@@ -38,6 +38,9 @@ describe('scene data', () => {
     expect(byId.get('door')?.after).toEqual(['chips', 'terminal']);
     expect(room?.seat?.standAfter).toBe('cigarette');
     expect(room?.dazeOnEnter?.until).toBe('jack');
+    expect(Object.keys(byId.get('door')?.hints ?? {})).toEqual(['chips', 'terminal']);
+    expect(byId.get('cigarette')?.lines).toEqual([]);
+    expect(room?.seat?.eyeHeight).toBe(1.1);
   });
 
   it('keeps hint keys inside after', () => {

@@ -19,6 +19,7 @@ export const ROOM_BOXES: BoxDef[] = [
 export const ROOM_SPAWN = { position: [1.5, 0, -1.2] as Vec3, yaw: 0 };
 export const SEAT_EYE_HEIGHT = 1.1;
 
+/** 座った目線（高さ 1.1）から水平に見ても視線の角度に入らず、下を向くと入る位置。y や SEAT_EYE_HEIGHT を動かすと崩れる */
 export const JACK_POS: Vec3 = [1.75, 0.75, -1.5];
 export const CIGARETTE_POS: Vec3 = [2.5, 0.85, -1.0];
 export const CIGARETTE_BOX_POS: Vec3 = [2.4, 0.85, -0.85];
