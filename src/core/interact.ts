@@ -28,7 +28,7 @@ export function selectInteractable(
   for (const it of items) {
     if ((it.once ?? true) && done.has(it.id)) continue;
     const unmet = unmetPrerequisite(it, done);
-    if (unmet !== null && !it.hints?.[unmet]) continue;
+    if (unmet !== null && !it.hints?.[unmet]?.length) continue;
     const dx = it.position[0] - camPos[0];
     const dy = it.position[1] - camPos[1];
     const dz = it.position[2] - camPos[2];

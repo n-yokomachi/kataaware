@@ -48,6 +48,7 @@ async function main(): Promise<void> {
     (window as unknown as { __step: (dt: number, n?: number) => void }).__step = (dt, n = 1) => {
       for (let i = 0; i < n; i++) app.step(dt);
     };
+    (window as unknown as { __camera: typeof app.camera }).__camera = app.camera;
   }
   await manager.start(FIRST_SCENE);
 }

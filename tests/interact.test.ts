@@ -62,6 +62,17 @@ describe('selectInteractable', () => {
     const partly: Interactable = { id: 'p', position: [0, 1.6, -1], after: ['x', 'y'], hints: { x: ['先に x'] }, lines: [] };
     expect(selectInteractable(cam, fwd, [partly], new Set(['x']))).toBeNull();
   });
+
+  it('uses the hint of the first unmet prerequisite only', () => {
+    const later: Interactable = { id: 'l', position: [0, 1.6, -1], after: ['x', 'y'], hints: { y: ['先に y'] }, lines: [] };
+    expect(selectInteractable(cam, fwd, [later], new Set())).toBeNull();
+    expect(selectInteractable(cam, fwd, [later], new Set(['x']))?.id).toBe('l');
+  });
+
+  it('treats an empty hint list as no hint', () => {
+    const empty: Interactable = { id: 'e', position: [0, 1.6, -1], after: ['x'], hints: { x: [] }, lines: [] };
+    expect(selectInteractable(cam, fwd, [empty], new Set())).toBeNull();
+  });
 });
 
 describe('unmetPrerequisite', () => {

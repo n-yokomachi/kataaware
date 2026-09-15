@@ -1,6 +1,6 @@
 const wait = (seconds: number): Promise<void> => new Promise((r) => setTimeout(r, seconds * 1000));
 
-/** 字幕、印、中央の文字、暗転、開始と再開の画面 */
+/** 字幕、印、中央の文字、暗転、煙、開始と再開の画面 */
 export class Overlay {
   private start: HTMLDivElement;
   private resume: HTMLDivElement;
@@ -97,7 +97,7 @@ export class Overlay {
     this.center.style.opacity = '0';
   }
 
-  /** 画面下から煙を立ち上らせ、seconds 秒で消す */
+  /** 画面下から煙を立ち上らせ、seconds 秒後に消え始める（消え終わるのはさらに 1 秒後） */
   async showSmoke(seconds: number): Promise<void> {
     this.smoke.classList.add('on');
     await wait(seconds);

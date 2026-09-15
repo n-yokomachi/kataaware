@@ -116,11 +116,14 @@ export class Runtime {
     }
     ctx.overlay.setPrompt(selected ? `E  ${selected.label ?? '調べる'}` : null);
     if (selected && interact) this.examine(selected);
+    // examine の中のフックが freeze を呼ぶことがあるので、止まっているかは調べた後に見直す
+    const frozenNow = this.time < this.frozenUntil;
     this.releaseDaze();
-    this.standUp(dt, frozen);
+    this.standUp(dt, frozenNow);
+    walker.applyTo(ctx.camera);
     ctx.overlay.setSubtitle(current(this.subs));
     this.hooks.onUpdate?.(ctx, this, dt);
-    return isComplete(this.required, this.done) && !this.talking && !frozen ? 'complete' : 'continue';
+    return isComplete(this.required, this.done) && !this.talking && !frozenNow ? 'complete' : 'continue';
   }
 
   /** 前提が未達なら、その id の文だけ出して済んだことにはしない */
