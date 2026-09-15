@@ -37,7 +37,9 @@ export class Input {
   }
 
   requestLock(): void {
-    if (this.requireLock && document.pointerLockElement !== this.target) this.target.requestPointerLock();
+    if (!this.requireLock || document.pointerLockElement === this.target) return;
+    const result = this.target.requestPointerLock() as unknown;
+    if (result instanceof Promise) result.catch(() => undefined);
   }
 
   down(code: string): boolean {
@@ -59,9 +61,10 @@ export class Input {
     return m;
   }
 
-  /** 毎フレームの最後に呼ぶ */
+  /** 毎フレームの最後に呼ぶ。消費されなかったマウス移動量も捨て、転換中の動きが次のフレームで一気に反映されないようにする */
   endFrame(): void {
     this.edges.clear();
     this.clickEdge = false;
+    this.mouse = { x: 0, y: 0 };
   }
 }

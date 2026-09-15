@@ -29,12 +29,29 @@ describe('walkDelta', () => {
   it('stays still without input', () => {
     expect(walkDelta(0, 0, 0, 1)).toEqual([0, 0, 0]);
   });
+
+  it('scales with dt and speed', () => {
+    const d = walkDelta(0, 1, 0, 0.5, 4);
+    expect(d[2]).toBeCloseTo(-2);
+  });
+
+  it('walks backward and strafes left', () => {
+    const back = walkDelta(0, -1, 0, 1);
+    expect(back[2]).toBeCloseTo(WALK_SPEED);
+    const left = walkDelta(0, 0, -1, 1);
+    expect(left[0]).toBeCloseTo(-WALK_SPEED);
+  });
 });
 
 describe('applyLook', () => {
   it('turns right when the mouse moves right', () => {
     const s = applyLook({ feet: [0, 0, 0], yaw: 0, pitch: 0 }, 100, 0);
     expect(s.yaw).toBeLessThan(0);
+  });
+
+  it('turns by the mouse delta times the sensitivity', () => {
+    const s = applyLook({ feet: [0, 0, 0], yaw: 0, pitch: 0 }, 100, 0, 0.01);
+    expect(s.yaw).toBeCloseTo(-1);
   });
 
   it('clamps pitch', () => {
