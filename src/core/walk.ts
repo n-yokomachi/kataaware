@@ -32,6 +32,10 @@ export function walkDelta(yaw: number, fwd: number, strafe: number, dt: number, 
 
 export class Walker {
   state: WalkState;
+  /** false の間は見回しだけできる（座っている、演出中など） */
+  canMove = true;
+  /** 足元からカメラまでの高さ。座位と立位で変える */
+  eyeHeight = EYE_HEIGHT;
 
   constructor(
     spawn: { position: Vec3; yaw: number },
@@ -43,6 +47,7 @@ export class Walker {
   update(input: Input, dt: number): void {
     const m = input.consumeMouse();
     this.state = applyLook(this.state, m.x, m.y);
+    if (!this.canMove) return;
     const fwd = (input.down('KeyW') ? 1 : 0) - (input.down('KeyS') ? 1 : 0);
     const strafe = (input.down('KeyD') ? 1 : 0) - (input.down('KeyA') ? 1 : 0);
     if (fwd === 0 && strafe === 0) return;
@@ -54,7 +59,7 @@ export class Walker {
 
   applyTo(camera: PerspectiveCamera): void {
     const [x, y, z] = this.state.feet;
-    camera.position.set(x, y + EYE_HEIGHT, z);
+    camera.position.set(x, y + this.eyeHeight, z);
     camera.rotation.order = 'YXZ';
     camera.rotation.set(this.state.pitch, this.state.yaw, 0);
   }

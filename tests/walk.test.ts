@@ -1,5 +1,7 @@
+import { PerspectiveCamera } from 'three';
 import { describe, expect, it } from 'vitest';
-import { PITCH_LIMIT, WALK_SPEED, applyLook, walkDelta } from '../src/core/walk';
+import type { Input } from '../src/core/input';
+import { EYE_HEIGHT, PITCH_LIMIT, WALK_SPEED, Walker, applyLook, walkDelta } from '../src/core/walk';
 
 describe('walkDelta', () => {
   it('walks toward -Z when yaw is 0', () => {
@@ -59,5 +61,37 @@ describe('applyLook', () => {
     expect(up.pitch).toBeCloseTo(PITCH_LIMIT);
     const down = applyLook({ feet: [0, 0, 0], yaw: 0, pitch: 0 }, 0, 100000);
     expect(down.pitch).toBeCloseTo(-PITCH_LIMIT);
+  });
+});
+
+/** W だけ押されている入力の代わり */
+const holdingW = { consumeMouse: () => ({ x: 0, y: 0 }), down: (code: string) => code === 'KeyW' } as unknown as Input;
+
+describe('Walker', () => {
+  it('walks when canMove is true', () => {
+    const w = new Walker({ position: [0, 0, 0], yaw: 0 }, []);
+    w.update(holdingW, 0.5);
+    expect(w.state.feet[2]).toBeCloseTo(-WALK_SPEED * 0.5);
+  });
+
+  it('stays put when canMove is false but still looks around', () => {
+    const w = new Walker({ position: [0, 0, 0], yaw: 0 }, []);
+    w.canMove = false;
+    const turning = { consumeMouse: () => ({ x: 100, y: 0 }), down: (code: string) => code === 'KeyW' } as unknown as Input;
+    w.update(turning, 0.5);
+    expect(w.state.feet).toEqual([0, 0, 0]);
+    expect(w.state.yaw).toBeLessThan(0);
+  });
+
+  it('places the camera at its own eye height', () => {
+    const w = new Walker({ position: [1, 0, 2], yaw: 0 }, []);
+    const camera = new PerspectiveCamera();
+    w.applyTo(camera);
+    expect(camera.position.y).toBeCloseTo(EYE_HEIGHT);
+    w.eyeHeight = 1.1;
+    w.applyTo(camera);
+    expect(camera.position.y).toBeCloseTo(1.1);
+    expect(camera.position.x).toBeCloseTo(1);
+    expect(camera.position.z).toBeCloseTo(2);
   });
 });
