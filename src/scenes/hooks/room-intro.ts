@@ -20,8 +20,9 @@ export function roomIntroHooks(): Hooks {
         rt.say(['（仮）他人の記憶を観た後は、いつもこうなる。']);
       })();
     },
-    onExit() {
+    onExit(ctx) {
       alive = false;
+      ctx.overlay.cancelCenter();
     },
   };
 }

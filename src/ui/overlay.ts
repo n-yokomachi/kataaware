@@ -8,6 +8,7 @@ export class Overlay {
   private subtitle: HTMLDivElement;
   private prompt: HTMLDivElement;
   private center: HTMLDivElement;
+  private centerGeneration = 0;
 
   constructor(root: HTMLElement) {
     const make = (id: string, text = ''): HTMLDivElement => {
@@ -62,25 +63,35 @@ export class Overlay {
     this.prompt.classList.toggle('hidden', text === null);
   }
 
-  /** 黒い層の不透明度を seconds 秒かけて変える。0 なら即時 */
+  /** 黒い層の不透明度を seconds 秒かけて変える。0 なら即時。すでにその値なら何もしない */
   fadeTo(opacity: number, seconds: number): Promise<void> {
+    if (this.fade.style.opacity === String(opacity)) return Promise.resolve();
     this.fade.style.transition = seconds > 0 ? `opacity ${seconds}s linear` : 'none';
     this.fade.style.opacity = String(opacity);
     return wait(seconds);
   }
 
-  /** 中央に文字を出し、seconds 秒見せてから消す */
+  /** 中央に文字を出し、seconds 秒見せてから消す。その間に holdCenter や cancelCenter が呼ばれたら消さない */
   async showCenter(text: string, seconds: number): Promise<void> {
+    const generation = ++this.centerGeneration;
     this.center.textContent = text;
     this.center.style.opacity = '1';
     await wait(seconds);
+    if (generation !== this.centerGeneration) return;
     this.center.style.opacity = '0';
     await wait(0.8);
   }
 
-  /** 中央に文字を出したままにする（結末用） */
+  /** 中央に文字を出したままにする（結末用）。進行中の showCenter は以後 DOM に触れない */
   holdCenter(text: string): void {
+    this.centerGeneration++;
     this.center.textContent = text;
     this.center.style.opacity = '1';
+  }
+
+  /** 進行中の showCenter を無効にして中央の文字を消す */
+  cancelCenter(): void {
+    this.centerGeneration++;
+    this.center.style.opacity = '0';
   }
 }

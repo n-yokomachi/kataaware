@@ -15,14 +15,16 @@ async function main(): Promise<void> {
   const app = new App(canvas);
   const input = new Input(canvas, !params.has('nolock'));
   const ctx: Ctx = { three: app.scene, camera: app.camera, input, overlay, fx: app.fx };
+  let ended = false;
   const manager = new SceneManager(ctx, sceneMap, hooks, async () => {
+    ended = true;
     await overlay.fadeTo(1, 1.5);
     overlay.holdCenter(TO_BE_CONTINUED);
   });
 
   // ポインタロックが外れている間は場面を止め、「クリックで再開」を出す
   const onLockLost = (): void => {
-    if (input.requireLock && document.pointerLockElement !== canvas) overlay.showResume(true);
+    if (!ended && input.requireLock && document.pointerLockElement !== canvas) overlay.showResume(true);
   };
   overlay.onResume(() => {
     overlay.showResume(false);
