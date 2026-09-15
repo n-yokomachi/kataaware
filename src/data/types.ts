@@ -8,7 +8,22 @@ export interface BoxDef {
   collider?: boolean; // 省略時 true
 }
 
-export type EnvironmentDef = { boxes: BoxDef[] } | { url: string };
+/** 舞台に置く glTF 1 つ分。asset は public/assets/ 以下の相対パス */
+export interface LayoutItem {
+  asset: string;
+  position: Vec3;
+  rotationY?: number; // ラジアン。省略時 0
+  scale?: number; // 省略時 1
+  collider?: boolean; // 省略時 true
+  tint?: number; // 材質の色を上書きする
+}
+
+/** 舞台の定義。仮の箱、配置データ、three.js editor の書き出しを混在できる */
+export interface EnvironmentDef {
+  boxes?: BoxDef[];
+  layout?: LayoutItem[];
+  url?: string;
+}
 
 export interface Interactable {
   id: string;

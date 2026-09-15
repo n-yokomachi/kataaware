@@ -82,14 +82,11 @@ export async function buildEnvironment(def: SceneDef): Promise<BuiltEnvironment>
   addFloor(group);
   addLights(group);
   const env = def.environment;
-  if ('boxes' in env) {
-    for (const b of env.boxes) {
-      group.add(boxMesh(b));
-      if (b.collider !== false) colliders.push(boxFromDef(b));
-    }
-  } else {
-    await loadFromUrl(env.url, group, colliders);
+  for (const b of env.boxes ?? []) {
+    group.add(boxMesh(b));
+    if (b.collider !== false) colliders.push(boxFromDef(b));
   }
+  if (env.url) await loadFromUrl(env.url, group, colliders);
   for (const c of def.colliders ?? []) colliders.push(boxFromDef(c));
   for (const it of def.interactables) group.add(markerMesh(it));
   return {
