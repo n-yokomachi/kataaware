@@ -2,6 +2,8 @@ import { App } from './core/app';
 import { Input } from './core/input';
 import { SceneManager } from './core/scene-manager';
 import { FIRST_SCENE, sceneMap } from './data/scenes';
+import { startLayoutMode } from './debug/layout-mode';
+import { PS1_DEFAULT } from './fx';
 import { hooks } from './scenes';
 import type { Ctx } from './scenes/runtime';
 import { Overlay } from './ui/overlay';
@@ -13,7 +15,8 @@ async function main(): Promise<void> {
   const canvas = document.getElementById('view') as HTMLCanvasElement;
   const overlay = new Overlay(document.getElementById('overlay') as HTMLElement);
   const app = new App(canvas);
-  const input = new Input(canvas, !params.has('nolock'));
+  const layoutMode = params.has('layout');
+  const input = new Input(canvas, !params.has('nolock') && !layoutMode);
   const ctx: Ctx = { three: app.scene, camera: app.camera, input, overlay, fx: app.fx };
   let ended = false;
   const manager = new SceneManager(ctx, sceneMap, hooks, async () => {
@@ -39,7 +42,7 @@ async function main(): Promise<void> {
   input.endFrame();
   // 場面の暗転明けを描画するため、最初の場面を開始する前にループを回し始める
   app.run((dt) => {
-    if (!input.requireLock || input.locked) manager.update(dt);
+    if (!layoutMode && (!input.requireLock || input.locked)) manager.update(dt);
     input.endFrame();
   });
   if (params.has('debug')) {
@@ -51,6 +54,13 @@ async function main(): Promise<void> {
     (window as unknown as { __camera: typeof app.camera }).__camera = app.camera;
   }
   await manager.start(FIRST_SCENE);
+  if (layoutMode) {
+    // 配置の確認用。眩暈と減色を切り、ゲームの進行を止めてカメラを自由にする
+    app.fx.setDaze(0, 0);
+    app.fx.setPs1(PS1_DEFAULT.levels, PS1_DEFAULT.dither, 0);
+    overlay.cancelCenter();
+    startLayoutMode(app.renderer, app.scene, app.camera);
+  }
 }
 
 void main();
