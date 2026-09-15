@@ -3,7 +3,7 @@ export interface SubtitleState {
   index: number;
 }
 
-export const emptySubtitles: SubtitleState = { lines: [], index: 0 };
+export const emptySubtitles: Readonly<SubtitleState> = { lines: [], index: 0 };
 
 export function enqueue(s: SubtitleState, lines: readonly string[]): SubtitleState {
   if (lines.length === 0) return s;

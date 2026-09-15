@@ -16,8 +16,26 @@ describe('selectInteractable', () => {
     expect(selectInteractable(cam, fwd, items, new Set())?.id).toBe('near');
   });
 
-  it('ignores items behind the camera and outside the radius', () => {
-    expect(selectInteractable(cam, fwd, [items[2], items[3]], new Set())).toBeNull();
+  it('ignores items behind the camera', () => {
+    expect(selectInteractable(cam, fwd, [items[2]], new Set())).toBeNull();
+  });
+
+  it('ignores items outside the radius', () => {
+    expect(selectInteractable(cam, fwd, [items[3]], new Set())).toBeNull();
+  });
+
+  it('accepts items inside the view cone and rejects items just outside it', () => {
+    // MAX_ANGLE は 0.7 rad（約 40°）。x=0.6, z=-1 は約 31°、x=0.9, z=-1 は約 42°
+    const inside: Interactable = { id: 'in', position: [0.6, 1.6, -1], lines: [] };
+    const outside: Interactable = { id: 'out', position: [0.9, 1.6, -1], lines: [] };
+    expect(selectInteractable(cam, fwd, [inside], new Set())?.id).toBe('in');
+    expect(selectInteractable(cam, fwd, [outside], new Set())).toBeNull();
+    expect(selectInteractable(cam, fwd, [outside], new Set(), 0.8)?.id).toBe('out');
+  });
+
+  it('honours a per-item radius', () => {
+    const wide: Interactable = { id: 'w', position: [0, 1.6, -5], radius: 6, lines: [] };
+    expect(selectInteractable(cam, fwd, [wide], new Set())?.id).toBe('w');
   });
 
   it('skips items already examined when once is set', () => {
