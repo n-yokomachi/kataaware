@@ -1,35 +1,51 @@
 import { App } from './core/app';
-import { applyAtmosphere, buildEnvironment } from './scenes/environment';
-import type { WalkScene } from './data/types';
+import { Input } from './core/input';
+import { SceneManager } from './core/scene-manager';
+import { FIRST_SCENE, sceneMap } from './data/scenes';
+import { hooks } from './scenes';
+import type { Ctx } from './scenes/runtime';
+import { Overlay } from './ui/overlay';
 
-const canvas = document.getElementById('view') as HTMLCanvasElement;
-const app = new App(canvas);
-const def: WalkScene = {
-  id: 'smoke',
-  kind: 'walk',
-  next: null,
-  transition: 'cut',
-  tone: { color: 0xc8d0ff, amount: 0.3 },
-  sky: 0x0b0b12,
-  environment: {
-    boxes: [
-      { position: [0, 1.5, -3], size: [6, 3, 0.2], color: 0x4a4a55 },
-      { position: [1.5, 0.4, -2.2], size: [1.6, 0.8, 0.8], color: 0x7a5a40 },
-    ],
-  },
-  spawn: { position: [0, 0, 0.5], yaw: 0 },
-  interactables: [{ id: 'x', position: [1.5, 1, -2.4], lines: [] }],
-};
-const env = await buildEnvironment(def);
-app.scene.add(env.group);
-applyAtmosphere(app.scene, def);
-app.camera.position.set(0, 1.6, 0.5);
-app.fx.setTone(def.tone.color, def.tone.amount);
-app.fx.dazeDecay(1, 1, 6);
-app.run(() => {});
-if (new URLSearchParams(location.search).has('debug')) {
-  // 非表示のタブでは requestAnimationFrame が止まるため、確認用に手動で進められるようにする
-  (window as unknown as { __step: (dt: number, n?: number) => void }).__step = (dt, n = 1) => {
-    for (let i = 0; i < n; i++) app.step(dt);
+const TO_BE_CONTINUED = '（仮）続く';
+
+async function main(): Promise<void> {
+  const params = new URLSearchParams(location.search);
+  const canvas = document.getElementById('view') as HTMLCanvasElement;
+  const overlay = new Overlay(document.getElementById('overlay') as HTMLElement);
+  const app = new App(canvas);
+  const input = new Input(canvas, !params.has('nolock'));
+  const ctx: Ctx = { three: app.scene, camera: app.camera, input, overlay, fx: app.fx };
+  const manager = new SceneManager(ctx, sceneMap, hooks, async () => {
+    await overlay.fadeTo(1, 1.5);
+    overlay.holdCenter(TO_BE_CONTINUED);
+  });
+
+  // ポインタロックが外れている間は場面を止め、「クリックで再開」を出す
+  const onLockLost = (): void => {
+    if (input.requireLock && document.pointerLockElement !== canvas) overlay.showResume(true);
   };
+  overlay.onResume(() => {
+    overlay.showResume(false);
+    input.requestLock();
+  });
+  document.addEventListener('pointerlockchange', onLockLost);
+  document.addEventListener('pointerlockerror', onLockLost);
+
+  await overlay.fadeTo(1, 0);
+  await overlay.waitForStart();
+  input.requestLock();
+  input.endFrame();
+  await manager.start(FIRST_SCENE);
+  app.run((dt) => {
+    if (!input.requireLock || input.locked) manager.update(dt);
+    input.endFrame();
+  });
+  if (params.has('debug')) {
+    // 非表示のタブでは requestAnimationFrame が止まるため、確認用に手動で進められるようにする
+    (window as unknown as { __step: (dt: number, n?: number) => void }).__step = (dt, n = 1) => {
+      for (let i = 0; i < n; i++) app.step(dt);
+    };
+  }
 }
+
+void main();
