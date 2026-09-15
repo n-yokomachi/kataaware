@@ -32,9 +32,12 @@ const Ps1Shader = {
     }
     void main() {
       vec4 c = texture2D(tDiffuse, vUv);
+      // 表示色に近い明るさで減色する。線形のまま量子化すると暗部だけ段差が粗くなる
+      vec3 g = pow(max(c.rgb, 0.0), vec3(1.0 / 2.2));
       float t = bayer4(gl_FragCoord.xy) - 0.5;
-      vec3 q = floor(c.rgb * levels + dither * t + 0.5) / levels;
-      gl_FragColor = vec4(mix(c.rgb, q, amount), c.a);
+      vec3 q = floor(g * levels + dither * t + 0.5) / levels;
+      vec3 back = pow(max(q, 0.0), vec3(2.2));
+      gl_FragColor = vec4(mix(c.rgb, back, amount), c.a);
     }`,
 };
 

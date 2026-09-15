@@ -48,7 +48,12 @@ export const ROOM_OPTIONAL: Interactable[] = [
   },
 ];
 
-/** 配置データ。段階 1 は椅子だけ。座る位置なので当たり判定は付けない */
+/**
+ * 配置データ。段階 1 は椅子だけ（段階 3 で生成した椅子に置き換える）。
+ * Kenney の椅子は原点が座面の角にあり、背もたれが -Z 側なので、
+ * 1.7 倍にして半回転させ、中心が座る位置（1.5, -1.2）に来るよう原点のずれ分を足している。
+ * 座る位置なので当たり判定は付けない
+ */
 export const ROOM_LAYOUT: LayoutItem[] = [
-  { asset: 'kenney/chairDesk.glb', position: [1.5, 0, -1.2], rotationY: 0, collider: false },
+  { asset: 'kenney/chairDesk.glb', position: [1.785, 0, -1.467], rotationY: Math.PI, scale: 1.7, collider: false },
 ];

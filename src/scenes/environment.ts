@@ -76,6 +76,7 @@ async function loadFromUrl(url: string, group: Group, colliders: AABB[]): Promis
   root.updateMatrixWorld(true);
   root.traverse((o) => {
     if (!(o instanceof Mesh) || o.name.startsWith(NO_COLLIDE_PREFIX)) return;
+    o.userData.owned = true;
     const b = new Box3().setFromObject(o);
     colliders.push({ min: [b.min.x, b.min.y, b.min.z], max: [b.max.x, b.max.y, b.max.z] });
   });

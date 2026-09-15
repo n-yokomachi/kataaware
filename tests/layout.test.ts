@@ -12,20 +12,36 @@ function cube(): Group {
 
 describe('layout', () => {
   it('places an item and derives its world-space collider', () => {
-    const root = cube();
+    // 長さ 3 の直方体を Y で 90° 回すと、外接箱の x と z の幅が入れ替わる
+    const root = new Group();
+    root.add(new Mesh(new BoxGeometry(1, 1, 3), new MeshStandardMaterial()));
     const item: LayoutItem = { asset: 'x.glb', position: [2, 0, -3], rotationY: Math.PI / 2, scale: 2 };
     placeItem(root, item);
     const box = colliderOf(root);
-    expect(box.min.map((v) => +v.toFixed(3))).toEqual([1, -1, -4]);
-    expect(box.max.map((v) => +v.toFixed(3))).toEqual([3, 1, -2]);
+    expect(box.min.map((v) => +v.toFixed(3))).toEqual([-1, -1, -4]);
+    expect(box.max.map((v) => +v.toFixed(3))).toEqual([5, 1, -2]);
   });
 
-  it('defaults rotation to 0 and scale to 1', () => {
+  it('resets rotation to 0 and scale to 1 when the item omits them', () => {
     const root = cube();
+    root.rotation.set(1, 1, 1);
+    root.scale.set(3, 3, 3);
     placeItem(root, { asset: 'x.glb', position: [0, 0, 0] });
+    expect(root.rotation.x).toBe(0);
     expect(root.rotation.y).toBe(0);
+    expect(root.rotation.z).toBe(0);
     expect(root.scale.x).toBe(1);
     expect(colliderOf(root).max).toEqual([0.5, 0.5, 0.5]);
+  });
+
+  it('measures the collider in world space even under a moved parent', () => {
+    const parent = new Group();
+    parent.position.set(10, 0, 0);
+    const root = cube();
+    parent.add(root);
+    placeItem(root, { asset: 'x.glb', position: [0, 0, 0] });
+    expect(colliderOf(root).min[0]).toBeCloseTo(9.5);
+    expect(colliderOf(root).max[0]).toBeCloseTo(10.5);
   });
 
   it('writes the transform back into an item, rounded to millimetres', () => {

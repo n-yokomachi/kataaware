@@ -15,6 +15,7 @@ export function placeItem(root: Object3D, item: LayoutItem): void {
 
 /** 置いた物の world 座標での外接箱 */
 export function colliderOf(root: Object3D): AABB {
+  root.updateWorldMatrix(true, false);
   const b = new Box3().setFromObject(root);
   return { min: [b.min.x, b.min.y, b.min.z], max: [b.max.x, b.max.y, b.max.z] };
 }

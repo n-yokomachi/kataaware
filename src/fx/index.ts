@@ -9,7 +9,7 @@ import { TonePass } from './tone-pass';
 /** 3D の描画解像度。画面に対する比。字幕などの HTML には影響しない */
 export const RENDER_SCALE = 1 / 3;
 /** 減色の段階数、ディザの強さ、効き具合の既定値 */
-export const PS1_DEFAULT = { levels: 32, dither: 1, amount: 1 };
+export const PS1_DEFAULT = { levels: 32, dither: 1, amount: 1 } as const;
 
 interface Decay {
   blur: number;

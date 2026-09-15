@@ -63,4 +63,4 @@ async function main(): Promise<void> {
   }
 }
 
-void main();
+main().catch((err: unknown) => console.error('boot failed', err));

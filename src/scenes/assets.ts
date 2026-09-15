@@ -10,6 +10,7 @@ export function loadAsset(path: string): Promise<Group> {
   let pending = cache.get(path);
   if (!pending) {
     pending = loader.loadAsync(ASSET_ROOT + path).then((gltf) => gltf.scene);
+    pending.catch(() => cache.delete(path));
     cache.set(path, pending);
   }
   return pending;
