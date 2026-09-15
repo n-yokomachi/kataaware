@@ -31,8 +31,12 @@ export class Fx {
     this.daze.set(blur, wobble);
   }
 
-  /** 指定の強さから seconds 秒かけて 0 まで減らす */
+  /** 指定の強さから seconds 秒かけて 0 まで減らす。seconds が 0 以下なら眩暈を出さない */
   dazeDecay(blur: number, wobble: number, seconds: number): void {
+    if (seconds <= 0) {
+      this.setDaze(0, 0);
+      return;
+    }
     this.daze.set(blur, wobble);
     this.decay = { blur, wobble, total: seconds, left: seconds };
   }

@@ -27,3 +27,9 @@ app.camera.position.set(0, 1.6, 0.5);
 app.fx.setTone(def.tone.color, def.tone.amount);
 app.fx.dazeDecay(1, 1, 6);
 app.run(() => {});
+if (new URLSearchParams(location.search).has('debug')) {
+  // 非表示のタブでは requestAnimationFrame が止まるため、確認用に手動で進められるようにする
+  (window as unknown as { __step: (dt: number, n?: number) => void }).__step = (dt, n = 1) => {
+    for (let i = 0; i < n; i++) app.step(dt);
+  };
+}

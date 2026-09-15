@@ -41,11 +41,13 @@ const DazeShader = {
 export class DazePass extends ShaderPass {
   constructor() {
     super(DazeShader);
+    this.enabled = false;
   }
 
   set(blur: number, wobble: number): void {
     this.uniforms.blur.value = blur;
     this.uniforms.wobble.value = wobble;
+    this.enabled = blur > 0 || wobble > 0;
   }
 
   tick(dt: number): void {
