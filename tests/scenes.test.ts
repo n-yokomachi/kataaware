@@ -35,4 +35,26 @@ describe('scene data', () => {
     expect(byId.get('terminal')?.after).toEqual(['chips']);
     expect(byId.get('door')?.after).toEqual(['terminal']);
   });
+
+  it('keeps every required interactable reachable through its prerequisites', () => {
+    for (const s of SCENES) {
+      const byId = new Map(s.interactables.map((i) => [i.id, i]));
+      const done = new Set<string>();
+      let progressed = true;
+      while (progressed) {
+        progressed = false;
+        for (const i of s.interactables) {
+          if (done.has(i.id)) continue;
+          if ((i.after ?? []).every((a) => done.has(a))) {
+            done.add(i.id);
+            progressed = true;
+          }
+        }
+      }
+      for (const i of s.interactables) {
+        if (i.required) expect(done.has(i.id), `${s.id}: ${i.id} is unreachable`).toBe(true);
+      }
+      expect(byId.size).toBe(s.interactables.length);
+    }
+  });
 });

@@ -23,7 +23,9 @@ export class SceneManager {
     if (!this.current || this.busy) return;
     if (this.current.update(dt) === 'complete') {
       this.busy = true;
-      void this.advance();
+      this.advance().catch((err: unknown) => {
+        console.error(`scene transition failed after ${this.current?.def.id ?? 'end'}`, err);
+      });
     }
   }
 
