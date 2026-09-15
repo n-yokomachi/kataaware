@@ -8,6 +8,7 @@ export class Overlay {
   private subtitle: HTMLDivElement;
   private prompt: HTMLDivElement;
   private center: HTMLDivElement;
+  private smoke: HTMLDivElement;
   private centerGeneration = 0;
 
   constructor(root: HTMLElement) {
@@ -19,6 +20,7 @@ export class Overlay {
       return el;
     };
     // 後に追加したものほど手前に重なる。暗転は字幕と印を隠し、中央の文字は暗転の上に出す
+    this.smoke = make('smoke');
     this.subtitle = make('subtitle');
     this.prompt = make('prompt');
     this.fade = make('fade');
@@ -93,5 +95,12 @@ export class Overlay {
   cancelCenter(): void {
     this.centerGeneration++;
     this.center.style.opacity = '0';
+  }
+
+  /** 画面下から煙を立ち上らせ、seconds 秒で消す */
+  async showSmoke(seconds: number): Promise<void> {
+    this.smoke.classList.add('on');
+    await wait(seconds);
+    this.smoke.classList.remove('on');
   }
 }

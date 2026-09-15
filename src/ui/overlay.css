@@ -77,6 +77,30 @@ body {
   opacity: 0;
   transition: opacity 0.8s linear;
 }
+#smoke {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 60vh;
+  opacity: 0;
+  background: linear-gradient(to top, rgba(200, 200, 210, 0.35), rgba(200, 200, 210, 0));
+  transition: opacity 1s linear;
+}
+#smoke.on {
+  opacity: 1;
+  animation: smoke-drift 4s ease-in-out infinite;
+}
+@keyframes smoke-drift {
+  0% {
+    transform: translateY(6vh);
+  }
+  50% {
+    transform: translateY(-4vh);
+  }
+  100% {
+    transform: translateY(6vh);
+  }
+}
 .hidden {
   display: none !important;
 }
