@@ -22,9 +22,10 @@ export class SceneManager {
   update(dt: number): void {
     if (!this.current || this.busy) return;
     if (this.current.update(dt) === 'complete') {
+      const from = this.current.def.id;
       this.busy = true;
       this.advance().catch((err: unknown) => {
-        console.error(`scene transition failed after ${this.current?.def.id ?? 'end'}`, err);
+        console.error(`scene transition failed after ${from}`, err);
       });
     }
   }

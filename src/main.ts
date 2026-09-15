@@ -35,17 +35,19 @@ async function main(): Promise<void> {
   await overlay.waitForStart();
   input.requestLock();
   input.endFrame();
-  await manager.start(FIRST_SCENE);
+  // 場面の暗転明けを描画するため、最初の場面を開始する前にループを回し始める
   app.run((dt) => {
     if (!input.requireLock || input.locked) manager.update(dt);
     input.endFrame();
   });
   if (params.has('debug')) {
-    // 非表示のタブでは requestAnimationFrame が止まるため、確認用に手動で進められるようにする
+    // 非表示のタブでは requestAnimationFrame が止まるため、確認用に手動で進められるようにする。
+    // ポインタロックが要る設定では場面が止まるので、?nolock と併用する
     (window as unknown as { __step: (dt: number, n?: number) => void }).__step = (dt, n = 1) => {
       for (let i = 0; i < n; i++) app.step(dt);
     };
   }
+  await manager.start(FIRST_SCENE);
 }
 
 void main();
