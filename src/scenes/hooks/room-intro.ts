@@ -1,9 +1,17 @@
 import type { Hooks } from '../runtime';
 
-export const CREDITS = ['（仮）クレジット 1', '（仮）クレジット 2'];
-export const TITLE_CARD = '（仮）タイトル';
+export const CREDITS = ['制作 〔名義〕'];
+export const TITLE_CARD = 'HALF AWARE';
+export const FIRST_LINE = 'うぅ…今回は酔いが酷い…';
+export const AFTER_SMOKE_LINE = '煙草が切れた…買いに行くついでに今日のメモリも売っちゃおう';
+/** 煙草を取ってから吸い終わるまでの秒数 */
+export const SMOKE_SECONDS = 4;
 
-/** 眩暈が消えるまでの間にクレジットとタイトルを順に出し、消えたら最初の独白を流す。場面が終わっていたら途中でやめる */
+/**
+ * 眩暈の中でクレジットとタイトルを順に出し、消えたら最初の独白を流す。
+ * 煙草を取ったら、煙を立てて数秒止め、吸い終わりの独白を流す。
+ * 場面が終わっていたら途中でやめる。
+ */
 export function roomIntroHooks(): Hooks {
   let alive = false;
   return {
@@ -17,7 +25,15 @@ export function roomIntroHooks(): Hooks {
         if (!alive) return;
         await ctx.overlay.showCenter(TITLE_CARD, 2.5);
         if (!alive) return;
-        rt.say(['（仮）他人の記憶を観た後は、いつもこうなる。']);
+        rt.say([FIRST_LINE]);
+      })();
+    },
+    onExamine(ctx, rt, item) {
+      if (item.id !== 'cigarette') return;
+      rt.freeze(SMOKE_SECONDS);
+      void (async () => {
+        await ctx.overlay.showSmoke(SMOKE_SECONDS);
+        if (alive) rt.say([AFTER_SMOKE_LINE]);
       })();
     },
     onExit(ctx) {

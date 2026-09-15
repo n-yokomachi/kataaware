@@ -54,7 +54,7 @@ src/
 場面の中身は TypeScript のデータとして定義し、シナリオの段で文章だけ差し替えられるようにする。
 
 - 共通: `id`、`kind`、`next`、`transition`（`cut` | `fade`）、`tone`（色味）、`environment`（仮の箱の一覧。後の段で glTF や書き出した場面ファイルに置き換える）
-- `walk`: `spawn`（位置と向き）、`colliders`（見えない壁。省略時は舞台の物から自動生成）、`interactables`（`id`、位置、半径、`required`、`after`（先に済ませる対象）、字幕の行、`once`）、`onEnter` の字幕、`dazeOnEnter`（入ったときの眩暈）
+- `walk`: `spawn`（位置と向き）、`colliders`（見えない壁。省略時は舞台の物から自動生成）、`interactables`（`id`、位置、半径、`required`、`after`（先に済ませる対象）、字幕の行、`once`）、`onEnter` の字幕、`dazeOnEnter`（入ったときの眩暈）、`seat`（座った状態で始め、`standAfter` の対象を調べると立ち上がる）。`interactables` の `hints` は `after` の id ごとの未達時の文で、文がある id は未達でも選べて文だけ出る。`dazeOnEnter.until` はその対象を調べるまで眩暈を保つ
 - `rail` のデータ（経路、体の数値、見回しの範囲、時刻つきの演出）は記憶シーンを追加する段で定義する
 
 ## 5. 歩行と当たり判定

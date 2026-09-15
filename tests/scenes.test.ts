@@ -28,12 +28,26 @@ describe('scene data', () => {
     }
   });
 
-  it('orders the room as chips, terminal, door', () => {
+  it('orders the room as jack, cigarette, chips, terminal, door', () => {
     const room = sceneMap.get('room-intro');
     const byId = new Map(room?.interactables.map((i) => [i.id, i]));
-    expect(byId.get('chips')?.required).toBe(true);
+    expect(byId.get('jack')?.required).toBe(true);
+    expect(byId.get('cigarette')?.after).toEqual(['jack']);
+    expect(byId.get('chips')?.after).toEqual(['cigarette']);
     expect(byId.get('terminal')?.after).toEqual(['chips']);
-    expect(byId.get('door')?.after).toEqual(['terminal']);
+    expect(byId.get('door')?.after).toEqual(['chips', 'terminal']);
+    expect(room?.seat?.standAfter).toBe('cigarette');
+    expect(room?.dazeOnEnter?.until).toBe('jack');
+  });
+
+  it('keeps hint keys inside after', () => {
+    for (const s of SCENES) {
+      for (const i of s.interactables) {
+        for (const key of Object.keys(i.hints ?? {})) {
+          expect(i.after ?? [], `${s.id}: ${i.id} hint ${key}`).toContain(key);
+        }
+      }
+    }
   });
 
   it('keeps every required interactable reachable through its prerequisites', () => {
