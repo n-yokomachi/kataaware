@@ -53,7 +53,7 @@
 **Files:**
 - Create: `package.json`, `tsconfig.json`, `vite.config.ts`, `index.html`, `src/main.ts`, `src/ui/overlay.css`, `.claude/launch.json`
 
-- [ ] **Step 1: 依存を入れる**
+- [x] **Step 1: 依存を入れる**
 
 Run:
 ```bash
@@ -61,7 +61,7 @@ npm init -y >/dev/null && npm install three && npm install -D vite typescript vi
 ```
 Expected: `package.json` に `three` と devDependencies が記録される。
 
-- [ ] **Step 2: `package.json` を整える**
+- [x] **Step 2: `package.json` を整える**
 
 `npm init` が作った内容を次に置き換える。`dependencies` と `devDependencies` は Step 1 で入った値を残す。
 
@@ -81,7 +81,7 @@ Expected: `package.json` に `three` と devDependencies が記録される。
 }
 ```
 
-- [ ] **Step 3: `tsconfig.json`**
+- [x] **Step 3: `tsconfig.json`**
 
 ```json
 {
@@ -100,7 +100,7 @@ Expected: `package.json` に `three` と devDependencies が記録される。
 }
 ```
 
-- [ ] **Step 4: `vite.config.ts`**
+- [x] **Step 4: `vite.config.ts`**
 
 ```ts
 /// <reference types="vitest/config" />
@@ -113,7 +113,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 5: `index.html`**
+- [x] **Step 5: `index.html`**
 
 ```html
 <!doctype html>
@@ -132,7 +132,7 @@ export default defineConfig({
 </html>
 ```
 
-- [ ] **Step 6: `src/ui/overlay.css`**
+- [x] **Step 6: `src/ui/overlay.css`**
 
 ```css
 html,
@@ -219,7 +219,7 @@ body {
 }
 ```
 
-- [ ] **Step 7: 仮の `src/main.ts`**
+- [x] **Step 7: 仮の `src/main.ts`**
 
 Task 11 で置き換える。ここでは黒い画面が出て、コンソールにエラーが無いことだけ確認する。
 
@@ -229,7 +229,7 @@ canvas.getContext('webgl2');
 console.log('kataaware: boot');
 ```
 
-- [ ] **Step 8: `.claude/launch.json`**
+- [x] **Step 8: `.claude/launch.json`**
 
 ```json
 {
@@ -245,7 +245,7 @@ console.log('kataaware: boot');
 }
 ```
 
-- [ ] **Step 9: 起動とテスト実行を確認**
+- [x] **Step 9: 起動とテスト実行を確認**
 
 Run: `npm test`
 Expected: テストファイル無しの表示で終了コード 0。
@@ -256,7 +256,7 @@ Expected: エラーなし。
 Run: `npx vite build`
 Expected: `dist/index.html` が生成される。
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add package.json package-lock.json tsconfig.json vite.config.ts index.html src/main.ts src/ui/overlay.css .claude/launch.json
@@ -271,7 +271,7 @@ git commit -m "chore: scaffold vite + three + vitest project"
 - Create: `src/data/types.ts`, `src/core/progress.ts`
 - Test: `tests/progress.test.ts`
 
-- [ ] **Step 1: 型を書く**
+- [x] **Step 1: 型を書く**
 
 `src/data/types.ts`:
 
@@ -327,7 +327,7 @@ export interface WalkScene {
 export type SceneDef = WalkScene;
 ```
 
-- [ ] **Step 2: 失敗するテストを書く**
+- [x] **Step 2: 失敗するテストを書く**
 
 `tests/progress.test.ts`:
 
@@ -348,12 +348,12 @@ describe('progress', () => {
 });
 ```
 
-- [ ] **Step 3: 失敗を確認**
+- [x] **Step 3: 失敗を確認**
 
 Run: `npx vitest run tests/progress.test.ts`
 Expected: FAIL。`Failed to resolve import "../src/core/progress"`。
 
-- [ ] **Step 4: 実装**
+- [x] **Step 4: 実装**
 
 `src/core/progress.ts`:
 
@@ -367,12 +367,12 @@ export function isComplete(required: readonly string[], done: ReadonlySet<string
 }
 ```
 
-- [ ] **Step 5: 成功を確認**
+- [x] **Step 5: 成功を確認**
 
 Run: `npx vitest run tests/progress.test.ts`
 Expected: PASS（2 tests）。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/data/types.ts src/core/progress.ts tests/progress.test.ts
@@ -387,7 +387,7 @@ git commit -m "feat: scene data types and progress check"
 - Create: `src/core/collide.ts`
 - Test: `tests/collide.test.ts`
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 `tests/collide.test.ts`:
 
@@ -420,12 +420,12 @@ describe('collide', () => {
 });
 ```
 
-- [ ] **Step 2: 失敗を確認**
+- [x] **Step 2: 失敗を確認**
 
 Run: `npx vitest run tests/collide.test.ts`
 Expected: FAIL。モジュール未解決。
 
-- [ ] **Step 3: 実装**
+- [x] **Step 3: 実装**
 
 `src/core/collide.ts`:
 
@@ -479,12 +479,12 @@ export function moveWithSlide(feet: Vec3, delta: Vec3, boxes: readonly AABB[]): 
 }
 ```
 
-- [ ] **Step 4: 成功を確認**
+- [x] **Step 4: 成功を確認**
 
 Run: `npx vitest run tests/collide.test.ts`
 Expected: PASS（4 tests）。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/core/collide.ts tests/collide.test.ts
@@ -499,7 +499,7 @@ git commit -m "feat: AABB collision with axis sliding"
 - Create: `src/ui/subtitles.ts`
 - Test: `tests/subtitles.test.ts`
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 `tests/subtitles.test.ts`:
 
@@ -535,12 +535,12 @@ describe('subtitles', () => {
 });
 ```
 
-- [ ] **Step 2: 失敗を確認**
+- [x] **Step 2: 失敗を確認**
 
 Run: `npx vitest run tests/subtitles.test.ts`
 Expected: FAIL。モジュール未解決。
 
-- [ ] **Step 3: 実装**
+- [x] **Step 3: 実装**
 
 `src/ui/subtitles.ts`:
 
@@ -567,12 +567,12 @@ export function current(s: SubtitleState): string | null {
 }
 ```
 
-- [ ] **Step 4: 成功を確認**
+- [x] **Step 4: 成功を確認**
 
 Run: `npx vitest run tests/subtitles.test.ts`
 Expected: PASS（4 tests）。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/ui/subtitles.ts tests/subtitles.test.ts
@@ -587,7 +587,7 @@ git commit -m "feat: subtitle queue"
 - Create: `src/core/interact.ts`
 - Test: `tests/interact.test.ts`
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 `tests/interact.test.ts`:
 
@@ -631,12 +631,12 @@ describe('selectInteractable', () => {
 });
 ```
 
-- [ ] **Step 2: 失敗を確認**
+- [x] **Step 2: 失敗を確認**
 
 Run: `npx vitest run tests/interact.test.ts`
 Expected: FAIL。モジュール未解決。
 
-- [ ] **Step 3: 実装**
+- [x] **Step 3: 実装**
 
 `src/core/interact.ts`:
 
@@ -680,12 +680,12 @@ export function selectInteractable(
 }
 ```
 
-- [ ] **Step 4: 成功を確認**
+- [x] **Step 4: 成功を確認**
 
 Run: `npx vitest run tests/interact.test.ts`
 Expected: PASS（5 tests）。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/core/interact.ts tests/interact.test.ts
@@ -699,7 +699,7 @@ git commit -m "feat: interactable selection by distance and view cone"
 - Create: `src/core/input.ts`, `src/core/walk.ts`
 - Test: `tests/walk.test.ts`
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 `tests/walk.test.ts`:
 
@@ -752,12 +752,12 @@ describe('applyLook', () => {
 });
 ```
 
-- [ ] **Step 2: 失敗を確認**
+- [x] **Step 2: 失敗を確認**
 
 Run: `npx vitest run tests/walk.test.ts`
 Expected: FAIL。モジュール未解決。
 
-- [ ] **Step 3: `src/core/input.ts`**
+- [x] **Step 3: `src/core/input.ts`**
 
 ```ts
 export interface MouseDelta {
@@ -829,7 +829,7 @@ export class Input {
 }
 ```
 
-- [ ] **Step 4: `src/core/walk.ts`**
+- [x] **Step 4: `src/core/walk.ts`**
 
 ```ts
 import type { PerspectiveCamera } from 'three';
@@ -895,7 +895,7 @@ export class Walker {
 }
 ```
 
-- [ ] **Step 5: 成功を確認**
+- [x] **Step 5: 成功を確認**
 
 Run: `npx vitest run tests/walk.test.ts`
 Expected: PASS（7 tests）。
@@ -903,7 +903,7 @@ Expected: PASS（7 tests）。
 Run: `npx tsc --noEmit`
 Expected: エラーなし。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/core/input.ts src/core/walk.ts tests/walk.test.ts
@@ -917,7 +917,7 @@ git commit -m "feat: input handling and first-person walker"
 **Files:**
 - Create: `src/scenes/environment.ts`
 
-- [ ] **Step 1: 実装**
+- [x] **Step 1: 実装**
 
 `src/scenes/environment.ts`:
 
@@ -1037,12 +1037,12 @@ export function applyAtmosphere(scene: Scene, def: SceneDef): void {
 }
 ```
 
-- [ ] **Step 2: 型を確認**
+- [x] **Step 2: 型を確認**
 
 Run: `npx tsc --noEmit`
 Expected: エラーなし。
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/scenes/environment.ts
@@ -1057,7 +1057,7 @@ git commit -m "feat: build gray-box environments with colliders"
 - Create: `src/fx/daze-pass.ts`, `src/fx/tone-pass.ts`, `src/fx/index.ts`, `src/core/app.ts`
 - Modify: `src/main.ts`（動作確認用に一時的に書き換える）
 
-- [ ] **Step 1: `src/fx/daze-pass.ts`**
+- [x] **Step 1: `src/fx/daze-pass.ts`**
 
 ```ts
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
@@ -1116,7 +1116,7 @@ export class DazePass extends ShaderPass {
 }
 ```
 
-- [ ] **Step 2: `src/fx/tone-pass.ts`**
+- [x] **Step 2: `src/fx/tone-pass.ts`**
 
 ```ts
 import { Color } from 'three';
@@ -1162,7 +1162,7 @@ export class TonePass extends ShaderPass {
 }
 ```
 
-- [ ] **Step 3: `src/fx/index.ts`**
+- [x] **Step 3: `src/fx/index.ts`**
 
 ```ts
 import type { PerspectiveCamera, Scene, WebGLRenderer } from 'three';
@@ -1227,7 +1227,7 @@ export class Fx {
 }
 ```
 
-- [ ] **Step 4: `src/core/app.ts`**
+- [x] **Step 4: `src/core/app.ts`**
 
 ```ts
 import { Clock, PerspectiveCamera, Scene, WebGLRenderer } from 'three';
@@ -1271,7 +1271,7 @@ export class App {
 }
 ```
 
-- [ ] **Step 5: 動作確認用の `src/main.ts`（一時）**
+- [x] **Step 5: 動作確認用の `src/main.ts`（一時）**
 
 仮の箱の自室を出し、眩暈が 6 秒で消えることと色味が付くことを目で確認する。Task 11 で置き換える。
 
@@ -1307,7 +1307,7 @@ app.fx.dazeDecay(1, 1, 6);
 app.run(() => {});
 ```
 
-- [ ] **Step 6: ブラウザで確認**
+- [x] **Step 6: ブラウザで確認**
 
 `preview_start` で `dev` を起動し、in-app ブラウザで開く。
 Expected: 暗い部屋に壁と机の箱が見え、最初はぼやけて揺れ、6 秒で鮮明になる。コンソールにエラーが無い。
@@ -1315,7 +1315,7 @@ Expected: 暗い部屋に壁と机の箱が見え、最初はぼやけて揺れ�
 Run: `npx tsc --noEmit`
 Expected: エラーなし。
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/fx/daze-pass.ts src/fx/tone-pass.ts src/fx/index.ts src/core/app.ts src/main.ts
@@ -1329,7 +1329,7 @@ git commit -m "feat: renderer with daze and tone post-processing"
 **Files:**
 - Create: `src/ui/overlay.ts`
 
-- [ ] **Step 1: 実装**
+- [x] **Step 1: 実装**
 
 `src/ui/overlay.ts`:
 
@@ -1422,12 +1422,12 @@ export class Overlay {
 }
 ```
 
-- [ ] **Step 2: 型を確認**
+- [x] **Step 2: 型を確認**
 
 Run: `npx tsc --noEmit`
 Expected: エラーなし。
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/ui/overlay.ts
@@ -1440,7 +1440,7 @@ git commit -m "feat: DOM overlay for subtitles, prompts and transitions"
 **Files:**
 - Create: `src/scenes/runtime.ts`, `src/core/scene-manager.ts`
 
-- [ ] **Step 1: `src/scenes/runtime.ts`**
+- [x] **Step 1: `src/scenes/runtime.ts`**
 
 ```ts
 import { Vector3, type PerspectiveCamera, type Scene } from 'three';
@@ -1562,7 +1562,7 @@ export class Runtime {
 }
 ```
 
-- [ ] **Step 2: `src/core/scene-manager.ts`**
+- [x] **Step 2: `src/core/scene-manager.ts`**
 
 ```ts
 import type { SceneDef, Transition } from '../data/types';
@@ -1625,12 +1625,12 @@ export class SceneManager {
 }
 ```
 
-- [ ] **Step 3: 型を確認**
+- [x] **Step 3: 型を確認**
 
 Run: `npx tsc --noEmit`
 Expected: エラーなし。
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/scenes/runtime.ts src/core/scene-manager.ts
@@ -1646,7 +1646,7 @@ git commit -m "feat: scene runtime and manager with cut and fade transitions"
 - Modify: `src/main.ts`（Task 8 の一時版を置き換える）、`docs/superpowers/specs/2026-09-15-foundation-design.md`
 - Test: `tests/scenes.test.ts`
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 場面データが壊れていないことを確かめる。
 
@@ -1693,12 +1693,12 @@ describe('scene data', () => {
 });
 ```
 
-- [ ] **Step 2: 失敗を確認**
+- [x] **Step 2: 失敗を確認**
 
 Run: `npx vitest run tests/scenes.test.ts`
 Expected: FAIL。`../src/data/scenes` が未解決。
 
-- [ ] **Step 3: `src/data/scenes/room.ts`**
+- [x] **Step 3: `src/data/scenes/room.ts`**
 
 ```ts
 import type { BoxDef, Interactable, Vec3 } from '../types';
@@ -1733,7 +1733,7 @@ export const ROOM_OPTIONAL: Interactable[] = [
 ];
 ```
 
-- [ ] **Step 4: `src/data/scenes/s01-room-intro.ts`**
+- [x] **Step 4: `src/data/scenes/s01-room-intro.ts`**
 
 ```ts
 import type { WalkScene } from '../types';
@@ -1772,7 +1772,7 @@ export const roomIntro: WalkScene = {
 };
 ```
 
-- [ ] **Step 5: `src/data/scenes/index.ts`**
+- [x] **Step 5: `src/data/scenes/index.ts`**
 
 ```ts
 import type { SceneDef } from '../types';
@@ -1785,7 +1785,7 @@ export const FIRST_SCENE = SCENES[0].id;
 export const sceneMap: ReadonlyMap<string, SceneDef> = new Map(SCENES.map((s) => [s.id, s]));
 ```
 
-- [ ] **Step 6: `src/scenes/hooks/room-intro.ts`**
+- [x] **Step 6: `src/scenes/hooks/room-intro.ts`**
 
 ```ts
 import type { Hooks } from '../runtime';
@@ -1807,7 +1807,7 @@ export function roomIntroHooks(): Hooks {
 }
 ```
 
-- [ ] **Step 7: `src/scenes/index.ts`**
+- [x] **Step 7: `src/scenes/index.ts`**
 
 ```ts
 import { roomIntroHooks } from './hooks/room-intro';
@@ -1818,7 +1818,7 @@ export const hooks: Readonly<Record<string, Hooks>> = {
 };
 ```
 
-- [ ] **Step 8: `src/main.ts` を置き換える**
+- [x] **Step 8: `src/main.ts` を置き換える**
 
 ```ts
 import { App } from './core/app';
@@ -1865,7 +1865,7 @@ async function main(): Promise<void> {
 void main();
 ```
 
-- [ ] **Step 9: テストと型を確認**
+- [x] **Step 9: テストと型を確認**
 
 Run: `npm test`
 Expected: PASS。全ファイル（progress, collide, subtitles, interact, walk, scenes）。
@@ -1873,7 +1873,7 @@ Expected: PASS。全ファイル（progress, collide, subtitles, interact, walk,
 Run: `npx tsc --noEmit`
 Expected: エラーなし。
 
-- [ ] **Step 10: 通しの動作確認**
+- [x] **Step 10: 通しの動作確認**
 
 `preview_start` で `dev` を起動し、in-app ブラウザで `http://localhost:5173/?nolock` を開く。in-app ブラウザではポインタロックが取れない場合があるため `?nolock` を付ける。操作は `javascript_tool` からキーイベントを送って行う。
 
@@ -1904,8 +1904,9 @@ window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
 6. ドアを調べて字幕を送ると暗転して「（仮）続く」が出る
 7. どの段階でもコンソールにエラーが出ない
 8. `?nolock` を外して開き、クリックでポインタロックが取れるか確認する。in-app ブラウザで取れなければ、その旨を報告に残す（通常のブラウザで確認する）
+   - 結果: in-app ブラウザはペインが非表示だと描画ループもポインタロックも動かないため未確認。通常のブラウザでの確認が残っている。1〜7 は `?nolock&debug` と `window.__step` で確認済み
 
-- [ ] **Step 11: ビルドの確認**
+- [x] **Step 11: ビルドの確認**
 
 Run: `npm run build`
 Expected: `dist/` に `index.html` と `assets/` が出る。
@@ -1913,13 +1914,13 @@ Expected: `dist/` に `index.html` と `assets/` が出る。
 Run: `npx vite preview --port 4173`
 in-app ブラウザで `http://localhost:4173/?nolock` を開き、開始画面から自室に入れることを確認する。
 
-- [ ] **Step 12: 設計書の差分を反映**
+- [x] **Step 12: 設計書の差分を反映**
 
 `docs/superpowers/specs/2026-09-15-foundation-design.md` の 5 節の行
 「見回しは three.js の PointerLockControls。移動は WASD。走る操作は入れない」を
 「見回しは Pointer Lock API のマウス移動量から自前で計算する。後で足す受け身の記憶シーンでも同じ仕組みを使う。移動は WASD。走る操作は入れない」に書き換える。
 
-- [ ] **Step 13: Commit**
+- [x] **Step 13: Commit**
 
 ```bash
 git add src/data/scenes/room.ts src/data/scenes/s01-room-intro.ts src/data/scenes/index.ts src/scenes/hooks/room-intro.ts src/scenes/index.ts src/main.ts tests/scenes.test.ts docs/superpowers/specs/2026-09-15-foundation-design.md
