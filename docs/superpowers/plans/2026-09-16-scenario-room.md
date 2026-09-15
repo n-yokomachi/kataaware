@@ -39,7 +39,7 @@
 - Modify: `src/data/types.ts`, `src/core/interact.ts`
 - Test: `tests/interact.test.ts`
 
-- [ ] **Step 1: 型を足す**
+- [x] **Step 1: 型を足す**
 
 `src/data/types.ts` の `Interactable` を次に置き換える:
 
@@ -75,7 +75,7 @@ export interface Daze {
   seat?: { eyeHeight: number; standAfter: string };
 ```
 
-- [ ] **Step 2: 失敗するテストを書く**
+- [x] **Step 2: 失敗するテストを書く**
 
 `tests/interact.test.ts` の `import` 行を次に置き換える:
 
@@ -111,12 +111,12 @@ describe('unmetPrerequisite', () => {
 });
 ```
 
-- [ ] **Step 3: 失敗を確認**
+- [x] **Step 3: 失敗を確認**
 
 Run: `npx vitest run tests/interact.test.ts`
 Expected: FAIL。`unmetPrerequisite` が無い。
 
-- [ ] **Step 4: 実装**
+- [x] **Step 4: 実装**
 
 `src/core/interact.ts` に関数を足し、`selectInteractable` の `after` の判定を置き換える:
 
@@ -145,7 +145,7 @@ export function unmetPrerequisite(it: Interactable, done: ReadonlySet<string>): 
 
 関数の doc コメントの末尾に「前提が未達でも、その id の hints があれば選べる」を足す。
 
-- [ ] **Step 5: 成功を確認**
+- [x] **Step 5: 成功を確認**
 
 Run: `npx vitest run tests/interact.test.ts`
 Expected: PASS（11 tests）。
@@ -153,7 +153,7 @@ Expected: PASS（11 tests）。
 Run: `npx tsc --noEmit`
 Expected: エラーなし。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/data/types.ts src/core/interact.ts tests/interact.test.ts
@@ -168,7 +168,7 @@ git commit -m "feat: hint lines for unmet prerequisites, seat and daze-hold fiel
 - Modify: `src/core/walk.ts`
 - Test: `tests/walk.test.ts`
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 `tests/walk.test.ts` の `import` を次に置き換える:
 
@@ -215,12 +215,12 @@ describe('Walker', () => {
 });
 ```
 
-- [ ] **Step 2: 失敗を確認**
+- [x] **Step 2: 失敗を確認**
 
 Run: `npx vitest run tests/walk.test.ts`
 Expected: FAIL。`canMove` / `eyeHeight` が無い。
 
-- [ ] **Step 3: 実装**
+- [x] **Step 3: 実装**
 
 `src/core/walk.ts` の `Walker` を次に置き換える:
 
@@ -261,7 +261,7 @@ export class Walker {
 }
 ```
 
-- [ ] **Step 4: 成功を確認**
+- [x] **Step 4: 成功を確認**
 
 Run: `npx vitest run tests/walk.test.ts`
 Expected: PASS（13 tests）。
@@ -269,7 +269,7 @@ Expected: PASS（13 tests）。
 Run: `npx tsc --noEmit`
 Expected: エラーなし。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/core/walk.ts tests/walk.test.ts
@@ -283,7 +283,7 @@ git commit -m "feat: walker eye height and movement lock"
 **Files:**
 - Modify: `src/ui/overlay.ts`, `src/ui/overlay.css`
 
-- [ ] **Step 1: CSS**
+- [x] **Step 1: CSS**
 
 `src/ui/overlay.css` の `.hidden` の前に追加:
 
@@ -314,7 +314,7 @@ git commit -m "feat: walker eye height and movement lock"
 }
 ```
 
-- [ ] **Step 2: Overlay**
+- [x] **Step 2: Overlay**
 
 `src/ui/overlay.ts` のフィールドに `private smoke: HTMLDivElement;` を足し、コンストラクタの生成順を次にする（煙は字幕より下、暗転より下）:
 
@@ -340,12 +340,12 @@ git commit -m "feat: walker eye height and movement lock"
   }
 ```
 
-- [ ] **Step 3: 確認**
+- [x] **Step 3: 確認**
 
 Run: `npx tsc --noEmit`
 Expected: エラーなし。
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/ui/overlay.ts src/ui/overlay.css
@@ -358,7 +358,7 @@ git commit -m "feat: smoke overlay"
 **Files:**
 - Modify: `src/scenes/runtime.ts`
 
-- [ ] **Step 1: 実装**
+- [x] **Step 1: 実装**
 
 `src/scenes/runtime.ts` を次に置き換える:
 
@@ -537,7 +537,7 @@ export class Runtime {
 }
 ```
 
-- [ ] **Step 2: 確認**
+- [x] **Step 2: 確認**
 
 Run: `npx tsc --noEmit`
 Expected: エラーなし。
@@ -545,7 +545,7 @@ Expected: エラーなし。
 Run: `npm test`
 Expected: 6 files、40 tests（Task 1 で +5、Task 2 で +3）。
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/scenes/runtime.ts
@@ -559,7 +559,7 @@ git commit -m "feat: seated start, held daze, hint lines and input freeze in the
 **Files:**
 - Modify: `src/data/scenes/room.ts`, `src/data/scenes/s01-room-intro.ts`, `src/scenes/hooks/room-intro.ts`, `tests/scenes.test.ts`, `docs/superpowers/specs/2026-09-15-foundation-design.md`
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 `tests/scenes.test.ts` の `orders the room as chips, terminal, door` を次に置き換える:
 
@@ -587,12 +587,12 @@ git commit -m "feat: seated start, held daze, hint lines and input freeze in the
   });
 ```
 
-- [ ] **Step 2: 失敗を確認**
+- [x] **Step 2: 失敗を確認**
 
 Run: `npx vitest run tests/scenes.test.ts`
 Expected: FAIL（`jack` が無い）。
 
-- [ ] **Step 3: `src/data/scenes/room.ts`**
+- [x] **Step 3: `src/data/scenes/room.ts`**
 
 ```ts
 import type { BoxDef, Interactable, Vec3 } from '../types';
@@ -646,7 +646,7 @@ export const ROOM_OPTIONAL: Interactable[] = [
 ];
 ```
 
-- [ ] **Step 4: `src/data/scenes/s01-room-intro.ts`**
+- [x] **Step 4: `src/data/scenes/s01-room-intro.ts`**
 
 ```ts
 import type { WalkScene } from '../types';
@@ -735,7 +735,7 @@ export const roomIntro: WalkScene = {
 };
 ```
 
-- [ ] **Step 5: `src/scenes/hooks/room-intro.ts`**
+- [x] **Step 5: `src/scenes/hooks/room-intro.ts`**
 
 ```ts
 import type { Hooks } from '../runtime';
@@ -784,7 +784,7 @@ export function roomIntroHooks(): Hooks {
 }
 ```
 
-- [ ] **Step 6: 設計書の 4 節に追記**
+- [x] **Step 6: 設計書の 4 節に追記**
 
 `docs/superpowers/specs/2026-09-15-foundation-design.md` の 4 節の行
 
@@ -794,7 +794,7 @@ export function roomIntroHooks(): Hooks {
 
 `、`seat`（座った状態で始め、`standAfter` の対象を調べると立ち上がる）。`interactables` の `hints` は `after` の id ごとの未達時の文で、文がある id は未達でも選べて文だけ出る。`dazeOnEnter.until` はその対象を調べるまで眩暈を保つ`
 
-- [ ] **Step 7: テストと型と ビルド**
+- [x] **Step 7: テストと型と ビルド**
 
 Run: `npm test`
 Expected: 6 files、41 tests。
@@ -805,7 +805,7 @@ Expected: エラーなし。
 Run: `npm run build`
 Expected: 成功。
 
-- [ ] **Step 8: 通しの動作確認（controller が行う）**
+- [x] **Step 8: 通しの動作確認（controller が行う）**
 
 `CLAUDE.md` の方法で `http://localhost:5173/?nolock&debug` を開き、次を確かめる。
 
@@ -817,7 +817,7 @@ Expected: 成功。
 6. メモリハブ → 端末 → ドアの順で文が出て、暗転して「（仮）続く」
 7. コンソールにエラーが無い
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/data/scenes/room.ts src/data/scenes/s01-room-intro.ts src/scenes/hooks/room-intro.ts tests/scenes.test.ts docs/superpowers/specs/2026-09-15-foundation-design.md
