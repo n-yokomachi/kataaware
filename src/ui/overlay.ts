@@ -17,10 +17,10 @@ export class Overlay {
       root.appendChild(el);
       return el;
     };
-    // 後に追加したものほど手前に重なる
-    this.fade = make('fade');
+    // 後に追加したものほど手前に重なる。暗転は字幕と印を隠し、中央の文字は暗転の上に出す
     this.subtitle = make('subtitle');
     this.prompt = make('prompt');
+    this.fade = make('fade');
     this.center = make('center');
     this.resume = make('resume', 'クリックで再開');
     this.start = make('start', 'クリックで開始');
