@@ -1,4 +1,4 @@
-import type { BoxDef, Interactable, Vec3 } from '../types';
+import type { BoxDef, Interactable, LayoutItem, Vec3 } from '../types';
 
 /** 6m 四方の自室。-Z 側の壁に机と端末、机の前に椅子、椅子の右に小さな卓、+Z 側の壁にドア */
 export const ROOM_BOXES: BoxDef[] = [
@@ -10,7 +10,6 @@ export const ROOM_BOXES: BoxDef[] = [
   { position: [0.8, 1.1, 2.88], size: [0.9, 2.2, 0.06], color: 0x6a4a3a, collider: false }, // ドア
   { position: [1.5, 0.4, -2.2], size: [1.6, 0.8, 0.8], color: 0x7a5a40 }, // 机
   { position: [1.5, 1.05, -2.5], size: [0.7, 0.45, 0.08], color: 0x111118 }, // 端末の画面
-  { position: [1.5, 0.25, -1.2], size: [0.5, 0.5, 0.5], color: 0x3a3040, collider: false }, // 椅子（座る位置）
   { position: [2.5, 0.35, -1.0], size: [0.6, 0.7, 0.6], color: 0x5a4a3a }, // 卓。灰皿と煙草
   { position: [-1.8, 0.4, -2.2], size: [0.9, 0.8, 0.5], color: 0x3a3a4a }, // メモリハブ
 ];
@@ -47,4 +46,9 @@ export const ROOM_OPTIONAL: Interactable[] = [
     label: '紙ばさみ',
     lines: ['売り上げのメモだ', '2166/08/13 5枚　2166/08/14 4枚　2166/08/15 ―'],
   },
+];
+
+/** 配置データ。段階 1 は椅子だけ。座る位置なので当たり判定は付けない */
+export const ROOM_LAYOUT: LayoutItem[] = [
+  { asset: 'kenney/chairDesk.glb', position: [1.5, 0, -1.2], rotationY: 0, collider: false },
 ];

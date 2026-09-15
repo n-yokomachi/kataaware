@@ -15,6 +15,8 @@ import {
 } from 'three';
 import { boxFromDef, type AABB } from '../core/collide';
 import type { BoxDef, Interactable, SceneDef } from '../data/types';
+import { instantiate, loadAsset } from './assets';
+import { colliderOf, placeItem } from './layout';
 
 export interface BuiltEnvironment {
   group: Group;
@@ -34,6 +36,7 @@ function boxMesh(b: BoxDef): Mesh {
   }
   const mesh = new Mesh(new BoxGeometry(b.size[0], b.size[1], b.size[2]), mat);
   mesh.position.set(b.position[0], b.position[1], b.position[2]);
+  mesh.userData.owned = true;
   return mesh;
 }
 
@@ -45,6 +48,7 @@ function markerMesh(it: Interactable): Mesh {
   );
   mesh.position.set(it.position[0], it.position[1], it.position[2]);
   mesh.name = `marker:${it.id}`;
+  mesh.userData.owned = true;
   return mesh;
 }
 
@@ -61,6 +65,7 @@ function addFloor(group: Group): void {
     new MeshStandardMaterial({ color: 0x2e2e34, roughness: 1 }),
   );
   floor.rotation.x = -Math.PI / 2;
+  floor.userData.owned = true;
   group.add(floor);
 }
 
@@ -87,6 +92,13 @@ export async function buildEnvironment(def: SceneDef): Promise<BuiltEnvironment>
     if (b.collider !== false) colliders.push(boxFromDef(b));
   }
   if (env.url) await loadFromUrl(env.url, group, colliders);
+  for (const item of env.layout ?? []) {
+    const root = instantiate(await loadAsset(item.asset), item.tint);
+    root.userData.layoutItem = item;
+    placeItem(root, item);
+    group.add(root);
+    if (item.collider !== false) colliders.push(colliderOf(root));
+  }
   for (const c of def.colliders ?? []) colliders.push(boxFromDef(c));
   for (const it of def.interactables) group.add(markerMesh(it));
   return {
@@ -95,10 +107,12 @@ export async function buildEnvironment(def: SceneDef): Promise<BuiltEnvironment>
     dispose() {
       group.traverse((o) => {
         if (!(o instanceof Mesh)) return;
-        o.geometry.dispose();
-        const m = o.material;
-        if (Array.isArray(m)) m.forEach((x) => x.dispose());
-        else m.dispose();
+        if (o.userData.owned) o.geometry.dispose();
+        if (o.userData.owned || o.userData.ownedMaterial) {
+          const m = o.material;
+          if (Array.isArray(m)) m.forEach((x) => x.dispose());
+          else m.dispose();
+        }
       });
     },
   };
