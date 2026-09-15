@@ -16,7 +16,8 @@ export interface Interactable {
   radius?: number; // 省略時 2
   required?: boolean;
   once?: boolean; // 省略時 true
-  after?: string[]; // ここに挙げた id が済むまで選べない
+  after?: string[]; // ここに挙げた id が済むまで選べない。ただし hints に文がある id については選べて、その文だけ出る
+  hints?: Record<string, string[]>; // after の id ごとに、未達のときに調べると出す文。出しても済んだことにはならない
   label?: string;
   lines: string[];
 }
@@ -25,6 +26,7 @@ export interface Daze {
   blur: number;
   wobble: number;
   duration: number; // 秒。値が 0 まで減る時間
+  until?: string; // この id の対象を調べるまで最大のまま保ち、調べた後に duration で消す
 }
 
 export type Transition = 'cut' | 'fade';
@@ -44,6 +46,8 @@ export interface WalkScene {
   spawn: { position: Vec3; yaw: number };
   colliders?: BoxDef[];
   interactables: Interactable[];
+  /** 座った状態で始める。standAfter の対象を調べると立ち上がり、移動できるようになる */
+  seat?: { eyeHeight: number; standAfter: string };
 }
 
 export type SceneDef = WalkScene;

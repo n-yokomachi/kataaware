@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { selectInteractable } from '../src/core/interact';
+import { selectInteractable, unmetPrerequisite } from '../src/core/interact';
 import type { Interactable, Vec3 } from '../src/data/types';
 
 const cam: Vec3 = [0, 1.6, 0];
@@ -51,5 +51,25 @@ describe('selectInteractable', () => {
     const gated: Interactable = { id: 'g', position: [0, 1.6, -1], after: ['x'], lines: [] };
     expect(selectInteractable(cam, fwd, [gated], new Set())).toBeNull();
     expect(selectInteractable(cam, fwd, [gated], new Set(['x']))?.id).toBe('g');
+  });
+
+  it('keeps a gated item selectable when it has a hint for the unmet prerequisite', () => {
+    const hinted: Interactable = { id: 'h', position: [0, 1.6, -1], after: ['x'], hints: { x: ['先に x'] }, lines: [] };
+    expect(selectInteractable(cam, fwd, [hinted], new Set())?.id).toBe('h');
+  });
+
+  it('hides a gated item when the unmet prerequisite has no hint', () => {
+    const partly: Interactable = { id: 'p', position: [0, 1.6, -1], after: ['x', 'y'], hints: { x: ['先に x'] }, lines: [] };
+    expect(selectInteractable(cam, fwd, [partly], new Set(['x']))).toBeNull();
+  });
+});
+
+describe('unmetPrerequisite', () => {
+  it('returns the first prerequisite that is not done, or null', () => {
+    const it2: Interactable = { id: 'd', position: [0, 0, 0], after: ['a', 'b'], lines: [] };
+    expect(unmetPrerequisite(it2, new Set())).toBe('a');
+    expect(unmetPrerequisite(it2, new Set(['a']))).toBe('b');
+    expect(unmetPrerequisite(it2, new Set(['a', 'b']))).toBeNull();
+    expect(unmetPrerequisite({ id: 'n', position: [0, 0, 0], lines: [] }, new Set())).toBeNull();
   });
 });
