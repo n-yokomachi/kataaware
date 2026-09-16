@@ -8,7 +8,7 @@ namespace HalfAware
     /// <summary>
     /// 歩いて調べる場面 1 つ分の進行。毎フレーム、対象の選択 → 印 → 調べる → 字幕 → 完了の判定の順に進める。
     /// 字幕の表示中は E とクリックを字幕の送りにだけ使い、調べる操作は受け付けない。
-    /// 止まっている間は調べる操作も進行も止まり、見回しだけできる。
+    /// 止まっている間は調べる操作と進行が止まる。見回しと移動は止めない（場面 1 の停止はすべて座っている間に起きる）。
     /// 必須の対象をすべて調べ、字幕も出ておらず、止まってもいなければ暗転して「続く」を出す
     /// </summary>
     public sealed class SceneFlow : MonoBehaviour
@@ -91,7 +91,8 @@ namespace HalfAware
             if (Completed) return;
             var frozen = Frozen;
             var interact = (player.InteractPressed || pendingInteract) && !frozen;
-            pendingInteract = false;
+            // 止まっている間に届いた PressInteract は捨てずに持ち越す。実キー入力はその場限りなので落ちる
+            if (!frozen) pendingInteract = false;
             if (subtitles.IsTalking && interact)
             {
                 subtitles.Advance();
@@ -129,7 +130,7 @@ namespace HalfAware
         /// <summary>standAfter の対象を調べたら、止まっていない間に目線を上げて移動を許す</summary>
         void Stand(bool frozen)
         {
-            if (standUp == null) return;
+            if (standUp == null || standUp.Standing) return;
             standUp.Tick(Time.deltaTime, progress.Done.Contains(standAfter), frozen);
             player.EyeHeight = standUp.EyeHeight;
             player.CanMove = standUp.Standing;
@@ -138,6 +139,7 @@ namespace HalfAware
         IEnumerator Complete()
         {
             Completed = true;
+            player.CanMove = false;
             hud.SetPrompt(null);
             hud.SetSubtitle(null);
             hud.CancelSmoke();
