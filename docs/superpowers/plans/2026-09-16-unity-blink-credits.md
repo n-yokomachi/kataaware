@@ -106,7 +106,7 @@ cd /d/work/kataaware && git add unity/Assets/Scripts/Hud/HudView.cs && git commi
 **Files:**
 - Modify: `unity/Assets/Scripts/Flow/RoomIntroDirector.cs`
 
-- [ ] **Step 1: 書き換える**
+- [x] **Step 1: 書き換える**
 
 `unity/Assets/Scripts/Flow/RoomIntroDirector.cs` を全文次に置き換える:
 
@@ -237,14 +237,14 @@ namespace HalfAware
 }
 ```
 
-`credits` と `titleCard` と `IntroSeconds` は無くなる。カードは `blinkCards` にまとめ、何枚出すかで煙草の長さが決まる。
+`credits` と `titleCard` と `CreditSeconds` / `TitleSeconds` は無くなる。カードは `blinkCards` にまとめ、何枚出すかで煙草の長さが決まる。
 
-- [ ] **Step 2: コンパイルとテストを確かめる**
+- [x] **Step 2: コンパイルとテストを確かめる**
 
 `refresh_unity` → `read_console`（エラー・警告 0）→ `run_tests` → `get_test_job`。
 Expected: 67 件 passed。
 
-- [ ] **Step 3: コミット**
+- [x] **Step 3: コミット**
 
 ```bash
 cd /d/work/kataaware && git add unity/Assets/Scripts/Flow/RoomIntroDirector.cs && git commit -m "feat: put the credits in the blinks while the cigarette burns"
