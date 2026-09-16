@@ -72,6 +72,16 @@ namespace HalfAware.Tests
         }
 
         [Test]
+        public void TellsAnEntryWithNoLinesApartFromAMissingOne()
+        {
+            // 煙草は文を持たず、吸い終わりの独白を演出の側が言う。「在るが空」を「無い」と取り違えない
+            var found = ScriptEntry.Find(new[] { new ScriptEntry { id = "cigarette" } }, "cigarette");
+            Assert.That(found.id, Is.Not.Null);
+            Assert.That(found.Lines, Is.Empty);
+            Assert.That(ScriptEntry.Find(new[] { new ScriptEntry { id = "cigarette" } }, "other").id, Is.Null);
+        }
+
+        [Test]
         public void TakesTheFirstEntryWhenAnIdIsRepeated()
         {
             var first = new ScriptEntry { id = "a", label = "先", lines = null, hints = null };
