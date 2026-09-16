@@ -531,7 +531,7 @@ cd /d/work/kataaware && git status --short && git add unity/Assets/Scripts/Inter
 - Create: `unity/Assets/Scripts/Fx/DazeVolume.cs`
 - Test: `unity/Assets/Tests/EditMode/DazeTests.cs`
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 `unity/Assets/Tests/EditMode/DazeTests.cs`:
 
@@ -622,12 +622,12 @@ namespace HalfAware.Tests
 }
 ```
 
-- [ ] **Step 2: 失敗を確認**
+- [x] **Step 2: 失敗を確認**
 
 `refresh_unity` → `read_console`（`types: ["error"]`）。
 Expected: `Daze` が見つからないというコンパイルエラー。
 
-- [ ] **Step 3: 実装**
+- [x] **Step 3: 実装**
 
 `unity/Assets/Scripts/Fx/Daze.cs`:
 
@@ -726,12 +726,12 @@ namespace HalfAware
 }
 ```
 
-- [ ] **Step 4: テストが通ることを確認**
+- [x] **Step 4: テストが通ることを確認**
 
 `refresh_unity` → `read_console`（エラー・警告 0）→ `run_tests` → `get_test_job`。
 Expected: 42 件 passed（35 + 7 件）、failed 0。
 
-- [ ] **Step 5: コミット**
+- [x] **Step 5: コミット**
 
 ```bash
 cd /d/work/kataaware && git add unity/Assets/Scripts unity/Assets/Tests && git commit -m "feat: add the daze strength with its hold and decay"
@@ -747,7 +747,7 @@ cd /d/work/kataaware && git add unity/Assets/Scripts unity/Assets/Tests && git c
 - Create: `unity/Assets/Scripts/Player/StandUp.cs`
 - Test: `unity/Assets/Tests/EditMode/StandUpTests.cs`
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 `unity/Assets/Tests/EditMode/StandUpTests.cs`:
 
@@ -830,12 +830,12 @@ namespace HalfAware.Tests
 }
 ```
 
-- [ ] **Step 2: 失敗を確認**
+- [x] **Step 2: 失敗を確認**
 
 `refresh_unity` → `read_console`（`types: ["error"]`）。
 Expected: `StandUp` が見つからないというコンパイルエラー。
 
-- [ ] **Step 3: 実装**
+- [x] **Step 3: 実装**
 
 `unity/Assets/Scripts/Player/StandUp.cs`:
 
@@ -890,12 +890,12 @@ namespace HalfAware
 }
 ```
 
-- [ ] **Step 4: テストが通ることを確認**
+- [x] **Step 4: テストが通ることを確認**
 
 `refresh_unity` → `read_console`（エラー・警告 0）→ `run_tests` → `get_test_job`。
 Expected: 49 件 passed（42 + 7 件）、failed 0。
 
-- [ ] **Step 5: コミット**
+- [x] **Step 5: コミット**
 
 ```bash
 cd /d/work/kataaware && git add unity/Assets/Scripts unity/Assets/Tests && git commit -m "feat: add the rise from the seat to standing"
