@@ -40,6 +40,19 @@ namespace HalfAware
         /// <summary>このフレームで調べる操作（E か左クリック）が押されたか。ロック中だけ true になる</summary>
         public bool InteractPressed { get; private set; }
 
+        /// <summary>上下の向き。度。書き込むと範囲に収まる。動作確認から視線を向けるのにも使う</summary>
+        public float Pitch
+        {
+            get { return pitch; }
+            set { pitch = Mathf.Clamp(value, -PitchLimit, PitchLimit); }
+        }
+
+        /// <summary>目の位置に上乗せするずれ。眩暈の漂いが毎フレーム入れる</summary>
+        public Vector3 EyeOffset { get; set; }
+
+        /// <summary>目の向きに上乗せする傾き。x が上下、y が左右。度。眩暈の漂いが毎フレーム入れる</summary>
+        public Vector2 EyeTilt { get; set; }
+
         void Awake()
         {
             body = GetComponent<CharacterController>();
@@ -56,17 +69,23 @@ namespace HalfAware
         void Update()
         {
             InteractPressed = false;
-            eye.localPosition = new Vector3(0f, EyeHeight, 0f);
-            if (!CursorLocked)
+            if (CursorLocked)
+            {
+                InteractPressed = interact.WasPressedThisFrame();
+                Look(look.ReadValue<Vector2>());
+                if (CanMove) Walk(move.ReadValue<Vector2>());
+            }
+            else
             {
                 // ロックが外れている間はカーソルを見せる。ロックするためのクリックは調べる操作に使わない
                 Cursor.visible = true;
                 if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) Lock();
-                return;
             }
-            InteractPressed = interact.WasPressedThisFrame();
-            Look(look.ReadValue<Vector2>());
-            if (CanMove) Walk(move.ReadValue<Vector2>());
+            // 目の位置と向きは、ロックの有無にかかわらず毎フレーム書き直す。
+            // 上乗せしていく形にすると、書き直されない間にずれが溜まって視界が回り続ける。
+            // 傾きをこの順で組むと、左右の傾きが親の水平面で効くので、下を向いていても画面が回らない
+            eye.localPosition = new Vector3(0f, EyeHeight, 0f) + EyeOffset;
+            eye.localRotation = Quaternion.Euler(pitch + EyeTilt.x, EyeTilt.y, 0f);
         }
 
         static void Lock()
@@ -78,8 +97,7 @@ namespace HalfAware
         void Look(Vector2 delta)
         {
             transform.Rotate(0f, delta.x * LookSensitivity, 0f);
-            pitch = Mathf.Clamp(pitch - delta.y * LookSensitivity, -PitchLimit, PitchLimit);
-            eye.localRotation = Quaternion.Euler(pitch, 0f, 0f);
+            Pitch -= delta.y * LookSensitivity;
         }
 
         void Walk(Vector2 input)

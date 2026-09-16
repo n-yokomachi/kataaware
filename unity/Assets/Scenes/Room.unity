@@ -3337,7 +3337,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: HalfAware::HalfAware.EyeSway
   daze: {fileID: 835399818}
-  eye: {fileID: 330585546}
+  player: {fileID: 2045684572}
   shift: 0.03
   tilt: 0.9
 --- !u!1660057539 &9223372036854775807
