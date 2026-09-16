@@ -930,6 +930,7 @@ namespace HalfAware
     {
         /// <summary>煙が消えるのにかける秒数</summary>
         public const float SmokeFadeSeconds = 1f;
+
         /// <summary>煙のいちばん濃いときの不透明度。向こう側が透けて見える濃さに留める</summary>
         public const float SmokePeakAlpha = 0.45f;
 
