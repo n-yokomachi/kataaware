@@ -18,6 +18,7 @@
 - **フォントのアトラスをコミットに入れない**: `unity/Assets/Fonts/NotoSansJP-Regular SDF.asset` は動的アトラスなので、エディタで日本語を表示するたびにファイルが約 2 MB に膨らむ。ビルド時には破棄されるので履歴に入れる価値が無い。`git status` にこのファイルが出たら `git checkout -- "unity/Assets/Fonts/NotoSansJP-Regular SDF.asset"` で戻してからコミットする
 - **MCP から再生するとき**は、エディタの窓が前面に無いと `Application.runInBackground` が false のままで `Update` が走らず、2 フレーム目で止まって見える。実行中に `Application.runInBackground = true` を立てれば進む。この代入は `PlayerSettings` 側にも書かれるので、確認の後に false へ戻し、`unity/ProjectSettings/ProjectSettings.asset` に差分が無いことを確かめる
 - 座標: Unity は +Z が正面。試作（`prototype-three/src/data/scenes/room.ts`）の値は Z の符号を反転して使う
+- **YAML の中の日本語は `grep` で探せない**: Unity はシーンにもアセットにも日本語を `\uXXXX` の逃がし表記で書き、長い文字列は字下げして折り返す。文面が入ったかを確かめるときは、文字列をそのまま探さず、`execute_code` で読み返すか、ファイル側なら折り返しを畳んで逃がし表記を戻してから照合する
 - オーナーがエディタで並行して触ることがある。シーンを変える前に `mcp__UnityMCP__manage_scene`（`action: "get_hierarchy"`）で現状を見て、知らない物があれば親セッションに戻す
 - 各タスクの終わりでシーンは通しで遊べる状態を保つ。新しい部品は既定値が段階 2 と同じ挙動になるようにしてある
 
@@ -55,7 +56,7 @@
 - Create: `unity/Assets/Scripts/Data/RoomScript.cs`
 - Test: `unity/Assets/Tests/EditMode/ScriptEntryTests.cs`
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 `unity/Assets/Tests/EditMode/ScriptEntryTests.cs`:
 
@@ -134,6 +135,16 @@ namespace HalfAware.Tests
         }
 
         [Test]
+        public void TellsAnEntryWithNoLinesApartFromAMissingOne()
+        {
+            // 煙草は文を持たず、吸い終わりの独白を演出の側が言う。「在るが空」を「無い」と取り違えない
+            var found = ScriptEntry.Find(new[] { new ScriptEntry { id = "cigarette" } }, "cigarette");
+            Assert.That(found.id, Is.Not.Null);
+            Assert.That(found.Lines, Is.Empty);
+            Assert.That(ScriptEntry.Find(new[] { new ScriptEntry { id = "cigarette" } }, "other").id, Is.Null);
+        }
+
+        [Test]
         public void TakesTheFirstEntryWhenAnIdIsRepeated()
         {
             var first = new ScriptEntry { id = "a", label = "先", lines = null, hints = null };
@@ -144,12 +155,12 @@ namespace HalfAware.Tests
 }
 ```
 
-- [ ] **Step 2: 失敗を確認**
+- [x] **Step 2: 失敗を確認**
 
 `refresh_unity` → `read_console`（`types: ["error"]`）。
 Expected: `ScriptEntry` と `ScriptHint` が見つからないというコンパイルエラー。
 
-- [ ] **Step 3: 型と検索を書く**
+- [x] **Step 3: 型と検索を書く**
 
 `unity/Assets/Scripts/Data/ScriptEntry.cs`:
 
@@ -243,12 +254,12 @@ namespace HalfAware
 
 `ScriptEntry` の `lines` と `ScriptHint` の `lines` は Inspector で 1 行ずつ編集する。複数行の入力欄にはしない（字幕は 1 行ずつ送るため、1 要素 = 1 行）。
 
-- [ ] **Step 4: テストが通ることを確認**
+- [x] **Step 4: テストが通ることを確認**
 
 `refresh_unity` → `read_console`（エラー・警告 0）→ `run_tests` → `get_test_job`。
-Expected: 34 件 passed（段階 2 の 27 件 + 7 件）、failed 0。
+Expected: 35 件 passed（段階 2 の 27 件 + 8 件）、failed 0。
 
-- [ ] **Step 5: コミット**
+- [x] **Step 5: コミット**
 
 ```bash
 cd /d/work/kataaware && git add unity/Assets/Scripts unity/Assets/Tests && git commit -m "feat: add the room script asset type and its lookup by id"
@@ -263,7 +274,7 @@ cd /d/work/kataaware && git add unity/Assets/Scripts unity/Assets/Tests && git c
 **Files:**
 - Create: `unity/Assets/Data/RoomScript.asset`
 
-- [ ] **Step 1: アセットを作る**
+- [x] **Step 1: アセットを作る**
 
 `execute_code`:
 
@@ -345,7 +356,7 @@ Expected: 戻り値 `jack,cigarette,chips,terminal,door,ashtray,cigarette-box,cl
 
 `hint(4, 1, ...)` の「（仮）」は、シナリオ設計書 6 節で「ドアを、チップを取った後・端末を確かめる前に調べたときの文」が未決のまま残っているため。文が決まるまでこの印を外さない。
 
-- [ ] **Step 2: 中身を読み返す**
+- [x] **Step 2: 中身を読み返す**
 
 `execute_code`:
 
@@ -367,7 +378,7 @@ return report;
 
 Expected: `jack` は文 1 件、`cigarette` は 0 件、`chips` は 7 件、`terminal` は 11 件で `hints=0`、`door` は文 1 件で `hints=2`、`ashtray` と `cigarette-box` は 1 件、`clipboard` は 2 件。ドアの 2 つの文が読め、端末の 10 行目が `対象　防壁なし　距離 ランダム　期間 2156年3月2日～2156年3月3日` であること（全角の空白が潰れていないことの確認）。
 
-- [ ] **Step 3: コミット**
+- [x] **Step 3: コミット**
 
 ```bash
 cd /d/work/kataaware && git add unity/Assets/Data unity/Assets/Data.meta && git commit -m "feat: add the scene 1 script with the scenario text"
@@ -416,7 +427,17 @@ namespace HalfAware
         public bool Required => required;
         public bool Once => once;
         public IReadOnlyList<string> After => after;
-        public string Label => script != null ? script.Find(id).Label : id;
+        /// <summary>文面が引けないときは id を出す。印が空欄になって気づけないのを避ける</summary>
+        public string Label
+        {
+            get
+            {
+                if (script == null) return id;
+                var entry = script.Find(id);
+                return entry.id != null ? entry.Label : id;
+            }
+        }
+
         public IReadOnlyList<string> Lines => script != null ? script.Find(id).Lines : NoLines;
 
         public IReadOnlyList<string> HintFor(string afterId)
@@ -440,7 +461,8 @@ namespace HalfAware
         void OnValidate()
         {
             if (string.IsNullOrEmpty(id)) Debug.LogWarning("Interactable に id がない: " + name, this);
-            else if (script != null && script.Find(id).id == null) Debug.LogWarning("文面に id が無い: " + id, this);
+            else if (script == null) Debug.LogWarning("Interactable に文面のアセットがない: " + name, this);
+            else if (script.Find(id).id == null) Debug.LogWarning("文面に id が無い: " + id, this);
         }
 #endif
     }
@@ -483,14 +505,14 @@ Expected: 5 件それぞれに文面から引いた印と件数が出る（`chip
 - [ ] **Step 4: シーンから古い文面が消えたことを確かめる**
 
 ```bash
-cd /d/work/kataaware && grep -c "（仮）" unity/Assets/Scenes/Room.unity; grep -c "RoomScript" unity/Assets/Scenes/Room.unity
+cd /d/work/kataaware && echo "label keys: $(grep -cE '^  label: ' unity/Assets/Scenes/Room.unity)"; echo "lines keys: $(grep -cE '^  lines:' unity/Assets/Scenes/Room.unity)"; echo "hints keys: $(grep -cE '^  hints:' unity/Assets/Scenes/Room.unity)"; echo "script refs: $(grep -c 041d521c5151e274996d894e143d3cb2 unity/Assets/Scenes/Room.unity)"
 ```
 
-Expected: 1 つ目は 0（埋め込みの仮の文が落ちた）、2 つ目は 0 より大きい（アセットへの参照が入った。GUID で書かれるため `grep` はメタ情報側に当たる。0 のときは `git diff unity/Assets/Scenes/Room.unity` で `m_Script` 以外の参照が増えていることを目で確かめる）。
+Expected: `label` / `lines` / `hints` の 3 つが 0（埋め込みの文面が落ちた。この作業の前はそれぞれ 5）、`script refs` が 5（5 つの対象それぞれに文面のアセットへの参照が入った）。`041d52...` は `unity/Assets/Data/RoomScript.asset.meta` の `guid`。
 
 - [ ] **Step 5: テストとコミット**
 
-`run_tests` → `get_test_job`。Expected: 34 件 passed。
+`run_tests` → `get_test_job`。Expected: 35 件 passed。
 
 ```bash
 cd /d/work/kataaware && git status --short && git add unity/Assets/Scripts/Interaction/Interactable.cs unity/Assets/Scenes/Room.unity && git commit -m "feat: read the label and the lines of an interactable from the room script"
@@ -707,7 +729,7 @@ namespace HalfAware
 - [ ] **Step 4: テストが通ることを確認**
 
 `refresh_unity` → `read_console`（エラー・警告 0）→ `run_tests` → `get_test_job`。
-Expected: 41 件 passed（34 + 7 件）、failed 0。
+Expected: 42 件 passed（35 + 7 件）、failed 0。
 
 - [ ] **Step 5: コミット**
 
@@ -871,7 +893,7 @@ namespace HalfAware
 - [ ] **Step 4: テストが通ることを確認**
 
 `refresh_unity` → `read_console`（エラー・警告 0）→ `run_tests` → `get_test_job`。
-Expected: 48 件 passed（41 + 7 件）、failed 0。
+Expected: 49 件 passed（42 + 7 件）、failed 0。
 
 - [ ] **Step 5: コミット**
 
@@ -1029,7 +1051,7 @@ namespace HalfAware
 - [ ] **Step 2: コンパイルとテストを確認**
 
 `refresh_unity` → `read_console`（エラー・警告 0）→ `run_tests` → `get_test_job`。
-Expected: 48 件 passed。
+Expected: 49 件 passed。
 
 - [ ] **Step 3: コミット**
 
@@ -1204,7 +1226,7 @@ namespace HalfAware
 - [ ] **Step 2: コンパイルとテストを確認**
 
 `refresh_unity` → `read_console`（エラー・警告 0）→ `run_tests` → `get_test_job`。
-Expected: 48 件 passed。
+Expected: 49 件 passed。
 
 - [ ] **Step 3: コミット**
 
@@ -1316,7 +1338,7 @@ namespace HalfAware
 - [ ] **Step 2: コンパイルとテストを確認**
 
 `refresh_unity` → `read_console`（エラー・警告 0）→ `run_tests` → `get_test_job`。
-Expected: 48 件 passed。
+Expected: 49 件 passed。
 
 - [ ] **Step 3: コミット**
 
@@ -1557,7 +1579,7 @@ Expected: すべての参照が `True`、`standAfter=cigarette`、`seatEye=1.1`�
 
 - [ ] **Step 6: テストとコミット**
 
-`run_tests` → `get_test_job`。Expected: 48 件 passed。
+`run_tests` → `get_test_job`。Expected: 49 件 passed。
 
 ```bash
 cd /d/work/kataaware && git status --short && git add unity/Assets/Scenes/Room.unity unity/Assets/Materials && git commit -m "feat: place the jack, the cigarette and the chair, and wire the scene 1 sequence"
