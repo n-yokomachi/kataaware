@@ -908,7 +908,7 @@ cd /d/work/kataaware && git add unity/Assets/Scripts unity/Assets/Tests && git c
 **Files:**
 - Modify: `unity/Assets/Scripts/Hud/HudView.cs`
 
-- [ ] **Step 1: 書き換える**
+- [x] **Step 1: 書き換える**
 
 `unity/Assets/Scripts/Hud/HudView.cs` を全文次に置き換える:
 
@@ -1048,12 +1048,12 @@ namespace HalfAware
 }
 ```
 
-- [ ] **Step 2: コンパイルとテストを確認**
+- [x] **Step 2: コンパイルとテストを確認**
 
 `refresh_unity` → `read_console`（エラー・警告 0）→ `run_tests` → `get_test_job`。
 Expected: 49 件 passed。
 
-- [ ] **Step 3: コミット**
+- [x] **Step 3: コミット**
 
 ```bash
 cd /d/work/kataaware && git add unity/Assets/Scripts/Hud/HudView.cs && git commit -m "feat: add the fade layer and the smoke layer to the HUD"
@@ -1066,7 +1066,7 @@ cd /d/work/kataaware && git add unity/Assets/Scripts/Hud/HudView.cs && git commi
 **Files:**
 - Modify: `unity/Assets/Scripts/Flow/SceneFlow.cs`
 
-- [ ] **Step 1: 書き換える**
+- [x] **Step 1: 書き換える**
 
 `unity/Assets/Scripts/Flow/SceneFlow.cs` を全文次に置き換える:
 
@@ -1223,12 +1223,12 @@ namespace HalfAware
 
 `standAfter` と `dazeUntil` の既定は空なので、シーンを繋ぐ前は段階 2 と同じ動き（立って始まり、眩暈なし）のまま。
 
-- [ ] **Step 2: コンパイルとテストを確認**
+- [x] **Step 2: コンパイルとテストを確認**
 
 `refresh_unity` → `read_console`（エラー・警告 0）→ `run_tests` → `get_test_job`。
 Expected: 49 件 passed。
 
-- [ ] **Step 3: コミット**
+- [x] **Step 3: コミット**
 
 ```bash
 cd /d/work/kataaware && git add unity/Assets/Scripts/Flow/SceneFlow.cs && git commit -m "feat: add the freeze, the seat, the daze and the fade to the scene flow"
@@ -1241,7 +1241,7 @@ cd /d/work/kataaware && git add unity/Assets/Scripts/Flow/SceneFlow.cs && git co
 **Files:**
 - Create: `unity/Assets/Scripts/Flow/RoomIntroDirector.cs`
 
-- [ ] **Step 1: 書く**
+- [x] **Step 1: 書く**
 
 `unity/Assets/Scripts/Flow/RoomIntroDirector.cs`:
 
@@ -1335,15 +1335,15 @@ namespace HalfAware
 
 クレジットの名義はオーナーが決めるまで `〔名義〕` のまま（シナリオ設計書 4.1）。
 
-- [ ] **Step 2: コンパイルとテストを確認**
+- [x] **Step 2: コンパイルとテストを確認**
 
 `refresh_unity` → `read_console`（エラー・警告 0）→ `run_tests` → `get_test_job`。
 Expected: 49 件 passed。
 
-- [ ] **Step 3: コミット**
+- [x] **Step 3: コミット**
 
 ```bash
-cd /d/work/kataaware && git add unity/Assets/Scripts/Flow/RoomIntroDirector.cs && git commit -m "feat: add the credits, the title and the cigarette sequence of scene 1"
+cd /d/work/kataaware && git add unity/Assets/Scripts/Flow && git commit -m "feat: add the credits, the title and the cigarette sequence of scene 1"
 ```
 
 ---
