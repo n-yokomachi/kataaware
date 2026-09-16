@@ -32,6 +32,16 @@ namespace HalfAware
         [Tooltip("この id を調べると立ち上がって移動できるようになる。空なら最初から立っている")]
         [SerializeField] string standAfter = "";
 
+        [Header("目覚めの起き上がり")]
+        [Tooltip("座位の目線からどれだけ下から始めるか。メートル")]
+        [SerializeField] float wakeDrop = WakeUp.DefaultDrop;
+        [Tooltip("始まりの伏し目の角度。度")]
+        [SerializeField] float wakeStartPitch = WakeUp.DefaultStartPitch;
+        [Tooltip("起き上がりにかける秒数。0 なら起き上がりを入れない")]
+        [SerializeField] float wakeSeconds = WakeUp.DefaultSeconds;
+        [Tooltip("自分の体。座っている間はカメラが中に入るので伏せる。立ったら出す")]
+        [SerializeField] GameObject body;
+
         [Header("入ったときの眩暈")]
         [SerializeField] float dazeBlur = 1f;
         [SerializeField] float dazeWobble = 1f;
@@ -44,6 +54,7 @@ namespace HalfAware
         List<IInteractable> items;
         SceneProgress progress;
         StandUp standUp;
+        WakeUp wakeUp;
         bool pendingInteract;
         float frozenUntil;
         bool dazeReleased;
@@ -78,6 +89,15 @@ namespace HalfAware
                 standUp = new StandUp(seatEyeHeight, PlayerController.StandingEyeHeight, StandSeconds);
                 player.CanMove = false;
                 player.EyeHeight = seatEyeHeight;
+                // 座っている間、体はカメラを包んでしまうので伏せておく
+                if (body != null) body.SetActive(false);
+                wakeUp = new WakeUp(seatEyeHeight, wakeDrop, wakeStartPitch, wakeSeconds);
+                if (!wakeUp.Done)
+                {
+                    player.EyeHeight = wakeUp.EyeHeight;
+                    player.Pitch = wakeUp.Pitch;
+                    player.CanLook = false;
+                }
             }
             if (daze != null && dazeUntil.Length > 0) daze.Hold(dazeBlur, dazeWobble);
         }
@@ -118,6 +138,7 @@ namespace HalfAware
             // 調べた先の演出が Freeze を呼ぶので、止まっているかは調べた後に見直す
             var frozenNow = Frozen;
             ReleaseDaze();
+            Wake();
             Stand(frozenNow);
             hud.SetSubtitle(subtitles.Current);
             if (progress.IsComplete && !subtitles.IsTalking && !frozenNow) StartCoroutine(Complete());
@@ -132,13 +153,27 @@ namespace HalfAware
             daze.Decay(dazeBlur, dazeWobble, dazeSeconds);
         }
 
+        /// <summary>始まりの起き上がり。終わるまで見回しを預かる</summary>
+        void Wake()
+        {
+            if (wakeUp == null || wakeUp.Done) return;
+            wakeUp.Tick(Time.deltaTime);
+            player.EyeHeight = wakeUp.EyeHeight;
+            player.Pitch = wakeUp.Pitch;
+            if (!wakeUp.Done) return;
+            player.CanLook = true;
+        }
+
         /// <summary>standAfter の対象を調べたら、止まっていない間に目線を上げて移動を許す</summary>
         void Stand(bool frozen)
         {
             if (standUp == null || standUp.Standing) return;
+            if (wakeUp != null && !wakeUp.Done) return;   // 起き上がりが先
             standUp.Tick(Time.deltaTime, progress.Done.Contains(standAfter), frozen);
             player.EyeHeight = standUp.EyeHeight;
             player.CanMove = standUp.Standing;
+            // 立ち上がりきってから体を出す。座位の姿勢ができたら、この出し分けは要らなくなる
+            if (standUp.Standing && body != null && !body.activeSelf) body.SetActive(true);
         }
 
         IEnumerator Complete()
