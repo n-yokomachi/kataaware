@@ -394,7 +394,7 @@ cd /d/work/kataaware && git add unity/Assets/Data unity/Assets/Data.meta && git 
 - Modify: `unity/Assets/Scripts/Interaction/Interactable.cs`
 - Modify: `unity/Assets/Scenes/Room.unity`
 
-- [ ] **Step 1: `Interactable` を書き換える**
+- [x] **Step 1: `Interactable` を書き換える**
 
 `unity/Assets/Scripts/Interaction/Interactable.cs` を全文次に置き換える:
 
@@ -471,12 +471,12 @@ namespace HalfAware
 
 `Label` は選ばれた対象 1 つにつき 1 フレーム 1 回、`Lines` と `HintFor` は調べたときだけ引かれる。文面は 8 件なので線形の検索で足りる。
 
-- [ ] **Step 2: コンパイルを確認**
+- [x] **Step 2: コンパイルを確認**
 
 `refresh_unity` → `read_console`（`types: ["error"]`）。
-Expected: エラー 0。シーン側の `label` / `lines` / `hints` は参照されなくなるだけで、この時点では警告も出ない。
+Expected: エラー 0。文面のアセットをまだ繋いでいないので、`OnValidate` の警告「Interactable に文面のアセットがない」がシーンの対象 5 件それぞれに 1 回出る。これは Step 3 で消える。
 
-- [ ] **Step 3: シーンの対象に文面のアセットを繋ぐ**
+- [x] **Step 3: シーンの対象に文面のアセットを繋ぐ**
 
 `execute_code`:
 
@@ -502,7 +502,7 @@ return report + "saved " + items.Length;
 
 Expected: 5 件それぞれに文面から引いた印と件数が出る（`chips label=チップを抜く lines=7`、`terminal label=端末 lines=11`、`door label=ドア lines=1`、`clipboard label=紙ばさみ lines=2`、`ashtray label=灰皿 lines=1`）、最後に `saved 5`。`read_console` でエラー 0。
 
-- [ ] **Step 4: シーンから古い文面が消えたことを確かめる**
+- [x] **Step 4: シーンから古い文面が消えたことを確かめる**
 
 ```bash
 cd /d/work/kataaware && echo "label keys: $(grep -cE '^  label: ' unity/Assets/Scenes/Room.unity)"; echo "lines keys: $(grep -cE '^  lines:' unity/Assets/Scenes/Room.unity)"; echo "hints keys: $(grep -cE '^  hints:' unity/Assets/Scenes/Room.unity)"; echo "script refs: $(grep -c 041d521c5151e274996d894e143d3cb2 unity/Assets/Scenes/Room.unity)"
@@ -510,7 +510,7 @@ cd /d/work/kataaware && echo "label keys: $(grep -cE '^  label: ' unity/Assets/S
 
 Expected: `label` / `lines` / `hints` の 3 つが 0（埋め込みの文面が落ちた。この作業の前はそれぞれ 5）、`script refs` が 5（5 つの対象それぞれに文面のアセットへの参照が入った）。`041d52...` は `unity/Assets/Data/RoomScript.asset.meta` の `guid`。
 
-- [ ] **Step 5: テストとコミット**
+- [x] **Step 5: テストとコミット**
 
 `run_tests` → `get_test_job`。Expected: 35 件 passed。
 
