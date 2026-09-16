@@ -15,6 +15,9 @@ namespace HalfAware
         /// <summary>煙が消えるのにかける秒数</summary>
         public const float SmokeFadeSeconds = 1f;
 
+        /// <summary>煙のいちばん濃いときの不透明度。向こう側が透けて見える濃さに留める</summary>
+        public const float SmokePeakAlpha = 0.45f;
+
         [SerializeField] GameObject subtitleBand;
         [SerializeField] TMP_Text subtitleText;
         [SerializeField] TMP_Text promptText;
@@ -102,14 +105,14 @@ namespace HalfAware
         {
             for (var t = 0f; t < SmokeFadeSeconds; t += Time.deltaTime)
             {
-                SetSmoke(t / SmokeFadeSeconds);
+                SetSmoke(SmokePeakAlpha * t / SmokeFadeSeconds);
                 yield return null;
             }
-            SetSmoke(1f);
+            SetSmoke(SmokePeakAlpha);
             yield return new WaitForSeconds(Mathf.Max(0f, seconds - SmokeFadeSeconds));
             for (var t = 0f; t < SmokeFadeSeconds; t += Time.deltaTime)
             {
-                SetSmoke(1f - t / SmokeFadeSeconds);
+                SetSmoke(SmokePeakAlpha * (1f - t / SmokeFadeSeconds));
                 yield return null;
             }
             SetSmoke(0f);
