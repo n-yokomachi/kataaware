@@ -40,10 +40,9 @@ Shader "HalfAware/Daze"
                 return SAMPLE_TEXTURE2D_X_LOD(_BlitTexture, sampler_LinearClamp, uv, _BlitMipLevel);
             }
 
-            // 3x3 の平均。二重像が溶け合わない程度の弱いぼかしに留める
+            // 3x3 の平均。二重像が溶け合わない程度の弱いぼかしに留める。半径 0 なら同じ点を 9 回読むので素通しになる
             float4 Soften(float2 uv, float r)
             {
-                if (r <= 0.0) return Tap(uv);
                 float4 sum = 0.0;
                 [unroll]
                 for (int i = -1; i <= 1; i++)
