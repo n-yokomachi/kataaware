@@ -287,7 +287,7 @@ cd /d/work/kataaware && git add unity/Assets/Shaders unity/Assets/Shaders.meta u
 **Files:**
 - Modify: `unity/Assets/Scripts/Fx/DazeVolume.cs`
 
-- [ ] **Step 1: 書き換える**
+- [x] **Step 1: 書き換える**
 
 `unity/Assets/Scripts/Fx/DazeVolume.cs` を全文次に置き換える:
 
@@ -344,12 +344,12 @@ namespace HalfAware
 
 `Daze` は変えない。テストもそのまま通る。
 
-- [ ] **Step 2: コンパイルとテストを確かめる**
+- [x] **Step 2: コンパイルとテストを確かめる**
 
 `refresh_unity` → `read_console`（エラー・警告 0）→ `run_tests` → `get_test_job`。
 Expected: 60 件 passed。
 
-- [ ] **Step 3: コミット**
+- [x] **Step 3: コミット**
 
 ```bash
 cd /d/work/kataaware && git add unity/Assets/Scripts/Fx/DazeVolume.cs && git commit -m "feat: hand the daze strength to the shaders"
