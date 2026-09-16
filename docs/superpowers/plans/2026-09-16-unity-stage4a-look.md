@@ -488,7 +488,7 @@ cd /d/work/kataaware && git status --short && git add unity/Assets/Settings/PC_R
 - Create: `unity/Assets/Settings/RoomVolumeProfile.asset`
 - Modify: `unity/Assets/Scenes/Room.unity`（`Global Volume` が指す設定資産のみ）
 
-- [ ] **Step 1: 設定資産を作る**
+- [x] **Step 1: 設定資産を作る**
 
 `execute_code`:
 
@@ -534,7 +534,7 @@ return path + " components: " + names.Trim() + " filter=" + color.colorFilter.va
 
 Expected: 戻り値に `components: ColorAdjustments Tonemapping` が含まれ、`filter` が白よりわずかに青い値（各成分が 0.94 前後から 1.0）。
 
-- [ ] **Step 2: シーンの `Global Volume` を向け直す**
+- [x] **Step 2: シーンの `Global Volume` を向け直す**
 
 `execute_code`:
 
@@ -556,7 +556,7 @@ return before + " -> " + volume.sharedProfile.name + " isGlobal=" + volume.isGlo
 
 Expected: 戻り値 `SampleSceneProfile -> RoomVolumeProfile isGlobal=True`。
 
-- [ ] **Step 3: シーンの差分が 1 か所だけか確かめてコミット**
+- [x] **Step 3: シーンの差分が 1 か所だけか確かめてコミット**
 
 ```bash
 cd /d/work/kataaware && git diff --stat unity/Assets/Scenes/Room.unity && git diff unity/Assets/Scenes/Room.unity | grep -E "^[-+]" | grep -v "^[-+][-+]" | head -10
