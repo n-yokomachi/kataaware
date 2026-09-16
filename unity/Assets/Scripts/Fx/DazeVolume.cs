@@ -3,12 +3,15 @@ using UnityEngine;
 namespace HalfAware
 {
     /// <summary>
-    /// 眩暈の強さをシーンに置く。SceneFlow が Hold と Decay を呼び、段階 4 の後処理がここから数値を読む。
+    /// 眩暈の強さをシーンに置く。SceneFlow が Hold と Decay を呼び、毎フレーム シェーダのグローバル変数へ入れる。
     /// SceneFlow より後に Update が走るよう実行順を後ろに置く
     /// </summary>
     [DefaultExecutionOrder(10)]
     public sealed class DazeVolume : MonoBehaviour
     {
+        static readonly int BlurId = Shader.PropertyToID("_DazeBlur");
+        static readonly int WobbleId = Shader.PropertyToID("_DazeWobble");
+
         readonly Daze daze = new Daze();
 
         public float Blur => daze.Blur;
@@ -21,6 +24,25 @@ namespace HalfAware
 
         public void Clear() => daze.Clear();
 
-        void Update() => daze.Tick(Time.deltaTime);
+        void OnEnable() => Push();
+
+        /// <summary>グローバル変数は再生を抜けても残るので、消えるときに 0 へ戻す。戻さないとシーンビューが眩暈のままになる</summary>
+        void OnDisable()
+        {
+            Shader.SetGlobalFloat(BlurId, 0f);
+            Shader.SetGlobalFloat(WobbleId, 0f);
+        }
+
+        void Update()
+        {
+            daze.Tick(Time.deltaTime);
+            Push();
+        }
+
+        void Push()
+        {
+            Shader.SetGlobalFloat(BlurId, daze.Blur);
+            Shader.SetGlobalFloat(WobbleId, daze.Wobble);
+        }
     }
 }
