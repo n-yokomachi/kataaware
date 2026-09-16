@@ -5,8 +5,8 @@ namespace HalfAware
 {
     /// <summary>
     /// 場面 1 固有の演出。始まってすぐ最初の独白を流す。
-    /// 煙草を取ったら煙を立てて操作を止め、そのあいだに 3 回の瞬きを挟む。
-    /// 瞼が閉じているあいだにクレジットとタイトルのカードを出し、目を開けると消えている。
+    /// 煙草を取ったら煙を立てて操作を止め、そのあいだに黒い幕を 3 回通す。
+    /// 幕が覆っているあいだにクレジットとタイトルのカードを出し、幕が抜けると消えている。
     /// 吸い終わりの独白で締める。SceneFlow とは Examined / Say / Freeze だけで繋ぐ
     /// </summary>
     public sealed class RoomIntroDirector : MonoBehaviour
@@ -14,16 +14,14 @@ namespace HalfAware
         /// <summary>停止に足す余裕。停止が先に切れて、演出の途中で調べられるのを防ぐ</summary>
         public const float FreezeMargin = 0.25f;
 
-        [Header("瞬きの間。遊びながら詰められるよう Inspector に出してある")]
-        [Tooltip("瞼が閉じるのにかける秒数。開くより速い")]
-        [SerializeField] float blinkCloseSeconds = 0.32f;
-        [Tooltip("閉じきって止まっている秒数。カードを読む時間")]
-        [SerializeField] float blinkHoldSeconds = 2.6f;
-        [Tooltip("瞼が開くのにかける秒数")]
-        [SerializeField] float blinkOpenSeconds = 0.5f;
-        [Tooltip("瞬きと瞬きのあいだ、目を開けている秒数")]
-        [SerializeField] float blinkGapSeconds = 1.2f;
-        [Tooltip("煙草を取ってから最初の瞬きまでの秒数")]
+        [Header("幕の間。遊びながら詰められるよう Inspector に出してある")]
+        [Tooltip("黒い幕が画面を通り抜けるのにかける秒数。入りと出でそれぞれこの長さ")]
+        [SerializeField] float panSeconds = 0.55f;
+        [Tooltip("幕が覆ったまま止まっている秒数。カードを読む時間")]
+        [SerializeField] float holdSeconds = 2.6f;
+        [Tooltip("幕と幕のあいだ、画面が見えている秒数")]
+        [SerializeField] float gapSeconds = 1.2f;
+        [Tooltip("煙草を取ってから最初の幕までの秒数")]
         [SerializeField] float leadInSeconds = 0.8f;
 
         [SerializeField] SceneFlow flow;
@@ -31,8 +29,8 @@ namespace HalfAware
         [Tooltip("この id を調べたら煙草の演出を始める")]
         [SerializeField] string cigaretteId = "cigarette";
         [SerializeField] string[] firstLines = { "うぅ…今回は酔いが酷い…" };
-        [Tooltip("瞬き 1 回につき 1 枚。空の要素は文字を出さずに閉じて開くだけ")]
-        [SerializeField, TextArea] string[] blinkCards = new string[0];
+        [Tooltip("幕 1 回につき 1 枚。空の要素は文字を出さずに通り抜けるだけ")]
+        [SerializeField, TextArea] string[] cards = new string[0];
         [SerializeField] string[] afterSmokeLines = { "煙草が切れた…買いに行くついでに今日のメモリも売っちゃおう" };
 
         bool smoking;
@@ -42,8 +40,8 @@ namespace HalfAware
         {
             get
             {
-                var blink = blinkCloseSeconds + blinkHoldSeconds + blinkOpenSeconds + blinkGapSeconds;
-                return leadInSeconds + blink * Mathf.Max(1, blinkCards.Length);
+                var one = panSeconds * 2f + holdSeconds + gapSeconds;
+                return leadInSeconds + one * Mathf.Max(1, cards.Length);
             }
         }
 
@@ -65,7 +63,7 @@ namespace HalfAware
             smoking = false;
             if (hud == null) return;
             hud.SetCenter(null);
-            hud.SetEyelids(0f);
+            hud.SetCurtain(1f);
             hud.CancelSmoke();
         }
 
@@ -91,36 +89,39 @@ namespace HalfAware
             hud.ShowSmoke(SmokeSeconds);
             flow.Freeze(leadInSeconds + FreezeMargin);
             yield return new WaitForSeconds(leadInSeconds);
-            foreach (var card in blinkCards)
+            foreach (var card in cards)
             {
                 if (flow.Completed) yield break;
-                flow.Freeze(blinkCloseSeconds + blinkHoldSeconds + blinkOpenSeconds + blinkGapSeconds + FreezeMargin);
-                yield return Blink(card);
-                yield return new WaitForSeconds(blinkGapSeconds);
+                flow.Freeze(panSeconds * 2f + holdSeconds + gapSeconds + FreezeMargin);
+                yield return Pan(card);
+                yield return new WaitForSeconds(gapSeconds);
             }
             smoking = false;
             if (flow.Completed) yield break;
             flow.Say(afterSmokeLines);
         }
 
-        /// <summary>瞼を閉じ、閉じきったあいだにカードを出し、また開く。閉じる方が速く、開く方が遅い</summary>
-        IEnumerator Blink(string card)
+        /// <summary>
+        /// 黒い幕を上から下へ通す。覆いきったあいだにカードを出し、そのまま下へ抜ける。
+        /// 抜けた後は上へ戻しておく。画面の外なので見えない
+        /// </summary>
+        IEnumerator Pan(string card)
         {
-            for (var t = 0f; t < blinkCloseSeconds; t += Time.deltaTime)
+            for (var t = 0f; t < panSeconds; t += Time.deltaTime)
             {
-                hud.SetEyelids(t / blinkCloseSeconds);
+                hud.SetCurtain(1f - t / panSeconds);
                 yield return null;
             }
-            hud.SetEyelids(1f);
+            hud.SetCurtain(0f);
             if (!string.IsNullOrEmpty(card)) hud.SetCenter(card);
-            yield return new WaitForSeconds(blinkHoldSeconds);
+            yield return new WaitForSeconds(holdSeconds);
             hud.SetCenter(null);
-            for (var t = 0f; t < blinkOpenSeconds; t += Time.deltaTime)
+            for (var t = 0f; t < panSeconds; t += Time.deltaTime)
             {
-                hud.SetEyelids(1f - t / blinkOpenSeconds);
+                hud.SetCurtain(-t / panSeconds);
                 yield return null;
             }
-            hud.SetEyelids(0f);
+            hud.SetCurtain(1f);
         }
     }
 }
