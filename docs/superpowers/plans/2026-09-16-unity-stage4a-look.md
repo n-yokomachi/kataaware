@@ -576,12 +576,12 @@ cd /d/work/kataaware && git add unity/Assets/Settings/RoomVolumeProfile.asset un
 
 **Files:** なし
 
-- [ ] **Step 1: 再生に入る**
+- [x] **Step 1: 再生に入る**
 
 `read_console`（`action: "clear"`）→ `execute_code` で `EditorApplication.isPlaying` を読み、`False` を確かめる → `manage_editor`（`action: "play"`）→ `execute_code` で `Application.runInBackground = true;` → `read_console`（`types: ["error", "warning"]`）。
 Expected: エラー 0。シェーダの実行時の誤りはここで出る。
 
-- [ ] **Step 2: 導入のあいだ（眩暈が最大）の画面を撮る**
+- [x] **Step 2: 導入のあいだ（眩暈が最大）の画面を撮る**
 
 `execute_code`:
 
@@ -595,7 +595,7 @@ return "blur=" + daze.Blur.ToString("0.00") + " wobble=" + daze.Wobble.ToString(
 数秒後に `D:\work\kataaware\unity\Temp\stage4a-01-daze.png` を Read で見る。
 Expected: `blur=1.00`。画面は画素が粗く、輪郭が歪み、全体がぼやけている。字幕と中央の文字は粗くならず、くっきりしたまま。
 
-- [ ] **Step 3: 眩暈を切った画面を撮る**
+- [x] **Step 3: 眩暈を切った画面を撮る**
 
 `execute_code`:
 
@@ -609,7 +609,7 @@ return "blur=" + daze.Blur.ToString("0.00") + " wobble=" + daze.Wobble.ToString(
 次の呼び出しで `ScreenCapture.CaptureScreenshot("Temp/stage4a-02-clear.png");` を撮り、Read で見る。
 Expected: `blur=0.00 wobble=0.00`。画面は粗いまま（減色とディザは効いている）が、歪みとぼやけが消えている。
 
-- [ ] **Step 4: 減色とディザを素通しにして比べる**
+- [x] **Step 4: 減色とディザを素通しにして比べる**
 
 `execute_code`:
 
@@ -634,7 +634,7 @@ return "amount=" + ps1.GetFloat("_Amount");
 
 Expected: `amount=1`。
 
-- [ ] **Step 5: 止めて後始末**
+- [x] **Step 5: 止めて後始末**
 
 `execute_code` で `Time.timeScale = 1f; Application.runInBackground = false;` → `manage_editor`（`action: "stop"`）→ `read_console`（`types: ["error"]`）。
 
@@ -644,7 +644,7 @@ cd /d/work/kataaware && git status --short && grep -n "runInBackground" unity/Pr
 
 Expected: エラー 0、`runInBackground: 0`、作業ツリーはこのプランのファイル以外きれい。`Room.unity` に差分が出ていたら `git checkout` で戻す。フォントのアトラスが出ていたら同じく戻す。
 
-- [ ] **Step 6: オーナーに手元の確認を頼む**
+- [x] **Step 6: オーナーに手元の確認を頼む**
 
 （親セッションが行う。あなたは実施しない）
 
@@ -659,3 +659,18 @@ Expected: エラー 0、`runInBackground: 0`、作業ツリーはこのプラン
 - 端末の黒い画面に映る顔の反射。片割れの顔のモデルが要るので、固有物の生成より後
 - `Daze` が素通しのときも後処理は走る。`DazeVolume.IsClear` を見て `FullScreenPassRendererFeature.SetActive(false)` に切り替えれば省ける。WebGL の負荷を見てから決める
 - 音（効果音、英語の合成音声のサンプリング、BGM）
+
+---
+
+## 締めた後に直したこと
+
+計画の実行後、オーナーが実機で見て出た指摘を直した。以下は記録であり、上のタスクの記述は実行時のまま残してある。
+
+- `accceb4` `47b9a55` 眩暈が正弦波で UV を歪ませる作りだった。画面で見ると熱で空気が揺らいでいるように見え、酔いに結びつかない。同じ絵を少しずらして 2 枚重ね、ずれの向きをゆっくり回す形に替えた。ぼかしは 2 枚が溶け合わない程度まで小さくした。材質の調整項目は、ずれの大きさ・ぼかしの半径・2 枚の混ざり具合・画面の漂いの 4 つ
+- `e2b2078` `255e4f3` `05dbf2d` 視点そのものをゆっくり漂わせる仕組みを足した。後処理で絵をずらすのは画面が滑るだけで、身体が揺れている感じにならないため。漂いの計算は純粋な C# に切り出してテストで固定し、眩暈の強さに比例させて、引けば完全に止まるようにした。後処理側の漂いは 0 にした
+- `412a37c` その漂いを入れた直後、カーソルのロックが外れている間に視界が回り続ける不具合が出た。目の向きはロック中しか書き直されない作りだったのに、漂いを毎フレーム掛け算で上乗せしていたため、ずれが溜まっていた。位置と向きを常に毎フレーム書き直す形に変え、漂いは値を渡すだけにして変換に触れないようにした。あわせて、下を向いた状態で左右に傾けても画面が回らない順序に組み直した。動作確認から視線を向けられるよう `PlayerController.Pitch` を公開した（段階 3 の確認手順はカメラの向きを直接書いていたが、その方法はもう効かない）
+
+段階 4-a で分かった見え方の癖:
+
+- 二重像は輪郭のはっきりした物ではよく見えるが、平らな面では滲みに近く見える。今は仮の箱ばかりなので、段階 4-b で家具に差し替わると印象が変わる可能性がある
+- 字幕・印・中央の文字は画面空間の Canvas に載っているため粗くならない。設計どおりだが、煙の層も同じ Canvas にあるので背景より鮮明に見える。世界の側に見せるなら Canvas から出す必要がある
