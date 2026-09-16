@@ -174,7 +174,7 @@ cd /d/work/kataaware && git add unity/Assets/Shaders unity/Assets/Shaders.meta u
 - Create: `unity/Assets/Shaders/Daze.shader`
 - Create: `unity/Assets/Materials/Fx/Daze.mat`
 
-- [ ] **Step 1: シェーダを書く**
+- [x] **Step 1: シェーダを書く**
 
 `unity/Assets/Shaders/Daze.shader`:
 
@@ -248,12 +248,12 @@ Shader "HalfAware/Daze"
 
 揺れと半径の数値は試作（`prototype-three/src/fx/daze-pass.ts`）と同じ。ただし試作は画面いっぱいの解像度で掛けていたのに対し、ここは 3 分の 1 の上で掛かるので、見え方が強すぎるか弱すぎるかは Task 6 で見て決める。
 
-- [ ] **Step 2: 取り込みと組み立てを確かめる**
+- [x] **Step 2: 取り込みと組み立てを確かめる**
 
 `refresh_unity` → `read_console` → シェーダの検査を `Assets/Shaders/Daze.shader` に対して行う。
 Expected: コンソール 0 件、`isSupported=True messages=0`。
 
-- [ ] **Step 3: 材質を作る**
+- [x] **Step 3: 材質を作る**
 
 `execute_code`:
 
@@ -274,7 +274,7 @@ return path + " radius=" + mat.GetFloat("_BlurRadius") + " wobbleX=" + mat.GetFl
 
 Expected: 戻り値 `Assets/Materials/Fx/Daze.mat radius=0.012 wobbleX=0.03 wobbleY=0.02`。
 
-- [ ] **Step 4: コミット**
+- [x] **Step 4: コミット**
 
 ```bash
 cd /d/work/kataaware && git add unity/Assets/Shaders unity/Assets/Shaders.meta unity/Assets/Materials && git commit -m "feat: add the daze blur and wobble pass"
