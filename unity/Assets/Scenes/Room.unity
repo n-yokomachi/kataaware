@@ -1235,7 +1235,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: HalfAware::HalfAware.RoomIntroDirector
   holdSeconds: 2.6
-  gapSeconds: 1.2
+  gapSeconds: 2.4
   leadInSeconds: 0.8
   flow: {fileID: 835399815}
   hud: {fileID: 230293359}
