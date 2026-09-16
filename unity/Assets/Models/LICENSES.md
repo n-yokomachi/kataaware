@@ -3,6 +3,8 @@
 | 置き場 | 出典 | 許諾 |
 |---|---|---|
 | `kenney/` | Kenney Furniture Kit（https://kenney.nl/assets/furniture-kit） | Creative Commons CC0 1.0 |
+| `quaternius/` | Quaternius Ultimate Modular Women（https://quaternius.com/packs/ultimatemodularwomen.html） | 下の注記を参照 |
+| `generated/` | 自作。`Assets/Editor/ProcMesh.cs` で断面を張って作った物 | 本作の一部 |
 
 Kenney の素材は CC0 なので表示の義務は無いが、どこから来た物かを残すために記録する。
 
@@ -42,3 +44,17 @@ Kenney の素材は CC0 なので表示の義務は無いが、どこから来�
 窓は kit の `wallWindow.glb` を使うのをやめた。壁の板ごと部屋の中へせり出してしまうため、壁を 4 枚に割って穴を空け、枠とガラスを箱で組んでいる。ドアは `doorway.glb` をそのまま使うが、枠が 0.227 メートル厚で壁の前に立ってしまうので、背面の壁を 3 枚に割り、枠より 0.01 メートル小さい穴へ手前の面を揃えて沈めてある。
 
 長椅子の革は `Assets/Textures/Leather.png`（色の濃淡）と `LeatherNormal.png`（法線）で作った。詰め物のうねりと粒の 2 層から高さを作り、その傾きを符号付きで書き出したもの。`loungeSofa.glb` には接線が無く法線が効かないため、接線を付けた写しを `Assets/Models/generated/` に置いて場面ではそちらを使っている。
+
+## Quaternius の許諾について
+
+表記が 2 つ存在する。**パックに同梱されている `License.txt` は CC0 1.0 Universal（パブリックドメインの献呈）**と書いてある。一方、サイトの現行の許諾ページは Quaternius Asset License (QAL) v1.0 に変わっている。
+
+両者に共通するのは、表記不要・商用可・地域の制限なし・完成した作品への同梱は明示的に可、という点。異なるのは QAL だけが「素材そのものを単体の素材集・素材ファイル・雛形として抽出・再梱包・再配布すること」を禁じていること。
+
+本作は game の一部として同梱するので、どちらの読み方でも問題ない。CC0 の献呈は撤回できないため、同梱の License.txt を伴って配られた版は CC0 として扱える。
+
+ただし**この repo を公開する場合は、生の `.fbx` を置いたままにしない**こと。QAL の側で読むと、素材ファイルそのものの再配布に当たりうる。
+
+## 取り込みの注意
+
+人体は **FBX で取り込む**。`.gltf` は glTFast が骨入りの mesh で `SortAndNormalizeBoneWeightsJob` のジョブ安全性の例外を出して失敗する。Kenney の家具は骨が無いので `.glb` のままで通っている。
