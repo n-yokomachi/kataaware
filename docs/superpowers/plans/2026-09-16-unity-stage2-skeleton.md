@@ -37,7 +37,8 @@
 | `Assets/Scripts/Player/PlayerController.cs` | 新規 | 歩く・見回す・カーソルのロック（CharacterController + Input System） |
 | `Assets/Tests/EditMode/HalfAware.Tests.EditMode.asmdef` | 新規 | テストアセンブリ |
 | `Assets/Tests/EditMode/SubtitleQueueTests.cs` | 新規 | 字幕の待ち行列のテスト |
-| `Assets/Tests/EditMode/InteractionPickerTests.cs` | 新規 | 選択の規則のテスト（テスト用の対象 `FakeItem` を含む） |
+| `Assets/Tests/EditMode/FakeItem.cs` | 新規 | テスト用の調べる対象（選択と進行のテストで共用） |
+| `Assets/Tests/EditMode/InteractionPickerTests.cs` | 新規 | 選択の規則のテスト |
 | `Assets/Tests/EditMode/SceneProgressTests.cs` | 新規 | 進行の判定のテスト |
 | `Assets/InputSystem_Actions.inputactions` | 変更 | `Interact` の Hold を外し、左クリックを追加 |
 | `Assets/Fonts/NotoSansJP-Regular.otf`, `Assets/Fonts/NotoSansJP-Regular SDF.asset`, `Assets/Fonts/LICENSES.md` | 新規 | 日本語フォントと出典 |
@@ -61,7 +62,7 @@
 - Create: `unity/Assets/Tests/EditMode/HalfAware.Tests.EditMode.asmdef`
 - Test: `unity/Assets/Tests/EditMode/SubtitleQueueTests.cs`
 
-- [ ] **Step 1: asmdef を 2 つ書く**
+- [x] **Step 1: asmdef を 2 つ書く**
 
 `unity/Assets/Scripts/HalfAware.asmdef`:
 
@@ -115,7 +116,7 @@
 }
 ```
 
-- [ ] **Step 2: 失敗するテストを書く**
+- [x] **Step 2: 失敗するテストを書く**
 
 `unity/Assets/Tests/EditMode/SubtitleQueueTests.cs`:
 
@@ -180,12 +181,12 @@ namespace HalfAware.Tests
 }
 ```
 
-- [ ] **Step 3: 失敗を確認**
+- [x] **Step 3: 失敗を確認**
 
 `refresh_unity`（`compile: "request"`）→ `read_console`（`types: ["error"]`）。
 Expected: `SubtitleQueue` が見つからないというコンパイルエラーが出る（テストアセンブリが組めないので、テストはまだ走らない）。
 
-- [ ] **Step 4: 実装**
+- [x] **Step 4: 実装**
 
 `unity/Assets/Scripts/Hud/SubtitleQueue.cs`:
 
@@ -231,12 +232,12 @@ namespace HalfAware
 }
 ```
 
-- [ ] **Step 5: テストが通ることを確認**
+- [x] **Step 5: テストが通ることを確認**
 
 `refresh_unity` → `read_console`（エラー 0）→ `run_tests` → `get_test_job`。
-Expected: `HalfAware.Tests.EditMode` の 5 件が passed、failed 0。
+Expected: `HalfAware.Tests.EditMode` の 5 件が passed、failed 0（この後のレビューで 6 件に増えた）。
 
-- [ ] **Step 6: コミット**
+- [x] **Step 6: コミット**
 
 ```bash
 cd /d/work/kataaware && git add unity/Assets/Scripts unity/Assets/Scripts.meta unity/Assets/Tests unity/Assets/Tests.meta && git commit -m "feat: add the HalfAware assemblies and the subtitle queue with EditMode tests"
@@ -251,7 +252,7 @@ cd /d/work/kataaware && git add unity/Assets/Scripts unity/Assets/Scripts.meta u
 - Create: `unity/Assets/Scripts/Interaction/InteractionPicker.cs`
 - Test: `unity/Assets/Tests/EditMode/InteractionPickerTests.cs`
 
-- [ ] **Step 1: 読み取り口を書く**
+- [x] **Step 1: 読み取り口を書く**
 
 `unity/Assets/Scripts/Interaction/IInteractable.cs`:
 
@@ -281,7 +282,7 @@ namespace HalfAware
 }
 ```
 
-- [ ] **Step 2: 失敗するテストを書く**
+- [x] **Step 2: 失敗するテストを書く**
 
 `unity/Assets/Tests/EditMode/InteractionPickerTests.cs`:
 
@@ -443,12 +444,12 @@ namespace HalfAware.Tests
 }
 ```
 
-- [ ] **Step 3: 失敗を確認**
+- [x] **Step 3: 失敗を確認**
 
 `refresh_unity` → `read_console`（`types: ["error"]`）。
 Expected: `InteractionPicker` が見つからないというコンパイルエラー。
 
-- [ ] **Step 4: 実装**
+- [x] **Step 4: 実装**
 
 `unity/Assets/Scripts/Interaction/InteractionPicker.cs`:
 
@@ -520,12 +521,12 @@ namespace HalfAware
 }
 ```
 
-- [ ] **Step 5: テストが通ることを確認**
+- [x] **Step 5: テストが通ることを確認**
 
 `refresh_unity` → `read_console`（エラー 0）→ `run_tests` → `get_test_job`。
-Expected: 18 件 passed（Task 1 の 5 件 + 13 件）、failed 0。
+Expected: 19 件 passed（Task 1 の 6 件 + 13 件）、failed 0（この後のレビューで 20 件に増えた）。
 
-- [ ] **Step 6: コミット**
+- [x] **Step 6: コミット**
 
 ```bash
 cd /d/work/kataaware && git add unity/Assets/Scripts unity/Assets/Tests && git commit -m "feat: add the interaction picker with its selection rules"
@@ -539,7 +540,7 @@ cd /d/work/kataaware && git add unity/Assets/Scripts unity/Assets/Tests && git c
 - Create: `unity/Assets/Scripts/Flow/SceneProgress.cs`
 - Test: `unity/Assets/Tests/EditMode/SceneProgressTests.cs`
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 `unity/Assets/Tests/EditMode/SceneProgressTests.cs`:
 
@@ -618,12 +619,12 @@ namespace HalfAware.Tests
 }
 ```
 
-- [ ] **Step 2: 失敗を確認**
+- [x] **Step 2: 失敗を確認**
 
 `refresh_unity` → `read_console`（`types: ["error"]`）。
 Expected: `SceneProgress` が見つからないというコンパイルエラー。
 
-- [ ] **Step 3: 実装**
+- [x] **Step 3: 実装**
 
 `unity/Assets/Scripts/Flow/SceneProgress.cs`:
 
@@ -668,12 +669,12 @@ namespace HalfAware
 }
 ```
 
-- [ ] **Step 4: テストが通ることを確認**
+- [x] **Step 4: テストが通ることを確認**
 
 `refresh_unity` → `read_console`（エラー 0）→ `run_tests` → `get_test_job`。
-Expected: 24 件 passed、failed 0。
+Expected: 26 件 passed、failed 0（この後のレビューで 27 件に増えた）。
 
-- [ ] **Step 5: コミット**
+- [x] **Step 5: コミット**
 
 ```bash
 cd /d/work/kataaware && git add unity/Assets/Scripts unity/Assets/Tests && git commit -m "feat: add the scene progress with the required-item completion"
@@ -690,7 +691,7 @@ MonoBehaviour なので単体テストは無い。コンパイルが通ること
 - Create: `unity/Assets/Scripts/Player/PlayerController.cs`
 - Modify: `unity/Assets/InputSystem_Actions.inputactions`
 
-- [ ] **Step 1: 入力アセットを調整する**
+- [x] **Step 1: 入力アセットを調整する**
 
 テンプレートの `Interact` には Hold（長押し）が付いているので外し、左クリックを追加する。リポジトリ直下で実行:
 
@@ -724,7 +725,7 @@ EOF
 
 確認: `git diff --stat unity/Assets/InputSystem_Actions.inputactions` に変更が出て、`grep -n '"interactions": "Hold"' unity/Assets/InputSystem_Actions.inputactions` が何も出さない。
 
-- [ ] **Step 2: `Interactable` を書く**
+- [x] **Step 2: `Interactable` を書く**
 
 `unity/Assets/Scripts/Interaction/Interactable.cs`:
 
@@ -780,11 +781,24 @@ namespace HalfAware
             Gizmos.color = required ? new Color(1f, 0.6f, 0.2f) : new Color(0.6f, 0.8f, 1f);
             Gizmos.DrawWireSphere(transform.position, 0.1f);
         }
+
+        void OnDrawGizmosSelected()
+        {
+            Gizmos.color = new Color(1f, 1f, 1f, 0.35f);
+            Gizmos.DrawWireSphere(transform.position, radius);
+        }
+
+#if UNITY_EDITOR
+        void OnValidate()
+        {
+            if (string.IsNullOrEmpty(id)) Debug.LogWarning("Interactable に id がない: " + name, this);
+        }
+#endif
     }
 }
 ```
 
-- [ ] **Step 3: `PlayerController` を書く**
+- [x] **Step 3: `PlayerController` を書く**
 
 `unity/Assets/Scripts/Player/PlayerController.cs`:
 
@@ -847,15 +861,16 @@ namespace HalfAware
         void Update()
         {
             InteractPressed = false;
+            eye.localPosition = new Vector3(0f, EyeHeight, 0f);
             if (!CursorLocked)
             {
-                // ロックするためのクリックは調べる操作に使わない
+                // ロックが外れている間はカーソルを見せる。ロックするためのクリックは調べる操作に使わない
+                Cursor.visible = true;
                 if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) Lock();
                 return;
             }
             InteractPressed = interact.WasPressedThisFrame();
             Look(look.ReadValue<Vector2>());
-            eye.localPosition = new Vector3(0f, EyeHeight, 0f);
             if (CanMove) Walk(move.ReadValue<Vector2>());
         }
 
@@ -881,17 +896,17 @@ namespace HalfAware
 }
 ```
 
-- [ ] **Step 4: コンパイルを確認**
+- [x] **Step 4: コンパイルを確認**
 
 `refresh_unity` → `read_console`（`types: ["error", "warning"]`）。
 Expected: エラー 0。`InputSystem_Actions.inputactions` の再取り込みで警告が出ないこと。
 
-- [ ] **Step 5: テストが引き続き通ることを確認**
+- [x] **Step 5: テストが引き続き通ることを確認**
 
 `run_tests` → `get_test_job`。
-Expected: 24 件 passed。
+Expected: 27 件 passed。
 
-- [ ] **Step 6: コミット**
+- [x] **Step 6: コミット**
 
 ```bash
 cd /d/work/kataaware && git add unity/Assets/Scripts unity/Assets/InputSystem_Actions.inputactions && git commit -m "feat: add the interactable component and the player controller"
@@ -905,7 +920,7 @@ cd /d/work/kataaware && git add unity/Assets/Scripts unity/Assets/InputSystem_Ac
 - Create: `unity/Assets/Scripts/Hud/HudView.cs`
 - Create: `unity/Assets/Scripts/Flow/SceneFlow.cs`
 
-- [ ] **Step 1: `HudView` を書く**
+- [x] **Step 1: `HudView` を書く**
 
 `unity/Assets/Scripts/Hud/HudView.cs`:
 
@@ -954,7 +969,7 @@ namespace HalfAware
 }
 ```
 
-- [ ] **Step 2: `SceneFlow` を書く**
+- [x] **Step 2: `SceneFlow` を書く**
 
 `unity/Assets/Scripts/Flow/SceneFlow.cs`:
 
@@ -988,7 +1003,14 @@ namespace HalfAware
 
         void Awake()
         {
-            items = new List<IInteractable>(FindObjectsByType<Interactable>(FindObjectsSortMode.None));
+            if (player == null || hud == null)
+            {
+                Debug.LogError("SceneFlow: player か hud が未接続", this);
+                enabled = false;
+                return;
+            }
+            items = new List<IInteractable>(FindObjectsByType<Interactable>(FindObjectsSortMode.InstanceID));
+            if (items.Count == 0) Debug.LogWarning("SceneFlow: 調べる対象が 1 つも見つからない", this);
             progress = new SceneProgress(items);
         }
 
@@ -1028,12 +1050,12 @@ namespace HalfAware
 }
 ```
 
-- [ ] **Step 3: コンパイルとテストを確認**
+- [x] **Step 3: コンパイルとテストを確認**
 
 `refresh_unity` → `read_console`（エラー 0）→ `run_tests` → `get_test_job`。
-Expected: 24 件 passed。
+Expected: 27 件 passed。
 
-- [ ] **Step 4: コミット**
+- [x] **Step 4: コミット**
 
 ```bash
 cd /d/work/kataaware && git add unity/Assets/Scripts && git commit -m "feat: add the HUD view and the scene flow"
@@ -1051,7 +1073,7 @@ cd /d/work/kataaware && git add unity/Assets/Scripts && git commit -m "feat: add
 - Create: `unity/Assets/Fonts/NotoSansJP-Regular SDF.asset`
 - Create: `unity/Assets/Fonts/LICENSES.md`
 
-- [ ] **Step 1: TMP の必須リソースを取り込む**
+- [x] **Step 1: TMP の必須リソースを取り込む**
 
 メニューの「Import TMP Essential Resources」はダイアログを出すので、`mcp__UnityMCP__execute_code`（`action: "execute"`）で非対話に取り込む:
 
@@ -1065,9 +1087,9 @@ return "imported " + path;
 
 確認: `refresh_unity` の後、`ls "unity/Assets/TextMesh Pro/Resources"` に `TMP Settings.asset` がある。
 
-- [ ] **Step 2: フォントを取得する（オーナーの許可が要る）**
+- [x] **Step 2: フォントを取得する（オーナーの許可が要る）**
 
-親セッションがオーナーの許可を得てから行う。取得元と大きさ:
+親セッションがオーナーの許可を得てから行う（実施済み）。取得元と大きさ:
 
 - `https://github.com/notofonts/noto-cjk/raw/main/Sans/SubsetOTF/JP/NotoSansJP-Regular.otf`（約 4.5 MB、OFL 1.1）
 
@@ -1087,7 +1109,7 @@ Expected: 4 MB 台のファイル。`file` か `head -c 4` で `OTTO` で始ま�
 | `NotoSansJP-Regular.otf` | Noto Sans JP（notofonts/noto-cjk、Sans/SubsetOTF/JP） | SIL Open Font License 1.1 |
 ```
 
-- [ ] **Step 3: TMP フォントアセットを作る**
+- [x] **Step 3: TMP フォントアセットを作る**
 
 `refresh_unity` でフォントを取り込んでから、`execute_code` で:
 
@@ -1112,7 +1134,7 @@ return AssetDatabase.GetAssetPath(asset) + " / default=" + (TMPro.TMP_Settings.d
 Expected: 戻り値が `Assets/Fonts/NotoSansJP-Regular SDF.asset / default=True`。`read_console` でエラー 0。
 うまくいかない場合は Window > TextMeshPro > Font Asset Creator で、Source Font = `NotoSansJP-Regular.otf`、Sampling Point Size = 64、Padding = 6、Atlas Resolution = 1024×1024、Render Mode = SDFAA、Character Set = ASCII で生成して同じパスに保存し、Inspector の Generation Settings で Atlas Population Mode を Dynamic にする。その場合はオーナーに手順を伝えて任せる。
 
-- [ ] **Step 4: コミット**
+- [x] **Step 4: コミット**
 
 ```bash
 cd /d/work/kataaware && git add "unity/Assets/TextMesh Pro" "unity/Assets/TextMesh Pro.meta" unity/Assets/Fonts unity/Assets/Fonts.meta && git commit -m "feat: import the TextMeshPro resources and add Noto Sans JP as the subtitle font"
@@ -1130,11 +1152,11 @@ cd /d/work/kataaware && git add "unity/Assets/TextMesh Pro" "unity/Assets/TextMe
 - Delete: `unity/Assets/TutorialInfo/`, `unity/Assets/Readme.asset`
 - Modify: `unity/ProjectSettings/EditorBuildSettings.asset`
 
-- [ ] **Step 1: 現状を見る**
+- [x] **Step 1: 現状を見る**
 
 `manage_scene`（`action: "get_active"`）で `SampleScene.unity` が開いていることと、`manage_scene`（`action: "get_hierarchy"`）で `Main Camera`、`Directional Light`、`Global Volume` の 3 つだけであることを確かめる。他に物があればオーナーが置いたものなので、親セッションに戻す。
 
-- [ ] **Step 2: 改名とテンプレートの残骸の削除**
+- [x] **Step 2: 改名とテンプレートの残骸の削除**
 
 `manage_scene`（`action: "save"`）の後、`execute_code`:
 
@@ -1152,7 +1174,7 @@ return UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene().path;
 
 Expected: 戻り値 `Assets/Scenes/Room.unity`。`read_console` でエラー 0（`Readme` 関連のエラーが出たら `refresh_unity` を 1 回挟んで再確認）。
 
-- [ ] **Step 3: 仮の箱、明かり、プレイヤー、調べる対象を組む**
+- [x] **Step 3: 仮の箱、明かり、プレイヤー、調べる対象を組む**
 
 `execute_code`:
 
@@ -1228,7 +1250,9 @@ camera.fieldOfView = 70f;
 camera.nearClipPlane = 0.05f;
 var pc = player.AddComponent(System.Type.GetType("HalfAware.PlayerController, HalfAware"));
 var pcSo = new SerializedObject(pc);
-pcSo.FindProperty("actions").objectReferenceValue = AssetDatabase.LoadAssetAtPath<UnityEngine.InputSystem.InputActionAsset>("Assets/InputSystem_Actions.inputactions");
+var inputAsset = AssetDatabase.LoadAssetAtPath<UnityEngine.InputSystem.InputActionAsset>("Assets/InputSystem_Actions.inputactions");
+if (inputAsset == null) return "input actions asset not found";
+pcSo.FindProperty("actions").objectReferenceValue = inputAsset;
 pcSo.FindProperty("eye").objectReferenceValue = cam.transform;
 pcSo.ApplyModifiedPropertiesWithoutUndo();
 
@@ -1266,7 +1290,7 @@ return "room built, " + itemsRoot.transform.childCount + " interactables";
 
 Expected: 戻り値 `room built, 5 interactables`。`read_console` でエラー 0。`manage_scene`（`get_hierarchy`）に `Room`（11 個の子）、`RoomLight`、`Player`（子に `Main Camera`）、`Interactables`（5 個の子）が出る。
 
-- [ ] **Step 4: HUD と進行を組む**
+- [x] **Step 4: HUD と進行を組む**
 
 `execute_code`:
 
@@ -1287,6 +1311,11 @@ System.Func<string, Transform, TMPro.TextMeshProUGUI> text = (name, parent) => {
     t.font = jp;
     t.color = Color.white;
     t.alignment = TMPro.TextAlignmentOptions.Center;
+    var rect = t.rectTransform;
+    rect.anchorMin = new Vector2(0.5f, 0.5f);
+    rect.anchorMax = new Vector2(0.5f, 0.5f);
+    rect.pivot = new Vector2(0.5f, 0.5f);
+    rect.anchoredPosition = Vector2.zero;
     return t;
 };
 
@@ -1342,7 +1371,7 @@ return "hud and flow built";
 
 Expected: 戻り値 `hud and flow built`。`read_console` でエラー 0。
 
-- [ ] **Step 5: 保存されたことを確認してコミット**
+- [x] **Step 5: 保存されたことを確認してコミット**
 
 ```bash
 cd /d/work/kataaware && git status --short unity/ && grep -c "Interactable_" unity/Assets/Scenes/Room.unity
@@ -1362,12 +1391,12 @@ MCP で再生し、進行を外から起こして字幕と印と完了を確か�
 
 **Files:** なし（直すものが出たら該当タスクのファイル）
 
-- [ ] **Step 1: 再生してエラーを見る**
+- [x] **Step 1: 再生してエラーを見る**
 
 `manage_editor`（`action: "play"`）→ `read_console`（`types: ["error", "warning"]`）。
 Expected: エラー 0。`InputActionAsset` や `TMP` の警告が出たら内容を記録して親セッションに報告する。
 
-- [ ] **Step 2: 最初の画面を撮る**
+- [x] **Step 2: 最初の画面を撮る**
 
 `execute_code`:
 
@@ -1379,7 +1408,7 @@ return "queued";
 数秒後に `unity/Temp/stage2-01-start.png` を Read で見る。
 Expected: 正面に机と黒い画面の箱、右手に卓、部屋の壁。画面下に黒帯は出ていない（字幕なし）。
 
-- [ ] **Step 3: 前提が済むまでドアが選べないことを見る**
+- [x] **Step 3: 前提が済むまでドアが選べないことを見る**
 
 `execute_code` でドアの前に立たせる（CharacterController を一度切ってから位置を変える）:
 
@@ -1402,7 +1431,7 @@ return prompt.gameObject.activeSelf + " | " + prompt.GetComponent<TMPro.TextMesh
 
 Expected: `False | `（ドアは `terminal` が未達で、文も無いので選べない）。
 
-- [ ] **Step 4: メモリハブ → 端末 → ドアの順に調べる**
+- [x] **Step 4: メモリハブ → 端末 → ドアの順に調べる**
 
 メモリハブの前へ:
 
@@ -1463,18 +1492,19 @@ return center.gameObject.activeSelf + " | " + center.GetComponent<TMPro.TextMesh
 
 Expected: `True | （仮）続く`。`ScreenCapture.CaptureScreenshot("Temp/stage2-03-end.png")` を撮って Read で見る。
 
-- [ ] **Step 5: 停止してコンソールを見る**
+- [x] **Step 5: 停止してコンソールを見る**
 
 `manage_editor`（`action: "stop"`）→ `read_console`（`types: ["error"]`）。
 Expected: エラー 0。再生中に変えた位置はシーンに残らない（`git status` で `Room.unity` に差分が無い）。差分が出ていたら `git checkout unity/Assets/Scenes/Room.unity` で戻す。
 
-- [ ] **Step 6: オーナーに手元の確認を頼む**
+- [x] **Step 6: オーナーに手元の確認を頼む**
 
 親セッションから次を伝える:
 - Game ビューをクリックするとカーソルがロックされ、WASD で歩き、マウスで見回せる。Esc で外れる
 - 対象に近づいて視線を向けると印が出て、E か左クリックで調べる。字幕は E かクリックで送る
 - メモリハブ → 端末 → ドアの順で必須が終わると「（仮）続く」が出る
-- 見た目（明るさ、視野角 70°、感度、歩く速さ 2.6 m/s）の違和感はオーナーが伝え、数値は該当スクリプトの定数か Inspector で直す
+- 「（仮）続く」が出た後も歩き回れる。移動を止める仕組み（`freeze`）は段階 3 で足す
+- 見た目（明るさ、視野角 70°、感度、歩く速さ 2.6 m/s）の違和感はオーナーが伝える。`PlayerController` の定数（速さ・感度・目線の高さ）はスクリプトを直し、シーンに保存済みの値（`SceneFlow.maxAngle`、`Interactable.radius` など）は Inspector で直す
 
 ---
 
@@ -1487,3 +1517,5 @@ Expected: エラー 0。再生中に変えた位置はシーンに残らない�
 - 暗転と「続く」（`HudView` に黒い層を足す）
 - WebGL では `Cursor.lockState` の変更がクリックのイベント内でしか効かないことがある。段階 5 で実機確認し、必要なら `PlayerController.Lock` を Input System のコールバックに移す
 - WebGL の容量: Noto Sans JP は約 4.5 MB。段階 5 で必要なら使う文字だけに絞る
+- `NotoSansJP-Regular SDF.asset` は動的アトラスなので、エディタで日本語を表示するたび（再生も含む）に 1024×1024 のアトラスが焼き込まれ、ファイルが約 2 MB に膨らむ。ビルド時には破棄される（`Clear Dynamic Data on Build` が有効）ため履歴に入れる価値が無い。コミット前に Inspector の Reset か `ClearFontAssetData(true)` で消して 6 KB に戻す。文面が固まる段階 5 で、使う文字だけの静的なアトラスに切り替えればこの手間は無くなる
+- MCP から再生して確かめるときは、エディタの窓が前面に無いと `Application.runInBackground` が false のままで `Update` が走らず、2 フレーム目で止まって見える。実行中に `Application.runInBackground = true` を立てれば進む。この代入は `PlayerSettings` 側にも書かれるので、確認の後に false へ戻す
