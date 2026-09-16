@@ -26,6 +26,10 @@ namespace HalfAware
         [SerializeField] Image fadeLayer;
         [Tooltip("画面下から立ち上る煙。見た目は段階 4 で作り込む")]
         [SerializeField] Image smokeLayer;
+        [Tooltip("上の瞼。画面の上から中央へ降りてくる黒い層")]
+        [SerializeField] Image eyelidTop;
+        [Tooltip("下の瞼。画面の下から中央へ上がってくる黒い層")]
+        [SerializeField] Image eyelidBottom;
 
         Coroutine smoking;
 
@@ -36,6 +40,7 @@ namespace HalfAware
             SetCenter(null);
             SetFade(0f);
             SetSmoke(0f);
+            SetEyelids(0f);
         }
 
         /// <summary>null で黒帯ごと隠す</summary>
@@ -117,6 +122,28 @@ namespace HalfAware
             }
             SetSmoke(0f);
             smoking = null;
+        }
+
+        /// <summary>
+        /// 瞼の閉じ具合。0 で開ききり、1 で閉じきる。
+        /// 上下の層の高さを画面の半分まで伸ばして中央で合わせるので、画面の大きさに依らない
+        /// </summary>
+        public void SetEyelids(float closed)
+        {
+            var t = Mathf.Clamp01(closed);
+            Cover(eyelidTop, new Vector2(0f, 1f - 0.5f * t), new Vector2(1f, 1f), t);
+            Cover(eyelidBottom, new Vector2(0f, 0f), new Vector2(1f, 0.5f * t), t);
+        }
+
+        static void Cover(Image layer, Vector2 anchorMin, Vector2 anchorMax, float shown)
+        {
+            if (layer == null) return;
+            var rect = layer.rectTransform;
+            rect.anchorMin = anchorMin;
+            rect.anchorMax = anchorMax;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            layer.gameObject.SetActive(shown > 0f);
         }
 
         void SetSmoke(float alpha)
