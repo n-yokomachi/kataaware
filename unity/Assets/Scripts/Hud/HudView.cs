@@ -26,7 +26,7 @@ namespace HalfAware
         [SerializeField] Image fadeLayer;
         [Tooltip("画面下から立ち上る煙。見た目は段階 4 で作り込む")]
         [SerializeField] Image smokeLayer;
-        [Tooltip("画面を上から下へ通り抜ける黒い幕。クレジットのカードを載せる")]
+        [Tooltip("画面全体を覆う黒い幕。クレジットのカードを載せる")]
         [SerializeField] Image curtainLayer;
 
         Coroutine smoking;
@@ -38,7 +38,7 @@ namespace HalfAware
             SetCenter(null);
             SetFade(0f);
             SetSmoke(0f);
-            SetCurtain(1f);
+            SetCurtain(false);
         }
 
         /// <summary>null で黒帯ごと隠す</summary>
@@ -122,19 +122,16 @@ namespace HalfAware
             smoking = null;
         }
 
-        /// <summary>
-        /// 黒い幕の位置。画面の高さを 1 として、1 で上へ外れ、0 で画面を覆い、-1 で下へ外れる。
-        /// 画面の大きさに依らないよう、位置は割合で持つ
-        /// </summary>
-        public void SetCurtain(float offset)
+        /// <summary>黒い幕。true で画面を覆い、false で消す。動きは付けず、そのまま切り替える</summary>
+        public void SetCurtain(bool covered)
         {
             if (curtainLayer == null) return;
             var rect = curtainLayer.rectTransform;
-            rect.anchorMin = new Vector2(0f, offset);
-            rect.anchorMax = new Vector2(1f, 1f + offset);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
-            curtainLayer.gameObject.SetActive(offset > -1f && offset < 1f);
+            curtainLayer.gameObject.SetActive(covered);
         }
 
         void SetSmoke(float alpha)

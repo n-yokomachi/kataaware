@@ -1234,7 +1234,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cf507023a493c1e4c9eaa9b16846c00f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: HalfAware::HalfAware.RoomIntroDirector
-  panSeconds: 0.55
   holdSeconds: 2.6
   gapSeconds: 1.2
   leadInSeconds: 0.8
@@ -1421,8 +1420,8 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 230293360}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 1, y: 2}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
