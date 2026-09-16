@@ -24,7 +24,7 @@
 - `execute_code` は C# 6 の範囲（`out var`・タプル・パターンマッチ・ローカル関数・文字列補間は使わない）。`HalfAware.*` と `UnityEngine.*` は名前空間つきなら直接書ける
 - **YAML の中の日本語は `grep` で探せない**。Unity は `\uXXXX` で書き、長い文字列は折り返す。入ったかを確かめるときは `execute_code` で読み返す
 - **フォントのアトラスをコミットに入れない**: `git status` に `unity/Assets/Fonts/NotoSansJP-Regular SDF.asset` が出たら `git checkout -- "unity/Assets/Fonts/NotoSansJP-Regular SDF.asset"` で戻す
-- **MCP から再生するとき**は、実行中に `Application.runInBackground = true` を立て、確認の後に false へ戻す。カメラを向けたいときは `PlayerController.Pitch` に度を書く（カメラの変換を直接書いても毎フレーム上書きされる）
+- **MCP から再生するとき**は、実行中に `Application.runInBackground = true` を立て、確認の後に false へ戻す。カメラを向けたいときは `PlayerController.Pitch` に度を書く（カメラの変換を直接書いても毎フレーム上書きされる）。**正の値が下向き**。下を向かせるなら正の度を書く
 
 ---
 
@@ -358,12 +358,12 @@ cd /d/work/kataaware && git status --short && git add unity/Assets/Scenes/Room.u
 
 **Files:** なし
 
-- [ ] **Step 1: 再生に入る**
+- [x] **Step 1: 再生に入る**
 
 `read_console`（`action: "clear"`）→ `EditorApplication.isPlaying` が `False` を確かめる → `manage_editor`（`action: "play"`）→ `execute_code` で `Application.runInBackground = true;` → `read_console`（`types: ["error", "warning"]`）。
 Expected: エラー 0。
 
-- [ ] **Step 2: 冒頭にカードが出ないことを見る**
+- [x] **Step 2: 冒頭にカードが出ないことを見る**
 
 ```csharp
 var center = GameObject.Find("Hud").transform.Find("Center");
@@ -378,14 +378,14 @@ return "t=" + Time.time.ToString("0.0")
 
 Expected: `center=[]`、`frozen=False`、字幕が `[うぅ…今回は酔いが酷い…]`。冒頭でカードが出ず、操作も止まっていないこと。
 
-- [ ] **Step 3: ジャックを抜いて煙草まで進める**
+- [x] **Step 3: ジャックを抜いて煙草まで進める**
 
 字幕を `SendMessage("PressInteract")` で送り切る。カメラを下へ向けるには `PlayerController.Pitch` に書く:
 
 ```csharp
 var pc = GameObject.Find("Player").GetComponent<HalfAware.PlayerController>();
-pc.Pitch = -55f;
-return "pitch=" + pc.Pitch;
+pc.Pitch = 46f;
+return "pitch=" + pc.Pitch; // 正が下向き
 ```
 
 印が `E  インプラントジャックを抜く` になったら `PressInteract` で抜き、字幕を送り切る。次にカメラを戻して卓の方を向く:
@@ -403,7 +403,7 @@ return "facing the side table";
 
 印が `E  煙草を取る` になったら `PressInteract`。
 
-- [ ] **Step 4: 3 回の瞬きとカードを撮る**
+- [x] **Step 4: 3 回の瞬きとカードを撮る**
 
 煙草を取った直後から、瞼とカードを繰り返し読む:
 
@@ -429,11 +429,11 @@ return "t=" + Time.time.ToString("0.0")
 
 ふりがなの位置がずれていたら、直さずに実際の見え方を報告する。`<space=-2em>` の数値で合わせるため、親セッションが判断する。
 
-- [ ] **Step 5: 吸い終わりまで通す**
+- [x] **Step 5: 吸い終わりまで通す**
 
 3 回目の瞬きが明けた後、字幕が `[煙草が切れた…買いに行くついでに今日のメモリも売っちゃおう]` になり、`frozen=False` に戻り、その後 `PlayerController.CanMove` が `True`、`EyeHeight` が `1.60` になること。
 
-- [ ] **Step 6: 止めて後始末**
+- [x] **Step 6: 止めて後始末**
 
 `Time.timeScale = 1f; Application.runInBackground = false;` → `manage_editor`（`action: "stop"`）→ `read_console`（`types: ["error"]`）。
 
@@ -443,7 +443,7 @@ cd /d/work/kataaware && git status --short && grep -n "runInBackground" unity/Pr
 
 Expected: エラー 0、`runInBackground: 0`、作業ツリーはきれい。
 
-- [ ] **Step 7: オーナーに手元の確認を頼む**
+- [x] **Step 7: オーナーに手元の確認を頼む**
 
 （親セッションが行う。あなたは実施しない）
 
