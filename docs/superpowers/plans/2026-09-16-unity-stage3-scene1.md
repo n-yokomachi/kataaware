@@ -20,6 +20,7 @@
 - 座標: Unity は +Z が正面。試作（`prototype-three/src/data/scenes/room.ts`）の値は Z の符号を反転して使う
 - **YAML の中の日本語は `grep` で探せない**: Unity はシーンにもアセットにも日本語を `\uXXXX` の逃がし表記で書き、長い文字列は字下げして折り返す。文面が入ったかを確かめるときは、文字列をそのまま探さず、`execute_code` で読み返すか、ファイル側なら折り返しを畳んで逃がし表記を戻してから照合する
 - オーナーがエディタで並行して触ることがある。シーンを変える前に `mcp__UnityMCP__manage_scene`（`action: "get_hierarchy"`）で現状を見て、知らない物があれば親セッションに戻す
+- **シーンを変える前に再生中でないことを確かめる**: `execute_code` で `EditorApplication.isPlaying` を読む。再生中は `EditorSceneManager.SaveScene` が `This cannot be used during play mode.` で落ち、作った物は再生を抜けた時点で消える（`AssetDatabase.CreateAsset` で作った材質だけは残る）。再生中だったら、オーナーが遊んでいる可能性があるので勝手に止めず、親セッションに戻す
 - 各タスクの終わりでシーンは通しで遊べる状態を保つ。新しい部品は既定値が段階 2 と同じ挙動になるようにしてある
 
 ---
@@ -1353,12 +1354,12 @@ cd /d/work/kataaware && git add unity/Assets/Scripts/Flow && git commit -m "feat
 **Files:**
 - Modify: `unity/Assets/Scenes/Room.unity`
 
-- [ ] **Step 1: 現状を見る**
+- [x] **Step 1: 現状を見る**
 
 `manage_scene`（`action: "get_hierarchy"`, `max_depth: 3`）。
 Expected: `Directional Light`、`Global Volume`、`Room`（11 個の子）、`RoomLight`、`Player`（子に `Main Camera`）、`Interactables`（5 個の子）、`Hud`（3 個の子）、`SceneFlow`。知らない物があれば親セッションに戻す。
 
-- [ ] **Step 2: 椅子とジャックの仮の箱、対象 3 つを足し、前提を繋ぎ直す**
+- [x] **Step 2: 椅子とジャックの仮の箱、対象 3 つを足し、前提を繋ぎ直す**
 
 `execute_code`:
 
@@ -1434,7 +1435,7 @@ return "interactables=" + itemsRoot.transform.childCount + " roomChildren=" + ro
 
 Expected: 戻り値 `interactables=8 roomChildren=13`。`read_console` でエラー 0（`Interactable に id がない` の警告は `AddComponent` の直後に 1 回出るが、`id` はその後に書かれるので問題ない。Step 5 の読み返しで確かめる）。
 
-- [ ] **Step 3: HUD に暗転と煙の層を足す**
+- [x] **Step 3: HUD に暗転と煙の層を足す**
 
 重なりの順は、後に足したものほど手前。煙 → 黒帯 → 印 → 暗転 → 中央の文字（暗転は字幕と印を隠し、中央の文字は暗転の上に出す）。既にある 3 つは `SubtitleBand` → `Prompt` → `Center` の順に並んでいるので、煙を先頭へ、暗転を `Center` の直前へ入れる。
 
@@ -1484,7 +1485,7 @@ return order.Trim();
 
 Expected: 戻り値 `Smoke SubtitleBand Prompt Fade Center`。`read_console` でエラー 0。
 
-- [ ] **Step 4: 眩暈の容れ物と演出を置き、`SceneFlow` を繋ぐ**
+- [x] **Step 4: 眩暈の容れ物と演出を置き、`SceneFlow` を繋ぐ**
 
 `execute_code`:
 
@@ -1524,7 +1525,7 @@ return "wired";
 
 Expected: 戻り値 `wired`。`read_console` でエラー 0。
 
-- [ ] **Step 5: 全部の配線を読み返す**
+- [x] **Step 5: 全部の配線を読み返す**
 
 `execute_code`:
 
@@ -1577,7 +1578,7 @@ Expected: すべての参照が `True`、`standAfter=cigarette`、`seatEye=1.1`�
 
 食い違いがあれば止めて報告する。
 
-- [ ] **Step 6: テストとコミット**
+- [x] **Step 6: テストとコミット**
 
 `run_tests` → `get_test_job`。Expected: 49 件 passed。
 
