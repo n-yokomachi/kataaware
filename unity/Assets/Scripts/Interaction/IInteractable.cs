@@ -8,12 +8,12 @@ namespace HalfAware
     {
         string Id { get; }
         Vector3 Position { get; }
-        /// <summary>この距離以内で選べる</summary>
+        /// <summary>この距離以内で選べる。既定は InteractionPicker.DefaultRadius</summary>
         float Radius { get; }
         bool Required { get; }
-        /// <summary>true なら一度調べると選べなくなる</summary>
+        /// <summary>true なら一度調べると選べなくなる。既定は true</summary>
         bool Once { get; }
-        /// <summary>ここに挙げた id が済むまで選べない。ただし HintFor に文がある id については選べて、その文だけ出る</summary>
+        /// <summary>ここに挙げた id が済むまで選べない。ただし HintFor に文がある id については選べて、その文だけ出る。null にせず、無ければ空にする</summary>
         IReadOnlyList<string> After { get; }
         string Label { get; }
         IReadOnlyList<string> Lines { get; }
