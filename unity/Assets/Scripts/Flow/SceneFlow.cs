@@ -27,7 +27,14 @@ namespace HalfAware
 
         void Awake()
         {
+            if (player == null || hud == null)
+            {
+                Debug.LogError("SceneFlow: player か hud が未接続", this);
+                enabled = false;
+                return;
+            }
             items = new List<IInteractable>(FindObjectsByType<Interactable>(FindObjectsSortMode.InstanceID));
+            if (items.Count == 0) Debug.LogWarning("SceneFlow: 調べる対象が 1 つも見つからない", this);
             progress = new SceneProgress(items);
         }
 
