@@ -1319,7 +1319,7 @@ MonoBehaviour:
   blinkCards:
   - "\u5236\u4F5C : yoko"
   - "<size=64>HALF AWARE</size>\n<size=32>\u304B\u305F\u3042\u306F\u308C</size>"
-  - "<size=30>2166\u5E748\u670815\u65E5 18\u664235\u5206\u3000<voffset=0.75em><size=15>\u30ED\u30F3\u30C9\u30F3</size></voffset><space=-2em>\u502B\u6566</size>"
+  - "<size=30>2166\u5E748\u670815\u65E5 18\u664235\u5206\u3000<voffset=1.05em><size=15>\u30ED\u30F3\u30C9\u30F3</size></voffset><space=-2em>\u502B\u6566</size>"
   afterSmokeLines:
   - "\u7159\u8349\u304C\u5207\u308C\u305F\u2026\u8CB7\u3044\u306B\u884C\u304F\u3064\u3044\u3067\u306B\u4ECA\u65E5\u306E\u30E1\u30E2\u30EA\u3082\u58F2\u3063\u3061\u3083\u304A\u3046"
 --- !u!114 &835399818
