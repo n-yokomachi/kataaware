@@ -42,6 +42,7 @@ namespace HalfAware
             var bestDist = float.PositiveInfinity;
             foreach (var item in items)
             {
+                if (!item.Active) continue;
                 if (item.Once && done.Contains(item.Id)) continue;
                 var unmet = UnmetPrerequisite(item, done);
                 if (unmet != null && !HasHint(item, unmet)) continue;

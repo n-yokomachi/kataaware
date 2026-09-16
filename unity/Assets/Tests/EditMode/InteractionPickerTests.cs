@@ -131,5 +131,26 @@ namespace HalfAware.Tests
             Assert.That(InteractionPicker.UnmetPrerequisite(item, Done("a", "b")), Is.Null);
             Assert.That(InteractionPicker.UnmetPrerequisite(At("n", 0f, 0f), Done()), Is.Null);
         }
+
+        [Test]
+        public void SkipsAnItemThatIsNotInThePlaceRightNow()
+        {
+            var near = new FakeItem("arm", new Vector3(0f, 0f, 1f)) { Active = false };
+            var far = new FakeItem("desk", new Vector3(0f, 0f, 1.6f));
+            var picked = InteractionPicker.Select(Vector3.zero, Vector3.forward,
+                new IInteractable[] { near, far }, new HashSet<string>());
+            Assert.AreSame(far, picked, "伏せている対象は、近くても選ばれない");
+        }
+
+        [Test]
+        public void PicksItBackUpOnceItIsInThePlaceAgain()
+        {
+            var near = new FakeItem("arm", new Vector3(0f, 0f, 1f)) { Active = false };
+            var far = new FakeItem("desk", new Vector3(0f, 0f, 1.6f));
+            var items = new IInteractable[] { near, far };
+            near.Active = true;
+            var picked = InteractionPicker.Select(Vector3.zero, Vector3.forward, items, new HashSet<string>());
+            Assert.AreSame(near, picked);
+        }
     }
 }

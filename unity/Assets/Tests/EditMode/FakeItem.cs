@@ -8,6 +8,7 @@ namespace HalfAware.Tests
     {
         public string Id { get; set; }
         public Vector3 Position { get; set; }
+        public bool Active { get; set; } = true;
         public float Radius { get; set; } = InteractionPicker.DefaultRadius;
         public bool Required { get; set; }
         public bool Once { get; set; } = true;
