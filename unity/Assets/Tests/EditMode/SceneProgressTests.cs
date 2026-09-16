@@ -68,5 +68,19 @@ namespace HalfAware.Tests
             Assert.That(p.Examine(door), Is.Empty);
             Assert.That(p.Done, Does.Not.Contain("door"));
         }
+
+        [Test]
+        public void ExamineMarksAGatedItemDoneOnceItsPrerequisiteIsDone()
+        {
+            var door = Item("door");
+            door.After = new[] { "terminal" };
+            door.Hints["terminal"] = new[] { "先に端末" };
+            var terminal = Item("terminal");
+            var p = new SceneProgress(new[] { terminal, door });
+            Assert.That(p.Examine(door), Is.EqualTo(new[] { "先に端末" }));
+            p.Examine(terminal);
+            Assert.That(p.Examine(door), Is.EqualTo(new[] { "door の文" }));
+            Assert.That(p.Done, Does.Contain("door"));
+        }
     }
 }
