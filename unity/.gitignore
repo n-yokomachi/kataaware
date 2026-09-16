@@ -25,6 +25,7 @@
 *.VC.db
 .vs/
 .idea/
+.vscode/
 crashlytics-build.properties
 sysinfo.txt
 *.apk
