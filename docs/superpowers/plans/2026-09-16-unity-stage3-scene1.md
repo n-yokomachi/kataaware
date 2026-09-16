@@ -930,6 +930,8 @@ namespace HalfAware
     {
         /// <summary>煙が消えるのにかける秒数</summary>
         public const float SmokeFadeSeconds = 1f;
+        /// <summary>煙のいちばん濃いときの不透明度。向こう側が透けて見える濃さに留める</summary>
+        public const float SmokePeakAlpha = 0.45f;
 
         [SerializeField] GameObject subtitleBand;
         [SerializeField] TMP_Text subtitleText;
@@ -1018,14 +1020,14 @@ namespace HalfAware
         {
             for (var t = 0f; t < SmokeFadeSeconds; t += Time.deltaTime)
             {
-                SetSmoke(t / SmokeFadeSeconds);
+                SetSmoke(SmokePeakAlpha * t / SmokeFadeSeconds);
                 yield return null;
             }
-            SetSmoke(1f);
+            SetSmoke(SmokePeakAlpha);
             yield return new WaitForSeconds(Mathf.Max(0f, seconds - SmokeFadeSeconds));
             for (var t = 0f; t < SmokeFadeSeconds; t += Time.deltaTime)
             {
-                SetSmoke(1f - t / SmokeFadeSeconds);
+                SetSmoke(SmokePeakAlpha * (1f - t / SmokeFadeSeconds));
                 yield return null;
             }
             SetSmoke(0f);
@@ -1596,7 +1598,7 @@ cd /d/work/kataaware && git status --short && git add unity/Assets/Scenes/Room.u
 
 **Files:** なし（直すものが出たら該当タスクのファイル）
 
-- [ ] **Step 1: 再生して導入を見る**
+- [x] **Step 1: 再生して導入を見る**
 
 `read_console`（`action: "clear"`）→ `manage_editor`（`action: "play"`）。
 再生に入ったら、`execute_code` で `Application.runInBackground = true;` を立てる（エディタが前面に無いと `Update` が走らないため）。
@@ -1619,7 +1621,7 @@ return "t=" + Time.time.ToString("0.0")
 
 Expected: 2 秒あたりで `center=[制作 〔名義〕]`、その後 `center=[HALF AWARE]`。どちらのときも `frozen=True`、`blur=1.00`、`canMove=False`、`eye=1.10`。`ScreenCapture.CaptureScreenshot("Temp/stage3-01-title.png")` を撮り、`D:\work\kataaware\unity\Temp\stage3-01-title.png` を Read で見る。
 
-- [ ] **Step 2: 導入が明けて最初の独白が出ることを見る**
+- [x] **Step 2: 導入が明けて最初の独白が出ることを見る**
 
 6.2 秒を過ぎてから字幕を読む:
 
@@ -1634,7 +1636,7 @@ return "t=" + Time.time.ToString("0.0") + " frozen=" + flow.Frozen
 Expected: `frozen=False`、`band=True`、`[うぅ…今回は酔いが酷い…]`。
 `SendMessage("PressInteract")` で送ってから字幕を読む。Expected: `band=False`。
 
-- [ ] **Step 3: 座ったままではジャックが選べず、下を向くと選べることを見る**
+- [x] **Step 3: 座ったままではジャックが選べず、下を向くと選べることを見る**
 
 印を読む:
 
@@ -1655,7 +1657,7 @@ return eye.localEulerAngles.ToString();
 
 印を読む。Expected: `True | E  インプラントジャックを抜く`。
 
-- [ ] **Step 4: ジャックを抜くと眩暈が引き始めることを見る**
+- [x] **Step 4: ジャックを抜くと眩暈が引き始めることを見る**
 
 `SendMessage("PressInteract")` → 字幕を読む。Expected: `True | [大小の差こそあれ、他人の記憶を観た後はいつもこうだ]`。
 `PressInteract` で送る → 眩暈を読む:
@@ -1667,7 +1669,7 @@ return "blur=" + daze.Blur.ToString("0.00") + " wobble=" + daze.Wobble.ToString(
 
 Expected: `blur` が 1.00 より小さくなっている。数秒おいてもう一度読むとさらに小さく、5 秒経つと `clear=True`。
 
-- [ ] **Step 5: 煙草を取ると自動で進み、立ち上がることを見る**
+- [x] **Step 5: 煙草を取ると自動で進み、立ち上がることを見る**
 
 カメラを水平に戻して卓の方を向く:
 
@@ -1695,11 +1697,11 @@ return "frozen=" + flow.Frozen + " smoke=" + smoke.gameObject.activeSelf
     + " canMove=" + player.CanMove + " eye=" + player.EyeHeight.ToString("0.00");
 ```
 
-Expected: `frozen=True`、`smoke=True` で `alpha` が 0 より大きい、`canMove=False`、`eye=1.10`（止まっている間は立ち上がらない）。ここで `ScreenCapture.CaptureScreenshot("Temp/stage3-02-smoke.png")` を撮って Read で見る。
+Expected: `frozen=True`、`smoke=True` で `alpha` が 0 より大きく `HudView.SmokePeakAlpha`（0.45）以下、`canMove=False`、`eye=1.10`（止まっている間は立ち上がらない）。ここで `ScreenCapture.CaptureScreenshot("Temp/stage3-02-smoke.png")` を撮って Read で見る。
 
 4 秒を過ぎてから読む。Expected: 字幕が `[煙草が切れた…買いに行くついでに今日のメモリも売っちゃおう]`、`frozen=False`、`smoke=False`。さらに 1 秒ほど後に `canMove=True`、`eye=1.60`。
 
-- [ ] **Step 6: メモリハブ → 端末 → ドアを通して暗転まで見る**
+- [x] **Step 6: メモリハブ → 端末 → ドアを通して暗転まで見る**
 
 字幕が残っていれば `PressInteract` で送り切る。以降は段階 2 の確認と同じ要領で、`CharacterController` を切って位置を変えてから戻す。
 
@@ -1722,7 +1724,7 @@ return "completed=" + flow.Completed + " fade=" + fade.color.a.ToString("0.00")
 
 Expected: 1.5 秒かけて `fade` が 1.00 になり、その後 `center=True` で `[（仮）続く]`。`ScreenCapture.CaptureScreenshot("Temp/stage3-03-end.png")` を撮って Read で見る。真っ黒な画面に「（仮）続く」だけが見えること。
 
-- [ ] **Step 7: 停止して後始末**
+- [x] **Step 7: 停止して後始末**
 
 `execute_code` で `Application.runInBackground = false;` に戻す → `manage_editor`（`action: "stop"`）→ `read_console`（`types: ["error"]`）。
 Expected: エラー 0。
@@ -1733,7 +1735,7 @@ cd /d/work/kataaware && git status --short && grep -n "runInBackground" unity/Pr
 
 Expected: `Room.unity` に差分が無く、`runInBackground: 0`。`unity/Assets/Fonts/NotoSansJP-Regular SDF.asset` が出ていたら `git checkout --` で戻す。差分が残る場合は該当ファイルを報告する。
 
-- [ ] **Step 8: オーナーに手元の確認を頼む**
+- [x] **Step 8: オーナーに手元の確認を頼む**
 
 親セッションから次を伝える:
 - 再生してクリックすると、座った視界でクレジットとタイトルが出て、明けると最初の独白が出る
