@@ -49,5 +49,18 @@ namespace HalfAware
             Gizmos.color = required ? new Color(1f, 0.6f, 0.2f) : new Color(0.6f, 0.8f, 1f);
             Gizmos.DrawWireSphere(transform.position, 0.1f);
         }
+
+        void OnDrawGizmosSelected()
+        {
+            Gizmos.color = new Color(1f, 1f, 1f, 0.35f);
+            Gizmos.DrawWireSphere(transform.position, radius);
+        }
+
+#if UNITY_EDITOR
+        void OnValidate()
+        {
+            if (string.IsNullOrEmpty(id)) Debug.LogWarning("Interactable に id がない: " + name, this);
+        }
+#endif
     }
 }

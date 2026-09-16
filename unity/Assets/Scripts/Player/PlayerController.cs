@@ -56,15 +56,16 @@ namespace HalfAware
         void Update()
         {
             InteractPressed = false;
+            eye.localPosition = new Vector3(0f, EyeHeight, 0f);
             if (!CursorLocked)
             {
-                // ロックするためのクリックは調べる操作に使わない
+                // ロックが外れている間はカーソルを見せる。ロックするためのクリックは調べる操作に使わない
+                Cursor.visible = true;
                 if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) Lock();
                 return;
             }
             InteractPressed = interact.WasPressedThisFrame();
             Look(look.ReadValue<Vector2>());
-            eye.localPosition = new Vector3(0f, EyeHeight, 0f);
             if (CanMove) Walk(move.ReadValue<Vector2>());
         }
 
