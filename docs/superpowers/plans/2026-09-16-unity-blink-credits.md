@@ -43,7 +43,7 @@
 **Files:**
 - Modify: `unity/Assets/Scripts/Hud/HudView.cs`
 
-- [ ] **Step 1: 項目と操作を足す**
+- [x] **Step 1: 項目と操作を足す**
 
 `unity/Assets/Scripts/Hud/HudView.cs` の `[SerializeField] Image smokeLayer;` の行の直後に次を足す:
 
@@ -88,12 +88,12 @@
 
 暗転の層と同じく、瞼の層も繋がっていなければ何もしない。段階を追って足すため。
 
-- [ ] **Step 2: コンパイルとテストを確かめる**
+- [x] **Step 2: コンパイルとテストを確かめる**
 
 `refresh_unity` → `read_console`（エラー・警告 0）→ `run_tests` → `get_test_job`。
 Expected: 67 件 passed。
 
-- [ ] **Step 3: コミット**
+- [x] **Step 3: コミット**
 
 ```bash
 cd /d/work/kataaware && git add unity/Assets/Scripts/Hud/HudView.cs && git commit -m "feat: add the eyelids to the HUD"
