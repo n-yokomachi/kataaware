@@ -28,7 +28,7 @@ Material:
     - _BlurRadius: 0.0035
     - _DoubleMix: 0.45
     - _DoubleOffset: 0.02
-    - _Sway: 0.006
+    - _Sway: 0
     - _WobbleX: 0.03
     - _WobbleY: 0.02
     m_Colors: []
