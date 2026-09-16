@@ -16,6 +16,7 @@ namespace HalfAware
         /// <summary>ここに挙げた id が済むまで選べない。ただし HintFor に文がある id については選べて、その文だけ出る。null にせず、無ければ空にする</summary>
         IReadOnlyList<string> After { get; }
         string Label { get; }
+        /// <summary>調べたときに出す文。null にせず、無ければ空にする</summary>
         IReadOnlyList<string> Lines { get; }
         /// <summary>After の id が未達のときに出す文。無ければ null</summary>
         IReadOnlyList<string> HintFor(string afterId);
