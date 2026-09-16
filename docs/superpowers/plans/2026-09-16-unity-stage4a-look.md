@@ -363,12 +363,12 @@ cd /d/work/kataaware && git add unity/Assets/Scripts/Fx/DazeVolume.cs && git com
 - Modify: `unity/Assets/Settings/PC_RPAsset.asset`
 - Modify: `unity/Assets/Settings/PC_Renderer.asset`
 
-- [ ] **Step 1: 再生中でないことを確かめる**
+- [x] **Step 1: 再生中でないことを確かめる**
 
 `execute_code` で `return "isPlaying=" + EditorApplication.isPlaying;`。
 Expected: `isPlaying=False`。`True` なら止めて親セッションに戻す。
 
-- [ ] **Step 2: 解像度の倍率と拡大の仕方**
+- [x] **Step 2: 解像度の倍率と拡大の仕方**
 
 `execute_code`:
 
@@ -388,7 +388,7 @@ return "renderScale=" + check.FindProperty("m_RenderScale").floatValue
 
 Expected: 戻り値 `renderScale=0.3333333 upscaling=2`。
 
-- [ ] **Step 3: 後処理 2 つを登録し、環境遮蔽を止める**
+- [x] **Step 3: 後処理 2 つを登録し、環境遮蔽を止める**
 
 `execute_code`:
 
@@ -450,7 +450,7 @@ return a + " / " + b + " / " + ssao;
 
 Expected: 戻り値 `added Daze / added Ps1 / ssao off`。`read_console` でエラー 0。
 
-- [ ] **Step 4: 登録された結果を読み返す**
+- [x] **Step 4: 登録された結果を読み返す**
 
 `execute_code`:
 
@@ -472,7 +472,7 @@ return report;
 
 Expected: `features=3 map=3`、`ScreenSpaceAmbientOcclusion active=False`、`Daze active=True point=BeforeRenderingPostProcessing material=Daze`、`Ps1 active=True point=AfterRenderingPostProcessing material=Ps1`。`features` と `map` の数が食い違っていたら止めて報告する。
 
-- [ ] **Step 5: コミット**
+- [x] **Step 5: コミット**
 
 ```bash
 cd /d/work/kataaware && git status --short && git add unity/Assets/Settings/PC_RPAsset.asset unity/Assets/Settings/PC_Renderer.asset && git commit -m "feat: render at a third of the resolution and hang the two passes on the renderer"
