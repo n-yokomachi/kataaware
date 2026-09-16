@@ -52,6 +52,9 @@ namespace HalfAware
         public event Action<IInteractable> Examined;
 
         public SceneProgress Progress => progress;
+
+        /// <summary>場面固有の演出が、向きを変えたり見回しを止めたりするのに使う</summary>
+        public PlayerController Player => player;
         public bool Completed { get; private set; }
 
         /// <summary>調べる操作と進行が止まっているか。見回しは止めない</summary>

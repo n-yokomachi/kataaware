@@ -29,6 +29,9 @@ namespace HalfAware
         /// <summary>false の間は見回しだけできる（座っている、演出中など）</summary>
         public bool CanMove { get; set; } = true;
 
+        /// <summary>false の間は見回しも受け付けない。自動で進む演出のあいだに使う</summary>
+        public bool CanLook { get; set; } = true;
+
         /// <summary>足元からカメラまでの高さ。座位と立位で変える</summary>
         public float EyeHeight { get; set; } = StandingEyeHeight;
 
@@ -39,6 +42,13 @@ namespace HalfAware
 
         /// <summary>このフレームで調べる操作（E か左クリック）が押されたか。ロック中だけ true になる</summary>
         public bool InteractPressed { get; private set; }
+
+        /// <summary>左右の向き。度。書き込むと体ごと向き直る。演出から正面へ戻すのに使う</summary>
+        public float Yaw
+        {
+            get { return transform.eulerAngles.y; }
+            set { transform.rotation = Quaternion.Euler(0f, value, 0f); }
+        }
 
         /// <summary>上下の向き。度。書き込むと範囲に収まる。動作確認から視線を向けるのにも使う</summary>
         public float Pitch
@@ -72,7 +82,7 @@ namespace HalfAware
             if (CursorLocked)
             {
                 InteractPressed = interact.WasPressedThisFrame();
-                Look(look.ReadValue<Vector2>());
+                if (CanLook) Look(look.ReadValue<Vector2>());
                 if (CanMove) Walk(move.ReadValue<Vector2>());
             }
             else

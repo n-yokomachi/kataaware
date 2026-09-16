@@ -16,11 +16,13 @@ namespace HalfAware
 
         [Header("カードの間。遊びながら詰められるよう Inspector に出してある")]
         [Tooltip("カードを出したまま止まっている秒数。読む時間")]
-        [SerializeField] float holdSeconds = 2.6f;
+        [SerializeField] float holdSeconds = 7.8f;
         [Tooltip("カードとカードのあいだ、部屋が見えている秒数")]
-        [SerializeField] float gapSeconds = 2.4f;
+        [SerializeField] float gapSeconds = 7.2f;
         [Tooltip("煙草を取ってから最初のカードまでの秒数")]
         [SerializeField] float leadInSeconds = 0.8f;
+        [Tooltip("煙草を取った直後、正面へ向き直すのにかける秒数")]
+        [SerializeField] float aimSeconds = 2.5f;
 
         [SerializeField] SceneFlow flow;
         [SerializeField] HudView hud;
@@ -32,13 +34,15 @@ namespace HalfAware
         [SerializeField] string[] afterSmokeLines = { "煙草が切れた…買いに行くついでに今日のメモリも売っちゃおう" };
 
         bool smoking;
+        /// <summary>座って始めたときの体の向き。煙草のあいだはここへ戻す</summary>
+        float seatedYaw;
 
         /// <summary>煙草を取ってから吸い終わるまでの秒数。瞬きの回数から決まる</summary>
         public float SmokeSeconds
         {
             get
             {
-                return leadInSeconds + (holdSeconds + gapSeconds) * Mathf.Max(1, cards.Length);
+                return aimSeconds + leadInSeconds + (holdSeconds + gapSeconds) * Mathf.Max(1, cards.Length);
             }
         }
 
@@ -55,7 +59,12 @@ namespace HalfAware
 
         void OnDisable()
         {
-            if (flow != null) flow.Examined -= OnExamined;
+            if (flow != null)
+            {
+                flow.Examined -= OnExamined;
+                // 止められた場合は finally が走らないので、ここでも見回しを戻す
+                if (flow.Player != null) flow.Player.CanLook = true;
+            }
             StopAllCoroutines();
             smoking = false;
             if (hud == null) return;
@@ -67,7 +76,9 @@ namespace HalfAware
         /// <summary>最初の独白は場面の始めに 1 度だけ。切って入れ直してもやり直さない</summary>
         void Start()
         {
-            if (enabled) flow.Say(firstLines);
+            if (!enabled) return;
+            if (flow.Player != null) seatedYaw = flow.Player.Yaw;
+            flow.Say(firstLines);
         }
 
         void OnExamined(IInteractable item)
@@ -82,20 +93,48 @@ namespace HalfAware
         /// </summary>
         IEnumerator Smoke()
         {
+            var player = flow.Player;
             smoking = true;
-            hud.ShowSmoke(SmokeSeconds);
-            flow.Freeze(leadInSeconds + FreezeMargin);
-            yield return new WaitForSeconds(leadInSeconds);
-            foreach (var card in cards)
+            // 吸い終わるまで見回しも受け付けない
+            if (player != null) player.CanLook = false;
+            try
             {
-                if (flow.Completed) yield break;
-                flow.Freeze(holdSeconds + gapSeconds + FreezeMargin);
-                yield return Show(card);
-                yield return new WaitForSeconds(gapSeconds);
+                hud.ShowSmoke(SmokeSeconds);
+                flow.Freeze(aimSeconds + leadInSeconds + FreezeMargin);
+                yield return AimForward(player);
+                yield return new WaitForSeconds(leadInSeconds);
+                foreach (var card in cards)
+                {
+                    if (flow.Completed) yield break;
+                    flow.Freeze(holdSeconds + gapSeconds + FreezeMargin);
+                    yield return Show(card);
+                    yield return new WaitForSeconds(gapSeconds);
+                }
             }
-            smoking = false;
+            finally
+            {
+                smoking = false;
+                if (player != null) player.CanLook = true;
+            }
             if (flow.Completed) yield break;
             flow.Say(afterSmokeLines);
+        }
+
+        /// <summary>座って始めたときの向きへ、滑らかに戻す。切り替えではなく回して戻すので繋ぎ目が出ない</summary>
+        IEnumerator AimForward(PlayerController player)
+        {
+            if (player == null || aimSeconds <= 0f) yield break;
+            var fromYaw = player.Yaw;
+            var fromPitch = player.Pitch;
+            for (var t = 0f; t < aimSeconds; t += Time.deltaTime)
+            {
+                var k = Mathf.SmoothStep(0f, 1f, t / aimSeconds);
+                player.Yaw = Mathf.LerpAngle(fromYaw, seatedYaw, k);
+                player.Pitch = Mathf.Lerp(fromPitch, 0f, k);
+                yield return null;
+            }
+            player.Yaw = seatedYaw;
+            player.Pitch = 0f;
         }
 
         /// <summary>画面を黒く覆ってカードを出し、読む時間を置いてそのまま戻す。動きは付けない</summary>
