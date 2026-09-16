@@ -318,7 +318,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -628,14 +628,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: HalfAware::HalfAware.Interactable
   id: clipboard
+  script: {fileID: 11400000, guid: 041d521c5151e274996d894e143d3cb2, type: 2}
   radius: 2
   required: 0
   once: 1
   after: []
-  hints: []
-  label: "\u7D19\u3070\u3055\u307F"
-  lines:
-  - "\uFF08\u4EEE\uFF09\u7D19\u3070\u3055\u307F"
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0
@@ -818,16 +815,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: HalfAware::HalfAware.Interactable
   id: terminal
+  script: {fileID: 11400000, guid: 041d521c5151e274996d894e143d3cb2, type: 2}
   radius: 2
   required: 1
   once: 1
   after:
   - chips
-  hints: []
-  label: "\u7AEF\u672B"
-  lines:
-  - "\uFF08\u4EEE\uFF09\u7AEF\u672B\u3092\u8ABF\u3079\u305F"
-  - "\uFF08\u4EEE\uFF09\u5B57\u5E55\u306E 2 \u884C\u76EE"
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
@@ -1298,14 +1291,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: HalfAware::HalfAware.Interactable
   id: chips
+  script: {fileID: 11400000, guid: 041d521c5151e274996d894e143d3cb2, type: 2}
   radius: 2
   required: 1
   once: 1
   after: []
-  hints: []
-  label: "\u30C1\u30C3\u30D7\u3092\u629C\u304F"
-  lines:
-  - "\uFF08\u4EEE\uFF09\u30E1\u30E2\u30EA\u30CF\u30D6\u304B\u3089\u30C1\u30C3\u30D7\u3092\u629C\u3044\u305F"
 --- !u!1 &1169647182
 GameObject:
   m_ObjectHideFlags: 0
@@ -1856,7 +1846,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -2504,7 +2494,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -2626,14 +2616,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: HalfAware::HalfAware.Interactable
   id: ashtray
+  script: {fileID: 11400000, guid: 041d521c5151e274996d894e143d3cb2, type: 2}
   radius: 2
   required: 0
   once: 1
   after: []
-  hints: []
-  label: "\u7070\u76BF"
-  lines:
-  - "\uFF08\u4EEE\uFF09\u7070\u76BF"
 --- !u!1 &2033988452
 GameObject:
   m_ObjectHideFlags: 0
@@ -2679,15 +2666,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: HalfAware::HalfAware.Interactable
   id: door
+  script: {fileID: 11400000, guid: 041d521c5151e274996d894e143d3cb2, type: 2}
   radius: 2
   required: 1
   once: 1
   after:
   - terminal
-  hints: []
-  label: "\u30C9\u30A2"
-  lines:
-  - "\uFF08\u4EEE\uFF09\u30C9\u30A2\u304B\u3089\u51FA\u308B"
 --- !u!1 &2037330633
 GameObject:
   m_ObjectHideFlags: 0

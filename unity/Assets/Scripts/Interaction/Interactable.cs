@@ -1,30 +1,24 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 namespace HalfAware
 {
-    /// <summary>シーン上の調べる対象。位置はこの GameObject の位置。文面はこの段では仮の文を直接持ち、段階 3 で RoomScript に移す</summary>
+    /// <summary>
+    /// シーン上の調べる対象。位置はこの GameObject の位置。
+    /// 印と文は RoomScript から id で引く。位置と規則はシーン、文面はアセットと分けてある
+    /// </summary>
     public sealed class Interactable : MonoBehaviour, IInteractable
     {
-        [Serializable]
-        public struct Hint
-        {
-            /// <summary>after に挙げた id</summary>
-            public string after;
-            /// <summary>その id が未達のときに出す文。出しても済んだことにはならない</summary>
-            [TextArea] public string[] lines;
-        }
+        static readonly string[] NoLines = new string[0];
 
         [SerializeField] string id;
+        [Tooltip("印と文を引く文面のアセット")]
+        [SerializeField] RoomScript script;
         [SerializeField] float radius = InteractionPicker.DefaultRadius;
         [SerializeField] bool required;
         [SerializeField] bool once = true;
-        [Tooltip("ここに挙げた id が済むまで選べない。hints に文がある id については選べて、その文だけ出る")]
+        [Tooltip("ここに挙げた id が済むまで選べない。文面に hint がある id については選べて、その文だけ出る")]
         [SerializeField] string[] after = new string[0];
-        [SerializeField] Hint[] hints = new Hint[0];
-        [SerializeField] string label = "調べる";
-        [SerializeField, TextArea] string[] lines = new string[0];
 
         public string Id => id;
         public Vector3 Position => transform.position;
@@ -32,16 +26,22 @@ namespace HalfAware
         public bool Required => required;
         public bool Once => once;
         public IReadOnlyList<string> After => after;
-        public string Label => label;
-        public IReadOnlyList<string> Lines => lines;
+        /// <summary>文面が引けないときは id を出す。印が空欄になって気づけないのを避ける</summary>
+        public string Label
+        {
+            get
+            {
+                if (script == null) return id;
+                var entry = script.Find(id);
+                return entry.id != null ? entry.Label : id;
+            }
+        }
+
+        public IReadOnlyList<string> Lines => script != null ? script.Find(id).Lines : NoLines;
 
         public IReadOnlyList<string> HintFor(string afterId)
         {
-            foreach (var hint in hints)
-            {
-                if (hint.after == afterId) return hint.lines;
-            }
-            return null;
+            return script != null ? script.Find(id).HintFor(afterId) : null;
         }
 
         void OnDrawGizmos()
@@ -60,6 +60,8 @@ namespace HalfAware
         void OnValidate()
         {
             if (string.IsNullOrEmpty(id)) Debug.LogWarning("Interactable に id がない: " + name, this);
+            else if (script == null) Debug.LogWarning("Interactable に文面のアセットがない: " + name, this);
+            else if (script.Find(id).id == null) Debug.LogWarning("文面に id が無い: " + id, this);
         }
 #endif
     }
