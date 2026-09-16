@@ -4,32 +4,6 @@ using UnityEngine;
 
 namespace HalfAware.Tests
 {
-    /// <summary>テスト用の調べる対象。必要な項目だけ設定する</summary>
-    public sealed class FakeItem : IInteractable
-    {
-        public string Id { get; set; }
-        public Vector3 Position { get; set; }
-        public float Radius { get; set; } = InteractionPicker.DefaultRadius;
-        public bool Required { get; set; }
-        public bool Once { get; set; } = true;
-        public IReadOnlyList<string> After { get; set; } = new string[0];
-        public string Label { get; set; } = "調べる";
-        public IReadOnlyList<string> Lines { get; set; } = new string[0];
-        public Dictionary<string, string[]> Hints { get; } = new Dictionary<string, string[]>();
-
-        public FakeItem(string id, Vector3 position)
-        {
-            Id = id;
-            Position = position;
-        }
-
-        public IReadOnlyList<string> HintFor(string afterId)
-        {
-            string[] lines;
-            return Hints.TryGetValue(afterId, out lines) ? lines : null;
-        }
-    }
-
     public class InteractionPickerTests
     {
         static readonly Vector3 Cam = new Vector3(0f, 1.6f, 0f);
@@ -45,7 +19,7 @@ namespace HalfAware.Tests
         [Test]
         public void PicksTheNearestItemInsideTheRadiusAndTheViewCone()
         {
-            var picked = Pick(Done(), At("near", 0f, 1f), At("far", 0f, 1.8f), At("behind", 0f, -1f), At("out", 0f, 5f));
+            var picked = Pick(Done(), At("far", 0f, 1.8f), At("near", 0f, 1f), At("behind", 0f, -1f), At("out", 0f, 5f));
             Assert.That(picked.Id, Is.EqualTo("near"));
         }
 
@@ -59,6 +33,12 @@ namespace HalfAware.Tests
         public void IgnoresItemsOutsideTheRadius()
         {
             Assert.That(Pick(Done(), At("out", 0f, 5f)), Is.Null);
+        }
+
+        [Test]
+        public void PicksAnItemAtTheEyeRegardlessOfTheViewDirection()
+        {
+            Assert.That(InteractionPicker.Select(Cam, Vector3.back, new[] { At("here", 0f, 0f) }, Done()).Id, Is.EqualTo("here"));
         }
 
         [Test]
