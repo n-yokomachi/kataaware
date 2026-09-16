@@ -66,7 +66,7 @@ return report;
 - Create: `unity/Assets/Shaders/Ps1.shader`
 - Create: `unity/Assets/Materials/Fx/Ps1.mat`
 
-- [ ] **Step 1: シェーダを書く**
+- [x] **Step 1: シェーダを書く**
 
 `unity/Assets/Shaders/Ps1.shader`:
 
@@ -133,12 +133,12 @@ Shader "HalfAware/Ps1"
 }
 ```
 
-- [ ] **Step 2: 取り込みと組み立てを確かめる**
+- [x] **Step 2: 取り込みと組み立てを確かめる**
 
 `refresh_unity` → `read_console`（`types: ["error", "warning"]`）→ 冒頭の注意にあるシェーダの検査を `Assets/Shaders/Ps1.shader` に対して行う。
 Expected: コンソール 0 件、`isSupported=True messages=0`。
 
-- [ ] **Step 3: 材質を作る**
+- [x] **Step 3: 材質を作る**
 
 `execute_code`:
 
@@ -160,10 +160,10 @@ return path + " levels=" + mat.GetFloat("_Levels") + " dither=" + mat.GetFloat("
 
 Expected: 戻り値 `Assets/Materials/Fx/Ps1.mat levels=32 dither=1 amount=1`。
 
-- [ ] **Step 4: コミット**
+- [x] **Step 4: コミット**
 
 ```bash
-cd /d/work/kataaware && git add unity/Assets/Shaders unity/Assets/Materials && git commit -m "feat: add the posterize and dither pass"
+cd /d/work/kataaware && git add unity/Assets/Shaders unity/Assets/Shaders.meta unity/Assets/Materials unity/Assets/Materials/Fx.meta && git commit -m "feat: add the posterize and dither pass"
 ```
 
 ---
@@ -277,7 +277,7 @@ Expected: 戻り値 `Assets/Materials/Fx/Daze.mat radius=0.012 wobbleX=0.03 wobb
 - [ ] **Step 4: コミット**
 
 ```bash
-cd /d/work/kataaware && git add unity/Assets/Shaders unity/Assets/Materials && git commit -m "feat: add the daze blur and wobble pass"
+cd /d/work/kataaware && git add unity/Assets/Shaders unity/Assets/Shaders.meta unity/Assets/Materials && git commit -m "feat: add the daze blur and wobble pass"
 ```
 
 ---
