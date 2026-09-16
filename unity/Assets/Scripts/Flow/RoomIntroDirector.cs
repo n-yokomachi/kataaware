@@ -16,9 +16,9 @@ namespace HalfAware
 
         [Header("カードの間。遊びながら詰められるよう Inspector に出してある")]
         [Tooltip("カードを出したまま止まっている秒数。読む時間")]
-        [SerializeField] float holdSeconds = 7.8f;
+        [SerializeField] float holdSeconds = 1.95f;
         [Tooltip("カードとカードのあいだ、部屋が見えている秒数")]
-        [SerializeField] float gapSeconds = 7.2f;
+        [SerializeField] float gapSeconds = 1.8f;
         [Tooltip("煙草を取ってから最初のカードまでの秒数")]
         [SerializeField] float leadInSeconds = 0.8f;
         [Tooltip("煙草を取った直後、正面へ向き直すのにかける秒数")]

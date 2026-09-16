@@ -1234,8 +1234,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cf507023a493c1e4c9eaa9b16846c00f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: HalfAware::HalfAware.RoomIntroDirector
-  holdSeconds: 7.8
-  gapSeconds: 7.2
+  holdSeconds: 1.95
+  gapSeconds: 1.8
   leadInSeconds: 0.8
   aimSeconds: 2.5
   flow: {fileID: 835399815}
