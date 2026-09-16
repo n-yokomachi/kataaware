@@ -11,18 +11,20 @@ namespace HalfAware
     /// </summary>
     public sealed class RoomIntroDirector : MonoBehaviour
     {
-        /// <summary>瞼が閉じるのにかける秒数。開くより速い</summary>
-        public const float BlinkCloseSeconds = 0.18f;
-        /// <summary>閉じきって止まっている秒数。カードを読む時間</summary>
-        public const float BlinkHoldSeconds = 1.3f;
-        /// <summary>瞼が開くのにかける秒数</summary>
-        public const float BlinkOpenSeconds = 0.25f;
-        /// <summary>瞬きと瞬きのあいだ、目を開けている秒数</summary>
-        public const float BlinkGapSeconds = 1f;
-        /// <summary>煙草を取ってから最初の瞬きまでの秒数</summary>
-        public const float LeadInSeconds = 0.8f;
         /// <summary>停止に足す余裕。停止が先に切れて、演出の途中で調べられるのを防ぐ</summary>
         public const float FreezeMargin = 0.25f;
+
+        [Header("瞬きの間。遊びながら詰められるよう Inspector に出してある")]
+        [Tooltip("瞼が閉じるのにかける秒数。開くより速い")]
+        [SerializeField] float blinkCloseSeconds = 0.32f;
+        [Tooltip("閉じきって止まっている秒数。カードを読む時間")]
+        [SerializeField] float blinkHoldSeconds = 2.6f;
+        [Tooltip("瞼が開くのにかける秒数")]
+        [SerializeField] float blinkOpenSeconds = 0.5f;
+        [Tooltip("瞬きと瞬きのあいだ、目を開けている秒数")]
+        [SerializeField] float blinkGapSeconds = 1.2f;
+        [Tooltip("煙草を取ってから最初の瞬きまでの秒数")]
+        [SerializeField] float leadInSeconds = 0.8f;
 
         [SerializeField] SceneFlow flow;
         [SerializeField] HudView hud;
@@ -40,8 +42,8 @@ namespace HalfAware
         {
             get
             {
-                var blink = BlinkCloseSeconds + BlinkHoldSeconds + BlinkOpenSeconds + BlinkGapSeconds;
-                return LeadInSeconds + blink * Mathf.Max(1, blinkCards.Length);
+                var blink = blinkCloseSeconds + blinkHoldSeconds + blinkOpenSeconds + blinkGapSeconds;
+                return leadInSeconds + blink * Mathf.Max(1, blinkCards.Length);
             }
         }
 
@@ -87,14 +89,14 @@ namespace HalfAware
         {
             smoking = true;
             hud.ShowSmoke(SmokeSeconds);
-            flow.Freeze(LeadInSeconds + FreezeMargin);
-            yield return new WaitForSeconds(LeadInSeconds);
+            flow.Freeze(leadInSeconds + FreezeMargin);
+            yield return new WaitForSeconds(leadInSeconds);
             foreach (var card in blinkCards)
             {
                 if (flow.Completed) yield break;
-                flow.Freeze(BlinkCloseSeconds + BlinkHoldSeconds + BlinkOpenSeconds + BlinkGapSeconds + FreezeMargin);
+                flow.Freeze(blinkCloseSeconds + blinkHoldSeconds + blinkOpenSeconds + blinkGapSeconds + FreezeMargin);
                 yield return Blink(card);
-                yield return new WaitForSeconds(BlinkGapSeconds);
+                yield return new WaitForSeconds(blinkGapSeconds);
             }
             smoking = false;
             if (flow.Completed) yield break;
@@ -104,18 +106,18 @@ namespace HalfAware
         /// <summary>瞼を閉じ、閉じきったあいだにカードを出し、また開く。閉じる方が速く、開く方が遅い</summary>
         IEnumerator Blink(string card)
         {
-            for (var t = 0f; t < BlinkCloseSeconds; t += Time.deltaTime)
+            for (var t = 0f; t < blinkCloseSeconds; t += Time.deltaTime)
             {
-                hud.SetEyelids(t / BlinkCloseSeconds);
+                hud.SetEyelids(t / blinkCloseSeconds);
                 yield return null;
             }
             hud.SetEyelids(1f);
             if (!string.IsNullOrEmpty(card)) hud.SetCenter(card);
-            yield return new WaitForSeconds(BlinkHoldSeconds);
+            yield return new WaitForSeconds(blinkHoldSeconds);
             hud.SetCenter(null);
-            for (var t = 0f; t < BlinkOpenSeconds; t += Time.deltaTime)
+            for (var t = 0f; t < blinkOpenSeconds; t += Time.deltaTime)
             {
-                hud.SetEyelids(1f - t / BlinkOpenSeconds);
+                hud.SetEyelids(1f - t / blinkOpenSeconds);
                 yield return null;
             }
             hud.SetEyelids(0f);
