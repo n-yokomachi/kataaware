@@ -31,6 +31,7 @@ namespace HalfAware.Tests
             var q = new SubtitleQueue();
             q.Enqueue(new[] { "a" });
             q.Enqueue(new[] { "b" });
+            Assert.That(q.Current, Is.EqualTo("a"));
             q.Advance();
             Assert.That(q.Current, Is.EqualTo("b"));
         }
@@ -40,6 +41,15 @@ namespace HalfAware.Tests
         {
             var q = new SubtitleQueue();
             q.Enqueue(new string[0]);
+            Assert.That(q.Current, Is.Null);
+            Assert.That(q.IsTalking, Is.False);
+        }
+
+        [Test]
+        public void AdvanceOnAnEmptyQueueDoesNothing()
+        {
+            var q = new SubtitleQueue();
+            Assert.DoesNotThrow(() => q.Advance());
             Assert.That(q.Current, Is.Null);
             Assert.That(q.IsTalking, Is.False);
         }
