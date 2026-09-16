@@ -257,13 +257,13 @@ cd /d/work/kataaware && git add unity/Assets/Scripts/Flow/RoomIntroDirector.cs &
 **Files:**
 - Modify: `unity/Assets/Scenes/Room.unity`
 
-- [ ] **Step 1: 現状を見る**
+- [x] **Step 1: 現状を見る**
 
 `execute_code` で `return "isPlaying=" + EditorApplication.isPlaying;`。`True` なら止めて親セッションに戻す。
 
 `mcp__UnityMCP__manage_scene`（`action: "get_hierarchy"`, `max_depth: 2`）で `Hud` の子が `Smoke` `SubtitleBand` `Prompt` `Fade` `Center` の 5 つであることを確かめる。
 
-- [ ] **Step 2: 瞼の層を足して繋ぐ**
+- [x] **Step 2: 瞼の層を足して繋ぐ**
 
 重なりの順は、後に足したものほど手前。瞼は暗転より手前、中央の文字より奥に置く。カードは瞼の上に出したいため。
 
@@ -306,7 +306,7 @@ return order.Trim();
 
 Expected: 戻り値 `Smoke SubtitleBand Prompt Fade EyelidTop EyelidBottom Center`。`read_console` でエラー 0。
 
-- [ ] **Step 3: カードの文面を入れる**
+- [x] **Step 3: カードの文面を入れる**
 
 3 枚目の「倫敦」にふりがなを添える。TextMeshPro にルビの機能は無いので、小さくした「ロンドン」を上へずらして置き、そのぶん横へ戻して重ねる。ふりがな 4 文字を半分の大きさにすると幅は 2 文字ぶんになり、「倫敦」の 2 文字と同じ幅で揃う。
 
@@ -342,11 +342,11 @@ return report;
 
 Expected: `cards=3`、3 枚の文面がそのまま読め、`smokeSeconds=8.99`。中央の文字の基準の大きさは 40 なので、タイトルは 64、日付は 30、ふりがなは 15 になる。
 
-- [ ] **Step 4: 文面が壊れていないか確かめる**
+- [x] **Step 4: 文面が壊れていないか確かめる**
 
 Step 3 の戻り値を、シナリオ設計書 4.1 の 3 と 1 文字ずつ突き合わせる。`制作 : yoko`、`HALF AWARE`、`かたあはれ`、`2166年8月15日 18時35分　倫敦`、ふりがなの `ロンドン`。全角の空白（年月日と時刻のあいだではなく、`18時35分` と `倫敦` のあいだ）が潰れていないこと。
 
-- [ ] **Step 5: コミット**
+- [x] **Step 5: コミット**
 
 ```bash
 cd /d/work/kataaware && git status --short && git add unity/Assets/Scenes/Room.unity && git commit -m "feat: put the eyelids and the three cards in the room"
