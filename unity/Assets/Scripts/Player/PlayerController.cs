@@ -12,7 +12,7 @@ namespace HalfAware
     [RequireComponent(typeof(CharacterController))]
     public sealed class PlayerController : MonoBehaviour
     {
-        public const float WalkSpeed = 2.6f;         // m/s
+        public const float WalkSpeed = 1.4f;         // m/s。歩きの一巡とほぼ同じ速さ
         public const float StandingEyeHeight = 1.6f;
         public const float PitchLimit = 80f;         // 度
         public const float LookSensitivity = 0.126f; // 度 / ピクセル。試作の 0.0022 rad/px と同じ
