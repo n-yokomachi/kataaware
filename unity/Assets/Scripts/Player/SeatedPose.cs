@@ -65,6 +65,12 @@ namespace HalfAware
         /// <summary>true の間だけ座位の姿勢を当てる</summary>
         public bool Seated { get; set; } = true;
 
+        /// <summary>座位の上に重ねる曲げ。場面の演出が差し込む。null なら何も重ねない</summary>
+        public BoneTurn[] Extra { get; set; }
+
+        /// <summary>重ねる曲げの強さ。0 で無し、1 で指定のまま</summary>
+        public float ExtraWeight { get; set; }
+
         void Awake()
         {
             var root = body != null ? body : transform;
@@ -138,9 +144,23 @@ namespace HalfAware
                 Quaternion r;
                 if (!rest.TryGetValue(b, out r)) continue;
                 b.localRotation = r;
-                var axis = t.axis == Axis.Right ? root.right : t.axis == Axis.Up ? root.up : root.forward;
-                b.rotation = Quaternion.AngleAxis(t.degrees, axis) * b.rotation;
+                Turn(b, t, root, 1f);
             }
+            // 重ねる分は安静へ戻さない。座位の上へ足していく
+            if (Extra == null || Mathf.Approximately(ExtraWeight, 0f)) return;
+            foreach (var t in Extra)
+            {
+                Transform b;
+                if (!bones.TryGetValue(t.bone, out b)) continue;
+                Turn(b, t, root, ExtraWeight);
+            }
+        }
+
+        /// <summary>体から見た軸まわりに曲げる。骨それぞれの軸ではないので、左右で符号が揃う</summary>
+        static void Turn(Transform b, BoneTurn t, Transform root, float weight)
+        {
+            var axis = t.axis == Axis.Right ? root.right : t.axis == Axis.Up ? root.up : root.forward;
+            b.rotation = Quaternion.AngleAxis(t.degrees * weight, axis) * b.rotation;
         }
     }
 }

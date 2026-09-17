@@ -29,6 +29,16 @@ namespace HalfAware.EditorTools
             Mark(tray);
         }
 
+        [MenuItem("HalfAware/Build the implant jack")]
+        public static void BuildJackMenu()
+        {
+            var wrist = FindBone("Wrist.R");
+            if (wrist == null) { Debug.LogError("右手首の骨が見つからない"); return; }
+            var jack = BuildJack(wrist);
+            Selection.activeGameObject = jack;
+            Mark(jack);
+        }
+
         [MenuItem("HalfAware/Build the hair clip")]
         public static void BuildHairClipMenu()
         {
@@ -221,6 +231,218 @@ namespace HalfAware.EditorTools
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             go.AddComponent<MeshRenderer>().sharedMaterial = Mat("Steel");
             Place(go.transform, "Pin", pin, Mat("SteelDark"));
+            return go;
+        }
+
+        // ---- 手首のジャックとケーブル -------------------------------------
+
+        /// <summary>
+        /// 手首に刺さっているジャック。骨は 100 倍なので入れ物で打ち消す。
+        /// 掌側の、肘寄りに刺す。座位では掌が上を向くので、下を見ると目に入る
+        /// </summary>
+        public static GameObject BuildJack(Transform wrist)
+        {
+            var old = wrist.Find("Jack");
+            if (old != null) Object.DestroyImmediate(old.gameObject);
+
+            var parts = new List<Mesh>();
+            // 差し込み口の座金 → 胴 → ケーブルの根元、と +Z へ伸ばす
+            parts.Add(ProcMesh.Loft(new List<ProcMesh.Ring>
+            {
+                new ProcMesh.Ring(new Vector3(0f, 0f, -0.002f), 0.0115f, 0.0115f),
+                new ProcMesh.Ring(new Vector3(0f, 0f, 0.0035f), 0.0118f, 0.0118f),
+                new ProcMesh.Ring(new Vector3(0f, 0f, 0.0050f), 0.0092f, 0.0092f),
+            }, 10));
+            parts.Add(ProcMesh.Loft(new List<ProcMesh.Ring>
+            {
+                new ProcMesh.Ring(new Vector3(0f, 0f, 0.0050f), 0.0088f, 0.0088f),
+                new ProcMesh.Ring(new Vector3(0f, 0f, 0.0165f), 0.0086f, 0.0086f),
+                new ProcMesh.Ring(new Vector3(0f, 0f, 0.0185f), 0.0062f, 0.0062f),
+            }, 10));
+            parts.Add(ProcMesh.Loft(new List<ProcMesh.Ring>
+            {
+                new ProcMesh.Ring(new Vector3(0f, 0f, 0.0185f), 0.0058f, 0.0058f),
+                new ProcMesh.Ring(new Vector3(0f, 0f, 0.0300f), 0.0040f, 0.0040f),
+            }, 8));
+            var mesh = ProcMesh.Save(ProcMesh.Combine(parts, null), Generated + "Jack.asset");
+
+            var go = new GameObject("Jack");
+            go.transform.SetParent(wrist, false);
+            go.transform.localScale = Vector3.one / wrist.lossyScale.x;
+            // 掌の側（骨の +forward）へ、肘寄り（骨の -up）に寄せて刺す。
+            // 座位では掌が上を向くので、この面が目に入る
+            go.transform.position = wrist.position + wrist.forward * 0.019f - wrist.up * 0.014f;
+            go.transform.rotation = Quaternion.LookRotation(wrist.forward, -wrist.up);
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            go.AddComponent<MeshRenderer>().sharedMaterial = Mat("SteelDark");
+
+            var end = new GameObject("CableEnd");
+            end.transform.SetParent(go.transform, false);
+            end.transform.localPosition = new Vector3(0f, 0f, 0.030f);
+            return go;
+        }
+
+        /// <summary>
+        /// 椅子の差込口と手首のジャックを結ぶケーブル。毎フレーム張り直すので、
+        /// 抜いて手が離れても繋がったまま垂れる
+        /// </summary>
+        [MenuItem("HalfAware/Wire the jack to the chair")]
+        public static void WireCableMenu()
+        {
+            var chair = GameObject.Find("Room/Chair");
+            var port = chair == null ? null : chair.transform.Find("PortHole");
+            var jack = FindBone("Wrist.R");
+            var end = jack == null ? null : jack.Find("Jack/CableEnd");
+            if (port == null || end == null) { Debug.LogError("差込口かジャックが見つからない"); return; }
+
+            var old = chair.transform.Find("Cable");
+            if (old != null) Object.DestroyImmediate(old.gameObject);
+            var go = new GameObject("Cable");
+            go.transform.SetParent(chair.transform, false);
+            go.transform.localPosition = Vector3.zero;
+            go.AddComponent<MeshFilter>();
+            go.AddComponent<MeshRenderer>().sharedMaterial = Mat("Ink");
+            var cable = go.AddComponent<Cable>();
+            var so = new SerializedObject(cable);
+            so.FindProperty("from").objectReferenceValue = port;
+            so.FindProperty("to").objectReferenceValue = end;
+            // 座位で差込口とジャックは 12 cm ほどしか離れない。少し輪になって垂れるぶんを足す。
+            // 組み立て時の腕は下ろした姿勢なので、そこからは測れない
+            so.FindProperty("length").floatValue = 0.38f;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            // 抜いた後にジャックを置く場所。差込口の脇
+            var rest = chair.transform.Find("JackRest");
+            if (rest == null)
+            {
+                rest = new GameObject("JackRest").transform;
+                rest.SetParent(chair.transform, false);
+            }
+            rest.position = port.position + new Vector3(0f, 0.006f, -0.075f);
+            rest.rotation = Quaternion.Euler(90f, 18f, 0f);
+            Mark(go);
+        }
+
+        static Transform FindBone(string name)
+        {
+            var pro = GameObject.Find("Player/Protagonist");
+            if (pro == null) return null;
+            foreach (var t in pro.GetComponentsInChildren<Transform>(true))
+                if (t.name == name) return t;
+            return null;
+        }
+
+        // ---- 煙草の煙 -----------------------------------------------------
+
+        /// <summary>
+        /// 口元から立ちのぼる煙。粒は世界の座標で動かすので、首を振っても置き去りになる。
+        /// 一人称なので、目の少し下・少し前から出して視界を横切らせる
+        /// </summary>
+        [MenuItem("HalfAware/Build the cigarette smoke")]
+        public static void BuildSmokeMenu()
+        {
+            var cam = GameObject.Find("Player/Main Camera");
+            if (cam == null) { Debug.LogError("カメラが見つからない"); return; }
+            var made = BuildSmoke(cam.transform);
+            Selection.activeGameObject = made;
+            Mark(made);
+        }
+
+        public static GameObject BuildSmoke(Transform cam)
+        {
+            var old = cam.Find("SmokePuffs");
+            if (old != null) Object.DestroyImmediate(old.gameObject);
+            var go = new GameObject("SmokePuffs");
+            go.transform.SetParent(cam, false);
+            go.transform.localPosition = new Vector3(0.05f, -0.19f, 0.23f);
+            go.transform.localRotation = Quaternion.Euler(-80f, 0f, 0f);
+
+            var ps = go.AddComponent<ParticleSystem>();
+            var main = ps.main;
+            main.duration = 5f;
+            main.loop = true;
+            main.playOnAwake = false;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(4.0f, 6.0f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(0.04f, 0.09f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.10f, 0.18f);
+            main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+            main.startColor = new ParticleSystem.MinMaxGradient(
+                new Color(0.82f, 0.81f, 0.78f, 0.44f), new Color(0.74f, 0.73f, 0.71f, 0.56f));
+            main.gravityModifier = new ParticleSystem.MinMaxCurve(-0.007f);
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.maxParticles = 120;
+
+            var em = ps.emission;
+            em.enabled = true;
+            em.rateOverTime = 7.5f;
+
+            var shape = ps.shape;
+            shape.enabled = true;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = 20f;
+            shape.radius = 0.015f;
+
+            var vel = ps.velocityOverLifetime;
+            vel.enabled = true;
+            vel.space = ParticleSystemSimulationSpace.World;
+            vel.x = new ParticleSystem.MinMaxCurve(-0.06f, 0.06f);
+            vel.y = new ParticleSystem.MinMaxCurve(0.03f, 0.075f);
+            vel.z = new ParticleSystem.MinMaxCurve(-0.04f, 0.05f);
+
+            var size = ps.sizeOverLifetime;
+            size.enabled = true;
+            var grow = new AnimationCurve();
+            grow.AddKey(0f, 0.30f);
+            grow.AddKey(0.4f, 1.3f);
+            grow.AddKey(1f, 2.4f);
+            size.size = new ParticleSystem.MinMaxCurve(1f, grow);
+
+            var col = ps.colorOverLifetime;
+            col.enabled = true;
+            var grad = new Gradient();
+            grad.SetKeys(
+                new GradientColorKey[]{ new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+                new GradientAlphaKey[]
+                {
+                    new GradientAlphaKey(0f, 0f),
+                    new GradientAlphaKey(1f, 0.15f),
+                    new GradientAlphaKey(0.62f, 0.55f),
+                    new GradientAlphaKey(0f, 1f),
+                });
+            col.color = new ParticleSystem.MinMaxGradient(grad);
+
+            var rot = ps.rotationOverLifetime;
+            rot.enabled = true;
+            rot.z = new ParticleSystem.MinMaxCurve(-0.35f, 0.35f);
+
+            var noise = ps.noise;
+            noise.enabled = true;
+            noise.strength = new ParticleSystem.MinMaxCurve(0.085f);
+            noise.frequency = 0.5f;
+            noise.scrollSpeed = new ParticleSystem.MinMaxCurve(0.12f);
+            noise.damping = true;
+
+            var r = go.GetComponent<ParticleSystemRenderer>();
+            r.sharedMaterial = Mat("Smoke");
+            r.renderMode = ParticleSystemRenderMode.Billboard;
+            r.sortMode = ParticleSystemSortMode.Distance;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            r.receiveShadows = false;
+            r.alignment = ParticleSystemRenderSpace.View;
+
+            var puffs = go.AddComponent<SmokePuffs>();
+            var so = new SerializedObject(puffs);
+            so.FindProperty("puffs").objectReferenceValue = ps;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            // 場面の演出へ繋ぐ
+            var dir = Object.FindFirstObjectByType<RoomIntroDirector>();
+            if (dir != null)
+            {
+                var dso = new SerializedObject(dir);
+                dso.FindProperty("puffs").objectReferenceValue = puffs;
+                dso.ApplyModifiedPropertiesWithoutUndo();
+            }
             return go;
         }
 

@@ -26,6 +26,8 @@ namespace HalfAware
 
         [SerializeField] SceneFlow flow;
         [SerializeField] HudView hud;
+        [Tooltip("口元から立ちのぼる煙。無くても場面は進む")]
+        [SerializeField] SmokePuffs puffs;
         [Tooltip("この id を調べたら煙草の演出を始める")]
         [SerializeField] string cigaretteId = "cigarette";
         [SerializeField] string[] firstLines = { "うぅ…今回は酔いが酷い…" };
@@ -71,6 +73,7 @@ namespace HalfAware
             hud.SetCenter(null);
             hud.SetCurtain(false);
             hud.CancelSmoke();
+            if (puffs != null) puffs.Cancel();
         }
 
         /// <summary>最初の独白は場面の始めに 1 度だけ。切って入れ直してもやり直さない</summary>
@@ -100,6 +103,7 @@ namespace HalfAware
             try
             {
                 hud.ShowSmoke(SmokeSeconds);
+                if (puffs != null) puffs.Begin(SmokeSeconds);
                 flow.Freeze(aimSeconds + leadInSeconds + FreezeMargin);
                 yield return AimForward(player);
                 yield return new WaitForSeconds(leadInSeconds);

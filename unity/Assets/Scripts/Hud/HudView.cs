@@ -15,8 +15,8 @@ namespace HalfAware
         /// <summary>煙が消えるのにかける秒数</summary>
         public const float SmokeFadeSeconds = 1f;
 
-        /// <summary>煙のいちばん濃いときの不透明度。向こう側が透けて見える濃さに留める</summary>
-        public const float SmokePeakAlpha = 0.45f;
+        /// <summary>画面を覆う霞みのいちばん濃いところ。煙そのものは粒が描くので、ここは薄く添えるだけ</summary>
+        public const float SmokePeakAlpha = 0.16f;
 
         [SerializeField] GameObject subtitleBand;
         [SerializeField] TMP_Text subtitleText;
