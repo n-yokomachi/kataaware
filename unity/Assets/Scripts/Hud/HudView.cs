@@ -13,7 +13,7 @@ namespace HalfAware
     /// </summary>
     public sealed class HudView : MonoBehaviour
     {
-        /// <summary>控えに一度に出す行数。画面に収まる分だけ</summary>
+        /// <summary>ログに一度に出す行数。画面に収まる分だけ</summary>
         public const int LogLines = 18;
 
         [SerializeField] GameObject subtitleBand;
@@ -24,7 +24,7 @@ namespace HalfAware
         [SerializeField] Image fadeLayer;
         [Tooltip("画面全体を覆う黒い幕。クレジットのカードを載せる")]
         [SerializeField] Image curtainLayer;
-        [Tooltip("Tab で出す、これまでの文の控え")]
+        [Tooltip("Tab で出す、これまでの文のログ")]
         [SerializeField] GameObject logPanel;
         [SerializeField] TMP_Text logText;
 
@@ -82,7 +82,7 @@ namespace HalfAware
             SetFade(alpha);
         }
 
-        /// <summary>これまでの文の控え。null で閉じる</summary>
+        /// <summary>これまでの文のログ。null で閉じる</summary>
         public void SetLog(string text)
         {
             if (logPanel != null) logPanel.SetActive(text != null);

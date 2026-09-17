@@ -47,7 +47,7 @@ namespace HalfAware
         /// <summary>このフレームで調べる操作（E か左クリック）が押されたか。ロック中だけ true になる</summary>
         public bool InteractPressed { get; private set; }
 
-        /// <summary>このフレームで控えの開閉（Tab）が押されたか</summary>
+        /// <summary>このフレームでログの開閉（Tab）が押されたか</summary>
         public bool LogPressed { get; private set; }
 
         /// <summary>

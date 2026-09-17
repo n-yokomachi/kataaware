@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace HalfAware
 {
     /// <summary>
-    /// 出した文の控え。読み飛ばしても後から追えるように、古い順に溜めておく。
+    /// 出した文のログ。読み飛ばしても後から追えるように、古い順に溜めておく。
     /// 同じ文が続けて入ることはあるが、それも起きたとおりに残す
     /// </summary>
     public sealed class MessageLog
@@ -19,7 +19,7 @@ namespace HalfAware
 
         public bool IsEmpty { get { return lines.Count == 0; } }
 
-        /// <summary>1 行を控える。空の行は残さない</summary>
+        /// <summary>1 行をログに残す。空の行は入れない</summary>
         public void Add(string line)
         {
             if (string.IsNullOrEmpty(line)) return;
@@ -27,7 +27,7 @@ namespace HalfAware
             if (lines.Count > Keep) lines.RemoveRange(0, lines.Count - Keep);
         }
 
-        /// <summary>まとめて控える</summary>
+        /// <summary>まとめてログに残す</summary>
         public void AddRange(IEnumerable<string> newLines)
         {
             if (newLines == null) return;

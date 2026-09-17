@@ -5,7 +5,7 @@ namespace HalfAware
     /// <summary>
     /// 持っていった物を場から消す。メモリラックから抜いたメモリのように、
     /// 調べた結果が部屋の見た目に残るところに使う。
-    /// 消す物と、代わりに現れる物と、色を替える材質を挙げておく
+    /// 消す物と、代わりに現れる物と、色を替えるマテリアルを挙げておく
     /// </summary>
     public sealed class Taken : MonoBehaviour
     {
@@ -17,9 +17,9 @@ namespace HalfAware
         [SerializeField] GameObject[] removed = new GameObject[0];
         [Tooltip("持っていったら現れる物")]
         [SerializeField] GameObject[] revealed = new GameObject[0];
-        [Tooltip("持っていったら材質が替わる描画。lamp と対にする")]
+        [Tooltip("持っていったらマテリアルが替わるレンダラー。lamp と対にする")]
         [SerializeField] Renderer[] relit = new Renderer[0];
-        [Tooltip("替えた後の材質")]
+        [Tooltip("替えた後のマテリアル")]
         [SerializeField] Material lamp;
 
         bool taken;

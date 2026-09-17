@@ -72,10 +72,10 @@ namespace HalfAware
 
         public SceneProgress Progress => progress;
 
-        /// <summary>これまでに出した文の控え。Tab で開く</summary>
+        /// <summary>これまでに出した文のログ。Tab で開く</summary>
         public MessageLog Log => log;
 
-        /// <summary>控えを開いている間。調べる操作は受け付けない</summary>
+        /// <summary>ログを開いている間。調べる操作は受け付けない</summary>
         public bool LogOpen => logOpen;
 
         /// <summary>場面固有の演出が、向きを変えたり見回しを止めたりするのに使う</summary>
@@ -129,7 +129,7 @@ namespace HalfAware
         /// <summary>次のフレームで調べる操作を 1 回起こす。E キーの代わりに、再生中の動作確認から SendMessage で呼ぶ</summary>
         public void PressInteract() => pendingInteract = true;
 
-        /// <summary>字幕を積む。場面固有の演出から呼ぶ。控えにも残す</summary>
+        /// <summary>字幕を積む。場面固有の演出から呼ぶ。ログにも残す</summary>
         public void Say(IReadOnlyList<string> lines)
         {
             subtitles.Enqueue(lines);
@@ -173,7 +173,7 @@ namespace HalfAware
             Wake();
             // 独白を読み終えてから腰を上げる。喋りながら立ち上がらせない
             Stand(frozenNow || subtitles.IsTalking);
-            // 控えを開いている間は字幕を伏せる。控えの上に重なって読みにくい
+            // ログを開いている間は字幕を伏せる。ログの上に重なって読みにくい
             hud.SetSubtitle(logOpen ? null : subtitles.Current);
             if (progress.IsComplete && !subtitles.IsTalking && !frozenNow) StartCoroutine(Complete());
         }

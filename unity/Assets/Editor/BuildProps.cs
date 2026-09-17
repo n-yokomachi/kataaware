@@ -309,10 +309,10 @@ namespace HalfAware.EditorTools
             return null;
         }
 
-        // ---- 調べられる物の目印 --------------------------------------------
+        // ---- 調べられる物のピン --------------------------------------------
 
         /// <summary>
-        /// 地図の鋲。丸い頭に穴が開いていて、下が尖っている。
+        /// 地図のピン。丸い頭に穴が開いていて、下が尖っている。
         /// 高さ 1 で、尖った先が原点。置いた点をそのまま指す。
         /// こちらを向かせて距離で伸ばすのは PinMarkers の仕事
         /// </summary>
@@ -380,7 +380,7 @@ namespace HalfAware.EditorTools
             return root;
         }
 
-        /// <summary>自分で光る材質。暗い部屋でも目印が沈まないように</summary>
+        /// <summary>自分で光るマテリアル。暗い部屋でもピンが沈まないように</summary>
         static Material Glow(string name, Color col, float strength)
         {
             var m = Tinted(name, col, 0f, 0.2f);
@@ -525,11 +525,11 @@ namespace HalfAware.EditorTools
         static Material Mat(string name)
         {
             var m = AssetDatabase.LoadAssetAtPath<Material>(Materials + name + ".mat");
-            if (m == null) Debug.LogWarning("材質が無い: " + name);
+            if (m == null) Debug.LogWarning("マテリアルが無い: " + name);
             return m;
         }
 
-        /// <summary>Steel を下地に色だけ変えた材質を用意する。無ければ作って残す</summary>
+        /// <summary>Steel を下地に色だけ変えたマテリアルを用意する。無ければ作って残す</summary>
         static Material Tinted(string name, Color col, float metal, float smooth)
         {
             var path = Materials + name + ".mat";

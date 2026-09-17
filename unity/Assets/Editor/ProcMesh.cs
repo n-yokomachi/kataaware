@@ -123,7 +123,7 @@ namespace HalfAware.EditorTools
             return mesh;
         }
 
-        /// <summary>作った mesh を資産として保存する。場面から参照できるようにするため</summary>
+        /// <summary>作った mesh をアセットとして保存する。場面から参照できるようにするため</summary>
         public static Mesh Save(Mesh mesh, string path)
         {
             var dir = System.IO.Path.GetDirectoryName(path);

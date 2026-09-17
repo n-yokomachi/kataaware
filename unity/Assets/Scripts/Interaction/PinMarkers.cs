@@ -4,9 +4,9 @@ using UnityEngine;
 namespace HalfAware
 {
     /// <summary>
-    /// 調べられる物の上に立てる目印。地図の鋲のような形を、今できることの上にだけ出す。
+    /// 調べられる物の上に立てるピン。地図のピンのような形を、今できることの上にだけ出す。
     /// 済んだ物と、まだ前提が揃っていない物には立てない。
-    /// 鋲は常にこちらを向き、遠くても同じ大きさに見えるよう距離で伸ばす
+    /// ピンは常にこちらを向き、遠くても同じ大きさに見えるよう距離で伸ばす
     /// </summary>
     [DefaultExecutionOrder(30)]
     public sealed class PinMarkers : MonoBehaviour

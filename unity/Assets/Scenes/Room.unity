@@ -3413,7 +3413,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\u8A18\u9332\u3000\u3000Tab \u3067\u9589\u3058\u308B"
+  m_text: "\u30ED\u30B0\u3000\u3000Tab \u3067\u9589\u3058\u308B"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 6ce0a87a0354d05499d621c3c7163477, type: 2}
   m_sharedMaterial: {fileID: -8995817149374074583, guid: 6ce0a87a0354d05499d621c3c7163477, type: 2}
