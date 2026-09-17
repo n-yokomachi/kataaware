@@ -19,8 +19,11 @@ namespace HalfAware
 
         [SerializeField] InputActionAsset actions;
         [SerializeField] Transform eye;
+        [Tooltip("目は背骨の中心ではなく顔にある。体の前へこれだけ出す。メートル")]
+        [SerializeField] float eyeLead = 0.11f;
 
         CharacterController body;
+        readonly HeadTurn head = new HeadTurn();
         InputAction move;
         InputAction look;
         InputAction interact;
@@ -43,11 +46,35 @@ namespace HalfAware
         /// <summary>このフレームで調べる操作（E か左クリック）が押されたか。ロック中だけ true になる</summary>
         public bool InteractPressed { get; private set; }
 
-        /// <summary>左右の向き。度。書き込むと体ごと向き直る。演出から正面へ戻すのに使う</summary>
+        /// <summary>
+        /// 座っている間、左右に振れる角度。度。片側の値。0 以下なら体ごと回れる。
+        /// 立ち上がるときは ReleaseHead を呼んで、首の向きを体へ渡す
+        /// </summary>
+        public float HeadYawLimit
+        {
+            get { return head.Limit; }
+            set { head.Limit = value; }
+        }
+
+        /// <summary>体から見た首の向き。度</summary>
+        public float HeadYaw { get { return head.Yaw; } }
+
+        /// <summary>首の制限を解き、溜めていた向きを体へ移す。見た目は繋がったまま</summary>
+        public void ReleaseHead()
+        {
+            var carried = head.Release();
+            if (Mathf.Abs(carried) > 1e-4f) transform.Rotate(0f, carried, 0f);
+        }
+
+        /// <summary>左右の向き。度。体と首を合わせた向きを指す。演出から正面へ戻すのに使う</summary>
         public float Yaw
         {
-            get { return transform.eulerAngles.y; }
-            set { transform.rotation = Quaternion.Euler(0f, value, 0f); }
+            get { return transform.eulerAngles.y + head.Yaw; }
+            set
+            {
+                if (head.Limited) head.Set(Mathf.DeltaAngle(transform.eulerAngles.y, value));
+                else transform.rotation = Quaternion.Euler(0f, value, 0f);
+            }
         }
 
         /// <summary>上下の向き。度。書き込むと範囲に収まる。動作確認から視線を向けるのにも使う</summary>
@@ -94,8 +121,8 @@ namespace HalfAware
             // 目の位置と向きは、ロックの有無にかかわらず毎フレーム書き直す。
             // 上乗せしていく形にすると、書き直されない間にずれが溜まって視界が回り続ける。
             // 傾きをこの順で組むと、左右の傾きが親の水平面で効くので、下を向いていても画面が回らない
-            eye.localPosition = new Vector3(0f, EyeHeight, 0f) + EyeOffset;
-            eye.localRotation = Quaternion.Euler(pitch + EyeTilt.x, EyeTilt.y, 0f);
+            eye.localPosition = new Vector3(0f, EyeHeight, eyeLead) + EyeOffset;
+            eye.localRotation = Quaternion.Euler(pitch + EyeTilt.x, head.Yaw + EyeTilt.y, 0f);
         }
 
         static void Lock()
@@ -106,7 +133,9 @@ namespace HalfAware
 
         void Look(Vector2 delta)
         {
-            transform.Rotate(0f, delta.x * LookSensitivity, 0f);
+            var turn = delta.x * LookSensitivity;
+            // 座っている間は首だけ。立てば体ごと回る
+            if (!head.Add(turn)) transform.Rotate(0f, turn, 0f);
             Pitch -= delta.y * LookSensitivity;
         }
 

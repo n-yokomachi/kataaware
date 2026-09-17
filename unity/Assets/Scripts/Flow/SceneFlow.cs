@@ -90,6 +90,8 @@ namespace HalfAware
                 standUp = new StandUp(seatEyeHeight, PlayerController.StandingEyeHeight, StandSeconds);
                 player.CanMove = false;
                 player.EyeHeight = seatEyeHeight;
+                // 座っている間は体を据えて首だけ振る
+                player.HeadYawLimit = HeadTurn.DefaultLimit;
                 if (body != null)
                 {
                     seatedPose = body.GetComponent<SeatedPose>();
@@ -176,8 +178,10 @@ namespace HalfAware
             standUp.Tick(Time.deltaTime, progress.Done.Contains(standAfter), frozen);
             player.EyeHeight = standUp.EyeHeight;
             player.CanMove = standUp.Standing;
-            // 立ち上がりきってから立位の姿勢へ戻す
-            if (standUp.Standing && seatedPose != null) seatedPose.Seated = false;
+            if (!standUp.Standing) return;
+            // 立ち上がりきってから、立位の姿勢に戻して首の制限を解く
+            if (seatedPose != null) seatedPose.Seated = false;
+            if (player.HeadYawLimit > 0f) player.ReleaseHead();
         }
 
         IEnumerator Complete()
