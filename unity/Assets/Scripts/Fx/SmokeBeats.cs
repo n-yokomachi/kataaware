@@ -15,12 +15,12 @@ namespace HalfAware
         /// <summary>火が点いてから最初の一服まで</summary>
         public const float FirstDragAfterFlame = 0.55f;
 
-        /// <summary>吸っている長さ</summary>
-        public const float DragSeconds = 1.15f;
+        /// <summary>吸っている長さ。素材の長さに合わせてある</summary>
+        public const float DragSeconds = 0.95f;
         /// <summary>肺に留めている長さ</summary>
         public const float HoldSeconds = 0.55f;
-        /// <summary>吐いている長さ</summary>
-        public const float BlowSeconds = 1.70f;
+        /// <summary>吐いている長さ。素材の長さに合わせてある</summary>
+        public const float BlowSeconds = 1.20f;
         /// <summary>吐き終わってから次に吸うまで</summary>
         public const float RestSeconds = 2.10f;
 

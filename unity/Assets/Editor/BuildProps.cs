@@ -39,14 +39,14 @@ namespace HalfAware.EditorTools
             Mark(jack);
         }
 
-        [MenuItem("HalfAware/Build the hair clip")]
-        public static void BuildHairClipMenu()
+        [MenuItem("HalfAware/Build the binder")]
+        public static void BuildBinderMenu()
         {
             var room = GameObject.Find("Room");
             if (room == null) { Debug.LogError("部屋が場面に無い"); return; }
-            var clip = BuildHairClip(room.transform);
-            Selection.activeGameObject = clip;
-            Mark(clip);
+            var made = BuildBinder(room.transform);
+            Selection.activeGameObject = made;
+            Mark(made);
         }
 
         // ---- 灰皿の中身 -------------------------------------------------
@@ -161,93 +161,53 @@ namespace HalfAware.EditorTools
             }, segments);
         }
 
-        // ---- 髪ばさみ ---------------------------------------------------
+        // ---- 紙ばさみ -----------------------------------------------------
 
         /// <summary>
-        /// 髪を留めるばさみ。爪を噛み合わせた口が開いているのが目印になるので、
-        /// 上下の顎に爪を並べて隙間を残す。黒い革や毛布の上では黒い樹脂は沈むので地金の色にする
+        /// 売り上げを書きつけた紙ばさみ。厚紙の台に紙束を挟んで、頭に金具の口金。
+        /// ソファの毛布の上に投げてある
         /// </summary>
-        public static GameObject BuildHairClip(Transform room)
+        public static GameObject BuildBinder(Transform room)
         {
-            const float half = 0.046f;    // 長さの半分
-            const float wide = 0.013f;    // 幅の半分
-            var body = new List<Mesh>();
+            const float w = 0.108f;    // 幅の半分。A4 より少し小さい
+            const float h = 0.150f;    // 丈の半分
 
-            // 下顎。ほぼまっすぐな板
-            var lower = new List<ProcMesh.Ring>();
-            for (var i = 0; i <= 8; i++)
-            {
-                var k = i / 8f;
-                var x = Mathf.Lerp(-half, half, k);
-                var w = wide * (1f - 0.22f * Mathf.Pow(Mathf.Abs(x) / half, 3f));
-                lower.Add(new ProcMesh.Ring(new Vector3(x, 0.0042f, 0f), w, 0.0030f,
-                    Quaternion.LookRotation(Vector3.right, Vector3.up)));
-            }
-            body.Add(ProcMesh.Loft(lower, 8));
+            var old = GameObject.Find("Room/Binder");
+            if (old != null) Object.DestroyImmediate(old);
+            var oldClip = GameObject.Find("Room/HairClip");
+            if (oldClip != null) Object.DestroyImmediate(oldClip);
 
-            // 上顎。後ろの蝶番から立ち上がり、真ん中で高く、前で下りてくる。
-            // 前を閉じきらないので、口が開いているのが横から判る
-            var upper = new List<ProcMesh.Ring>();
-            for (var i = 0; i <= 12; i++)
-            {
-                var k = i / 12f;
-                var x = Mathf.Lerp(-half, half, k);
-                var arc = Mathf.Sin(Mathf.Pow(k, 0.85f) * Mathf.PI);
-                var w = wide * (0.70f + 0.30f * arc);
-                upper.Add(new ProcMesh.Ring(new Vector3(x, 0.0090f + 0.0215f * arc, 0f), w, 0.0028f,
-                    Quaternion.LookRotation(Vector3.right, Vector3.up)));
-            }
-            body.Add(ProcMesh.Loft(upper, 8));
+            var go = new GameObject("Binder");
+            go.transform.SetParent(room, false);
+            // 毛布の襞の上。座面そのものは毛布に覆われている
+            go.transform.position = new Vector3(-2.40f, 0.636f, 0.19f);
+            go.transform.rotation = Quaternion.Euler(0f, 62f, 0f);
 
-            // 下顎の爪。上へ伸びる
+            Slab(go.transform, "Board", new Vector3(0f, 0.0025f, 0f), Vector3.zero,
+                new Vector3(w * 2f, 0.005f, h * 2f), Mat("PanelDark"));
+            // 紙束。台より一回り小さく、少しずれて重なっている
+            Slab(go.transform, "Paper", new Vector3(0.002f, 0.0075f, -0.004f), new Vector3(0f, 1.2f, 0f),
+                new Vector3(w * 1.90f, 0.005f, h * 1.90f), Mat("Steel"));
+            Slab(go.transform, "Paper2", new Vector3(-0.003f, 0.0106f, 0.002f), new Vector3(0f, -0.8f, 0f),
+                new Vector3(w * 1.86f, 0.002f, h * 1.86f), Mat("Steel"));
+            // 口金。頭に渡した金具と、押さえの爪
+            Slab(go.transform, "Clip", new Vector3(0f, 0.0128f, h * 0.80f), Vector3.zero,
+                new Vector3(w * 1.05f, 0.005f, 0.030f), Mat("SteelDark"));
+            Slab(go.transform, "ClipLip", new Vector3(0f, 0.0150f, h * 0.80f - 0.017f), new Vector3(-16f, 0f, 0f),
+                new Vector3(w * 0.98f, 0.003f, 0.012f), Mat("SteelDark"));
+            Slab(go.transform, "HingeL", new Vector3(-w * 0.52f, 0.0128f, h * 0.92f), Vector3.zero,
+                new Vector3(0.012f, 0.009f, 0.012f), Mat("Steel"));
+            Slab(go.transform, "HingeR", new Vector3(w * 0.52f, 0.0128f, h * 0.92f), Vector3.zero,
+                new Vector3(0.012f, 0.009f, 0.012f), Mat("Steel"));
+            // 走り書き。紙の上に薄い帯を並べて、字が書いてあるように見せる
             for (var i = 0; i < 5; i++)
             {
-                var x = Mathf.Lerp(-half * 0.62f, half * 0.80f, i / 4f);
-                Claw(body, new Vector3(x, 0.0060f, 0f), Vector3.up, 0.0092f, -Mathf.Lerp(-6f, 12f, i / 4f));
+                var y = Mathf.Lerp(h * 0.42f, -h * 0.55f, i / 4f);
+                var len = w * (i == 0 ? 1.30f : Random.Range(0.85f, 1.55f));
+                Slab(go.transform, "Line" + i, new Vector3(-w * 0.10f + len * 0.10f, 0.0119f, y), Vector3.zero,
+                    new Vector3(len, 0.001f, 0.0035f), Mat("Ink"));
             }
-            // 上顎の爪。下へ伸び、下顎の爪と噛み合う
-            for (var i = 0; i < 4; i++)
-            {
-                var k = i / 3f;
-                var x = Mathf.Lerp(-half * 0.40f, half * 0.86f, k);
-                var arc = Mathf.Sin(Mathf.Pow((x + half) / (half * 2f), 0.85f) * Mathf.PI);
-                Claw(body, new Vector3(x, 0.0090f + 0.0215f * arc - 0.0020f, 0f), Vector3.down, 0.0088f,
-                    Mathf.Lerp(4f, 14f, k));
-            }
-
-            var mesh = ProcMesh.Save(ProcMesh.Combine(body, null), Generated + "HairClip.asset");
-            var pin = ProcMesh.Save(ProcMesh.Loft(new List<ProcMesh.Ring>
-            {
-                new ProcMesh.Ring(new Vector3(-half + 0.004f, 0.0075f, -wide - 0.0018f), 0.0030f, 0.0030f,
-                    Quaternion.LookRotation(Vector3.forward, Vector3.up)),
-                new ProcMesh.Ring(new Vector3(-half + 0.004f, 0.0075f, wide + 0.0018f), 0.0030f, 0.0030f,
-                    Quaternion.LookRotation(Vector3.forward, Vector3.up)),
-            }, 8), Generated + "HairClipPin.asset");
-
-            var old = GameObject.Find("Room/HairClip");
-            if (old != null) Object.DestroyImmediate(old);
-            var go = new GameObject("HairClip");
-            go.transform.SetParent(room, false);
-            // 毛布の襞の上へ。座面は襞に覆われていて、肘掛けの上は目につきにくかった
-            go.transform.position = new Vector3(-2.40f, 0.636f, 0.21f);
-            go.transform.rotation = Quaternion.Euler(0f, 68f, 0f);
-            go.AddComponent<MeshFilter>().sharedMesh = mesh;
-            go.AddComponent<MeshRenderer>().sharedMaterial = Mat("Steel");
-            Place(go.transform, "Pin", pin, Mat("SteelDark"));
             return go;
-        }
-
-        /// <summary>爪 1 本。根元から dir へ伸びて先が細る</summary>
-        static void Claw(List<Mesh> into, Vector3 root, Vector3 dir, float length, float lean)
-        {
-            var tilt = Quaternion.AngleAxis(lean, Vector3.forward) * dir;
-            var tip = root + tilt.normalized * length;
-            into.Add(ProcMesh.Loft(new List<ProcMesh.Ring>
-            {
-                new ProcMesh.Ring(root, 0.0072f, 0.0026f, Quaternion.LookRotation(dir, Vector3.right)),
-                new ProcMesh.Ring(Vector3.Lerp(root, tip, 0.55f), 0.0052f, 0.0019f, Quaternion.LookRotation(dir, Vector3.right)),
-                new ProcMesh.Ring(tip, 0.0018f, 0.0008f, Quaternion.LookRotation(dir, Vector3.right)),
-            }, 6));
         }
 
         // ---- 手首のジャックとケーブル -------------------------------------
@@ -538,6 +498,20 @@ namespace HalfAware.EditorTools
         }
 
         // ---- 下ごしらえ -------------------------------------------------
+
+        /// <summary>箱 1 つ。板や金具のように、曲面の要らないところに使う</summary>
+        static GameObject Slab(Transform parent, string name, Vector3 pos, Vector3 rot, Vector3 scale, Material mat)
+        {
+            var g = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            g.name = name;
+            g.transform.SetParent(parent, false);
+            g.transform.localPosition = pos;
+            g.transform.localRotation = Quaternion.Euler(rot);
+            g.transform.localScale = scale;
+            g.GetComponent<Renderer>().sharedMaterial = mat;
+            Object.DestroyImmediate(g.GetComponent<Collider>());
+            return g;
+        }
 
         static GameObject Place(Transform parent, string name, Mesh mesh, Material mat)
         {
