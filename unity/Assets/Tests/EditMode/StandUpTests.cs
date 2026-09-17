@@ -72,5 +72,25 @@ namespace HalfAware.Tests
             Assert.That(s.EyeHeight, Is.EqualTo(1.6f));
             Assert.That(s.Standing, Is.True);
         }
+        [Test]
+        public void TheProgressFollowsTheEyeHeight()
+        {
+            Assert.AreEqual(0f, StandUp.Progress(1.1f, 1.1f, 1.6f), 1e-4f);
+            Assert.AreEqual(1f, StandUp.Progress(1.6f, 1.1f, 1.6f), 1e-4f);
+            Assert.AreEqual(0.5f, StandUp.Progress(1.35f, 1.1f, 1.6f), 1e-4f);
+        }
+
+        [Test]
+        public void TheProgressStaysInsideItsRange()
+        {
+            Assert.AreEqual(0f, StandUp.Progress(0.4f, 1.1f, 1.6f), 1e-4f);
+            Assert.AreEqual(1f, StandUp.Progress(9f, 1.1f, 1.6f), 1e-4f);
+        }
+
+        [Test]
+        public void NoHeightToGainIsAlreadyThere()
+        {
+            Assert.AreEqual(1f, StandUp.Progress(1.6f, 1.6f, 1.6f), 1e-4f);
+        }
     }
 }

@@ -31,6 +31,10 @@ namespace HalfAware
         [SerializeField] float seatEyeHeight = 1.1f;
         [Tooltip("この id を調べると立ち上がって移動できるようになる。空なら最初から立っている")]
         [SerializeField] string standAfter = "";
+        [Tooltip("立ち上がって足を下ろす場所。椅子の中に立ち尽くさないよう、ここへ滑らせる")]
+        [SerializeField] Transform standSpot;
+        [Tooltip("立ってから効かせる当たり。座っている間は椅子に当たらないよう切っておく")]
+        [SerializeField] GameObject chairBlocker;
 
         [Header("目覚めの起き上がり")]
         [Tooltip("座位の目線からどれだけ下から始めるか。メートル")]
@@ -51,6 +55,7 @@ namespace HalfAware
         [SerializeField] string dazeUntil = "";
 
         readonly SubtitleQueue subtitles = new SubtitleQueue();
+        readonly MessageLog log = new MessageLog();
         List<IInteractable> items;
         SceneProgress progress;
         StandUp standUp;
@@ -59,11 +64,19 @@ namespace HalfAware
         bool pendingInteract;
         float frozenUntil;
         bool dazeReleased;
+        bool logOpen;
+        Vector3 seatedSpot;
 
         /// <summary>対象を調べて済んだ直後。前提が未達で文だけ出たときは呼ばない</summary>
         public event Action<IInteractable> Examined;
 
         public SceneProgress Progress => progress;
+
+        /// <summary>これまでに出した文の控え。Tab で開く</summary>
+        public MessageLog Log => log;
+
+        /// <summary>控えを開いている間。調べる操作は受け付けない</summary>
+        public bool LogOpen => logOpen;
 
         /// <summary>場面固有の演出が、向きを変えたり見回しを止めたりするのに使う</summary>
         public PlayerController Player => player;
@@ -71,6 +84,9 @@ namespace HalfAware
 
         /// <summary>調べる操作と進行が止まっているか。見回しは止めない</summary>
         public bool Frozen => Time.time < frozenUntil;
+
+        /// <summary>字幕を出している最中か</summary>
+        public bool Talking => subtitles.IsTalking;
 
         void Awake()
         {
@@ -85,6 +101,8 @@ namespace HalfAware
             items = new List<IInteractable>(FindObjectsByType<Interactable>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID));
             if (items.Count == 0) Debug.LogWarning("SceneFlow: 調べる対象が 1 つも見つからない", this);
             progress = new SceneProgress(items);
+            seatedSpot = player.transform.position;
+            if (chairBlocker != null) chairBlocker.SetActive(false);
             if (standAfter.Length > 0)
             {
                 standUp = new StandUp(seatEyeHeight, PlayerController.StandingEyeHeight, StandSeconds);
@@ -111,8 +129,12 @@ namespace HalfAware
         /// <summary>次のフレームで調べる操作を 1 回起こす。E キーの代わりに、再生中の動作確認から SendMessage で呼ぶ</summary>
         public void PressInteract() => pendingInteract = true;
 
-        /// <summary>字幕を積む。場面固有の演出から呼ぶ</summary>
-        public void Say(IReadOnlyList<string> lines) => subtitles.Enqueue(lines);
+        /// <summary>字幕を積む。場面固有の演出から呼ぶ。控えにも残す</summary>
+        public void Say(IReadOnlyList<string> lines)
+        {
+            subtitles.Enqueue(lines);
+            log.AddRange(lines);
+        }
 
         /// <summary>seconds 秒のあいだ、調べる操作と進行を止める。すでに止まっているときは長い方を採る</summary>
         public void Freeze(float seconds) => frozenUntil = Mathf.Max(frozenUntil, Time.time + seconds);
@@ -120,7 +142,9 @@ namespace HalfAware
         void Update()
         {
             if (Completed) return;
-            var frozen = Frozen;
+            if (player.LogPressed) logOpen = !logOpen;
+            hud.SetLog(logOpen ? log.Compose(HudView.LogLines) : null);
+            var frozen = Frozen || logOpen;
             var interact = (player.InteractPressed || pendingInteract) && !frozen;
             // 止まっている間に届いた PressInteract は捨てずに持ち越す。実キー入力はその場限りなので落ちる
             if (!frozen) pendingInteract = false;
@@ -138,7 +162,9 @@ namespace HalfAware
             hud.SetPrompt(selected != null ? "E  " + selected.Label : null);
             if (selected != null && interact)
             {
-                subtitles.Enqueue(progress.Examine(selected));
+                var said = progress.Examine(selected);
+                subtitles.Enqueue(said);
+                log.AddRange(said);
                 if (progress.Done.Contains(selected.Id) && Examined != null) Examined(selected);
             }
             // 調べた先の演出が Freeze を呼ぶので、止まっているかは調べた後に見直す
@@ -147,7 +173,8 @@ namespace HalfAware
             Wake();
             // 独白を読み終えてから腰を上げる。喋りながら立ち上がらせない
             Stand(frozenNow || subtitles.IsTalking);
-            hud.SetSubtitle(subtitles.Current);
+            // 控えを開いている間は字幕を伏せる。控えの上に重なって読みにくい
+            hud.SetSubtitle(logOpen ? null : subtitles.Current);
             if (progress.IsComplete && !subtitles.IsTalking && !frozenNow) StartCoroutine(Complete());
         }
 
@@ -179,10 +206,25 @@ namespace HalfAware
             standUp.Tick(Time.deltaTime, progress.Done.Contains(standAfter), frozen);
             player.EyeHeight = standUp.EyeHeight;
             player.CanMove = standUp.Standing;
+            StepOffTheChair();
             if (!standUp.Standing) return;
             // 立ち上がりきってから、立位の姿勢に戻して首の制限を解く
             if (seatedPose != null) seatedPose.Seated = false;
             if (player.HeadYawLimit > 0f) player.ReleaseHead();
+            // 椅子から離れきってから当たりを入れる。座ったまま入れると押し出される
+            if (chairBlocker != null) chairBlocker.SetActive(true);
+        }
+
+        /// <summary>
+        /// 立ち上がる間に、腰を下ろしていた場所から足を下ろす場所へ滑らせる。
+        /// 椅子の中に立ち尽くすと、下を向いたとき体が椅子を突き抜けて見える
+        /// </summary>
+        void StepOffTheChair()
+        {
+            if (standSpot == null || standUp == null) return;
+            var k = StandUp.Progress(standUp.EyeHeight, seatEyeHeight, PlayerController.StandingEyeHeight);
+            var at = Vector3.Lerp(seatedSpot, standSpot.position, k);
+            player.transform.position = new Vector3(at.x, player.transform.position.y, at.z);
         }
 
         IEnumerator Complete()

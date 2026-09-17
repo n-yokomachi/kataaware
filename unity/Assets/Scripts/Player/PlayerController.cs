@@ -27,6 +27,7 @@ namespace HalfAware
         InputAction move;
         InputAction look;
         InputAction interact;
+        InputAction logToggle;
         float pitch;
 
         /// <summary>false の間は見回しだけできる（座っている、演出中など）</summary>
@@ -45,6 +46,9 @@ namespace HalfAware
 
         /// <summary>このフレームで調べる操作（E か左クリック）が押されたか。ロック中だけ true になる</summary>
         public bool InteractPressed { get; private set; }
+
+        /// <summary>このフレームで控えの開閉（Tab）が押されたか</summary>
+        public bool LogPressed { get; private set; }
 
         /// <summary>
         /// 座っている間、左右に振れる角度。度。片側の値。0 以下なら体ごと回れる。
@@ -97,6 +101,7 @@ namespace HalfAware
             move = map.FindAction("Move", true);
             look = map.FindAction("Look", true);
             interact = map.FindAction("Interact", true);
+            logToggle = map.FindAction("Log", true);
         }
 
         void OnEnable() => actions.FindActionMap("Player", true).Enable();
@@ -106,9 +111,11 @@ namespace HalfAware
         void Update()
         {
             InteractPressed = false;
+            LogPressed = false;
             if (CursorLocked)
             {
                 InteractPressed = interact.WasPressedThisFrame();
+                LogPressed = logToggle.WasPressedThisFrame();
                 if (CanLook) Look(look.ReadValue<Vector2>());
                 if (CanMove) Walk(move.ReadValue<Vector2>());
             }

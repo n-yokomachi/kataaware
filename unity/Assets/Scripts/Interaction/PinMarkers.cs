@@ -54,9 +54,11 @@ namespace HalfAware
             if (eye == null || flow.Progress == null) return;
             var done = flow.Progress.Done;
             var camPos = eye.transform.position;
+            // 手が離せない間は出さない。煙草を吸い終わるまでや、独白の途中は用が無い
+            var busy = flow.Completed || flow.Frozen || flow.Talking || flow.LogOpen;
             for (var i = 0; i < items.Count; i++)
             {
-                var show = !flow.Completed && InteractionPicker.Marked(items[i], done);
+                var show = !busy && InteractionPicker.Marked(items[i], done);
                 var made = pins[i];
                 if (made.activeSelf != show) made.SetActive(show);
                 if (!show) continue;

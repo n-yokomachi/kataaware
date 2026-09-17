@@ -27,6 +27,17 @@ namespace HalfAware
         /// <summary>立ち終わったか。true になったら移動を許してよい</summary>
         public bool Standing { get; private set; }
 
+        /// <summary>
+        /// 目線の高さから、立ち上がりのどのあたりかを 0〜1 で返す。
+        /// 高さ以外（体を椅子から離すなど）を同じ進みで動かすのに使う
+        /// </summary>
+        public static float Progress(float eyeHeight, float seatEyeHeight, float standingEyeHeight)
+        {
+            var span = standingEyeHeight - seatEyeHeight;
+            if (Mathf.Abs(span) < 1e-5f) return 1f;
+            return Mathf.Clamp01((eyeHeight - seatEyeHeight) / span);
+        }
+
         public void Tick(float dt, bool released, bool frozen)
         {
             if (Standing) return;
