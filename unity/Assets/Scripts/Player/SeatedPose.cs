@@ -42,12 +42,25 @@ namespace HalfAware
         [SerializeField] BoneTurn[] turns;
         [Tooltip("座ると腰が座面まで下がる。その沈み込み。体の座標で指定する")]
         [SerializeField] Vector3 seatedOffset = new Vector3(0f, -0.51f, 0f);
+        [Tooltip("立っている間だけ動かす。座っている間は骨をこちらが握るので止める")]
+        [SerializeField] Animator animator;
+
+        /// <summary>繋ぎ直す前の親と、その下での置き方。立つときに戻す</summary>
+        struct Hung
+        {
+            public Transform child;
+            public Transform parent;
+            public Vector3 position;
+            public Quaternion rotation;
+        }
 
         Vector3 standingPosition;
 
         readonly Dictionary<string, Transform> bones = new Dictionary<string, Transform>();
         readonly Dictionary<Transform, Quaternion> rest = new Dictionary<Transform, Quaternion>();
+        readonly List<Hung> refooted = new List<Hung>();
         bool ready;
+        bool handedOver;
 
         /// <summary>true の間だけ座位の姿勢を当てる</summary>
         public bool Seated { get; set; } = true;
@@ -67,6 +80,13 @@ namespace HalfAware
                 if (!bones.TryGetValue(refootBones[i], out foot)) continue;
                 if (!bones.TryGetValue(shinBones[i], out shin)) continue;
                 if (foot.parent == shin) continue;
+                refooted.Add(new Hung
+                {
+                    child = foot,
+                    parent = foot.parent,
+                    position = foot.localPosition,
+                    rotation = foot.localRotation,
+                });
                 foot.SetParent(shin, true);
             }
             foreach (var t in turns)
@@ -84,10 +104,31 @@ namespace HalfAware
             if (!ready) return;
             if (!Seated)
             {
-                transform.localPosition = standingPosition;
-                foreach (var pair in rest) pair.Key.localRotation = pair.Value;
+                if (!handedOver)
+                {
+                    // 座位を解いた一度だけ骨を戻し、そこから先は動きに任せる
+                    transform.localPosition = standingPosition;
+                    foreach (var pair in rest) pair.Key.localRotation = pair.Value;
+                    // 足首は元の親へ返す。歩きの動作は足首を根の直下として付けているので、
+                    // 繋いだままだと足の曲げが当たらない
+                    foreach (var h in refooted)
+                    {
+                        h.child.SetParent(h.parent, false);
+                        h.child.localPosition = h.position;
+                        h.child.localRotation = h.rotation;
+                    }
+                    if (animator != null)
+                    {
+                        // 繋ぎ替えた先を見に行かせるため、道筋を取り直させてから回す
+                        animator.enabled = true;
+                        animator.Rebind();
+                    }
+                    handedOver = true;
+                }
                 return;
             }
+            handedOver = false;
+            if (animator != null && animator.enabled) animator.enabled = false;
             transform.localPosition = standingPosition + seatedOffset;
             var root = body != null ? body : transform;
             foreach (var t in turns)

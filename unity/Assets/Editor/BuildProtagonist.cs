@@ -15,6 +15,7 @@ namespace HalfAware.EditorTools
         public const string SourceModel = "Assets/Models/quaternius/W_Suit.fbx";
         public const string FacePlateMesh = "Assets/Models/generated/FacePlate.asset";
         public const string FaceMaterial = "Assets/Materials/Room/Face.mat";
+        public const string Controller = "Assets/Animation/Protagonist.controller";
 
         static readonly Color Hair = new Color(0.045f, 0.042f, 0.050f);
         static readonly Color Jacket = new Color(0.055f, 0.053f, 0.062f);
@@ -40,7 +41,25 @@ namespace HalfAware.EditorTools
             Recolour(her);
             AddFacePlate(her);
             AddRidersJacket(her);
+            AddAnimator(her);
             return her;
+        }
+
+        /// <summary>
+        /// 立ちと歩きの動き。進むのは CharacterController の仕事なので、
+        /// 動作そのものに体を運ばせない。姿は自分の足元しか映らないが、
+        /// 画面の外に出ても骨は回し続けさせる
+        /// </summary>
+        static void AddAnimator(GameObject her)
+        {
+            var ctrl = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(Controller);
+            if (ctrl == null) { Debug.LogWarning("動作の状態機械が見つからない: " + Controller); return; }
+            var an = her.GetComponent<Animator>();
+            if (an == null) an = her.AddComponent<Animator>();
+            an.runtimeAnimatorController = ctrl;
+            an.applyRootMotion = false;
+            an.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            an.updateMode = AnimatorUpdateMode.Normal;
         }
 
         /// <summary>髪を黒、上着を革の黒、シャツを白へ。眉と目は顔の絵に任せるので肌で塗り潰す</summary>

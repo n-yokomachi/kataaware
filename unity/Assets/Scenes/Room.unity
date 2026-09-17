@@ -2427,6 +2427,8 @@ GameObject:
   m_Component:
   - component: {fileID: 215547117}
   - component: {fileID: 215547118}
+  - component: {fileID: 215547120}
+  - component: {fileID: 215547119}
   m_Layer: 0
   m_Name: Protagonist
   m_TagString: Untagged
@@ -2517,6 +2519,43 @@ MonoBehaviour:
     axis: 2
     degrees: 72
   seatedOffset: {x: 0, y: -0.51, z: 0}
+  animator: {fileID: 215547120}
+--- !u!114 &215547119
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 215547116}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81582aa8d25f88345a70c754a16b26c5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: HalfAware::HalfAware.BodyMotion
+  body: {fileID: 2045684573}
+  animator: {fileID: 215547120}
+--- !u!95 &215547120
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 215547116}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: 24a7b90188241b6408b3708e83ce2d65, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &222116180
 GameObject:
   m_ObjectHideFlags: 0
