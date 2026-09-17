@@ -2426,6 +2426,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 215547117}
+  - component: {fileID: 215547118}
   m_Layer: 0
   m_Name: Protagonist
   m_TagString: Untagged
@@ -2453,6 +2454,69 @@ Transform:
   - {fileID: 887243937}
   m_Father: {fileID: 2045684574}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &215547118
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 215547116}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aa3e393bc3fcb1646b0e4bda21930c29, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: HalfAware::HalfAware.SeatedPose
+  body: {fileID: 215547117}
+  refootBones:
+  - Foot.L
+  - Foot.R
+  shinBones:
+  - LowerLeg.L
+  - LowerLeg.R
+  turns:
+  - bone: UpperLeg.L
+    axis: 0
+    degrees: -78
+  - bone: UpperLeg.R
+    axis: 0
+    degrees: -78
+  - bone: LowerLeg.L
+    axis: 0
+    degrees: 72
+  - bone: LowerLeg.R
+    axis: 0
+    degrees: 72
+  - bone: Torso
+    axis: 0
+    degrees: -6
+  - bone: Abdomen
+    axis: 0
+    degrees: -4
+  - bone: Shoulder.L
+    axis: 0
+    degrees: 4
+  - bone: Shoulder.R
+    axis: 0
+    degrees: 4
+  - bone: UpperArm.L
+    axis: 0
+    degrees: -12
+  - bone: UpperArm.R
+    axis: 0
+    degrees: -12
+  - bone: LowerArm.L
+    axis: 0
+    degrees: -54
+  - bone: LowerArm.R
+    axis: 0
+    degrees: -54
+  - bone: Wrist.L
+    axis: 2
+    degrees: 72
+  - bone: Wrist.R
+    axis: 2
+    degrees: -72
+  seatedOffset: {x: 0, y: -0.51, z: 0}
 --- !u!1 &222116180
 GameObject:
   m_ObjectHideFlags: 0

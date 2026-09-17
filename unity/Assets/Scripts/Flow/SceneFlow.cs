@@ -39,7 +39,7 @@ namespace HalfAware
         [SerializeField] float wakeStartPitch = WakeUp.DefaultStartPitch;
         [Tooltip("起き上がりにかける秒数。0 なら起き上がりを入れない")]
         [SerializeField] float wakeSeconds = WakeUp.DefaultSeconds;
-        [Tooltip("自分の体。座っている間はカメラが中に入るので伏せる。立ったら出す")]
+        [Tooltip("自分の体。座位と立位の姿勢を切り替える")]
         [SerializeField] GameObject body;
 
         [Header("入ったときの眩暈")]
@@ -55,6 +55,7 @@ namespace HalfAware
         SceneProgress progress;
         StandUp standUp;
         WakeUp wakeUp;
+        SeatedPose seatedPose;
         bool pendingInteract;
         float frozenUntil;
         bool dazeReleased;
@@ -89,8 +90,11 @@ namespace HalfAware
                 standUp = new StandUp(seatEyeHeight, PlayerController.StandingEyeHeight, StandSeconds);
                 player.CanMove = false;
                 player.EyeHeight = seatEyeHeight;
-                // 座っている間、体はカメラを包んでしまうので伏せておく
-                if (body != null) body.SetActive(false);
+                if (body != null)
+                {
+                    seatedPose = body.GetComponent<SeatedPose>();
+                    if (seatedPose != null) seatedPose.Seated = true;
+                }
                 wakeUp = new WakeUp(seatEyeHeight, wakeDrop, wakeStartPitch, wakeSeconds);
                 if (!wakeUp.Done)
                 {
@@ -172,8 +176,8 @@ namespace HalfAware
             standUp.Tick(Time.deltaTime, progress.Done.Contains(standAfter), frozen);
             player.EyeHeight = standUp.EyeHeight;
             player.CanMove = standUp.Standing;
-            // 立ち上がりきってから体を出す。座位の姿勢ができたら、この出し分けは要らなくなる
-            if (standUp.Standing && body != null && !body.activeSelf) body.SetActive(true);
+            // 立ち上がりきってから立位の姿勢へ戻す
+            if (standUp.Standing && seatedPose != null) seatedPose.Seated = false;
         }
 
         IEnumerator Complete()
