@@ -59,6 +59,7 @@ namespace HalfAware
         readonly Dictionary<string, Transform> bones = new Dictionary<string, Transform>();
         readonly Dictionary<Transform, Quaternion> rest = new Dictionary<Transform, Quaternion>();
         readonly List<Hung> refooted = new List<Hung>();
+        readonly HashSet<Transform> cleared = new HashSet<Transform>();
         bool ready;
         bool handedOver;
 
@@ -137,13 +138,15 @@ namespace HalfAware
             if (animator != null && animator.enabled) animator.enabled = false;
             transform.localPosition = standingPosition + seatedOffset;
             var root = body != null ? body : transform;
+            // 同じ骨に複数の軸を指定できるよう、安静へ戻すのは最初の 1 回だけにする
+            cleared.Clear();
             foreach (var t in turns)
             {
                 Transform b;
                 if (!bones.TryGetValue(t.bone, out b)) continue;
                 Quaternion r;
                 if (!rest.TryGetValue(b, out r)) continue;
-                b.localRotation = r;
+                if (cleared.Add(b)) b.localRotation = r;
                 Turn(b, t, root, 1f);
             }
             // 重ねる分は安静へ戻さない。座位の上へ足していく

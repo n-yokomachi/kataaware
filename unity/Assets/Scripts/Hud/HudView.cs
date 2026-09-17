@@ -6,30 +6,21 @@ using UnityEngine.UI;
 namespace HalfAware
 {
     /// <summary>
-    /// 字幕（画面下の黒帯）、印（中央）、中央の文字、暗転、煙。
+    /// 字幕（画面下の黒帯）、印（中央）、中央の文字、暗転、幕。
     /// 見せるだけで、何をいつ出すかは SceneFlow と場面固有の演出が決める。
-    /// 暗転と煙の層は、繋がっていなければ何もしない（段階を追って足すため）
+    /// 煙は画面を覆う層ではなく世界の粒で描くので、ここには無い（SmokePuffs）。
+    /// 暗転と幕の層は、繋がっていなければ何もしない
     /// </summary>
     public sealed class HudView : MonoBehaviour
     {
-        /// <summary>煙が消えるのにかける秒数</summary>
-        public const float SmokeFadeSeconds = 1f;
-
-        /// <summary>画面を覆う霞みのいちばん濃いところ。煙そのものは粒が描くので、ここは薄く添えるだけ</summary>
-        public const float SmokePeakAlpha = 0.16f;
-
         [SerializeField] GameObject subtitleBand;
         [SerializeField] TMP_Text subtitleText;
         [SerializeField] TMP_Text promptText;
         [SerializeField] TMP_Text centerText;
         [Tooltip("画面全体の黒い層。暗転に使う")]
         [SerializeField] Image fadeLayer;
-        [Tooltip("画面下から立ち上る煙。見た目は段階 4 で作り込む")]
-        [SerializeField] Image smokeLayer;
         [Tooltip("画面全体を覆う黒い幕。クレジットのカードを載せる")]
         [SerializeField] Image curtainLayer;
-
-        Coroutine smoking;
 
         void Awake()
         {
@@ -37,7 +28,6 @@ namespace HalfAware
             SetPrompt(null);
             SetCenter(null);
             SetFade(0f);
-            SetSmoke(0f);
             SetCurtain(false);
         }
 
@@ -85,43 +75,6 @@ namespace HalfAware
             SetFade(alpha);
         }
 
-        /// <summary>煙を seconds 秒立ち上らせ、その後 SmokeFadeSeconds 秒かけて消す</summary>
-        public void ShowSmoke(float seconds)
-        {
-            CancelSmoke();
-            if (smokeLayer == null) return;
-            smoking = StartCoroutine(Smoke(seconds));
-        }
-
-        /// <summary>進行中の煙を止めて消す。場面が終わるときに呼ぶ</summary>
-        public void CancelSmoke()
-        {
-            if (smoking != null)
-            {
-                StopCoroutine(smoking);
-                smoking = null;
-            }
-            SetSmoke(0f);
-        }
-
-        IEnumerator Smoke(float seconds)
-        {
-            for (var t = 0f; t < SmokeFadeSeconds; t += Time.deltaTime)
-            {
-                SetSmoke(SmokePeakAlpha * t / SmokeFadeSeconds);
-                yield return null;
-            }
-            SetSmoke(SmokePeakAlpha);
-            yield return new WaitForSeconds(Mathf.Max(0f, seconds - SmokeFadeSeconds));
-            for (var t = 0f; t < SmokeFadeSeconds; t += Time.deltaTime)
-            {
-                SetSmoke(SmokePeakAlpha * (1f - t / SmokeFadeSeconds));
-                yield return null;
-            }
-            SetSmoke(0f);
-            smoking = null;
-        }
-
         /// <summary>黒い幕。true で画面を覆い、false で消す。動きは付けず、そのまま切り替える</summary>
         public void SetCurtain(bool covered)
         {
@@ -132,11 +85,6 @@ namespace HalfAware
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
             curtainLayer.gameObject.SetActive(covered);
-        }
-
-        void SetSmoke(float alpha)
-        {
-            SetAlpha(smokeLayer, alpha);
         }
 
         static void SetAlpha(Image layer, float alpha)

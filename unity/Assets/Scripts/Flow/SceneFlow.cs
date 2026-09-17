@@ -145,7 +145,8 @@ namespace HalfAware
             var frozenNow = Frozen;
             ReleaseDaze();
             Wake();
-            Stand(frozenNow);
+            // 独白を読み終えてから腰を上げる。喋りながら立ち上がらせない
+            Stand(frozenNow || subtitles.IsTalking);
             hud.SetSubtitle(subtitles.Current);
             if (progress.IsComplete && !subtitles.IsTalking && !frozenNow) StartCoroutine(Complete());
         }
@@ -170,7 +171,7 @@ namespace HalfAware
             player.CanLook = true;
         }
 
-        /// <summary>standAfter の対象を調べたら、止まっていない間に目線を上げて移動を許す</summary>
+        /// <summary>standAfter の対象を調べたら、止まってもおらず字幕も出ていない間に目線を上げて移動を許す</summary>
         void Stand(bool frozen)
         {
             if (standUp == null || standUp.Standing) return;
@@ -190,7 +191,6 @@ namespace HalfAware
             player.CanMove = false;
             hud.SetPrompt(null);
             hud.SetSubtitle(null);
-            hud.CancelSmoke();
             yield return hud.FadeTo(1f, FadeSeconds);
             hud.SetCenter(ToBeContinued);
         }

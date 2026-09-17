@@ -20,6 +20,17 @@ namespace HalfAware
             return null;
         }
 
+        /// <summary>
+        /// 目印を立てる対象か。今この場に在って、まだ済んでおらず、前提も済んでいるもの。
+        /// 前提が未達で文だけ出る対象は、まだ用が無いので印を立てない
+        /// </summary>
+        public static bool Marked(IInteractable item, ICollection<string> done)
+        {
+            if (item == null || !item.Active) return false;
+            if (item.Once && done.Contains(item.Id)) return false;
+            return UnmetPrerequisite(item, done) == null;
+        }
+
         static bool HasHint(IInteractable item, string afterId)
         {
             var hint = item.HintFor(afterId);

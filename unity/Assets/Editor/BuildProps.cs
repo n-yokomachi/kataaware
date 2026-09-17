@@ -164,59 +164,63 @@ namespace HalfAware.EditorTools
         // ---- 髪ばさみ ---------------------------------------------------
 
         /// <summary>
-        /// 髪を留めるばさみ。爪のある方を上にして、ソファの座面に転がしておく。
-        /// 黒い革の上では黒い樹脂は沈むので、地金のままの色にする
+        /// 髪を留めるばさみ。爪を噛み合わせた口が開いているのが目印になるので、
+        /// 上下の顎に爪を並べて隙間を残す。黒い革や毛布の上では黒い樹脂は沈むので地金の色にする
         /// </summary>
         public static GameObject BuildHairClip(Transform room)
         {
-            const float half = 0.038f;    // 長さの半分
-            const float wide = 0.011f;    // 幅の半分
+            const float half = 0.046f;    // 長さの半分
+            const float wide = 0.013f;    // 幅の半分
             var body = new List<Mesh>();
 
-            // 下顎。まっすぐな板
+            // 下顎。ほぼまっすぐな板
             var lower = new List<ProcMesh.Ring>();
-            for (var i = 0; i <= 6; i++)
+            for (var i = 0; i <= 8; i++)
             {
-                var x = Mathf.Lerp(-half, half, i / 6f);
-                var w = wide * (1f - 0.25f * Mathf.Pow(Mathf.Abs(x) / half, 3f));
-                lower.Add(new ProcMesh.Ring(new Vector3(x, 0.0038f, 0f), w, 0.0026f,
+                var k = i / 8f;
+                var x = Mathf.Lerp(-half, half, k);
+                var w = wide * (1f - 0.22f * Mathf.Pow(Mathf.Abs(x) / half, 3f));
+                lower.Add(new ProcMesh.Ring(new Vector3(x, 0.0042f, 0f), w, 0.0030f,
                     Quaternion.LookRotation(Vector3.right, Vector3.up)));
             }
             body.Add(ProcMesh.Loft(lower, 8));
 
-            // 上顎。真ん中が持ち上がった弓なり
+            // 上顎。後ろの蝶番から立ち上がり、真ん中で高く、前で下りてくる。
+            // 前を閉じきらないので、口が開いているのが横から判る
             var upper = new List<ProcMesh.Ring>();
-            for (var i = 0; i <= 10; i++)
+            for (var i = 0; i <= 12; i++)
             {
-                var k = i / 10f;
+                var k = i / 12f;
                 var x = Mathf.Lerp(-half, half, k);
-                var arc = Mathf.Sin(k * Mathf.PI);
-                var w = wide * (0.72f + 0.28f * arc);
-                upper.Add(new ProcMesh.Ring(new Vector3(x, 0.0072f + 0.0128f * arc, 0f), w, 0.0024f,
+                var arc = Mathf.Sin(Mathf.Pow(k, 0.85f) * Mathf.PI);
+                var w = wide * (0.70f + 0.30f * arc);
+                upper.Add(new ProcMesh.Ring(new Vector3(x, 0.0090f + 0.0215f * arc, 0f), w, 0.0028f,
                     Quaternion.LookRotation(Vector3.right, Vector3.up)));
             }
             body.Add(ProcMesh.Loft(upper, 8));
 
-            // 爪。下顎から上へ。先は細くする
-            for (var i = 0; i < 6; i++)
+            // 下顎の爪。上へ伸びる
+            for (var i = 0; i < 5; i++)
             {
-                var x = Mathf.Lerp(-half * 0.74f, half * 0.74f, i / 5f);
-                var lean = Mathf.Lerp(-9f, 9f, i / 5f);
-                var root = new Vector3(x, 0.0052f, 0f);
-                var top = root + Quaternion.Euler(0f, 0f, -lean) * Vector3.up * 0.0068f;
-                body.Add(ProcMesh.Loft(new List<ProcMesh.Ring>
-                {
-                    new ProcMesh.Ring(root, 0.0060f, 0.0022f, Quaternion.LookRotation(Vector3.up, Vector3.right)),
-                    new ProcMesh.Ring(top, 0.0026f, 0.0007f, Quaternion.LookRotation(Vector3.up, Vector3.right)),
-                }, 6));
+                var x = Mathf.Lerp(-half * 0.62f, half * 0.80f, i / 4f);
+                Claw(body, new Vector3(x, 0.0060f, 0f), Vector3.up, 0.0092f, -Mathf.Lerp(-6f, 12f, i / 4f));
+            }
+            // 上顎の爪。下へ伸び、下顎の爪と噛み合う
+            for (var i = 0; i < 4; i++)
+            {
+                var k = i / 3f;
+                var x = Mathf.Lerp(-half * 0.40f, half * 0.86f, k);
+                var arc = Mathf.Sin(Mathf.Pow((x + half) / (half * 2f), 0.85f) * Mathf.PI);
+                Claw(body, new Vector3(x, 0.0090f + 0.0215f * arc - 0.0020f, 0f), Vector3.down, 0.0088f,
+                    Mathf.Lerp(4f, 14f, k));
             }
 
             var mesh = ProcMesh.Save(ProcMesh.Combine(body, null), Generated + "HairClip.asset");
             var pin = ProcMesh.Save(ProcMesh.Loft(new List<ProcMesh.Ring>
             {
-                new ProcMesh.Ring(new Vector3(-half + 0.004f, 0.0062f, -wide - 0.0016f), 0.0026f, 0.0026f,
+                new ProcMesh.Ring(new Vector3(-half + 0.004f, 0.0075f, -wide - 0.0018f), 0.0030f, 0.0030f,
                     Quaternion.LookRotation(Vector3.forward, Vector3.up)),
-                new ProcMesh.Ring(new Vector3(-half + 0.004f, 0.0062f, wide + 0.0016f), 0.0026f, 0.0026f,
+                new ProcMesh.Ring(new Vector3(-half + 0.004f, 0.0075f, wide + 0.0018f), 0.0030f, 0.0030f,
                     Quaternion.LookRotation(Vector3.forward, Vector3.up)),
             }, 8), Generated + "HairClipPin.asset");
 
@@ -224,14 +228,26 @@ namespace HalfAware.EditorTools
             if (old != null) Object.DestroyImmediate(old);
             var go = new GameObject("HairClip");
             go.transform.SetParent(room, false);
-            // 座面は毛布に覆われているので、手前の肘掛けの上（y=0.777）に置く。
-            // 髪から外してそのまま放ったという置き方
-            go.transform.position = new Vector3(-2.46f, 0.777f, -0.79f);
-            go.transform.rotation = Quaternion.Euler(0f, 11f, 0f);
+            // 毛布の襞の上へ。座面は襞に覆われていて、肘掛けの上は目につきにくかった
+            go.transform.position = new Vector3(-2.40f, 0.636f, 0.21f);
+            go.transform.rotation = Quaternion.Euler(0f, 68f, 0f);
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             go.AddComponent<MeshRenderer>().sharedMaterial = Mat("Steel");
             Place(go.transform, "Pin", pin, Mat("SteelDark"));
             return go;
+        }
+
+        /// <summary>爪 1 本。根元から dir へ伸びて先が細る</summary>
+        static void Claw(List<Mesh> into, Vector3 root, Vector3 dir, float length, float lean)
+        {
+            var tilt = Quaternion.AngleAxis(lean, Vector3.forward) * dir;
+            var tip = root + tilt.normalized * length;
+            into.Add(ProcMesh.Loft(new List<ProcMesh.Ring>
+            {
+                new ProcMesh.Ring(root, 0.0072f, 0.0026f, Quaternion.LookRotation(dir, Vector3.right)),
+                new ProcMesh.Ring(Vector3.Lerp(root, tip, 0.55f), 0.0052f, 0.0019f, Quaternion.LookRotation(dir, Vector3.right)),
+                new ProcMesh.Ring(tip, 0.0018f, 0.0008f, Quaternion.LookRotation(dir, Vector3.right)),
+            }, 6));
         }
 
         // ---- 手首のジャックとケーブル -------------------------------------
@@ -269,10 +285,11 @@ namespace HalfAware.EditorTools
             var go = new GameObject("Jack");
             go.transform.SetParent(wrist, false);
             go.transform.localScale = Vector3.one / wrist.lossyScale.x;
-            // 掌の側（骨の +forward）へ、肘寄り（骨の -up）に寄せて刺す。
-            // 座位では掌が上を向くので、この面が目に入る
-            go.transform.position = wrist.position + wrist.forward * 0.019f - wrist.up * 0.014f;
-            go.transform.rotation = Quaternion.LookRotation(wrist.forward, -wrist.up);
+            // 掌の側へ、肘寄り（骨の -up）に寄せて刺す。
+            // 掌の向きは骨の -forward（親指の位置から求めた）。座位では右腕だけ掌を上に返すので、
+            // 差し込み口はそのまま目に入る
+            go.transform.position = wrist.position - wrist.forward * 0.019f - wrist.up * 0.014f;
+            go.transform.rotation = Quaternion.LookRotation(-wrist.forward, -wrist.up);
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             go.AddComponent<MeshRenderer>().sharedMaterial = Mat("SteelDark");
 
@@ -332,6 +349,89 @@ namespace HalfAware.EditorTools
             return null;
         }
 
+        // ---- 調べられる物の目印 --------------------------------------------
+
+        /// <summary>
+        /// 地図の鋲。丸い頭に穴が開いていて、下が尖っている。
+        /// 高さ 1 で、尖った先が原点。置いた点をそのまま指す。
+        /// こちらを向かせて距離で伸ばすのは PinMarkers の仕事
+        /// </summary>
+        [MenuItem("HalfAware/Build the interaction pins")]
+        public static void BuildPinsMenu()
+        {
+            var flow = Object.FindFirstObjectByType<SceneFlow>();
+            if (flow == null) { Debug.LogError("SceneFlow が見つからない"); return; }
+            var made = BuildPins(flow);
+            Selection.activeGameObject = made;
+            Mark(made);
+        }
+
+        public static GameObject BuildPins(SceneFlow flow)
+        {
+            var body = new List<Mesh>();
+            // 頭。球
+            var head = new List<ProcMesh.Ring>();
+            for (var i = 0; i <= 12; i++)
+            {
+                var a = Mathf.PI * i / 12f;
+                var r = Mathf.Sin(a) * 0.30f;
+                head.Add(new ProcMesh.Ring(new Vector3(0f, 0.70f - Mathf.Cos(a) * 0.30f, 0f), r, r,
+                    Quaternion.LookRotation(Vector3.up, Vector3.forward)));
+            }
+            body.Add(ProcMesh.Loft(head, 12));
+            // 首から先端まで
+            var spike = new List<ProcMesh.Ring>();
+            for (var i = 0; i <= 8; i++)
+            {
+                var k = i / 8f;
+                var y = Mathf.Lerp(0.62f, 0f, k);
+                var r = Mathf.Lerp(0.20f, 0.0f, Mathf.Pow(k, 0.65f));
+                spike.Add(new ProcMesh.Ring(new Vector3(0f, y, 0f), r, r,
+                    Quaternion.LookRotation(Vector3.up, Vector3.forward)));
+            }
+            body.Add(ProcMesh.Loft(spike, 12, false, false));
+            var mesh = ProcMesh.Save(ProcMesh.Combine(body, null), Generated + "Pin.asset");
+
+            // 穴。手前側にだけ見えればよいので、薄い円盤を前へ出す
+            var hole = ProcMesh.Save(ProcMesh.Loft(new List<ProcMesh.Ring>
+            {
+                new ProcMesh.Ring(new Vector3(0f, 0.70f, -0.255f), 0.125f, 0.125f, Quaternion.identity),
+                new ProcMesh.Ring(new Vector3(0f, 0.70f, -0.300f), 0.125f, 0.125f, Quaternion.identity),
+            }, 10), Generated + "PinHole.asset");
+
+            var old = GameObject.Find("Pins");
+            if (old != null) Object.DestroyImmediate(old);
+            var root = new GameObject("Pins");
+            var source = new GameObject("PinSource");
+            source.transform.SetParent(root.transform, false);
+            source.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var r0 = source.AddComponent<MeshRenderer>();
+            r0.sharedMaterial = Glow("PinHead", new Color(0.96f, 0.74f, 0.22f), 2.2f);
+            r0.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            var eye = Place(source.transform, "Hole", hole, Tinted("PinHole", new Color(0.06f, 0.05f, 0.05f), 0f, 0.1f));
+            eye.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            source.SetActive(false);
+
+            var markers = root.AddComponent<PinMarkers>();
+            var so = new SerializedObject(markers);
+            so.FindProperty("flow").objectReferenceValue = flow;
+            so.FindProperty("pin").objectReferenceValue = source;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            return root;
+        }
+
+        /// <summary>自分で光る材質。暗い部屋でも目印が沈まないように</summary>
+        static Material Glow(string name, Color col, float strength)
+        {
+            var m = Tinted(name, col, 0f, 0.2f);
+            m.EnableKeyword("_EMISSION");
+            m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            m.SetColor("_EmissionColor", col * strength);
+            EditorUtility.SetDirty(m);
+            AssetDatabase.SaveAssets();
+            return m;
+        }
+
         // ---- 煙草の煙 -----------------------------------------------------
 
         /// <summary>
@@ -370,7 +470,7 @@ namespace HalfAware.EditorTools
                 new Color(0.82f, 0.81f, 0.78f, 0.44f), new Color(0.74f, 0.73f, 0.71f, 0.56f));
             main.gravityModifier = new ParticleSystem.MinMaxCurve(-0.007f);
             main.simulationSpace = ParticleSystemSimulationSpace.World;
-            main.maxParticles = 120;
+            main.maxParticles = 220;
 
             var em = ps.emission;
             em.enabled = true;
@@ -434,15 +534,6 @@ namespace HalfAware.EditorTools
             var so = new SerializedObject(puffs);
             so.FindProperty("puffs").objectReferenceValue = ps;
             so.ApplyModifiedPropertiesWithoutUndo();
-
-            // 場面の演出へ繋ぐ
-            var dir = Object.FindFirstObjectByType<RoomIntroDirector>();
-            if (dir != null)
-            {
-                var dso = new SerializedObject(dir);
-                dso.FindProperty("puffs").objectReferenceValue = puffs;
-                dso.ApplyModifiedPropertiesWithoutUndo();
-            }
             return go;
         }
 

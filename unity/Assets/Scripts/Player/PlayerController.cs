@@ -20,7 +20,7 @@ namespace HalfAware
         [SerializeField] InputActionAsset actions;
         [SerializeField] Transform eye;
         [Tooltip("目は背骨の中心ではなく顔にある。体の前へこれだけ出す。メートル")]
-        [SerializeField] float eyeLead = 0.11f;
+        [SerializeField] float eyeLead = 0.22f;
 
         CharacterController body;
         readonly HeadTurn head = new HeadTurn();
