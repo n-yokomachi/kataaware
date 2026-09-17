@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace HalfAware
 {
@@ -25,6 +26,8 @@ namespace HalfAware
         [SerializeField] DazeVolume daze;
         [Tooltip("ラジアン。視線からこの角度以内の対象だけ選ぶ")]
         [SerializeField] float maxAngle = InteractionPicker.MaxAngle;
+        [Tooltip("必須をすべて終えたら読むシーンの名前。空なら「続く」で止まる")]
+        [SerializeField] string nextScene = "";
 
         [Header("座って始める")]
         [Tooltip("座っているときの目線の高さ")]
@@ -233,8 +236,16 @@ namespace HalfAware
             player.CanMove = false;
             hud.SetPrompt(null);
             hud.SetSubtitle(null);
-            yield return hud.FadeTo(1f, FadeSeconds);
-            hud.SetCenter(ToBeContinued);
+            hud.SetLog(null);
+            // 場面のつなぎは暗転を挟まない。止まるときだけ黒く落とす
+            if (!SceneExit.Continues(nextScene))
+            {
+                yield return hud.FadeTo(1f, FadeSeconds);
+                hud.SetCenter(ToBeContinued);
+                yield break;
+            }
+            yield return null;
+            SceneManager.LoadScene(SceneExit.Target(nextScene));
         }
     }
 }

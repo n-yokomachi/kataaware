@@ -11261,6 +11261,7 @@ MonoBehaviour:
   hud: {fileID: 230293359}
   daze: {fileID: 835399818}
   maxAngle: 0.7
+  nextScene: Alley
   seatEyeHeight: 1.1
   standAfter: cigarette
   standSpot: {fileID: 1890007234}
