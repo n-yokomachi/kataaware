@@ -89,6 +89,7 @@ namespace HalfAware.Tests
             var route = new DriveRoute(null);
             Assert.AreEqual(0, route.Count);
             Assert.IsNull(route.At(0).trigger, "範囲の外は空の帯");
+            Assert.IsFalse(route.IsLast(0), "帯がひとつも無いうちは最後にしない");
         }
 
         [Test]
@@ -112,8 +113,9 @@ namespace HalfAware.Tests
         public void OutOfRangeIsTreatedAsTheLast()
         {
             var route = new DriveRoute(new[] { Band("夜", "a") });
+            Assert.IsTrue(route.IsLast(0), "1 つしか無ければそれが最後");
             Assert.IsTrue(route.IsLast(9), "範囲を外れても落ちない");
-            Assert.IsTrue(route.IsLast(-1));
+            Assert.IsFalse(route.IsLast(-1), "まだどの帯にも入っていない");
         }
 
         [Test]
@@ -123,6 +125,16 @@ namespace HalfAware.Tests
             Assert.AreEqual(1, route.BandOf("b"));
             Assert.AreEqual(-1, route.BandOf("c"), "どの帯のきっかけでもない");
             Assert.AreEqual(-1, route.BandOf(null));
+            Assert.AreEqual(-1, route.BandOf(""), "Inspector で空のままの id");
+        }
+
+        [Test]
+        public void TheRouteDoesNotFollowLaterEditsToTheArray()
+        {
+            var source = new[] { Band("夜", "a") };
+            var route = new DriveRoute(source);
+            source[0].speed = 99f;
+            Assert.AreEqual(22f, route.At(0).speed, 0.0001f, "渡された配列とは切り離して持つ");
         }
     }
 }
@@ -189,10 +201,14 @@ namespace HalfAware
             return i >= 0 && i < bands.Length ? bands[i] : new DriveBand();
         }
 
-        /// <summary>i が最後の帯か。範囲の外も最後として扱い、進み続けないようにする</summary>
+        /// <summary>
+        /// i が最後の帯か。帯がひとつも無いうちは最後にしない。
+        /// 組み立て途中の場面が、入った瞬間に閉じてしまうのを防ぐ（SceneProgress.IsComplete と同じ構え）。
+        /// -1 は「まだどの帯にも入っていない」の意で、これも最後として扱わない
+        /// </summary>
         public bool IsLast(int i)
         {
-            return i < 0 || i >= bands.Length - 1;
+            return bands.Length > 0 && i >= bands.Length - 1;
         }
 
         /// <summary>そのきっかけの id を持つ帯。どの帯のものでもなければ -1</summary>
@@ -210,7 +226,7 @@ namespace HalfAware
 - [ ] **Step 4: テストが通ることを確かめる**
 
 `run_tests`（EditMode）→ `get_test_job`。
-Expected: `failed: 0`。既存の 261 件に 5 件足して 266 件。
+Expected: `failed: 0`。既存の 261 件に 6 件足して 267 件。
 
 - [ ] **Step 5: commit**
 
@@ -322,7 +338,7 @@ namespace HalfAware
 
 - [ ] **Step 4: テストが通ることを確かめる**
 
-Expected: `failed: 0`。269 件。
+Expected: `failed: 0`。270 件。
 
 - [ ] **Step 5: commit**
 
@@ -630,7 +646,7 @@ namespace HalfAware
 
 - [ ] **Step 4: テストが通ることを確かめる**
 
-Expected: `failed: 0`。280 件。
+Expected: `failed: 0`。281 件。
 
 - [ ] **Step 5: commit**
 
@@ -794,7 +810,7 @@ namespace HalfAware
 
 - [ ] **Step 4: テストが通ることを確かめる**
 
-Expected: `failed: 0`。288 件。
+Expected: `failed: 0`。289 件。
 
 落ちたら実装を直す。**テストの期待値を実装に寄せて黙らせない。**
 
@@ -894,7 +910,7 @@ Expected: 0 件。
 
 - [ ] **Step 3: テストを走らせて崩れていないことを確かめる**
 
-Expected: `failed: 0`。288 件のまま。
+Expected: `failed: 0`。289 件のまま。
 
 - [ ] **Step 4: commit**
 
@@ -1156,7 +1172,7 @@ namespace HalfAware.Tests
 
 - [ ] **Step 4: テストが通ることを確かめる**
 
-Expected: `failed: 0`。292 件。
+Expected: `failed: 0`。293 件。
 
 - [ ] **Step 5: commit**
 
@@ -1222,6 +1238,16 @@ namespace HalfAware
         int band = -1;
         bool aboard;
 
+        /// <summary>
+        /// 今の帯の値。DriveRoute は並びの問い合わせにだけ使い、秒数はここから直に読む。
+        /// 秒数はオーナーが再生しながら Inspector で決めるので、
+        /// Awake で写し取ると触っても効かなくなる
+        /// </summary>
+        DriveBand Now
+        {
+            get { return band >= 0 && band < bands.Length ? bands[band] : new DriveBand(); }
+        }
+
         void Awake()
         {
             if (flow == null || hud == null || player == null || world == null)
@@ -1249,8 +1275,8 @@ namespace HalfAware
             // 独白を送り切ったか。積んだ字幕が尽きたところで余韻へ移る
             if (clock.Beat == DriveBeat.Talking && !flow.Talking) clock.Spoken();
 
-            clock.Tick(Time.deltaTime, route.At(band));
-            hud.SetFade(clock.Dark(route.At(band)));
+            clock.Tick(Time.deltaTime, Now);
+            hud.SetFade(clock.Dark(Now));
 
             // 黒へ入った一度だけ、次の帯を並べる
             if (clock.TakeSwap()) Enter(band + 1);
@@ -1266,8 +1292,10 @@ namespace HalfAware
         {
             if (item == null) return;
             if (item.Id == DriveIds.Door) { Board(); return; }
-            if (!aboard) return;
-            // その帯のきっかけでなければ、対象そのものの文だけで終わる
+            if (!aboard || band < 0) return;
+            // その帯のきっかけでなければ、対象そのものの文だけで終わる。
+            // band を先に弾いておくのは、BandOf の「見つからない」も -1 で返るため。
+            // 両方 -1 のまま比べると、どの対象を調べても通ってしまう
             if (route.BandOf(item.Id) != band) return;
             clock.Trigger();
             if (script == null) { Debug.LogWarning("DriveDirector: 文面が未接続", this); return; }
@@ -1304,7 +1332,8 @@ namespace HalfAware
             }
             band = which;
             clock.Reset();
-            world.Speed = route.At(band).speed;
+            world.Speed = Now.speed;
+            world.Rough = Now.rough;
             world.Dress(band);
             world.Rewind();
             ShowTrigger(band);
@@ -1327,7 +1356,7 @@ Expected: 0 件。`PlayerController` に `CanMove` / `Yaw` / `Pitch` が無け�
 
 - [ ] **Step 3: テストを走らせて崩れていないことを確かめる**
 
-Expected: `failed: 0`。292 件のまま。
+Expected: `failed: 0`。293 件のまま。
 
 - [ ] **Step 4: commit**
 
@@ -1545,8 +1574,9 @@ shaken.localPosition = rest + new Vector3(
     0f);
 ```
 
-`Rough` は帯ごとの値で、`DriveBand.rough` として Task 1 で既に定義してある。
-`DriveDirector.Enter` に `world.Rough = route.At(band).rough;` を足す。
+`Rough` は帯ごとの値で、`DriveBand.rough` として Task 1 で定義済み。
+`DriveDirector.Enter` での受け渡しも Task 7 で済んでいる（`world.Rough = Now.rough;`）ので、
+ここでやるのは `DriveWorld` 側に `Rough` と揺れを足すところまで。
 
 - [ ] **Step 3: 前腕を出す**
 
@@ -1584,7 +1614,7 @@ Expected: 0 件。
 
 - [ ] **Step 5: テストを走らせる**
 
-Expected: `failed: 0`。292 件のまま。テストは足していない。
+Expected: `failed: 0`。293 件のまま。テストは足していない。
 
 - [ ] **Step 6: commit**
 
@@ -1670,7 +1700,7 @@ return "帯 " + f.GetValue(d) + " / 走行 " + w.Travelled.ToString("F1") + " / 
 - [ ] **Step 3: テストを全部走らせる**
 
 `run_tests`（EditMode）→ `get_test_job`。
-Expected: `failed: 0`。292 件。
+Expected: `failed: 0`。293 件。
 
 - [ ] **Step 4: 組み立て直して保存する**
 
