@@ -64,7 +64,7 @@ namespace HalfAware.EditorTools
 
             var root = Root("Alley");
             // 前の作りで残っている束を落とす
-            Prune(root, new[] { "Shell", "Fixtures", "Lamps", "Puddles", "Neon", "Market", "Boards", "Litter", "Crowd", "Backdrop", "Sky", "Bounds" });
+            Prune(root, new[] { "Shell", "Fixtures", "Lamps", "Puddles", "Neon", "Market", "Boards", "Litter", "Crowd", "Backdrop", "Sky", "Bounds", "Roofs" });
             Shell(Child(root, "Shell"));
             Fixtures(Child(root, "Fixtures"));
             Lamps(Child(root, "Lamps"));
@@ -77,6 +77,7 @@ namespace HalfAware.EditorTools
             Backdrop(Child(root, "Backdrop"));
             Sky(Child(root, "Sky"));
             Bounds(Child(root, "Bounds"));
+            Roofs(Child(root, "Roofs"));
             NightSky();
             Mirrors(Child(root, "Mirrors"));
             BakeMirrors(root);
@@ -2024,6 +2025,60 @@ namespace HalfAware.EditorTools
                 new Vector3(1f, h, YardNorth - LaneZ - LaneHalf));
         }
 
+        /// <summary>雨を受け止める層。粒の当たりはこの層だけを見る</summary>
+        public const int RoofLayer = 8;
+
+        /// <summary>
+        /// 屋根に当たりを付ける。雨の粒はここへ当たって消える。
+        /// 人が屋根の下へ入ったときだけ降りを止める作りだと、
+        /// 外から眺めたときに屋根を貫いて降っているのが見えてしまう。
+        /// 見えない箱なので、絵には出ない
+        /// </summary>
+        static void Roofs(Transform parent)
+        {
+            Clear(parent);
+            // 小路の屋根。躯体の下面は 4.5
+            Roof(parent, "Roof.Lane", new Vector3((LaneWest - StreetHalf) * 0.5f, 4.45f, LaneZ),
+                new Vector3(-StreetHalf - LaneWest, 0.2f, LaneHalf * 2f + 0.4f));
+            // 露天席の天蓋
+            Roof(parent, "Roof.Bistro",
+                new Vector3((TerraceWest + TerraceEast) * 0.5f, 2.78f, (TerraceSouth + TerraceNorth) * 0.5f),
+                new Vector3(TerraceEast - TerraceWest + 0.4f, 0.14f, TerraceNorth - TerraceSouth + 0.4f));
+            Roof(parent, "Roof.Tavern",
+                new Vector3((YardWest + 4.6f + LaneWest - 2.6f) * 0.5f, 2.60f,
+                    (YardSouth + 0.65f + TavernTerraceNorth) * 0.5f),
+                new Vector3(LaneWest - 2.6f - YardWest - 4.6f, 0.14f, TavernTerraceNorth - YardSouth - 0.65f + 0.4f));
+            Roof(parent, "Roof.Restaurant",
+                new Vector3((RestaurantWest + RestaurantEast) * 0.5f, 3.32f, YardNorth - 1.05f),
+                new Vector3(RestaurantEast - RestaurantWest, 0.14f, 1.6f));
+            // ビストロの 2 階の露台。下は雨をしのげる
+            Roof(parent, "Roof.Balcony", new Vector3(YardWest + 1.15f, 3.88f, LaneZ - 2.5f),
+                new Vector3(2.3f, 0.24f, 8f));
+            // 通りを渡る歩道橋
+            Roof(parent, "Roof.Walk0", new Vector3(0f, 6.38f, -13.5f), new Vector3(StreetHalf * 2f, 0.24f, 1.9f));
+            Roof(parent, "Roof.Walk1", new Vector3(0f, 7.08f, 26.5f), new Vector3(StreetHalf * 2f, 0.24f, 1.9f));
+            Roof(parent, "Roof.Walk2", new Vector3(0f, 6.78f, 47.5f), new Vector3(StreetHalf * 2f, 0.24f, 1.9f));
+
+            // 出店のタープ。すでに当たりを持っているので、層だけ移す。
+            // 自分の店のタープは破れているので、破れ目からは降り込む
+            var market = GameObject.Find("Alley/Market");
+            if (market == null) return;
+            var all = market.GetComponentsInChildren<Transform>(true);
+            for (var i = 0; i < all.Length; i++)
+                if (all[i].name.StartsWith("Tarp")) all[i].gameObject.layer = RoofLayer;
+        }
+
+        /// <summary>屋根ひとつ。見えない箱を置いて、雨の層へ移す</summary>
+        static void Roof(Transform parent, string name, Vector3 centre, Vector3 size)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = centre;
+            go.layer = RoofLayer;
+            var c = go.AddComponent<BoxCollider>();
+            c.size = size;
+        }
+
         static void Blocker(Transform parent, string name, Vector3 centre, Vector3 size)
         {
             var go = new GameObject(name);
@@ -3372,12 +3427,27 @@ namespace HalfAware.EditorTools
             main.startColor = new ParticleSystem.MinMaxGradient(
                 new Color(0.62f, 0.70f, 0.82f, 0.22f), new Color(0.78f, 0.84f, 0.95f, 0.42f));
             main.simulationSpace = ParticleSystemSimulationSpace.World;
-            main.maxParticles = 900;
+            main.maxParticles = 760;
             main.gravityModifier = new ParticleSystem.MinMaxCurve(0.35f);
 
             var em = ps.emission;
             em.enabled = true;
-            em.rateOverTime = 620f;
+            em.rateOverTime = 560f;
+
+            // 屋根で止める。人が屋根の下へ入ったかどうかではなく、
+            // 粒が屋根に当たって消える。外から眺めても屋根を貫かない
+            var hit = ps.collision;
+            hit.enabled = true;
+            hit.type = ParticleSystemCollisionType.World;
+            hit.mode = ParticleSystemCollisionMode.Collision3D;
+            hit.quality = ParticleSystemCollisionQuality.High;
+            hit.collidesWith = 1 << RoofLayer;
+            hit.enableDynamicColliders = false;
+            hit.sendCollisionMessages = false;
+            hit.lifetimeLoss = 1f;      // 当たったら消える。跳ねさせない
+            hit.bounce = 0f;
+            hit.dampen = 1f;
+            hit.radiusScale = 0.2f;
 
             var shape = ps.shape;
             shape.enabled = true;

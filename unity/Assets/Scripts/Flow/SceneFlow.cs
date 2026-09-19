@@ -31,6 +31,20 @@ namespace HalfAware
         [Tooltip("必須をすべて終えたら読むシーンの名前。空なら「続く」で止まる")]
         [SerializeField] string nextScene = "";
 
+        [Header("場面の頭と終わり")]
+        [Tooltip("黒いうちに出す見出し。空なら出さず、そのまま明ける")]
+        [SerializeField, TextArea] string openingCard = "";
+        [Tooltip("見出しを出しておく秒数")]
+        [SerializeField] float cardSeconds = 2.4f;
+        [Tooltip("見出しから明けるまでの秒数")]
+        [SerializeField] float cardLiftSeconds = 1.8f;
+        [Tooltip("出て行くときに 1 度鳴らす音。扉の開け閉めなど")]
+        [SerializeField] AudioSource exitSound;
+        [Tooltip("その音を鳴らしてから暗転を始めるまでの秒数")]
+        [SerializeField] float exitSoundSeconds = 1.7f;
+        [Tooltip("次の場面へ渡す前に暗転するか。見出しを挟んで切り替えるときに使う")]
+        [SerializeField] bool fadeOutToNext;
+
         [Header("座って始める")]
         [Tooltip("座っているときの目線の高さ")]
         [SerializeField] float seatEyeHeight = 1.1f;
@@ -140,9 +154,24 @@ namespace HalfAware
             if (daze != null && dazeUntil.Length > 0) daze.Hold(dazeBlur, dazeWobble);
         }
 
-        /// <summary>場面の頭は黒から明ける。前の場面から切り替わった直後の目の慣れを兼ねる</summary>
+        /// <summary>
+        /// 場面の頭は黒から明ける。前の場面から切り替わった直後の目の慣れを兼ねる。
+        /// 見出しがあるときは、黒いうちにそれを出してから明ける
+        /// </summary>
         IEnumerator Start()
         {
+            if (!string.IsNullOrEmpty(openingCard))
+            {
+                // 幕は見出しの下に敷く層。暗転の層とは別に持つ
+                hud.SetFade(0f);
+                hud.SetCurtain(true);
+                hud.SetCenter(openingCard);
+                yield return new WaitForSeconds(cardSeconds);
+                hud.SetCenter(null);
+                yield return hud.CurtainTo(0f, cardLiftSeconds);
+                hud.SetCurtain(false);
+                yield break;
+            }
             hud.SetFade(1f);
             yield return hud.FadeTo(0f, FadeInSeconds);
         }
@@ -317,6 +346,12 @@ namespace HalfAware
             hud.SetPrompt(null);
             hud.SetSubtitle(null);
             hud.SetLog(null);
+            // 出がけの音。扉を閉めてから暗転へ移る
+            if (exitSound != null)
+            {
+                exitSound.Play();
+                if (exitSoundSeconds > 0f) yield return new WaitForSeconds(exitSoundSeconds);
+            }
             // 場面のつなぎは暗転を挟まない。止まるときだけ黒く落とす
             if (!SceneExit.Continues(nextScene))
             {
@@ -324,7 +359,9 @@ namespace HalfAware
                 hud.SetCenter(ToBeContinued);
                 yield break;
             }
-            yield return null;
+            // 見出しを挟んで渡すときだけ、先に黒く落とす
+            if (fadeOutToNext) yield return hud.FadeTo(1f, FadeSeconds);
+            else yield return null;
             SceneManager.LoadScene(SceneExit.Target(nextScene));
         }
     }
