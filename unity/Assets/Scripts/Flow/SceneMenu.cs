@@ -41,7 +41,7 @@ namespace HalfAware
         public static string Compose(string here)
         {
             var sb = new StringBuilder();
-            sb.Append("\n\n──  場面  ──");
+            sb.Append("\n\n――  場面  ――");
             for (var i = 0; i < Scenes.Length; i++)
             {
                 sb.Append("\n  ");
