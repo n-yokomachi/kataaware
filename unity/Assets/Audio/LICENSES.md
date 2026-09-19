@@ -7,8 +7,9 @@
 |---|---|---|---|
 | `Step1`〜`Step5.wav` | Kenney RPG Audio（https://kenney.nl/assets/rpg-audio）の `footstep00/02/04/06/08.ogg` | CC0 1.0 | モノラル 44.1kHz へ、末尾を落として頂点を −6dB に揃えた |
 | `LighterClick.wav` | OpenGameArt「Zippo click sound」（https://opengameart.org/content/zippo-click-sound）作者 dawith | CC0 1.0 | 金属音の当たりだけを 0.060〜0.320 秒で切り出し、頂点 −3dB |
-| `LighterFlame.wav` | OpenGameArt「Catching fire」（https://opengameart.org/content/catching-fire）作者 themightyglider | CC0 1.0 | 全体を使い、頭と尻に短い出入りを付けて頂点 −5dB |
-| `Drag.wav` | Pixabay「Cigarette inhale」（https://pixabay.com/sound-effects/film-special-effects-cigarette-inhale-84768/）原作者 kczub（Freesound） | Pixabay Content License | 頭と尻を落として頂点 −8dB。実際に煙草を吸っている録音 |
+| `Drag.wav` | Pixabay「Cigarette Cracklings Lighter smoke」（https://pixabay.com/sound-effects/film-special-effects-cigarette-cracklings-lighter-smoke-6693/）原作者 gaby7129（Freesound） | Pixabay Content License | 5.00〜6.70 秒。火の粉が鳴りながら吸っているところ |
+| `LighterFlame.wav` | 同上 | Pixabay Content License | 0.02〜0.80 秒。火を点けるところ |
+| `ChipPull.wav` | OpenGameArt「Sound Effects Pack」（https://opengameart.org/content/sound-effects-pack）作者 OwlishMedia の `Technology/plugpull.wav` | CC0 1.0 | 0.02〜0.40 秒、頂点 −6dB |
 | `Blow.wav` | Pixabay「Smoking a cigarette」（https://pixabay.com/sound-effects/people-smoking-a-cigarette-6335/）原作者 ammorts（Freesound） | Pixabay Content License | 69.67〜71.90 秒の一息を切り出して頂点 −8dB |
 
 切り出しの手順は ffmpeg で、`docs/` ではなくここに残す。素材そのものは repo に置かず、加工後の物だけを置いている。
@@ -29,6 +30,9 @@
 はじめは呼吸の素材を引き伸ばして作ったが、元が息切れの録音だったため、
 吸っているのではなく息が上がっているように聞こえた。実際に煙草を吸っている録音へ差し替えてある。
 
-## 使わなかった物
+## 差し替えた経緯
 
-`Sound Effects Pack` には `Technology/plugpull.wav`（差込を抜く音）もある。手首のジャックを抜く場面に合うが、今は入れていない。
+はじめは呼吸の素材を引き伸ばして合成したが、元が息切れの録音で、吸っているように聞こえなかった。
+次に「Cigarette inhale」へ替えたが、火の鳴る音が無く物足りなかった。
+いまは火の粉が鳴りながら吸っている録音から、吸う音と火を点ける音の両方を取っている。
+候補は `candidates/` に切り出してあり、採否はオーナーが聴いて決める。

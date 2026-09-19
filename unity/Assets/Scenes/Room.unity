@@ -6917,6 +6917,8 @@ MonoBehaviour:
   relit:
   - {fileID: 281531887}
   lamp: {fileID: 2100000, guid: b131a772dbe906a4092653a68fe8bed7, type: 2}
+  source: {fileID: 154678549}
+  sound: {fileID: 8300000, guid: fd91952f5388bb1469c22326ffaf63ac, type: 3}
 --- !u!1 &519808115
 GameObject:
   m_ObjectHideFlags: 0

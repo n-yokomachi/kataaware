@@ -42,5 +42,44 @@ namespace HalfAware
             if (lines <= ShrinkOver) return 1f;
             return Mathf.Max(MinScale, (float)ShrinkOver / lines);
         }
+
+        /// <summary>これより長い 1 行は 2 行に割る。半角いくつぶん</summary>
+        public const int WrapOver = 40;
+
+        /// <summary>割り口として良い字。この後ろで切る</summary>
+        const string BreakAfter = "、。！？…」』）";
+
+        /// <summary>行の頭に置きたくない字</summary>
+        const string NeverStarts = "、。！？…」』）」";
+
+        /// <summary>
+        /// 長い 1 行を 2 行に割る。ウインドウは 2 行あるので、
+        /// 1 行だけ浮かせずに埋める。すでに改行があるものと短いものはそのまま
+        /// </summary>
+        public static string Wrap(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+            if (LineCount(text) > 1) return text;
+            var units = ListFormat.Units(text);
+            if (units <= WrapOver) return text;
+
+            var half = units / 2;
+            var best = -1;
+            var bestGap = int.MaxValue;
+            var at = 0;
+            for (var i = 0; i < text.Length - 1; i++)
+            {
+                at += ListFormat.Units(text.Substring(i, 1));
+                if (NeverStarts.IndexOf(text[i + 1]) >= 0) continue;   // 行頭に来る字を避ける
+                var gap = Mathf.Abs(at - half);
+                // 句読点の直後は優先する。多少 真ん中から外れても切りたい
+                if (BreakAfter.IndexOf(text[i]) >= 0) gap -= 6;
+                if (gap >= bestGap) continue;
+                bestGap = gap;
+                best = i + 1;
+            }
+            if (best <= 0 || best >= text.Length) return text;
+            return text.Substring(0, best) + "\n" + text.Substring(best);
+        }
     }
 }

@@ -68,12 +68,14 @@ namespace HalfAware
             subtitleBand.SetActive(text != null);
             subtitleText.text = text ?? string.Empty;
             if (text == null) return;
-            var rows = SubtitleBox.Rows(text);
-            var scale = SubtitleBox.FontScale(text);
-            // 並びになっているものは表に組む。列を揃えるため左寄せにして、
-            // 表ごと帯の真ん中へ寄せる
+            // 並びになっているものは表に組む。そうでない長い 1 行は 2 行に割って、
+            // ウインドウの 2 行を埋める
             var list = asTable && ListFormat.IsList(text);
-            if (list) subtitleText.text = ListFormat.Compose(text, RoomEm(scale));
+            var shown = list ? text : SubtitleBox.Wrap(text);
+            var rows = SubtitleBox.Rows(shown);
+            var scale = SubtitleBox.FontScale(shown);
+            // 列を揃えるため表は左寄せにして、表ごと帯の真ん中へ寄せる
+            subtitleText.text = list ? ListFormat.Compose(text, RoomEm(scale)) : shown;
             subtitleText.alignment = list ? TMPro.TextAlignmentOptions.Left : listlessAlignment;
             var band = subtitleBand.GetComponent<RectTransform>();
             if (band != null)

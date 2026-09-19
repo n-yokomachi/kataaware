@@ -67,6 +67,10 @@ namespace HalfAware.EditorTools
                 });
             }
 
+            // ドア: 出る前に一度きく
+            var door = Entry(entries, "door");
+            if (door != null) Ask(door, "部屋を出る", new string[0]);
+
             // メモ: 売り上げは 3 行に割って 1 ページで出す
             var clipboard = Entry(entries, "clipboard");
             if (clipboard != null)

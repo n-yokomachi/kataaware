@@ -45,9 +45,10 @@ namespace HalfAware.Tests
             Assert.That(count, Is.EqualTo(lines));
         }
 
-        // シナリオ 4 節で二択を出すのはこの 2 つだけ
+        // 見た目や進行が変わる 3 つだけ二択を出す
         [TestCase("chips", "チップを抜く")]
         [TestCase("terminal", "スリープを解除する")]
+        [TestCase("door", "部屋を出る")]
         public void AsksBeforeItChangesAnything(string id, string question)
         {
             var entry = Load().Find(id);
@@ -56,8 +57,8 @@ namespace HalfAware.Tests
         }
 
         [TestCase("jack")]
-        [TestCase("door")]
         [TestCase("ashtray")]
+        [TestCase("cigarette-box")]
         [TestCase("clipboard")]
         public void EverythingElseJustSpeaks(string id)
         {

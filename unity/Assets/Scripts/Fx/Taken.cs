@@ -21,6 +21,9 @@ namespace HalfAware
         [SerializeField] Renderer[] relit = new Renderer[0];
         [Tooltip("替えた後のマテリアル")]
         [SerializeField] Material lamp;
+        [Tooltip("持っていったときに鳴らす音")]
+        [SerializeField] AudioSource source;
+        [SerializeField] AudioClip sound;
 
         bool taken;
 
@@ -52,6 +55,7 @@ namespace HalfAware
             if (!Triggers(item.Id, id, taken)) return;
             taken = true;
             Apply();
+            if (source != null && sound != null) source.PlayOneShot(sound);
         }
 
         void Apply()
