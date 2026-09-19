@@ -93,6 +93,10 @@ namespace HalfAware
             if (route.IsLast(band) && clock.Beat != DriveBeat.Running && clock.Beat != DriveBeat.Talking)
             {
                 clock.Tick(Time.deltaTime, Now);
+                // 次の帯は無いので、入れ替えの知らせは受け取って捨てる。
+                // 残しておくと、場面がまだ閉じられないときに一巡して戻ってきたとき、
+                // 古い知らせで範囲の外を並べにいって走りが止まる
+                clock.TakeSwap();
                 flow.Held = clock.Beat == DriveBeat.Afterglow;
                 return;
             }
