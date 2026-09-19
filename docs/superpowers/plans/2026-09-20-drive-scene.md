@@ -949,7 +949,10 @@ namespace HalfAware
     /// 沿道はタイルの子にはせず、帯ごとの入れ物に分けて持つ。
     /// 子にすると帯の出し分けがタイルの数だけ増えるうえ、
     /// 入れ物を切り替えるだけでは済まなくなる。
-    /// 入れ物の中身を道と同じ環に乗せれば、継ぎ目は勝手に揃う
+    /// 入れ物の中身を道と同じ環に乗せれば、継ぎ目は勝手に揃う。
+    ///
+    /// 対向車だけは同じ環に乗せない。すれ違う車は自分の速さと相手の速さの和で
+    /// 近づいてくるので、道と同じ速さで流すと隣を並んで走っているように見える
     /// </summary>
     public sealed class DriveWorld : MonoBehaviour
     {
@@ -961,6 +964,10 @@ namespace HalfAware
         [SerializeField] float behind = -30f;
         [Tooltip("帯ごとの沿道。今の帯のものだけ出す。中身はタイルと同じ枚数に割って並べる")]
         [SerializeField] Transform[] roadsides = new Transform[0];
+        [Tooltip("対向車。帯ごとの入れ物。中身は沿道と同じく区切りに割る")]
+        [SerializeField] Transform[] oncoming = new Transform[0];
+        [Tooltip("対向車が流れる速さ。道の何倍か。1 だと並んで走っているように見える")]
+        [SerializeField] float oncomingRate = 2.2f;
 
         /// <summary>走る速さ。m/s。0 で止まる</summary>
         public float Speed { get; set; }
@@ -977,6 +984,9 @@ namespace HalfAware
         /// <summary>今出している沿道。道と同じ環に乗せるので Place が面倒を見る</summary>
         Transform dressed;
 
+        /// <summary>今出している対向車。道より速い環に乗せる</summary>
+        Transform rushing;
+
         void Update()
         {
             if (!Rolling) return;
@@ -984,39 +994,54 @@ namespace HalfAware
             Place();
         }
 
-        /// <summary>今の走行距離で、道と沿道を並べ直す</summary>
+        /// <summary>今の走行距離で、道と沿道と対向車を並べ直す</summary>
         public void Place()
         {
-            for (var i = 0; i < tiles.Length; i++) Slide(tiles[i], i, tiles.Length);
+            for (var i = 0; i < tiles.Length; i++) Slide(tiles[i], i, tiles.Length, Travelled);
             // 沿道は出ている帯のぶんだけ。道と同じ環に乗せるので、道との継ぎ目がずれない
-            if (dressed == null) return;
-            var n = dressed.childCount;
-            for (var i = 0; i < n; i++) Slide(dressed.GetChild(i), i, n);
+            if (dressed != null)
+            {
+                var n = dressed.childCount;
+                for (var i = 0; i < n; i++) Slide(dressed.GetChild(i), i, n, Travelled);
+            }
+            // 対向車だけは別の環。速く流さないと、並んで走っているように見える
+            if (rushing == null) return;
+            var m = rushing.childCount;
+            for (var i = 0; i < m; i++) Slide(rushing.GetChild(i), i, m, Travelled * oncomingRate);
         }
 
         /// <summary>
         /// 環の i 番目の枠へ置く。x と y は組み立てのときのまま残すので、
-        /// 車線のずらしや路面の反りは組み立て側で決められる
+        /// 車線のずらしや路面の反りは組み立て側で決められる。
+        /// 距離を外から渡すのは、対向車だけ別の速さで流すため
         /// </summary>
-        void Slide(Transform what, int i, int n)
+        void Slide(Transform what, int i, int n, float travelled)
         {
             if (what == null) return;
-            var z = RoadRing.Slot(i, n, tileLength, Travelled, behind);
+            var z = RoadRing.Slot(i, n, tileLength, travelled, behind);
             var at = what.localPosition;
             what.localPosition = new Vector3(at.x, at.y, z);
         }
 
-        /// <summary>which 番目の帯の沿道だけ出す。-1 でどれも出さない</summary>
+        /// <summary>which 番目の帯の沿道と対向車だけ出す。-1 でどれも出さない</summary>
         public void Dress(int which)
         {
-            dressed = null;
-            for (var i = 0; i < roadsides.Length; i++)
+            dressed = Only(roadsides, which);
+            rushing = Only(oncoming, which);
+        }
+
+        /// <summary>which 番目だけ出して、それを返す。-1 でどれも出さない</summary>
+        static Transform Only(Transform[] row, int which)
+        {
+            Transform lit = null;
+            for (var i = 0; i < row.Length; i++)
             {
-                if (roadsides[i] == null) continue;
+                if (row[i] == null) continue;
                 var on = i == which;
-                roadsides[i].gameObject.SetActive(on);
-                if (on) dressed = roadsides[i];
+                row[i].gameObject.SetActive(on);
+                if (on) lit = row[i];
             }
+            return lit;
         }
 
         /// <summary>
