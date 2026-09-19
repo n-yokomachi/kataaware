@@ -20,8 +20,11 @@ namespace HalfAware
 
         public IReadOnlyList<string> Required => required;
 
-        /// <summary>必須の対象をすべて調べたか</summary>
-        public bool IsComplete => required.All(done.Contains);
+        /// <summary>
+        /// 必須の対象をすべて調べたか。必須がひとつも無い場面は終われない。
+        /// 組み立て途中の場面が、入った瞬間に「続く」で閉じてしまうのを防ぐ
+        /// </summary>
+        public bool IsComplete => required.Count > 0 && required.All(done.Contains);
 
         /// <summary>
         /// 調べたときに出す文を返す。前提が未達なら、その id の文だけ返して済んだことにはしない。

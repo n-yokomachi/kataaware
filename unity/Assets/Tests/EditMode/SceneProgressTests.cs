@@ -34,9 +34,11 @@ namespace HalfAware.Tests
         }
 
         [Test]
-        public void IsCompleteWithoutRequiredItems()
+        public void ASceneWithNothingRequiredNeverEnds()
         {
-            Assert.That(new SceneProgress(new[] { Item("b") }).IsComplete, Is.True);
+            // 組み立て途中の場面は、入った瞬間に閉じずに歩けるままにしておく
+            Assert.That(new SceneProgress(new[] { Item("b") }).IsComplete, Is.False);
+            Assert.That(new SceneProgress(new FakeItem[0]).IsComplete, Is.False);
         }
 
         [Test]
