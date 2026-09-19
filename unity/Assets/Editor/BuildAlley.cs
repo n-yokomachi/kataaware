@@ -103,20 +103,21 @@ namespace HalfAware.EditorTools
             var metal = new Bank { Texel = 0.60f };
             var glass = new Bank { Texel = 0.50f };
             var timber = new Bank { Texel = 0.55f };
-            var warm = new Bank { Texel = 0.50f };
-            var cold = new Bank { Texel = 0.50f };
+            // 窓の灯りは色ごとに分かれる。1 色だと通りが黄色く染まる
+            var glow = new Glazing(glass);
 
             Ground(road, paving, stone);
             for (var s = 0; s < 2; s++)
             {
                 var side = s == 0 ? -1 : 1;
-                Facades(brick, stone, metal, glass, warm, cold, side);
+                Facades(brick, stone, metal, glass, glow, side);
             }
             LaneShell(brick, stone, paving);
             YardShell(brick, stone, paving);
-            YardFacades(brick, stone, metal, glass, warm, cold);
+            YardFacades(brick, stone, metal, glass, glow);
             SouthEnd(brick, stone, metal);
-            Heritage(Child(parent.parent, "Heritage"), brick, stone, metal, timber, glass, warm);
+            Heritage(Child(parent.parent, "Heritage"), brick, stone, metal, timber, glass, glow);
+            Terraces(Child(parent.parent, "Terraces"), stone, metal, timber);
             Walkway(metal, stone, -13.5f, 6.4f);
             Walkway(metal, stone, 26.5f, 7.1f);
             Walkway(metal, stone, 47.5f, 6.8f);
@@ -129,8 +130,79 @@ namespace HalfAware.EditorTools
             metal.Emit(parent, "MetalShell", Mat("Metal"), false, Generated);
             glass.Emit(parent, "Glass", Mat("Glass"), false, Generated);
             timber.Emit(parent, "Timberwork", Mat("Timber"), false, Generated);
-            warm.Emit(parent, "WindowWarm", GlowMat(new Color(1.00f, 0.74f, 0.42f), 1.05f), false, Generated);
-            cold.Emit(parent, "WindowCold", GlowMat(new Color(0.48f, 0.68f, 1.00f), 1.15f), false, Generated);
+            glow.Emit(parent);
+        }
+
+        /// <summary>
+        /// 窓の灯り。色も明るさも一種類だと通りが一色に染まって見えるので、束で持って引く。
+        /// 引いた先はそれぞれ別のマテリアルになるので、色の違いがそのまま画面に出る
+        /// </summary>
+        sealed class Glazing
+        {
+            /// <summary>灯りの色。タングステンに寄せつつ、蛍光灯・画面・色つきの灯りを混ぜる</summary>
+            static readonly Color[] Hues =
+            {
+                new Color(1.00f, 0.78f, 0.50f),   // タングステン
+                new Color(1.00f, 0.86f, 0.66f),   // 窓掛けごしの暖色
+                new Color(0.97f, 0.94f, 0.86f),   // 白めの電球
+                new Color(0.86f, 0.94f, 0.90f),   // 蛍光灯
+                new Color(0.68f, 0.82f, 1.00f),   // 画面の青
+                new Color(0.36f, 0.54f, 0.94f),   // 奥まった画面の青
+                new Color(1.00f, 0.50f, 0.40f),   // 赤い灯り
+                new Color(0.44f, 0.94f, 0.88f),   // 青緑
+                new Color(0.78f, 0.58f, 1.00f),   // 藤
+                new Color(1.00f, 0.62f, 0.24f),   // 深い橙
+                new Color(1.00f, 0.80f, 0.56f),   // 店内の暖色。面が広いので暗く
+                new Color(0.92f, 0.95f, 0.92f),   // 店内の白
+                new Color(0.98f, 0.74f, 0.44f),   // 店の奥。いちばん暗い
+            };
+
+            /// <summary>色ごとの明るさ。ぜんぶ明るいと窓の並びが白く潰れて一色に見える</summary>
+            static readonly float[] Glow =
+            { 0.82f, 0.36f, 0.60f, 0.46f, 0.62f, 0.24f, 0.38f, 0.44f, 0.32f, 0.20f,
+              0.46f, 0.40f, 0.29f };
+
+            /// <summary>引く目。暖色をやや多めに、ほかも必ず混じるように並べる</summary>
+            static readonly int[] Wheel =
+            { 0, 4, 1, 2, 6, 0, 3, 8, 1, 5, 2, 7, 0, 9, 4, 1, 3, 6, 2, 5 };
+
+            /// <summary>店先に使う色。暗い灯りや画面の青は引かない</summary>
+            static readonly int[] Shopfronts = { 10, 11, 12, 10, 12 };
+
+            readonly Bank[] lit = new Bank[Hues.Length];
+            readonly Bank dark;
+
+            public Glazing(Bank dark)
+            {
+                this.dark = dark;
+                for (var i = 0; i < lit.Length; i++) lit[i] = new Bank { Texel = 0.50f };
+            }
+
+            /// <summary>窓を 1 枚引く。unlit は灯りの点いていない窓の割合</summary>
+            public Bank Pick(System.Random rng, double unlit)
+            {
+                if (rng.NextDouble() < unlit) return dark;
+                return lit[Wheel[rng.Next(Wheel.Length)]];
+            }
+
+            /// <summary>必ず灯りの点いた窓。店先のように暗くできないところで使う</summary>
+            public Bank Shop(System.Random rng)
+            {
+                return lit[Shopfronts[rng.Next(Shopfronts.Length)]];
+            }
+
+            /// <summary>色を名指しで引く。同じ店の窓を揃えたいときに使う</summary>
+            public Bank Lit(int i)
+            {
+                return lit[((i % lit.Length) + lit.Length) % lit.Length];
+            }
+
+            /// <summary>色ごとに 1 枚の mesh へ焼く</summary>
+            public void Emit(Transform parent)
+            {
+                for (var i = 0; i < lit.Length; i++)
+                    lit[i].Emit(parent, "Window" + i, GlowMat(Hues[i], Glow[i]), false, Generated);
+            }
         }
 
         /// <summary>路面と歩道。車道は縁石ぶん低くして、排水口を等間隔に落とす</summary>
@@ -196,7 +268,7 @@ namespace HalfAware.EditorTools
         /// 片側の建物の面。1 階は店先かシャッターか戸口、2 階から上は窓を並べる。
         /// 面を平らのままにせず、付柱・胴蛇腹・窓台・軒で段を作る
         /// </summary>
-        static void Facades(Bank brick, Bank stone, Bank metal, Bank glass, Bank warm, Bank cold, int side)
+        static void Facades(Bank brick, Bank stone, Bank metal, Bank glass, Glazing glow, int side)
         {
             var wx = side * StreetHalf;
             var inward = -side;
@@ -213,10 +285,10 @@ namespace HalfAware.EditorTools
             }
             foreach (var run in runs)
                 foreach (var u in Units(run.x, run.y, rng))
-                    Facade(brick, stone, metal, glass, warm, cold, side, wx, inward, u, rng);
+                    Facade(brick, stone, metal, glass, glow, side, wx, inward, u, rng);
         }
 
-        static void Facade(Bank brick, Bank stone, Bank metal, Bank glass, Bank warm, Bank cold,
+        static void Facade(Bank brick, Bank stone, Bank metal, Bank glass, Glazing glow,
             int side, float wx, int inward, Unit u, System.Random rng)
         {
             var pil = 0.34f;
@@ -262,9 +334,7 @@ namespace HalfAware.EditorTools
             foreach (var o in openings)
             {
                 Reveal(stone, wx, back, o);
-                var lit = rng.NextDouble();
-                var bank = lit < 0.42 ? warm : lit < 0.60 ? cold : glass;
-                bank.FaceX(back, o.x, o.y, o.z, o.w, inward);
+                glow.Pick(rng, 0.40).FaceX(back, o.x, o.y, o.z, o.w, inward);
                 stone.Box(new Vector3(wx + inward * 0.06f, o.z - 0.07f, (o.x + o.y) * 0.5f),
                     new Vector3(0.13f, 0.09f, o.y - o.x + 0.24f));
                 stone.Box(new Vector3(wx + inward * 0.04f, o.w + 0.09f, (o.x + o.y) * 0.5f),
@@ -273,7 +343,7 @@ namespace HalfAware.EditorTools
 
             if (u.ground == 0)
             {
-                Shopfront(stone, metal, warm, wx, back, z0, z1, shopY0, shopY1, inward);
+                Shopfront(stone, metal, glow.Shop(rng), glass, wx, back, z0, z1, shopY0, shopY1, inward, rng);
                 // 店の戸口。ここを塞がないと壁に穴が空いたままになる
                 Doorway(stone, metal, wx, back, new Vector4(z1 - 1.25f, z1 - 0.35f, 0f, shopY1 - 0.15f), inward);
             }
@@ -297,6 +367,67 @@ namespace HalfAware.EditorTools
                 new Vector3(0.28f, 0.68f, u.z1 - u.z0));
         }
 
+        /// <summary>
+        /// 硝子の内側。灯りの面だけでは光る板にしか見えないので、
+        /// 手前へ暗い影を並べて奥行きを作る。卓・棚・吊り灯り・客の影。
+        /// axis は 0 なら面が x 一定（z 方向に広がる）、2 なら z 一定。
+        /// towards は見る人が居る側。影はその手前へ出す
+        /// </summary>
+        static void Behind(Bank dark, int axis, float plane, int towards,
+            float a0, float a1, float y0, float y1, System.Random rng)
+        {
+            var span = a1 - a0;
+            if (span < 0.8f) return;
+
+            // 面から手前へ出す距離。奥行きの違いで前後が読める
+            var near = plane + towards * 0.05f;
+            var mid = plane + towards * 0.13f;
+            var far = plane + towards * 0.20f;
+
+            // 客の影。座った高さと立った高さを混ぜる
+            var n = Mathf.Max(1, Mathf.FloorToInt(span / 1.15f));
+            for (var i = 0; i < n; i++)
+            {
+                var a = a0 + span * (i + 0.5f) / n + (float)(rng.NextDouble() - 0.5) * 0.3f;
+                if (rng.NextDouble() < 0.28) continue;
+                var stand = rng.NextDouble() < 0.34;
+                var high = stand ? 1.72f : 1.28f;
+                var foot = stand ? y0 : y0 + 0.42f;
+                var d = rng.NextDouble() < 0.5 ? mid : far;
+                Slab(dark, axis, d, a, (foot + high) * 0.5f, 0.40f, high - foot);
+                Slab(dark, axis, d, a, high - 0.11f, 0.24f, 0.24f);
+            }
+
+            // 手前の卓と、奥の棚
+            for (var a = a0 + 0.5f; a < a1 - 0.3f; a += (float)(1.5 + rng.NextDouble() * 1.1))
+            {
+                Slab(dark, axis, near, a, y0 + 0.40f, 1.05f, 0.09f);
+                Slab(dark, axis, near, a, y0 + 0.20f, 0.12f, 0.40f);
+            }
+            var shelf = y0 + (y1 - y0) * 0.62f;
+            Slab(dark, axis, far, (a0 + a1) * 0.5f, shelf, span * 0.78f, 0.07f);
+            for (var a = a0 + 0.35f; a < a1 - 0.2f; a += 0.24f)
+            {
+                if (rng.NextDouble() < 0.35) continue;
+                Slab(dark, axis, far, a, shelf + 0.16f, 0.09f, 0.26f);
+            }
+
+            // 吊り灯り。天井から 3 割ほど下がる
+            for (var a = a0 + span * 0.25f; a < a1; a += span * 0.34f)
+            {
+                Slab(dark, axis, mid, a, y1 - 0.22f, 0.05f, 0.44f);
+                Slab(dark, axis, mid, a, y1 - 0.48f, 0.30f, 0.16f);
+            }
+        }
+
+        /// <summary>影ひとつ。面の向きに合わせて薄い板を立てる</summary>
+        static void Slab(Bank dark, int axis, float depth, float along, float y, float wide, float high)
+        {
+            var size = axis == 0 ? new Vector3(0.03f, high, wide) : new Vector3(wide, high, 0.03f);
+            var at = axis == 0 ? new Vector3(depth, y, along) : new Vector3(along, y, depth);
+            dark.Box(at, size);
+        }
+
         /// <summary>窓の抜けの内側。四方の返しを張って、壁に厚みを持たせる</summary>
         static void Reveal(Bank bank, float wx, float back, Vector4 o)
         {
@@ -309,13 +440,14 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>店先。大きな硝子の奥に灯りを置き、上に庇を掛ける</summary>
-        static void Shopfront(Bank stone, Bank metal, Bank warm, float wx, float back,
-            float z0, float z1, float y0, float y1, int inward)
+        static void Shopfront(Bank stone, Bank metal, Bank warm, Bank dark, float wx, float back,
+            float z0, float z1, float y0, float y1, int inward, System.Random rng)
         {
             var gz0 = z0 + 0.35f;
             var gz1 = z1 - 1.55f;
             Reveal(stone, wx, back, new Vector4(gz0, gz1, y0, y1));
             warm.FaceX(back, gz0, gz1, y0, y1, inward);
+            Behind(dark, 0, back, inward, gz0 + 0.2f, gz1 - 0.2f, y0, y1, rng);
             for (var z = gz0 + 1.2f; z < gz1 - 0.2f; z += 1.2f)
                 metal.Box(new Vector3(wx + inward * 0.12f, (y0 + y1) * 0.5f, z), new Vector3(0.12f, y1 - y0, 0.07f));
             metal.Box(new Vector3(wx + inward * 0.12f, y0, (gz0 + gz1) * 0.5f), new Vector3(0.16f, 0.12f, gz1 - gz0));
@@ -745,15 +877,42 @@ namespace HalfAware.EditorTools
                         rng.NextDouble() < 0.4 ? 6 : StandPose(rng), rng);
                 }
             }
-            // 四方の壁ぎわ。立ち話や雨宿り
+            // 露天席。椅子の 7 割ほどが埋まっている。空席が混じるほうが店らしい
+            for (var i = 0; i < ChairSpots.Count; i++)
+            {
+                var c = ChairSpots[i];
+                if (rng.NextDouble() < 0.30) continue;
+                var roll = rng.NextDouble();
+                var seat = roll < 0.42 ? 6 : roll < 0.78 ? 5 : 7;
+                // 椅子に深く腰掛けるので、座面より少し後ろへ置く
+                var back = Quaternion.Euler(0f, c.w, 0f) * new Vector3(0f, 0f, -0.07f);
+                Put(spots, new Vector3(c.x + back.x, c.y, c.z + back.z),
+                    c.w + (float)(rng.NextDouble() * 14.0 - 7.0), seat, rng, true);
+                Occupy(c.x, c.z, 0.34f);
+            }
+
+            // 樽の卓のまわり。立ったまま飲んでいる
+            for (var i = 0; i < StandSpots.Count; i++)
+            {
+                var c = StandSpots[i];
+                if (rng.NextDouble() < 0.34) continue;
+                Put(spots, new Vector3(c.x, c.y, c.z), c.w + (float)(rng.NextDouble() * 24.0 - 12.0),
+                    rng.NextDouble() < 0.35 ? 2 : StandPose(rng), rng, true);
+                Occupy(c.x, c.z, 0.34f);
+            }
+
+            // 四方の壁ぎわ。立ち話や雨宿り。露天席の区画は避ける
             for (var z = YardSouth + 2.2f; z < YardNorth - 2f; z += (float)(1.9 + rng.NextDouble() * 2.2))
             {
-                Put(spots, new Vector3(YardWest + 1.15f, 0.02f, z), 90f + (float)(rng.NextDouble() * 50.0 - 25.0), 8, rng);
+                if (z < TerraceNorth + 0.8f)
+                    Put(spots, new Vector3(TerraceEast + 0.9f, 0.02f, z), 90f + (float)(rng.NextDouble() * 50.0 - 25.0), 8, rng);
+                else
+                    Put(spots, new Vector3(YardWest + 1.15f, 0.02f, z), 90f + (float)(rng.NextDouble() * 50.0 - 25.0), 8, rng);
                 Put(spots, new Vector3(LaneWest - 1.15f, 0.02f, z), -90f + (float)(rng.NextDouble() * 50.0 - 25.0), 8, rng);
             }
             for (var x = YardWest + 2.2f; x < LaneWest - 2f; x += (float)(1.9 + rng.NextDouble() * 2.2))
             {
-                Put(spots, new Vector3(x, 0.02f, YardSouth + 1.15f), 0f + (float)(rng.NextDouble() * 50.0 - 25.0), 8, rng);
+                Put(spots, new Vector3(x, 0.02f, TavernTerraceNorth + 0.75f), 0f + (float)(rng.NextDouble() * 50.0 - 25.0), 8, rng);
                 Put(spots, new Vector3(x, 0.02f, YardNorth - 1.15f), 180f + (float)(rng.NextDouble() * 50.0 - 25.0), 8, rng);
             }
 
@@ -801,6 +960,8 @@ namespace HalfAware.EditorTools
                 var inst = (GameObject)PrefabUtility.InstantiatePrefab(src, stage.transform);
                 inst.transform.localPosition = Vector3.zero;
                 inst.transform.localRotation = Quaternion.identity;
+                // プレハブの結びを解かないと骨は繋ぎ変えられない。解かないまま曲げると靴だけ残る
+                PrefabUtility.UnpackPrefabInstance(inst, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
                 // 足首が脛の子ではないので、膝を曲げても靴が置き去りになる。繋ぎ直す
                 foreach (var pair in new[] { "L", "R" })
                 {
@@ -874,14 +1035,17 @@ namespace HalfAware.EditorTools
             return null;
         }
 
-        /// <summary>姿勢ごとの腰の下がり。座りとしゃがみは骨を曲げるだけでは沈まない</summary>
+        /// <summary>
+        /// 姿勢ごとの下げ量。骨を曲げても腰は動かないので、座った形のまま床へ落とす。
+        /// 値は焼いた形の一番低い頂点を実測して決めてある。靴の裏が床に来る
+        /// </summary>
         static float PoseDrop(int pose)
         {
             switch (pose)
             {
-                case 5: return 0.60f;
-                case 6: return 0.58f;
-                case 7: return 0.52f;
+                case 5: return 0.392f;
+                case 6: return 0.404f;
+                case 7: return 0.394f;
                 default: return 0f;
             }
         }
@@ -897,6 +1061,8 @@ namespace HalfAware.EditorTools
             float thighL = 2f, thighR = -2f, kneeL = 0f, kneeR = 0f;
             float armL = 6f, armR = -6f, elbowL = 12f, elbowR = 12f;
             float outL = 4f, outR = -4f, spine = 2f, lean = 0f;
+            // 足首。0 なら脛のまま。座ると爪先が下を向くので、起こして靴の裏を床へ向ける
+            var level = false;
 
             switch (pose)
             {
@@ -917,25 +1083,27 @@ namespace HalfAware.EditorTools
                     armL = 10f; armR = -4f; elbowL = 14f; elbowR = 20f;
                     outL = 9f; outR = -8f; spine = 3f; thighL = -3f; thighR = 4f;
                     break;
-                case 5:  // 座る
-                    thighL = 80f; thighR = 76f; kneeL = -96f; kneeR = -100f;
-                    outL = 16f; outR = -16f; armL = 34f; armR = 30f; elbowL = 56f; elbowR = 52f;
-                    spine = 6f;
+                // 座る 3 つは腿と膝をほぼ揃える。腰の高さが揃わないと、
+                // 同じ椅子に座らせたときに浮いたり沈んだりする
+                case 5:  // 椅子に座る
+                    thighL = 107f; thighR = 106f; kneeL = -119f; kneeR = -120f;
+                    outL = 14f; outR = -14f; armL = 30f; armR = 26f; elbowL = 52f; elbowR = 48f;
+                    spine = 5f; level = true;
                     break;
-                case 6:  // 台に手をついて座る
-                    thighL = 78f; thighR = 82f; kneeL = -100f; kneeR = -94f;
-                    outL = 20f; outR = -12f; armL = 18f; armR = 52f; elbowL = 30f; elbowR = 72f;
-                    spine = 10f;
+                case 6:  // 卓に肘をついて座る
+                    thighL = 106f; thighR = 108f; kneeL = -120f; kneeR = -118f;
+                    outL = 18f; outR = -10f; armL = 16f; armR = 48f; elbowL = 28f; elbowR = 68f;
+                    spine = 9f; level = true;
                     break;
                 case 8:  // 壁に背をつけて立つ
                     lean = -9f; thighL = -10f; thighR = -6f; kneeL = 6f; kneeR = 3f;
                     armL = -16f; armR = 14f; elbowL = 30f; elbowR = 22f;
                     outL = 3f; outR = -8f; spine = -4f;
                     break;
-                case 7:  // 膝を立てて座る
-                    thighL = 88f; thighR = 70f; kneeL = -128f; kneeR = -88f;
-                    outL = 10f; outR = -18f; armL = 46f; armR = 26f; elbowL = 64f; elbowR = 44f;
-                    spine = 12f;
+                case 7:  // 膝を寄せて横を向いて座る
+                    thighL = 108f; thighR = 106f; kneeL = -118f; kneeR = -121f;
+                    outL = 4f; outR = -24f; armL = 42f; armR = 24f; elbowL = 60f; elbowR = 40f;
+                    spine = 11f; level = true;
                     break;
             }
 
@@ -950,6 +1118,12 @@ namespace HalfAware.EditorTools
             Turn(root, "UpperLeg.R", thighR, outR * 0.25f);
             Turn(root, "LowerLeg.L", kneeL, 0f);
             Turn(root, "LowerLeg.R", kneeR, 0f);
+
+            if (level)
+            {
+                Turn(root, "Foot.L", -(thighL + kneeL), 0f);
+                Turn(root, "Foot.R", -(thighR + kneeR), 0f);
+            }
 
             Turn(root, "UpperArm.L", armL, outL);
             Turn(root, "UpperArm.R", armR, outR);
@@ -1814,6 +1988,10 @@ namespace HalfAware.EditorTools
                         var gap = new Vector2(px - MyStallX, pz - MyStallZ);
                         if (gap.magnitude < 3.2f) continue;
                         if (Mathf.Abs(pz - LaneZ) < AisleHalf + 0.9f) continue;
+                        // 露天席の区画には出さない。店と席がぶつかる
+                        if (px < TerraceEast + 1.2f && pz < TerraceNorth + 1.2f) continue;
+                        if (pz < TavernTerraceNorth + 1.2f) continue;
+                        if (px > RestaurantWest - 1.2f && pz > RestaurantTerraceSouth - 1.2f) continue;
                         if (!Free(px, pz, 1.4f)) continue;
                         // 正面は筋の側。北の列は南を向き、南の列は北を向く
                         var face = (sideZ > 0 ? 0f : 180f) + (float)(rng.NextDouble() * 40.0 - 20.0);
@@ -1864,7 +2042,8 @@ namespace HalfAware.EditorTools
 
             var th = 0.78f;
             Box(t, "Table", new Vector3(0f, th, -d * 0.18f), new Vector3(w * 0.88f, 0.06f, d * 0.52f), "Timber");
-            Box(t, "Skirt", new Vector3(0f, th * 0.5f, -d * 0.18f - d * 0.24f), new Vector3(w * 0.88f, th, 0.05f), "Timber");
+            // 前垂れはタープと同じ布。板を張ると白い衝立に見える
+            Box(t, "Skirt", new Vector3(0f, th * 0.5f, -d * 0.18f - d * 0.24f), new Vector3(w * 0.88f, th, 0.05f), tarp);
 
             var boxes = mine ? 2 : 1 + rng.Next(3);
             for (var i = 0; i < boxes; i++)
@@ -1942,11 +2121,14 @@ namespace HalfAware.EditorTools
                 ball.name = "Glass";
                 ball.transform.SetParent(g.transform, false);
                 ball.transform.localScale = new Vector3(0.11f, 0.11f, 0.11f);
-                ball.GetComponent<MeshRenderer>().sharedMaterial = GlowMat(new Color(1.00f, 0.80f, 0.52f), 2.2f);
+                // 3 つに 1 つは新しい白い玉。橙ばかりだと市が黄色一色になる
+                var cold = i % 3 == 1;
+                var hue = cold ? new Color(0.76f, 0.86f, 1.00f) : new Color(1.00f, 0.87f, 0.68f);
+                ball.GetComponent<MeshRenderer>().sharedMaterial = GlowMat(hue, 2.2f);
                 Object.DestroyImmediate(ball.GetComponent<Collider>());
                 var l = g.AddComponent<Light>();
                 l.type = LightType.Point;
-                l.color = new Color(1.00f, 0.79f, 0.52f);
+                l.color = hue;
                 l.range = 11f;
                 l.intensity = 30f;
                 l.shadows = LightShadows.None;
@@ -1958,21 +2140,21 @@ namespace HalfAware.EditorTools
         /// ヤードを囲む建物の裏の顔。通りに面した表と違って店先は無く、
         /// 窓と樋と物干しと外づけの階段が雑然と並ぶ。中庭はこの壁で出来ている
         /// </summary>
-        static void YardFacades(Bank brick, Bank stone, Bank metal, Bank glass, Bank warm, Bank cold)
+        static void YardFacades(Bank brick, Bank stone, Bank metal, Bank glass, Glazing glow)
         {
             var rng = new System.Random(6210);
             // 西の壁。奥に立ちはだかる
-            YardWallX(brick, stone, metal, glass, warm, cold, YardWest, 1, YardSouth, YardNorth, rng);
+            YardWallX(brick, stone, metal, glass, glow, YardWest, 1, YardSouth, YardNorth, rng);
             // 東の壁は小路の口ぶんだけ切れている
-            YardWallX(brick, stone, metal, glass, warm, cold, LaneWest, -1, YardSouth, LaneZ - LaneHalf, rng);
-            YardWallX(brick, stone, metal, glass, warm, cold, LaneWest, -1, LaneZ + LaneHalf, YardNorth, rng);
+            YardWallX(brick, stone, metal, glass, glow, LaneWest, -1, YardSouth, LaneZ - LaneHalf, rng);
+            YardWallX(brick, stone, metal, glass, glow, LaneWest, -1, LaneZ + LaneHalf, YardNorth, rng);
             // 南と北
-            YardWallZ(brick, stone, metal, glass, warm, cold, YardSouth, 1, YardWest, LaneWest, rng);
-            YardWallZ(brick, stone, metal, glass, warm, cold, YardNorth, -1, YardWest, LaneWest, rng);
+            YardWallZ(brick, stone, metal, glass, glow, YardSouth, 1, YardWest, LaneWest, rng);
+            YardWallZ(brick, stone, metal, glass, glow, YardNorth, -1, YardWest, LaneWest, rng);
         }
 
         /// <summary>x が一定の囲い壁。窓を彫り、樋と物干しを掛ける</summary>
-        static void YardWallX(Bank brick, Bank stone, Bank metal, Bank glass, Bank warm, Bank cold,
+        static void YardWallX(Bank brick, Bank stone, Bank metal, Bank glass, Glazing glow,
             float wx, int inward, float z0, float z1, System.Random rng)
         {
             var holes = new List<Vector4>();
@@ -1993,9 +2175,7 @@ namespace HalfAware.EditorTools
             foreach (var o in holes)
             {
                 Reveal(stone, wx, back, o);
-                var lit = rng.NextDouble();
-                var bank = lit < 0.34 ? warm : lit < 0.48 ? cold : glass;
-                bank.FaceX(back, o.x, o.y, o.z, o.w, inward);
+                glow.Pick(rng, 0.34).FaceX(back, o.x, o.y, o.z, o.w, inward);
                 stone.Box(new Vector3(wx + inward * 0.07f, o.z - 0.08f, (o.x + o.y) * 0.5f),
                     new Vector3(0.16f, 0.10f, o.y - o.x + 0.26f));
                 // 物干し。窓から窓へ渡した紐と布
@@ -2021,7 +2201,7 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>z が一定の囲い壁</summary>
-        static void YardWallZ(Bank brick, Bank stone, Bank metal, Bank glass, Bank warm, Bank cold,
+        static void YardWallZ(Bank brick, Bank stone, Bank metal, Bank glass, Glazing glow,
             float wz, int inward, float x0, float x1, System.Random rng)
         {
             var holes = new List<Vector4>();
@@ -2046,9 +2226,7 @@ namespace HalfAware.EditorTools
                 stone.FaceX(o.y, y0, y1, o.z, o.w, 1);
                 stone.FaceY(o.w, o.x, o.y, y0, y1, -1);
                 stone.FaceY(o.z, o.x, o.y, y0, y1, 1);
-                var lit = rng.NextDouble();
-                var bank = lit < 0.34 ? warm : lit < 0.48 ? cold : glass;
-                bank.FaceZ(back, o.x, o.y, o.z, o.w, inward);
+                glow.Pick(rng, 0.34).FaceZ(back, o.x, o.y, o.z, o.w, inward);
                 stone.Box(new Vector3((o.x + o.y) * 0.5f, o.z - 0.08f, wz + inward * 0.07f),
                     new Vector3(o.y - o.x + 0.26f, 0.10f, 0.16f));
             }
@@ -2228,7 +2406,7 @@ namespace HalfAware.EditorTools
         /// ビストロは元は倉庫で、剥き出しの木の梁と鉄の柱、19 世紀の仏ワインの刷り物が貼ってあった。
         /// 2166 年のここには、その名残だけが板で塞がれて残っている
         /// </summary>
-        static void Heritage(Transform parent, Bank brick, Bank stone, Bank metal, Bank timber, Bank glass, Bank warm)
+        static void Heritage(Transform parent, Bank brick, Bank stone, Bank metal, Bank timber, Bank glass, Glazing glow)
         {
             // --- 西側。ビストロ。今も開いている。2 階は中庭を見下ろす露台 ---
             var wx = YardWest;
@@ -2259,7 +2437,13 @@ namespace HalfAware.EditorTools
             // 1 階。大きな硝子と、中の灯り
             var gz0 = tz0 + 0.5f;
             var gz1 = tz1 - 0.5f;
-            warm.FaceX(wx + 0.30f, gz0, gz1, 0.55f, 2.85f, 1);
+            var inside = new System.Random(4141);
+            var bistro = glow.Lit(10);         // ビストロの中はタングステン。面が広いので暗め
+            bistro.FaceX(wx + 0.30f, gz0, gz1, 0.55f, 2.85f, 1);
+            Behind(glass, 0, wx + 0.30f, 1, gz0 + 0.25f, gz1 - 0.25f, 0.55f, 2.85f, inside);
+            // 桟。縦だけだと硝子が一枚板に見えるので、横も入れる
+            for (var y = 1.35f; y < 2.8f; y += 0.72f)
+                metal.Box(new Vector3(wx + 0.26f, y, (gz0 + gz1) * 0.5f), new Vector3(0.11f, 0.07f, gz1 - gz0));
             for (var z = gz0 + 1.15f; z < gz1 - 0.2f; z += 1.15f)
                 metal.Box(new Vector3(wx + 0.26f, 1.7f, z), new Vector3(0.13f, 2.3f, 0.09f));
             metal.Box(new Vector3(wx + 0.26f, 0.52f, (gz0 + gz1) * 0.5f), new Vector3(0.18f, 0.16f, gz1 - gz0));
@@ -2273,7 +2457,8 @@ namespace HalfAware.EditorTools
             // 扉と、その上の灯り
             timber.Box(new Vector3(wx + 0.16f, 1.10f, tz1 + 1.35f), new Vector3(0.20f, 2.2f, 1.1f));
             metal.Box(new Vector3(wx + 0.30f, 1.05f, tz1 + 1.05f), new Vector3(0.08f, 0.3f, 0.06f));
-            warm.FaceX(wx + 0.30f, tz1 + 2.1f, tz1 + 2.9f, 0.9f, 2.4f, 1);
+            bistro.FaceX(wx + 0.30f, tz1 + 2.1f, tz1 + 2.9f, 0.9f, 2.4f, 1);
+            Behind(glass, 0, wx + 0.30f, 1, tz1 + 2.2f, tz1 + 2.8f, 0.9f, 2.4f, inside);
             // 品書きの黒板。扉の脇に立てかける
             timber.Box(new Vector3(wx + 0.72f, 0.62f, tz1 + 2.25f), new Vector3(0.09f, 1.2f, 0.7f),
                 Quaternion.Euler(0f, 0f, 9f));
@@ -2291,7 +2476,8 @@ namespace HalfAware.EditorTools
                 stone.Box(new Vector3(x, 2.85f, sz + 0.26f), new Vector3(2.3f, 0.30f, 0.52f));
                 for (var i = -1; i <= 1; i += 2)
                     stone.Box(new Vector3(x + i * 1.05f, 1.45f, sz + 0.24f), new Vector3(0.28f, 2.9f, 0.48f));
-                warm.FaceZ(sz + 0.40f, x - 0.85f, x + 0.85f, 0.55f, 2.7f, 1);
+                glow.Lit(12).FaceZ(sz + 0.40f, x - 0.85f, x + 0.85f, 0.55f, 2.7f, 1);
+                Behind(glass, 2, sz + 0.40f, 1, x - 0.78f, x + 0.78f, 0.55f, 2.7f, inside);
                 for (var i = -1; i <= 1; i += 2)
                     metal.Box(new Vector3(x + i * 0.42f, 1.62f, sz + 0.36f), new Vector3(0.09f, 2.15f, 0.13f));
                 metal.Box(new Vector3(x, 1.62f, sz + 0.36f), new Vector3(1.7f, 0.09f, 0.13f));
@@ -2310,9 +2496,9 @@ namespace HalfAware.EditorTools
                 timber.Box(new Vector3(bx, 0.86f, sz + 1.25f), new Vector3(0.70f, 0.06f, 0.70f));
             }
 
-            // --- 北側。元倉庫。荷揚げの梁と滑車、鎧戸 ---
+            // --- 北側。西半分は元倉庫のまま。荷揚げの梁と滑車、鎧戸 ---
             var nz = YardNorth;
-            for (var x = YardWest + 4.0f; x < LaneWest - 3f; x += 5.4f)
+            for (var x = YardWest + 4.0f; x < RestaurantWest - 1f; x += 5.4f)
             {
                 metal.Box(new Vector3(x, 8.6f, nz - 0.85f), new Vector3(0.22f, 0.22f, 1.8f));
                 metal.Box(new Vector3(x, 8.35f, nz - 1.55f), new Vector3(0.14f, 0.36f, 0.14f));
@@ -2325,6 +2511,32 @@ namespace HalfAware.EditorTools
                 timber.Box(new Vector3(x + 0.55f, 7.0f, nz - 0.18f), new Vector3(1.0f, 2.1f, 0.14f));
                 metal.Box(new Vector3(x, 7.0f, nz - 0.26f), new Vector3(0.09f, 2.1f, 0.09f));
             }
+
+            // --- 北側の東半分。三軒目。倉庫の一階をぶち抜いた店 ---
+            var inn = glow.Lit(11);            // 中は白めの電球。面が広いので暗め
+            var rx0 = RestaurantWest;
+            var rx1 = RestaurantEast;
+            var rc = (rx0 + rx1) * 0.5f;
+            inn.FaceZ(nz - 0.34f, rx0 + 0.4f, rx1 - 1.9f, 0.62f, 2.95f, -1);
+            Behind(glass, 2, nz - 0.34f, -1, rx0 + 0.6f, rx1 - 2.1f, 0.62f, 2.95f, inside);
+            // 桟の横木
+            for (var y = 1.35f; y < 2.9f; y += 0.74f)
+                metal.Box(new Vector3((rx0 + rx1 - 1.5f) * 0.5f, y, nz - 0.30f),
+                    new Vector3(rx1 - 1.9f - rx0 - 0.4f, 0.07f, 0.11f));
+            for (var x = rx0 + 1.5f; x < rx1 - 2.0f; x += 1.1f)
+                metal.Box(new Vector3(x, 1.8f, nz - 0.30f), new Vector3(0.10f, 2.4f, 0.13f));
+            metal.Box(new Vector3((rx0 + rx1 - 1.5f) * 0.5f, 0.58f, nz - 0.30f),
+                new Vector3(rx1 - 1.9f - rx0 - 0.4f, 0.16f, 0.18f));
+            metal.Box(new Vector3((rx0 + rx1 - 1.5f) * 0.5f, 3.02f, nz - 0.30f),
+                new Vector3(rx1 - 1.9f - rx0 - 0.4f, 0.16f, 0.18f));
+            // 扉。東の端に寄せる
+            timber.Box(new Vector3(rx1 - 1.15f, 1.12f, nz - 0.20f), new Vector3(1.15f, 2.24f, 0.18f));
+            metal.Box(new Vector3(rx1 - 1.55f, 1.05f, nz - 0.32f), new Vector3(0.07f, 0.34f, 0.07f));
+            for (var x = rx0; x < rx1 + 0.1f; x += 1.7f)
+                metal.Box(new Vector3(x, 3.10f, nz - 1.05f), new Vector3(0.07f, 0.07f, 1.5f));
+            // 古い倉庫の梁は残っている。日除けの上に一本
+            metal.Box(new Vector3(rc, 5.6f, nz - 0.85f), new Vector3(0.24f, 0.24f, 1.8f));
+            metal.Box(new Vector3(rc, 5.35f, nz - 1.55f), new Vector3(0.14f, 0.36f, 0.14f));
 
             // --- 吊り看板と刷り物 ---
             var signs = Child(parent, "Heritage");
@@ -2339,6 +2551,10 @@ namespace HalfAware.EditorTools
                 new Vector3(hx, 2.48f, YardSouth + 1.35f), Vector3.forward, new Vector2(1.6f, 1.0f));
             Board(signs, "SignTavern.B", "SignTavern",
                 new Vector3(hx, 2.48f, YardSouth + 1.29f), Vector3.back, new Vector2(1.6f, 1.0f));
+            // レストランの看板。日除けの上、中庭を向く
+            Board(signs, "SignRestaurant", "SignRestaurant",
+                new Vector3((RestaurantWest + RestaurantEast) * 0.5f, 3.92f, YardNorth - 0.42f),
+                Vector3.back, new Vector2(2.4f, 0.72f), true);
             // ビストロの窓脇に貼った刷り物
             Board(signs, "PosterWine", "PosterWine",
                 new Vector3(YardWest + 0.42f, 2.05f, LaneZ + 2.6f), Vector3.right, new Vector2(0.78f, 1.04f));
@@ -2365,19 +2581,334 @@ namespace HalfAware.EditorTools
                 glassBox.name = "Glass";
                 glassBox.transform.SetParent(g.transform, false);
                 glassBox.transform.localScale = new Vector3(0.22f, 0.30f, 0.22f);
-                glassBox.GetComponent<MeshRenderer>().sharedMaterial = GlowMat(new Color(1.00f, 0.82f, 0.50f), 2.0f);
+                // 1 本だけ新しい灯りに替わっている。全部が橙だと中庭が一色になる
+                var hue = i == 2 ? new Color(0.80f, 0.88f, 1.00f) : new Color(1.00f, 0.90f, 0.74f);
+                glassBox.GetComponent<MeshRenderer>().sharedMaterial = GlowMat(hue, 2.0f);
                 Object.DestroyImmediate(glassBox.GetComponent<Collider>());
                 var l = g.AddComponent<Light>();
                 l.type = LightType.Point;
-                l.color = new Color(1.00f, 0.84f, 0.58f);
-                l.range = 9f;
-                l.intensity = 16f;
+                l.color = hue;
+                l.range = 8f;
+                l.intensity = 11f;
                 l.shadows = LightShadows.None;
             }
 
             // --- 由来の石板。心臓の話はここから来ている ---
             stone.Box(new Vector3(LaneWest - 0.14f, 2.1f, LaneZ - 3.2f), new Vector3(0.14f, 0.62f, 0.9f));
             metal.Box(new Vector3(LaneWest - 0.24f, 2.1f, LaneZ - 3.2f), new Vector3(0.05f, 0.5f, 0.78f));
+        }
+
+        // ---- 露天席 --------------------------------------------------------
+
+        /// <summary>ビストロの露天席。天蓋の下。市との境はここで切れる</summary>
+        public const float TerraceWest = -31.45f;
+        public const float TerraceEast = -29.25f;
+        public const float TerraceSouth = 27.30f;
+        public const float TerraceNorth = 33.10f;
+
+        /// <summary>タヴァーンの露天席。南の壁づたい</summary>
+        public const float TavernTerraceNorth = 28.55f;
+
+        /// <summary>レストラン。北の壁の東半分。自分の露店とは離す</summary>
+        public const float RestaurantWest = -24.6f;
+        public const float RestaurantEast = -17.4f;
+        public const float RestaurantTerraceSouth = 41.15f;
+
+        /// <summary>
+        /// 椅子の座面の高さ。座り姿勢で尻が 0.43 に来るのを測ってあるので、
+        /// 板の天面がその少し下に来るところへ置く
+        /// </summary>
+        public const float SeatHigh = 0.40f;
+
+        /// <summary>
+        /// 椅子の場所と向き。(x, y, z) と w に yaw。
+        /// 組み立ての順は 外形 → 人 なので、ここへ並べておけば人を座らせられる
+        /// </summary>
+        static readonly List<Vector4> ChairSpots = new List<Vector4>();
+
+        /// <summary>立ち飲みの場所と向き。樽の卓のまわりはここから埋める</summary>
+        static readonly List<Vector4> StandSpots = new List<Vector4>();
+
+        /// <summary>植木の葉を溜めるところ。露天席を組んでいる間だけ生きる</summary>
+        static Bank LeafBank;
+
+        /// <summary>刈り込んだ葉。箱を 3 つずらして重ね、輪郭を崩す</summary>
+        static void Leaves(Bank leaf, Vector3 at, float size, System.Random rng)
+        {
+            leaf.Box(at, new Vector3(size, size * 0.86f, size),
+                Quaternion.Euler(0f, (float)(rng.NextDouble() * 45.0), 0f));
+            leaf.Box(at + new Vector3(0f, size * 0.34f, 0f), new Vector3(size * 0.78f, size * 0.62f, size * 0.78f),
+                Quaternion.Euler(0f, (float)(rng.NextDouble() * 45.0), 0f));
+            leaf.Box(at + new Vector3((float)(rng.NextDouble() - 0.5) * 0.14f, -size * 0.3f,
+                    (float)(rng.NextDouble() - 0.5) * 0.14f),
+                new Vector3(size * 0.72f, size * 0.5f, size * 0.72f),
+                Quaternion.Euler(0f, (float)(rng.NextDouble() * 45.0), 0f));
+        }
+
+        /// <summary>
+        /// 中庭の露天席。ブリーディング・ハート・ヤードの実物は、
+        /// 敷石の上に卓を出して天蓋を張り、暖房と豆電球を点けている。
+        /// 2166 年でもそこは変わっていない、という作りにする
+        /// </summary>
+        static void Terraces(Transform parent, Bank stone, Bank metal, Bank timber)
+        {
+            ChairSpots.Clear();
+            StandSpots.Clear();
+            Clear(parent);
+            var rng = new System.Random(3311);
+            // 日除けは帆布。木の板で張ると店先が一色の木箱に見える
+            var awning = new Bank { Texel = 0.55f };
+            LeafBank = new Bank { Texel = 1.4f };
+
+            BistroTerrace(parent, stone, metal, timber, awning, rng);
+            TavernTerrace(parent, stone, metal, timber, awning, rng);
+            RestaurantTerrace(parent, stone, metal, timber, awning, rng);
+
+            awning.Emit(parent, "Awnings", Mat("Awning"), false, Generated);
+            LeafBank.Emit(parent, "Leaves", Mat("Foliage"), false, Generated);
+        }
+
+        /// <summary>ビストロの露天席。中庭の南西へ張り出す</summary>
+        static void BistroTerrace(Transform parent, Bank stone, Bank metal, Bank timber, Bank awning, System.Random rng)
+        {
+            var leaf = LeafBank;
+            var cx = (TerraceWest + TerraceEast) * 0.5f;
+            var cz = (TerraceSouth + TerraceNorth) * 0.5f;
+            var wide = TerraceEast - TerraceWest;
+            var deep = TerraceNorth - TerraceSouth;
+            var roof = 2.80f;
+
+            // 天蓋。西は建物へ、東は柱で受ける。雨が落ちるよう東へ傾ける
+            awning.Box(new Vector3(cx, roof, cz), new Vector3(wide + 0.35f, 0.07f, deep + 0.30f),
+                Quaternion.Euler(0f, 0f, 4.5f));
+            awning.Box(new Vector3(TerraceEast + 0.12f, roof - 0.20f, cz), new Vector3(0.10f, 0.26f, deep + 0.30f));
+            for (var z = TerraceSouth; z <= TerraceNorth + 0.1f; z += deep * 0.5f)
+            {
+                metal.Box(new Vector3(TerraceEast, roof * 0.5f, z), new Vector3(0.11f, roof, 0.11f));
+                metal.Box(new Vector3(cx, roof - 0.16f, z), new Vector3(wide, 0.07f, 0.07f));
+            }
+            // 天蓋を吊る筋交い
+            for (var z = TerraceSouth + 0.6f; z < TerraceNorth; z += deep * 0.5f)
+                metal.Box(new Vector3(TerraceEast - 0.45f, roof - 0.45f, z), new Vector3(1.0f, 0.06f, 0.06f),
+                    Quaternion.Euler(0f, 0f, 38f));
+
+            // 市との境の柵。切れ目をひとつ空けて、そこから入る
+            for (var z = TerraceSouth; z < TerraceNorth; z += 0.42f)
+            {
+                if (z > cz - 0.75f && z < cz + 0.75f) continue;
+                metal.Box(new Vector3(TerraceEast - 0.06f, 0.44f, z), new Vector3(0.04f, 0.88f, 0.04f));
+            }
+            metal.Box(new Vector3(TerraceEast - 0.06f, 0.88f, TerraceSouth + (cz - 0.75f - TerraceSouth) * 0.5f),
+                new Vector3(0.07f, 0.07f, cz - 0.75f - TerraceSouth));
+            metal.Box(new Vector3(TerraceEast - 0.06f, 0.88f, cz + 0.75f + (TerraceNorth - cz - 0.75f) * 0.5f),
+                new Vector3(0.07f, 0.07f, TerraceNorth - cz - 0.75f));
+
+            // 敷石の上に石板を敷いて、露天席だけ一段上げる
+            stone.Box(new Vector3(cx, 0.035f, cz), new Vector3(wide + 0.2f, 0.07f, deep + 0.1f));
+
+            // 卓と椅子。向かい合わせに 2 脚、ときどき 3 脚目
+            var tables = new float[] { TerraceSouth + 1.05f, cz, TerraceNorth - 1.05f };
+            for (var i = 0; i < tables.Length; i++)
+            {
+                var tz = tables[i];
+                var tx = cx - 0.05f;
+                Table(parent, "BistroTable" + i, new Vector3(tx, 0.09f, tz), rng);
+                Chair(parent, "BistroChair" + i + "a", new Vector3(tx - 0.72f, 0.09f, tz + (float)(rng.NextDouble() - 0.5) * 0.2f), 90f, rng);
+                Chair(parent, "BistroChair" + i + "b", new Vector3(tx + 0.72f, 0.09f, tz + (float)(rng.NextDouble() - 0.5) * 0.2f), -90f, rng);
+                if (rng.NextDouble() < 0.5)
+                    Chair(parent, "BistroChair" + i + "c", new Vector3(tx + 0.1f, 0.09f, tz - 0.74f), 0f, rng);
+            }
+
+            // 豆電球。天蓋の下に一列
+            var wire = Child(parent, "BistroBulbs");
+            var b = 0;
+            for (var z = TerraceSouth + 0.35f; z < TerraceNorth; z += 0.52f, b++)
+                // 玉ひとつずつに灯りを足すと数が増えすぎる。4 つに 1 つだけ光源を持たせる
+                Bulb(wire, new Vector3(cx + Mathf.Sin(z * 1.7f) * 0.35f, roof - 0.42f, z), 0.055f, 1.9f,
+                    null, 3.0f, b % 4 == 0 ? 3.2f : 0f);
+            metal.Box(new Vector3(cx, roof - 0.33f, cz), new Vector3(0.035f, 0.035f, deep));
+
+            // 暖房。傘つきの柱。雨の中で外に座れるのはこれのおかげ
+            for (var i = 0; i < 2; i++)
+            {
+                var hz = TerraceSouth + 0.7f + i * (deep - 1.4f);
+                var hx = TerraceEast - 0.42f;
+                metal.Box(new Vector3(hx, 0.05f, hz), new Vector3(0.44f, 0.10f, 0.44f));
+                metal.Box(new Vector3(hx, 0.95f, hz), new Vector3(0.12f, 1.8f, 0.12f));
+                metal.Box(new Vector3(hx, 2.02f, hz), new Vector3(0.34f, 0.42f, 0.34f));
+                metal.Box(new Vector3(hx, 2.30f, hz), new Vector3(0.72f, 0.07f, 0.72f));
+                Bulb(Child(parent, "Heater" + i), new Vector3(hx, 2.02f, hz), 0.17f, 2.0f,
+                    new Color(1.00f, 0.44f, 0.20f), 4.2f, 4.5f);
+            }
+
+            // 植木。柵ぎわ、卓と卓のあいだへ。椅子と場所を取り合わせない
+            for (var i = 0; i < 4; i++)
+            {
+                var pz = TerraceSouth + 0.25f + i * 1.80f;
+                var px = TerraceEast - 0.24f;
+                stone.Box(new Vector3(px, 0.26f, pz), new Vector3(0.40f, 0.52f, 0.40f));
+                stone.Box(new Vector3(px, 0.53f, pz), new Vector3(0.46f, 0.06f, 0.46f));
+                timber.Box(new Vector3(px, 0.82f, pz), new Vector3(0.08f, 0.58f, 0.08f));
+                Leaves(leaf, new Vector3(px, 1.28f, pz), 0.54f, rng);
+            }
+        }
+
+        /// <summary>タヴァーンの露天席。樽を卓に立てて、南の壁づたいに並べる</summary>
+        static void TavernTerrace(Transform parent, Bank stone, Bank metal, Bank timber, Bank awning, System.Random rng)
+        {
+            var z0 = YardSouth + 0.65f;
+            var z1 = TavernTerraceNorth;
+            var cz = (z0 + z1) * 0.5f;
+            var x0 = YardWest + 4.6f;
+            var x1 = LaneWest - 2.6f;
+            var roof = 2.62f;
+            var doorX = YardWest + 7.4f;
+
+            // 日除け。壁から中庭へ張り出す
+            awning.Box(new Vector3((x0 + x1) * 0.5f, roof, cz), new Vector3(x1 - x0, 0.06f, z1 - z0 + 0.4f),
+                Quaternion.Euler(-5f, 0f, 0f));
+            for (var x = x0; x <= x1 + 0.1f; x += (x1 - x0) * 0.25f)
+            {
+                metal.Box(new Vector3(x, roof * 0.5f, z1 - 0.06f), new Vector3(0.10f, roof, 0.10f));
+                metal.Box(new Vector3(x, roof - 0.22f, cz), new Vector3(0.06f, 0.06f, z1 - z0));
+            }
+
+            // 樽の卓と丸椅子。入口の前だけ空ける
+            var n = 0;
+            for (var x = x0 + 0.9f; x < x1 - 0.6f; x += (float)(1.9 + rng.NextDouble() * 0.7))
+            {
+                if (Mathf.Abs(x - doorX) < 1.5f) continue;
+                var bz = cz + (float)(rng.NextDouble() - 0.5) * 0.35f;
+                // 樽。上面を卓にする
+                timber.Box(new Vector3(x, 0.44f, bz), new Vector3(0.60f, 0.88f, 0.60f));
+                metal.Box(new Vector3(x, 0.30f, bz), new Vector3(0.64f, 0.06f, 0.64f));
+                metal.Box(new Vector3(x, 0.66f, bz), new Vector3(0.64f, 0.06f, 0.64f));
+                timber.Box(new Vector3(x, 0.90f, bz), new Vector3(0.74f, 0.05f, 0.74f));
+                // 樽の上に硝子を 2 つ 3 つ。誰かが置いていったもの
+                var top = Child(parent, "TavernTop" + n);
+                top.localPosition = new Vector3(x, 0f, bz);
+                var glasses = 2 + rng.Next(2);
+                for (var i = 0; i < glasses; i++)
+                    Box(top, "Glass" + i, new Vector3((float)(rng.NextDouble() - 0.5) * 0.44f, 0.98f,
+                            (float)(rng.NextDouble() - 0.5) * 0.44f),
+                        new Vector3(0.06f, 0.12f, 0.06f), "Glass");
+                // 樽は立ったまま飲む卓。腰掛けずに囲む
+                for (var i = -1; i <= 1; i += 2)
+                {
+                    var sx = x + i * 0.78f;
+                    if (Mathf.Abs(sx - doorX) < 1.2f) continue;
+                    StandSpots.Add(new Vector4(sx, 0.02f, bz, i > 0 ? -90f : 90f));
+                }
+                n++;
+            }
+
+            // 灰皿がわりの砂の桶と、積んだ空樽
+            metal.Box(new Vector3(x1 - 1.1f, 0.22f, z0 + 0.25f), new Vector3(0.34f, 0.44f, 0.34f));
+            for (var i = 0; i < 3; i++)
+                timber.Box(new Vector3(x0 - 0.6f, 0.30f + i * 0.60f, z0 + 0.35f + (i % 2) * 0.1f),
+                    new Vector3(0.56f, 0.58f, 0.56f), Quaternion.Euler(0f, i * 17f, 0f));
+
+            // 豆電球
+            var wire = Child(parent, "TavernBulbs");
+            var b = 0;
+            for (var x = x0 + 0.4f; x < x1; x += 0.62f, b++)
+                Bulb(wire, new Vector3(x, roof - 0.36f + Mathf.Sin(x * 1.3f) * 0.06f, cz), 0.05f, 1.7f,
+                    null, 3.0f, b % 4 == 0 ? 3.2f : 0f);
+        }
+
+        /// <summary>レストランの歩道席。北の壁の前。日除けの下に卓を並べる</summary>
+        static void RestaurantTerrace(Transform parent, Bank stone, Bank metal, Bank timber, Bank awning, System.Random rng)
+        {
+            var z = RestaurantTerraceSouth + 1.35f;
+            // 日除け。北の壁から中庭へ張り出す
+            awning.Box(new Vector3((RestaurantWest + RestaurantEast) * 0.5f, 3.34f, YardNorth - 1.05f),
+                new Vector3(RestaurantEast - RestaurantWest, 0.07f, 1.5f), Quaternion.Euler(6f, 0f, 0f));
+            // 敷居。歩道席と市の境に鉢を並べる
+            for (var x = RestaurantWest; x < RestaurantEast + 0.1f; x += 1.15f)
+            {
+                stone.Box(new Vector3(x, 0.26f, RestaurantTerraceSouth), new Vector3(0.40f, 0.52f, 0.40f));
+                stone.Box(new Vector3(x, 0.53f, RestaurantTerraceSouth), new Vector3(0.46f, 0.06f, 0.46f));
+                Leaves(LeafBank, new Vector3(x, 0.74f, RestaurantTerraceSouth), 0.40f, rng);
+            }
+            // 卓は 3 つ。壁を背にする側と、中庭を向く側
+            for (var i = 0; i < 3; i++)
+            {
+                var x = RestaurantWest + 1.5f + i * 2.2f;
+                Table(parent, "InnTable" + i, new Vector3(x, 0f, z), rng);
+                Chair(parent, "InnChair" + i + "a", new Vector3(x, 0f, z + 0.74f), 180f, rng);
+                Chair(parent, "InnChair" + i + "b", new Vector3(x, 0f, z - 0.74f), 0f, rng);
+                if (rng.NextDouble() < 0.4)
+                    Chair(parent, "InnChair" + i + "c", new Vector3(x - 0.76f, 0f, z), 90f, rng);
+            }
+            // 豆電球。日除けの下
+            var wire = Child(parent, "InnBulbs");
+            var b = 0;
+            for (var x = RestaurantWest + 0.4f; x < RestaurantEast; x += 0.58f, b++)
+                Bulb(wire, new Vector3(x, 2.92f, YardNorth - 1.35f), 0.05f, 1.8f,
+                    null, 3.0f, b % 4 == 0 ? 3.2f : 0f);
+        }
+
+        /// <summary>丸い卓。脚は一本柱。上に硝子と燭台を載せる</summary>
+        static void Table(Transform parent, string name, Vector3 at, System.Random rng)
+        {
+            var t = Child(parent, name);
+            t.localPosition = at;
+            t.localRotation = Quaternion.Euler(0f, (float)(rng.NextDouble() * 24.0 - 12.0), 0f);
+            Box(t, "Foot", new Vector3(0f, 0.03f, 0f), new Vector3(0.42f, 0.06f, 0.42f), "Furniture");
+            Box(t, "Stem", new Vector3(0f, 0.36f, 0f), new Vector3(0.09f, 0.66f, 0.09f), "Furniture");
+            Box(t, "Top", new Vector3(0f, 0.72f, 0f), new Vector3(0.76f, 0.05f, 0.76f), "Timber");
+            Box(t, "Rim", new Vector3(0f, 0.68f, 0f), new Vector3(0.80f, 0.04f, 0.80f), "Furniture");
+            // 卓の上。燭台と、硝子を 2 つ
+            Bulb(t, new Vector3(0.06f, 0.83f, 0.04f), 0.045f, 2.4f, new Color(1.00f, 0.66f, 0.30f), 2.6f, 3.2f);
+            Box(t, "Candle", new Vector3(0.06f, 0.78f, 0.04f), new Vector3(0.09f, 0.11f, 0.09f), "Metal");
+            for (var i = 0; i < 2; i++)
+                Box(t, "Glass" + i, new Vector3((float)(rng.NextDouble() - 0.5) * 0.42f, 0.80f,
+                        (float)(rng.NextDouble() - 0.5) * 0.42f),
+                    new Vector3(0.06f, 0.11f, 0.06f), "Glass");
+        }
+
+        /// <summary>椅子ひとつ。座面の高さは人形の座り姿勢に合わせる。yaw は座る人が向く向き</summary>
+        static void Chair(Transform parent, string name, Vector3 at, float yaw, System.Random rng)
+        {
+            var spin = yaw + (float)(rng.NextDouble() * 24.0 - 12.0);
+            var t = Child(parent, name);
+            t.localPosition = at;
+            t.localRotation = Quaternion.Euler(0f, spin, 0f);
+            Box(t, "Seat", new Vector3(0f, SeatHigh, 0f), new Vector3(0.44f, 0.05f, 0.44f), "Timber");
+            for (var i = 0; i < 4; i++)
+                Box(t, "Leg" + i, new Vector3((i % 2 == 0 ? -1 : 1) * 0.18f, SeatHigh * 0.5f, (i < 2 ? -1 : 1) * 0.18f),
+                    new Vector3(0.04f, SeatHigh, 0.04f), "Furniture");
+            // 背もたれは座る人の後ろ。この場では -z が後ろ。
+            // 1 枚板だと白い衝立に見えるので、縦框と横桟で組む
+            for (var i = -1; i <= 1; i += 2)
+                Box(t, "Stile" + i, new Vector3(i * 0.20f, SeatHigh + 0.28f, -0.20f),
+                    new Vector3(0.04f, 0.56f, 0.04f), "Furniture");
+            Box(t, "Rail", new Vector3(0f, SeatHigh + 0.54f, -0.20f), new Vector3(0.44f, 0.07f, 0.045f), "Furniture");
+            Box(t, "Slat", new Vector3(0f, SeatHigh + 0.30f, -0.20f), new Vector3(0.40f, 0.08f, 0.035f), "Furniture");
+            Box(t, "Slat2", new Vector3(0f, SeatHigh + 0.14f, -0.20f), new Vector3(0.40f, 0.07f, 0.035f), "Furniture");
+            ChairSpots.Add(new Vector4(at.x, at.y, at.z, spin));
+        }
+
+        /// <summary>豆電球ひとつ。光る玉と、そこから漏れる灯り</summary>
+        static void Bulb(Transform parent, Vector3 at, float size, float glow,
+            Color? tint = null, float range = 3.0f, float power = 4f)
+        {
+            var col = tint.HasValue ? tint.Value : new Color(1.00f, 0.89f, 0.74f);
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            go.name = "Bulb";
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = at;
+            go.transform.localScale = new Vector3(size, size, size);
+            go.GetComponent<MeshRenderer>().sharedMaterial = GlowMat(col, glow);
+            Object.DestroyImmediate(go.GetComponent<Collider>());
+            // 光源まで足すと数が増えすぎる。光る玉だけで済むところは power を 0 にする
+            if (power <= 0f) return;
+            var l = go.AddComponent<Light>();
+            l.type = LightType.Point;
+            l.color = col;
+            l.range = range;
+            l.intensity = power;
+            l.shadows = LightShadows.None;
         }
 
         // ---- 表示板 --------------------------------------------------------
@@ -2522,12 +3053,23 @@ namespace HalfAware.EditorTools
             var cover = go.AddComponent<RainCover>();
             var cso = new SerializedObject(cover);
             var boxes = cso.FindProperty("shelters");
-            boxes.arraySize = 2;
+            boxes.arraySize = 5;
             boxes.GetArrayElementAtIndex(0).boundsValue = new Bounds(
                 new Vector3((LaneWest - StreetHalf) * 0.5f, 3f, LaneZ),
                 new Vector3(-StreetHalf - LaneWest + 1.2f, 6f, LaneHalf * 2f + 0.6f));
             boxes.GetArrayElementAtIndex(1).boundsValue = new Bounds(
                 new Vector3(MyStallX, 1.2f, MyStallZ), new Vector3(3.0f, 2.4f, 3.0f));
+            // 露天席の天蓋の下。ここに入れば雨に濡れない
+            boxes.GetArrayElementAtIndex(2).boundsValue = new Bounds(
+                new Vector3((TerraceWest + TerraceEast) * 0.5f, 1.4f, (TerraceSouth + TerraceNorth) * 0.5f),
+                new Vector3(TerraceEast - TerraceWest + 0.3f, 2.8f, TerraceNorth - TerraceSouth + 0.3f));
+            boxes.GetArrayElementAtIndex(3).boundsValue = new Bounds(
+                new Vector3((YardWest + 4.6f + LaneWest - 2.6f) * 0.5f, 1.3f,
+                    (YardSouth + 0.65f + TavernTerraceNorth) * 0.5f),
+                new Vector3(LaneWest - 2.6f - YardWest - 4.6f, 2.6f, TavernTerraceNorth - YardSouth - 0.65f + 0.4f));
+            boxes.GetArrayElementAtIndex(4).boundsValue = new Bounds(
+                new Vector3((RestaurantWest + RestaurantEast) * 0.5f, 1.5f, YardNorth - 1.05f),
+                new Vector3(RestaurantEast - RestaurantWest, 3.0f, 2.2f));
             cso.FindProperty("player").objectReferenceValue = player.transform;
             cso.FindProperty("sound").objectReferenceValue = RainSound(player.transform);
             cso.ApplyModifiedPropertiesWithoutUndo();
@@ -2711,6 +3253,12 @@ namespace HalfAware.EditorTools
                 // 真っ黒で艶だけの面は、映り込む物が無いと穴に見える。地の明るさを持たせる
                 case "Puddle": col = new Color(0.165f, 0.172f, 0.190f); smooth = 0.78f; break;
                 case "Tarp": col = new Color(0.150f, 0.145f, 0.130f); smooth = 0.30f; break;
+                // 店の日除け。ロンドンの店先にある濃い帆布
+                case "Awning": col = new Color(0.052f, 0.108f, 0.082f); smooth = 0.22f; break;
+                // 植木の葉。中庭で唯一の緑
+                case "Foliage": col = new Color(0.042f, 0.082f, 0.046f); smooth = 0.12f; break;
+                // 露天席の卓と椅子。塗った鉄と木。灯りの前で影になる濃さ
+                case "Furniture": col = new Color(0.062f, 0.058f, 0.052f); smooth = 0.28f; break;
                 case "TarpRed": col = new Color(0.290f, 0.105f, 0.095f); smooth = 0.28f; break;
                 case "TarpGreen": col = new Color(0.105f, 0.215f, 0.135f); smooth = 0.28f; break;
                 case "TarpBlue": col = new Color(0.095f, 0.150f, 0.260f); smooth = 0.28f; break;
