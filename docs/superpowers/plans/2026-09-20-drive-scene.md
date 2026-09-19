@@ -1742,6 +1742,10 @@ git commit -m "feat: build the car and the road it runs on"
 
 `garage.door` と `drive.window` を required にしておくと、`SceneFlow` の必須の判定が乗り込みと窓の両方を見る。`drive.window` は帯 4 に入るまで伏せてあるので、それまで場面は閉じない。
 
+**必須はこの 2 つだけにする。** 最後の帯で窓の独白を送り切ったところで `SceneFlow` が場面を閉じる前提になっている。ほかに必須を足すと、閉じられないまま `BandClock` が一巡して戻り、古い入れ替えの知らせで範囲の外を並べにいって走りが止まる。
+
+**シーンの `SceneFlow` の `standAfter` は空のままにする。** 何か入れると `Stand()` が毎フレーム `player.CanMove` を書くので、`Board()` が false にしたものを歩ける側へ戻してしまう。車内は座ったままなので、立ち上がりの段取りはそもそも要らない。
+
 - [ ] **Step 3: 帯の値を入れる**
 
 `DriveDirector.bands` に 5 つ。**すべて仮置き。オーナーが実画面を見てから決める。**
