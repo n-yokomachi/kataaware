@@ -1409,8 +1409,8 @@ Prune → Scene → Car → Road → Roadsides → Garage → Items → Wire →
 | 前方に敷く距離 | 140 |
 | 後ろに残す距離 | -30 |
 | タイルの枚数 | `RoadRing.Needed(140f, 20f, -30f)` |
-| 道幅（舗装） | 7.0（帯 1〜4） |
-| 道幅（未舗装） | 4.6（帯 5） |
+| 道幅（舗装） | 7.0（帯 0〜3） |
+| 道幅（未舗装） | 4.6（帯 4） |
 | 路肩 | 片側 1.2 |
 
 道のタイルは `Bank` の `FaceY` で 1 枚ずつ作る。マテリアルは帯ごとに差し替えず、タイルは 1 種のみにして、色味は Volume（Color Adjustments）で寄せる。
@@ -1616,7 +1616,7 @@ shaken.localPosition = rest + new Vector3(
 `Enter` の末尾に足す。
 
 ```csharp
-// 帯 5 は原作どおり手動運転。ただし描画だけで、入力は受け付けない
+// 最後の帯は原作どおり手動運転。ただし描画だけで、入力は受け付けない
 var driving = band == drivenBand;
 if (folded != null) folded.SetActive(!driving);
 if (onWheel != null) onWheel.SetActive(driving);
@@ -1659,7 +1659,7 @@ git commit -m "feat: let me look around, feel the road, and fold my arms"
 2. **沿道が道に出ていないか** — 各帯の沿道の物の mesh 頂点を車の向きへ直し、`|x| < 道幅の半分` に入る頂点があれば「沿道の物が道に出ている: 名前」
 3. **ピンが埋まっていないか** — `Physics.OverlapSphere(it.Position + up * 0.17f, 0.12f)` と `ClosestPoint` で包含を見る。`CheckAlley.Pins` と同じ
 4. **id の食い違い** — シーンの `Interactable` の id と `DriveScript` の id を突き合わせる。`DriveIds.IsPage` は対象を持たないので飛ばす。`CheckAlley.Ids` と同じ
-5. **帯ときっかけの対応** — `DriveDirector.bands` の `trigger` が `DriveIds.Triggers` と同じ並びか、どの帯にもちょうど一つ割り当たっているか。欠けていたら「帯 N にきっかけが無い」、重複していたら「きっかけが二つの帯で使われている: id」
+5. **帯ときっかけの対応** — `DriveDirector.bands` の `trigger` が `DriveIds.Triggers` と同じ並びか、どの帯にもちょうど一つ割り当たっているか。欠けていたら「〈帯の名前〉にきっかけが無い」、重複していたら「きっかけが二つの帯で使われている: id」。警告に数字でなく `DriveBand.name` を出すのは、オーナーが 1 始まりの設計書を横に置いて読むため。`name` の説明にも「ログと見直しで使う」と書いてある
 6. **きっかけの対象がシーンにあるか** — `bands[i].trigger` と同じ id の `Interactable` が `triggers[i]` の下にあるか
 
 最後に `bad == 0` なら `Debug.Log("見直し: 気になるところは無し")`、そうでなければ `Debug.LogWarning("見直し: 気になるところ " + bad + " 件。上を参照")`。
