@@ -31,3 +31,11 @@ sysinfo.txt
 *.apk
 *.aab
 *.unitypackage
+
+# 組み直せば出来るもの。路地裏は HalfAware/Build the alley のひと押しで揃う。
+# 焼いた mesh は 62 MB あるので repo には置かない
+/Assets/Models/generated/alley/
+/Assets/Models/generated/alley.meta
+
+# 映り込みの下地も組み立てのたびに焼き直す
+/Assets/Models/generated/alley/Mirror*.exr
