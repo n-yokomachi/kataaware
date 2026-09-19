@@ -43,7 +43,7 @@ namespace HalfAware
         /// 最後の一服だけ、吸う前と吐く前に置く間。
         /// ここで一拍おくと、終わりに向かっているのが伝わる
         /// </summary>
-        public const float LastPauseSeconds = 0.85f;
+        public const float LastPauseSeconds = 1.70f;
 
         public static float FlameAt { get { return ClickAt + FlameAfterClick; } }
 

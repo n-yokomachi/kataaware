@@ -122,18 +122,29 @@ namespace HalfAware
         /// <summary>seconds 秒かけて黒い層の濃さを変える</summary>
         public IEnumerator FadeTo(float alpha, float seconds)
         {
-            if (fadeLayer == null || seconds <= 0f)
+            return Ramp(fadeLayer, alpha, seconds);
+        }
+
+        /// <summary>seconds 秒かけて黒い幕の濃さを変える。切り替えずに明けたいときに使う</summary>
+        public IEnumerator CurtainTo(float alpha, float seconds)
+        {
+            return Ramp(curtainLayer, alpha, seconds);
+        }
+
+        static IEnumerator Ramp(Image layer, float alpha, float seconds)
+        {
+            if (layer == null || seconds <= 0f)
             {
-                SetFade(alpha);
+                SetAlpha(layer, alpha);
                 yield break;
             }
-            var from = fadeLayer.color.a;
+            var from = layer.color.a;
             for (var t = 0f; t < seconds; t += Time.deltaTime)
             {
-                SetFade(Mathf.Lerp(from, alpha, t / seconds));
+                SetAlpha(layer, Mathf.Lerp(from, alpha, t / seconds));
                 yield return null;
             }
-            SetFade(alpha);
+            SetAlpha(layer, alpha);
         }
 
         /// <summary>これまでの文のログ。null で閉じる</summary>
@@ -143,7 +154,10 @@ namespace HalfAware
             if (logText != null) logText.text = text ?? string.Empty;
         }
 
-        /// <summary>黒い幕。true で画面を覆い、false で消す。動きは付けず、そのまま切り替える</summary>
+        /// <summary>
+        /// 黒い幕。true で画面を覆い、false で消す。動きは付けず、そのまま切り替える。
+        /// 濃さもここで戻すので、CurtainTo で薄くした後に覆い直しても透けない
+        /// </summary>
         public void SetCurtain(bool covered)
         {
             if (curtainLayer == null) return;
@@ -152,7 +166,7 @@ namespace HalfAware
             rect.anchorMax = Vector2.one;
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
-            curtainLayer.gameObject.SetActive(covered);
+            SetAlpha(curtainLayer, covered ? 1f : 0f);
         }
 
         static void SetAlpha(Image layer, float alpha)

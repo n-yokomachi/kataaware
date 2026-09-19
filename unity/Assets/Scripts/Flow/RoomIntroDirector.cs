@@ -19,6 +19,8 @@ namespace HalfAware
         [SerializeField] float holdSeconds = 1.95f;
         [Tooltip("煙草を取った直後、正面へ向き直すのにかける秒数")]
         [SerializeField] float aimSeconds = 2.5f;
+        [Tooltip("最後のカードから明けるのにかける秒数。ここだけは切り替えずに戻す")]
+        [SerializeField] float liftSeconds = 1.4f;
 
         [SerializeField] SceneFlow flow;
         [SerializeField] HudView hud;
@@ -102,10 +104,12 @@ namespace HalfAware
                 for (var i = 0; i < Drags; i++)
                 {
                     if (flow.Completed) yield break;
+                    var last = i == Drags - 1;
                     var at = started + SmokeBeats.CardAt(i, Drags);
-                    flow.Freeze(at - Time.time + holdSeconds + FreezeMargin);
+                    // 明ける間も止めておく。暗いうちに調べられないように
+                    flow.Freeze(at - Time.time + holdSeconds + (last ? liftSeconds : 0f) + FreezeMargin);
                     while (Time.time < at) yield return null;
-                    yield return Show(cards[i]);
+                    yield return Show(cards[i], last);
                 }
                 // 最後に吐き終わってから、少し置いて独白へ
                 var until = started + SmokeBeats.Total(Drags);
@@ -138,13 +142,17 @@ namespace HalfAware
             player.Pitch = 0f;
         }
 
-        /// <summary>画面を黒く覆ってカードを出し、読む時間を置いてそのまま戻す。動きは付けない</summary>
-        IEnumerator Show(string card)
+        /// <summary>
+        /// 画面を黒く覆ってカードを出し、読む時間を置いて戻す。
+        /// 途中は瞬きのように切り替えるが、最後の一枚だけは薄れさせて明ける
+        /// </summary>
+        IEnumerator Show(string card, bool lift)
         {
             hud.SetCurtain(true);
             if (!string.IsNullOrEmpty(card)) hud.SetCenter(card);
             yield return new WaitForSeconds(holdSeconds);
             hud.SetCenter(null);
+            if (lift) yield return hud.CurtainTo(0f, liftSeconds);
             hud.SetCurtain(false);
         }
     }
