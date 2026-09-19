@@ -37,7 +37,7 @@ namespace HalfAware
         public const string Radio = "drive.radio";
         /// <summary>上着のポケット。同じく帯は進まない</summary>
         public const string Pocket = "drive.pocket";
-        /// <summary>給油計。同じく帯は進まない</summary>
+        /// <summary>燃料計。同じく帯は進まない</summary>
         public const string Fuel = "drive.fuel";
 
         /// <summary>i 番目の帯で出す独白の段</summary>

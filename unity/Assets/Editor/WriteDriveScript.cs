@@ -25,7 +25,7 @@ namespace HalfAware.EditorTools
             new[]
             {
                 "ナーヴ・ターミナルのローカルストレージにデータを保存した。日は暮れていた",
-                "自動運転に任せて、私は腕組みをしながら考える",
+                "自動運転に任せて私は腕組みをしながら考える",
             },
             new[]
             {
@@ -44,7 +44,8 @@ namespace HalfAware.EditorTools
             },
             new[]
             {
-                "この匂いを覚えている。あの記憶の中で嗅いだ匂いだ",
+                "この匂いを覚えている",
+                "あの記憶の中で嗅いだ匂いだ",
             },
         };
 
@@ -55,7 +56,7 @@ namespace HalfAware.EditorTools
             "アクセスログの写し。エディンバラから少し離れた田舎町の名がある",
             "ルームミラー。角度が悪くて、自分の顔は映らない",
             "メーターの脇に、誰のものとも知れない古い写真立てが挟んである",
-            "窓を開けて、大きく息を吸い込んだ",
+            "窓を開けて大きく息を吸い込んだ",
         };
 
         /// <summary>きっかけの対象の印に出す文</summary>
@@ -77,13 +78,19 @@ namespace HalfAware.EditorTools
 
             var entries = new List<ScriptEntry>();
 
-            // ガレージ。運転席のドアを調べると乗り込む
+            // ガレージ。運転席のドアを調べると乗り込む。乗り込めばガレージには戻れないので、
+            // 見た目や進行が変わる対象として二択で確かめる（場面 1 の扉・場面 2 のテーブルと同じ扱い）
             entries.Add(new ScriptEntry
             {
                 id = DriveIds.Door,
                 label = "車に乗り込む",
                 lines = new[] { "ボロのオフロード車。ドアの立て付けは相変わらず悪い" },
                 hints = new ScriptHint[0],
+                choice = new ScriptChoice
+                {
+                    question = "車に乗り込む",
+                    afterYes = new string[0],
+                },
             });
 
             // 帯ごとのきっかけ。対象の文のあとに、DriveDirector が段を積む
@@ -123,7 +130,7 @@ namespace HalfAware.EditorTools
             entries.Add(new ScriptEntry
             {
                 id = DriveIds.Fuel,
-                label = "給油計を見る",
+                label = "燃料計を見る",
                 lines = new[] { "半分を切っている。町に着くまでは保つ" },
                 hints = new ScriptHint[0],
             });
