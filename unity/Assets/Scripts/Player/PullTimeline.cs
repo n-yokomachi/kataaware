@@ -88,6 +88,15 @@ namespace HalfAware
             return t >= LetGoAt;
         }
 
+        /// <summary>
+        /// 視線がまだジャックを追ってよいか。手を離すとジャックは肘掛けへ移るので、
+        /// そのまま追うと視線が右下へ飛ぶ。離した後は最後に見ていた先を保つ
+        /// </summary>
+        public static bool Follows(float t)
+        {
+            return !LetGo(t);
+        }
+
         public static bool Done(float t)
         {
             return t >= Total;

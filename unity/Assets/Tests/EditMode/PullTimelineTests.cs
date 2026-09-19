@@ -73,6 +73,15 @@ namespace HalfAware.Tests
         }
 
         [Test]
+        public void TheEyeLetsGoOfTheJackWhenTheHandDoes()
+        {
+            Assert.IsTrue(PullTimeline.Follows(0f), "初めから追う");
+            Assert.IsTrue(PullTimeline.Follows(PullTimeline.LetGoAt - 1e-4f));
+            Assert.IsFalse(PullTimeline.Follows(PullTimeline.LetGoAt), "肘掛けへ置いた先は追わない");
+            Assert.IsFalse(PullTimeline.Follows(PullTimeline.Total));
+        }
+
+        [Test]
         public void EverythingIsBackAtTheEnd()
         {
             Assert.AreEqual(0f, PullTimeline.Aim(PullTimeline.Total), 1e-4f);

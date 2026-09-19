@@ -41,6 +41,9 @@ namespace HalfAware
         float elapsed = -1f;
         float fromYaw;
         float fromPitch;
+        float aimYaw;
+        float aimPitch;
+        bool aimed;
         bool held;
         bool letGo;
         bool sounded;
@@ -125,20 +128,29 @@ namespace HalfAware
 
         /// <summary>
         /// 視線をジャックへ寄せる。ジャックは掴めば左手について動くので、
-        /// 追っているだけで抜ける瞬間も、前へ出したケーブルも画面に入る
+        /// 追っているだけで抜ける瞬間も、前へ出したケーブルも画面に入る。
+        /// 手を離した後は追わない。ジャックは肘掛けへ移るので、追うと視線が右下へ飛ぶ
         /// </summary>
         void Aim(float t)
         {
             var player = flow != null ? flow.Player : null;
-            if (player == null || jack == null || player.Eye == null) return;
+            if (player == null || player.Eye == null) return;
+            if (PullTimeline.Follows(t) && jack != null)
+            {
+                var to = jack.position - player.Eye.position;
+                if (to.sqrMagnitude > 1e-6f)
+                {
+                    to.Normalize();
+                    aimYaw = Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg;
+                    aimPitch = -Mathf.Asin(Mathf.Clamp(to.y, -1f, 1f)) * Mathf.Rad2Deg;
+                    aimed = true;
+                }
+            }
+            if (!aimed) return;
+            // 離した後は最後の狙いを保ったまま、戻しの間に元の向きへ帰る
             var k = PullTimeline.Aim(t);
-            var to = jack.position - player.Eye.position;
-            if (to.sqrMagnitude < 1e-6f) return;
-            to.Normalize();
-            var yaw = Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg;
-            var pitch = -Mathf.Asin(Mathf.Clamp(to.y, -1f, 1f)) * Mathf.Rad2Deg;
-            player.Yaw = Mathf.LerpAngle(fromYaw, yaw, k);
-            player.Pitch = Mathf.Lerp(fromPitch, pitch, k);
+            player.Yaw = Mathf.LerpAngle(fromYaw, aimYaw, k);
+            player.Pitch = Mathf.Lerp(fromPitch, aimPitch, k);
         }
 
         /// <summary>掴んだ。ここからジャックは左手について動く</summary>
