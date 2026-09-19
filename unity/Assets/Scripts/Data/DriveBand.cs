@@ -49,10 +49,13 @@ namespace HalfAware
             return i >= 0 && i < bands.Length ? bands[i] : new DriveBand();
         }
 
-        /// <summary>i が最後の帯か。範囲の外も最後として扱い、進み続けないようにする</summary>
+        /// <summary>
+        /// i が最後の帯か。帯がひとつも無いうちは最後にしない。
+        /// 組み立て途中の場面が、入った瞬間に閉じてしまうのを防ぐ（SceneProgress.IsComplete と同じ構え）
+        /// </summary>
         public bool IsLast(int i)
         {
-            return i < 0 || i >= bands.Length - 1;
+            return bands.Length > 0 && i >= bands.Length - 1;
         }
 
         /// <summary>そのきっかけの id を持つ帯。どの帯のものでもなければ -1</summary>
