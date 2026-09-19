@@ -1381,6 +1381,109 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
+        /// 人をひとりだけ焼いて、自前の mesh を持った物として返す。
+        ///
+        /// 群衆は 62 体を 1 枚の mesh にまとめてしまうので、出したり消したりできない。
+        /// 売り買いの買い手のように、場面の途中で現れて去る人はこちらで作る。
+        /// build は体つき。この企画には女の模型しか無いので、
+        /// 男は縦横を少し増して体格で見分けさせる
+        /// </summary>
+        public static GameObject BakeOne(Transform parent, string name, string model,
+            Vector3 at, float yaw, int pose, Vector3 build, Material mat)
+        {
+            var src = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/quaternius/" + model + ".fbx");
+            if (src == null) { Debug.LogWarning("モデルが無い: " + model); return null; }
+
+            var stage = new GameObject("__one_stage");
+            var inst = (GameObject)PrefabUtility.InstantiatePrefab(src, stage.transform);
+            inst.transform.localPosition = Vector3.zero;
+            inst.transform.localRotation = Quaternion.identity;
+            PrefabUtility.UnpackPrefabInstance(inst, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+            foreach (var pair in new[] { "L", "R" })
+            {
+                var foot = Find(inst.transform, "Foot." + pair);
+                var shin = Find(inst.transform, "LowerLeg." + pair);
+                if (foot != null && shin != null && foot.parent != shin) foot.SetParent(shin, true);
+            }
+            var rest = new Dictionary<Transform, Quaternion>();
+            foreach (var t in inst.GetComponentsInChildren<Transform>(true)) rest[t] = t.localRotation;
+            Pose(inst.transform, rest, pose);
+
+            var verts = new List<Vector3>();
+            var norms = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var tris = new List<int>();
+            var tmp = new Mesh();
+            // 焼いた形は原点に置く。位置と向きは物の transform で持たせて、あとから動かせるようにする
+            var trs = Matrix4x4.TRS(new Vector3(0f, -PoseDrop(pose) * build.y, 0f), Quaternion.identity, build);
+            foreach (var smr in inst.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                smr.BakeMesh(tmp, false);
+                var place = trs * Matrix4x4.TRS(smr.transform.position, smr.transform.rotation, Vector3.one);
+                var v = tmp.vertices;
+                var n = tmp.normals;
+                var t2 = tmp.triangles;
+                var head = verts.Count;
+                for (var i = 0; i < v.Length; i++)
+                {
+                    verts.Add(place.MultiplyPoint3x4(v[i]));
+                    norms.Add(place.MultiplyVector(i < n.Length ? n[i] : Vector3.up).normalized);
+                    uvs.Add(Vector2.zero);
+                }
+                for (var i = 0; i < t2.Length; i++) tris.Add(head + t2[i]);
+            }
+            Object.DestroyImmediate(tmp);
+            Object.DestroyImmediate(stage);
+            if (tris.Count == 0) return null;
+
+            var mesh = new Mesh();
+            mesh.name = name;
+            mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+            mesh.SetVertices(verts);
+            mesh.SetNormals(norms);
+            mesh.SetUVs(0, uvs);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateBounds();
+            var path = Generated + name + ".asset";
+            ProcMesh.Save(mesh, path);
+
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.position = at;
+            go.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+            go.AddComponent<MeshFilter>().sharedMesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            go.AddComponent<MeshRenderer>().sharedMaterial = mat;
+            return go;
+        }
+
+        /// <summary>
+        /// 買い手の色。群衆より濃くして、まわりの人だかりから浮かせる。
+        /// 群衆は薄く透かしてあるが、こちらは芝居の相手なので透かさない
+        /// </summary>
+        public static Material BuyerMat()
+        {
+            var path = Materials + "Buyer.mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                if (!AssetDatabase.IsValidFolder("Assets/Materials/Alley"))
+                    AssetDatabase.CreateFolder("Assets/Materials", "Alley");
+                m = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                m.name = "Buyer";
+                AssetDatabase.CreateAsset(m, path);
+            }
+            m.SetTexture("_BaseMap", null);
+            m.SetColor("_BaseColor", new Color(0.072f, 0.078f, 0.092f, 1f));
+            m.SetFloat("_Surface", 0f);
+            m.SetFloat("_Smoothness", 0.10f);
+            m.SetFloat("_Metallic", 0f);
+            m.DisableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Geometry;
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// <summary>
         /// 姿勢ごとの下げ量。骨を曲げても腰は動かないので、座った形のまま床へ落とす。
         /// 値は焼いた形の一番低い頂点を実測して決めてある。靴の裏が床に来る
         /// </summary>
@@ -2734,6 +2837,9 @@ namespace HalfAware.EditorTools
             if (market == null) return;
             foreach (Transform stall in market.transform)
             {
+                // 自分の露店には市の品を置かない。ここに並ぶのはメモリーチップだけで、
+                // 瓶や鉢を積むとチップが埋もれて、置いたことが分からなくなる
+                if (stall.name == "MyStall") continue;
                 Transform body = stall.name.StartsWith("Stall") ? stall : stall.Find("Stall");
                 if (body == null) continue;
                 var rot = Quaternion.Euler(0f, body.localEulerAngles.y, 0f);
@@ -3413,18 +3519,53 @@ namespace HalfAware.EditorTools
             // 大通りから小道への案内。歩道の上へ突き出して、南から歩いてくる目に入れる
             var armZ = LaneZ - 2.6f;
             Board(parent, "SignYardArrow", "SignYardArrow",
-                new Vector3(-StreetHalf + 1.45f, 3.05f, armZ), Vector3.back, new Vector2(2.9f, 1.27f), true);
+                new Vector3(-StreetHalf + 1.45f, 3.05f, armZ), Vector3.back, new Vector2(2.9f, 1.27f), true, false);
             Board(parent, "SignYardArrow.N", "SignYardArrow",
-                new Vector3(-StreetHalf + 1.45f, 3.05f, armZ + 0.07f), Vector3.forward, new Vector2(2.9f, 1.27f), true);
+                new Vector3(-StreetHalf + 1.45f, 3.05f, armZ + 0.07f), Vector3.forward, new Vector2(2.9f, 1.27f), true, false);
             // 小道の口の脇。通りを歩きながら読める高さに
             Board(parent, "SignYardName", "SignYardName",
                 new Vector3(-StreetHalf + 0.10f, 2.35f, LaneZ - 2.45f), Vector3.right, new Vector2(1.9f, 0.6f));
             // 小道を抜けた先。ヤードから振り返ったときに読める
             Board(parent, "SignYardName.Lane", "SignYardName",
                 new Vector3(LaneWest + 0.7f, 2.9f, LaneZ - LaneHalf + 0.06f), Vector3.forward, new Vector2(1.9f, 0.6f));
+            // 露店の看板。1.6 くらいに下げると、売り手の側に回ったときに
+            // 板の背が目の高さに来て、買い手も卓も見えなくなる。頭の上へ吊る
             var front = Quaternion.Euler(0f, MyStallYaw, 0f) * new Vector3(0f, 0f, -1f);
             Board(parent, "SignMemories", "SignMemories",
-                new Vector3(MyStallX, 1.64f, MyStallZ) + front * 1.12f, front, new Vector2(1.5f, 0.75f));
+                new Vector3(MyStallX, 2.14f, MyStallZ) + front * 1.12f, front, new Vector2(1.5f, 0.75f));
+
+            StreetSigns(parent);
+        }
+
+        /// <summary>通りで読む板の数。BuildAlleyItems が調べる対象を立てる数と揃える</summary>
+        public const int StreetSignCount = 5;
+
+        /// <summary>
+        /// 通りの壁に掛かっている、立ち止まって読む板。調べる対象はこの 5 枚。
+        ///
+        /// ネオンは頭上の店の灯りで、近づいて読む物ではない。こちらは目の高さに掛け、
+        /// 左右に振り分けて、歩いていれば必ずどれかが目に入るようにする。
+        /// 管が前を横切らないよう、壁から少しだけ手前へ出す
+        /// </summary>
+        static void StreetSigns(Transform parent)
+        {
+            // 名前、絵、南から数えた z、側（1 で東の壁）、高さ、大きさ
+            var plates = new[]
+            {
+                new { tex = "SignStreetName", z = 2.6f,  side = 1,  y = 2.62f, size = new Vector2(2.00f, 0.625f) },
+                new { tex = "SignFitting",    z = 9.2f,  side = -1, y = 2.22f, size = new Vector2(1.86f, 0.93f) },
+                new { tex = "SignChemist",    z = 14.6f, side = 1,  y = 2.22f, size = new Vector2(1.86f, 0.93f) },
+                new { tex = "SignPawn",       z = 20.8f, side = -1, y = 2.22f, size = new Vector2(1.86f, 0.93f) },
+                new { tex = "SignNotice",     z = 27.6f, side = 1,  y = 2.26f, size = new Vector2(1.86f, 0.93f) },
+            };
+            for (var i = 0; i < plates.Length; i++)
+            {
+                var p = plates[i];
+                // 読む人は通りの真ん中に立つので、板は通りの中央を向く
+                var face = new Vector3(-p.side, 0f, 0f);
+                Board(parent, "StreetSign" + i, p.tex,
+                    new Vector3(p.side * (StreetHalf - 0.14f), p.y, p.z), face, p.size);
+            }
         }
 
         /// <summary>
@@ -3433,7 +3574,7 @@ namespace HalfAware.EditorTools
         /// 呼ぶ側が角度を書くと必ずどれかが裏返るので、角度は受け取らない
         /// </summary>
         static void Board(Transform parent, string name, string texture, Vector3 at, Vector3 face, Vector2 size,
-            bool glowing = false)
+            bool glowing = false, bool backing = true)
         {
             var tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/" + texture + ".png");
             if (tex == null) { Debug.LogWarning("テクスチャが無い: " + texture); return; }
@@ -3445,6 +3586,18 @@ namespace HalfAware.EditorTools
             go.transform.localScale = new Vector3(size.x, size.y, 1f);
             go.GetComponent<MeshRenderer>().sharedMaterial = BoardMat(texture, tex, glowing);
             Object.DestroyImmediate(go.GetComponent<Collider>());
+
+            if (!backing) return;
+            // 板の背。1 枚だけだと裏から絵が透けて、しかも左右が返って見える。
+            // 表裏で 2 枚使う物（案内の矢）は呼ぶ側で backing を切る
+            var back = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            back.name = name + ".Back";
+            back.transform.SetParent(parent, false);
+            back.transform.localPosition = at - face.normalized * 0.03f;
+            back.transform.localRotation = Quaternion.LookRotation(face.normalized, Vector3.up);
+            back.transform.localScale = new Vector3(size.x, size.y, 1f);
+            back.GetComponent<MeshRenderer>().sharedMaterial = Mat("Metal");
+            Object.DestroyImmediate(back.GetComponent<Collider>());
         }
 
         /// <summary>
@@ -3466,7 +3619,7 @@ namespace HalfAware.EditorTools
             }
             m.SetTexture("_BaseMap", tex);
             m.SetColor("_BaseColor", glowing ? new Color(1.45f, 1.45f, 1.50f, 1f) : new Color(0.85f, 0.85f, 0.85f, 1f));
-            m.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Off);
+            m.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Back);
             EditorUtility.SetDirty(m);
             AssetDatabase.SaveAssets();
             return m;

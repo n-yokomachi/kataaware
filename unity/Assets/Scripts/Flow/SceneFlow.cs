@@ -118,6 +118,12 @@ namespace HalfAware
         public bool Talking => subtitles.IsTalking;
 
         /// <summary>
+        /// いま出している行。出していなければ null。
+        /// 台詞の途中でしぐさを入れたい演出が、どこまで進んだかを見るのに使う
+        /// </summary>
+        public string CurrentLine => subtitles.Current;
+
+        /// <summary>
         /// 必須を済ませたあとも続きの演出がある場面で、そのあいだ場面を閉じるのを止める。
         /// Freeze と違って調べる操作は止めないので、字幕は送れる。
         /// 必須がひとつしかなく、それを済ませてから長い芝居が続く場面（路地裏の売り買い）で使う
@@ -256,7 +262,8 @@ namespace HalfAware
             // 独白を読み終えてから腰を上げる。喋りながら立ち上がらせない
             Stand(frozenNow || subtitles.IsTalking || choice != null);
             // ログを開いている間は字幕を伏せる。ログの上に重なって読みにくい
-            hud.SetSubtitle(logOpen ? null : choice != null ? choice.Compose() : subtitles.Current, choice == null);
+            hud.SetSubtitle(logOpen ? null : choice != null ? choice.Compose() : subtitles.Current,
+                choice == null ? SubtitleKind.Line : SubtitleKind.Choice);
             if (progress.IsComplete && !subtitles.IsTalking && choice == null && !frozenNow && !Held) StartCoroutine(Complete());
         }
 

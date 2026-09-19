@@ -1,38 +1,30 @@
-using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
 namespace HalfAware.EditorTools
 {
     /// <summary>
-    /// 場面 2 の「調べる対象」を立てる。通りの看板、小路の口の表示板、
-    /// 自分の露店の看板とテーブル、テーブルに並べるチップ、売るときに立つ場所。
+    /// 場面 2 の「調べる対象」と、売り買いに出てくる物を立てる。
+    /// 通りの板、小路の口の表示板、自分の露店の看板とテーブル、
+    /// テーブルに並べるチップ、買い手が置いていく煙草、買い手そのもの、売るときに立つ場所。
     ///
     /// 位置はここ（シーン）、文はアセット（WriteAlleyScript）、
-    /// 読み順と売り買いは AlleyDirector が持つ。BuildAlley から呼ぶ
+    /// 読み順と売り買いの進行は AlleyDirector が持つ。BuildAlley から呼ぶ
     /// </summary>
     public static class BuildAlleyItems
     {
         const string ScriptPath = "Assets/Data/AlleyScript.asset";
 
         /// <summary>
-        /// 看板を読める距離。判定は 3D の距離と、視線から 0.7 rad の円錐で取る。
-        /// ネオンそのものは頭上 4〜10 m に出ているので、そこへ判定点を置くと
-        /// 真下に立っても仰角が円錐から外れて読めない。判定点は目線の高さに下ろし、
-        /// 看板の真下あたりで壁の方を向けば拾えるようにする
+        /// 板を読める距離。判定は 3D の距離と、視線から 0.7 rad の円錐で取る。
+        /// 板は目の高さに掛かっているので、近づいて向けば拾える
         /// </summary>
-        const float SignRadius = 7.5f;
-
-        /// <summary>看板の判定点を置く高さ。立っているときの目線に合わせる</summary>
-        const float SignEyeLevel = PlayerController.StandingEyeHeight;
-
-        /// <summary>
-        /// 判定点を壁から通りの側へ引き出す距離。看板は壁に貼ってあるので、
-        /// そのままの x に置くとピンが壁や看板そのものに埋もれて見えなくなる
-        /// </summary>
-        const float SignReach = 1.35f;
+        const float SignRadius = 5.5f;
         const float BoardRadius = 3.2f;
         const float TableRadius = 2.6f;
+
+        /// <summary>板の判定点を、読む人の居る側へ引き出す距離</summary>
+        const float ReadReach = 0.75f;
 
         public static void Build(Transform root)
         {
@@ -45,20 +37,26 @@ namespace HalfAware.EditorTools
             var parent = Child(root, "Items");
             Clear(parent);
 
-            var signs = Signs(root);
-            for (var i = 0; i < signs.Count; i++)
-                Put(parent, "Sign" + i, signs[i], script, AlleyIds.Sign(i), SignRadius, false, false);
+            var signs = 0;
+            for (var i = 0; i < BuildAlley.StreetSignCount && i < WriteAlleyScript.Signs; i++)
+            {
+                var board = Find(root, "Boards/StreetSign" + i);
+                if (board == null) continue;
+                Put(parent, "Sign" + i, ReadFrom(board), script, AlleyIds.Sign(i), SignRadius, false, false);
+                signs++;
+            }
 
-            var board = Find(root, "Boards/SignYardName");
-            if (board != null) Put(parent, "YardBoard", ReadFrom(board), script, AlleyIds.Board, BoardRadius, false, true);
+            var yardBoard = Find(root, "Boards/SignYardName");
+            if (yardBoard != null) Put(parent, "YardBoard", ReadFrom(yardBoard), script, AlleyIds.Board, BoardRadius, false, true);
 
             var stallSign = Find(root, "Boards/SignMemories");
             if (stallSign != null) Put(parent, "StallSign", ReadFrom(stallSign), script, AlleyIds.StallSign, BoardRadius, false, true);
 
-            Stall(parent, root, script);
+            Stall(parent, script);
 
-            Wire(root, script, parent);
-            Debug.Log(string.Format("場面 2 の対象を立てた。看板 {0} 枚、表示板と露店の看板とテーブル", signs.Count));
+            Wire(root, script);
+            Debug.Log(string.Format("場面 2 の対象を立てた。通りの板 {0} 枚、チップ {1} 枚、煙草 {2} 個、買い手 {3} 人",
+                signs, MarketSale.Chips, Smokes.Length, Buyers.Length));
         }
 
         /// <summary>
@@ -67,43 +65,11 @@ namespace HalfAware.EditorTools
         /// </summary>
         static Vector3 ReadFrom(Transform board)
         {
-            return board.position - board.forward * 0.75f;
+            return board.position - board.forward * ReadReach;
         }
 
-        /// <summary>
-        /// 通りの看板。歩ける範囲に出ているネオンから、間を空けて選ぶ。
-        /// どれから読んでも同じ列から引くので、どれを選んでも筋は通る
-        /// </summary>
-        static List<Vector3> Signs(Transform root)
-        {
-            var spots = new List<Vector3>();
-            var neon = root.Find("Neon");
-            if (neon == null) return spots;
-            var found = new List<Transform>();
-            foreach (Transform t in neon)
-            {
-                if (!t.name.StartsWith("Sign")) continue;
-                if (t.name.EndsWith(".Back")) continue;          // 裏面は数えない
-                var z = t.position.z;
-                if (z < BuildAlley.WalkSouth + 1f || z > BuildAlley.LaneZ - 1f) continue;
-                found.Add(t);
-            }
-            found.Sort(delegate (Transform a, Transform b) { return a.position.z.CompareTo(b.position.z); });
-            var want = WriteAlleyScript.Signs;
-            if (found.Count == 0 || want == 0) return spots;
-            for (var i = 0; i < want; i++)
-            {
-                // 端に寄らないよう、通りを等分した位置から拾う
-                var k = Mathf.RoundToInt((found.Count - 1) * (i + 0.5f) / want);
-                var at = found[Mathf.Clamp(k, 0, found.Count - 1)].position;
-                // 高さは目線に下ろし、壁から通りの側へ引き出す
-                spots.Add(new Vector3(at.x - Mathf.Sign(at.x) * SignReach, SignEyeLevel, at.z));
-            }
-            return spots;
-        }
-
-        /// <summary>自分の露店。テーブルとチップと、売るときに立つ場所</summary>
-        static void Stall(Transform parent, Transform root, RoomScript script)
+        /// <summary>自分の露店。テーブル・チップ・煙草・買い手・売るときに立つ場所</summary>
+        static void Stall(Transform parent, RoomScript script)
         {
             var yaw = BuildAlley.MyStallYaw;
             var spin = Quaternion.Euler(0f, yaw, 0f);
@@ -111,60 +77,155 @@ namespace HalfAware.EditorTools
 
             // テーブルの天面は 0.81。手前の縁の少し上に置く。
             // 天面に合わせるとピンが卓に埋まって見えない
-            var table = at + spin * new Vector3(0f, 1.06f, -0.62f);
-            Put(parent, "Table", table, script, AlleyIds.Table, TableRadius, true, true);
+            Put(parent, "Table", at + spin * new Vector3(0f, 1.06f, -0.62f),
+                script, AlleyIds.Table, TableRadius, true, true);
 
-            // 並べるチップ。はじめは伏せておき、置いたときに出す
             var chips = Child(parent, "Chips");
-            var made = new GameObject[MarketSale.Chips];
-            for (var i = 0; i < made.Length; i++)
+            Chips = new GameObject[MarketSale.Chips];
+            for (var i = 0; i < Chips.Length; i++)
             {
-                var slot = (i - (made.Length - 1) * 0.5f) * 0.17f;
-                var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                go.name = "Chip" + i;
-                go.transform.SetParent(chips, false);
-                go.transform.position = at + spin * new Vector3(slot, 0.845f, -0.42f);
-                go.transform.rotation = spin * Quaternion.Euler(0f, (i % 2 == 0 ? 4f : -5f), 0f);
-                go.transform.localScale = new Vector3(0.115f, 0.014f, 0.078f);
-                go.GetComponent<MeshRenderer>().sharedMaterial = ChipMat();
-                Object.DestroyImmediate(go.GetComponent<Collider>());
-                go.SetActive(false);
-                made[i] = go;
+                var slot = (i - (Chips.Length - 1) * 0.5f) * 0.17f;
+                Chips[i] = Chip(chips, "Chip" + i,
+                    at + spin * new Vector3(slot, 0.812f, -0.40f),
+                    spin * Quaternion.Euler(0f, i % 2 == 0 ? 4f : -5f, 0f));
             }
+
+            // 買い手 B が置いていく煙草。卓の向こう寄り、買い手の手が届くあたり
+            var smokes = Child(parent, "Smokes");
+            Smokes = new GameObject[3];
+            for (var i = 0; i < Smokes.Length; i++)
+            {
+                var slot = (i - (Smokes.Length - 1) * 0.5f) * 0.075f;
+                Smokes[i] = Pack(smokes, "Smoke" + i,
+                    at + spin * new Vector3(slot + 0.30f, 0.822f, 0.02f - i * 0.03f),
+                    spin * Quaternion.Euler(0f, -22f + i * 19f, 0f));
+            }
+
+            Buyers = MakeBuyers(Child(parent, "Buyers"), at, spin, yaw);
 
             // 売るときに立つ場所。テーブルの向こう、店の内側
             var spot = Child(parent, "SellSpot");
             spot.position = at + spin * new Vector3(0f, 0f, 0.95f);
             spot.rotation = Quaternion.Euler(0f, yaw + 180f, 0f);
-
-            Chips = made;
             SellSpot = spot;
         }
 
         static GameObject[] Chips;
+        static GameObject[] Smokes;
+        static GameObject[] Buyers;
         static Transform SellSpot;
 
+        /// <summary>
+        /// 買い手。卓の手前に立ち、店の方を向く。
+        ///
+        /// この企画には女の模型しか無いので、男は縦横を少し増した体格で見分けさせる。
+        /// 色は群衆より濃くして、後ろの人だかりから浮かせる。
+        /// はじめは伏せておき、その買い手の番だけ AlleyDirector が出す
+        /// </summary>
+        static GameObject[] MakeBuyers(Transform parent, Vector3 at, Quaternion spin, float yaw)
+        {
+            // 卓の前面はここから -z の側。買い手はそちらに立って、店を向く
+            var front = spin * new Vector3(0f, 0f, -1f);
+            var mat = BuildAlley.BuyerMat();
+            var made = new GameObject[MarketSale.Count];
+            var models = new[] { "W_Suit", "W_Casual", "W_Formal" };
+            var poses = new[] { 1, 2, 0 };
+            var sway = new[] { -0.12f, 0.10f, -0.04f };
+            for (var i = 0; i < made.Length; i++)
+            {
+                var woman = MarketSale.Woman(i);
+                var build = woman
+                    ? new Vector3(0.985f, 0.990f, 0.985f)
+                    : new Vector3(1.090f, 1.055f, 1.090f);
+                // 卓の前端は露店の中心から 0.98 m、体が入るのは 1.23 m から。
+                // 買い手は縁から少し下がって立つ
+                var spot = at + front * 1.55f + spin * new Vector3(sway[i], 0f, 0f);
+                spot.y = Ground(spot);
+                var go = BuildAlley.BakeOne(parent, "Buyer" + i, models[i % models.Length],
+                    spot, yaw, poses[i % poses.Length], build, mat);
+                if (go == null) continue;
+                go.SetActive(false);
+                made[i] = go;
+            }
+            return made;
+        }
+
+        /// <summary>そこの床の高さ。中庭の敷石は 0.02 で、素のままだと足が沈む</summary>
+        static float Ground(Vector3 at)
+        {
+            RaycastHit hit;
+            return Physics.Raycast(at + Vector3.up * 3f, Vector3.down, out hit, 6f) ? hit.point.y : at.y;
+        }
+
+        /// <summary>
+        /// メモリーチップ 1 枚。ただの箱だと何だか分からないので、
+        /// 本体・貼った札・端の接点の 3 つで組む
+        /// </summary>
+        static GameObject Chip(Transform parent, string name, Vector3 at, Quaternion rot)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.position = at;
+            go.transform.rotation = rot;
+            Part(go.transform, "Body", new Vector3(0f, 0.008f, 0f), new Vector3(0.115f, 0.016f, 0.078f), ChipMat());
+            Part(go.transform, "Label", new Vector3(0f, 0.0168f, -0.009f), new Vector3(0.088f, 0.0022f, 0.042f), LabelMat());
+            Part(go.transform, "Contacts", new Vector3(0f, 0.0132f, 0.031f), new Vector3(0.072f, 0.0032f, 0.013f), BrassMat());
+            go.SetActive(false);
+            return go;
+        }
+
+        /// <summary>煙草 1 箱。自室にあるものと同じ絵を巻く</summary>
+        static GameObject Pack(Transform parent, string name, Vector3 at, Quaternion rot)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.position = at;
+            go.transform.rotation = rot;
+            Part(go.transform, "Box", new Vector3(0f, 0.011f, 0f), new Vector3(0.056f, 0.022f, 0.086f), PackMat());
+            go.SetActive(false);
+            return go;
+        }
+
+        /// <summary>部品ひとつ。当たり判定は要らないので落とす</summary>
+        static void Part(Transform parent, string name, Vector3 offset, Vector3 size, Material mat)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            go.name = name;
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = offset;
+            go.transform.localRotation = Quaternion.identity;
+            go.transform.localScale = size;
+            go.GetComponent<MeshRenderer>().sharedMaterial = mat;
+            Object.DestroyImmediate(go.GetComponent<Collider>());
+        }
+
         /// <summary>AlleyDirector を SceneFlow の隣に置いて、繋ぎ直す</summary>
-        static void Wire(Transform root, RoomScript script, Transform parent)
+        static void Wire(Transform root, RoomScript script)
         {
             var flow = Object.FindFirstObjectByType<SceneFlow>();
             if (flow == null) { Debug.LogWarning("SceneFlow が見つからない。AlleyDirector を繋げない"); return; }
             var director = flow.GetComponent<AlleyDirector>();
             if (director == null) director = flow.gameObject.AddComponent<AlleyDirector>();
-            var hud = Object.FindFirstObjectByType<HudView>();
-            var player = Object.FindFirstObjectByType<PlayerController>();
 
             var so = new SerializedObject(director);
             so.FindProperty("flow").objectReferenceValue = flow;
-            so.FindProperty("hud").objectReferenceValue = hud;
-            so.FindProperty("player").objectReferenceValue = player;
+            so.FindProperty("hud").objectReferenceValue = Object.FindFirstObjectByType<HudView>();
+            so.FindProperty("player").objectReferenceValue = Object.FindFirstObjectByType<PlayerController>();
             so.FindProperty("script").objectReferenceValue = script;
             so.FindProperty("sellSpot").objectReferenceValue = SellSpot;
-            var list = so.FindProperty("chips");
-            list.arraySize = Chips == null ? 0 : Chips.Length;
-            for (var i = 0; i < list.arraySize; i++) list.GetArrayElementAtIndex(i).objectReferenceValue = Chips[i];
+            Fill(so, "chips", Chips);
+            Fill(so, "buyers", Buyers);
+            Fill(so, "smokes", Smokes);
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(director);
+        }
+
+        static void Fill(SerializedObject so, string field, GameObject[] made)
+        {
+            var list = so.FindProperty(field);
+            if (list == null) { Debug.LogWarning("AlleyDirector に " + field + " が無い"); return; }
+            list.arraySize = made == null ? 0 : made.Length;
+            for (var i = 0; i < list.arraySize; i++) list.GetArrayElementAtIndex(i).objectReferenceValue = made[i];
         }
 
         /// <summary>調べる対象をひとつ立てる</summary>
@@ -174,6 +235,8 @@ namespace HalfAware.EditorTools
             var go = new GameObject("Interactable_" + name);
             go.transform.SetParent(parent, false);
             go.transform.position = at;
+            // Interactable の OnValidate は AddComponent の中で走るので、
+            // ここで「id がない」と一度警告が出る。id はこの直後に入れている
             var item = go.AddComponent<Interactable>();
             var so = new SerializedObject(item);
             so.FindProperty("id").stringValue = id;
@@ -185,24 +248,51 @@ namespace HalfAware.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        static Material ChipMat()
+        static Material Solid(string name, Color colour, float smooth, float metal)
         {
-            var path = "Assets/Materials/Alley/Chip.mat";
+            var path = "Assets/Materials/Alley/" + name + ".mat";
             var m = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (m == null)
             {
                 if (!AssetDatabase.IsValidFolder("Assets/Materials/Alley"))
                     AssetDatabase.CreateFolder("Assets/Materials", "Alley");
                 m = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-                m.name = "Chip";
+                m.name = name;
                 AssetDatabase.CreateAsset(m, path);
             }
             m.SetTexture("_BaseMap", null);
-            m.SetColor("_BaseColor", new Color(0.115f, 0.125f, 0.145f));
-            if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", 0.62f);
-            if (m.HasProperty("_Metallic")) m.SetFloat("_Metallic", 0.35f);
+            m.SetColor("_BaseColor", colour);
+            if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", smooth);
+            if (m.HasProperty("_Metallic")) m.SetFloat("_Metallic", metal);
             EditorUtility.SetDirty(m);
             return m;
+        }
+
+        /// <summary>チップの本体。黒い樹脂</summary>
+        static Material ChipMat()
+        {
+            return Solid("Chip", new Color(0.115f, 0.125f, 0.145f), 0.62f, 0.35f);
+        }
+
+        /// <summary>貼った札。手書きの日付と番号が載っている紙</summary>
+        static Material LabelMat()
+        {
+            return Solid("ChipLabel", new Color(0.560f, 0.545f, 0.490f), 0.18f, 0f);
+        }
+
+        /// <summary>端の接点。差し込む側の金</summary>
+        static Material BrassMat()
+        {
+            return Solid("ChipContacts", new Color(0.520f, 0.430f, 0.185f), 0.74f, 0.85f);
+        }
+
+        /// <summary>煙草の箱。自室で使っている絵をそのまま巻く</summary>
+        static Material PackMat()
+        {
+            var shared = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/Room/CigarettePack.mat");
+            if (shared != null) return shared;
+            Debug.LogWarning("自室の煙草のマテリアルが無い。無地で置く");
+            return Solid("Smoke", new Color(0.320f, 0.180f, 0.155f), 0.24f, 0f);
         }
 
         static Transform Find(Transform root, string path)

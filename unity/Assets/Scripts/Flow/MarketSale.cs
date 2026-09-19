@@ -19,6 +19,12 @@ namespace HalfAware
             public string[] lines;
             /// <summary>この買い手が去ったあと、テーブルに残る枚数</summary>
             public int left;
+            /// <summary>女か。この企画には女の模型しか無いので、男は体格で見分けさせる</summary>
+            public bool woman;
+            /// <summary>この行が出たところで煙草を置く。置かないなら null</summary>
+            public string putsSmokes;
+            /// <summary>置く煙草の数</summary>
+            public int smokes;
         }
 
         static readonly Buyer[] buyers =
@@ -34,6 +40,7 @@ namespace HalfAware
                     "買い手A「へっへ、いつも助かるよ。・・・OK、送金した。それじゃあ」",
                 },
                 left = 4,
+                woman = false,
             },
             new Buyer
             {
@@ -43,10 +50,14 @@ namespace HalfAware
                     "私「ちゃんと取り置いてるよ、どうぞ」",
                     "買い手B「支払いもいつもので？」",
                     "私「ああ、助かるよ。丁度切らしちゃって」",
-                    "買い手B「はいはい、じゃあこれな（煙草を2,3個テーブルに置く）」",
+                    "買い手B「はいはい、じゃあこれな」",
                     "私「どうも」",
                 },
                 left = 2,
+                woman = false,
+                // 「じゃあこれな」は台詞で、煙草を置くのはしぐさ。この行で卓に現れる
+                putsSmokes = "買い手B「はいはい、じゃあこれな」",
+                smokes = 3,
             },
             new Buyer
             {
@@ -58,6 +69,7 @@ namespace HalfAware
                     "私「ええ、いいですよ」",
                 },
                 left = 1,
+                woman = true,
             },
         };
 
@@ -87,6 +99,27 @@ namespace HalfAware
             if (i < 0) return Chips;
             if (i >= buyers.Length) return 0;
             return buyers[i].left;
+        }
+
+        /// <summary>i 人目は女か</summary>
+        public static bool Woman(int i)
+        {
+            return i >= 0 && i < buyers.Length && buyers[i].woman;
+        }
+
+        /// <summary>
+        /// i 人目が煙草を置く行。置かなければ null。
+        /// この行が字幕に出たところで卓に煙草を出す
+        /// </summary>
+        public static string PutsSmokes(int i)
+        {
+            return i >= 0 && i < buyers.Length ? buyers[i].putsSmokes : null;
+        }
+
+        /// <summary>i 人目が置く煙草の数</summary>
+        public static int Smokes(int i)
+        {
+            return i >= 0 && i < buyers.Length ? buyers[i].smokes : 0;
         }
 
         /// <summary>i 人目が持っていく枚数</summary>

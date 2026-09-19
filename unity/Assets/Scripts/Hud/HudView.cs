@@ -55,9 +55,13 @@ namespace HalfAware
         /// 画面の実寸を拡大率で割って丸めるので、キャンバスは画面より 1 ピクセルほど
         /// 小さくなることがある。幕をぴったり張ると端に地が覗くので、少し外へはみ出させる
         /// </summary>
-        const float Overscan = 8f;
+        const float Overscan = 96f;
 
-        /// <summary>幕を画面いっぱい、少しはみ出させて張る</summary>
+        /// <summary>
+        /// 幕を画面いっぱい、四方へ大きくはみ出させて張る。
+        /// 暗転で端に地が覗くのは目に付くうえ、はみ出させて困ることは何も無いので、
+        /// ぎりぎりを狙わずに十分な余りを取る
+        /// </summary>
         static void Cover(Image layer)
         {
             if (layer == null) return;
@@ -74,21 +78,20 @@ namespace HalfAware
         /// </summary>
         public void SetSubtitle(string text)
         {
-            SetSubtitle(text, true);
+            SetSubtitle(text, SubtitleKind.Line);
         }
 
         /// <summary>
-        /// asTable が false なら表に組まない。二択のように、
-        /// 空白で分かれていても列にしたくないものに使う
+        /// 二択は表に組まず、帯の真ん中へ寄せる。
+        /// 「はい　いいえ」を左に寄せると、どちらを選んでいるかが目で追いにくい
         /// </summary>
-        public void SetSubtitle(string text, bool asTable)
+        public void SetSubtitle(string text, SubtitleKind kind)
         {
             subtitleBand.SetActive(text != null);
             subtitleText.text = text ?? string.Empty;
             if (text == null) return;
-            // 並びになっているものは表に組む。そうでない長い 1 行は 2 行に割って、
-            // ウインドウの 2 行を埋める
-            var list = asTable && ListFormat.IsList(text);
+            // 並びになっているものは表に組む。そうでない長い 1 行は割ってウインドウに収める
+            var list = kind == SubtitleKind.Line && ListFormat.IsList(text);
             // 1 行に入る幅はウインドウの実寸から。全角 1 文字で半角 2 つぶん
             var fits = Mathf.Max(SubtitleBox.BaseRows * 2, Mathf.FloorToInt(RoomEm(1f) * 2f) - 1);
             var shown = list ? text : SubtitleBox.Wrap(text, fits);
@@ -96,7 +99,9 @@ namespace HalfAware
             var scale = SubtitleBox.FontScale(shown);
             // 列を揃えるため表は左寄せにして、表ごと帯の真ん中へ寄せる
             subtitleText.text = list ? ListFormat.Compose(text, RoomEm(scale)) : shown;
-            subtitleText.alignment = list ? TMPro.TextAlignmentOptions.Left : listlessAlignment;
+            subtitleText.alignment =
+                kind == SubtitleKind.Choice ? TMPro.TextAlignmentOptions.Center :
+                list ? TMPro.TextAlignmentOptions.Left : listlessAlignment;
             var band = subtitleBand.GetComponent<RectTransform>();
             if (band != null)
             {
@@ -134,12 +139,14 @@ namespace HalfAware
         /// <summary>黒い層の濃さ。0 で透明、1 で真っ黒</summary>
         public void SetFade(float alpha)
         {
+            Cover(fadeLayer);
             SetAlpha(fadeLayer, alpha);
         }
 
         /// <summary>seconds 秒かけて黒い層の濃さを変える</summary>
         public IEnumerator FadeTo(float alpha, float seconds)
         {
+            Cover(fadeLayer);
             return Ramp(fadeLayer, alpha, seconds);
         }
 

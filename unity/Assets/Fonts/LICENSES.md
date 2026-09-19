@@ -64,3 +64,7 @@ SIL Open Font License は描き出した絵の扱いを縛らないので、
 再配布の扱いが面倒なので触っていない。
 
 看板の文言を変えるときは `tools/make-neon.py` の `SIGNS` を直して走らせ直す。
+
+通りで読む板（`SignStreetName` / `SignChemist` / `SignPawn` / `SignNotice` /
+`SignFitting`）も同じく Noto Sans JP の字形から描き起こしている。
+生成は `tools/make-signs.py`。文言を変えるときは `SIGNS` を直して走らせ直す。

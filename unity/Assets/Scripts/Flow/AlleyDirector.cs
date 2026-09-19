@@ -30,6 +30,10 @@ namespace HalfAware
         [SerializeField] Transform sellSpot;
         [Tooltip("テーブルの上に並べるチップ。左から順に消える")]
         [SerializeField] GameObject[] chips = new GameObject[0];
+        [Tooltip("卓の向こうに立つ買い手。台詞のあいだだけ出す")]
+        [SerializeField] GameObject[] buyers = new GameObject[0];
+        [Tooltip("買い手 B が置いていく煙草。その行で順に出る")]
+        [SerializeField] GameObject[] smokes = new GameObject[0];
         [Tooltip("暗転にかける秒数")]
         [SerializeField] float fadeSeconds = 1.0f;
         [Tooltip("暗転したまま置く秒数")]
@@ -50,6 +54,8 @@ namespace HalfAware
             }
             signs = new SignQueue(Pages());
             Show(0);
+            ShowBuyer(-1);
+            ShowSmokes(0);
             flow.Examined += Examined;
         }
 
@@ -115,10 +121,12 @@ namespace HalfAware
 
             for (var i = 0; i < MarketSale.Count; i++)
             {
+                ShowBuyer(i);
                 flow.Say(MarketSale.Lines(i));
-                yield return Spoken();
+                yield return Spoken(MarketSale.PutsSmokes(i), MarketSale.Smokes(i));
                 // 買い手が去る。暗転しているあいだに、持っていったぶんを引く
                 yield return Black(true);
+                ShowBuyer(-1);
                 Show(MarketSale.Left(i));
                 yield return new WaitForSeconds(blackSeconds);
                 yield return Black(false);
@@ -131,11 +139,25 @@ namespace HalfAware
             selling = false;
         }
 
-        /// <summary>字幕を読み終えるまで待つ。積んだ次のフレームから見る</summary>
-        IEnumerator Spoken()
+        /// <summary>
+        /// 字幕を読み終えるまで待つ。積んだ次のフレームから見る。
+        /// mark の行が出たところで卓に煙草を出す。
+        /// 送りが速くて拾い損ねても、読み終えたところで必ず出す
+        /// </summary>
+        IEnumerator Spoken(string mark, int count)
         {
+            var waiting = mark != null && count > 0;
             yield return null;
-            while (flow.Talking) yield return null;
+            while (flow.Talking)
+            {
+                if (waiting && flow.CurrentLine == mark)
+                {
+                    ShowSmokes(count);
+                    waiting = false;
+                }
+                yield return null;
+            }
+            if (waiting) ShowSmokes(count);
         }
 
         /// <summary>暗転と、そこから明けるの両方。あいだは進行を止めておく</summary>
@@ -161,6 +183,20 @@ namespace HalfAware
         {
             for (var i = 0; i < chips.Length; i++)
                 if (chips[i] != null) chips[i].SetActive(i < left);
+        }
+
+        /// <summary>i 人目の買い手だけ立たせる。-1 で誰も出さない</summary>
+        void ShowBuyer(int which)
+        {
+            for (var i = 0; i < buyers.Length; i++)
+                if (buyers[i] != null) buyers[i].SetActive(i == which);
+        }
+
+        /// <summary>卓の上の煙草を count 個見せる</summary>
+        void ShowSmokes(int count)
+        {
+            for (var i = 0; i < smokes.Length; i++)
+                if (smokes[i] != null) smokes[i].SetActive(i < count);
         }
     }
 }

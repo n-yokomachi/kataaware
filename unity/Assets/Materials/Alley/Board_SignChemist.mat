@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-3909572909522777501
+--- !u!114 &-2449624500981434378
 MonoBehaviour:
   m_ObjectHideFlags: 11
   m_CorrespondingSourceObject: {fileID: 0}
@@ -20,7 +20,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Board_SignYardArrow_lit
+  m_Name: Board_SignChemist
   m_Shader: {fileID: 4800000, guid: 650dd9526735d5b46b79224bc6e94025, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -39,11 +39,11 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: 2800000, guid: 36d403b03f4882b48bf554f7439bd2f4, type: 3}
+        m_Texture: {fileID: 2800000, guid: 2e223dd564d68384790e68aa42db8808, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
-        m_Texture: {fileID: 2800000, guid: 36d403b03f4882b48bf554f7439bd2f4, type: 3}
+        m_Texture: {fileID: 2800000, guid: 2e223dd564d68384790e68aa42db8808, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
@@ -65,7 +65,7 @@ Material:
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 1.45, g: 1.45, b: 1.5, a: 1}
-    - _Color: {r: 1.45, g: 1.45, b: 1.5, a: 1}
+    - _BaseColor: {r: 0.85, g: 0.85, b: 0.85, a: 1}
+    - _Color: {r: 0.85, g: 0.85, b: 0.85, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
