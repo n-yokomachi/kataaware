@@ -55,15 +55,17 @@ namespace HalfAware
             subtitleText.text = text ?? string.Empty;
             if (text == null) return;
             var rows = SubtitleBox.Rows(text);
+            var scale = SubtitleBox.FontScale(text);
             var band = subtitleBand.GetComponent<RectTransform>();
             if (band != null)
             {
+                // 字を小さくしたぶん 1 行も低くなる。帯の高さも同じだけ詰める
                 var size = band.sizeDelta;
-                size.y = subtitlePadding + subtitleRowHeight * rows;
+                size.y = subtitlePadding + subtitleRowHeight * rows * scale;
                 band.sizeDelta = size;
             }
             if (baseFontSize <= 0f) baseFontSize = subtitleText.fontSize;
-            subtitleText.fontSize = baseFontSize * SubtitleBox.FontScale(text);
+            subtitleText.fontSize = baseFontSize * scale;
         }
 
         /// <summary>null で隠す</summary>

@@ -24,6 +24,8 @@ namespace HalfAware.Tests
             }));
         }
 
+        // 何ページに割るかは見た目の都合で変わるので、行の総数で見る。
+        // 二択の後に出す文も、シナリオの一部なので数に入れる。
         // 煙草だけ 0 行。吸い終わりの独白は RoomIntroDirector が言う
         [TestCase("jack", 1)]
         [TestCase("cigarette", 0)]
@@ -32,12 +34,44 @@ namespace HalfAware.Tests
         [TestCase("door", 1)]
         [TestCase("ashtray", 1)]
         [TestCase("cigarette-box", 1)]
-        [TestCase("clipboard", 2)]
+        [TestCase("clipboard", 4)]
         public void KeepsTheLineCountOfTheScenario(string id, int lines)
         {
             var entry = Load().Find(id);
             Assert.That(entry.id, Is.EqualTo(id));
-            Assert.That(entry.Lines.Count, Is.EqualTo(lines));
+            var count = 0;
+            foreach (var page in entry.Lines) count += SubtitleBox.LineCount(page);
+            foreach (var page in entry.choice.AfterYes) count += SubtitleBox.LineCount(page);
+            Assert.That(count, Is.EqualTo(lines));
+        }
+
+        // シナリオ 4 節で二択を出すのはこの 2 つだけ
+        [TestCase("chips", "チップを抜く")]
+        [TestCase("terminal", "スリープを解除する")]
+        public void AsksBeforeItChangesAnything(string id, string question)
+        {
+            var entry = Load().Find(id);
+            Assert.That(entry.Asks, Is.True, id + " は二択を出す");
+            Assert.That(entry.choice.question, Is.EqualTo(question));
+        }
+
+        [TestCase("jack")]
+        [TestCase("door")]
+        [TestCase("ashtray")]
+        [TestCase("clipboard")]
+        public void EverythingElseJustSpeaks(string id)
+        {
+            Assert.That(Load().Find(id).Asks, Is.False, id + " は二択を出さない");
+        }
+
+        // 長い並びは 1 ページにまとめて出す
+        [TestCase("chips", 6)]
+        public void ShowsTheLongListInOnePage(string id, int rows)
+        {
+            var entry = Load().Find(id);
+            var longest = 0;
+            foreach (var page in entry.Lines) longest = System.Math.Max(longest, SubtitleBox.LineCount(page));
+            Assert.That(longest, Is.EqualTo(rows));
         }
 
         [Test]

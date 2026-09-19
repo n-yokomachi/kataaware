@@ -40,6 +40,10 @@ namespace HalfAware
         [SerializeField] Transform standSpot;
         [Tooltip("立ってから効かせる当たり。座っている間は椅子に当たらないよう切っておく")]
         [SerializeField] GameObject chairBlocker;
+        [Tooltip("立つときに後ろへ押す椅子。椅子と机のあいだに立つ幅を空ける")]
+        [SerializeField] Transform chair;
+        [Tooltip("椅子を押し下げる距離。椅子の後ろ向きに。メートル")]
+        [SerializeField] float chairPushBack = 0.24f;
 
         [Header("目覚めの起き上がり")]
         [Tooltip("座位の目線からどれだけ下から始めるか。メートル")]
@@ -71,6 +75,7 @@ namespace HalfAware
         bool dazeReleased;
         bool logOpen;
         Vector3 seatedSpot;
+        Vector3 chairSpot;
         Choice choice;
         IInteractable asking;
         int lastStep;
@@ -110,6 +115,7 @@ namespace HalfAware
             if (items.Count == 0) Debug.LogWarning("SceneFlow: 調べる対象が 1 つも見つからない", this);
             progress = new SceneProgress(items);
             seatedSpot = player.transform.position;
+            if (chair != null) chairSpot = chair.position;
             if (chairBlocker != null) chairBlocker.SetActive(false);
             if (standAfter.Length > 0)
             {
@@ -287,6 +293,9 @@ namespace HalfAware
             var k = StandUp.Progress(standUp.EyeHeight, seatEyeHeight, PlayerController.StandingEyeHeight);
             var at = Vector3.Lerp(seatedSpot, standSpot.position, k);
             player.transform.position = new Vector3(at.x, player.transform.position.y, at.z);
+            // 椅子は後ろへ下がる。押しのけないと机とのあいだに立てない
+            if (chair == null) return;
+            chair.position = chairSpot - chair.forward * (chairPushBack * k);
         }
 
         IEnumerator Complete()
