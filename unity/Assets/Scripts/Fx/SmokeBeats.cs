@@ -15,6 +15,12 @@ namespace HalfAware
         /// <summary>火が点いてから最初の一服まで。火の音が鳴りきる長さ</summary>
         public const float FirstDragAfterFlame = 1.55f;
 
+        /// <summary>
+        /// 火の音が鳴り終わるまでの目安。煙はここから立ちはじめる。
+        /// 素材の実尺が分かるならそちらを使う
+        /// </summary>
+        public const float FlameSeconds = 1.50f;
+
         /// <summary>吸っている長さ。素材の長さに合わせてある</summary>
         public const float DragSeconds = 3.70f;
         /// <summary>肺に留めている長さ</summary>
@@ -34,6 +40,13 @@ namespace HalfAware
         public const float TailSeconds = 1.40f;
 
         public static float FlameAt { get { return ClickAt + FlameAfterClick; } }
+
+        /// <summary>煙が立ちはじめる時刻。火の音が鳴り終わってから</summary>
+        public static float SmokeAt(float flameSeconds)
+        {
+            return FlameAt + (flameSeconds > 0f ? flameSeconds : FlameSeconds);
+        }
+
         public static float FirstDragAt { get { return FlameAt + FirstDragAfterFlame; } }
         public static float Cycle { get { return DragSeconds + HoldSeconds + BlowSeconds + RestSeconds; } }
 

@@ -572,19 +572,21 @@ namespace HalfAware.EditorTools
             main.duration = 5f;
             main.loop = true;
             main.playOnAwake = false;
-            main.startLifetime = new ParticleSystem.MinMaxCurve(4.0f, 6.0f);
-            main.startSpeed = new ParticleSystem.MinMaxCurve(0.04f, 0.09f);
-            main.startSize = new ParticleSystem.MinMaxCurve(0.10f, 0.18f);
+            main.startLifetime = new ParticleSystem.MinMaxCurve(4.5f, 7.0f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(0.03f, 0.07f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.09f, 0.16f);
             main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+            // 1 粒ずつが丸く見えないよう、薄いものを数多く重ねる
             main.startColor = new ParticleSystem.MinMaxGradient(
-                new Color(0.82f, 0.81f, 0.78f, 0.44f), new Color(0.74f, 0.73f, 0.71f, 0.56f));
-            main.gravityModifier = new ParticleSystem.MinMaxCurve(-0.007f);
+                new Color(0.82f, 0.81f, 0.78f, 0.17f), new Color(0.74f, 0.73f, 0.71f, 0.26f));
+            main.gravityModifier = new ParticleSystem.MinMaxCurve(-0.010f);
             main.simulationSpace = ParticleSystemSimulationSpace.World;
-            main.maxParticles = 220;
+            main.maxParticles = 500;
 
             var em = ps.emission;
             em.enabled = true;
-            em.rateOverTime = 7.5f;
+            // 吸っているあいだは細く燻るだけ。濃くなるのは吐いたとき
+            em.rateOverTime = 5f;
 
             var shape = ps.shape;
             shape.enabled = true;
@@ -595,16 +597,23 @@ namespace HalfAware.EditorTools
             var vel = ps.velocityOverLifetime;
             vel.enabled = true;
             vel.space = ParticleSystemSimulationSpace.World;
-            vel.x = new ParticleSystem.MinMaxCurve(-0.06f, 0.06f);
-            vel.y = new ParticleSystem.MinMaxCurve(0.03f, 0.075f);
-            vel.z = new ParticleSystem.MinMaxCurve(-0.04f, 0.05f);
+            // 横へは漂う程度。上へ立ちのぼるのが主
+            vel.x = new ParticleSystem.MinMaxCurve(-0.018f, 0.018f);
+            vel.y = new ParticleSystem.MinMaxCurve(0.05f, 0.11f);
+            vel.z = new ParticleSystem.MinMaxCurve(-0.018f, 0.018f);
+
+            // 吐いた勢いは 1 秒ほどで抜ける。そこから先は上への流れだけが残る
+            var limit = ps.limitVelocityOverLifetime;
+            limit.enabled = true;
+            limit.limit = new ParticleSystem.MinMaxCurve(0.12f);
+            limit.dampen = 0.30f;
 
             var size = ps.sizeOverLifetime;
             size.enabled = true;
             var grow = new AnimationCurve();
-            grow.AddKey(0f, 0.30f);
-            grow.AddKey(0.4f, 1.3f);
-            grow.AddKey(1f, 2.4f);
+            grow.AddKey(0f, 0.34f);
+            grow.AddKey(0.4f, 1.5f);
+            grow.AddKey(1f, 3.0f);
             size.size = new ParticleSystem.MinMaxCurve(1f, grow);
 
             var col = ps.colorOverLifetime;
@@ -627,9 +636,9 @@ namespace HalfAware.EditorTools
 
             var noise = ps.noise;
             noise.enabled = true;
-            noise.strength = new ParticleSystem.MinMaxCurve(0.085f);
-            noise.frequency = 0.5f;
-            noise.scrollSpeed = new ParticleSystem.MinMaxCurve(0.12f);
+            noise.strength = new ParticleSystem.MinMaxCurve(0.055f);
+            noise.frequency = 0.40f;
+            noise.scrollSpeed = new ParticleSystem.MinMaxCurve(0.10f);
             noise.damping = true;
 
             var r = go.GetComponent<ParticleSystemRenderer>();

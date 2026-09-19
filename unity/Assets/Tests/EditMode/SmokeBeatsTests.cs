@@ -70,5 +70,19 @@ namespace HalfAware.Tests
         {
             Assert.AreEqual(3, SmokeBeats.Drags);
         }
+        [Test]
+        public void TheSmokeStartsOnlyAfterTheFlameHasSounded()
+        {
+            var flame = 1.49f;
+            Assert.AreEqual(SmokeBeats.FlameAt + flame, SmokeBeats.SmokeAt(flame), 1e-4f);
+            Assert.Greater(SmokeBeats.SmokeAt(flame), SmokeBeats.FlameAt, "火の音が鳴りきってから煙が出る");
+            Assert.LessOrEqual(SmokeBeats.SmokeAt(flame), SmokeBeats.FirstDragAt + 1e-3f, "最初の一服には間に合う");
+        }
+
+        [Test]
+        public void WithoutAClipItFallsBackToTheEstimate()
+        {
+            Assert.AreEqual(SmokeBeats.FlameAt + SmokeBeats.FlameSeconds, SmokeBeats.SmokeAt(0f), 1e-4f);
+        }
     }
 }

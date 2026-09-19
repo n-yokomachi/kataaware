@@ -25,6 +25,7 @@ namespace HalfAware
         int nextBlow;
         bool clicked;
         bool flamed;
+        bool smoked;
 
         /// <summary>吐き始めるたびに知らせる。何服目かを渡す。0 から数える</summary>
         public event Action<int> Blew;
@@ -44,6 +45,7 @@ namespace HalfAware
             nextBlow = 0;
             clicked = false;
             flamed = false;
+            smoked = false;
         }
 
         /// <summary>途中で止める</summary>
@@ -66,7 +68,11 @@ namespace HalfAware
             {
                 flamed = true;
                 Play(lighterFlame);
-                // 火が点いてから煙が立ちはじめる
+            }
+            // 煙は火の音が鳴り終わってから立ちはじめる
+            if (!smoked && elapsed >= SmokeBeats.SmokeAt(lighterFlame != null ? lighterFlame.length : 0f))
+            {
+                smoked = true;
                 if (puffs != null) puffs.Begin(SmokeBeats.Total(drags));
             }
             if (nextDrag < drags && elapsed >= SmokeBeats.DragAt(nextDrag))
