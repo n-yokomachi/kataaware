@@ -10,20 +10,23 @@ using UnityEngine.TextCore.LowLevel;
 namespace HalfAware.EditorTools
 {
     /// <summary>
-    /// 画面の書体を焼き直す。
+    /// 暗転のカードに使う明朝を焼き直す。
     ///
-    /// 字は要るぶんだけ先に焼いて、実行中には足さない（Static）。
-    /// 足りない字は予備の書体へ落ちるので、明朝の中にゴシックが混じる。
-    /// **台詞を足したらこれを走らせること。**
+    /// 台詞・ログ・調べる印は Noto Sans JP のまま。読ませる字はゴシックのほうが楽で、
+    /// 明朝は暗転して見せるカードだけに使う。
     ///
-    /// 焼く字は、両方の場面に入っている文字列と、コードが組み立てる言葉と、
-    /// 仮名・ASCII・約物ひとそろい。
+    /// TextMeshPro は .ttf から直に字を描かず、字の形を並べた絵から切り出して貼る。
+    /// だから使う字は先に絵へ入れておく（焼いておく）必要がある。
+    /// **カードの文を変えたらこれを走らせること。**
     /// </summary>
     public static class BakeFont
     {
         const string Face = "Assets/Fonts/ShipporiMincho-Regular SDF.asset";
         const string Source = "Assets/Fonts/ShipporiMincho-Regular.ttf";
         const string Spare = "Assets/Fonts/NotoSansJP-Regular SDF.asset";
+
+        /// <summary>明朝にする文字の名。暗転して真ん中に出すカード</summary>
+        const string Card = "Center";
 
         /// <summary>
         /// 焼く大きさ。大きいほど綺麗だが、図に入る字数が減る。
@@ -104,27 +107,35 @@ namespace HalfAware.EditorTools
             Apply(asset);
         }
 
-        /// <summary>焼いた書体を、両方の場面と TextMeshPro の既定へ当てる</summary>
-        static void Apply(TMP_FontAsset asset)
+        /// <summary>
+        /// 書体を当てる。画面の真ん中に出すカードだけ明朝、
+        /// 台詞・ログ・調べる印はゴシックのまま
+        /// </summary>
+        static void Apply(TMP_FontAsset mincho)
         {
+            var gothic = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(Spare);
             var settings = TMP_Settings.instance;
-            if (settings != null)
+            if (settings != null && gothic != null)
             {
                 var so = new SerializedObject(settings);
                 var p = so.FindProperty("m_defaultFontAsset");
-                if (p != null) p.objectReferenceValue = asset;
+                if (p != null) p.objectReferenceValue = gothic;
                 so.ApplyModifiedPropertiesWithoutUndo();
                 EditorUtility.SetDirty(settings);
             }
             var open = EditorSceneManager.GetActiveScene().path;
+            var sb = new StringBuilder();
             for (var i = 0; i < Scenes.Length; i++)
             {
                 EditorSceneManager.OpenScene(Scenes[i], OpenSceneMode.Single);
                 var texts = Object.FindObjectsByType<TMP_Text>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID);
                 for (var k = 0; k < texts.Length; k++)
                 {
-                    texts[k].font = asset;
+                    var card = texts[k].gameObject.name == Card;
+                    texts[k].font = card ? mincho : gothic;
                     EditorUtility.SetDirty(texts[k]);
+                    sb.AppendFormat("  {0} / {1} → {2}\n", Scenes[i].Substring(14), texts[k].gameObject.name,
+                        card ? "明朝" : "ゴシック");
                 }
                 var scene = EditorSceneManager.GetActiveScene();
                 EditorSceneManager.MarkSceneDirty(scene);
@@ -132,6 +143,7 @@ namespace HalfAware.EditorTools
             }
             if (!string.IsNullOrEmpty(open)) EditorSceneManager.OpenScene(open, OpenSceneMode.Single);
             AssetDatabase.SaveAssets();
+            Debug.Log("書体を当てた\n" + sb);
         }
 
         /// <summary>焼く字を集める</summary>
