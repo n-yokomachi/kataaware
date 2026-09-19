@@ -749,32 +749,55 @@ namespace HalfAware.EditorTools
             // 少し大きめに戻す。輪郭が自由になったので、広くても染みには見えない
             var rng = new System.Random(7720);
 
+            // 車道と歩道は高さも絵も違う。縁石をまたがせると、
+            // 歩道の絵が一段高いまま車道へ張り出して見える。どちらか片方へ必ず収める
             for (var z = StreetSouth + 3f; z < StreetNorth - 2f; z += (float)(2.6 + rng.NextDouble() * 3.4))
             {
-                var x = (float)(rng.NextDouble() * 2.0 - 1.0) * (StreetHalf - 0.9f);
-                var w = (float)(0.9 + rng.NextDouble() * 1.9);
-                var d = (float)(0.7 + rng.NextDouble() * 1.5);
-                var kerb = Mathf.Abs(x) > RoadHalf;
-                var y = kerb ? KerbRise + 0.006f : 0.006f;
-                Pool(kerb ? stoneDamp : roadDamp, kerb ? stoneWet : roadWet, y, x, z, w, d, rng);
+                if (rng.NextDouble() < 0.34)
+                {
+                    // 歩道。幅 1.7 しかないので小ぶりに
+                    var w = (float)(0.45 + rng.NextDouble() * 0.45);
+                    var d = (float)(0.5 + rng.NextDouble() * 0.9);
+                    var reach = Reach(w, d);
+                    var lo = RoadHalf + reach;
+                    var hi = StreetHalf - reach;
+                    if (hi <= lo) continue;
+                    var side = rng.NextDouble() < 0.5 ? -1f : 1f;
+                    var x = side * Mathf.Lerp(lo, hi, (float)rng.NextDouble());
+                    Pool(stoneDamp, stoneWet, KerbRise + 0.006f, x, z, w, d, rng);
+                }
+                else
+                {
+                    var w = (float)(0.9 + rng.NextDouble() * 1.9);
+                    var d = (float)(0.7 + rng.NextDouble() * 1.5);
+                    var span = RoadHalf - Reach(w, d);
+                    if (span <= 0f) continue;
+                    var x = (float)(rng.NextDouble() * 2.0 - 1.0) * span;
+                    Pool(roadDamp, roadWet, 0.006f, x, z, w, d, rng);
+                }
             }
-            // 中庭。照り返しはここだけが持つので、筋のほかにも散らす
+            // 中庭。照り返しはここだけが持つので、筋のほかにも散らす。壁は越えさせない
             for (var x = YardWest + 1.5f; x < LaneWest - 1f; x += (float)(1.6 + rng.NextDouble() * 1.8))
             {
                 var lanes = 1 + rng.Next(3);
                 for (var i = 0; i < lanes; i++)
                 {
-                    var z = Mathf.Lerp(YardSouth + 1.2f, YardNorth - 1.2f, (float)rng.NextDouble());
                     var w = (float)(0.7 + rng.NextDouble() * 1.7);
                     var d = (float)(0.5 + rng.NextDouble() * 1.3);
+                    var reach = Reach(w, d);
+                    if (x - reach < YardWest || x + reach > LaneWest) continue;
+                    var z = Mathf.Lerp(YardSouth + reach, YardNorth - reach, (float)rng.NextDouble());
                     Pool(stoneDamp, stoneWet, 0.026f, x, z, w, d, rng);
                 }
             }
-            // 小路。屋根があるので口の側だけ濡れている
+            // 小路。屋根があるので口の側だけ濡れている。壁の間に収める
             for (var x = LaneWest + 0.8f; x < -StreetHalf - 1f; x += (float)(2.2 + rng.NextDouble() * 2.0))
             {
-                var w = (float)(0.7 + rng.NextDouble() * 1.2);
-                Pool(stoneDamp, stoneWet, 0.024f, x, LaneZ, w, LaneHalf * 2f - 0.6f, rng);
+                var w = (float)(0.6 + rng.NextDouble() * 1.0);
+                var d = LaneHalf * 2f - 1.0f;
+                var reach = Reach(w, d);
+                if (reach > LaneHalf - 0.05f) continue;
+                Pool(stoneDamp, stoneWet, 0.024f, x, LaneZ, w, d, rng);
             }
 
             // 濡れた縁は地面より少し暗いだけ。水面はさらに暗く、艶を上げる。
@@ -787,6 +810,18 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
+        /// 水たまりが中心からどこまで届くか。うねりで膨らむぶんと、
+        /// 外へ広げた濡れた縁ぶんを足した最大値。境をまたがせないための当たり
+        /// </summary>
+        static float Reach(float w, float d)
+        {
+            return Mathf.Max(w, d) * 0.5f * Swell + 0.20f;
+        }
+
+        /// <summary>うねりで半径が膨らむ上限。Pool のうねりの振れ幅と揃える</summary>
+        const float Swell = 1.60f;
+
+        /// <summary>
         /// 水たまり 1 つ。四角を並べると床に黒い四角が乗っているようにしか見えない。
         /// 中心から放射に縁を取り、うねりを 2 つ重ねて丸でも四角でもない輪郭にする。
         /// 濡れた縁を一回り外へ敷いて、乾いた地面へなだらかに繋ぐ
@@ -797,6 +832,7 @@ namespace HalfAware.EditorTools
             var rim = new Vector2[n];
             var edge = new Vector2[n];
             var phase = (float)(rng.NextDouble() * Mathf.PI * 2.0);
+            // 2 つ足して Swell - 1 を超えないように。超えると境をまたぐ
             var wob1 = (float)(0.16 + rng.NextDouble() * 0.20);
             var wob2 = (float)(0.08 + rng.NextDouble() * 0.14);
             var lean = (float)(rng.NextDouble() * Mathf.PI);

@@ -162,9 +162,21 @@ namespace HalfAware
 
         void Update()
         {
-            if (Completed) return;
+            // ログと場面の一覧は、場面を終えたあとでも開ける
             if (player.LogPressed) logOpen = !logOpen;
-            hud.SetLog(logOpen ? log.Compose(HudView.LogLines) : null);
+            if (logOpen)
+            {
+                var jump = SceneMenu.Target(player.MenuPick, SceneManager.GetActiveScene().name);
+                if (jump != null)
+                {
+                    SceneManager.LoadScene(jump);
+                    return;
+                }
+            }
+            hud.SetLog(logOpen
+                ? log.Compose(HudView.LogLines) + SceneMenu.Compose(SceneManager.GetActiveScene().name)
+                : null);
+            if (Completed) return;
             var frozen = Frozen || logOpen;
             var interact = (player.InteractPressed || pendingInteract) && !frozen;
             // 止まっている間に届いた PressInteract は捨てずに持ち越す。実キー入力はその場限りなので落ちる

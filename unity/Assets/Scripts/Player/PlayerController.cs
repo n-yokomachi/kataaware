@@ -61,6 +61,12 @@ namespace HalfAware
         public bool LogPressed { get; private set; }
 
         /// <summary>
+        /// このフレームで押された数字。1〜4。押されていなければ 0。
+        /// Tab の一覧から場面を選ぶのに使う。入力の割り当ては増やさず鍵盤を直に見る
+        /// </summary>
+        public int MenuPick { get; private set; }
+
+        /// <summary>
         /// 二択の左右。-1 が左、+1 が右、倒していなければ 0。
         /// 押した瞬間を取るのは呼び手の仕事で、ここは倒れ具合をそのまま渡す
         /// </summary>
@@ -128,11 +134,13 @@ namespace HalfAware
         {
             InteractPressed = false;
             LogPressed = false;
+            MenuPick = 0;
             ChoiceStep = 0;
             if (CursorLocked)
             {
                 InteractPressed = interact.WasPressedThisFrame();
                 LogPressed = logToggle.WasPressedThisFrame();
+                MenuPick = Digit();
                 var stick = move.ReadValue<Vector2>();
                 ChoiceStep = stick.x > 0.5f ? 1 : stick.x < -0.5f ? -1 : 0;
                 if (CanLook) Look(look.ReadValue<Vector2>());
@@ -149,6 +157,18 @@ namespace HalfAware
             // 傾きをこの順で組むと、左右の傾きが親の水平面で効くので、下を向いていても画面が回らない
             eye.localPosition = new Vector3(0f, EyeHeight, eyeLead) + EyeOffset;
             eye.localRotation = Quaternion.Euler(pitch + EyeTilt.x, head.Yaw + EyeTilt.y, 0f);
+        }
+
+        /// <summary>押された数字の鍵盤を読む。1〜4 だけ見る</summary>
+        static int Digit()
+        {
+            var k = Keyboard.current;
+            if (k == null) return 0;
+            if (k.digit1Key.wasPressedThisFrame) return 1;
+            if (k.digit2Key.wasPressedThisFrame) return 2;
+            if (k.digit3Key.wasPressedThisFrame) return 3;
+            if (k.digit4Key.wasPressedThisFrame) return 4;
+            return 0;
         }
 
         static void Lock()
