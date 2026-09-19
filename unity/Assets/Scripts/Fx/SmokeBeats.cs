@@ -13,16 +13,16 @@ namespace HalfAware
         /// <summary>「カチン」から「シュボッ」まで</summary>
         public const float FlameAfterClick = 0.34f;
         /// <summary>火が点いてから最初の一服まで</summary>
-        public const float FirstDragAfterFlame = 0.85f;
+        public const float FirstDragAfterFlame = 1.55f;
 
         /// <summary>吸っている長さ。素材の長さに合わせてある</summary>
-        public const float DragSeconds = 1.70f;
+        public const float DragSeconds = 3.70f;
         /// <summary>肺に留めている長さ</summary>
         public const float HoldSeconds = 0.55f;
         /// <summary>吐いている長さ。素材の長さに合わせてある</summary>
-        public const float BlowSeconds = 2.25f;
+        public const float BlowSeconds = 3.35f;
         /// <summary>吐き終わってから次に吸うまで</summary>
-        public const float RestSeconds = 2.10f;
+        public const float RestSeconds = 1.60f;
 
         public static float FlameAt { get { return ClickAt + FlameAfterClick; } }
         public static float FirstDragAt { get { return FlameAt + FirstDragAfterFlame; } }

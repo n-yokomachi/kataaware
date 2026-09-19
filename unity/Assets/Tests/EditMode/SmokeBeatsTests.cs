@@ -45,7 +45,7 @@ namespace HalfAware.Tests
             // 境目そのものは浮動小数の丸めで揺れるので、わずかに内側で見る
             Assert.AreEqual(1, SmokeBeats.Drags(SmokeBeats.BlowAt(0) + SmokeBeats.BlowSeconds + 1e-3f));
             Assert.AreEqual(2, SmokeBeats.Drags(SmokeBeats.BlowAt(1) + SmokeBeats.BlowSeconds + 1e-3f));
-            Assert.GreaterOrEqual(SmokeBeats.Drags(30f), 4, "30 秒なら何服も入る");
+            Assert.GreaterOrEqual(SmokeBeats.Drags(60f), 4, "1 分なら何服も入る");
         }
 
         [Test]

@@ -71,7 +71,9 @@ namespace HalfAware
             // 並びになっているものは表に組む。そうでない長い 1 行は 2 行に割って、
             // ウインドウの 2 行を埋める
             var list = asTable && ListFormat.IsList(text);
-            var shown = list ? text : SubtitleBox.Wrap(text);
+            // 1 行に入る幅はウインドウの実寸から。全角 1 文字で半角 2 つぶん
+            var fits = Mathf.Max(SubtitleBox.BaseRows * 2, Mathf.FloorToInt(RoomEm(1f) * 2f) - 1);
+            var shown = list ? text : SubtitleBox.Wrap(text, fits);
             var rows = SubtitleBox.Rows(shown);
             var scale = SubtitleBox.FontScale(shown);
             // 列を揃えるため表は左寄せにして、表ごと帯の真ん中へ寄せる

@@ -486,16 +486,17 @@ namespace HalfAware.EditorTools
             main.prewarm = true;                       // 入った瞬間から漂っている
             main.startLifetime = new ParticleSystem.MinMaxCurve(9f, 18f);
             main.startSpeed = new ParticleSystem.MinMaxCurve(0.004f, 0.016f);
-            main.startSize = new ParticleSystem.MinMaxCurve(0.004f, 0.010f);
+            // 1/3 の解像度で描くので、小さすぎると点にもならない
+            main.startSize = new ParticleSystem.MinMaxCurve(0.016f, 0.038f);
             main.startColor = new ParticleSystem.MinMaxGradient(
-                new Color(0.86f, 0.85f, 0.82f, 0.20f), new Color(0.78f, 0.78f, 0.76f, 0.42f));
+                new Color(0.88f, 0.87f, 0.84f, 0.34f), new Color(0.80f, 0.80f, 0.78f, 0.62f));
             main.gravityModifier = new ParticleSystem.MinMaxCurve(0.0012f);   // ゆっくり沈む
             main.simulationSpace = ParticleSystemSimulationSpace.World;
             main.maxParticles = 420;
 
             var em = ps.emission;
             em.enabled = true;
-            em.rateOverTime = 30f;
+            em.rateOverTime = 22f;
 
             var shape = ps.shape;
             shape.enabled = true;

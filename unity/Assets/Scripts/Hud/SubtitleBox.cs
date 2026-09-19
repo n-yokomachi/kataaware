@@ -43,8 +43,11 @@ namespace HalfAware
             return Mathf.Max(MinScale, (float)ShrinkOver / lines);
         }
 
-        /// <summary>これより長い 1 行は 2 行に割る。半角いくつぶん</summary>
-        public const int WrapOver = 40;
+        /// <summary>
+        /// 1 行に入る幅が分からないときの目安。半角いくつぶん。
+        /// ふだんはウインドウの実寸から求めた値を渡す
+        /// </summary>
+        public const int WrapOver = 80;
 
         /// <summary>割り口として良い字。この後ろで切る</summary>
         const string BreakAfter = "、。！？…」』）";
@@ -58,10 +61,19 @@ namespace HalfAware
         /// </summary>
         public static string Wrap(string text)
         {
+            return Wrap(text, WrapOver);
+        }
+
+        /// <summary>
+        /// 1 行に fits ぶんしか入らないとして、はみ出すなら 2 行に割る。
+        /// 割るときは半々に近いところで切り、句読点の後ろを優先する
+        /// </summary>
+        public static string Wrap(string text, int fits)
+        {
             if (string.IsNullOrEmpty(text)) return text;
             if (LineCount(text) > 1) return text;
             var units = ListFormat.Units(text);
-            if (units <= WrapOver) return text;
+            if (units <= fits) return text;
 
             var half = units / 2;
             var best = -1;
