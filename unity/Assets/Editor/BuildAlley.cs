@@ -60,7 +60,7 @@ namespace HalfAware.EditorTools
 
             var root = Root("Alley");
             // 前の作りで残っている束を落とす
-            Prune(root, new[] { "Shell", "Fixtures", "Lamps", "Puddles", "Neon", "Market", "Boards", "Litter", "Crowd", "Bounds" });
+            Prune(root, new[] { "Shell", "Fixtures", "Lamps", "Puddles", "Neon", "Market", "Boards", "Litter", "Crowd", "Sky", "Bounds" });
             Shell(Child(root, "Shell"));
             Fixtures(Child(root, "Fixtures"));
             Lamps(Child(root, "Lamps"));
@@ -70,6 +70,7 @@ namespace HalfAware.EditorTools
             Boards(Child(root, "Boards"));
             Litter(Child(root, "Litter"));
             Crowd(Child(root, "Crowd"));
+            Sky(Child(root, "Sky"));
             Bounds(Child(root, "Bounds"));
             Rain();
             var temp = GameObject.Find("TempGround");
@@ -943,6 +944,76 @@ namespace HalfAware.EditorTools
                 b.Box(at + rot * new Vector3(i * 0.95f, 0.55f, 0f), new Vector3(0.09f, 1.1f, 1.28f), rot);
         }
 
+
+        // ---- 空 ------------------------------------------------------------
+
+        /// <summary>
+        /// 低く垂れた黒い雲。板を 3 枚重ね、それぞれ別の速さで流す。
+        /// 下から見上げる物なので面は下を向け、街の灯りを受けて底だけ少し色づかせる
+        /// </summary>
+        static void Sky(Transform parent)
+        {
+            Clear(parent);
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/CloudLayer.png");
+            if (tex == null) { Debug.LogWarning("雲の絵が無い"); return; }
+
+            var midX = (YardWest + StreetHalf) * 0.5f;
+            var midZ = (StreetSouth + StreetNorth) * 0.5f;
+            var wide = (StreetHalf - YardWest) + 120f;
+            var deep = (StreetNorth - StreetSouth) + 120f;
+
+            var layers = new float[] { 19f, 25f };
+            var tile = new float[] { 0.052f, 0.031f };
+            var tint = new Color[]
+            {
+                new Color(0.017f, 0.015f, 0.023f, 0.90f),
+                new Color(0.048f, 0.038f, 0.056f, 0.58f),
+            };
+            var speed = new Vector2[]
+            {
+                new Vector2(0.0072f, 0.0021f),
+                new Vector2(0.0036f, 0.0011f),
+            };
+            for (var i = 0; i < layers.Length; i++)
+            {
+                var bank = new Bank { Texel = tile[i] };
+                bank.FaceY(layers[i], midX - wide * 0.5f, midX + wide * 0.5f,
+                    midZ - deep * 0.5f, midZ + deep * 0.5f, -1);
+                var go = bank.Emit(parent, "Cloud" + i, CloudMat(i, tex, tint[i]), false, Generated);
+                if (go == null) continue;
+                var drift = go.AddComponent<CloudDrift>();
+                var so = new SerializedObject(drift);
+                so.FindProperty("speed").vector2Value = speed[i];
+                so.ApplyModifiedPropertiesWithoutUndo();
+            }
+        }
+
+        /// <summary>雲のマテリアル。層ごとに 1 枚ずつ作る。絵を別々にずらすため</summary>
+        static Material CloudMat(int index, Texture2D tex, Color tint)
+        {
+            var path = Materials + "Cloud" + index + ".mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                if (!AssetDatabase.IsValidFolder("Assets/Materials/Alley"))
+                    AssetDatabase.CreateFolder("Assets/Materials", "Alley");
+                m = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+                m.name = "Cloud" + index;
+                AssetDatabase.CreateAsset(m, path);
+            }
+            m.SetTexture("_BaseMap", tex);
+            m.SetColor("_BaseColor", tint);
+            m.SetFloat("_Surface", 1f);
+            m.SetFloat("_Blend", 0f);
+            m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            m.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            m.SetFloat("_ZWrite", 0f);
+            m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent - 50;
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
         // ---- 当たり判定 ----------------------------------------------------
 
         /// <summary>
@@ -1023,14 +1094,18 @@ namespace HalfAware.EditorTools
         {
             switch (texture)
             {
-                case "NeonNerve": return new Color(1.00f, 0.16f, 0.67f);
-                case "NeonChiba": return new Color(0.16f, 0.92f, 1.00f);
-                case "NeonMemory": return new Color(1.00f, 0.59f, 0.12f);
-                case "NeonJack": return new Color(0.27f, 1.00f, 0.47f);
-                case "NeonRafu": return new Color(1.00f, 0.24f, 0.24f);
-                case "NeonBar": return new Color(0.67f, 0.43f, 1.00f);
-                case "NeonNoodle": return new Color(1.00f, 0.86f, 0.24f);
-                case "NeonClinic": return new Color(0.35f, 0.78f, 1.00f);
+                case "NeonNerve": return new Color(1.00f, 0.18f, 0.66f);
+                case "NeonOpen": return new Color(0.22f, 0.93f, 1.00f);
+                case "NeonBar": return new Color(0.69f, 0.45f, 1.00f);
+                case "NeonHotel": return new Color(1.00f, 0.24f, 0.24f);
+                case "NeonArrow": return new Color(1.00f, 0.62f, 0.12f);
+                case "NeonEye": return new Color(0.22f, 0.89f, 0.84f);
+                case "NeonLive": return new Color(1.00f, 0.89f, 0.25f);
+                case "NeonCross": return new Color(0.34f, 1.00f, 0.54f);
+                case "NeonClub": return new Color(1.00f, 0.29f, 0.54f);
+                case "NeonRings": return new Color(0.36f, 0.66f, 1.00f);
+                case "NeonSleep": return new Color(1.00f, 0.47f, 0.82f);
+                case "NeonNoodle": return new Color(1.00f, 0.78f, 0.28f);
                 default: return Color.white;
             }
         }
@@ -1038,8 +1113,8 @@ namespace HalfAware.EditorTools
         /// <summary>縦長の絵か。縦なら高さが幅の倍になる</summary>
         static bool Tall(string texture)
         {
-            return texture == "NeonNerve" || texture == "NeonMemory"
-                || texture == "NeonRafu" || texture == "NeonBar";
+            return texture == "NeonBar" || texture == "NeonHotel"
+                || texture == "NeonArrow" || texture == "NeonCross" || texture == "NeonRings";
         }
 
         /// <summary>
@@ -1051,34 +1126,34 @@ namespace HalfAware.EditorTools
             Clear(parent);
             var plates = new List<Plate>
             {
-                new Plate("NeonNerve",  -1,  1.5f,  4.7f, true,  1.55f),
-                new Plate("NeonChiba",   1,  2.4f,  5.6f, false, 1.75f),
-                new Plate("NeonRafu",    1,  3.6f, 10.4f, false, 2.35f),
-                new Plate("NeonNoodle",  1,  6.2f,  4.0f, true,  1.45f),
-                new Plate("NeonBar",    -1,  6.8f,  9.6f, false, 2.10f),
-                new Plate("NeonJack",   -1,  8.6f,  4.2f, true,  1.60f),
-                new Plate("NeonClinic",  1,  9.8f,  6.4f, false, 1.70f),
-                new Plate("NeonMemory", -1, 11.4f,  7.2f, false, 1.55f),
-                new Plate("NeonChiba",  -1, 12.6f,  4.1f, true,  1.50f),
-                new Plate("NeonBar",     1, 13.4f,  4.5f, true,  1.45f),
-                new Plate("NeonNerve",   1, 15.2f,  8.6f, false, 2.20f),
-                new Plate("NeonRafu",   -1, 16.6f,  4.4f, true,  1.50f),
-                new Plate("NeonNoodle", -1, 18.2f,  7.4f, false, 1.60f),
-                new Plate("NeonMemory",  1, 19.0f,  4.2f, true,  1.55f),
-                new Plate("NeonJack",    1, 21.6f,  6.8f, false, 1.75f),
-                new Plate("NeonClinic", -1, 22.4f,  4.3f, true,  1.55f),
-                new Plate("NeonBar",    -1, 24.0f, 10.2f, false, 2.30f),
-                new Plate("NeonChiba",   1, 25.2f,  4.1f, true,  1.50f),
-                new Plate("NeonNerve",  -1, 27.0f,  4.6f, true,  1.50f),
-                new Plate("NeonNoodle",  1, 28.2f,  7.8f, false, 1.65f),
-                new Plate("NeonMemory", -1, 29.6f,  9.4f, false, 2.15f),
-                new Plate("NeonJack",    1, 30.4f,  4.4f, true,  1.55f),
-                new Plate("NeonRafu",    1, 33.0f,  6.2f, false, 1.60f),
-                new Plate("NeonClinic",  1, 34.6f,  4.2f, true,  1.60f),
-                new Plate("NeonChiba",  -1, 37.2f,  8.2f, false, 1.70f),
-                new Plate("NeonBar",     1, 37.8f,  4.5f, true,  1.45f),
-                new Plate("NeonNerve",  -1, 39.4f,  4.3f, true,  1.50f),
-                new Plate("NeonMemory",  1, 40.6f,  9.0f, false, 2.05f),
+                new Plate("NeonOpen",   -1,  1.5f,  4.6f, true,  1.55f),
+                new Plate("NeonNerve",   1,  2.4f,  5.6f, false, 1.80f),
+                new Plate("NeonHotel",   1,  3.8f, 10.2f, false, 2.30f),
+                new Plate("NeonBar",     1,  6.2f,  4.1f, true,  1.35f),
+                new Plate("NeonSleep",  -1,  6.8f,  9.4f, false, 2.05f),
+                new Plate("NeonArrow",  -1,  8.6f,  4.3f, true,  1.25f),
+                new Plate("NeonEye",     1,  9.8f,  6.4f, false, 1.75f),
+                new Plate("NeonClub",   -1, 11.4f,  7.2f, false, 1.70f),
+                new Plate("NeonCross",  -1, 12.6f,  4.2f, true,  1.30f),
+                new Plate("NeonRings",   1, 13.4f,  4.6f, true,  1.30f),
+                new Plate("NeonNoodle",  1, 15.2f,  8.6f, false, 2.15f),
+                new Plate("NeonHotel",  -1, 16.6f,  4.4f, true,  1.35f),
+                new Plate("NeonLive",   -1, 18.2f,  7.4f, false, 1.70f),
+                new Plate("NeonBar",     1, 19.0f,  4.2f, true,  1.35f),
+                new Plate("NeonOpen",    1, 21.6f,  6.8f, false, 1.70f),
+                new Plate("NeonArrow",  -1, 22.4f,  4.3f, true,  1.25f),
+                new Plate("NeonNerve",  -1, 24.0f, 10.0f, false, 2.25f),
+                new Plate("NeonCross",   1, 25.2f,  4.1f, true,  1.30f),
+                new Plate("NeonRings",  -1, 27.0f,  4.5f, true,  1.30f),
+                new Plate("NeonSleep",   1, 28.2f,  7.8f, false, 1.70f),
+                new Plate("NeonEye",    -1, 29.6f,  9.2f, false, 2.10f),
+                new Plate("NeonBar",     1, 30.4f,  4.4f, true,  1.35f),
+                new Plate("NeonClub",    1, 33.0f,  6.2f, false, 1.65f),
+                new Plate("NeonArrow",   1, 34.6f,  4.2f, true,  1.25f),
+                new Plate("NeonNoodle", -1, 37.2f,  8.2f, false, 1.75f),
+                new Plate("NeonHotel",   1, 37.8f,  4.5f, true,  1.35f),
+                new Plate("NeonCross",  -1, 39.4f,  4.3f, true,  1.30f),
+                new Plate("NeonLive",    1, 40.6f,  8.8f, false, 2.00f),
             };
             for (var i = 0; i < plates.Count; i++) Sign(parent, "Sign" + i, plates[i]);
             Tubes(Child(parent, "Tubes"));
@@ -1514,6 +1589,15 @@ namespace HalfAware.EditorTools
         /// <summary>立ち位置。通りの入口に、北を向いて立たせる</summary>
         static void Place(Transform root)
         {
+            var cam = GameObject.Find("Player/Main Camera");
+            if (cam != null)
+            {
+                var c = cam.GetComponent<Camera>();
+                // 空が真っ黒だと雲の形が出ない。街明かりを受けた夜空の色を置く
+                c.clearFlags = CameraClearFlags.SolidColor;
+                c.backgroundColor = new Color(0.270f, 0.186f, 0.196f);
+                EditorUtility.SetDirty(c);
+            }
             var player = GameObject.Find("Player");
             if (player == null) return;
             var cc = player.GetComponent<CharacterController>();
