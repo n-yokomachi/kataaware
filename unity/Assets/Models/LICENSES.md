@@ -4,6 +4,7 @@
 |---|---|---|
 | `kenney/` | Kenney Furniture Kit（https://kenney.nl/assets/furniture-kit） | Creative Commons CC0 1.0 |
 | `quaternius/` | Quaternius Ultimate Modular Women（https://quaternius.com/packs/ultimatemodularwomen.html） | 下の注記を参照 |
+| `quaternius/` | Quaternius Ultimate Modular Men（https://quaternius.com/packs/ultimatemodularcharacters.html） | 下の注記を参照 |
 | `generated/` | 自作。`Assets/Editor/ProcMesh.cs` で断面を張って作った物 | 本作の一部 |
 
 Kenney の素材は CC0 なので表示の義務は無いが、どこから来た物かを残すために記録する。
@@ -58,3 +59,20 @@ Kenney の素材は CC0 なので表示の義務は無いが、どこから来�
 ## 取り込みの注意
 
 人体は **FBX で取り込む**。`.gltf` は glTFast が骨入りの mesh で `SortAndNormalizeBoneWeightsJob` のジョブ安全性の例外を出して失敗する。Kenney の家具は骨が無いので `.glb` のままで通っている。
+
+## 通りの人
+
+`W_*.fbx` が Ultimate Modular Women、`M_*.fbx` が Ultimate Modular Men。どちらも CC0。
+
+街に居そうな身なりだけを選んで、男女 6 体ずつ置いてある。群衆は一様に選ぶので
+半々に散る（`HalfAware/Build the alley` の記録に内訳が出る）。
+男性パックは `Individual Characters/FBX/` から取った。King・Spacesuit・Swat・
+Beach・Farmer はこの街に合わないので入れていない。
+
+**骨組みは男女で同じ**（85〜86 本、`UpperLeg.L` などの名前も揃っている）ので、
+`BuildAlley.Pose` はどちらにもそのまま効く。
+
+配布の模型は歩いている途中の姿勢で入っていて、素のままだと足首が前後に 0.29 m ずれる。
+立ち姿はそのぶん腿を寄せて揃えている（`BuildAlley.Stride`）。
+**骨を identity へ戻してはいけない。** mesh はこの姿勢に合わせて皮を張ってあるので、
+大きくずらすと体が裂ける。

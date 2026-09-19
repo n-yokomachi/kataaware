@@ -971,9 +971,15 @@ namespace HalfAware.EditorTools
         // ---- 人 ------------------------------------------------------------
 
         /// <summary>仮置きの人に使うモデル。自室の主人公と同じ Quaternius の一式</summary>
+        /// <summary>
+        /// 通りとヤードに立たせる模型。Quaternius の Ultimate Modular Women と
+        /// Ultimate Modular Men から、街に居そうな身なりだけを選んである。
+        /// 男女を同数並べて、拾い方は一様。半々くらいに散る
+        /// </summary>
         static readonly string[] CrowdModels =
         {
-            "W_Casual", "W_SciFi", "W_Formal", "W_Adventurer", "W_Suit",
+            "W_Casual", "W_SciFi", "W_Formal", "W_Adventurer", "W_Suit", "W_Punk",
+            "M_Casual", "M_Hoodie", "M_Suit", "M_Worker", "M_Punk", "M_Adventurer",
         };
 
         /// <summary>置き場所ひとつ。どのモデルを、どの姿勢で、どこへ向けて立たせるか</summary>
@@ -1325,10 +1331,13 @@ namespace HalfAware.EditorTools
             var uvs = new List<Vector2>();
             var tris = new List<int>();
             var tmp = new Mesh();
+            var menCount = 0;
+            var womenCount = 0;
             foreach (var spot in spots)
             {
                 var k = rng.Next(CrowdModels.Length);
                 if (insts[k] == null) continue;
+                if (CrowdModels[k][0] == 'M') menCount++; else womenCount++;
                 Pose(insts[k].transform, rests[k], spot.pose);
                 var drop = PoseDrop(spot.pose);
                 var trs = Matrix4x4.TRS(spot.at + new Vector3(0f, -drop * spot.scale, 0f),
@@ -1371,7 +1380,8 @@ namespace HalfAware.EditorTools
             go.transform.SetParent(parent, false);
             go.AddComponent<MeshFilter>().sharedMesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
             go.AddComponent<MeshRenderer>().sharedMaterial = CrowdMat();
-            Debug.Log("人 " + spots.Count + " 体、" + (tris.Count / 3) + " ポリゴン。壁に近くて見送った場所 " + Skipped);
+            Debug.Log("人 " + spots.Count + " 体（男 " + menCount + " / 女 " + womenCount + "）、"
+                + (tris.Count / 3) + " ポリゴン。壁に近くて見送った場所 " + Skipped);
         }
 
         static Transform Find(Transform root, string name)
@@ -1494,7 +1504,14 @@ namespace HalfAware.EditorTools
                 case 5: return 0.422f;
                 case 6: return 0.415f;
                 case 7: return 0.432f;
-                default: return 0f;
+                // 立ち姿は歩幅を詰めたぶんだけ脚が伸びるので、そのぶん持ち上げる。
+                // 負の値は上げる向き。値は焼いた形の最下点を実測してある
+                case 1: return -0.051f;
+                case 2: return -0.043f;
+                case 3: return -0.047f;
+                case 4: return -0.028f;
+                case 8: return -0.018f;
+                default: return -0.045f;
             }
         }
 
@@ -1504,6 +1521,20 @@ namespace HalfAware.EditorTools
         /// 0 立つ／1 片脚に預ける／2 腕組み／3 手を後ろ／4 振り向く／
         /// 5 椅子に座る／6 卓に肘をつく／7 横を向いて座る／8 壁にもたれる
         /// </summary>
+        /// <summary>
+        /// 立ち姿で腕を前後から寄せる量。度。
+        ///
+        /// 配布の模型は歩いている途中の姿勢で入っており、
+        /// 素のままだと足首が前後に 0.29 m ずれている。
+        /// そのまま立たせると大股で止まっているように見えるので、
+        /// 腿を寄せて揃える。±10.5 度で足首が並ぶのを実測してある。
+        /// 少しだけ残して、突っ立ちすぎないようにする。
+        ///
+        /// 骨を素の向きへ戻す（localRotation を identity にする）のは驄目。
+        /// mesh はこの姿勢に合わせて皮を張ってあるので、大きくずらすと体が裂ける
+        /// </summary>
+        const float Stride = 9.5f;
+
         static void Pose(Transform root, Dictionary<Transform, Quaternion> rest, int pose)
         {
             foreach (var pair in rest) pair.Key.localRotation = pair.Value;
@@ -1566,9 +1597,11 @@ namespace HalfAware.EditorTools
             Turn(root, "Head", -spine * 0.25f + (float)0f, 0f);
 
             // 四肢は下を向いた骨なので、正の値が前へ出るよう符号を返す。
-            // 背骨は上を向いているのでそのまま
-            Turn(root, "UpperLeg.L", -thighL, outL * 0.25f);
-            Turn(root, "UpperLeg.R", -thighR, outR * 0.25f);
+            // 背骨は上を向いているのでそのまま。
+            // 立ち姿はここで歩幅を詰める
+            var close = pose >= 5 && pose <= 7 ? 0f : Stride;
+            Turn(root, "UpperLeg.L", -(thighL + close), outL * 0.25f);
+            Turn(root, "UpperLeg.R", -(thighR - close), outR * 0.25f);
             Turn(root, "LowerLeg.L", -kneeL, 0f);
             Turn(root, "LowerLeg.R", -kneeR, 0f);
 

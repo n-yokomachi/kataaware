@@ -84,10 +84,10 @@ namespace HalfAware.EditorTools
             Chips = new GameObject[MarketSale.Chips];
             for (var i = 0; i < Chips.Length; i++)
             {
-                var slot = (i - (Chips.Length - 1) * 0.5f) * 0.17f;
+                var slot = (i - (Chips.Length - 1) * 0.5f) * 0.098f;
                 Chips[i] = Chip(chips, "Chip" + i,
                     at + spin * new Vector3(slot, 0.812f, -0.40f),
-                    spin * Quaternion.Euler(0f, i % 2 == 0 ? 4f : -5f, 0f));
+                    spin * Quaternion.Euler(0f, i % 2 == 0 ? 6f : -7f, 0f));
             }
 
             // 買い手 B が置いていく煙草。卓の向こう寄り、買い手の手が届くあたり
@@ -118,7 +118,7 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// 買い手。卓の手前に立ち、店の方を向く。
         ///
-        /// この企画には女の模型しか無いので、男は縦横を少し増した体格で見分けさせる。
+        /// 6.4 のとおり 1 人目と 2 人目は男、3 人目は女。
         /// 色は群衆より濃くして、後ろの人だかりから浮かせる。
         /// はじめは伏せておき、その買い手の番だけ AlleyDirector が出す
         /// </summary>
@@ -128,21 +128,22 @@ namespace HalfAware.EditorTools
             var front = spin * new Vector3(0f, 0f, -1f);
             var mat = BuildAlley.BuyerMat();
             var made = new GameObject[MarketSale.Count];
-            var models = new[] { "W_Suit", "W_Casual", "W_Formal" };
+            var men = new[] { "M_Suit", "M_Worker" };
+            var women = new[] { "W_Formal", "W_Casual" };
             var poses = new[] { 1, 2, 0 };
             var sway = new[] { -0.12f, 0.10f, -0.04f };
+            var man = 0;
+            var lady = 0;
             for (var i = 0; i < made.Length; i++)
             {
                 var woman = MarketSale.Woman(i);
-                var build = woman
-                    ? new Vector3(0.985f, 0.990f, 0.985f)
-                    : new Vector3(1.090f, 1.055f, 1.090f);
+                var model = woman ? women[lady++ % women.Length] : men[man++ % men.Length];
                 // 卓の前端は露店の中心から 0.98 m、体が入るのは 1.23 m から。
                 // 買い手は縁から少し下がって立つ
                 var spot = at + front * 1.55f + spin * new Vector3(sway[i], 0f, 0f);
                 spot.y = Ground(spot);
-                var go = BuildAlley.BakeOne(parent, "Buyer" + i, models[i % models.Length],
-                    spot, yaw, poses[i % poses.Length], build, mat);
+                var go = BuildAlley.BakeOne(parent, "Buyer" + i, model,
+                    spot, yaw, poses[i % poses.Length], Vector3.one, mat);
                 if (go == null) continue;
                 go.SetActive(false);
                 made[i] = go;
@@ -158,8 +159,11 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// メモリーチップ 1 枚。ただの箱だと何だか分からないので、
-        /// 本体・貼った札・端の接点の 3 つで組む
+        /// メモリーチップ 1 枚。
+        ///
+        /// 寸法もマテリアルも自室のラックに差さっているものと揃える。
+        /// 向こうは 15 × 46 × 34 mm の小さな板で、立てて差してある。
+        /// こちらは卓に平らに置くので、同じ板を寝かせて札を上に向ける
         /// </summary>
         static GameObject Chip(Transform parent, string name, Vector3 at, Quaternion rot)
         {
@@ -167,9 +171,8 @@ namespace HalfAware.EditorTools
             go.transform.SetParent(parent, false);
             go.transform.position = at;
             go.transform.rotation = rot;
-            Part(go.transform, "Body", new Vector3(0f, 0.008f, 0f), new Vector3(0.115f, 0.016f, 0.078f), ChipMat());
-            Part(go.transform, "Label", new Vector3(0f, 0.0168f, -0.009f), new Vector3(0.088f, 0.0022f, 0.042f), LabelMat());
-            Part(go.transform, "Contacts", new Vector3(0f, 0.0132f, 0.031f), new Vector3(0.072f, 0.0032f, 0.013f), BrassMat());
+            Part(go.transform, "Body", new Vector3(0f, 0.0075f, 0f), new Vector3(0.046f, 0.015f, 0.034f), ChipMat());
+            Part(go.transform, "Label", new Vector3(0.013f, 0.0160f, 0f), new Vector3(0.010f, 0.002f, 0.026f), LabelMat());
             go.SetActive(false);
             return go;
         }
@@ -268,22 +271,27 @@ namespace HalfAware.EditorTools
             return m;
         }
 
-        /// <summary>チップの本体。黒い樹脂</summary>
+        /// <summary>チップの本体。自室のラックと同じ物を使う</summary>
         static Material ChipMat()
         {
-            return Solid("Chip", new Color(0.115f, 0.125f, 0.145f), 0.62f, 0.35f);
+            return Shared("Assets/Materials/Room/SteelDark.mat", "Chip",
+                new Color(0.115f, 0.125f, 0.145f), 0.62f, 0.35f);
         }
 
-        /// <summary>貼った札。手書きの日付と番号が載っている紙</summary>
+        /// <summary>貼った札。これも自室と同じ</summary>
         static Material LabelMat()
         {
-            return Solid("ChipLabel", new Color(0.560f, 0.545f, 0.490f), 0.18f, 0f);
+            return Shared("Assets/Materials/Room/Steel.mat", "ChipLabel",
+                new Color(0.560f, 0.545f, 0.490f), 0.18f, 0f);
         }
 
-        /// <summary>端の接点。差し込む側の金</summary>
-        static Material BrassMat()
+        /// <summary>あれば自室のものを使う。無ければ同じ色で作る</summary>
+        static Material Shared(string path, string fallback, Color colour, float smooth, float metal)
         {
-            return Solid("ChipContacts", new Color(0.520f, 0.430f, 0.185f), 0.74f, 0.85f);
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m != null) return m;
+            Debug.LogWarning("自室のマテリアルが無い: " + path);
+            return Solid(fallback, colour, smooth, metal);
         }
 
         /// <summary>煙草の箱。自室で使っている絵をそのまま巻く</summary>
