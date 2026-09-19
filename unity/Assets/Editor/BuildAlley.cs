@@ -77,6 +77,9 @@ namespace HalfAware.EditorTools
             Backdrop(Child(root, "Backdrop"));
             Sky(Child(root, "Sky"));
             Bounds(Child(root, "Bounds"));
+            NightSky();
+            Mirrors(Child(root, "Mirrors"));
+            BakeMirrors(root);
             Rain();
             var temp = GameObject.Find("TempGround");
             if (temp != null) Object.DestroyImmediate(temp);
@@ -737,15 +740,22 @@ namespace HalfAware.EditorTools
         static void Puddles(Transform parent)
         {
             Clear(parent);
-            var bank = new Bank { Texel = 0.35f };
+            // 水は下の地面を透かして見せる。単色の板を置くと、暗い場では黒い穴になる。
+            // 濡れた縁 → 水面 の 2 枚を重ねて、乾いた地面へなだらかに繋ぐ
+            var roadDamp = new Bank { Texel = 0.22f };
+            var roadWet = new Bank { Texel = 0.22f };
+            var stoneDamp = new Bank { Texel = 0.42f };
+            var stoneWet = new Bank { Texel = 0.42f };
             var rng = new System.Random(7720);
+
             for (var z = StreetSouth + 3f; z < StreetNorth - 2f; z += (float)(2.6 + rng.NextDouble() * 3.4))
             {
                 var x = (float)(rng.NextDouble() * 2.0 - 1.0) * (StreetHalf - 0.9f);
-                var w = (float)(0.9 + rng.NextDouble() * 2.6);
-                var d = (float)(0.7 + rng.NextDouble() * 2.2);
-                var y = Mathf.Abs(x) > RoadHalf ? KerbRise + 0.008f : 0.008f;
-                Pool(bank, y, x, z, w, d, rng);
+                var w = (float)(0.7 + rng.NextDouble() * 1.5);
+                var d = (float)(0.5 + rng.NextDouble() * 1.2);
+                var kerb = Mathf.Abs(x) > RoadHalf;
+                var y = kerb ? KerbRise + 0.006f : 0.006f;
+                Pool(kerb ? stoneDamp : roadDamp, kerb ? stoneWet : roadWet, y, x, z, w, d, rng);
             }
             // 中庭。照り返しはここだけが持つので、筋のほかにも散らす
             for (var x = YardWest + 1.5f; x < LaneWest - 1f; x += (float)(1.6 + rng.NextDouble() * 1.8))
@@ -756,35 +766,153 @@ namespace HalfAware.EditorTools
                     var z = Mathf.Lerp(YardSouth + 1.2f, YardNorth - 1.2f, (float)rng.NextDouble());
                     var w = (float)(0.7 + rng.NextDouble() * 1.7);
                     var d = (float)(0.5 + rng.NextDouble() * 1.3);
-                    Pool(bank, 0.028f, x, z, w, d, rng);
+                    Pool(stoneDamp, stoneWet, 0.026f, x, z, w, d, rng);
                 }
             }
-            // 小路。屋根があるので入口の側だけ濡れている
+            // 小路。屋根があるので口の側だけ濡れている
             for (var x = LaneWest + 0.8f; x < -StreetHalf - 1f; x += (float)(2.2 + rng.NextDouble() * 2.0))
             {
                 var w = (float)(0.7 + rng.NextDouble() * 1.2);
-                Pool(bank, 0.026f, x, LaneZ, w, LaneHalf * 2f - 0.6f, rng);
+                Pool(stoneDamp, stoneWet, 0.024f, x, LaneZ, w, LaneHalf * 2f - 0.6f, rng);
             }
-            bank.Emit(parent, "Puddles", Mat("Puddle"), false, Generated);
+
+            // 濡れた縁は地面より少し暗いだけ。水面はさらに暗く、艶を上げる。
+            // 暗くしすぎると黒い穴に見えるので、下の地面が透けて見える明るさに留める
+            roadDamp.Emit(parent, "DampRoad", WetMat("DampRoad", "AlleyAsphalt", 0.86f, 0.28f), false, Generated);
+            stoneDamp.Emit(parent, "DampStone", WetMat("DampStone", "AlleyCobble", 0.86f, 0.28f), false, Generated);
+            roadWet.Emit(parent, "WetRoad", WetMat("WetRoad", "AlleyAsphalt", 0.70f, 0.80f), false, Generated);
+            stoneWet.Emit(parent, "WetStone", WetMat("WetStone", "AlleyCobble", 0.70f, 0.80f), false, Generated);
         }
 
         /// <summary>
         /// 水たまり 1 つ。四角のままだと紙を敷いたように見えるので、
-        /// 大きさの違う面を 3 枚ずらして重ね、輪郭を崩す
+        /// 大きさの違う面を 3 枚ずらして重ねて輪郭を崩す。
+        /// 濡れた縁を一回り大きく敷き、その上に水面を置く
         /// </summary>
-        static void Pool(Bank bank, float y, float cx, float cz, float w, float d, System.Random rng)
+        static void Pool(Bank damp, Bank wet, float y, float cx, float cz, float w, float d, System.Random rng)
         {
-            bank.FaceY(y, cx - w * 0.5f, cx + w * 0.5f, cz - d * 0.5f, cz + d * 0.5f, 1);
-            for (var i = 0; i < 2; i++)
+            var parts = new Vector4[3];
+            parts[0] = new Vector4(cx, cz, w, d);
+            for (var i = 1; i < 3; i++)
             {
-                var sw = w * (float)(0.35 + rng.NextDouble() * 0.5);
-                var sd = d * (float)(0.35 + rng.NextDouble() * 0.5);
-                var ox = cx + (float)(rng.NextDouble() - 0.5) * w * 0.9f;
-                var oz = cz + (float)(rng.NextDouble() - 0.5) * d * 0.9f;
-                bank.FaceY(y, ox - sw * 0.5f, ox + sw * 0.5f, oz - sd * 0.5f, oz + sd * 0.5f, 1);
+                var sw = w * (float)(0.35 + rng.NextDouble() * 0.45);
+                var sd = d * (float)(0.35 + rng.NextDouble() * 0.45);
+                parts[i] = new Vector4(cx + (float)(rng.NextDouble() - 0.5) * w * 0.6f,
+                    cz + (float)(rng.NextDouble() - 0.5) * d * 0.6f, sw, sd);
+            }
+            for (var i = 0; i < parts.Length; i++)
+            {
+                var q = parts[i];
+                // 濡れた縁。水面より一回り大きく、少しだけ下
+                damp.FaceY(y, q.x - q.z * 0.5f - 0.16f, q.x + q.z * 0.5f + 0.16f,
+                    q.y - q.w * 0.5f - 0.16f, q.y + q.w * 0.5f + 0.16f, 1);
+                wet.FaceY(y + 0.004f, q.x - q.z * 0.5f, q.x + q.z * 0.5f,
+                    q.y - q.w * 0.5f, q.y + q.w * 0.5f, 1);
             }
         }
 
+        /// <summary>
+        /// 濡れた地面。下の地面と同じ絵を貼って暗く沈め、艶だけ上げる。
+        /// 絵を貼らずに色だけにすると、暗い場では黒い板にしか見えない
+        /// </summary>
+        static Material WetMat(string name, string skin, float dim, float smooth)
+        {
+            var path = Materials + name + ".mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                if (!AssetDatabase.IsValidFolder("Assets/Materials/Alley"))
+                    AssetDatabase.CreateFolder("Assets/Materials", "Alley");
+                m = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                m.name = name;
+                AssetDatabase.CreateAsset(m, path);
+            }
+            m.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/" + skin + ".png"));
+            m.SetColor("_BaseColor", new Color(dim, dim, dim * 1.06f, 1f));
+            if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", smooth);
+            if (m.HasProperty("_Metallic")) m.SetFloat("_Metallic", 0f);
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// <summary>
+        /// 映り込みの下地になる空。既定のままだと昼の空なので、
+        /// 濡れた面がそれを映して白く光る。夜の色まで落とす。
+        /// 環境光は場面側で別に持っているので、ここでは触らない
+        /// </summary>
+        static void NightSky()
+        {
+            var path = Materials + "NightSky.mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                if (!AssetDatabase.IsValidFolder("Assets/Materials/Alley"))
+                    AssetDatabase.CreateFolder("Assets/Materials", "Alley");
+                m = new Material(Shader.Find("Skybox/Procedural"));
+                m.name = "NightSky";
+                AssetDatabase.CreateAsset(m, path);
+            }
+            m.SetFloat("_SunDisk", 0f);
+            m.SetFloat("_SunSize", 0f);
+            m.SetFloat("_AtmosphereThickness", 0.40f);
+            m.SetColor("_SkyTint", new Color(0.17f, 0.19f, 0.30f));
+            m.SetColor("_GroundColor", new Color(0.035f, 0.036f, 0.045f));
+            m.SetFloat("_Exposure", 0.22f);
+            EditorUtility.SetDirty(m);
+            RenderSettings.skybox = m;
+            RenderSettings.reflectionIntensity = 1f;
+        }
+
+        /// <summary>映り込みを焼く。組み直すたびに焼き直さないと、前の絵が残る</summary>
+        static void BakeMirrors(Transform root)
+        {
+            var probes = root.GetComponentsInChildren<ReflectionProbe>(true);
+            for (var i = 0; i < probes.Length; i++)
+            {
+                var path = Generated + "Mirror" + i + ".exr";
+                if (!Lightmapping.BakeReflectionProbe(probes[i], path))
+                    Debug.LogWarning("映り込みを焼けなかった: " + path);
+            }
+        }
+
+        /// <summary>
+        /// 映り込みの下地。これが無いと、艶のある面は空だけを映して黒く沈む。
+        /// ネオンと窓の灯りを拾わせたいので、通りと中庭に置いて焼く
+        /// </summary>
+        static void Mirrors(Transform parent)
+        {
+            Clear(parent);
+            var at = new Vector3[]
+            {
+                new Vector3(0f, 2.6f, 2f),
+                new Vector3(0f, 2.6f, 28f),
+                new Vector3((YardWest + LaneWest) * 0.5f, 2.6f, LaneZ),
+                new Vector3((LaneWest - StreetHalf) * 0.5f, 1.8f, LaneZ),
+            };
+            var size = new Vector3[]
+            {
+                new Vector3(StreetHalf * 2f, 9f, 34f),
+                new Vector3(StreetHalf * 2f, 9f, 34f),
+                new Vector3(LaneWest - YardWest, 9f, YardNorth - YardSouth),
+                new Vector3(-StreetHalf - LaneWest, 5f, LaneHalf * 2f),
+            };
+            for (var i = 0; i < at.Length; i++)
+            {
+                var go = new GameObject("Mirror" + i);
+                go.transform.SetParent(parent, false);
+                go.transform.localPosition = at[i];
+                var pr = go.AddComponent<ReflectionProbe>();
+                pr.mode = UnityEngine.Rendering.ReflectionProbeMode.Baked;
+                pr.size = size[i];
+                pr.resolution = 64;
+                pr.hdr = true;
+                pr.shadowDistance = 0f;
+                pr.cullingMask = ~0;
+                pr.clearFlags = UnityEngine.Rendering.ReflectionProbeClearFlags.Skybox;
+                pr.importance = 1;
+                pr.boxProjection = true;
+            }
+        }
 
         // ---- 人 ------------------------------------------------------------
 
@@ -813,6 +941,8 @@ namespace HalfAware.EditorTools
             Clear(parent);
             var spots = new List<Spot>();
             var rng = new System.Random(4820);
+            Skipped = 0;
+            TouchShell();
 
             // 通り。立ち止まっている人を並べ、ときどき二人組で向かい合わせる
             for (var s = 0; s < 2; s++)
@@ -821,7 +951,8 @@ namespace HalfAware.EditorTools
                 for (var z = WalkSouth + 2f; z < StreetNorth - 3f; z += (float)(2.3 + rng.NextDouble() * 2.8))
                 {
                     if (side < 0 && z > LaneZ - 2.5f && z < LaneZ + 2.5f) continue;
-                    var x = side * (RoadHalf + 0.72f + (float)rng.NextDouble() * 0.75f);
+                    // 壁の面は ±StreetHalf。飾りと腕の振りぶん、そこから 0.85 は空ける
+                    var x = side * (RoadHalf + 0.42f + (float)rng.NextDouble() * 0.40f);
                     if (rng.NextDouble() < 0.28)
                     {
                         // 二人組。肩を寄せて向かい合う
@@ -863,7 +994,7 @@ namespace HalfAware.EditorTools
                     var yaw = stall.localEulerAngles.y;
                     // 座ると膝が 0.47 ほど前へ出る。台にぶつからないよう奥へ下げる
                     var back = Quaternion.Euler(0f, yaw, 0f) * new Vector3(
-                        (float)(rng.NextDouble() - 0.5) * 0.6f, 0f, 0.78f);
+                        (float)(rng.NextDouble() - 0.5) * 0.5f, 0f, 0.95f);
                     var seat = rng.Next(3);
                     Put(spots, new Vector3(p.x + back.x, 0.02f, p.z + back.z),
                         yaw + 180f + (float)(rng.NextDouble() * 40.0 - 20.0), seat == 0 ? 5 : seat == 1 ? 6 : 7, rng, true);
@@ -926,9 +1057,9 @@ namespace HalfAware.EditorTools
             {
                 var c = StandSpots[i];
                 if (rng.NextDouble() < 0.34) continue;
+                // 立ち飲みは場所に幅があるので、当たりを見てずらしてよい
                 Put(spots, new Vector3(c.x, c.y, c.z), c.w + (float)(rng.NextDouble() * 24.0 - 12.0),
-                    rng.NextDouble() < 0.35 ? 2 : StandPose(rng), rng, true);
-                Occupy(c.x, c.z, 0.34f);
+                    rng.NextDouble() < 0.35 ? 2 : StandPose(rng), rng);
             }
 
             // 四方の壁ぎわ。立ち話や雨宿り。露天席の区画は避ける
@@ -946,7 +1077,99 @@ namespace HalfAware.EditorTools
                 Put(spots, new Vector3(x, 0.02f, YardNorth - 1.15f), 180f + (float)(rng.NextDouble() * 50.0 - 25.0), 8, rng);
             }
 
+            UntouchShell();
             Bake(parent, spots, rng);
+        }
+
+        /// <summary>
+        /// 見えている壁の面。(x0, z0) から (x1, z1) の線で持つ。
+        /// 人をここへ近づけすぎると、肩や頭が壁へ食い込む
+        /// </summary>
+        static readonly Vector4[] Walls =
+        {
+            // 通りの東側
+            new Vector4(StreetHalf, StreetSouth, StreetHalf, StreetNorth),
+            // 通りの西側。小路の口だけ切れている
+            new Vector4(-StreetHalf, StreetSouth, -StreetHalf, LaneZ - LaneHalf),
+            new Vector4(-StreetHalf, LaneZ + LaneHalf, -StreetHalf, StreetNorth),
+            // 小路の南北
+            new Vector4(LaneWest, LaneZ - LaneHalf, -StreetHalf, LaneZ - LaneHalf),
+            new Vector4(LaneWest, LaneZ + LaneHalf, -StreetHalf, LaneZ + LaneHalf),
+            // 中庭の四方。東側は小路の口だけ切れている
+            new Vector4(YardWest, YardSouth, YardWest, YardNorth),
+            new Vector4(YardWest, YardSouth, LaneWest, YardSouth),
+            new Vector4(YardWest, YardNorth, LaneWest, YardNorth),
+            new Vector4(LaneWest, YardSouth, LaneWest, LaneZ - LaneHalf),
+            new Vector4(LaneWest, LaneZ + LaneHalf, LaneWest, YardNorth),
+        };
+
+        /// <summary>壁の面までの近さ。一番近い一本との距離を返す</summary>
+        static float ToWall(float x, float z)
+        {
+            var best = 9e9f;
+            for (var i = 0; i < Walls.Length; i++)
+            {
+                var w = Walls[i];
+                var ax = w.x; var az = w.y; var bx = w.z; var bz = w.w;
+                var vx = bx - ax; var vz = bz - az;
+                var len = vx * vx + vz * vz;
+                var t = len < 1e-6f ? 0f : Mathf.Clamp01(((x - ax) * vx + (z - az) * vz) / len);
+                var dx = x - (ax + vx * t);
+                var dz = z - (az + vz * t);
+                var d = Mathf.Sqrt(dx * dx + dz * dz);
+                if (d < best) best = d;
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// そこに人を立たせられるか。壁の面までの間合いと、
+        /// 実際に建っている物との当たりの両方で見る。
+        /// 壁に寄りかかる姿勢だけは面へ近づけてよい
+        /// </summary>
+        static bool Standable(Vector3 at, float clearance, bool solid)
+        {
+            if (ToWall(at.x, at.z) < clearance) return false;
+            if (!solid || Touched.Count == 0) return true;
+            // 胴の高さだけを見る。足元まで見ると地面や縁石に当たってしまう
+            var lo = at + new Vector3(0f, 0.42f, 0f);
+            var hi = at + new Vector3(0f, 1.52f, 0f);
+            return !Physics.CheckCapsule(lo, hi, 0.32f, ~0, QueryTriggerInteraction.Ignore);
+        }
+
+        /// <summary>調べのあいだだけ付けた当たり</summary>
+        static readonly List<MeshCollider> Touched = new List<MeshCollider>();
+
+        /// <summary>
+        /// 壁・柱・出店に当たりを付ける。見た目用の mesh は当たりを持たないので、
+        /// 人を置くあいだだけここで付けて、済んだら外す
+        /// </summary>
+        static void TouchShell()
+        {
+            UntouchShell();
+            var names = new[] { "Shell", "Heritage", "Terraces", "Fixtures", "Market", "Litter", "Lamps" };
+            for (var n = 0; n < names.Length; n++)
+            {
+                var go = GameObject.Find("Alley/" + names[n]);
+                if (go == null) continue;
+                var filters = go.GetComponentsInChildren<MeshFilter>(true);
+                for (var i = 0; i < filters.Length; i++)
+                {
+                    if (filters[i].sharedMesh == null) continue;
+                    if (filters[i].GetComponent<Collider>() != null) continue;
+                    var mc = filters[i].gameObject.AddComponent<MeshCollider>();
+                    mc.sharedMesh = filters[i].sharedMesh;
+                    Touched.Add(mc);
+                }
+            }
+            Physics.SyncTransforms();
+        }
+
+        static void UntouchShell()
+        {
+            for (var i = 0; i < Touched.Count; i++)
+                if (Touched[i] != null) Object.DestroyImmediate(Touched[i]);
+            Touched.Clear();
         }
 
         /// <summary>立ち姿を 4 つから選ぶ。同じ形が並ばないように</summary>
@@ -956,12 +1179,50 @@ namespace HalfAware.EditorTools
             return r < 0.30 ? 0 : r < 0.56 ? 1 : r < 0.78 ? 3 : 4;
         }
 
-        /// <summary>空いていれば立たせる。塞がっていれば諦める</summary>
+        /// <summary>
+        /// 空いていれば立たせる。塞がっていれば諦める。
+        /// force は台帳を飛ばす指定で、売り手や椅子のように場所が決まっているとき。
+        /// 壁との間合いだけは force でも見る。ここを飛ばすと壁に埋まる
+        /// </summary>
         static void Put(List<Spot> spots, Vector3 at, float yaw, int pose, System.Random rng, bool force = false)
         {
+            // 壁に寄りかかる姿勢は背中をつけるので、近づいてよい。
+            // 場所が決まっている置き方（売り手・椅子）は物との当たりを見ない。
+            // そこに卓や樽があるのは承知の上で置いている
+            // 腕を開いた姿勢は肩より 0.7 ほど外へ出る。壁の飾りぶんと足して見る
+            var clearance = pose == 8 ? 0.40f : 0.85f;
+            if (!Standable(at, clearance, !force))
+            {
+                // 少しずらせば立てることが多い。諦める前に周りを当たる
+                if (force || !Shift(ref at, clearance)) { Skipped++; return; }
+            }
             if (!force && !Free(at.x, at.z, 0.36f)) return;
             if (!force) Occupy(at.x, at.z, 0.30f);
             spots.Add(Spot1(at, yaw, pose, rng));
+        }
+
+        /// <summary>壁や物に当たって諦めた数。組み立ての最後に出す</summary>
+        static int Skipped;
+
+        /// <summary>
+        /// 立てない場所を少しずらして直す。8 方向を 2 段階の距離で当たり、
+        /// 最初に空いたところへ移す。どこも駄目なら false
+        /// </summary>
+        static bool Shift(ref Vector3 at, float clearance)
+        {
+            for (var step = 0; step < 3; step++)
+            {
+                var r = 0.26f + step * 0.28f;
+                for (var k = 0; k < 8; k++)
+                {
+                    var a = k * Mathf.PI * 0.25f;
+                    var t = new Vector3(at.x + Mathf.Cos(a) * r, at.y, at.z + Mathf.Sin(a) * r);
+                    if (!Standable(t, clearance, true)) continue;
+                    at = t;
+                    return true;
+                }
+            }
+            return false;
         }
 
         static Spot Spot1(Vector3 at, float yaw, int pose, System.Random rng)
@@ -1056,7 +1317,7 @@ namespace HalfAware.EditorTools
             go.transform.SetParent(parent, false);
             go.AddComponent<MeshFilter>().sharedMesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
             go.AddComponent<MeshRenderer>().sharedMaterial = CrowdMat();
-            Debug.Log("人 " + spots.Count + " 体、" + (tris.Count / 3) + " ポリゴン");
+            Debug.Log("人 " + spots.Count + " 体、" + (tris.Count / 3) + " ポリゴン。壁に近くて見送った場所 " + Skipped);
         }
 
         static Transform Find(Transform root, string name)
@@ -2084,7 +2345,9 @@ namespace HalfAware.EditorTools
             for (var i = 0; i < boxes; i++)
             {
                 var bw = (float)(0.35 + rng.NextDouble() * 0.2);
-                Box(t, "Crate" + i, new Vector3((float)(rng.NextDouble() - 0.5) * w * 0.7f, bw * 0.5f,
+                // 売り手は台の真後ろに座る。木箱はその左右へ寄せる
+                var side2 = rng.NextDouble() < 0.5 ? -1f : 1f;
+                Box(t, "Crate" + i, new Vector3(side2 * (w * 0.30f + 0.14f), bw * 0.5f,
                         d * 0.30f + (float)(rng.NextDouble() - 0.5) * 0.3f),
                     new Vector3(bw, bw, bw), "Crate");
             }
@@ -2831,7 +3094,8 @@ namespace HalfAware.EditorTools
                 // 樽は立ったまま飲む卓。腰掛けずに囲む
                 for (var i = -1; i <= 1; i += 2)
                 {
-                    var sx = x + i * 0.78f;
+                    // 樽の天板は 0.74。腹がめり込まない距離まで離す
+                    var sx = x + i * 0.98f;
                     if (Mathf.Abs(sx - doorX) < 1.2f) continue;
                     StandSpots.Add(new Vector4(sx, 0.02f, bz, i > 0 ? -90f : 90f));
                 }
