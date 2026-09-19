@@ -745,16 +745,44 @@ namespace HalfAware.EditorTools
                 var w = (float)(0.9 + rng.NextDouble() * 2.6);
                 var d = (float)(0.7 + rng.NextDouble() * 2.2);
                 var y = Mathf.Abs(x) > RoadHalf ? KerbRise + 0.008f : 0.008f;
-                bank.FaceY(y, x - w * 0.5f, x + w * 0.5f, z - d * 0.5f, z + d * 0.5f, 1);
+                Pool(bank, y, x, z, w, d, rng);
             }
-            for (var x = YardWest + 1.5f; x < LaneWest - 1f; x += (float)(2.0 + rng.NextDouble() * 2.5))
+            // 中庭。照り返しはここだけが持つので、筋のほかにも散らす
+            for (var x = YardWest + 1.5f; x < LaneWest - 1f; x += (float)(1.6 + rng.NextDouble() * 1.8))
             {
-                var z = LaneZ + (float)(rng.NextDouble() * 2.0 - 1.0) * 1.3f;
-                var w = (float)(0.8 + rng.NextDouble() * 1.8);
-                var d = (float)(0.6 + rng.NextDouble() * 1.4);
-                bank.FaceY(0.028f, x - w * 0.5f, x + w * 0.5f, z - d * 0.5f, z + d * 0.5f, 1);
+                var lanes = 1 + rng.Next(3);
+                for (var i = 0; i < lanes; i++)
+                {
+                    var z = Mathf.Lerp(YardSouth + 1.2f, YardNorth - 1.2f, (float)rng.NextDouble());
+                    var w = (float)(0.7 + rng.NextDouble() * 1.7);
+                    var d = (float)(0.5 + rng.NextDouble() * 1.3);
+                    Pool(bank, 0.028f, x, z, w, d, rng);
+                }
+            }
+            // 小路。屋根があるので入口の側だけ濡れている
+            for (var x = LaneWest + 0.8f; x < -StreetHalf - 1f; x += (float)(2.2 + rng.NextDouble() * 2.0))
+            {
+                var w = (float)(0.7 + rng.NextDouble() * 1.2);
+                Pool(bank, 0.026f, x, LaneZ, w, LaneHalf * 2f - 0.6f, rng);
             }
             bank.Emit(parent, "Puddles", Mat("Puddle"), false, Generated);
+        }
+
+        /// <summary>
+        /// 水たまり 1 つ。四角のままだと紙を敷いたように見えるので、
+        /// 大きさの違う面を 3 枚ずらして重ね、輪郭を崩す
+        /// </summary>
+        static void Pool(Bank bank, float y, float cx, float cz, float w, float d, System.Random rng)
+        {
+            bank.FaceY(y, cx - w * 0.5f, cx + w * 0.5f, cz - d * 0.5f, cz + d * 0.5f, 1);
+            for (var i = 0; i < 2; i++)
+            {
+                var sw = w * (float)(0.35 + rng.NextDouble() * 0.5);
+                var sd = d * (float)(0.35 + rng.NextDouble() * 0.5);
+                var ox = cx + (float)(rng.NextDouble() - 0.5) * w * 0.9f;
+                var oz = cz + (float)(rng.NextDouble() - 0.5) * d * 0.9f;
+                bank.FaceY(y, ox - sw * 0.5f, ox + sw * 0.5f, oz - sd * 0.5f, oz + sd * 0.5f, 1);
+            }
         }
 
 
@@ -833,8 +861,9 @@ namespace HalfAware.EditorTools
                     if (rng.NextDouble() < 0.42) continue;          // 空の店もある
                     var p = stall.localPosition;
                     var yaw = stall.localEulerAngles.y;
+                    // 座ると膝が 0.47 ほど前へ出る。台にぶつからないよう奥へ下げる
                     var back = Quaternion.Euler(0f, yaw, 0f) * new Vector3(
-                        (float)(rng.NextDouble() - 0.5) * 0.6f, 0f, 0.62f);
+                        (float)(rng.NextDouble() - 0.5) * 0.6f, 0f, 0.78f);
                     var seat = rng.Next(3);
                     Put(spots, new Vector3(p.x + back.x, 0.02f, p.z + back.z),
                         yaw + 180f + (float)(rng.NextDouble() * 40.0 - 20.0), seat == 0 ? 5 : seat == 1 ? 6 : 7, rng, true);
@@ -873,7 +902,8 @@ namespace HalfAware.EditorTools
                     var front2 = Quaternion.Euler(0f, yaw2, 0f) * new Vector3(
                         (float)(rng.NextDouble() - 0.5) * 1.1f, 0f, -1.35f);
                     var at2 = bodyT.localPosition + front2;
-                    Put(spots, new Vector3(at2.x, 0.02f, at2.z), yaw2 + 180f + (float)(rng.NextDouble() * 30.0 - 15.0),
+                    // 店の正面は店の -z 側。客はそこに立って、店のほうを向く
+                    Put(spots, new Vector3(at2.x, 0.02f, at2.z), yaw2 + (float)(rng.NextDouble() * 30.0 - 15.0),
                         rng.NextDouble() < 0.4 ? 6 : StandPose(rng), rng);
                 }
             }
@@ -1043,16 +1073,18 @@ namespace HalfAware.EditorTools
         {
             switch (pose)
             {
-                case 5: return 0.392f;
-                case 6: return 0.404f;
-                case 7: return 0.394f;
+                case 5: return 0.422f;
+                case 6: return 0.415f;
+                case 7: return 0.432f;
                 default: return 0f;
             }
         }
 
         /// <summary>
         /// 骨を曲げて姿勢を作る。安静へ戻してから重ねるので、同じ体を何度でも使い回せる。
-        /// 0 立つ／1 歩く／2 腕組み／3 しゃがむ／4 もたれる／5 座る／6 覗き込む
+        /// 模型は +z を向いている。角度はどれも「正なら前」に揃えてある。
+        /// 0 立つ／1 片脚に預ける／2 腕組み／3 手を後ろ／4 振り向く／
+        /// 5 椅子に座る／6 卓に肘をつく／7 横を向いて座る／8 壁にもたれる
         /// </summary>
         static void Pose(Transform root, Dictionary<Transform, Quaternion> rest, int pose)
         {
@@ -1084,26 +1116,27 @@ namespace HalfAware.EditorTools
                     outL = 9f; outR = -8f; spine = 3f; thighL = -3f; thighR = 4f;
                     break;
                 // 座る 3 つは腿と膝をほぼ揃える。腰の高さが揃わないと、
-                // 同じ椅子に座らせたときに浮いたり沈んだりする
+                // 同じ椅子に座らせたときに浮いたり沈んだりする。
+                // 腿を水平に、脛をほぼ垂直に落として、靴の裏が床へ着く角度を測ってある
                 case 5:  // 椅子に座る
-                    thighL = 107f; thighR = 106f; kneeL = -119f; kneeR = -120f;
-                    outL = 14f; outR = -14f; armL = 30f; armR = 26f; elbowL = 52f; elbowR = 48f;
-                    spine = 5f; level = true;
+                    thighL = 85f; thighR = 84f; kneeL = -70f; kneeR = -72f;
+                    outL = 12f; outR = -12f; armL = 26f; armR = 22f; elbowL = 48f; elbowR = 44f;
+                    spine = 4f; level = true;
                     break;
                 case 6:  // 卓に肘をついて座る
-                    thighL = 106f; thighR = 108f; kneeL = -120f; kneeR = -118f;
-                    outL = 18f; outR = -10f; armL = 16f; armR = 48f; elbowL = 28f; elbowR = 68f;
-                    spine = 9f; level = true;
+                    thighL = 84f; thighR = 86f; kneeL = -72f; kneeR = -68f;
+                    outL = 16f; outR = -9f; armL = 14f; armR = 44f; elbowL = 26f; elbowR = 64f;
+                    spine = 8f; level = true;
                     break;
-                case 8:  // 壁に背をつけて立つ
-                    lean = -9f; thighL = -10f; thighR = -6f; kneeL = 6f; kneeR = 3f;
+                case 8:  // 壁に背をつけて立つ。足は体より前へ出る
+                    lean = -9f; thighL = 12f; thighR = 8f; kneeL = -8f; kneeR = -5f;
                     armL = -16f; armR = 14f; elbowL = 30f; elbowR = 22f;
                     outL = 3f; outR = -8f; spine = -4f;
                     break;
                 case 7:  // 膝を寄せて横を向いて座る
-                    thighL = 108f; thighR = 106f; kneeL = -118f; kneeR = -121f;
-                    outL = 4f; outR = -24f; armL = 42f; armR = 24f; elbowL = 60f; elbowR = 40f;
-                    spine = 11f; level = true;
+                    thighL = 86f; thighR = 83f; kneeL = -68f; kneeR = -74f;
+                    outL = 3f; outR = -22f; armL = 38f; armR = 20f; elbowL = 56f; elbowR = 36f;
+                    spine = 10f; level = true;
                     break;
             }
 
@@ -1114,21 +1147,23 @@ namespace HalfAware.EditorTools
             Turn(root, "Neck", -spine * 0.35f, 0f);
             Turn(root, "Head", -spine * 0.25f + (float)0f, 0f);
 
-            Turn(root, "UpperLeg.L", thighL, outL * 0.25f);
-            Turn(root, "UpperLeg.R", thighR, outR * 0.25f);
-            Turn(root, "LowerLeg.L", kneeL, 0f);
-            Turn(root, "LowerLeg.R", kneeR, 0f);
+            // 四肢は下を向いた骨なので、正の値が前へ出るよう符号を返す。
+            // 背骨は上を向いているのでそのまま
+            Turn(root, "UpperLeg.L", -thighL, outL * 0.25f);
+            Turn(root, "UpperLeg.R", -thighR, outR * 0.25f);
+            Turn(root, "LowerLeg.L", -kneeL, 0f);
+            Turn(root, "LowerLeg.R", -kneeR, 0f);
 
             if (level)
             {
-                Turn(root, "Foot.L", -(thighL + kneeL), 0f);
-                Turn(root, "Foot.R", -(thighR + kneeR), 0f);
+                Turn(root, "Foot.L", thighL + kneeL, 0f);
+                Turn(root, "Foot.R", thighR + kneeR, 0f);
             }
 
-            Turn(root, "UpperArm.L", armL, outL);
-            Turn(root, "UpperArm.R", armR, outR);
-            Turn(root, "LowerArm.L", elbowL, 0f);
-            Turn(root, "LowerArm.R", elbowR, 0f);
+            Turn(root, "UpperArm.L", -armL, outL);
+            Turn(root, "UpperArm.R", -armR, outR);
+            Turn(root, "LowerArm.L", -elbowL, 0f);
+            Turn(root, "LowerArm.R", -elbowR, 0f);
         }
 
         /// <summary>骨ひとつを、体から見た軸で曲げる。左右で符号が揃う</summary>
@@ -2129,8 +2164,8 @@ namespace HalfAware.EditorTools
                 var l = g.AddComponent<Light>();
                 l.type = LightType.Point;
                 l.color = hue;
-                l.range = 11f;
-                l.intensity = 30f;
+                l.range = 8.5f;
+                l.intensity = 17f;
                 l.shadows = LightShadows.None;
             }
         }
@@ -2588,8 +2623,8 @@ namespace HalfAware.EditorTools
                 var l = g.AddComponent<Light>();
                 l.type = LightType.Point;
                 l.color = hue;
-                l.range = 8f;
-                l.intensity = 11f;
+                l.range = 7.5f;
+                l.intensity = 10f;
                 l.shadows = LightShadows.None;
             }
 
@@ -2615,10 +2650,10 @@ namespace HalfAware.EditorTools
         public const float RestaurantTerraceSouth = 41.15f;
 
         /// <summary>
-        /// 椅子の座面の高さ。座り姿勢で尻が 0.43 に来るのを測ってあるので、
-        /// 板の天面がその少し下に来るところへ置く
+        /// 椅子の座面の高さ。座り姿勢で尻が 0.47 に来るのを測ってあるので、
+        /// 板の天面がその少し下、0.46 に来るところへ置く
         /// </summary>
-        public const float SeatHigh = 0.40f;
+        public const float SeatHigh = 0.435f;
 
         /// <summary>
         /// 椅子の場所と向き。(x, y, z) と w に yaw。
@@ -2712,20 +2747,21 @@ namespace HalfAware.EditorTools
             {
                 var tz = tables[i];
                 var tx = cx - 0.05f;
-                Table(parent, "BistroTable" + i, new Vector3(tx, 0.09f, tz), rng);
-                Chair(parent, "BistroChair" + i + "a", new Vector3(tx - 0.72f, 0.09f, tz + (float)(rng.NextDouble() - 0.5) * 0.2f), 90f, rng);
-                Chair(parent, "BistroChair" + i + "b", new Vector3(tx + 0.72f, 0.09f, tz + (float)(rng.NextDouble() - 0.5) * 0.2f), -90f, rng);
+                // 石板の天面は 0.07。卓も椅子もそこへ置く
+                Table(parent, "BistroTable" + i, new Vector3(tx, 0.07f, tz), rng);
+                Chair(parent, "BistroChair" + i + "a", new Vector3(tx - 0.72f, 0.07f, tz + (float)(rng.NextDouble() - 0.5) * 0.2f), 90f, rng);
+                Chair(parent, "BistroChair" + i + "b", new Vector3(tx + 0.72f, 0.07f, tz + (float)(rng.NextDouble() - 0.5) * 0.2f), -90f, rng);
                 if (rng.NextDouble() < 0.5)
-                    Chair(parent, "BistroChair" + i + "c", new Vector3(tx + 0.1f, 0.09f, tz - 0.74f), 0f, rng);
+                    Chair(parent, "BistroChair" + i + "c", new Vector3(tx + 0.1f, 0.07f, tz - 0.74f), 0f, rng);
             }
 
             // 豆電球。天蓋の下に一列
             var wire = Child(parent, "BistroBulbs");
             var b = 0;
             for (var z = TerraceSouth + 0.35f; z < TerraceNorth; z += 0.52f, b++)
-                // 玉ひとつずつに灯りを足すと数が増えすぎる。4 つに 1 つだけ光源を持たせる
+                // 玉ひとつずつに灯りを足すと数が増えすぎる。8 つに 1 つだけ光源を持たせる
                 Bulb(wire, new Vector3(cx + Mathf.Sin(z * 1.7f) * 0.35f, roof - 0.42f, z), 0.055f, 1.9f,
-                    null, 3.0f, b % 4 == 0 ? 3.2f : 0f);
+                    null, 3.0f, b % 8 == 0 ? 2.4f : 0f);
             metal.Box(new Vector3(cx, roof - 0.33f, cz), new Vector3(0.035f, 0.035f, deep));
 
             // 暖房。傘つきの柱。雨の中で外に座れるのはこれのおかげ
@@ -2738,7 +2774,7 @@ namespace HalfAware.EditorTools
                 metal.Box(new Vector3(hx, 2.02f, hz), new Vector3(0.34f, 0.42f, 0.34f));
                 metal.Box(new Vector3(hx, 2.30f, hz), new Vector3(0.72f, 0.07f, 0.72f));
                 Bulb(Child(parent, "Heater" + i), new Vector3(hx, 2.02f, hz), 0.17f, 2.0f,
-                    new Color(1.00f, 0.44f, 0.20f), 4.2f, 4.5f);
+                    new Color(1.00f, 0.44f, 0.20f), 3.4f, 2.6f);
             }
 
             // 植木。柵ぎわ、卓と卓のあいだへ。椅子と場所を取り合わせない
@@ -2813,7 +2849,7 @@ namespace HalfAware.EditorTools
             var b = 0;
             for (var x = x0 + 0.4f; x < x1; x += 0.62f, b++)
                 Bulb(wire, new Vector3(x, roof - 0.36f + Mathf.Sin(x * 1.3f) * 0.06f, cz), 0.05f, 1.7f,
-                    null, 3.0f, b % 4 == 0 ? 3.2f : 0f);
+                    null, 3.0f, b % 8 == 0 ? 2.4f : 0f);
         }
 
         /// <summary>レストランの歩道席。北の壁の前。日除けの下に卓を並べる</summary>
@@ -2845,7 +2881,7 @@ namespace HalfAware.EditorTools
             var b = 0;
             for (var x = RestaurantWest + 0.4f; x < RestaurantEast; x += 0.58f, b++)
                 Bulb(wire, new Vector3(x, 2.92f, YardNorth - 1.35f), 0.05f, 1.8f,
-                    null, 3.0f, b % 4 == 0 ? 3.2f : 0f);
+                    null, 3.0f, b % 8 == 0 ? 2.4f : 0f);
         }
 
         /// <summary>丸い卓。脚は一本柱。上に硝子と燭台を載せる</summary>
@@ -2859,7 +2895,7 @@ namespace HalfAware.EditorTools
             Box(t, "Top", new Vector3(0f, 0.72f, 0f), new Vector3(0.76f, 0.05f, 0.76f), "Timber");
             Box(t, "Rim", new Vector3(0f, 0.68f, 0f), new Vector3(0.80f, 0.04f, 0.80f), "Furniture");
             // 卓の上。燭台と、硝子を 2 つ
-            Bulb(t, new Vector3(0.06f, 0.83f, 0.04f), 0.045f, 2.4f, new Color(1.00f, 0.66f, 0.30f), 2.6f, 3.2f);
+            Bulb(t, new Vector3(0.06f, 0.83f, 0.04f), 0.045f, 2.4f, new Color(1.00f, 0.66f, 0.30f), 2.6f, 0f);
             Box(t, "Candle", new Vector3(0.06f, 0.78f, 0.04f), new Vector3(0.09f, 0.11f, 0.09f), "Metal");
             for (var i = 0; i < 2; i++)
                 Box(t, "Glass" + i, new Vector3((float)(rng.NextDouble() - 0.5) * 0.42f, 0.80f,
@@ -3239,19 +3275,22 @@ namespace HalfAware.EditorTools
             return m;
         }
 
-        /// <summary>素材ごとの色と艶。雨に濡れているので路面と敷石だけ強く光らせる</summary>
+        /// <summary>
+        /// 素材ごとの色と艶。面という面が光ると画面が白く滑るので、地の艶は低く抑える。
+        /// 濡れて強く照り返すのは水たまりだけ
+        /// </summary>
         static void Tone(string name, out Color col, out float smooth)
         {
             switch (name)
             {
-                case "Asphalt": col = new Color(0.125f, 0.132f, 0.155f); smooth = 0.72f; break;
-                case "Cobble": col = new Color(0.135f, 0.138f, 0.150f); smooth = 0.58f; break;
+                case "Asphalt": col = new Color(0.125f, 0.132f, 0.155f); smooth = 0.14f; break;
+                case "Cobble": col = new Color(0.135f, 0.138f, 0.150f); smooth = 0.12f; break;
                 case "Brick": col = new Color(0.165f, 0.130f, 0.118f); smooth = 0.18f; break;
-                case "Concrete": col = new Color(0.185f, 0.186f, 0.192f); smooth = 0.24f; break;
-                case "Metal": col = new Color(0.095f, 0.098f, 0.105f); smooth = 0.46f; break;
-                case "Glass": col = new Color(0.030f, 0.036f, 0.048f); smooth = 0.86f; break;
+                case "Concrete": col = new Color(0.185f, 0.186f, 0.192f); smooth = 0.10f; break;
+                case "Metal": col = new Color(0.095f, 0.098f, 0.105f); smooth = 0.26f; break;
+                case "Glass": col = new Color(0.030f, 0.036f, 0.048f); smooth = 0.52f; break;
                 // 真っ黒で艶だけの面は、映り込む物が無いと穴に見える。地の明るさを持たせる
-                case "Puddle": col = new Color(0.165f, 0.172f, 0.190f); smooth = 0.78f; break;
+                case "Puddle": col = new Color(0.100f, 0.108f, 0.128f); smooth = 0.84f; break;
                 case "Tarp": col = new Color(0.150f, 0.145f, 0.130f); smooth = 0.30f; break;
                 // 店の日除け。ロンドンの店先にある濃い帆布
                 case "Awning": col = new Color(0.052f, 0.108f, 0.082f); smooth = 0.22f; break;
@@ -3265,7 +3304,7 @@ namespace HalfAware.EditorTools
                 case "TarpOchre": col = new Color(0.290f, 0.215f, 0.090f); smooth = 0.28f; break;
                 case "TarpMine": col = new Color(0.135f, 0.115f, 0.100f); smooth = 0.30f; break;
                 case "Timber": col = new Color(0.130f, 0.105f, 0.080f); smooth = 0.15f; break;
-                case "Pole": col = new Color(0.090f, 0.090f, 0.095f); smooth = 0.42f; break;
+                case "Pole": col = new Color(0.090f, 0.090f, 0.095f); smooth = 0.22f; break;
                 case "Crate": col = new Color(0.105f, 0.090f, 0.072f); smooth = 0.12f; break;
                 default: col = new Color(0.12f, 0.12f, 0.13f); smooth = 0.3f; break;
             }
