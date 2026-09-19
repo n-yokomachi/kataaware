@@ -87,6 +87,8 @@ namespace HalfAware.EditorTools
             var temp = GameObject.Find("TempGround");
             if (temp != null) Object.DestroyImmediate(temp);
             Place(root);
+            // 組み終えたら必ず見直す。目で気づくまで放っておかない
+            CheckAlley.Run(root);
             Selection.activeGameObject = root.gameObject;
             Mark(root.gameObject);
             AssetDatabase.SaveAssets();
@@ -1015,8 +1017,9 @@ namespace HalfAware.EditorTools
                     var x = side * (RoadHalf + 0.42f + (float)rng.NextDouble() * 0.40f);
                     if (rng.NextDouble() < 0.28)
                     {
-                        // 二人組。肩を寄せて向かい合う
-                        var face = (float)(rng.NextDouble() * 360.0);
+                        // 二人組。肩を寄せて向かい合う。
+                        // 向かい合う軸は通りに沿わせる。でたらめにすると片方が壁を向く
+                        var face = (rng.NextDouble() < 0.5 ? 0f : 180f) + (float)(rng.NextDouble() * 80.0 - 40.0);
                         var gap = 0.78f;
                         var off = Quaternion.Euler(0f, face, 0f) * new Vector3(0f, 0f, gap * 0.5f);
                         Put(spots, new Vector3(x - off.x, KerbRise, z - off.z), face, StandPose(rng), rng);
@@ -1025,13 +1028,18 @@ namespace HalfAware.EditorTools
                     }
                     var roll = rng.NextDouble();
                     var pose = roll < 0.30 ? 2 : roll < 0.58 ? 1 : roll < 0.80 ? 3 : 4;
-                    var yaw = roll < 0.30 ? (side > 0 ? 90f : -90f) : (float)(rng.NextDouble() * 360.0);
-                    Put(spots, new Vector3(x, KerbRise, z), yaw + (float)(rng.NextDouble() * 24.0 - 12.0), pose, rng);
+                    // 通りに立つ人は、店先を覚いているか、通りの南北どちらかを向いている。
+                    // 向きをでたらめにすると、半分が壁に向かって立ち尽くして見える
+                    var yaw = roll < 0.22
+                        ? (side > 0 ? 90f : -90f)                       // 店先を覚く
+                        : rng.NextDouble() < 0.5 ? 0f : 180f;           // 通りの先を見る
+                    Put(spots, new Vector3(x, KerbRise, z), yaw + (float)(rng.NextDouble() * 34.0 - 17.0), pose, rng);
                 }
             }
+            // 車道の真ん中にまばらに。こちらも通りの先を向く
             for (var z = WalkSouth + 6f; z < StreetNorth - 6f; z += (float)(8.0 + rng.NextDouble() * 6.0))
                 Put(spots, new Vector3((float)(rng.NextDouble() * 2.0 - 1.0) * (RoadHalf - 0.6f), 0f, z),
-                    (float)(rng.NextDouble() * 360.0), StandPose(rng), rng);
+                    (rng.NextDouble() < 0.5 ? 0f : 180f) + (float)(rng.NextDouble() * 40.0 - 20.0), StandPose(rng), rng);
 
             // 小路
             for (var x = LaneWest + 2.5f; x < -StreetHalf - 2f; x += (float)(4.0 + rng.NextDouble() * 3.0))
@@ -3596,9 +3604,56 @@ namespace HalfAware.EditorTools
                 var p = plates[i];
                 // 読む人は通りの真ん中に立つので、板は通りの中央を向く
                 var face = new Vector3(-p.side, 0f, 0f);
+                var x = p.side * (StreetHalf - 0.14f);
                 Board(parent, "StreetSign" + i, p.tex,
-                    new Vector3(p.side * (StreetHalf - 0.14f), p.y, p.z), face, p.size);
+                    Clear(new Vector3(x, p.y, p.z), p.size), face, p.size);
             }
+        }
+
+        /// <summary>
+        /// 板を掛けられる z を探す。壁には窓・鎧戸・管・梯子が先に付いているので、
+        /// 狙った場所がそれらと重なっていたら前後へずらす。
+        ///
+        /// 壁の物はほとんどが当たり判定を持たない焼いた mesh なので、線では調べられない。
+        /// 板のぶんの薄い箱に頂点が入っているかで見る
+        /// </summary>
+        static Vector3 Clear(Vector3 at, Vector2 size)
+        {
+            // 壁に向いた板は、幅が z、厚みが x になる。
+            // ここを取り違えると壁の中へ 2 m 分の箱を伸ばしてしまい、どこも空いていないことになる
+            var half = new Vector3(0.10f, size.y * 0.5f, size.x * 0.5f);
+            // 高さは目の高さのままが良いので、前後を先に探す。
+            // 窓が壁一面に並んでいるとそれでは抜けないので、次に上下を動かす
+            var lifts = new[] { 0f, -0.42f, 0.46f, -0.78f, 0.92f, -1.10f };
+            for (var l = 0; l < lifts.Length; l++)
+                for (var step = 0; step <= 12; step++)
+                {
+                    // 狙いの前後へ交互に離れていく
+                    var shift = (step + 1) / 2 * 0.55f * (step % 2 == 0 ? 1f : -1f);
+                    var spot = at + new Vector3(0f, lifts[l], shift);
+                    if (spot.y < 1.5f || spot.y > 3.4f) continue;     // 読める高さから外れない
+                    if (Occupied(spot, half) == 0) return spot;
+                }
+            Debug.LogWarning("壁に板を掛けられる隙間が無い: " + at.ToString("F1"));
+            return at;
+        }
+
+        /// <summary>その箱に入っている頂点の数。壁に向いた板の食い込みを見るのに使う</summary>
+        static int Occupied(Vector3 centre, Vector3 half)
+        {
+            var box = new Bounds(centre, half * 2f);
+            var n = 0;
+            foreach (var r in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
+            {
+                if (!r.bounds.Intersects(box)) continue;
+                var filter = r.GetComponent<MeshFilter>();
+                if (filter == null || filter.sharedMesh == null) continue;
+                var verts = filter.sharedMesh.vertices;
+                var into = r.transform.localToWorldMatrix;
+                for (var i = 0; i < verts.Length; i++)
+                    if (box.Contains(into.MultiplyPoint3x4(verts[i]))) n++;
+            }
+            return n;
         }
 
         /// <summary>

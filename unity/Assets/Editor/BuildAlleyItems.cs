@@ -26,6 +26,9 @@ namespace HalfAware.EditorTools
         /// <summary>板の判定点を、読む人の居る側へ引き出す距離</summary>
         const float ReadReach = 0.75f;
 
+        /// <summary>壁と平行に近づく板で、ピンを横へ寄せる距離</summary>
+        const float BoardAside = 1.05f;
+
         public static void Build(Transform root)
         {
             var script = AssetDatabase.LoadAssetAtPath<RoomScript>(ScriptPath);
@@ -42,12 +45,17 @@ namespace HalfAware.EditorTools
             {
                 var board = Find(root, "Boards/StreetSign" + i);
                 if (board == null) continue;
-                Put(parent, "Sign" + i, ReadFrom(board), script, AlleyIds.Sign(i), SignRadius, false, false);
+                // 一度読んだ板はそれで終わり。段は 5 つしか無いので、
+                // 同じ板を何度も読めると最後の段を繰り返すだけになる
+                Put(parent, "Sign" + i, ReadFrom(board), script, AlleyIds.Sign(i), SignRadius, false, true);
                 signs++;
             }
 
+            // 小路の口の表示板は西の壁に貼ってあり、通りを北へ歩いて近づく。
+            // 正面に置くと板の裏側になってピンが見えないので、南（歩いてくる側）へ寄せる
             var yardBoard = Find(root, "Boards/SignYardName");
-            if (yardBoard != null) Put(parent, "YardBoard", ReadFrom(yardBoard), script, AlleyIds.Board, BoardRadius, false, true);
+            if (yardBoard != null)
+                Put(parent, "YardBoard", ReadFrom(yardBoard, -BoardAside), script, AlleyIds.Board, BoardRadius, false, true);
 
             var stallSign = Find(root, "Boards/SignMemories");
             if (stallSign != null) Put(parent, "StallSign", ReadFrom(stallSign), script, AlleyIds.StallSign, BoardRadius, false, true);
@@ -65,7 +73,18 @@ namespace HalfAware.EditorTools
         /// </summary>
         static Vector3 ReadFrom(Transform board)
         {
-            return board.position - board.forward * ReadReach;
+            return ReadFrom(board, 0f);
+        }
+
+        /// <summary>
+        /// 横へ sideways だけずらした判定点。board.right の向きに測る。
+        ///
+        /// 壁と平行に歩いて近づく板は、正面に置くと板そのものの陰にピンが入って見えない。
+        /// 歩いてくる側へ寄せておくと、手前から目に入る
+        /// </summary>
+        static Vector3 ReadFrom(Transform board, float sideways)
+        {
+            return board.position - board.forward * ReadReach + board.right * sideways;
         }
 
         /// <summary>自分の露店。テーブル・チップ・煙草・買い手・売るときに立つ場所</summary>

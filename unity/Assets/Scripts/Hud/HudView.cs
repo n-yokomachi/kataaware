@@ -98,7 +98,9 @@ namespace HalfAware
             var rows = SubtitleBox.Rows(shown);
             var scale = SubtitleBox.FontScale(shown);
             // 列を揃えるため表は左寄せにして、表ごと帯の真ん中へ寄せる
-            subtitleText.text = list ? ListFormat.Compose(text, RoomEm(scale)) : shown;
+            // ルビは折り返してから書式に直す。
+            // 先に直すと、折り返しがタグを字数に数えてしまう
+            subtitleText.text = Ruby.Expand(list ? ListFormat.Compose(text, RoomEm(scale)) : shown);
             subtitleText.alignment =
                 kind == SubtitleKind.Choice ? TMPro.TextAlignmentOptions.Center :
                 list ? TMPro.TextAlignmentOptions.Left : listlessAlignment;
@@ -133,7 +135,7 @@ namespace HalfAware
         public void SetCenter(string text)
         {
             centerText.gameObject.SetActive(text != null);
-            centerText.text = text ?? string.Empty;
+            centerText.text = Ruby.Expand(text ?? string.Empty);
         }
 
         /// <summary>黒い層の濃さ。0 で透明、1 で真っ黒</summary>
@@ -176,7 +178,7 @@ namespace HalfAware
         public void SetLog(string text)
         {
             if (logPanel != null) logPanel.SetActive(text != null);
-            if (logText != null) logText.text = text ?? string.Empty;
+            if (logText != null) logText.text = Ruby.Expand(text ?? string.Empty);
         }
 
         /// <summary>

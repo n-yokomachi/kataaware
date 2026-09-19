@@ -56,5 +56,32 @@ namespace HalfAware.Tests
             Assert.That(RainCover.Volume(0.30f, 0.35f, -1f), Is.EqualTo(0.30f).Within(1e-5f));
             Assert.That(RainCover.Volume(0.30f, 0.35f, 2f), Is.EqualTo(0.105f).Within(1e-5f));
         }
+
+        [Test]
+        public void OutsideTheRoofThereIsNoEcho()
+        {
+            Assert.AreEqual(-10000f, RainCover.Room(-10000f, -700f, 0f), 0.01f);
+        }
+
+        [Test]
+        public void UnderTheRoofTheEchoIsFullyOn()
+        {
+            Assert.AreEqual(-700f, RainCover.Room(-10000f, -700f, 1f), 0.01f);
+        }
+
+        [Test]
+        public void TheEchoComesInGradually()
+        {
+            var half = RainCover.Room(-10000f, -700f, 0.5f);
+            Assert.That(half, Is.GreaterThan(-10000f).And.LessThan(-700f), "境で急に切り替えない");
+            Assert.AreEqual(-5350f, half, 0.01f);
+        }
+
+        [Test]
+        public void TheEchoNeverRunsPastTheEnds()
+        {
+            Assert.AreEqual(-700f, RainCover.Room(-10000f, -700f, 2f), 0.01f);
+            Assert.AreEqual(-10000f, RainCover.Room(-10000f, -700f, -1f), 0.01f);
+        }
     }
 }

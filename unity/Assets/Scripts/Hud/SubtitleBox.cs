@@ -98,19 +98,53 @@ namespace HalfAware
         }
 
         /// <summary>
+        /// 字ごとの幅（半角いくつぶん）と、その後ろで切ってはいけないかを拾う。
+        ///
+        /// ルビの指定（｜親字《るび》）は、幅を親字だけで数える。
+        /// 記号とルビは画面に出ないので 0。
+        /// 指定の途中で切ると親字とルビが離れてしまうので、そこは繋いでおく
+        /// </summary>
+        static void Scan(string text, out int[] wide, out bool[] joined)
+        {
+            wide = new int[text.Length];
+            joined = new bool[text.Length];
+            var i = 0;
+            while (i < text.Length)
+            {
+                int baseFrom, baseTo, rubyFrom, rubyTo;
+                if (!Ruby.Group(text, i, out baseFrom, out baseTo, out rubyFrom, out rubyTo))
+                {
+                    wide[i] = ListFormat.Units(text.Substring(i, 1));
+                    i++;
+                    continue;
+                }
+                for (var k = i; k <= rubyTo; k++)
+                {
+                    wide[k] = k >= baseFrom && k < baseTo ? ListFormat.Units(text.Substring(k, 1)) : 0;
+                    joined[k] = k < rubyTo;
+                }
+                // 指定の直前でも切らない。行末に ｜ だけが残ると読めない
+                if (i > 0) joined[i - 1] = true;
+                i = rubyTo + 1;
+            }
+        }
+
+        /// <summary>
         /// この行の切り口を選ぶ。start から fits に収まる範囲で、
         /// 幅が want に近いところ。strict なら語の途中と熟語の境目を避ける。
         /// 見つからなければ -1
         /// </summary>
-        static int Pick(string text, int start, int carried, int fits, int want, bool strict)
+        static int Pick(string text, int[] wide, bool[] joined,
+            int start, int carried, int fits, int want, bool strict)
         {
             var best = -1;
             var bestGap = int.MaxValue;
             var at = carried;
             for (var i = start; i < text.Length - 1; i++)
             {
-                at += ListFormat.Units(text.Substring(i, 1));
+                at += wide[i];
                 if (at - carried > fits) break;                       // この行にはもう入らない
+                if (joined[i]) continue;                              // ルビの指定の途中では切らない
                 var a = text[i];
                 var b = text[i + 1];
                 if (NeverStarts.IndexOf(b) >= 0) continue;            // 行頭に来る字を避ける
@@ -150,7 +184,11 @@ namespace HalfAware
             if (string.IsNullOrEmpty(text)) return text;
             if (LineCount(text) > 1) return text;
             if (fits <= 0) return text;
-            var units = ListFormat.Units(text);
+            int[] wide;
+            bool[] joined;
+            Scan(text, out wide, out joined);
+            var units = 0;
+            for (var i = 0; i < wide.Length; i++) units += wide[i];
             if (units <= fits) return text;
 
             var rows = Mathf.CeilToInt((float)units / fits);
@@ -163,11 +201,11 @@ namespace HalfAware
             {
                 var want = Mathf.RoundToInt(target * row);
                 // まず語を割らずに探し、どうしても無ければ禁則だけ守って切る
-                var best = Pick(text, start, carried, fits, want, true);
-                if (best <= start) best = Pick(text, start, carried, fits, want, false);
+                var best = Pick(text, wide, joined, start, carried, fits, want, true);
+                if (best <= start) best = Pick(text, wide, joined, start, carried, fits, want, false);
                 if (best <= start || best >= text.Length) break;
                 made.Append(text, start, best - start).Append('\n');
-                carried += ListFormat.Units(text.Substring(start, best - start));
+                for (var k = start; k < best; k++) carried += wide[k];
                 start = best;
             }
             made.Append(text, start, text.Length - start);

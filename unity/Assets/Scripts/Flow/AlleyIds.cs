@@ -25,6 +25,12 @@ namespace HalfAware
             return id != null && id.StartsWith("street.sign");
         }
 
+        /// <summary>看板を読んだときに出す段か。段には調べる対象が紐づかない</summary>
+        public static bool IsPage(string id)
+        {
+            return id != null && id.StartsWith("street.page");
+        }
+
         /// <summary>小路の口の表示板</summary>
         public const string Board = "yard.board";
 
