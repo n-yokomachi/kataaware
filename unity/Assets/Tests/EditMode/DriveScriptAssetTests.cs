@@ -58,7 +58,7 @@ namespace HalfAware.Tests
         // それ以外が誤って二択を出すと SceneProgress.Examine が Done に加えなくなり、
         // きっかけの対象（drive.window など）を調べても帯や場面が終わらなくなる
         [Test]
-        public void EverythingJustSpeaks()
+        public void OnlyTheDoorAsks()
         {
             var script = Load();
             var door = script.Find(DriveIds.Door);
