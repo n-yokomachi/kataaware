@@ -204,8 +204,7 @@ namespace HalfAware
 
         /// <summary>
         /// i が最後の帯か。帯がひとつも無いうちは最後にしない。
-        /// 組み立て途中の場面が、入った瞬間に閉じてしまうのを防ぐ（SceneProgress.IsComplete と同じ構え）。
-        /// -1 は「まだどの帯にも入っていない」の意で、これも最後として扱わない
+        /// 組み立て途中の場面が、入った瞬間に閉じてしまうのを防ぐ（SceneProgress.IsComplete と同じ構え）
         /// </summary>
         public bool IsLast(int i)
         {
@@ -482,6 +481,7 @@ namespace HalfAware.Tests
             Run(clock, band, 5.1f + 0.9f);          // 余韻 5 と黒 0.8 を越える
             Assert.AreEqual(DriveBeat.FadingIn, clock.Beat);
             var first = clock.Dark(band);
+            Assert.Less(first, 1f, "黒から続けて明け始めている。越えた分が捨てられていない");
             Run(clock, band, 0.7f);
             var later = clock.Dark(band);
             Assert.Less(later, first, "少しずつ明るくなる");
@@ -509,6 +509,7 @@ namespace HalfAware.Tests
             clock.Spoken();
             clock.Tick(0.016f, band);
             Assert.AreEqual(DriveBeat.Running, clock.Beat, "全部 0 でも一巡して走りに戻る");
+            Assert.IsTrue(clock.TakeSwap(), "黒が 0 秒でも入れ替えは知らせる");
         }
 
         [Test]
@@ -523,6 +524,34 @@ namespace HalfAware.Tests
             Run(clock, band, 0.3f);
             Assert.IsTrue(clock.TakeSwap(), "黒へ入った一度だけ知らせる");
             Assert.IsFalse(clock.TakeSwap(), "二度は知らせない");
+        }
+
+        [Test]
+        public void ResettingMidBlackoutThrowsTheBlackoutAway()
+        {
+            var clock = new BandClock();
+            var band = Band();
+            clock.Trigger();
+            clock.Spoken();
+            Run(clock, band, 5.2f);
+            Assert.AreEqual(DriveBeat.Black, clock.Beat);
+            clock.Reset();
+            Assert.AreEqual(DriveBeat.Running, clock.Beat, "組み直すと黒は消える。帯を跨ぐたびに呼んではいけない");
+            Assert.AreEqual(0f, clock.Dark(band), 0.0001f);
+            Assert.IsFalse(clock.TakeSwap(), "知らせも一緒に消える");
+        }
+
+        [Test]
+        public void OneLongFrameLandsInTheRightPlace()
+        {
+            var clock = new BandClock();
+            var band = Band();                       // 余韻 5.0 / 黒 0.8 / 明け 1.4
+            clock.Trigger();
+            clock.Spoken();
+            clock.Tick(6.0f, band);                  // 一息に 2 段ぶん越える
+            Assert.AreEqual(DriveBeat.FadingIn, clock.Beat);
+            // 6.0 - 5.0 - 0.8 = 0.2 だけ明けが進んでいる
+            Assert.AreEqual(1f - 0.2f / 1.4f, clock.Dark(band), 0.001f, "越えた分が持ち越されている");
         }
     }
 }
@@ -608,13 +637,14 @@ namespace HalfAware
             if (Beat == DriveBeat.Running || Beat == DriveBeat.Talking) return;
             since += dt;
             // 秒数が 0 のときに 1 フレーム 1 段ずつ進むと、途中の段が見えてしまう。
-            // 越えた分をそのまま次へ持ち越して、その場で最後まで進める
+            // 越えた分をそのまま次へ持ち越して、その場で最後まで進める。
+            // 進む先は 3 段しか無いので、この数を使い切ることは無い
             for (var guard = 0; guard < 4; guard++)
             {
                 if (Beat == DriveBeat.Afterglow)
                 {
                     if (since < band.afterglow) return;
-                    since -= band.afterglow;
+                    since -= Spent(band.afterglow);
                     Beat = DriveBeat.Black;
                     swapped = true;
                     continue;
@@ -622,7 +652,7 @@ namespace HalfAware
                 if (Beat == DriveBeat.Black)
                 {
                     if (since < band.black) return;
-                    since -= band.black;
+                    since -= Spent(band.black);
                     Beat = DriveBeat.FadingIn;
                     continue;
                 }
@@ -638,6 +668,15 @@ namespace HalfAware
         }
 
         /// <summary>
+        /// その段に使った秒数。負の数を打たれても次の段に貸しを作らない。
+        /// 再生しながら Inspector を触る前提なので、打ち間違いはそのまま通る
+        /// </summary>
+        static float Spent(float seconds)
+        {
+            return seconds > 0f ? seconds : 0f;
+        }
+
+        /// <summary>
         /// 今どれだけ黒いか。0 で素通し、1 で真っ黒。
         /// 黒へは切り替えで入るので、Afterglow の 0 から Black の 1 へ一息に跳ぶ
         /// </summary>
@@ -649,7 +688,11 @@ namespace HalfAware
             return Mathf.Clamp01(1f - since / band.fadeIn);
         }
 
-        /// <summary>頭から組み直す。帯を跨ぐたびに呼ぶ</summary>
+        /// <summary>
+        /// 頭から組み直す。場面に入って最初の帯を並べるときだけ呼ぶ。
+        /// 帯を跨ぐときには呼ばない。黒と明けはこの時計が自分で進めるので、
+        /// そこで組み直すと暗転が 1 フレームで終わってしまう
+        /// </summary>
         public void Reset()
         {
             Beat = DriveBeat.Running;
@@ -706,6 +749,28 @@ namespace HalfAware.Tests
         }
 
         [Test]
+        public void TheRingStaysEvenlySpacedThroughTheWrap()
+        {
+            // TilesSitOneLengthApart は travelled = 0 だけを見るので、環が回り込むところを
+            // 一度も踏まない。隙間は回り込んだ瞬間に開くので、一周ぶん通して見ないと気づけない
+            var n = RoadRing.Needed(140f, Length, Behind);
+            var span = n * Length;
+            var zs = new float[n];
+            // 刻みをタイルの長さの約数から外して、継ぎ目のあらゆる位相を通す
+            for (var step = -200; step <= 400; step++)
+            {
+                var travelled = step * 0.97f;
+                for (var i = 0; i < n; i++) zs[i] = RoadRing.Slot(i, n, Length, travelled, Behind);
+                System.Array.Sort(zs);
+                var at = " travelled=" + travelled;
+                Assert.GreaterOrEqual(zs[0], Behind, "後ろの端より手前には来ない" + at);
+                Assert.Less(zs[n - 1], Behind + span, "前の端は越えない" + at);
+                for (var i = 1; i < n; i++)
+                    Assert.AreEqual(Length, zs[i] - zs[i - 1], 0.0001f, "隙間も重なりも無い" + at);
+            }
+        }
+
+        [Test]
         public void TheWholeRingCoversTheSpan()
         {
             var zs = new float[Tiles];
@@ -756,6 +821,13 @@ namespace HalfAware.Tests
             Assert.AreEqual(9, RoadRing.Needed(140f, Length, Behind));
             Assert.GreaterOrEqual(RoadRing.Needed(140f, Length, Behind) * Length, 140f - Behind,
                 "環の長さが見える範囲を覆っていないと、前の端に穴が空く");
+
+            // 寸法を変えても成り立たなければいけない関係。9 や 2 という数そのものではなく、
+            // 「環の長さが見える範囲に届く」ことを見る
+            foreach (var w in new[] { new Vector3(140f, 20f, -30f), new Vector3(1f, 100f, -1f),
+                                      new Vector3(60f, 7f, -12f), new Vector3(200f, 33f, -5f) })
+                Assert.GreaterOrEqual(RoadRing.Needed(w.x, w.y, w.z) * w.y, w.x - w.z,
+                    "環の長さが見える範囲に届いていない");
         }
 
         [Test]
@@ -788,6 +860,19 @@ namespace HalfAware
     /// 環の一番先へ回すので、何分走っても座標は原点の周りに留まる。
     /// 実寸で何 km も敷くと座標が大きくなり、揺れや影が粗くなるため。
     ///
+    /// 返すのは mesh の原点の z なので、タイルの mesh は z 方向にちょうど length だけ伸び、
+    /// 原点が手前（-z）の端にあることが要る。Needed はその置き方を前提に枚数を数えている。
+    /// 中央に置くと前の端が length の半分だけ手前に寄り、奥の端に置くと丸ごと一枚ぶん足りず、
+    /// タイル 1 枚ぶんの周期で地平に穴が空く。
+    ///
+    /// 毎回 travelled から出し直すのは、1 枚ずつ動かすとタイルごとに誤差が溜まって
+    /// 隣との間に隙間が開くため。共通の数から出せば、誤差が出ても道全体が同じだけずれるので
+    /// 継ぎ目は割れない。
+    ///
+    /// なお継ぎ目が割れないのは length が 2 の冪と相性の良い数のときで、
+    /// 20 / 環 180 / 後ろ 30 では計算に丸めが一切入らない。
+    /// 17.3 のような半端な数にすると 10 分ほどで 1 mm の隙間が開く
+    ///
     /// MonoBehaviour の外に出してあるのは、隙間や重なりをテストで確かめたいため
     /// </summary>
     public static class RoadRing
@@ -812,8 +897,10 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// 前方 ahead まで途切れず敷くのに要る枚数。
-        /// 環の長さが前後の見える範囲を覆えばよい
+        /// 前方 ahead まで途切れず敷くのに要る枚数。behind は負の値で渡す。
+        ///
+        /// 前の端は必ず ahead まで届く。後ろは環がずれるぶん最大でタイル 1 枚ぶん縮むが、
+        /// 運転席から後ろは見えないので構わない
         /// </summary>
         public static int Needed(float ahead, float length, float behind)
         {
@@ -1455,7 +1542,7 @@ Prune → Scene → Car → Road → Roadsides → Garage → Items → Wire →
 1. **原点は手前（-z）の端に置く。** `FaceY(0, -3.5, 3.5, 0, 20, 1)` であって、`FaceY(0, -3.5, 3.5, i*20, (i+1)*20, 1)` ではない。絶対の z を頂点に焼き込むと `localPosition` と二重にずれる。
    奥（+z）端に原点を置くと道が 10 m 足りず、**タイル 1 枚ぶんの周期で地平に穴が空く**。中央でも前の端がちょうど 140 で、余裕が無い
 2. **z 方向の長さはちょうど `tileLength`。** 短ければ継ぎ目に隙間、長ければ重なる
-3. **`tileLength` は 2 の冪と相性の良い数にする。** 20 なら計算に丸めが一切入らない。17.3 のような半端な数にすると 10 分ほどで 1 mm の隙間が開く。`tileLength * Bank` の一枚あたりの UV も整数にしないと、継ぎ目で絵柄が途切れる
+3. **`tileLength` は 2 の冪と相性の良い数にする。** 20 なら計算に丸めが一切入らない。17.3 のような半端な数にすると 10 分ほどで 1 mm の隙間が開く。一枚あたりの UV も整数にしないと、継ぎ目で絵柄が途切れる。`Bank` の `Texel`（既定 0.5）を掛けた値が整数になること。20 × 0.5 = 10 なので今の寸法では成り立つが、どちらかを変えたら見直す
 
 - [ ] **Step 2: 車内を組む**
 
