@@ -23,6 +23,7 @@
 - `refresh_unity` は `refresh_triggered: false` を返してコンパイルが走らないことがある。そのときは `execute_code` で `UnityEditor.AssetDatabase.Refresh(UnityEditor.ImportAssetOptions.ForceSynchronousImport); UnityEditor.Compilation.CompilationPipeline.RequestScriptCompilation();` を叩く
 - Game ビューの大きさを変えない。確認用のカメラを作るときは `cam.enabled = false` と `HideFlags.HideAndDontSave` を付ける
 - 秒数・文章量はオーナーが決める。この計画で入れるのは仮置きの値だけで、勝手に詰めない
+- **帯はコードでは 0 から数える。** 設計書は読み物なので帯 1〜5 と書いてあるが、`Triggers[i]` も `Page(i)` も `Enter(i)` も 0 始まりで、設計書の「帯 1」がここでは 0 番にあたる。この計画の表もコメントもログの文言も、すべて 0 始まりで揃える
 
 **Unity の EditMode テストの流儀:**
 
@@ -172,7 +173,7 @@ namespace HalfAware
         public float rough;
         /// <summary>独白を送り切ってから黒へ切り替わるまでの秒数。黙って走る</summary>
         public float afterglow;
-        /// <summary>黒のまま置く秒数。仮眠（帯 3 の末尾）だけ長く取る</summary>
+        /// <summary>黒のまま置く秒数。仮眠にあたる切れ目だけ長く取る</summary>
         public float black;
         /// <summary>黒から次の帯へ浮かび上がる秒数</summary>
         public float fadeIn;
@@ -267,13 +268,17 @@ namespace HalfAware.Tests
             Assert.IsTrue(DriveIds.IsPage("drive.band0"));
             Assert.IsFalse(DriveIds.IsPage(DriveIds.Chips), "対象は段ではない");
             Assert.IsFalse(DriveIds.IsPage(null));
+            foreach (var id in DriveIds.Triggers)
+                Assert.IsFalse(DriveIds.IsPage(id), "きっかけの対象が段に見えている: " + id);
+            foreach (var id in new[] { DriveIds.Door, DriveIds.Radio, DriveIds.Pocket, DriveIds.Fuel })
+                Assert.IsFalse(DriveIds.IsPage(id), "対象が段に見えている: " + id);
         }
 
         [Test]
         public void TheTriggersAreAllDifferent()
         {
             var all = DriveIds.Triggers;
-            Assert.AreEqual(5, all.Length, "帯は 5 つ");
+            Assert.AreEqual(5, all.Count, "帯は 5 つ");
             CollectionAssert.AllItemsAreUnique(all);
             Assert.AreEqual(DriveIds.Window, all[4], "最後の帯のきっかけは窓");
         }
@@ -290,35 +295,46 @@ Expected: `DriveIds` が未定義でコンパイルエラー。
 `unity/Assets/Scripts/Flow/DriveIds.cs`:
 
 ```csharp
+using System.Collections.Generic;
+
 namespace HalfAware
 {
     /// <summary>
     /// 場面 8 の対象につける id。シーンを組む側（BuildDrive）と、
     /// 文面を書き出す側（WriteDriveScript）と、進行を動かす側（DriveDirector）で
-    /// 同じ綴りを使う。文字列を三か所に散らすと、どれかを直し忘れて黙る
+    /// 同じ綴りを使う。文字列を三か所に散らすと、どれかを直し忘れて黙る。
+    ///
+    /// 帯はここでは 0 から数える。設計書が「帯 1」と呼ぶものが 0 番にあたる
     /// </summary>
     public static class DriveIds
     {
         /// <summary>ガレージ。運転席のドアを調べると乗り込む</summary>
         public const string Door = "garage.door";
 
-        /// <summary>帯 1 のきっかけ。助手席のメモリーチップの束</summary>
+        /// <summary>帯 0 のきっかけ。助手席のメモリーチップの束</summary>
         public const string Chips = "drive.chips";
-        /// <summary>帯 2 のきっかけ。アクセスログの写し</summary>
+        /// <summary>帯 1 のきっかけ。アクセスログの写し</summary>
         public const string Log = "drive.log";
-        /// <summary>帯 3 のきっかけ。ルームミラー</summary>
+        /// <summary>帯 2 のきっかけ。ルームミラー</summary>
         public const string Mirror = "drive.mirror";
-        /// <summary>帯 4 のきっかけ。メーターの脇の写真立て</summary>
+        /// <summary>帯 3 のきっかけ。メーターの脇の写真立て</summary>
         public const string Photo = "drive.photo";
-        /// <summary>帯 5 のきっかけ。窓を開けると場面 9 へ</summary>
+        /// <summary>帯 4 のきっかけ。窓を開けると場面 9 へ</summary>
         public const string Window = "drive.window";
 
-        /// <summary>帯の順に並べたきっかけの id。BuildDrive と WriteDriveScript が同じ並びを使う</summary>
-        public static readonly string[] Triggers = { Chips, Log, Mirror, Photo, Window };
+        static readonly string[] triggers = { Chips, Log, Mirror, Photo, Window };
 
-        /// <summary>帯を問わず置く、読んでも帯が進まない対象</summary>
+        /// <summary>
+        /// 帯の順に並べたきっかけの id。BuildDrive と WriteDriveScript が同じ並びを使う。
+        /// 中身を書き換えられないよう読み取りだけで渡す（MarketSale と同じ構え）
+        /// </summary>
+        public static IReadOnlyList<string> Triggers { get { return triggers; } }
+
+        /// <summary>ラジオ。帯を問わず置く、読んでも帯が進まない対象</summary>
         public const string Radio = "drive.radio";
+        /// <summary>上着のポケット。同じく帯は進まない</summary>
         public const string Pocket = "drive.pocket";
+        /// <summary>給油計。同じく帯は進まない</summary>
         public const string Fuel = "drive.fuel";
 
         /// <summary>i 番目の帯で出す独白の段</summary>
@@ -1025,7 +1041,7 @@ namespace HalfAware.EditorTools
             });
 
             // 帯ごとのきっかけ。対象の文のあとに、DriveDirector が段を積む
-            for (var i = 0; i < DriveIds.Triggers.Length; i++)
+            for (var i = 0; i < DriveIds.Triggers.Count; i++)
             {
                 entries.Add(new ScriptEntry
                 {
@@ -1144,7 +1160,7 @@ namespace HalfAware.Tests
         public void EveryBandHasItsPage()
         {
             var script = Load();
-            for (var i = 0; i < DriveIds.Triggers.Length; i++)
+            for (var i = 0; i < DriveIds.Triggers.Count; i++)
             {
                 var page = script.Find(DriveIds.Page(i));
                 Assert.AreEqual(DriveIds.Page(i), page.id, i + " 帯の段が文面に無い");
