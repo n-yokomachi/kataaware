@@ -2689,9 +2689,12 @@ namespace HalfAware.EditorTools
             }
 
             var th = 0.78f;
-            Box(t, "Table", new Vector3(0f, th, -d * 0.18f), new Vector3(w * 0.88f, 0.06f, d * 0.52f), "Timber");
+            // 自分の卓だけ浅くする。奥行きがあると、卓ごしに向き合う買い手が遠くなる
+            var deep = mine ? 0.80f : d * 0.52f;
+            var mid = -d * 0.18f;
+            Box(t, "Table", new Vector3(0f, th, mid), new Vector3(w * 0.88f, 0.06f, deep), "Timber");
             // 前垂れはタープと同じ布。板を張ると白い衝立に見える
-            Box(t, "Skirt", new Vector3(0f, th * 0.5f, -d * 0.18f - d * 0.24f), new Vector3(w * 0.88f, th, 0.05f), tarp);
+            Box(t, "Skirt", new Vector3(0f, th * 0.5f, mid - deep * 0.5f - 0.03f), new Vector3(w * 0.88f, th, 0.05f), tarp);
 
             var boxes = mine ? 2 : 1 + rng.Next(3);
             for (var i = 0; i < boxes; i++)
@@ -2909,20 +2912,32 @@ namespace HalfAware.EditorTools
             if (market == null) return;
             foreach (Transform stall in market.transform)
             {
-                // 自分の露店には市の品を置かない。ここに並ぶのはメモリーチップだけで、
-                // 瓶や鉢を積むとチップが埋もれて、置いたことが分からなくなる
-                if (stall.name == "MyStall") continue;
                 Transform body = stall.name.StartsWith("Stall") ? stall : stall.Find("Stall");
                 if (body == null) continue;
+                // 自分の露店の卓は他より広い。同じ密度になるよう数を増やす
+                var mine = stall.name == "MyStall";
                 var rot = Quaternion.Euler(0f, body.localEulerAngles.y, 0f);
                 var at = body.localPosition;
                 var top = 0.81f;
-                var n = 6 + rng.Next(8);
+                var n = mine ? 16 + rng.Next(6) : 6 + rng.Next(8);
                 for (var i = 0; i < n; i++)
                 {
                     var b = banks[rng.Next(banks.Length)];
-                    var local = new Vector3((float)(rng.NextDouble() - 0.5) * 1.5f, 0f,
-                        (float)(rng.NextDouble() - 0.5) * 0.5f - 0.32f);
+                    var local = mine
+                        ? new Vector3((float)(rng.NextDouble() - 0.5) * 2.1f, 0f,
+                            (float)(rng.NextDouble() - 0.5) * 0.66f - 0.38f)
+                        : new Vector3((float)(rng.NextDouble() - 0.5) * 1.5f, 0f,
+                            (float)(rng.NextDouble() - 0.5) * 0.5f - 0.32f);
+                    // チップを並べるところと、端末の周りだけは空けておく。
+                    // ここを埋めると、チップを置いたことが分からなくなる
+                    if (mine)
+                    {
+                        // チップを並べるところと端末の周り
+                        if (Mathf.Abs(local.x) < 0.52f && local.z > -0.60f && local.z < 0.18f) continue;
+                        // 卓の向こう側の真ん中。ここに背の高い品を置くと、
+                        // 売り手から見て買い手が陰になる
+                        if (Mathf.Abs(local.x) < 0.78f && local.z <= -0.60f) continue;
+                    }
                     var p = at + rot * local;
                     var spin = rot * Quaternion.Euler(0f, (float)(rng.NextDouble() * 360.0), 0f);
                     var kind = rng.Next(6);

@@ -174,9 +174,9 @@ namespace HalfAware.EditorTools
             {
                 var woman = MarketSale.Woman(i);
                 var model = woman ? women[lady++ % women.Length] : men[man++ % men.Length];
-                // 卓の前端は露店の中心から 0.98 m、体が入るのは 1.23 m から。
-                // 買い手は縁から少し下がって立つ
-                var spot = at + front * 1.55f + spin * new Vector3(sway[i], 0f, 0f);
+                // 卓を浅くしたので、前端は露店の中心から 0.80 m、
+                // 体が入るのは 1.12 m から。縁に寄って立たせる
+                var spot = at + front * 1.18f + spin * new Vector3(sway[i], 0f, 0f);
                 spot.y = Ground(spot);
                 var go = BuildAlley.BakeOne(parent, "Buyer" + i, model,
                     spot, yaw, poses[i % poses.Length], Vector3.one, mat);
