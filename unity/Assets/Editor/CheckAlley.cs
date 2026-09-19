@@ -45,12 +45,25 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 板の面が隠れていないか。読む人の側に立ち位置を取り、
-        /// 面に散らした点へ線を引いて、途中で何かに当たるかを見る
+        /// 面に散らした点へ線を引いて、途中で何かに当たるかを見る。
+        ///
+        /// 路地裏の物はほとんどが当たり判定を持たない焼いた mesh なので、
+        /// ここだけ一時的に当たり判定を立てる。
+        /// 頂点を数えるやり方だと、騎戸の桟のような長い一枚板を取り逃す
         /// </summary>
         static int Boards(Transform root)
         {
             var boards = root.Find("Boards");
             if (boards == null) { Debug.LogWarning("見直し: Boards が無い"); return 1; }
+            var temp = new List<MeshCollider>();
+            foreach (var r in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
+            {
+                if (r.GetComponent<Collider>() != null) continue;
+                if (r.transform.parent == boards) continue;
+                var mf = r.GetComponent<MeshFilter>();
+                if (mf == null || mf.sharedMesh == null) continue;
+                temp.Add(r.gameObject.AddComponent<MeshCollider>());
+            }
             var bad = 0;
             foreach (Transform t in boards)
             {
@@ -61,8 +74,8 @@ namespace HalfAware.EditorTools
                 var blocked = 0;
                 var total = 0;
                 var who = new Dictionary<string, int>();
-                for (var u = -0.4f; u <= 0.41f; u += 0.4f)
-                    for (var v = -0.4f; v <= 0.41f; v += 0.4f)
+                for (var u = -0.45f; u <= 0.46f; u += 0.225f)
+                    for (var v = -0.45f; v <= 0.46f; v += 0.225f)
                     {
                         var on = t.position + t.right * (u * t.localScale.x) + t.up * (v * t.localScale.y);
                         total++;
@@ -77,12 +90,14 @@ namespace HalfAware.EditorTools
                         who[name]++;
                     }
                 if (total == 0 || blocked / (float)total <= Hidden) continue;
+                // 板そのものは判定を持たないので、当たったものはすべて手前にある
                 var names = "";
                 foreach (var kv in who) names += (names == "" ? "" : ", ") + kv.Key + "×" + kv.Value;
                 Debug.LogWarning(string.Format("見直し: 板 {0} は {1}/{2} が隠れている。塞いでいるもの: {3}",
                     t.name, blocked, total, names), t.gameObject);
                 bad++;
             }
+            for (var i = 0; i < temp.Count; i++) Object.DestroyImmediate(temp[i]);
             return bad;
         }
 

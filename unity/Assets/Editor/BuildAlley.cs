@@ -3605,8 +3605,12 @@ namespace HalfAware.EditorTools
                 // 読む人は通りの真ん中に立つので、板は通りの中央を向く
                 var face = new Vector3(-p.side, 0f, 0f);
                 var x = p.side * (StreetHalf - 0.14f);
-                Board(parent, "StreetSign" + i, p.tex,
-                    Clear(new Vector3(x, p.y, p.z), p.size), face, p.size);
+                var spot = Clear(new Vector3(x, p.y, p.z), p.size, face);
+                // 壁の前に出ている物（騎戸の桟・序・管）より手前へ出す。
+                // 引っ込んでいると桟が板を横に切る
+                // face は読む人の居る側、つまり通りの方向。そちらへ出す
+                spot += face * Stick(spot, p.size, face);
+                Board(parent, "StreetSign" + i, p.tex, spot, face, p.size);
             }
         }
 
@@ -3617,7 +3621,7 @@ namespace HalfAware.EditorTools
         /// 壁の物はほとんどが当たり判定を持たない焼いた mesh なので、線では調べられない。
         /// 板のぶんの薄い箱に頂点が入っているかで見る
         /// </summary>
-        static Vector3 Clear(Vector3 at, Vector2 size)
+        static Vector3 Clear(Vector3 at, Vector2 size, Vector3 face)
         {
             // 壁に向いた板は、幅が z、厚みが x になる。
             // ここを取り違えると壁の中へ 2 m 分の箱を伸ばしてしまい、どこも空いていないことになる
@@ -3632,10 +3636,49 @@ namespace HalfAware.EditorTools
                     var shift = (step + 1) / 2 * 0.55f * (step % 2 == 0 ? 1f : -1f);
                     var spot = at + new Vector3(0f, lifts[l], shift);
                     if (spot.y < 1.5f || spot.y > 3.4f) continue;     // 読める高さから外れない
-                    if (Occupied(spot, half) == 0) return spot;
+                    if (Occupied(spot, half) != 0) continue;
+                    // 壁から大きく出ている物の前に掛けると、板が宙に浮いて見える。
+                    // 少し出るだけで済む場所を選ぶ
+                    if (Stick(spot, size, face) > 0.30f) continue;
+                    return spot;
                 }
             Debug.LogWarning("壁に板を掛けられる隙間が無い: " + at.ToString("F1"));
             return at;
+        }
+
+        /// <summary>
+        /// 板を掛けるところで、壁面よりどれだけ物が出ているか。通りの側を into で渡す。
+        ///
+        /// 騎戸の桟は長い板一枚でできており、頂点は店先の端にしか無い。
+        /// 頂点を数えても見つからないので、その場で当たり判定を立てて線を通す。
+        /// 済んだら外す
+        /// </summary>
+        static float Stick(Vector3 at, Vector2 size, Vector3 into)
+        {
+            var made = new List<MeshCollider>();
+            foreach (var r in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
+            {
+                if (r.GetComponent<Collider>() != null) continue;
+                if (r.transform.parent != null && r.transform.parent.name == "Boards") continue;
+                var mf = r.GetComponent<MeshFilter>();
+                if (mf == null || mf.sharedMesh == null) continue;
+                if (!r.bounds.Intersects(new Bounds(at, new Vector3(2f, size.y + 0.4f, size.x + 0.4f)))) continue;
+                made.Add(r.gameObject.AddComponent<MeshCollider>());
+            }
+            var most = 0f;
+            var wide = Vector3.Cross(Vector3.up, into).normalized;
+            for (var u = -0.45f; u <= 0.46f; u += 0.15f)
+                for (var v = -0.45f; v <= 0.46f; v += 0.15f)
+                {
+                    var on = at + wide * (u * size.x) + Vector3.up * (v * size.y);
+                    var from = on + into * 1.6f;
+                    RaycastHit hit;
+                    if (!Physics.Raycast(from, -into, out hit, 3.2f)) continue;
+                    var front = Vector3.Dot(hit.point - on, into);   // 板より通り側なら正
+                    if (front > most) most = front;
+                }
+            for (var i = 0; i < made.Count; i++) Object.DestroyImmediate(made[i]);
+            return most <= 0f ? 0f : most + 0.05f;
         }
 
         /// <summary>その箱に入っている頂点の数。壁に向いた板の食い込みを見るのに使う</summary>

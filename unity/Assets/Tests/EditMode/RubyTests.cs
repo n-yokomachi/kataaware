@@ -66,10 +66,20 @@ namespace HalfAware.Tests
         }
 
         [Test]
+        public void TheRubySitsClearOfTheBaseGlyphs()
+        {
+            // Noto の漢字はベースラインから 1.15 em まで伸びる。
+            // ルビの字は自分のベースラインから 0.24 em 上から始まるので、
+            // これを下回ると親字にかぶる
+            Assert.That(Ruby.Lift + 0.24f, Is.GreaterThanOrEqualTo(1.15f), "ルビが親字にかぶる");
+        }
+
+        [Test]
         public void ItRaisesAndShrinks()
         {
             var made = Ruby.Over("倫敦", "ロンドン");
-            StringAssert.Contains("<voffset=0.62em>", made);
+            // 持ち上げる高さは TMP で測って決めるものなので、定数を見る
+            StringAssert.Contains("<voffset=" + Ruby.Lift.ToString("0.###") + "em>", made);
             StringAssert.Contains("<size=50%>", made);
             StringAssert.Contains("</size></voffset>", made);
         }

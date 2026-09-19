@@ -17,8 +17,24 @@ namespace HalfAware
         /// <summary>ルビの大きさ。親字に対する割合</summary>
         public const float Scale = 0.5f;
 
-        /// <summary>持ち上げる高さ。親字の em に対する割合</summary>
-        public const float Lift = 0.62f;
+        /// <summary>
+        /// 持ち上げる高さ。親字の em に対する割合。
+        ///
+        /// Noto の漢字はベースラインから 1.15 em まで伸びている。
+        /// ルビの字は自分のベースラインから 0.24 em 上から始まるので、
+        /// 1.15 + 隙間 0.06 - 0.24 = 0.97 持ち上げないと親字にかぶる。
+        /// 値は TMP に実際に並べさせて測ったもの
+        /// </summary>
+        public const float Lift = 0.97f;
+
+        /// <summary>
+        /// ルビのある文に足す行間。字の大きさに対する百分率。
+        ///
+        /// 素の行送りは 1.45 em。ルビの上端はベースラインから 1.68 em になるので、
+        /// このままだと下の行のルビが上の行の親字（下端 0.19 em）にかぶる。
+        /// 1.55 em 以上送る必要があるので、余裕を見て 12 %分足す
+        /// </summary>
+        public const float ExtraLineSpacing = 12f;
 
         /// <summary>
         /// text にルビを振る。どちらかが空なら text をそのまま返す。

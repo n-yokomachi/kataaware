@@ -101,6 +101,9 @@ namespace HalfAware
             // ルビは折り返してから書式に直す。
             // 先に直すと、折り返しがタグを字数に数えてしまう
             subtitleText.text = Ruby.Expand(list ? ListFormat.Compose(text, RoomEm(scale)) : shown);
+            // ルビのある文は行を少し開ける。
+            // そのままだと下の行のルビが上の行の字にかぶる
+            subtitleText.lineSpacing = shown.IndexOf(Ruby.Head) >= 0 ? Ruby.ExtraLineSpacing : 0f;
             subtitleText.alignment =
                 kind == SubtitleKind.Choice ? TMPro.TextAlignmentOptions.Center :
                 list ? TMPro.TextAlignmentOptions.Left : listlessAlignment;
