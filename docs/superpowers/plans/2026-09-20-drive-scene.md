@@ -1819,7 +1819,7 @@ git commit -m "feat: let me look around, feel the road, and fold my arms"
 
 - [ ] **Step 1: 実装する**
 
-`[MenuItem("HalfAware/Check the drive", false, 235)]` と `public static void Run(Transform root)` を置く。見るのは次の 6 つで、それぞれ問題の数を返す。
+`[MenuItem("HalfAware/Check the drive", false, 235)]` と `public static void Run(Transform root)` を置く。見るのは次の 7 つで、それぞれ問題の数を返す。
 
 1. **タイルの環** — ここで見るのは `RoadRing` の計算ではなく、**シーンに立っている実物**。計算そのものは `RoadRingTests` が 601 点で確かめているので、ここで数え直しても落ちない。見るのは次の三つ。
    - タイルの入れ物に空きや欠けが無いか。空きがあると 20 m の穴が環に乗って回り、16 m/s なら 11 秒ごとに正面へ飛んでくる
