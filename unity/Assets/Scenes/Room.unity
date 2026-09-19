@@ -6687,6 +6687,37 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -2337254758723975033, guid: 63e4f3f8fbbe98a4184c3b6855c662b0, type: 3}
   m_PrefabInstance: {fileID: 178703030}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &182852855
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 182852856}
+  m_Layer: 0
+  m_Name: JackHold
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &182852856
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 182852855}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.4345098, y: -0.2915714, z: -0.77605647, w: 0.35202804}
+  m_LocalPosition: {x: 0, y: 0.0016, z: 0.00015}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1860798103}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &184553551
 GameObject:
   m_ObjectHideFlags: 0
@@ -7551,51 +7582,116 @@ MonoBehaviour:
   id: jack
   jack: {fileID: 1919075036}
   leftHand: {fileID: 1860798103}
+  grip: {fileID: 182852856}
   parked: {fileID: 385806763}
-  reach:
-  - bone: UpperArm.R
-    axis: 2
-    degrees: -20.3
+  source: {fileID: 154678549}
+  unplug: {fileID: 8300000, guid: a893cace45ca427198cd277ca2f21d4f, type: 3}
+  look:
   - bone: UpperArm.R
     axis: 0
-    degrees: -19.4
+    degrees: -48.1
   - bone: UpperArm.R
     axis: 1
-    degrees: -8.5
+    degrees: -27.2
+  - bone: UpperArm.R
+    axis: 2
+    degrees: -43.3
   - bone: LowerArm.R
     axis: 0
-    degrees: 15.4
+    degrees: 2.3
+  - bone: LowerArm.R
+    axis: 1
+    degrees: -16.7
   - bone: LowerArm.R
     axis: 2
-    degrees: -117.9
+    degrees: -16.7
+  - bone: Wrist.R
+    axis: 0
+    degrees: -55
+  - bone: Wrist.R
+    axis: 1
+    degrees: 45.1
   - bone: Wrist.R
     axis: 2
-    degrees: -24.4
+    degrees: -55
+  reach:
   - bone: Shoulder.L
     axis: 2
-    degrees: 22
+    degrees: -22
+  - bone: UpperArm.L
+    axis: 0
+    degrees: -22
+  - bone: UpperArm.L
+    axis: 1
+    degrees: 35.2
   - bone: UpperArm.L
     axis: 2
-    degrees: 80
+    degrees: 4.1
+  - bone: LowerArm.L
+    axis: 1
+    degrees: 22
+  - bone: LowerArm.L
+    axis: 2
+    degrees: 0
+  - bone: Wrist.L
+    axis: 0
+    degrees: -0.8
+  - bone: Wrist.L
+    axis: 1
+    degrees: 4.3
+  - bone: Wrist.L
+    axis: 2
+    degrees: 2.8
+  lift:
+  - bone: Shoulder.L
+    axis: 2
+    degrees: 13.5
   - bone: UpperArm.L
+    axis: 0
+    degrees: -29.4
+  - bone: UpperArm.L
+    axis: 1
+    degrees: 2.5
+  - bone: UpperArm.L
+    axis: 2
+    degrees: -13.8
+  - bone: LowerArm.L
+    axis: 0
+    degrees: 31.3
+  - bone: LowerArm.L
+    axis: 1
+    degrees: -10.2
+  - bone: LowerArm.L
+    axis: 2
+    degrees: 2.2
+  show:
+  - bone: UpperArm.R
+    axis: 0
+    degrees: 32
+  - bone: UpperArm.R
+    axis: 1
+    degrees: 32
+  - bone: LowerArm.R
     axis: 0
     degrees: 16
-  - bone: LowerArm.L
-    axis: 0
-    degrees: -7
-  lift:
-  - bone: UpperArm.L
+  - bone: LowerArm.R
     axis: 2
-    degrees: -50
-  - bone: LowerArm.L
-    axis: 0
     degrees: -16
   - bone: Shoulder.L
     axis: 2
-    degrees: -14
-  - bone: LowerArm.R
+    degrees: 10.3
+  - bone: UpperArm.L
     axis: 0
-    degrees: 20
+    degrees: 15.9
+  - bone: UpperArm.L
+    axis: 2
+    degrees: 8.9
+  - bone: LowerArm.L
+    axis: 0
+    degrees: -2.1
+  - bone: LowerArm.L
+    axis: 2
+    degrees: -2.2
 --- !u!1 &222116180
 GameObject:
   m_ObjectHideFlags: 0
@@ -10681,6 +10777,96 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!1 &417584895
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 417584896}
+  - component: {fileID: 417584898}
+  - component: {fileID: 417584897}
+  m_Layer: 0
+  m_Name: Band
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &417584896
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 417584895}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1919075036}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!23 &417584897
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 417584895}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 170d8d854f331b64ab3959ec4e53909b, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &417584898
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 417584895}
+  m_Mesh: {fileID: 4300000, guid: cf2dae3c4caea3342938a53ea7c94557, type: 2}
 --- !u!1 &419002407
 GameObject:
   m_ObjectHideFlags: 0
@@ -22585,7 +22771,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: HalfAware::HalfAware.Cable
   from: {fileID: 1808641445}
   to: {fileID: 313382132}
-  length: 0.38
+  length: 0.6
   points: 12
   radius: 0.008
   sides: 6
@@ -34141,6 +34327,7 @@ Transform:
   - {fileID: 400188883}
   - {fileID: 1627019571}
   - {fileID: 1797508300}
+  - {fileID: 182852856}
   m_Father: {fileID: 532214804}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1862127021
@@ -34825,6 +35012,7 @@ Transform:
   m_Children:
   - {fileID: 313382132}
   - {fileID: 1348661883}
+  - {fileID: 417584896}
   m_Father: {fileID: 1408424074}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!23 &1919075037

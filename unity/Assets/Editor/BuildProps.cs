@@ -218,9 +218,6 @@ namespace HalfAware.EditorTools
         /// </summary>
         public static GameObject BuildJack(Transform wrist)
         {
-            var old = wrist.Find("Jack");
-            if (old != null) Object.DestroyImmediate(old.gameObject);
-
             var parts = new List<Mesh>();
             // 差し込み口の座金 → 胴 → ケーブルの根元、と +Z へ伸ばす
             parts.Add(ProcMesh.Loft(new List<ProcMesh.Ring>
@@ -242,7 +239,10 @@ namespace HalfAware.EditorTools
             }, 8));
             var mesh = ProcMesh.Save(ProcMesh.Combine(parts, null), Generated + "Jack.asset");
 
-            var go = new GameObject("Jack");
+            // 作り直しても子は残す。調べる対象もケーブルの端もここにぶら下がっているので、
+            // 消して作り直すと参照が切れる
+            var found = wrist.Find("Jack");
+            var go = found != null ? found.gameObject : new GameObject("Jack");
             go.transform.SetParent(wrist, false);
             go.transform.localScale = Vector3.one / wrist.lossyScale.x;
             // 掌の側へ、肘寄り（骨の -up）に寄せて刺す。
@@ -250,10 +250,31 @@ namespace HalfAware.EditorTools
             // 差し込み口はそのまま目に入る
             go.transform.position = wrist.position - wrist.forward * 0.019f - wrist.up * 0.014f;
             go.transform.rotation = Quaternion.LookRotation(-wrist.forward, -wrist.up);
-            go.AddComponent<MeshFilter>().sharedMesh = mesh;
-            go.AddComponent<MeshRenderer>().sharedMaterial = Mat("SteelDark");
+            Need<MeshFilter>(go).sharedMesh = mesh;
+            Need<MeshRenderer>(go).sharedMaterial = Mat("SteelDark");
 
-            var end = new GameObject("CableEnd");
+            // 光る帯。部屋が暗いので、鋼のままだと手首の影に沈んで刺さっているのが分からない。
+            // 抜くところを見せるあいだ、目はこの帯を追う
+            var band = ProcMesh.Save(ProcMesh.Loft(new List<ProcMesh.Ring>
+            {
+                new ProcMesh.Ring(new Vector3(0f, 0f, 0.0072f), 0.0094f, 0.0094f),
+                new ProcMesh.Ring(new Vector3(0f, 0f, 0.0090f), 0.0098f, 0.0098f),
+                new ProcMesh.Ring(new Vector3(0f, 0f, 0.0122f), 0.0098f, 0.0098f),
+                new ProcMesh.Ring(new Vector3(0f, 0f, 0.0140f), 0.0094f, 0.0094f),
+            }, 10), Generated + "JackBand.asset");
+            var litT = go.transform.Find("Band");
+            var lit = litT != null ? litT.gameObject : new GameObject("Band");
+            lit.transform.SetParent(go.transform, false);
+            lit.transform.localPosition = Vector3.zero;
+            lit.transform.localRotation = Quaternion.identity;
+            lit.transform.localScale = Vector3.one;
+            Need<MeshFilter>(lit).sharedMesh = band;
+            var litR = Need<MeshRenderer>(lit);
+            litR.sharedMaterial = Glow("JackLight", new Color(0.36f, 0.82f, 0.86f), 2.4f);
+            litR.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+            var endT = go.transform.Find("CableEnd");
+            var end = endT != null ? endT.gameObject : new GameObject("CableEnd");
             end.transform.SetParent(go.transform, false);
             end.transform.localPosition = new Vector3(0f, 0f, 0.030f);
             return go;
@@ -670,6 +691,13 @@ namespace HalfAware.EditorTools
             g.GetComponent<Renderer>().sharedMaterial = mat;
             Object.DestroyImmediate(g.GetComponent<Collider>());
             return g;
+        }
+
+        /// <summary>付いていれば使い、無ければ足す。作り直しで参照を切らないために</summary>
+        static T Need<T>(GameObject go) where T : Component
+        {
+            var c = go.GetComponent<T>();
+            return c != null ? c : go.AddComponent<T>();
         }
 
         static GameObject Place(Transform parent, string name, Mesh mesh, Material mat)
