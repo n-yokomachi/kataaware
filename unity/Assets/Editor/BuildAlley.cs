@@ -56,6 +56,9 @@ namespace HalfAware.EditorTools
             Lane(Child(root, "Lane"));
             Yard(Child(root, "Yard"));
             Neon(Child(root, "Neon"));
+            Market(Child(root, "Market"));
+            Boards(Child(root, "Boards"));
+            Rain();
             var temp = GameObject.Find("TempGround");
             if (temp != null) Object.DestroyImmediate(temp);
             Place(root);
@@ -458,6 +461,289 @@ namespace HalfAware.EditorTools
             return m;
         }
 
+
+        // ---- 蚤の市 --------------------------------------------------------
+
+        /// <summary>歩ける筋の半幅。ここだけは何も置かない</summary>
+        public const float AisleHalf = 1.5f;
+        /// <summary>自分の露店の場所。いちばん奥</summary>
+        public const float MyStallX = -29.3f;
+
+        /// <summary>
+        /// ヤードの中身。両脇に出店を詰め、真ん中に人ひとりぶんの筋だけ残す。
+        /// 足の置き場もない、という文に合わせて隙間は詰める
+        /// </summary>
+        static void Market(Transform parent)
+        {
+            Clear(parent);
+            var rng = new System.Random(6100);
+            var n = 0;
+            for (var s2 = 0; s2 < 2; s2++)
+            {
+                var sideZ = s2 == 0 ? -1 : 1;
+                for (var row = 0; row < 2; row++)
+                {
+                    var z = LaneZ + sideZ * (AisleHalf + 1.35f + row * 3.1f);
+                    for (var x = LaneWest - 2.6f; x > MyStallX + 1.6f; x -= 3.2f)
+                    {
+                        Stall(parent, "Stall" + n++, new Vector3(x + (float)(rng.NextDouble() - 0.5) * 0.5f, 0f, z),
+                            sideZ > 0 ? 180f : 0f, rng, false);
+                    }
+                }
+            }
+            MyStall(Child(parent, "MyStall"));
+            Bulbs(Child(parent, "Bulbs"));
+        }
+
+        /// <summary>
+        /// 出店ひとつ。4 本の柱にタープを張り、テーブルと木箱を置く。
+        /// yaw は売り手が向く向きで、テーブルは筋の側へ出る
+        /// </summary>
+        static void Stall(Transform parent, string name, Vector3 at, float yaw, System.Random rng, bool mine)
+        {
+            var g = new GameObject(name);
+            g.transform.SetParent(parent, false);
+            g.transform.localPosition = at;
+            g.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
+            var t = g.transform;
+            var w = mine ? 2.6f : (float)(2.1 + rng.NextDouble() * 0.6);
+            var d = mine ? 2.2f : (float)(1.7 + rng.NextDouble() * 0.5);
+            var high = mine ? 2.25f : (float)(1.95 + rng.NextDouble() * 0.25);
+
+            for (var i = 0; i < 4; i++)
+            {
+                var px = (i % 2 == 0 ? -1 : 1) * w * 0.5f;
+                var pz = (i < 2 ? -1 : 1) * d * 0.5f;
+                Box(t, "Pole" + i, new Vector3(px, high * 0.5f, pz), new Vector3(0.06f, high, 0.06f), "Pole");
+            }
+
+            var tarp = mine ? "TarpMine" : "Tarp";
+            if (mine)
+            {
+                // 自分のぶんは穴が開いている。3 枚に割って、真ん中を空ける
+                Sheet(t, "Tarp.N", new Vector3(0f, high, -d * 0.28f), new Vector2(w + 0.3f, d * 0.40f), tarp);
+                Sheet(t, "Tarp.S", new Vector3(0f, high, d * 0.30f), new Vector2(w + 0.3f, d * 0.36f), tarp);
+                Sheet(t, "Tarp.W", new Vector3(-w * 0.34f, high, 0f), new Vector2(w * 0.30f, d * 0.30f), tarp);
+            }
+            else
+            {
+                Sheet(t, "Tarp", new Vector3(0f, high, 0f), new Vector2(w + 0.3f, d + 0.3f), tarp);
+            }
+
+            var th = 0.78f;
+            Box(t, "Table", new Vector3(0f, th, -d * 0.18f), new Vector3(w * 0.88f, 0.06f, d * 0.52f), "Timber");
+            Box(t, "Skirt", new Vector3(0f, th * 0.5f, -d * 0.18f - d * 0.24f), new Vector3(w * 0.88f, th, 0.05f), "Timber");
+
+            var boxes = mine ? 2 : 1 + rng.Next(3);
+            for (var i = 0; i < boxes; i++)
+            {
+                var bw = (float)(0.35 + rng.NextDouble() * 0.2);
+                Box(t, "Crate" + i, new Vector3((float)(rng.NextDouble() - 0.5) * w * 0.7f, bw * 0.5f,
+                        d * 0.30f + (float)(rng.NextDouble() - 0.5) * 0.3f),
+                    new Vector3(bw, bw, bw), "Crate");
+            }
+        }
+
+        /// <summary>タープの一枚。水平に張った薄い板</summary>
+        static void Sheet(Transform parent, string name, Vector3 centre, Vector2 size, string material)
+        {
+            Box(parent, name, centre, new Vector3(size.x, 0.04f, size.y), material);
+        }
+
+        /// <summary>
+        /// 自分の露店。穴の開いたタープの下に、テーブルと椅子と看板がひとつ。
+        /// いちばん奥に、入口を向いて構える
+        /// </summary>
+        static void MyStall(Transform parent)
+        {
+            Clear(parent);
+            var rng = new System.Random(77);
+            Stall(parent, "Stall", new Vector3(MyStallX, 0f, LaneZ), 90f, rng, true);
+            var t = parent.Find("Stall");
+            Box(t, "Chair.Seat", new Vector3(0f, 0.44f, 0.72f), new Vector3(0.44f, 0.06f, 0.44f), "Timber");
+            Box(t, "Chair.Back", new Vector3(0f, 0.70f, 0.94f), new Vector3(0.44f, 0.52f, 0.05f), "Timber");
+            for (var i = 0; i < 4; i++)
+            {
+                var px = (i % 2 == 0 ? -1 : 1) * 0.18f;
+                var pz = 0.72f + (i < 2 ? -0.18f : 0.18f);
+                Box(t, "Chair.Leg" + i, new Vector3(px, 0.22f, pz), new Vector3(0.04f, 0.44f, 0.04f), "Pole");
+            }
+        }
+
+        /// <summary>ヤードの裸電球。出店ごとには置かず、まばらに吊る</summary>
+        static void Bulbs(Transform parent)
+        {
+            Clear(parent);
+            var at = new Vector3[]
+            {
+                new Vector3(LaneWest - 3.2f, 3.1f, LaneZ + 0.4f),
+                new Vector3(LaneWest - 8.0f, 3.3f, LaneZ - 2.6f),
+                new Vector3(LaneWest - 8.6f, 3.2f, LaneZ + 3.0f),
+                new Vector3(MyStallX + 2.4f, 3.1f, LaneZ - 0.6f),
+                new Vector3(MyStallX + 0.2f, 2.5f, LaneZ + 0.2f),
+            };
+            for (var i = 0; i < at.Length; i++)
+            {
+                var g = new GameObject("Bulb" + i);
+                g.transform.SetParent(parent, false);
+                g.transform.localPosition = at[i];
+                var ball = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                ball.name = "Glass";
+                ball.transform.SetParent(g.transform, false);
+                ball.transform.localScale = new Vector3(0.11f, 0.11f, 0.11f);
+                ball.GetComponent<MeshRenderer>().sharedMaterial = GlowMat(new Color(1.00f, 0.80f, 0.52f), 2.2f);
+                Object.DestroyImmediate(ball.GetComponent<Collider>());
+                var l = g.AddComponent<Light>();
+                l.type = LightType.Point;
+                l.color = new Color(1.00f, 0.79f, 0.52f);
+                l.range = 9f;
+                l.intensity = 5.5f;
+                l.shadows = LightShadows.None;
+            }
+        }
+
+        // ---- 表示板 --------------------------------------------------------
+
+        /// <summary>小路の口の表示板と、自分の露店の看板。どちらも光らない板</summary>
+        static void Boards(Transform parent)
+        {
+            Clear(parent);
+            Board(parent, "SignYardName", "SignYardName", new Vector3(-StreetHalf + 0.10f, 2.9f, LaneZ - 2.4f),
+                Quaternion.Euler(0f, -90f, 0f), new Vector2(1.9f, 0.6f));
+            Board(parent, "SignYardName.Lane", "SignYardName", new Vector3(LaneWest + 0.6f, 2.9f, LaneZ - LaneHalf + 0.08f),
+                Quaternion.identity, new Vector2(1.9f, 0.6f));
+            Board(parent, "SignMemories", "SignMemories", new Vector3(MyStallX - 0.55f, 1.62f, LaneZ),
+                Quaternion.Euler(0f, -90f, 0f), new Vector2(1.5f, 0.75f));
+        }
+
+        /// <summary>板を 1 枚立てる。読ませるためではなく、そこに何があるかを示すために置く</summary>
+        static void Board(Transform parent, string name, string texture, Vector3 at, Quaternion rot, Vector2 size)
+        {
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/" + texture + ".png");
+            if (tex == null) { Debug.LogWarning("テクスチャが無い: " + texture); return; }
+            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            go.name = name;
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = at;
+            go.transform.localRotation = rot;
+            go.transform.localScale = new Vector3(size.x, size.y, 1f);
+            go.GetComponent<MeshRenderer>().sharedMaterial = BoardMat(texture, tex);
+            Object.DestroyImmediate(go.GetComponent<Collider>());
+        }
+
+        /// <summary>
+        /// 板のマテリアル。灯りを受ける Lit だと絵が出なかったので unlit で貼り、
+        /// 明るさは色で落としてある。暗い路地で読める程度に留める
+        /// </summary>
+        static Material BoardMat(string texture, Texture2D tex)
+        {
+            var path = Materials + "Board_" + texture + ".mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null || m.shader == null || m.shader.name != "Universal Render Pipeline/Unlit")
+            {
+                if (!AssetDatabase.IsValidFolder("Assets/Materials/Alley"))
+                    AssetDatabase.CreateFolder("Assets/Materials", "Alley");
+                if (m != null) AssetDatabase.DeleteAsset(path);
+                m = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+                m.name = "Board_" + texture;
+                AssetDatabase.CreateAsset(m, path);
+            }
+            m.SetTexture("_BaseMap", tex);
+            m.SetColor("_BaseColor", new Color(0.85f, 0.85f, 0.85f, 1f));
+            m.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Off);
+            EditorUtility.SetDirty(m);
+            AssetDatabase.SaveAssets();
+            return m;
+        }
+
+
+        // ---- 雨 ------------------------------------------------------------
+
+        /// <summary>
+        /// 雨。歩く先へ付いてくるよう、粒はプレイヤーの上から降らせる。
+        /// 粒そのものは世界の座標で動かすので、走っても雨が斜めに固まらない。
+        /// 屋根の下でも降り込むが、1/3 の解像度では気にならない
+        /// </summary>
+        static void Rain()
+        {
+            var player = GameObject.Find("Player");
+            if (player == null) return;
+            var old = player.transform.Find("Rain");
+            if (old != null) Object.DestroyImmediate(old.gameObject);
+
+            var go = new GameObject("Rain");
+            go.transform.SetParent(player.transform, false);
+            go.transform.localPosition = new Vector3(0f, 9f, 2.5f);
+            // 箱の面から真下へ吐かせる
+            go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+
+            var ps = go.AddComponent<ParticleSystem>();
+            var main = ps.main;
+            main.duration = 5f;
+            main.loop = true;
+            main.playOnAwake = true;
+            main.prewarm = true;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(1.35f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(8.5f, 11.5f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.020f, 0.038f);
+            main.startColor = new ParticleSystem.MinMaxGradient(
+                new Color(0.62f, 0.70f, 0.82f, 0.22f), new Color(0.78f, 0.84f, 0.95f, 0.42f));
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.maxParticles = 900;
+            main.gravityModifier = new ParticleSystem.MinMaxCurve(0.35f);
+
+            var em = ps.emission;
+            em.enabled = true;
+            em.rateOverTime = 620f;
+
+            var shape = ps.shape;
+            shape.enabled = true;
+            shape.shapeType = ParticleSystemShapeType.Box;
+            shape.scale = new Vector3(17f, 17f, 0.2f);
+
+            // 風。まっすぐ落ちる雨は書き割りに見える
+            var vel = ps.velocityOverLifetime;
+            vel.enabled = true;
+            vel.space = ParticleSystemSimulationSpace.World;
+            vel.x = new ParticleSystem.MinMaxCurve(-0.55f, -0.15f);
+            vel.z = new ParticleSystem.MinMaxCurve(-0.25f, 0.25f);
+
+            var r = go.GetComponent<ParticleSystemRenderer>();
+            r.sharedMaterial = RainMat();
+            r.renderMode = ParticleSystemRenderMode.Stretch;
+            r.lengthScale = 3.6f;
+            r.velocityScale = 0.06f;
+            r.cameraVelocityScale = 0f;
+            r.sortMode = ParticleSystemSortMode.None;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            r.receiveShadows = false;
+        }
+
+        /// <summary>雨粒のマテリアル。煙と同じ柔らかい絵を、細く引き伸ばして筋にする</summary>
+        static Material RainMat()
+        {
+            var path = Materials + "Rain.mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m != null) return m;
+            if (!AssetDatabase.IsValidFolder("Assets/Materials/Alley"))
+                AssetDatabase.CreateFolder("Assets/Materials", "Alley");
+            m = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit"));
+            m.name = "Rain";
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/SmokePuff.png");
+            if (tex != null) m.SetTexture("_BaseMap", tex);
+            m.SetColor("_BaseColor", new Color(1.1f, 1.15f, 1.25f, 1f));
+            m.SetFloat("_Surface", 1f);
+            m.SetFloat("_Blend", 0f);
+            m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            m.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.One);
+            m.SetFloat("_ZWrite", 0f);
+            m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+            AssetDatabase.CreateAsset(m, path);
+            AssetDatabase.SaveAssets();
+            return m;
+        }
+
         // ---- 置き方 --------------------------------------------------------
 
         /// <summary>立ち位置。通りの入口に、北を向いて立たせる</summary>
@@ -537,12 +823,17 @@ namespace HalfAware.EditorTools
         {
             switch (name)
             {
-                case "Asphalt": col = new Color(0.055f, 0.060f, 0.075f); smooth = 0.82f; break;
-                case "Cobble": col = new Color(0.075f, 0.075f, 0.085f); smooth = 0.68f; break;
+                case "Asphalt": col = new Color(0.055f, 0.060f, 0.075f); smooth = 0.66f; break;
+                case "Cobble": col = new Color(0.075f, 0.075f, 0.085f); smooth = 0.46f; break;
                 case "Kerb": col = new Color(0.115f, 0.115f, 0.125f); smooth = 0.55f; break;
                 case "Brick": col = new Color(0.105f, 0.085f, 0.085f); smooth = 0.18f; break;
                 case "Facade": col = new Color(0.085f, 0.090f, 0.105f); smooth = 0.22f; break;
                 case "Ledge": col = new Color(0.135f, 0.130f, 0.130f); smooth = 0.20f; break;
+                case "Tarp": col = new Color(0.150f, 0.145f, 0.130f); smooth = 0.30f; break;
+                case "TarpMine": col = new Color(0.135f, 0.115f, 0.100f); smooth = 0.30f; break;
+                case "Timber": col = new Color(0.130f, 0.105f, 0.080f); smooth = 0.15f; break;
+                case "Pole": col = new Color(0.090f, 0.090f, 0.095f); smooth = 0.42f; break;
+                case "Crate": col = new Color(0.105f, 0.090f, 0.072f); smooth = 0.12f; break;
                 default: col = new Color(0.12f, 0.12f, 0.13f); smooth = 0.3f; break;
             }
         }
