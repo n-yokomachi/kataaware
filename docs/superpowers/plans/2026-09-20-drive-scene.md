@@ -1396,6 +1396,12 @@ namespace HalfAware
             clock.Tick(Time.deltaTime, closing);
             hud.SetFade(clock.Dark(closing));
 
+            // 速さと粗さも秒数と同じ扱いで、毎フレーム渡す。
+            // Dress のときだけ渡すと、再生しながら Inspector で速さを触っても
+            // 次の暗転まで効かない。今の帯は一生効かないことになる
+            world.Speed = At(shown).speed;
+            world.Rough = At(shown).rough;
+
             // 黒へ入った一度だけ、景色を先に入れ替える。段取りはまだ終わる側のまま。
             // ここで clock.Reset を呼んではいけない。黒が 1 フレームで終わる
             if (clock.TakeSwap()) Dress(band + 1);
@@ -1461,9 +1467,6 @@ namespace HalfAware
                 return;
             }
             shown = which;
-            var next = At(which);
-            world.Speed = next.speed;
-            world.Rough = next.rough;
             world.Dress(which);
             world.Rewind();
             ShowTrigger(which);
@@ -1573,10 +1576,10 @@ Prune → Scene → Car → Road → Roadsides → Garage → Items → Wire →
 
 | 帯 | 沿道に並べるもの |
 |---|---|
-| 0 | 高架の脚（(±6.5, 0〜6.0)、40 m ごと）、ネオンの板（(±5.4, 3.2)、25 m ごと）、濡れた路面の照り返し |
-| 1 | 街灯（(±4.6, 0〜7.2)、35 m ごと）、対向車のヘッドライトの点（x -2.4、逆向きに流す） |
+| 0 | 高架の脚（(±6.5, 0〜6.0)、**45 m** ごと）、ネオンの板（(±5.4, 3.2)、**30 m** ごと）、濡れた路面の照り返し |
+| 1 | 街灯（(±4.6, 0〜7.2)、**36 m** ごと）、対向車のヘッドライトの点（x -2.4、逆向きに流す） |
 | 2 | 木立（(±5.8, 0〜5.0)、12 m ごとにばらけさせる） |
-| 3 | 石垣（(±4.4, 0〜0.9)、連続）、牧草地の面 |
+| 3 | 石垣（(±4.4, 0〜0.9)、連続。区切り 1 つぶんがちょうど 20 m）、牧草地の面 |
 | 4 | 小麦（(±3.4 より外、0〜1.1)、2.5 m ごと）、土の轍 |
 
 形はすべて `Bank.Box` の組み合わせで済ませる。細部はオーナーが実画面を見てから詰めるので、ここでは輪郭だけ作る。
@@ -1689,39 +1692,23 @@ return report;
 
 - [ ] **Step 2: 車体の揺れを繋ぐ**
 
-`unity/Assets/Scripts/Player/Sway.cs` を読み、揺れの強さを外から入れられるか確かめる。入れられなければ `DriveWorld` に次を足す。
+**目の位置は自分で書かない。** `PlayerController` が毎フレーム `eye.localPosition = new Vector3(0f, EyeHeight, eyeLead) + EyeOffset` と書き直しているので、`localPosition` を直に触ると上書きされるか、こちらが勝った場合は `EyeHeight` を初回の値で固めてしまう。`EyeSway` の説明文がその理由をそのまま書いている。
+
+同じやり方に倣い、ずれの値を `PlayerController.EyeOffset` へ渡す。`EyeSway` は実行順 -20 で同じ場所へ書くので、どちらが持ち主かを決める（場面 8 では眩暈を出さないので `EyeSway` を付けない、が単純）。
+
+揺れの計算そのものは `Sway` や `RoadRing` と同じく純粋なクラスへ出し、テストで確かめられるようにする。時間ではなく走った距離を位相にするのは、速く走るほど細かく揺れてほしいため。
 
 ```csharp
-[Header("揺れ")]
-[Tooltip("揺れの幅。m。舗装はごく小さく、未舗装は粗く")]
-[SerializeField] float shake = 0.004f;
-[Tooltip("揺れの速さ。走る速さに掛ける")]
-[SerializeField] float shakeRate = 0.35f;
-[Tooltip("揺らす対象。運転席のカメラ")]
-[SerializeField] Transform shaken;
-
-Vector3 rest;
-
-/// <summary>路面の粗さ。1 が舗装、未舗装はもっと大きい。帯ごとに入れる</summary>
-public float Rough { get; set; }
+        [Header("揺れ")]
+        [Tooltip("揺れの幅。m。舗装はごく小さく、未舗装は粗く")]
+        [SerializeField] float shake = 0.004f;
+        [Tooltip("揺れの速さ。走った距離に掛ける")]
+        [SerializeField] float shakeRate = 0.35f;
+        [Tooltip("ずれを渡す先")]
+        [SerializeField] PlayerController player;
 ```
 
-`Update` の末尾で、走った距離を位相にして上下と左右へ振る。時間ではなく距離で振るのは、速く走るほど細かく揺れてほしいため。
-
-```csharp
-if (shaken == null) return;
-if (rest == Vector3.zero) rest = shaken.localPosition;
-var phase = Travelled * shakeRate;
-var amount = shake * Mathf.Max(0f, Rough);
-shaken.localPosition = rest + new Vector3(
-    Mathf.Sin(phase * 2.3f) * amount * 0.6f,
-    Mathf.Sin(phase * 3.7f) * amount,
-    0f);
-```
-
-`Rough` は帯ごとの値で、`DriveBand.rough` として Task 1 で定義済み。
-`DriveDirector.Dress` での受け渡しも Task 7 で済んでいる（`world.Rough = next.rough;`）ので、
-ここでやるのは `DriveWorld` 側に `Rough` と揺れを足すところまで。
+`Update` の末尾で `player.EyeOffset` にずれを入れる。`Rough` は Task 5 で済んでいるので、ここでやるのは揺れの部分だけ。
 
 - [ ] **Step 3: 前腕を出す**
 
@@ -1784,7 +1771,10 @@ git commit -m "feat: let me look around, feel the road, and fold my arms"
 
 `[MenuItem("HalfAware/Check the drive", false, 235)]` と `public static void Run(Transform root)` を置く。見るのは次の 6 つで、それぞれ問題の数を返す。
 
-1. **タイルの環** — `RoadRing.Slot` で全枚数の z を出し、並べ替えて隣との差が 1 枚の長さと一致するか。**一点だけ見ても足りない。** 走行距離を 0 から環一周ぶん、タイルの長さの約数にならない刻みで動かして通しで見る。隙間は環が回り込んだ瞬間に開くので、`travelled = 0` だけだと素通りする。ずれていたら「タイルの環に隙間がある: 差 N m」。あわせて、タイルの入れ物に空きが混ざっていないかも見る。空きがあると道に穴が走る
+1. **タイルの環** — ここで見るのは `RoadRing` の計算ではなく、**シーンに立っている実物**。計算そのものは `RoadRingTests` が 601 点で確かめているので、ここで数え直しても落ちない。見るのは次の三つ。
+   - タイルの入れ物に空きや欠けが無いか。空きがあると 20 m の穴が環に乗って回り、16 m/s なら 11 秒ごとに正面へ飛んでくる
+   - 各タイルの `localPosition.z` が `RoadRing.Slot(i, n, tileLength, 0f, behind)` と合っているか。`BuildDrive` も同じ式で置く
+   - 各タイルの mesh の z 方向の長さが `tileLength` とぴったりか、原点が手前（-z）端にあるか。中央や奥端に原点があると、環は正しいのに地平へ穴が空く
 2. **沿道が道に出ていないか** — 各帯の沿道の物の mesh 頂点を車の向きへ直し、`|x| < 道幅の半分` に入る頂点があれば「沿道の物が道に出ている: 名前」
 3. **ピンが埋まっていないか** — `Physics.OverlapSphere(it.Position + up * 0.17f, 0.12f)` と `ClosestPoint` で包含を見る。`CheckAlley.Pins` と同じ
 4. **id の食い違い** — シーンの `Interactable` の id と `DriveScript` の id を突き合わせる。`DriveIds.IsPage` は対象を持たないので飛ばす。`CheckAlley.Ids` と同じ
