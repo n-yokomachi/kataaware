@@ -3712,7 +3712,7 @@ namespace HalfAware.EditorTools
                 var face = new Vector3(-p.side, 0f, 0f);
                 var x = p.side * (StreetHalf - 0.14f);
                 var spot = Clear(new Vector3(x, p.y, p.z), p.size, face);
-                // 壁の前に出ている物（騎戸の桟・序・管）より手前へ出す。
+                // 壁の前に出ている物（鎧戸の桟・庇・管）より手前へ出す。
                 // 引っ込んでいると桟が板を横に切る
                 // face は読む人の居る側、つまり通りの方向。そちらへ出す
                 spot += face * Stick(spot, p.size, face);
@@ -3748,14 +3748,16 @@ namespace HalfAware.EditorTools
                     if (Stick(spot, size, face) > 0.30f) continue;
                     return spot;
                 }
-            Debug.LogWarning("壁に板を掛けられる隙間が無い: " + at.ToString("F1"));
+            // 空いているところが無ければ狙いのまま。
+            // このあと Stick で手前へ出すので、窓の前に掛かる分には困らない。
+            // 本当に食い込んでいるかは、掛け終わってから見直しが見る
             return at;
         }
 
         /// <summary>
         /// 板を掛けるところで、壁面よりどれだけ物が出ているか。通りの側を into で渡す。
         ///
-        /// 騎戸の桟は長い板一枚でできており、頂点は店先の端にしか無い。
+        /// 鎧戸の桟は長い板一枚でできており、頂点は店先の端にしか無い。
         /// 頂点を数えても見つからないので、その場で当たり判定を立てて線を通す。
         /// 済んだら外す
         /// </summary>

@@ -49,7 +49,7 @@ namespace HalfAware.EditorTools
         ///
         /// 路地裏の物はほとんどが当たり判定を持たない焼いた mesh なので、
         /// ここだけ一時的に当たり判定を立てる。
-        /// 頂点を数えるやり方だと、騎戸の桟のような長い一枚板を取り逃す
+        /// 頂点を数えるやり方だと、鎧戸の桟のような長い一枚板を取り逃す
         /// </summary>
         static int Boards(Transform root)
         {

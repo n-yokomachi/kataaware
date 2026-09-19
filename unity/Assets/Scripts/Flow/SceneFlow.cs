@@ -216,6 +216,15 @@ namespace HalfAware
 
         void Update()
         {
+            // エディタで再生したままスクリプトを組み直すと、Awake を通さずに Update だけが続く。
+            // 覚えていたものは消えているので、拾い直せるものはここで拾い直す。
+            // これが無いと、例外がフレームごとに流れてログが読めなくなる
+            if (items == null)
+            {
+                items = new List<IInteractable>(FindObjectsByType<Interactable>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID));
+                progress = new SceneProgress(items);
+                Debug.LogWarning("SceneFlow: 再生中に組み直されたので、調べる対象を拾い直した", this);
+            }
             // ログと場面の一覧は、場面を終えたあとでも開ける
             if (player.LogPressed)
             {

@@ -67,6 +67,16 @@ namespace HalfAware
 #if UNITY_EDITOR
         void OnValidate()
         {
+            // 組み立ての途中にも OnValidate は鳴る。
+            // AddComponent した直後は id も文面もまだ入っていないので、
+            // その場で見ると毎回無駄に警告が出る。一拍置いてから見る
+            UnityEditor.EditorApplication.delayCall += Examine;
+        }
+
+        void Examine()
+        {
+            // 遅らせている間に消されていることがある
+            if (this == null) return;
             if (string.IsNullOrEmpty(id)) Debug.LogWarning("Interactable に id がない: " + name, this);
             else if (script == null) Debug.LogWarning("Interactable に文面のアセットがない: " + name, this);
             else if (script.Find(id).id == null) Debug.LogWarning("文面に id が無い: " + id, this);
