@@ -826,7 +826,7 @@ namespace HalfAware
 
 - [ ] **Step 4: テストが通ることを確かめる**
 
-Expected: `failed: 0`。291 件。
+Expected: `failed: 0`。292 件。
 
 落ちたら実装を直す。**テストの期待値を実装に寄せて黙らせない。**
 
@@ -863,7 +863,7 @@ namespace HalfAware
     /// </summary>
     public sealed class DriveWorld : MonoBehaviour
     {
-        [Tooltip("道のタイル。環にして流す。順番は問わない")]
+        [Tooltip("道のタイル。環にして流す。i 番目が環の i 番目の枠に入るので、並べ替えると沿道の出方が変わる")]
         [SerializeField] Transform[] tiles = new Transform[0];
         [Tooltip("タイル 1 枚の長さ。m")]
         [SerializeField] float tileLength = 20f;
@@ -926,7 +926,7 @@ Expected: 0 件。
 
 - [ ] **Step 3: テストを走らせて崩れていないことを確かめる**
 
-Expected: `failed: 0`。291 件のまま。
+Expected: `failed: 0`。292 件のまま。
 
 - [ ] **Step 4: commit**
 
@@ -1188,7 +1188,7 @@ namespace HalfAware.Tests
 
 - [ ] **Step 4: テストが通ることを確かめる**
 
-Expected: `failed: 0`。295 件。
+Expected: `failed: 0`。296 件。
 
 - [ ] **Step 5: commit**
 
@@ -1407,7 +1407,7 @@ Expected: 0 件。`PlayerController` に `CanMove` / `Yaw` / `Pitch` が無け�
 
 - [ ] **Step 3: テストを走らせて崩れていないことを確かめる**
 
-Expected: `failed: 0`。295 件のまま。
+Expected: `failed: 0`。296 件のまま。
 
 - [ ] **Step 4: commit**
 
@@ -1449,6 +1449,13 @@ Prune → Scene → Car → Road → Roadsides → Garage → Items → Wire →
 | 路肩 | 片側 1.2 |
 
 道のタイルは `Bank` の `FaceY` で 1 枚ずつ作る。マテリアルは帯ごとに差し替えず、タイルは 1 種のみにして、色味は Volume（Color Adjustments）で寄せる。
+
+**タイルの作り方には守らなければいけない条件が三つある。**`RoadRing.Slot` が返すのは mesh の原点の z で、mesh そのものには長さがあるため。
+
+1. **原点は手前（-z）の端に置く。** `FaceY(0, -3.5, 3.5, 0, 20, 1)` であって、`FaceY(0, -3.5, 3.5, i*20, (i+1)*20, 1)` ではない。絶対の z を頂点に焼き込むと `localPosition` と二重にずれる。
+   奥（+z）端に原点を置くと道が 10 m 足りず、**タイル 1 枚ぶんの周期で地平に穴が空く**。中央でも前の端がちょうど 140 で、余裕が無い
+2. **z 方向の長さはちょうど `tileLength`。** 短ければ継ぎ目に隙間、長ければ重なる
+3. **`tileLength` は 2 の冪と相性の良い数にする。** 20 なら計算に丸めが一切入らない。17.3 のような半端な数にすると 10 分ほどで 1 mm の隙間が開く。`tileLength * Bank` の一枚あたりの UV も整数にしないと、継ぎ目で絵柄が途切れる
 
 - [ ] **Step 2: 車内を組む**
 
@@ -1665,7 +1672,7 @@ Expected: 0 件。
 
 - [ ] **Step 5: テストを走らせる**
 
-Expected: `failed: 0`。295 件のまま。テストは足していない。
+Expected: `failed: 0`。296 件のまま。テストは足していない。
 
 - [ ] **Step 6: commit**
 
@@ -1690,7 +1697,7 @@ git commit -m "feat: let me look around, feel the road, and fold my arms"
 
 `[MenuItem("HalfAware/Check the drive", false, 235)]` と `public static void Run(Transform root)` を置く。見るのは次の 6 つで、それぞれ問題の数を返す。
 
-1. **タイルの環** — `RoadRing.Slot` で全枚数の z を出し、並べ替えて隣との差が 1 枚の長さと一致するか。ずれていたら「タイルの環に隙間がある: 差 N m」
+1. **タイルの環** — `RoadRing.Slot` で全枚数の z を出し、並べ替えて隣との差が 1 枚の長さと一致するか。**一点だけ見ても足りない。** 走行距離を 0 から環一周ぶん、タイルの長さの約数にならない刻みで動かして通しで見る。隙間は環が回り込んだ瞬間に開くので、`travelled = 0` だけだと素通りする。ずれていたら「タイルの環に隙間がある: 差 N m」。あわせて、タイルの入れ物に空きが混ざっていないかも見る。空きがあると道に穴が走る
 2. **沿道が道に出ていないか** — 各帯の沿道の物の mesh 頂点を車の向きへ直し、`|x| < 道幅の半分` に入る頂点があれば「沿道の物が道に出ている: 名前」
 3. **ピンが埋まっていないか** — `Physics.OverlapSphere(it.Position + up * 0.17f, 0.12f)` と `ClosestPoint` で包含を見る。`CheckAlley.Pins` と同じ
 4. **id の食い違い** — シーンの `Interactable` の id と `DriveScript` の id を突き合わせる。`DriveIds.IsPage` は対象を持たないので飛ばす。`CheckAlley.Ids` と同じ
@@ -1751,7 +1758,7 @@ return "帯 " + f.GetValue(d) + " / 走行 " + w.Travelled.ToString("F1") + " / 
 - [ ] **Step 3: テストを全部走らせる**
 
 `run_tests`（EditMode）→ `get_test_job`。
-Expected: `failed: 0`。295 件。
+Expected: `failed: 0`。296 件。
 
 - [ ] **Step 4: 組み立て直して保存する**
 
