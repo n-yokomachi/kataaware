@@ -18,6 +18,10 @@ namespace HalfAware
 
         [SerializeField] GameObject subtitleBand;
         [SerializeField] TMP_Text subtitleText;
+        [Tooltip("字幕 1 行ぶんの高さ。ウインドウはこの倍数で伸びる")]
+        [SerializeField] float subtitleRowHeight = 44f;
+        [Tooltip("帯の上下の余白をあわせた高さ")]
+        [SerializeField] float subtitlePadding = 34f;
         [SerializeField] TMP_Text promptText;
         [SerializeField] TMP_Text centerText;
         [Tooltip("画面全体の黒い層。暗転に使う")]
@@ -28,8 +32,11 @@ namespace HalfAware
         [SerializeField] GameObject logPanel;
         [SerializeField] TMP_Text logText;
 
+        float baseFontSize;
+
         void Awake()
         {
+            if (subtitleText != null) baseFontSize = subtitleText.fontSize;
             SetSubtitle(null);
             SetPrompt(null);
             SetCenter(null);
@@ -38,11 +45,25 @@ namespace HalfAware
             SetLog(null);
         }
 
-        /// <summary>null で黒帯ごと隠す</summary>
+        /// <summary>
+        /// null で黒帯ごと隠す。入っている行数に合わせて帯を伸ばし、
+        /// 長いものは字を小さくして収める
+        /// </summary>
         public void SetSubtitle(string text)
         {
             subtitleBand.SetActive(text != null);
             subtitleText.text = text ?? string.Empty;
+            if (text == null) return;
+            var rows = SubtitleBox.Rows(text);
+            var band = subtitleBand.GetComponent<RectTransform>();
+            if (band != null)
+            {
+                var size = band.sizeDelta;
+                size.y = subtitlePadding + subtitleRowHeight * rows;
+                band.sizeDelta = size;
+            }
+            if (baseFontSize <= 0f) baseFontSize = subtitleText.fontSize;
+            subtitleText.fontSize = baseFontSize * SubtitleBox.FontScale(text);
         }
 
         /// <summary>null で隠す</summary>

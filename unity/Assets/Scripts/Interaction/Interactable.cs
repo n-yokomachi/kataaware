@@ -41,6 +41,12 @@ namespace HalfAware
 
         public IReadOnlyList<string> Lines => script != null ? script.Find(id).Lines : NoLines;
 
+        public bool Asks => script != null && script.Find(id).Asks;
+
+        public string Question => script != null ? (script.Find(id).choice.question ?? "") : "";
+
+        public IReadOnlyList<string> AfterYes => script != null ? script.Find(id).choice.AfterYes : NoLines;
+
         public IReadOnlyList<string> HintFor(string afterId)
         {
             return script != null ? script.Find(id).HintFor(afterId) : null;

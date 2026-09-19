@@ -51,6 +51,12 @@ namespace HalfAware
         public bool LogPressed { get; private set; }
 
         /// <summary>
+        /// 二択の左右。-1 が左、+1 が右、倒していなければ 0。
+        /// 押した瞬間を取るのは呼び手の仕事で、ここは倒れ具合をそのまま渡す
+        /// </summary>
+        public int ChoiceStep { get; private set; }
+
+        /// <summary>
         /// 座っている間、左右に振れる角度。度。片側の値。0 以下なら体ごと回れる。
         /// 立ち上がるときは ReleaseHead を呼んで、首の向きを体へ渡す
         /// </summary>
@@ -112,12 +118,15 @@ namespace HalfAware
         {
             InteractPressed = false;
             LogPressed = false;
+            ChoiceStep = 0;
             if (CursorLocked)
             {
                 InteractPressed = interact.WasPressedThisFrame();
                 LogPressed = logToggle.WasPressedThisFrame();
+                var stick = move.ReadValue<Vector2>();
+                ChoiceStep = stick.x > 0.5f ? 1 : stick.x < -0.5f ? -1 : 0;
                 if (CanLook) Look(look.ReadValue<Vector2>());
-                if (CanMove) Walk(move.ReadValue<Vector2>());
+                if (CanMove) Walk(stick);
             }
             else
             {

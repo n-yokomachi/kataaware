@@ -392,6 +392,155 @@ namespace HalfAware.EditorTools
             return m;
         }
 
+        // ---- 立ち上がる場所 ---------------------------------------------------
+
+        /// <summary>
+        /// 立ち上がって足を下ろす場所を、椅子と机のあいだへ置く。
+        /// 椅子の当たりと机に触れない z を、椅子の前から机へ向かって探す
+        /// </summary>
+        [MenuItem("HalfAware/Fit the standing spot")]
+        public static void FitStandSpotMenu()
+        {
+            var player = GameObject.Find("Player");
+            var chair = GameObject.Find("Room/Chair");
+            var spot = GameObject.Find("Room/StandSpot");
+            if (player == null || chair == null || spot == null) { Debug.LogError("Player / Chair / StandSpot のどれかが無い"); return; }
+            var cc = player.GetComponent<CharacterController>();
+            var blocker = chair.transform.Find("Blocker");
+            var wasOn = blocker != null && blocker.gameObject.activeSelf;
+            if (blocker != null) blocker.gameObject.SetActive(true);
+
+            var found = false;
+            var at = spot.transform.position;
+            // 椅子の前（机寄り）から探す。見つからなければ椅子の後ろへ下がる
+            for (var z = 1.72f; z <= 2.10f; z += 0.02f)
+            {
+                var p = new Vector3(1.5f, 0.05f, z);
+                if (!Clear(cc, player.transform, p)) continue;
+                at = p;
+                found = true;
+                break;
+            }
+            if (!found)
+            {
+                for (var z = 0.60f; z >= 0.10f; z -= 0.02f)
+                {
+                    var p = new Vector3(1.5f, 0.05f, z);
+                    if (!Clear(cc, player.transform, p)) continue;
+                    at = p;
+                    found = true;
+                    Debug.LogWarning("椅子と机のあいだに立てる幅が無いので、椅子の後ろへ回した");
+                    break;
+                }
+            }
+            if (blocker != null) blocker.gameObject.SetActive(wasOn);
+            if (!found) { Debug.LogError("立てる場所が見つからない"); return; }
+            spot.transform.position = at;
+            Debug.Log("立ち上がる場所を " + at.ToString("F3") + " にした");
+            Mark(spot);
+        }
+
+        /// <summary>その場所に体の当たりが収まるか</summary>
+        static bool Clear(CharacterController cc, Transform player, Vector3 at)
+        {
+            var bottom = at + cc.center + Vector3.up * (-cc.height * 0.5f + cc.radius);
+            var top = at + cc.center + Vector3.up * (cc.height * 0.5f - cc.radius);
+            foreach (var col in Physics.OverlapCapsule(bottom, top, cc.radius))
+            {
+                if (col.transform.IsChildOf(player)) continue;
+                return false;
+            }
+            return true;
+        }
+
+        // ---- 部屋の埃 -------------------------------------------------------
+
+        /// <summary>
+        /// 空中を漂う埃。ごく小さい粒を部屋いっぱいに撒いて、ほとんど動かさない。
+        /// 明かりの中を横切ったときにだけ見える程度に留める
+        /// </summary>
+        [MenuItem("HalfAware/Build the dust")]
+        public static void BuildDustMenu()
+        {
+            var room = GameObject.Find("Room");
+            if (room == null) { Debug.LogError("部屋がシーンに無い"); return; }
+            var made = BuildDust(room.transform);
+            Selection.activeGameObject = made;
+            Mark(made);
+        }
+
+        public static GameObject BuildDust(Transform room)
+        {
+            var old = room.Find("Dust");
+            if (old != null) Object.DestroyImmediate(old.gameObject);
+            var go = new GameObject("Dust");
+            go.transform.SetParent(room, false);
+            go.transform.position = new Vector3(0f, 1.45f, 0f);
+            go.transform.rotation = Quaternion.identity;
+
+            var ps = go.AddComponent<ParticleSystem>();
+            var main = ps.main;
+            main.duration = 12f;
+            main.loop = true;
+            main.playOnAwake = true;
+            main.prewarm = true;                       // 入った瞬間から漂っている
+            main.startLifetime = new ParticleSystem.MinMaxCurve(9f, 18f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(0.004f, 0.016f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.004f, 0.010f);
+            main.startColor = new ParticleSystem.MinMaxGradient(
+                new Color(0.86f, 0.85f, 0.82f, 0.20f), new Color(0.78f, 0.78f, 0.76f, 0.42f));
+            main.gravityModifier = new ParticleSystem.MinMaxCurve(0.0012f);   // ゆっくり沈む
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.maxParticles = 420;
+
+            var em = ps.emission;
+            em.enabled = true;
+            em.rateOverTime = 30f;
+
+            var shape = ps.shape;
+            shape.enabled = true;
+            shape.shapeType = ParticleSystemShapeType.Box;
+            shape.scale = new Vector3(5.6f, 2.6f, 5.6f);
+
+            var vel = ps.velocityOverLifetime;
+            vel.enabled = true;
+            vel.space = ParticleSystemSimulationSpace.World;
+            vel.x = new ParticleSystem.MinMaxCurve(-0.012f, 0.012f);
+            vel.y = new ParticleSystem.MinMaxCurve(-0.006f, 0.010f);
+            vel.z = new ParticleSystem.MinMaxCurve(-0.012f, 0.012f);
+
+            // ちらつき。粒が回って光を拾ったり落としたりする
+            var col = ps.colorOverLifetime;
+            col.enabled = true;
+            var grad = new Gradient();
+            grad.SetKeys(
+                new GradientColorKey[]{ new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+                new GradientAlphaKey[]
+                {
+                    new GradientAlphaKey(0f, 0f),
+                    new GradientAlphaKey(1f, 0.18f),
+                    new GradientAlphaKey(0.75f, 0.70f),
+                    new GradientAlphaKey(0f, 1f),
+                });
+            col.color = new ParticleSystem.MinMaxGradient(grad);
+
+            var noise = ps.noise;
+            noise.enabled = true;
+            noise.strength = new ParticleSystem.MinMaxCurve(0.010f);
+            noise.frequency = 0.15f;
+            noise.scrollSpeed = new ParticleSystem.MinMaxCurve(0.03f);
+            noise.damping = true;
+
+            var r = go.GetComponent<ParticleSystemRenderer>();
+            r.sharedMaterial = Mat("Smoke");            // 煙と同じ柔らかい粒の絵を使い回す
+            r.renderMode = ParticleSystemRenderMode.Billboard;
+            r.sortMode = ParticleSystemSortMode.None;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            r.receiveShadows = false;
+            r.alignment = ParticleSystemRenderSpace.View;
+            return go;
+        }
+
         // ---- 煙草の煙 -----------------------------------------------------
 
         /// <summary>

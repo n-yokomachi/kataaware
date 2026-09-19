@@ -25,14 +25,26 @@ namespace HalfAware
 
         /// <summary>
         /// 調べたときに出す文を返す。前提が未達なら、その id の文だけ返して済んだことにはしない。
-        /// 済ませた場合は Done に加える
+        /// 二択を持つ対象は、ここでは済んだことにせず Confirm を待つ。
+        /// 二択を持たない対象は、この場で Done に加える
         /// </summary>
         public IReadOnlyList<string> Examine(IInteractable item)
         {
             var unmet = InteractionPicker.UnmetPrerequisite(item, done);
             if (unmet != null) return item.HintFor(unmet) ?? NoLines;
-            done.Add(item.Id);
+            if (!item.Asks) done.Add(item.Id);
             return item.Lines;
+        }
+
+        /// <summary>
+        /// 二択で「はい」を選んだときに呼ぶ。ここで初めて済んだことになる。
+        /// 「いいえ」なら呼ばない。対象は選べるまま残る
+        /// </summary>
+        public IReadOnlyList<string> Confirm(IInteractable item)
+        {
+            if (item == null) return NoLines;
+            done.Add(item.Id);
+            return item.AfterYes;
         }
     }
 }

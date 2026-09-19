@@ -17,6 +17,8 @@ namespace HalfAware
         public const string ToBeContinued = "（仮）続く";
         /// <summary>暗転にかける秒数</summary>
         public const float FadeSeconds = 1.5f;
+        /// <summary>場面の頭で黒から明ける秒数</summary>
+        public const float FadeInSeconds = 1.2f;
         /// <summary>座位から立位へ目線を上げる秒数</summary>
         public const float StandSeconds = 0.6f;
 
@@ -69,6 +71,9 @@ namespace HalfAware
         bool dazeReleased;
         bool logOpen;
         Vector3 seatedSpot;
+        Choice choice;
+        IInteractable asking;
+        int lastStep;
 
         /// <summary>対象を調べて済んだ直後。前提が未達で文だけ出たときは呼ばない</summary>
         public event Action<IInteractable> Examined;
@@ -129,6 +134,13 @@ namespace HalfAware
             if (daze != null && dazeUntil.Length > 0) daze.Hold(dazeBlur, dazeWobble);
         }
 
+        /// <summary>場面の頭は黒から明ける。前の場面から切り替わった直後の目の慣れを兼ねる</summary>
+        IEnumerator Start()
+        {
+            hud.SetFade(1f);
+            yield return hud.FadeTo(0f, FadeInSeconds);
+        }
+
         /// <summary>次のフレームで調べる操作を 1 回起こす。E キーの代わりに、再生中の動作確認から SendMessage で呼ぶ</summary>
         public void PressInteract() => pendingInteract = true;
 
@@ -155,9 +167,17 @@ namespace HalfAware
             {
                 subtitles.Advance();
                 interact = false;
+                // 文を読み終えたところで二択を出す
+                if (!subtitles.IsTalking && asking != null && choice == null) OpenChoice();
+            }
+            if (choice != null)
+            {
+                // 二択を出している間は、見回す以外は受け付けない
+                Ask(interact);
+                interact = false;
             }
             IInteractable selected = null;
-            if (!subtitles.IsTalking && !frozen)
+            if (choice == null && !subtitles.IsTalking && !frozen)
             {
                 var eye = player.Eye;
                 selected = InteractionPicker.Select(eye.position, eye.forward, items, progress.Done, maxAngle);
@@ -168,6 +188,9 @@ namespace HalfAware
                 var said = progress.Examine(selected);
                 subtitles.Enqueue(said);
                 log.AddRange(said);
+                // 二択を持つ対象は、文を読み終えてから問う
+                asking = selected.Asks ? selected : null;
+                if (asking != null && !subtitles.IsTalking) OpenChoice();
                 if (progress.Done.Contains(selected.Id) && Examined != null) Examined(selected);
             }
             // 調べた先の演出が Freeze を呼ぶので、止まっているかは調べた後に見直す
@@ -175,10 +198,46 @@ namespace HalfAware
             ReleaseDaze();
             Wake();
             // 独白を読み終えてから腰を上げる。喋りながら立ち上がらせない
-            Stand(frozenNow || subtitles.IsTalking);
+            Stand(frozenNow || subtitles.IsTalking || choice != null);
             // ログを開いている間は字幕を伏せる。ログの上に重なって読みにくい
-            hud.SetSubtitle(logOpen ? null : subtitles.Current);
-            if (progress.IsComplete && !subtitles.IsTalking && !frozenNow) StartCoroutine(Complete());
+            hud.SetSubtitle(logOpen ? null : choice != null ? choice.Compose() : subtitles.Current);
+            if (progress.IsComplete && !subtitles.IsTalking && choice == null && !frozenNow) StartCoroutine(Complete());
+        }
+
+        /// <summary>
+        /// 二択を出しているあいだ。左右で選び、調べる操作で決める。
+        /// 「はい」なら済んだことにして続きの文を出し、「いいえ」なら何もせず閉じる
+        /// </summary>
+        void Ask(bool interact)
+        {
+            var step = player.ChoiceStep;
+            if (step != 0 && step != lastStep) choice.Move(step);
+            lastStep = step;
+            if (!interact) return;
+            var accepted = choice.Accepted;
+            var item = asking;
+            CloseChoice();
+            if (!accepted) return;
+            var said = progress.Confirm(item);
+            subtitles.Enqueue(said);
+            log.AddRange(said);
+            if (Examined != null) Examined(item);
+        }
+
+        /// <summary>二択を開く。左右の入力が歩きに化けないよう、そのあいだは足を止める</summary>
+        void OpenChoice()
+        {
+            choice = new Choice(asking.Question);
+            lastStep = 0;
+            player.CanMove = false;
+        }
+
+        void CloseChoice()
+        {
+            choice = null;
+            asking = null;
+            lastStep = 0;
+            player.CanMove = standUp == null || standUp.Standing;
         }
 
         /// <summary>dazeUntil の対象を調べたら、保っていた眩暈を消し始める</summary>

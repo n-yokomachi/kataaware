@@ -15,6 +15,9 @@ namespace HalfAware.Tests
         public IReadOnlyList<string> After { get; set; } = new string[0];
         public string Label { get; set; } = "調べる";
         public IReadOnlyList<string> Lines { get; set; } = new string[0];
+        public bool Asks { get; set; }
+        public string Question { get; set; } = "";
+        public IReadOnlyList<string> AfterYes { get; set; } = new string[0];
         public Dictionary<string, string[]> Hints { get; } = new Dictionary<string, string[]>();
 
         public FakeItem(string id, Vector3 position)

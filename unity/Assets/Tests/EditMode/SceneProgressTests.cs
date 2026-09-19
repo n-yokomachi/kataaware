@@ -82,5 +82,53 @@ namespace HalfAware.Tests
             Assert.That(p.Examine(door), Is.EqualTo(new[] { "door の文" }));
             Assert.That(p.Done, Does.Contain("door"));
         }
+        [Test]
+        public void SomethingThatAsksIsNotDoneUntilItIsConfirmed()
+        {
+            var chips = Item("chips", true);
+            chips.Asks = true;
+            chips.Question = "チップを抜く";
+            chips.AfterYes = new[] { "抜いた" };
+            var p = new SceneProgress(new[] { chips });
+            var said = p.Examine(chips);
+            Assert.That(said, Is.EqualTo(chips.Lines), "文はその場で出る");
+            Assert.That(p.Done, Does.Not.Contain("chips"), "はいを選ぶまでは済んでいない");
+            Assert.That(p.IsComplete, Is.False);
+        }
+
+        [Test]
+        public void ConfirmingFinishesItAndReturnsWhatFollows()
+        {
+            var chips = Item("chips", true);
+            chips.Asks = true;
+            chips.AfterYes = new[] { "抜いた" };
+            var p = new SceneProgress(new[] { chips });
+            p.Examine(chips);
+            var said = p.Confirm(chips);
+            Assert.That(said, Is.EqualTo(new[] { "抜いた" }));
+            Assert.That(p.Done, Does.Contain("chips"));
+            Assert.That(p.IsComplete, Is.True);
+        }
+
+        [Test]
+        public void SayingNoLeavesItAsItWas()
+        {
+            var chips = Item("chips", true);
+            chips.Asks = true;
+            var p = new SceneProgress(new[] { chips });
+            p.Examine(chips);
+            // いいえのときは Confirm を呼ばない
+            Assert.That(p.Done, Does.Not.Contain("chips"));
+            Assert.That(p.Examine(chips), Is.EqualTo(chips.Lines), "もう一度調べられる");
+        }
+
+        [Test]
+        public void SomethingThatDoesNotAskIsDoneAtOnce()
+        {
+            var ashtray = Item("ashtray");
+            var p = new SceneProgress(new[] { ashtray });
+            p.Examine(ashtray);
+            Assert.That(p.Done, Does.Contain("ashtray"));
+        }
     }
 }

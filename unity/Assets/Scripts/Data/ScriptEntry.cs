@@ -12,6 +12,25 @@ namespace HalfAware
         public string[] lines;
     }
 
+    /// <summary>
+    /// 文を読み終えた後に出す二択。question が空なら出さない。
+    /// 「はい」を選んだときだけ済んだことになり、afterYes の文が続く
+    /// </summary>
+    [Serializable]
+    public struct ScriptChoice
+    {
+        static readonly string[] NoLines = new string[0];
+
+        /// <summary>問い。「チップを抜く」など</summary>
+        public string question;
+        /// <summary>「はい」の後に出す文</summary>
+        public string[] afterYes;
+
+        public bool Asks { get { return !string.IsNullOrEmpty(question); } }
+
+        public IReadOnlyList<string> AfterYes { get { return afterYes ?? NoLines; } }
+    }
+
     /// <summary>調べる対象 1 つ分の文面。位置と前提はシーンの Interactable が持つ</summary>
     [Serializable]
     public struct ScriptEntry
@@ -23,10 +42,15 @@ namespace HalfAware
         public string label;
         public string[] lines;
         public ScriptHint[] hints;
+        /// <summary>文の後に出す二択。question が空なら出さない</summary>
+        public ScriptChoice choice;
 
         public string Label => string.IsNullOrEmpty(label) ? (id ?? "") : label;
 
         public IReadOnlyList<string> Lines => lines ?? NoLines;
+
+        /// <summary>文の後に二択を出すか</summary>
+        public bool Asks => choice.Asks;
 
         /// <summary>afterId が未達のときに出す文。無ければ null</summary>
         public IReadOnlyList<string> HintFor(string afterId)

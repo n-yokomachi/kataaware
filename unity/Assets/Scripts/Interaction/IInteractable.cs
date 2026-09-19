@@ -20,6 +20,12 @@ namespace HalfAware
         string Label { get; }
         /// <summary>調べたときに出す文。null にせず、無ければ空にする</summary>
         IReadOnlyList<string> Lines { get; }
+        /// <summary>文の後に二択を出すか。出すなら「はい」を選ぶまで済んだことにならない</summary>
+        bool Asks { get; }
+        /// <summary>二択の問い。Asks が false なら空</summary>
+        string Question { get; }
+        /// <summary>「はい」の後に出す文。null にせず、無ければ空にする</summary>
+        IReadOnlyList<string> AfterYes { get; }
         /// <summary>After の id が未達のときに出す文。無ければ null</summary>
         IReadOnlyList<string> HintFor(string afterId);
     }
