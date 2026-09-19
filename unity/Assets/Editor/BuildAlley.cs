@@ -64,7 +64,7 @@ namespace HalfAware.EditorTools
 
             var root = Root("Alley");
             // 前の作りで残っている束を落とす
-            Prune(root, new[] { "Shell", "Fixtures", "Lamps", "Puddles", "Neon", "Market", "Boards", "Litter", "Crowd", "Backdrop", "Sky", "Bounds", "Roofs" });
+            Prune(root, new[] { "Shell", "Fixtures", "Lamps", "Puddles", "Neon", "Market", "Boards", "Litter", "Crowd", "Backdrop", "Sky", "Bounds", "Roofs", "Items" });
             Shell(Child(root, "Shell"));
             Fixtures(Child(root, "Fixtures"));
             Lamps(Child(root, "Lamps"));
@@ -82,6 +82,8 @@ namespace HalfAware.EditorTools
             Mirrors(Child(root, "Mirrors"));
             BakeMirrors(root);
             Rain();
+            // 調べる対象は、看板と露店が立ってから
+            BuildAlleyItems.Build(root);
             var temp = GameObject.Find("TempGround");
             if (temp != null) Object.DestroyImmediate(temp);
             Place(root);

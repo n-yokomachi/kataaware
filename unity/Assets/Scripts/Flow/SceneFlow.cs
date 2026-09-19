@@ -117,6 +117,13 @@ namespace HalfAware
         /// <summary>字幕を出している最中か</summary>
         public bool Talking => subtitles.IsTalking;
 
+        /// <summary>
+        /// 必須を済ませたあとも続きの演出がある場面で、そのあいだ場面を閉じるのを止める。
+        /// Freeze と違って調べる操作は止めないので、字幕は送れる。
+        /// 必須がひとつしかなく、それを済ませてから長い芝居が続く場面（路地裏の売り買い）で使う
+        /// </summary>
+        public bool Held { get; set; }
+
         void Awake()
         {
             if (player == null || hud == null)
@@ -250,7 +257,7 @@ namespace HalfAware
             Stand(frozenNow || subtitles.IsTalking || choice != null);
             // ログを開いている間は字幕を伏せる。ログの上に重なって読みにくい
             hud.SetSubtitle(logOpen ? null : choice != null ? choice.Compose() : subtitles.Current, choice == null);
-            if (progress.IsComplete && !subtitles.IsTalking && choice == null && !frozenNow) StartCoroutine(Complete());
+            if (progress.IsComplete && !subtitles.IsTalking && choice == null && !frozenNow && !Held) StartCoroutine(Complete());
         }
 
         /// <summary>
