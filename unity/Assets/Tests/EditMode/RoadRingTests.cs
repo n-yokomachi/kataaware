@@ -20,6 +20,28 @@ namespace HalfAware.Tests
         }
 
         [Test]
+        public void TheRingStaysEvenlySpacedThroughTheWrap()
+        {
+            // TilesSitOneLengthApart は travelled = 0 だけを見るので、環が回り込むところを
+            // 一度も踏まない。隙間は回り込んだ瞬間に開くので、一周ぶん通して見ないと気づけない
+            var n = RoadRing.Needed(140f, Length, Behind);
+            var span = n * Length;
+            var zs = new float[n];
+            // 刻みをタイルの長さの約数から外して、継ぎ目のあらゆる位相を通す
+            for (var step = -200; step <= 400; step++)
+            {
+                var travelled = step * 0.97f;
+                for (var i = 0; i < n; i++) zs[i] = RoadRing.Slot(i, n, Length, travelled, Behind);
+                System.Array.Sort(zs);
+                var at = " travelled=" + travelled;
+                Assert.GreaterOrEqual(zs[0], Behind, "後ろの端より手前には来ない" + at);
+                Assert.Less(zs[n - 1], Behind + span, "前の端は越えない" + at);
+                for (var i = 1; i < n; i++)
+                    Assert.AreEqual(Length, zs[i] - zs[i - 1], 0.0001f, "隙間も重なりも無い" + at);
+            }
+        }
+
+        [Test]
         public void TheWholeRingCoversTheSpan()
         {
             var zs = new float[Tiles];
@@ -70,6 +92,13 @@ namespace HalfAware.Tests
             Assert.AreEqual(9, RoadRing.Needed(140f, Length, Behind));
             Assert.GreaterOrEqual(RoadRing.Needed(140f, Length, Behind) * Length, 140f - Behind,
                 "環の長さが見える範囲を覆っていないと、前の端に穴が空く");
+
+            // 寸法を変えても成り立たなければいけない関係。9 や 2 という数そのものではなく、
+            // 「環の長さが見える範囲に届く」ことを見る
+            foreach (var w in new[] { new Vector3(140f, 20f, -30f), new Vector3(1f, 100f, -1f),
+                                      new Vector3(60f, 7f, -12f), new Vector3(200f, 33f, -5f) })
+                Assert.GreaterOrEqual(RoadRing.Needed(w.x, w.y, w.z) * w.y, w.x - w.z,
+                    "環の長さが見える範囲に届いていない");
         }
 
         [Test]
