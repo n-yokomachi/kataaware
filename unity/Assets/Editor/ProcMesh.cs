@@ -132,10 +132,15 @@ namespace HalfAware.EditorTools
             if (existing != null)
             {
                 existing.Clear();
+                // 頂点が 65535 を超える形は 32 bit の索引が要る。
+                // 以前の資産が 16 bit のままだと、ここで黙って切り捨てられる
+                existing.indexFormat = mesh.indexFormat;
                 existing.SetVertices(new List<Vector3>(mesh.vertices));
                 existing.SetUVs(0, new List<Vector2>(mesh.uv));
                 existing.SetTriangles(mesh.triangles, 0);
-                existing.RecalculateNormals();
+                var normals = mesh.normals;
+                if (normals != null && normals.Length == mesh.vertexCount) existing.SetNormals(normals);
+                else existing.RecalculateNormals();
                 existing.RecalculateBounds();
                 EditorUtility.SetDirty(existing);
                 AssetDatabase.SaveAssets();

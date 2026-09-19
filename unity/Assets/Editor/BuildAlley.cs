@@ -599,49 +599,61 @@ namespace HalfAware.EditorTools
 
         // ---- 人 ------------------------------------------------------------
 
+        /// <summary>仮置きの人に使うモデル。自室の主人公と同じ Quaternius の一式</summary>
+        static readonly string[] CrowdModels =
+        {
+            "W_Casual", "W_Punk", "W_SciFi", "W_Formal", "W_Adventurer", "W_Suit",
+        };
+
+        /// <summary>置き場所ひとつ。どのモデルを、どの姿勢で、どこへ向けて立たせるか</summary>
+        struct Spot
+        {
+            public Vector3 at;
+            public float yaw;
+            public int pose;
+            public float scale;
+        }
+
         /// <summary>
-        /// 通りとヤードの人。顔は作らない。仮置きなので、灰色ひと色の半透明で置く。
-        /// 全員ぶんを 1 枚の mesh へ焼くので、何十人立てても描画は 1 回で済む
+        /// 通りとヤードの人。モデルの骨を曲げて姿勢を作り、その形を焼いて 1 枚の mesh へ束ねる。
+        /// 焼いてしまえば実行時に骨は動かないので、何十人立てても描画は 1 回で済む。
+        /// 顔は作らない方針どおり、色は灰ひと色の半透明だけを当てる
         /// </summary>
         static void Crowd(Transform parent)
         {
             Clear(parent);
-            var bank = new Bank { Texel = 0.5f };
+            var spots = new List<Spot>();
             var rng = new System.Random(4820);
 
             // 通り。歩道を行き来する人と、店先で立ち止まっている人
             for (var s = 0; s < 2; s++)
             {
                 var side = s == 0 ? -1 : 1;
-                for (var z = StreetSouth + 3f; z < StreetNorth - 3f; z += (float)(1.1 + rng.NextDouble() * 1.7))
+                for (var z = StreetSouth + 3f; z < StreetNorth - 3f; z += (float)(2.1 + rng.NextDouble() * 2.6))
                 {
                     if (side < 0 && z > LaneZ - 2.5f && z < LaneZ + 2.5f) continue;
                     var x = side * (RoadHalf + 0.55f + (float)rng.NextDouble() * 1.1f);
                     var roll = rng.NextDouble();
                     int pose;
                     float yaw;
-                    if (roll < 0.52) { pose = 1; yaw = rng.NextDouble() < 0.5 ? 0f : 180f; }      // 歩く
-                    else if (roll < 0.70) { pose = 0; yaw = (float)(rng.NextDouble() * 360.0); }  // 立つ
-                    else if (roll < 0.84) { pose = 2; yaw = side > 0 ? 90f : -90f; }              // 店先を向いて腕組み
-                    else if (roll < 0.93) { pose = 4; yaw = side > 0 ? 90f : -90f; }              // 壁にもたれる
-                    else { pose = 3; yaw = (float)(rng.NextDouble() * 360.0); }                   // しゃがむ
+                    if (roll < 0.50) { pose = 1; yaw = rng.NextDouble() < 0.5 ? 0f : 180f; }
+                    else if (roll < 0.70) { pose = 0; yaw = (float)(rng.NextDouble() * 360.0); }
+                    else if (roll < 0.86) { pose = 2; yaw = side > 0 ? 90f : -90f; }
+                    else { pose = 0; yaw = side > 0 ? 90f : -90f; }
                     yaw += (float)(rng.NextDouble() * 30.0 - 15.0);
-                    Figure(bank, new Vector3(x, KerbRise, z), yaw, pose, rng);
+                    spots.Add(Spot1(new Vector3(x, KerbRise, z), yaw, pose, rng));
                 }
             }
-            // 車道を横切る人も少し入れる。歩道だけだと行列に見える
-            for (var z = StreetSouth + 6f; z < StreetNorth - 5f; z += (float)(3.4 + rng.NextDouble() * 4.0))
-            {
-                var x = (float)(rng.NextDouble() * 2.0 - 1.0) * (RoadHalf - 0.6f);
-                Figure(bank, new Vector3(x, 0f, z), (float)(rng.NextDouble() * 360.0), 1, rng);
-            }
+            for (var z = StreetSouth + 7f; z < StreetNorth - 6f; z += (float)(7.0 + rng.NextDouble() * 6.0))
+                spots.Add(Spot1(new Vector3((float)(rng.NextDouble() * 2.0 - 1.0) * (RoadHalf - 0.6f), 0f, z),
+                    (float)(rng.NextDouble() * 360.0), 1, rng));
 
             // 小路
-            for (var x = LaneWest + 2f; x < -StreetHalf - 1.5f; x += (float)(2.5 + rng.NextDouble() * 2.5))
-                Figure(bank, new Vector3(x, 0.02f, LaneZ + (float)(rng.NextDouble() - 0.5) * 1.4f),
-                    rng.NextDouble() < 0.5 ? 90f : -90f, 1, rng);
+            for (var x = LaneWest + 2.5f; x < -StreetHalf - 2f; x += (float)(4.0 + rng.NextDouble() * 3.0))
+                spots.Add(Spot1(new Vector3(x, 0.02f, LaneZ + (float)(rng.NextDouble() - 0.5) * 1.2f),
+                    rng.NextDouble() < 0.5 ? 90f : -90f, 1, rng));
 
-            // ヤード。売り手は出店の奥に座り、買い手は筋を歩く
+            // ヤード。売り手は出店の奥に座る
             var market = GameObject.Find("Alley/Market");
             if (market != null)
             {
@@ -651,111 +663,201 @@ namespace HalfAware.EditorTools
                     var p = stall.localPosition;
                     var yaw = stall.localEulerAngles.y;
                     var back = Quaternion.Euler(0f, yaw, 0f) * new Vector3(0f, 0f, 0.95f);
-                    Figure(bank, new Vector3(p.x + back.x, 0.02f, p.z + back.z), yaw + 180f, 5, rng);
+                    spots.Add(Spot1(new Vector3(p.x + back.x, 0.02f, p.z + back.z), yaw + 180f, 5, rng));
                 }
             }
-            for (var x = LaneWest - 1.2f; x > MyStallX + 2.2f; x -= (float)(0.9 + rng.NextDouble() * 1.1))
+            // ヤードの買い手
+            for (var x = LaneWest - 4.6f; x > MyStallX + 2.0f; x -= (float)(1.0 + rng.NextDouble() * 1.2))
             {
                 var lanes = 1 + rng.Next(3);
                 for (var i = 0; i < lanes; i++)
                 {
-                    var z = LaneZ + (float)(rng.NextDouble() * 2.0 - 1.0) * (AisleHalf - 0.35f);
+                    var z = LaneZ + (float)(rng.NextDouble() * 2.0 - 1.0) * (AisleHalf - 0.4f);
                     var roll = rng.NextDouble();
-                    var pose = roll < 0.55 ? 1 : roll < 0.78 ? 0 : roll < 0.9 ? 6 : 3;
-                    Figure(bank, new Vector3(x + (float)(rng.NextDouble() - 0.5) * 0.7f, 0.02f, z),
-                        (float)(rng.NextDouble() * 360.0), pose, rng);
+                    var pose = roll < 0.58 ? 1 : 0;
+                    spots.Add(Spot1(new Vector3(x + (float)(rng.NextDouble() - 0.5) * 0.6f, 0.02f, z),
+                        (float)(rng.NextDouble() * 360.0), pose, rng));
                 }
             }
-            bank.Emit(parent, "Crowd", CrowdMat(), false, Generated);
+
+            Bake(parent, spots, rng);
+        }
+
+        static Spot Spot1(Vector3 at, float yaw, int pose, System.Random rng)
+        {
+            var s = new Spot();
+            s.at = at;
+            s.yaw = yaw;
+            s.pose = pose;
+            s.scale = (float)(0.95 + rng.NextDouble() * 0.12);
+            return s;
         }
 
         /// <summary>
-        /// 人ひとり。胴と頭に手足を繋いだだけの形。
-        /// pose で関節の角度を変える。0 立つ／1 歩く／2 腕組み／3 しゃがむ／4 もたれる／5 座る／6 覗き込む
+        /// 置き場所ぶんだけモデルを曲げて焼き、頂点をまとめて 1 枚の mesh にする。
+        /// 焼いたあとの形は骨を持たないので、場面には静かな塊として残る
         /// </summary>
-        static void Figure(Bank b, Vector3 at, float yaw, int pose, System.Random rng)
+        static void Bake(Transform parent, List<Spot> spots, System.Random rng)
         {
-            var scale = (float)(0.94 + rng.NextDouble() * 0.14);       // 背丈を少し振る
-            var rot = Quaternion.Euler(0f, yaw, 0f);
-            var lean = 0f;
-            var hipY = 0.92f;
-            var torsoPitch = 4f;
+            var stage = new GameObject("__crowd_stage");
+            var insts = new GameObject[CrowdModels.Length];
+            var rests = new List<Dictionary<Transform, Quaternion>>();
+            for (var i = 0; i < CrowdModels.Length; i++)
+            {
+                var src = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/quaternius/" + CrowdModels[i] + ".fbx");
+                if (src == null) { Debug.LogWarning("モデルが無い: " + CrowdModels[i]); rests.Add(null); continue; }
+                var inst = (GameObject)PrefabUtility.InstantiatePrefab(src, stage.transform);
+                inst.transform.localPosition = Vector3.zero;
+                inst.transform.localRotation = Quaternion.identity;
+                // 足首が脛の子ではないので、膝を曲げても靴が置き去りになる。繋ぎ直す
+                foreach (var pair in new[] { "L", "R" })
+                {
+                    var foot = Find(inst.transform, "Foot." + pair);
+                    var shin = Find(inst.transform, "LowerLeg." + pair);
+                    if (foot != null && shin != null && foot.parent != shin) foot.SetParent(shin, true);
+                }
+                var rest = new Dictionary<Transform, Quaternion>();
+                foreach (var t in inst.GetComponentsInChildren<Transform>(true)) rest[t] = t.localRotation;
+                insts[i] = inst;
+                rests.Add(rest);
+            }
+
+            var verts = new List<Vector3>();
+            var norms = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var tris = new List<int>();
+            var tmp = new Mesh();
+            foreach (var spot in spots)
+            {
+                var k = rng.Next(CrowdModels.Length);
+                if (insts[k] == null) continue;
+                Pose(insts[k].transform, rests[k], spot.pose);
+                var drop = PoseDrop(spot.pose);
+                var trs = Matrix4x4.TRS(spot.at + new Vector3(0f, -drop * spot.scale, 0f),
+                    Quaternion.Euler(0f, spot.yaw, 0f), Vector3.one * spot.scale);
+                foreach (var smr in insts[k].GetComponentsInChildren<SkinnedMeshRenderer>(true))
+                {
+                    // 骨組みは 100 倍で作られているので、縮尺を掛けずに焼く。
+                    // 焼いた形は取り込み時の向きのままなので、描画部の向きで起こし直す
+                    smr.BakeMesh(tmp, false);
+                    var frame = Matrix4x4.TRS(smr.transform.position, smr.transform.rotation, Vector3.one);
+                    var place = trs * frame;
+                    var v = tmp.vertices;
+                    var n = tmp.normals;
+                    var t2 = tmp.triangles;
+                    var at = verts.Count;
+                    for (var i = 0; i < v.Length; i++)
+                    {
+                        verts.Add(place.MultiplyPoint3x4(v[i]));
+                        norms.Add(place.MultiplyVector(i < n.Length ? n[i] : Vector3.up).normalized);
+                        uvs.Add(Vector2.zero);
+                    }
+                    for (var i = 0; i < t2.Length; i++) tris.Add(at + t2[i]);
+                }
+            }
+            Object.DestroyImmediate(tmp);
+            Object.DestroyImmediate(stage);
+            if (tris.Count == 0) return;
+
+            var mesh = new Mesh();
+            mesh.name = "Crowd";
+            mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+            mesh.SetVertices(verts);
+            mesh.SetNormals(norms);
+            mesh.SetUVs(0, uvs);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateBounds();
+            var path = Generated + "Crowd.asset";
+            ProcMesh.Save(mesh, path);
+            var go = new GameObject("Crowd");
+            go.transform.SetParent(parent, false);
+            go.AddComponent<MeshFilter>().sharedMesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            go.AddComponent<MeshRenderer>().sharedMaterial = CrowdMat();
+            Debug.Log("人 " + spots.Count + " 体、" + (tris.Count / 3) + " ポリゴン");
+        }
+
+        static Transform Find(Transform root, string name)
+        {
+            foreach (var t in root.GetComponentsInChildren<Transform>(true)) if (t.name == name) return t;
+            return null;
+        }
+
+        /// <summary>姿勢ごとの腰の下がり。座りとしゃがみは骨を曲げるだけでは沈まない</summary>
+        static float PoseDrop(int pose)
+        {
+            switch (pose)
+            {
+                case 3: return 0.40f;
+                case 5: return 0.60f;
+                default: return 0f;
+            }
+        }
+
+        /// <summary>
+        /// 骨を曲げて姿勢を作る。安静へ戻してから重ねるので、同じ体を何度でも使い回せる。
+        /// 0 立つ／1 歩く／2 腕組み／3 しゃがむ／4 もたれる／5 座る／6 覗き込む
+        /// </summary>
+        static void Pose(Transform root, Dictionary<Transform, Quaternion> rest, int pose)
+        {
+            foreach (var pair in rest) pair.Key.localRotation = pair.Value;
 
             float thighL = 2f, thighR = -2f, kneeL = 0f, kneeR = 0f;
-            float armL = 8f, armR = -8f, elbowL = 10f, elbowR = 10f;
-            float armOutL = 4f, armOutR = -4f;
+            float armL = 6f, armR = -6f, elbowL = 12f, elbowR = 12f;
+            float outL = 4f, outR = -4f, spine = 2f, lean = 0f;
 
             switch (pose)
             {
-                case 1:  // 歩く
-                    thighL = 26f; kneeL = -24f; thighR = -20f; kneeR = 34f;
-                    armL = -22f; armR = 24f; torsoPitch = 6f;
+                case 1:
+                    thighL = 17f; kneeL = -19f; thighR = -14f; kneeR = 23f;
+                    armL = -14f; armR = 16f; spine = 3f;
                     break;
-                case 2:  // 腕組みで立つ
-                    armL = 62f; armR = -62f; elbowL = 96f; elbowR = 96f;
-                    armOutL = 22f; armOutR = -22f; torsoPitch = 2f;
+                case 2:
+                    armL = 44f; armR = -44f; elbowL = 76f; elbowR = 76f;
+                    outL = 12f; outR = -12f;
                     break;
-                case 3:  // しゃがむ
-                    hipY = 0.54f; thighL = 88f; thighR = 84f; kneeL = -104f; kneeR = -100f;
-                    torsoPitch = 22f; armL = 30f; armR = 26f; elbowL = 60f; elbowR = 58f;
+                case 3:
+                    thighL = 86f; thighR = 82f; kneeL = -102f; kneeR = -98f;
+                    spine = 20f; armL = 28f; armR = 24f; elbowL = 58f; elbowR = 56f;
                     break;
-                case 4:  // 壁にもたれる
-                    lean = 11f; thighL = -8f; thighR = -12f; armL = 14f; armR = -16f;
-                    torsoPitch = -6f;
+                case 4:
+                    lean = 10f; thighL = -8f; thighR = -12f; armL = 12f; armR = -14f; spine = -5f;
                     break;
-                case 5:  // 座る（あぐら）
-                    hipY = 0.34f; thighL = 86f; thighR = 82f; kneeL = -86f; kneeR = -92f;
-                    armOutL = 30f; armOutR = -30f; armL = 44f; armR = 40f; elbowL = 74f; elbowR = 70f;
-                    torsoPitch = 8f;
+                case 5:
+                    thighL = 80f; thighR = 76f; kneeL = -96f; kneeR = -100f;
+                    outL = 16f; outR = -16f; armL = 34f; armR = 30f; elbowL = 56f; elbowR = 52f;
+                    spine = 6f;
                     break;
-                case 6:  // 台を覗き込む
-                    hipY = 0.88f; torsoPitch = 38f; thighL = -6f; thighR = 8f;
-                    armL = 46f; armR = 42f; elbowL = 34f; elbowR = 30f;
+                case 6:
+                    spine = 34f; thighL = -6f; thighR = 8f;
+                    armL = 44f; armR = 40f; elbowL = 32f; elbowR = 28f;
                     break;
             }
 
-            var hip = at + rot * new Vector3(0f, hipY * scale, 0f);
-            var tilt = rot * Quaternion.Euler(lean, 0f, 0f);
+            Turn(root, "Hips", lean, 0f);
+            Turn(root, "Abdomen", spine * 0.45f, 0f);
+            Turn(root, "Torso", spine * 0.35f, 0f);
+            Turn(root, "Chest", spine * 0.20f, 0f);
+            Turn(root, "Neck", -spine * 0.35f, 0f);
+            Turn(root, "Head", -spine * 0.25f + (float)0f, 0f);
 
-            // 脚
-            var kneeLpos = Limb(b, hip + tilt * new Vector3(-0.10f * scale, 0f, 0f), tilt, thighL, 0f, 0.42f * scale, 0.155f * scale);
-            var kneeRpos = Limb(b, hip + tilt * new Vector3(0.10f * scale, 0f, 0f), tilt, thighR, 0f, 0.42f * scale, 0.155f * scale);
-            var footL = Limb(b, kneeLpos, tilt, thighL + kneeL, 0f, 0.44f * scale, 0.125f * scale);
-            var footR = Limb(b, kneeRpos, tilt, thighR + kneeR, 0f, 0.44f * scale, 0.125f * scale);
-            b.Box(footL + new Vector3(0f, 0.035f, 0f) + rot * new Vector3(0f, 0f, 0.07f),
-                new Vector3(0.12f * scale, 0.07f * scale, 0.26f * scale), rot);
-            b.Box(footR + new Vector3(0f, 0.035f, 0f) + rot * new Vector3(0f, 0f, 0.07f),
-                new Vector3(0.12f * scale, 0.07f * scale, 0.26f * scale), rot);
+            Turn(root, "UpperLeg.L", thighL, outL * 0.25f);
+            Turn(root, "UpperLeg.R", thighR, outR * 0.25f);
+            Turn(root, "LowerLeg.L", kneeL, 0f);
+            Turn(root, "LowerLeg.R", kneeR, 0f);
 
-            // 胴と頭
-            var body = tilt * Quaternion.Euler(torsoPitch, 0f, 0f);
-            var chest = hip + body * new Vector3(0f, 0.34f * scale, 0f);
-            b.Box(hip + body * new Vector3(0f, 0.09f * scale, 0f),
-                new Vector3(0.33f * scale, 0.20f * scale, 0.22f * scale), body);
-            b.Box(hip + body * new Vector3(0f, 0.36f * scale, 0f),
-                new Vector3(0.37f * scale, 0.42f * scale, 0.23f * scale), body);
-            var neck = hip + body * new Vector3(0f, 0.62f * scale, 0f);
-            b.Box(neck, new Vector3(0.11f * scale, 0.09f * scale, 0.11f * scale), body);
-            b.Box(neck + body * new Vector3(0f, 0.14f * scale, 0f),
-                new Vector3(0.19f * scale, 0.22f * scale, 0.20f * scale),
-                body * Quaternion.Euler(0f, (float)(rng.NextDouble() * 36.0 - 18.0), 0f));
-
-            // 腕
-            var shL = chest + body * new Vector3(-0.23f * scale, 0.14f * scale, 0f);
-            var shR = chest + body * new Vector3(0.23f * scale, 0.14f * scale, 0f);
-            var elL = Limb(b, shL, body, armL, armOutL, 0.30f * scale, 0.105f * scale);
-            var elR = Limb(b, shR, body, armR, armOutR, 0.30f * scale, 0.105f * scale);
-            Limb(b, elL, body, armL + elbowL, armOutL, 0.28f * scale, 0.085f * scale);
-            Limb(b, elR, body, armR + elbowR, armOutR, 0.28f * scale, 0.085f * scale);
+            Turn(root, "UpperArm.L", armL, outL);
+            Turn(root, "UpperArm.R", armR, outR);
+            Turn(root, "LowerArm.L", elbowL, 0f);
+            Turn(root, "LowerArm.R", elbowR, 0f);
         }
 
-        /// <summary>手足を 1 本。真下を 0 度として、pitch で前へ、roll で外へ振る</summary>
-        static Vector3 Limb(Bank b, Vector3 from, Quaternion frame, float pitch, float roll, float len, float thick)
+        /// <summary>骨ひとつを、体から見た軸で曲げる。左右で符号が揃う</summary>
+        static void Turn(Transform root, string bone, float pitch, float roll)
         {
-            var dir = frame * (Quaternion.Euler(pitch, 0f, roll) * Vector3.down);
-            var to = from + dir * len;
-            b.Box((from + to) * 0.5f, new Vector3(thick, len, thick), Quaternion.FromToRotation(Vector3.down, dir));
-            return to;
+            if (Mathf.Approximately(pitch, 0f) && Mathf.Approximately(roll, 0f)) return;
+            var b = Find(root, bone);
+            if (b == null) return;
+            b.rotation = Quaternion.AngleAxis(pitch, Vector3.right) * Quaternion.AngleAxis(roll, Vector3.forward) * b.rotation;
         }
 
         /// <summary>仮置きの人のマテリアル。灰色ひと色を少しだけ透かす</summary>
@@ -772,7 +874,7 @@ namespace HalfAware.EditorTools
                 AssetDatabase.CreateAsset(m, path);
             }
             m.SetTexture("_BaseMap", null);
-            m.SetColor("_BaseColor", new Color(0.26f, 0.27f, 0.30f, 0.82f));
+            m.SetColor("_BaseColor", new Color(0.175f, 0.182f, 0.205f, 0.86f));
             m.SetFloat("_Surface", 1f);
             m.SetFloat("_Blend", 0f);
             m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
@@ -828,13 +930,13 @@ namespace HalfAware.EditorTools
             for (var x = LaneWest + 1f; x < -StreetHalf - 1f; x += (float)(1.4 + rng.NextDouble() * 1.6))
                 Scatter(board, new Vector3(x, 0.02f, LaneZ + (float)(rng.NextDouble() - 0.5) * 2.4f), 1.1f, rng);
             // 入口のすぐ脇には積まない。入った瞬間に奥まで目が通るように
-            for (var x = YardWest + 1.2f; x < LaneWest - 3.4f; x += (float)(1.1 + rng.NextDouble() * 1.5))
+            for (var x = YardWest + 1.2f; x < LaneWest - 2.6f; x += (float)(0.9 + rng.NextDouble() * 1.2))
             {
                 for (var i = 0; i < 2; i++)
                 {
                     var edge = rng.NextDouble() < 0.5 ? YardSouth + 1.0f : YardNorth - 1.0f;
                     var z = Mathf.Lerp(edge, LaneZ, (float)rng.NextDouble() * 0.55f);
-                    if (Mathf.Abs(z - LaneZ) < AisleHalf + 0.75f) continue;
+                    if (Mathf.Abs(z - LaneZ) < AisleHalf + 0.30f) continue;
                     var roll = rng.NextDouble();
                     if (roll < 0.34) Sacks(sack, new Vector3(x, 0.02f, z), rng);
                     else if (roll < 0.62) Pallets(board, new Vector3(x, 0.02f, z), rng);
@@ -1241,6 +1343,7 @@ namespace HalfAware.EditorTools
             go.transform.SetParent(parent, false);
             go.transform.localPosition = new Vector3(x, p.y, p.z);
             // 突き出す物は通りの上下を向き、貼る物は通りの中央を向く
+            // 絵が乗るのは板の裏側。壁に貼る物は向きを返さないと字が反転する
             go.transform.localRotation = p.blade
                 ? Quaternion.identity
                 : Quaternion.Euler(0f, p.side > 0 ? 90f : -90f, 0f);
