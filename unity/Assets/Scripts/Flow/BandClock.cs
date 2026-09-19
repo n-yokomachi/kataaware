@@ -69,13 +69,14 @@ namespace HalfAware
             if (Beat == DriveBeat.Running || Beat == DriveBeat.Talking) return;
             since += dt;
             // 秒数が 0 のときに 1 フレーム 1 段ずつ進むと、途中の段が見えてしまう。
-            // 越えた分をそのまま次へ持ち越して、その場で最後まで進める
+            // 越えた分をそのまま次へ持ち越して、その場で最後まで進める。
+            // 進む先は 3 段しか無いので、この数を使い切ることは無い
             for (var guard = 0; guard < 4; guard++)
             {
                 if (Beat == DriveBeat.Afterglow)
                 {
                     if (since < band.afterglow) return;
-                    since -= band.afterglow;
+                    since -= Spent(band.afterglow);
                     Beat = DriveBeat.Black;
                     swapped = true;
                     continue;
@@ -83,7 +84,7 @@ namespace HalfAware
                 if (Beat == DriveBeat.Black)
                 {
                     if (since < band.black) return;
-                    since -= band.black;
+                    since -= Spent(band.black);
                     Beat = DriveBeat.FadingIn;
                     continue;
                 }
@@ -99,6 +100,15 @@ namespace HalfAware
         }
 
         /// <summary>
+        /// その段に使った秒数。負の数を打たれても次の段に貸しを作らない。
+        /// 再生しながら Inspector を触る前提なので、打ち間違いはそのまま通る
+        /// </summary>
+        static float Spent(float seconds)
+        {
+            return seconds > 0f ? seconds : 0f;
+        }
+
+        /// <summary>
         /// 今どれだけ黒いか。0 で素通し、1 で真っ黒。
         /// 黒へは切り替えで入るので、Afterglow の 0 から Black の 1 へ一息に跳ぶ
         /// </summary>
@@ -110,7 +120,11 @@ namespace HalfAware
             return Mathf.Clamp01(1f - since / band.fadeIn);
         }
 
-        /// <summary>頭から組み直す。帯を跨ぐたびに呼ぶ</summary>
+        /// <summary>
+        /// 頭から組み直す。場面に入って最初の帯を並べるときだけ呼ぶ。
+        /// 帯を跨ぐときには呼ばない。黒と明けはこの時計が自分で進めるので、
+        /// そこで組み直すと暗転が 1 フレームで終わってしまう
+        /// </summary>
         public void Reset()
         {
             Beat = DriveBeat.Running;
