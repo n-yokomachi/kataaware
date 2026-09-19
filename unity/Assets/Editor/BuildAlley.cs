@@ -62,7 +62,7 @@ namespace HalfAware.EditorTools
 
             var root = Root("Alley");
             // 前の作りで残っている束を落とす
-            Prune(root, new[] { "Shell", "Fixtures", "Lamps", "Puddles", "Neon", "Market", "Boards", "Litter", "Crowd", "Sky", "Bounds" });
+            Prune(root, new[] { "Shell", "Fixtures", "Lamps", "Puddles", "Neon", "Market", "Boards", "Litter", "Crowd", "Backdrop", "Sky", "Bounds" });
             Shell(Child(root, "Shell"));
             Fixtures(Child(root, "Fixtures"));
             Lamps(Child(root, "Lamps"));
@@ -72,6 +72,7 @@ namespace HalfAware.EditorTools
             Boards(Child(root, "Boards"));
             Litter(Child(root, "Litter"));
             Crowd(Child(root, "Crowd"));
+            Backdrop(Child(root, "Backdrop"));
             Sky(Child(root, "Sky"));
             Bounds(Child(root, "Bounds"));
             Rain();
@@ -111,6 +112,9 @@ namespace HalfAware.EditorTools
             LaneShell(brick, stone, paving);
             YardShell(brick, stone, paving);
             YardFacades(brick, stone, metal, glass, warm, cold);
+            SouthEnd(brick, stone, metal);
+            Walkway(metal, stone, -13.5f, 6.4f);
+            Walkway(metal, stone, 26.5f, 7.1f);
 
             road.Emit(parent, "Road", Mat("Asphalt"), false, Generated);
             paving.Emit(parent, "Paving", Mat("Cobble"), false, Generated);
@@ -408,27 +412,57 @@ namespace HalfAware.EditorTools
                 b.Box(new Vector3(x + inward * 0.36f, y + i * 0.11f, z), new Vector3(0.05f, 0.05f, 0.7f));
         }
 
-        /// <summary>非常階段。2 層の踊り場と手摺、斜めの段</summary>
+        /// <summary>
+        /// 非常階段。踊り場と手摺、斜めの段。
+        /// 段だけを宙に並べると浮いて見えるので、桁を通し、壁へ受けを打ち、
+        /// いちばん下には地面まで届く梯子を下ろす
+        /// </summary>
         static void FireEscape(Bank b, float wx, float z, int inward)
         {
             var from = 4.2f;
+            var lip = 0.75f;
             for (var f = 0; f < 2; f++)
             {
                 var y = from + f * UpperFloor;
-                var x = wx + inward * 0.75f;
-                b.Box(new Vector3(x, y, z), new Vector3(1.5f, 0.08f, 2.6f));
+                var x = wx + inward * lip;
+                b.Box(new Vector3(x, y, z), new Vector3(1.5f, 0.08f, 2.6f));                     // 踊り場
+                // 壁へ打った受け。ここが無いと踊り場が宙に浮く
+                for (var i = -1; i <= 1; i += 2)
+                {
+                    b.Box(new Vector3(wx + inward * (lip * 0.5f), y - 0.34f, z + i * 1.1f),
+                        new Vector3(1.5f, 0.07f, 0.09f));
+                    b.Box(new Vector3(wx + inward * (lip * 0.95f), y - 0.18f, z + i * 1.1f),
+                        new Vector3(0.09f, 0.42f, 0.09f));
+                }
+                // 手摺
                 b.Box(new Vector3(x + inward * 0.70f, y + 0.52f, z), new Vector3(0.06f, 1.04f, 2.6f));
                 for (var i = -1; i <= 1; i += 2)
                     b.Box(new Vector3(x, y + 0.52f, z + i * 1.28f), new Vector3(1.5f, 1.04f, 0.06f));
                 b.Box(new Vector3(x + inward * 0.70f, y + 1.02f, z), new Vector3(0.1f, 0.07f, 2.6f));
+                // 斜めの段と、それを支える桁
+                var rise = UpperFloor - 0.3f;
+                var run = 1.1f;
+                var mid = new Vector3(x + inward * (0.1f + run * 0.5f), y + 0.12f + rise * 0.5f, z + 1.0f);
+                var tilt = Quaternion.AngleAxis(inward * Mathf.Atan2(rise, run) * Mathf.Rad2Deg,
+                    Vector3.forward);
+                var span = Mathf.Sqrt(rise * rise + run * run);
+                for (var i = -1; i <= 1; i += 2)
+                    b.Box(mid + new Vector3(0f, 0f, i * 0.34f), new Vector3(0.09f, span, 0.09f),
+                        Quaternion.FromToRotation(Vector3.up, tilt * Vector3.up));
                 var step = 8;
                 for (var i = 0; i < step; i++)
                 {
                     var t = (i + 0.5f) / step;
-                    b.Box(new Vector3(x + inward * (0.1f + t * 1.1f), y + 0.12f + t * (UpperFloor - 0.3f), z + 1.0f),
+                    b.Box(new Vector3(x + inward * (0.1f + t * run - run * 0.5f), y + 0.12f + t * rise, z + 1.0f),
                         new Vector3(0.26f, 0.05f, 0.7f));
                 }
             }
+            // いちばん下の梯子。地面まで届かせる
+            var bx = wx + inward * (lip + 0.55f);
+            for (var i = -1; i <= 1; i += 2)
+                b.Box(new Vector3(bx, from * 0.5f, z + i * 0.3f), new Vector3(0.07f, from, 0.07f));
+            for (var y = 0.35f; y < from - 0.2f; y += 0.36f)
+                b.Box(new Vector3(bx, y, z), new Vector3(0.06f, 0.05f, 0.6f));
         }
 
         /// <summary>通りを渡す電線。真ん中を少し垂らす</summary>
@@ -520,7 +554,7 @@ namespace HalfAware.EditorTools
             Clear(parent);
             var metal = new Bank { Texel = 0.7f };
             var n = 0;
-            for (var z = StreetSouth + 5f; z < StreetNorth - 3f; z += 11f)
+            for (var z = StreetSouth + 6f; z < StreetNorth - 3f; z += 11f)
             {
                 for (var s = 0; s < 2; s++)
                 {
@@ -1169,6 +1203,184 @@ namespace HalfAware.EditorTools
             return m;
         }
 
+
+        // ---- 手前の突き当たりと、その先の景色 --------------------------------
+
+        /// <summary>遠景の板を置く位置。突き当たりの奥</summary>
+        public const float BackdropZ = StreetSouth - 2.2f;
+        /// <summary>突き当たりの抜け。ここから先の景色が見える</summary>
+        public const float ArchHalfWidth = 4.2f;
+        public const float ArchHigh = 7.2f;
+        /// <summary>遠景を撮る位置。歩ける端に立ったときの目の高さ</summary>
+        public const float AnchorZ = WalkSouth - 0.4f;
+        public const float AnchorY = 1.6f;
+
+        /// <summary>
+        /// 手前の突き当たり。壁で塞がず、くぐり抜けの形に開けて、
+        /// その奥に遠景の板を立てる。板は別に撮った通りの絵で、
+        /// 立ち位置から見たときだけ先が続いて見える
+        /// </summary>
+        static void SouthEnd(Bank brick, Bank stone, Bank metal)
+        {
+            var holes = new List<Vector4>
+            {
+                new Vector4(-ArchHalfWidth, ArchHalfWidth, 0f, ArchHigh),
+            };
+            brick.FaceZHoles(StreetSouth, -StreetHalf - 1f, StreetHalf + 1f, 0f, WallHeight, 1, holes);
+            // 抜けの縁。奥行きを見せる返し
+            var depth = 1.6f;
+            for (var i = -1; i <= 1; i += 2)
+                stone.Box(new Vector3(i * (ArchHalfWidth + 0.18f), ArchHigh * 0.5f, StreetSouth - depth * 0.5f),
+                    new Vector3(0.36f, ArchHigh + 0.7f, depth));
+            stone.Box(new Vector3(0f, ArchHigh + 0.30f, StreetSouth - depth * 0.5f),
+                new Vector3(ArchHalfWidth * 2f + 0.9f, 0.6f, depth));
+            // くぐりの天井
+            stone.FaceY(ArchHigh, -ArchHalfWidth, ArchHalfWidth, StreetSouth - depth, StreetSouth, -1);
+            // 上の階。抜けの上にも建物が乗っている
+            for (var f = 0; f < 3; f++)
+            {
+                var y = ArchHigh + 1.0f + f * 2.8f;
+                for (var x = -StreetHalf + 0.9f; x < StreetHalf - 0.5f; x += 2.2f)
+                    stone.Box(new Vector3(x, y, StreetSouth + 0.12f), new Vector3(0.95f, 1.25f, 0.24f));
+            }
+            metal.Box(new Vector3(0f, ArchHigh + 0.85f, StreetSouth - 0.35f), new Vector3(ArchHalfWidth * 1.4f, 0.10f, 0.10f));
+        }
+
+        /// <summary>
+        /// 通りを渡す歩道橋。手前の区間に架けて、奥行きを作る。
+        /// 桁と手摺と段だけの簡単な形だが、頭の上に物があると街が立体になる
+        /// </summary>
+        static void Walkway(Bank metal, Bank stone, float z, float height)
+        {
+            var wide = 1.9f;
+            stone.Box(new Vector3(0f, height, z), new Vector3(StreetHalf * 2f, 0.22f, wide));
+            metal.Box(new Vector3(0f, height - 0.18f, z - wide * 0.5f), new Vector3(StreetHalf * 2f, 0.16f, 0.12f));
+            metal.Box(new Vector3(0f, height - 0.18f, z + wide * 0.5f), new Vector3(StreetHalf * 2f, 0.16f, 0.12f));
+            for (var i = -1; i <= 1; i += 2)
+            {
+                var side = i * (wide * 0.5f);
+                metal.Box(new Vector3(0f, height + 0.62f, z + side), new Vector3(StreetHalf * 2f, 0.07f, 0.07f));
+                for (var x = -StreetHalf + 0.5f; x < StreetHalf; x += 1.1f)
+                    metal.Box(new Vector3(x, height + 0.34f, z + side), new Vector3(0.06f, 0.62f, 0.06f));
+            }
+            // 支柱
+            for (var i = -1; i <= 1; i += 2)
+                metal.Box(new Vector3(i * (StreetHalf - 0.35f), height * 0.5f, z), new Vector3(0.24f, height, 0.24f));
+        }
+
+        /// <summary>遠景の板。撮った絵が無ければ置かない</summary>
+        static void Backdrop(Transform parent)
+        {
+            Clear(parent);
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/StreetBackdrop.png");
+            if (tex == null)
+            {
+                Debug.Log("遠景の絵がまだ無い。HalfAware/Shoot the street backdrop で撮る");
+                return;
+            }
+            var size = BackdropSize();
+            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            go.name = "Backdrop";
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = new Vector3(0f, AnchorY, BackdropZ);
+            go.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            go.transform.localScale = new Vector3(size.x, size.y, 1f);
+            var m = BackdropMat(tex);
+            go.GetComponent<MeshRenderer>().sharedMaterial = m;
+            Object.DestroyImmediate(go.GetComponent<Collider>());
+        }
+
+        /// <summary>
+        /// 板の大きさ。立ち位置から抜けを見込む角に、余裕を足して決める。
+        /// ここと撮る側の画角が揃っていないと、絵が浮いて見える
+        /// </summary>
+        static Vector2 BackdropSize()
+        {
+            var reach = AnchorZ - BackdropZ;
+            var toArch = AnchorZ - StreetSouth;
+            var high = (ArchHigh - AnchorY) * reach / toArch * 2.2f;
+            var wide = ArchHalfWidth * 2f * reach / toArch * 1.35f;
+            return new Vector2(wide, high);
+        }
+
+        static Material BackdropMat(Texture2D tex)
+        {
+            var path = Materials + "Backdrop.mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                if (!AssetDatabase.IsValidFolder("Assets/Materials/Alley"))
+                    AssetDatabase.CreateFolder("Assets/Materials", "Alley");
+                m = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+                m.name = "Backdrop";
+                AssetDatabase.CreateAsset(m, path);
+            }
+            m.SetTexture("_BaseMap", tex);
+            m.SetColor("_BaseColor", new Color(0.86f, 0.86f, 0.92f, 1f));
+            m.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Off);
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// <summary>
+        /// 遠景を撮る。通りの北の端から南を向いて、板が見込む画角ぴったりで 1 枚。
+        /// 撮った絵を板に貼ると、突き当たりの向こうに通りが続いて見える
+        /// </summary>
+        [MenuItem("HalfAware/Shoot the street backdrop")]
+        public static void ShootBackdrop()
+        {
+            if (EditorApplication.isPlaying) { Debug.LogError("再生中は撮らない"); return; }
+            var root = GameObject.Find("Alley");
+            if (root == null) { Debug.LogError("路地裏がまだ組まれていない"); return; }
+            var old = root.transform.Find("Backdrop");
+            if (old != null) old.gameObject.SetActive(false);        // 自分を撮らない
+            var body = GameObject.Find("Player/Protagonist");
+            var wasOn = body != null && body.activeSelf;
+            if (body != null) body.SetActive(false);
+
+            var size = BackdropSize();
+            var reach = AnchorZ - BackdropZ;
+            var fov = 2f * Mathf.Atan(size.y * 0.5f / reach) * Mathf.Rad2Deg;
+            var aspect = size.x / size.y;
+            var w = 1280;
+            var h = Mathf.RoundToInt(w / aspect);
+
+            var cam = Camera.main;
+            var t = cam.transform;
+            var keepPos = t.position;
+            var keepRot = t.rotation;
+            var keepFov = cam.fieldOfView;
+            // 北の端から南を向く。ここからなら通りの長さがそのまま奥行きになる
+            t.position = new Vector3(0f, AnchorY, StreetNorth - 2.5f);
+            t.rotation = Quaternion.LookRotation(Vector3.back, Vector3.up);
+            cam.fieldOfView = fov;
+            cam.aspect = aspect;
+
+            var rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32);
+            cam.targetTexture = rt;
+            cam.Render();
+            cam.targetTexture = null;
+            var keepActive = RenderTexture.active;
+            RenderTexture.active = rt;
+            var shot = new Texture2D(w, h, TextureFormat.RGB24, false);
+            shot.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+            shot.Apply();
+            RenderTexture.active = keepActive;
+            System.IO.File.WriteAllBytes(Application.dataPath + "/Textures/StreetBackdrop.png", shot.EncodeToPNG());
+            Object.DestroyImmediate(shot);
+            rt.Release();
+            Object.DestroyImmediate(rt);
+
+            t.position = keepPos;
+            t.rotation = keepRot;
+            cam.fieldOfView = keepFov;
+            cam.ResetAspect();
+            if (body != null) body.SetActive(wasOn);
+            if (old != null) old.gameObject.SetActive(true);
+            AssetDatabase.ImportAsset("Assets/Textures/StreetBackdrop.png");
+            Debug.Log("遠景を撮った " + w + "x" + h + " 画角 " + fov.ToString("0.0"));
+        }
+
         // ---- 当たり判定 ----------------------------------------------------
 
         /// <summary>
@@ -1194,6 +1406,9 @@ namespace HalfAware.EditorTools
                 new Vector3(1f, h, StreetNorth - LaneZ - LaneHalf));
             Blocker(parent, "Wall.Head", new Vector3(0f, h * 0.5f, StreetNorth + 0.5f), new Vector3(StreetHalf * 2f + 2f, h, 1f));
             Blocker(parent, "Wall.Back", new Vector3(0f, h * 0.5f, WalkSouth - 0.5f), new Vector3(StreetHalf * 2f + 2f, h, 1f));
+            // 見えている先まで床は続く。落ちないように床だけ伸ばす
+            Blocker(parent, "Ground.South", new Vector3(0f, -0.5f, StreetSouth - 3f),
+                new Vector3(StreetHalf * 2f, 1f, 8f));
 
             Blocker(parent, "Lane.S", new Vector3((LaneWest - StreetHalf) * 0.5f, h * 0.5f, LaneZ - LaneHalf - 0.5f),
                 new Vector3(-StreetHalf - LaneWest, h, 1f));
