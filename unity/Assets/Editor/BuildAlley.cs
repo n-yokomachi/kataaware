@@ -1557,6 +1557,7 @@ namespace HalfAware.EditorTools
             var sack = new Bank { Texel = 0.8f };
             var board = new Bank { Texel = 0.5f };
             var metal = new Bank { Texel = 0.7f };
+            var paint = new Bank { Texel = 0.6f };
             var rng = new System.Random(6611);
 
             for (var s = 0; s < 2; s++)
@@ -1579,10 +1580,10 @@ namespace HalfAware.EditorTools
                 for (var z = StreetSouth + 2f; z < StreetNorth - 2f; z += (float)(0.8 + rng.NextDouble() * 1.6))
                     Scatter(board, new Vector3(side * (RoadHalf + 0.18f), KerbRise, z), 0.7f, rng);
             }
-            // 大型の塵芥箱
-            Skip(metal, new Vector3(StreetHalf - 1.5f, KerbRise, 24.5f), rng);
+            // 大型ゴミコンテナ
+            Skip(paint, metal, board, sack, new Vector3(StreetHalf - 1.5f, KerbRise, 24.5f), rng);
             Occupy(StreetHalf - 1.5f, 24.5f, 1.5f);
-            Skip(metal, new Vector3(-StreetHalf + 1.6f, KerbRise, 9.0f), rng);
+            Skip(paint, metal, board, sack, new Vector3(-StreetHalf + 1.6f, KerbRise, 9.0f), rng);
             Occupy(-StreetHalf + 1.6f, 9.0f, 1.5f);
 
             // 小路とヤード
@@ -1605,6 +1606,7 @@ namespace HalfAware.EditorTools
             sack.Emit(parent, "Sacks", Mat("Tarp"), false, Generated);
             board.Emit(parent, "Cartons", Mat("Timber"), false, Generated);
             metal.Emit(parent, "Bins", Mat("Metal"), false, Generated);
+            paint.Emit(parent, "Skips", Mat("Skip"), false, Generated);
         }
 
         /// <summary>ごみ袋の山。潰れた丸みを箱の重なりで代える</summary>
@@ -1653,7 +1655,7 @@ namespace HalfAware.EditorTools
             }
         }
 
-        /// <summary>蓋つきの塵芥箱</summary>
+        /// <summary>蓋つきのゴミ箱</summary>
         static void Bin(Bank metal, Bank sack, Vector3 at, System.Random rng)
         {
             var yaw = (float)(rng.NextDouble() * 360.0);
@@ -1694,15 +1696,82 @@ namespace HalfAware.EditorTools
             }
         }
 
-        /// <summary>大型の塵芥箱。通りに 1 つ 2 つあると縮尺が伝わる</summary>
-        static void Skip(Bank b, Vector3 at, System.Random rng)
+        /// <summary>
+        /// 大型ゴミコンテナ。工事や引っ越しのゴミを放り込む、端が外へ開いた上開きのやつ。
+        /// ロンドンの通りに 1 つ 2 つ置きっぱなしになっていて、縮尺も伝わる。
+        ///
+        /// 閉じた箱で作ると、暗い通りでは黒い塊にしか見えない。上を開けて中身を見せ、
+        /// 端を斜めに広げ、口の縁と縦の桟と吊り金具を足して、形だけで分かるようにする。
+        /// 塗りは褪せた黄土。周りが黒に近いので、ここだけ地の色を持たせて輪郭を立てる
+        /// </summary>
+        /// <param name="paint">箱そのもの。塗られた鉄板</param>
+        /// <param name="metal">縁・桟・吊り金具。塗りの剥げた地金</param>
+        /// <param name="board">中身の木材と瓦礫</param>
+        /// <param name="sack">中身の袋</param>
+        static void Skip(Bank paint, Bank metal, Bank board, Bank sack, Vector3 at, System.Random rng)
         {
-            var yaw = (float)(rng.NextDouble() * 20.0 - 10.0);
-            var rot = Quaternion.Euler(0f, yaw, 0f);
-            b.Box(at + new Vector3(0f, 0.55f, 0f), new Vector3(1.9f, 1.1f, 1.25f), rot);
-            b.Box(at + new Vector3(0f, 1.14f, 0f), new Vector3(1.95f, 0.08f, 1.3f), rot);
-            for (var i = -1; i <= 1; i += 2)
-                b.Box(at + rot * new Vector3(i * 0.95f, 0.55f, 0f), new Vector3(0.09f, 1.1f, 1.28f), rot);
+            var rot = Quaternion.Euler(0f, (float)(rng.NextDouble() * 20.0 - 10.0), 0f);
+            System.Func<float, float, float, Vector3> p = (x, y, z) => at + rot * new Vector3(x, y, z);
+
+            const float hxb = 0.78f;    // 底の半分の長さ
+            const float hxt = 0.95f;    // 口の半分の長さ。端が外へ広がる
+            const float hz = 0.62f;     // 幅の半分。長辺は立てたまま
+            const float h = 1.10f;      // 高さ
+            const float t = 0.055f;     // 板の厚み
+
+            // 長辺。下が狭く上が広い台形。外と内を張る
+            paint.Quad(p(hxb, 0f, hz), p(-hxb, 0f, hz), p(-hxt, h, hz), p(hxt, h, hz));
+            paint.Quad(p(-hxb, 0f, -hz), p(hxb, 0f, -hz), p(hxt, h, -hz), p(-hxt, h, -hz));
+            paint.Quad(p(-hxb, 0f, hz - t), p(hxb, 0f, hz - t), p(hxt, h, hz - t), p(-hxt, h, hz - t));
+            paint.Quad(p(hxb, 0f, -hz + t), p(-hxb, 0f, -hz + t), p(-hxt, h, -hz + t), p(hxt, h, -hz + t));
+
+            // 端。外へ斜めに開く
+            paint.Quad(p(hxb, 0f, hz), p(hxb, 0f, -hz), p(hxt, h, -hz), p(hxt, h, hz));
+            paint.Quad(p(-hxb, 0f, -hz), p(-hxb, 0f, hz), p(-hxt, h, hz), p(-hxt, h, -hz));
+            paint.Quad(p(hxb - t, 0f, -hz), p(hxb - t, 0f, hz), p(hxt - t, h, hz), p(hxt - t, h, -hz));
+            paint.Quad(p(-hxb + t, 0f, hz), p(-hxb + t, 0f, -hz), p(-hxt + t, h, -hz), p(-hxt + t, h, hz));
+
+            // 床と底
+            paint.Quad(p(-hxb, t, hz), p(hxb, t, hz), p(hxb, t, -hz), p(-hxb, t, -hz));
+            paint.Quad(p(-hxb, 0f, -hz), p(hxb, 0f, -hz), p(hxb, 0f, hz), p(-hxb, 0f, hz));
+
+            // 口の縁。四方に回した角材
+            for (var s = -1; s <= 1; s += 2)
+            {
+                metal.Box(p(0f, h + 0.02f, s * (hz + 0.015f)), new Vector3(2f * hxt + 0.10f, 0.08f, 0.09f), rot);
+                metal.Box(p(s * (hxt + 0.02f), h + 0.02f, 0f), new Vector3(0.09f, 0.08f, 2f * hz + 0.12f), rot);
+            }
+
+            // 縦の桟。長辺に三本ずつ
+            var ribs = new[] { -0.46f, 0.01f, 0.48f };
+            foreach (var rx in ribs)
+                for (var s = -1; s <= 1; s += 2)
+                    metal.Box(p(rx, h * 0.5f - 0.02f, s * (hz + 0.035f)), new Vector3(0.09f, h - 0.10f, 0.07f), rot);
+
+            // 吊り金具。鎖を掛ける立ち上がり
+            for (var s = -1; s <= 1; s += 2)
+                for (var e = -1; e <= 1; e += 2)
+                    metal.Box(p(e * 0.58f, h + 0.13f, s * (hz - 0.02f)), new Vector3(0.11f, 0.20f, 0.06f), rot);
+
+            // 中身。縁から覗いているだけでゴミコンテナと分かる。瓦礫を敷き、その上に木と袋
+            board.Box(p(0f, 0.45f, 0f), new Vector3(1.48f, 0.78f, 1.06f), rot);
+            for (var i = 0; i < 4; i++)
+            {
+                var spin = rot * Quaternion.Euler(
+                    (float)(rng.NextDouble() * 26.0 - 13.0),
+                    (float)(rng.NextDouble() * 60.0 - 30.0),
+                    (float)(rng.NextDouble() * 18.0 - 9.0));
+                var c = p((float)(rng.NextDouble() - 0.5) * 1.1f,
+                    0.98f + (float)rng.NextDouble() * 0.30f,
+                    (float)(rng.NextDouble() - 0.5) * 0.8f);
+                board.Box(c, new Vector3(1.05f + (float)rng.NextDouble() * 0.55f, 0.045f, 0.16f), spin);
+            }
+            for (var i = 0; i < 2; i++)
+            {
+                var c = p((float)(rng.NextDouble() - 0.5) * 1.0f, 1.05f, (float)(rng.NextDouble() - 0.5) * 0.7f);
+                sack.Box(c, new Vector3(0.44f, 0.30f, 0.38f),
+                    rot * Quaternion.Euler(0f, (float)(rng.NextDouble() * 50.0), 0f));
+            }
         }
 
 
@@ -3691,6 +3760,8 @@ namespace HalfAware.EditorTools
                 case "TarpOchre": col = new Color(0.290f, 0.215f, 0.090f); smooth = 0.28f; break;
                 case "TarpMine": col = new Color(0.135f, 0.115f, 0.100f); smooth = 0.30f; break;
                 case "Timber": col = new Color(0.130f, 0.105f, 0.080f); smooth = 0.15f; break;
+                // 大型ゴミコンテナの塗り。褪せた黄土。この通りで唯一、地の色で輪郭が出る物
+                case "Skip": col = new Color(0.225f, 0.160f, 0.055f); smooth = 0.20f; break;
                 case "Pole": col = new Color(0.090f, 0.090f, 0.095f); smooth = 0.22f; break;
                 case "Crate": col = new Color(0.105f, 0.090f, 0.072f); smooth = 0.12f; break;
                 default: col = new Color(0.12f, 0.12f, 0.13f); smooth = 0.3f; break;
