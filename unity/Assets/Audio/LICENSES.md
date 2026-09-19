@@ -13,7 +13,7 @@
 | `LighterFlame.wav` | オーナーが用意した `flint` | — | 前後の無音を落として頂点 −5dB |
 | `ChipPull.wav` | OpenGameArt「Sound Effects Pack」（https://opengameart.org/content/sound-effects-pack）作者 OwlishMedia の `Technology/plugpull.wav` | CC0 1.0 | 0.02〜0.40 秒、頂点 −6dB |
 | `JackPull.wav` | 同上パックの `Technology/plugpull2.wav` | CC0 1.0 | 3.33 秒から 0.50 秒を切り出し、再生速度 0.85 倍で低く伸ばし、前後の無音を落として頂点 −6dB |
-| `RainLoop.wav` | 自作。白色雑音を 2 段の 1 極濾波で丸め、粒の跳ねを重ねた | 本作の一部 | 16 秒。頭と尻を 1.2 秒重ねて輪にしてある |
+| `RainLoop.wav` | オーナーが用意した `dragon-studio-copyright-free-rain-sounds`（Pixabay） | 出典元の表記どおり copyright free。**正確な許諾は未記入。公開までに埋めること** | 60 秒地点から 24 秒を切り出し、モノラル 22.05kHz へ。末尾 1.5 秒を頭に重ねて輪にし、実効値を −22dBFS に揃えた |
 
 切り出しの手順は ffmpeg で、`docs/` ではなくここに残す。素材そのものは repo に置かず、加工後の物だけを置いている。
 
