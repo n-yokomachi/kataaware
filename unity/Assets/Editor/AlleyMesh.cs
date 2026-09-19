@@ -149,6 +149,48 @@ namespace HalfAware.EditorTools
             }
         }
 
+        /// <summary>
+        /// 穴の空いた壁の、z が一定の面。FaceXHoles と同じ考えで、
+        /// holes は (x0, x1, y0, y1) の並び
+        /// </summary>
+        public void FaceZHoles(float z, float x0, float x1, float y0, float y1, int sign, List<Vector4> holes)
+        {
+            if (holes == null || holes.Count == 0) { FaceZ(z, x0, x1, y0, y1, sign); return; }
+            var lines = new List<float> { y0, y1 };
+            foreach (var hole in holes)
+            {
+                if (hole.z > y0 && hole.z < y1) lines.Add(hole.z);
+                if (hole.w > y0 && hole.w < y1) lines.Add(hole.w);
+            }
+            lines.Sort();
+            for (var i = 0; i + 1 < lines.Count; i++)
+            {
+                var a = lines[i]; var b = lines[i + 1];
+                if (b - a < 1e-4f) continue;
+                var mid = (a + b) * 0.5f;
+                var cuts = new List<float> { x0, x1 };
+                foreach (var hole in holes)
+                {
+                    if (mid <= hole.z || mid >= hole.w) continue;
+                    if (hole.x > x0 && hole.x < x1) cuts.Add(hole.x);
+                    if (hole.y > x0 && hole.y < x1) cuts.Add(hole.y);
+                }
+                cuts.Sort();
+                for (var j = 0; j + 1 < cuts.Count; j++)
+                {
+                    var c = cuts[j]; var d = cuts[j + 1];
+                    if (d - c < 1e-4f) continue;
+                    var cx = (c + d) * 0.5f;
+                    var inside = false;
+                    foreach (var hole in holes)
+                    {
+                        if (cx > hole.x && cx < hole.y && mid > hole.z && mid < hole.w) { inside = true; break; }
+                    }
+                    if (!inside) FaceZ(z, c, d, a, b, sign);
+                }
+            }
+        }
+
         /// <summary>溜めた面を mesh にして、場面に置く</summary>
         public GameObject Emit(Transform parent, string name, Material mat, bool collide, string assetDir)
         {
