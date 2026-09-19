@@ -69,6 +69,7 @@ namespace HalfAware.EditorTools
             {
                 if (t.GetComponent<MeshRenderer>() == null) continue;
                 if (t.name.EndsWith(".Back")) continue;              // 背板は見えなくてよい
+                if (t.name == "SignArm") continue;                   // 板を留めている腕木。板ではない
                 // 絵は板の裏側に乗っているので、読む人は -forward の側に立つ
                 var eye = t.position - t.forward * Watch;
                 var blocked = 0;

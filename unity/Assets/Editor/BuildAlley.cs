@@ -1054,6 +1054,10 @@ namespace HalfAware.EditorTools
             var market = GameObject.Find("Alley/Market");
             if (market != null)
             {
+                // 座らせるなら腰掛けを置く。無いと宙に座っているように見える
+                var stalls = Child(parent, "Stools");
+                Clear(stalls);
+                var n = 0;
                 foreach (Transform stall in market.transform)
                 {
                     if (!stall.name.StartsWith("Stall")) continue;
@@ -1064,8 +1068,10 @@ namespace HalfAware.EditorTools
                     var back = Quaternion.Euler(0f, yaw, 0f) * new Vector3(
                         (float)(rng.NextDouble() - 0.5) * 0.5f, 0f, 0.95f);
                     var seat = rng.Next(3);
-                    Put(spots, new Vector3(p.x + back.x, 0.02f, p.z + back.z),
-                        yaw + 180f + (float)(rng.NextDouble() * 40.0 - 20.0), seat == 0 ? 5 : seat == 1 ? 6 : 7, rng, true);
+                    var sit = new Vector3(p.x + back.x, 0.02f, p.z + back.z);
+                    Put(spots, sit, yaw + 180f + (float)(rng.NextDouble() * 40.0 - 20.0),
+                        seat == 0 ? 5 : seat == 1 ? 6 : 7, rng, true);
+                    Stool(stalls, "Stool" + n++, sit, yaw);
                 }
             }
             // ヤードの買い手
@@ -1398,6 +1404,23 @@ namespace HalfAware.EditorTools
         {
             foreach (var t in root.GetComponentsInChildren<Transform>(true)) if (t.name == name) return t;
             return null;
+        }
+
+        /// <summary>
+        /// 売り手の腰掛け。座った形の腰は 0.42 の高さに来るので、
+        /// 天面をそこへ合わせる。無いと宙に座っているように見える
+        /// </summary>
+        static void Stool(Transform parent, string name, Vector3 at, float yaw)
+        {
+            var g = new GameObject(name);
+            g.transform.SetParent(parent, false);
+            g.transform.localPosition = at;
+            g.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
+            Box(g.transform, "Seat", new Vector3(0f, 0.40f, 0f), new Vector3(0.36f, 0.05f, 0.34f), "Timber");
+            for (var i = 0; i < 4; i++)
+                Box(g.transform, "Leg" + i,
+                    new Vector3((i % 2 == 0 ? -1 : 1) * 0.14f, 0.19f, (i < 2 ? -1 : 1) * 0.13f),
+                    new Vector3(0.04f, 0.38f, 0.04f), "Pole");
         }
 
         /// <summary>
@@ -2501,11 +2524,41 @@ namespace HalfAware.EditorTools
             var wallX = p.side * StreetHalf;
             var reach = p.blade ? 0.95f : 0.12f;
             var x = wallX - p.side * reach;
+            var z = p.z;
+            {
+                // 看板の場所を探す。壁には石の帯・樋・梯子・庭が先に付いていて、
+                // 狙った位置がそれらと重なっていることが多い。
+                // 壁から離す量と前後のずれを組み合わせて、空いているところを使う。
+                // 探すときの当たり判定と、見直しで使う判定を揃えてある
+                // 厄みは裏面の板（3 cm 後ろ）も含むように取る。
+                // 薄く取ると、先に立てた看板の裏面と重なる
+                var room = p.blade
+                    ? new Vector3(wide * 0.5f, high * 0.5f, 0.20f)
+                    : new Vector3(0.20f, high * 0.5f, wide * 0.5f);
+                var outs = p.blade
+                    ? new[] { 0f, 0.20f, -0.20f, 0.40f }
+                    : new[] { 0f, 0.22f, 0.45f, 0.70f, 1.00f, 1.35f };
+                var shifts = new[] { 0f, 0.65f, -0.65f, 1.30f, -1.30f, 1.95f, -1.95f, 2.60f, -2.60f, 3.25f, -3.25f };
+                var found = false;
+                for (var o = 0; o < outs.Length && !found; o++)
+                    for (var k = 0; k < shifts.Length && !found; k++)
+                    {
+                        var spot = new Vector3(x - p.side * outs[o], p.y, p.z + shifts[k]);
+                        if (Occupied(spot, room) != 0) continue;
+                        // 看板どうしは頂点では捉まらない。
+                        // 大きな四角は角にしか頂点が無いので、範囲の重なりで見る
+                        if (Crowded(parent, spot, room)) continue;
+                        x = spot.x;
+                        z = spot.z;
+                        found = true;
+                    }
+                if (!found) Debug.LogWarning("看板を掛けられる隙間が無い: " + name);
+            }
 
             var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
             go.name = name;
             go.transform.SetParent(parent, false);
-            go.transform.localPosition = new Vector3(x, p.y, p.z);
+            go.transform.localPosition = new Vector3(x, p.y, z);
             // 突き出す物は通りの上下を向き、貼る物は通りの中央を向く
             // 絵が乗るのは板の裏側。壁に貼る物は向きを返さないと字が反転する
             go.transform.localRotation = p.blade
@@ -2521,7 +2574,7 @@ namespace HalfAware.EditorTools
                 var back = GameObject.CreatePrimitive(PrimitiveType.Quad);
                 back.name = name + ".Back";
                 back.transform.SetParent(parent, false);
-                back.transform.localPosition = new Vector3(x, p.y, p.z - 0.03f);
+                back.transform.localPosition = new Vector3(x, p.y, z - 0.03f);
                 back.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
                 back.transform.localScale = new Vector3(-wide, high, 1f);
                 back.GetComponent<MeshRenderer>().sharedMaterial = NeonMat(p.texture, tex);
@@ -2530,12 +2583,12 @@ namespace HalfAware.EditorTools
 
             if (!p.blade) return;
             // 壁まで繋ぐ腕
-            Box(parent, name + ".Arm", new Vector3(wallX - p.side * reach * 0.5f, p.y + high * 0.5f - 0.1f, p.z),
+            Box(parent, name + ".Arm", new Vector3(wallX - p.side * reach * 0.5f, p.y + high * 0.5f - 0.1f, z),
                 new Vector3(reach, 0.08f, 0.08f), "Metal");
             // 通りへ落ちる色。突き出した物にだけ付ける
             var lamp = new GameObject(name + ".Lamp");
             lamp.transform.SetParent(parent, false);
-            lamp.transform.localPosition = new Vector3(x - p.side * 0.5f, p.y, p.z);
+            lamp.transform.localPosition = new Vector3(x - p.side * 0.5f, p.y, z);
             var l = lamp.AddComponent<Light>();
             l.type = LightType.Point;
             l.color = NeonTint(p.texture);
@@ -3729,6 +3782,22 @@ namespace HalfAware.EditorTools
                 }
             for (var i = 0; i < made.Count; i++) Object.DestroyImmediate(made[i]);
             return most <= 0f ? 0f : most + 0.05f;
+        }
+
+        /// <summary>
+        /// すでに立てた看板と重なるか。看板は四角一枚で、
+        /// 頂点が四隅にしか無いから、頂点を数えるやり方だと取り逃す
+        /// </summary>
+        static bool Crowded(Transform parent, Vector3 centre, Vector3 half)
+        {
+            var box = new Bounds(centre, half * 2f);
+            foreach (Transform t in parent)
+            {
+                var r = t.GetComponent<MeshRenderer>();
+                if (r == null) continue;
+                if (r.bounds.Intersects(box)) return true;
+            }
+            return false;
         }
 
         /// <summary>その箱に入っている頂点の数。壁に向いた板の食い込みを見るのに使う</summary>

@@ -34,7 +34,14 @@ namespace HalfAware.EditorTools
         /// 矢は歩道の上へ突き出していて、正面に置くと板の裏になる。
         /// 小道（x は -4.3 より西、z 33.1〜36.9）の口へ飛び出させる
         /// </summary>
-        static readonly Vector3 LaneSide = new Vector3(-1.30f, -0.78f, 1.55f);
+        /// <summary>
+        /// 案内の矢からピンを出すずれ。
+        ///
+        /// 通りを北へ歩いて近づくので、進む先から見て板の横に出す。
+        /// 小道の側へ出すと、通りを歩いている間は目に入らない。
+        /// 高さも板（3.05）から目線の辺りまで下げる
+        /// </summary>
+        static readonly Vector3 LaneSide = new Vector3(1.15f, -0.82f, -0.35f);
 
         public static void Build(Transform root)
         {
@@ -123,15 +130,18 @@ namespace HalfAware.EditorTools
                     spin * Quaternion.Euler(0f, i % 2 == 0 ? 6f : -7f, 0f));
             }
 
-            // 買い手 B が置いていく煙草。卓の向こう寄り、買い手の手が届くあたり
+            // 買い手 B が置いていく煙草。
+            // チップの列のすぐ手前、卓の真ん中へ並べる。
+            // 端に置くと「これな」で何が増えたのか分からない
             var smokes = Child(parent, "Smokes");
-            Smokes = new GameObject[3];
+            Smokes = new GameObject[6];
             for (var i = 0; i < Smokes.Length; i++)
             {
-                var slot = (i - (Smokes.Length - 1) * 0.5f) * 0.075f;
+                var row = i / 3;
+                var slot = (i % 3 - 1) * 0.098f;
                 Smokes[i] = Pack(smokes, "Smoke" + i,
-                    at + spin * new Vector3(slot + 0.30f, 0.822f, 0.02f - i * 0.03f),
-                    spin * Quaternion.Euler(0f, -22f + i * 19f, 0f));
+                    at + spin * new Vector3(slot, 0.822f, -0.56f + row * 0.10f),
+                    spin * Quaternion.Euler(0f, -16f + i * 11f, 0f));
             }
 
             Dressing(Child(parent, "Dressing"), at, spin);

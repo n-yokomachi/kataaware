@@ -44,6 +44,19 @@ namespace HalfAware.EditorTools
             },
         };
 
+        /// <summary>
+        /// 通りの板に何が書いてあるか。BuildAlley の StreetSigns と同じ順で並べる。
+        /// 調べるとまずこれが出て、次の窓で地の文に移る
+        /// </summary>
+        public static readonly string[] StreetPlates =
+        {
+            "「GREVILLE STREET」と書かれた街路名の札。下に小さく「EC1」",
+            "「NERVE TERMINAL」と書かれた看板。「適合と調整。予約不要」と続く",
+            "「HOLBORN CHEMIST」と書かれた看板。「インプラント用品と修理。夜通し」",
+            "「H. GOODCHILD & SON」と書かれた質屋の看板。「創業 1871 年」",
+            "「NANOMACHINE ADVISORY」と書かれた市の告示。「端末にファイアウォールを」",
+        };
+
         /// <summary>看板の数。BuildAlley が立てる数と揃える</summary>
         public static int Signs { get { return StreetPages.Length; } }
 
@@ -56,13 +69,14 @@ namespace HalfAware.EditorTools
 
             var entries = new List<ScriptEntry>();
 
-            // 通りの看板。文は page 側に持ち、看板そのものは印だけ
+            // 通りの看板。まずその板に何が書いてあるかを出し、
+            // 続けて AlleyDirector が地の文を積む。地の文はどの板からでも同じ順に流れる
             for (var i = 0; i < Signs; i++)
                 entries.Add(new ScriptEntry
                 {
                     id = AlleyIds.Sign(i),
                     label = "看板を読む",
-                    lines = new string[0],
+                    lines = new[] { StreetPlates[i] },
                     hints = new ScriptHint[0],
                 });
             for (var i = 0; i < Signs; i++)

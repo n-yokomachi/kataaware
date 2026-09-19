@@ -57,7 +57,7 @@ namespace HalfAware
                 woman = false,
                 // 「じゃあこれな」は台詞で、煙草を置くのはしぐさ。この行で卓に現れる
                 putsSmokes = "買い手B「はいはい、じゃあこれな」",
-                smokes = 3,
+                smokes = 6,
             },
             new Buyer
             {
