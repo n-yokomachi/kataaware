@@ -33,10 +33,15 @@ namespace HalfAware
         [SerializeField] TMP_Text logText;
 
         float baseFontSize;
+        TMPro.TextAlignmentOptions listlessAlignment = TMPro.TextAlignmentOptions.Center;
 
         void Awake()
         {
-            if (subtitleText != null) baseFontSize = subtitleText.fontSize;
+            if (subtitleText != null)
+            {
+                baseFontSize = subtitleText.fontSize;
+                listlessAlignment = subtitleText.alignment;
+            }
             SetSubtitle(null);
             SetPrompt(null);
             SetCenter(null);
@@ -51,11 +56,25 @@ namespace HalfAware
         /// </summary>
         public void SetSubtitle(string text)
         {
+            SetSubtitle(text, true);
+        }
+
+        /// <summary>
+        /// asTable が false なら表に組まない。二択のように、
+        /// 空白で分かれていても列にしたくないものに使う
+        /// </summary>
+        public void SetSubtitle(string text, bool asTable)
+        {
             subtitleBand.SetActive(text != null);
             subtitleText.text = text ?? string.Empty;
             if (text == null) return;
             var rows = SubtitleBox.Rows(text);
             var scale = SubtitleBox.FontScale(text);
+            // 並びになっているものは表に組む。列を揃えるため左寄せにして、
+            // 表ごと帯の真ん中へ寄せる
+            var list = asTable && ListFormat.IsList(text);
+            if (list) subtitleText.text = ListFormat.Compose(text, RoomEm(scale));
+            subtitleText.alignment = list ? TMPro.TextAlignmentOptions.Left : listlessAlignment;
             var band = subtitleBand.GetComponent<RectTransform>();
             if (band != null)
             {
@@ -66,6 +85,14 @@ namespace HalfAware
             }
             if (baseFontSize <= 0f) baseFontSize = subtitleText.fontSize;
             subtitleText.fontSize = baseFontSize * scale;
+        }
+
+        /// <summary>帯に入る横幅を em で。表の列数と寄せ方をこれで決める</summary>
+        float RoomEm(float scale)
+        {
+            var size = baseFontSize * scale;
+            if (size <= 0f) return 0f;
+            return subtitleText.rectTransform.rect.width / size;
         }
 
         /// <summary>null で隠す</summary>

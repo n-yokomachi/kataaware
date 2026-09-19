@@ -206,7 +206,7 @@ namespace HalfAware
             // 独白を読み終えてから腰を上げる。喋りながら立ち上がらせない
             Stand(frozenNow || subtitles.IsTalking || choice != null);
             // ログを開いている間は字幕を伏せる。ログの上に重なって読みにくい
-            hud.SetSubtitle(logOpen ? null : choice != null ? choice.Compose() : subtitles.Current);
+            hud.SetSubtitle(logOpen ? null : choice != null ? choice.Compose() : subtitles.Current, choice == null);
             if (progress.IsComplete && !subtitles.IsTalking && choice == null && !frozenNow) StartCoroutine(Complete());
         }
 
