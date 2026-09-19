@@ -33,31 +33,42 @@ namespace HalfAware.Tests
         }
 
         [Test]
-        public void AShortSmokeHasNoDrags()
+        public void TheCardComesJustAfterSheBreathesOut()
         {
-            Assert.AreEqual(0, SmokeBeats.Drags(0.5f));
-            Assert.AreEqual(0, SmokeBeats.Drags(SmokeBeats.BlowAt(0) + SmokeBeats.BlowSeconds - 0.01f));
-        }
-
-        [Test]
-        public void ALongerSmokeFitsMore()
-        {
-            // 境目そのものは浮動小数の丸めで揺れるので、わずかに内側で見る
-            Assert.AreEqual(1, SmokeBeats.Drags(SmokeBeats.BlowAt(0) + SmokeBeats.BlowSeconds + 1e-3f));
-            Assert.AreEqual(2, SmokeBeats.Drags(SmokeBeats.BlowAt(1) + SmokeBeats.BlowSeconds + 1e-3f));
-            Assert.GreaterOrEqual(SmokeBeats.Drags(60f), 4, "1 分なら何服も入る");
-        }
-
-        [Test]
-        public void TheCountNeverFalls()
-        {
-            var last = 0;
-            for (var s = 0f; s < 30f; s += 0.25f)
+            for (var i = 0; i < SmokeBeats.Drags; i++)
             {
-                var n = SmokeBeats.Drags(s);
-                Assert.GreaterOrEqual(n, last);
-                last = n;
+                Assert.AreEqual(SmokeBeats.CardAfterBlow, SmokeBeats.CardAt(i) - SmokeBeats.BlowAt(i), 1e-4f);
+                Assert.Less(SmokeBeats.CardAt(i), SmokeBeats.BlowAt(i) + SmokeBeats.BlowSeconds,
+                    "まだ吐いている最中に暗くなる");
             }
+        }
+
+        [Test]
+        public void TheWholeThingCoversEveryDrag()
+        {
+            var total = SmokeBeats.Total(SmokeBeats.Drags);
+            var last = SmokeBeats.BlowAt(SmokeBeats.Drags - 1) + SmokeBeats.BlowSeconds;
+            Assert.Greater(total, last, "最後に吐き終わってからも間がある");
+            Assert.AreEqual(SmokeBeats.TailSeconds, total - last, 1e-4f);
+        }
+
+        [Test]
+        public void NoDragsMeansNothingToWaitFor()
+        {
+            Assert.AreEqual(SmokeBeats.FirstDragAt, SmokeBeats.Total(0), 1e-4f);
+        }
+
+        [Test]
+        public void MoreDragsTakeLonger()
+        {
+            Assert.Greater(SmokeBeats.Total(3), SmokeBeats.Total(2));
+            Assert.AreEqual(SmokeBeats.Cycle, SmokeBeats.Total(3) - SmokeBeats.Total(2), 1e-3f);
+        }
+
+        [Test]
+        public void SheSmokesThreeTimes()
+        {
+            Assert.AreEqual(3, SmokeBeats.Drags);
         }
     }
 }

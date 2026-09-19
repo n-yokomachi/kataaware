@@ -19,6 +19,9 @@ namespace HalfAware
         /// <summary>全角 1 文字ぶんの幅。半角 2 つで 1em</summary>
         const float EmPerUnit = 0.5f;
 
+        /// <summary>帯の幅のうち、表に使ってよい割合。数え方の誤差ぶんを残す</summary>
+        const float Margin = 0.92f;
+
         /// <summary>
         /// 表に組むか。2 行以上あって、どれかの行が 2 つ以上の塊に分かれていること。
         /// 1 行だけの文や、区切りの無い文はそのまま出す
@@ -37,16 +40,18 @@ namespace HalfAware
         /// </summary>
         public static string Compose(string text, float roomEm)
         {
+            // 幅は字の実寸ではなく半角いくつで数えているので、少し余裕を見る
+            var safe = roomEm * Margin;
             var cols = Most(text);
             var widths = Widths(text, cols);
             // 収まるところまで列を減らす。減らした分は最後の列に元のまま残る
-            while (cols > 2 && Total(widths) > roomEm)
+            while (cols > 2 && Total(widths) > safe)
             {
                 cols--;
                 widths = Widths(text, cols);
             }
             var table = Total(widths);
-            var indent = roomEm > 0f && table < roomEm ? (roomEm - table) * 0.5f : 0f;
+            var indent = safe > 0f && table < safe ? (safe - table) * 0.5f : 0f;
 
             var at = new int[widths.Count];
             for (var i = 1; i < widths.Count; i++) at[i] = at[i - 1] + widths[i - 1] + Gap;

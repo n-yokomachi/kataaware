@@ -1,11 +1,12 @@
+using System;
 using UnityEngine;
 
 namespace HalfAware
 {
     /// <summary>
     /// 一本吸い終わるまでの音と煙。SmokeBeats の時刻表どおりに、
-    /// 蓋を開ける金属音 → 火が点く音 → 吸う息 → 吐く息、を並べる。
-    /// 吐く息に合わせて煙をひと吹き足す
+    /// 蓋を開ける金属音 → 火が点く音 → 吸う息 → 吐く息、を決めた回数だけ並べる。
+    /// 煙は火が点いてから立ちはじめ、吐く息に合わせてひと吹き足す
     /// </summary>
     [DefaultExecutionOrder(15)]
     public sealed class Cigarette : MonoBehaviour
@@ -19,30 +20,30 @@ namespace HalfAware
         [SerializeField] AudioClip blow;
 
         float elapsed = -1f;
-        float seconds;
         int drags;
         int nextDrag;
         int nextBlow;
         bool clicked;
         bool flamed;
 
+        /// <summary>吐き始めるたびに知らせる。何服目かを渡す。0 から数える</summary>
+        public event Action<int> Blew;
+
         /// <summary>吸っている最中か。動作確認から読む</summary>
-        public bool Smoking { get { return elapsed >= 0f && elapsed < seconds; } }
+        public bool Smoking { get { return elapsed >= 0f; } }
 
         /// <summary>これまでに吐いた回数。動作確認から読む</summary>
         public int Blows { get { return nextBlow; } }
 
-        /// <summary>火を点ける。seconds 秒で吸い終わる</summary>
-        public void Light(float seconds)
+        /// <summary>火を点ける。drags 服ぶん吸う</summary>
+        public void Light(int drags)
         {
-            this.seconds = seconds;
+            this.drags = Mathf.Max(0, drags);
             elapsed = 0f;
-            drags = SmokeBeats.Drags(seconds);
             nextDrag = 0;
             nextBlow = 0;
             clicked = false;
             flamed = false;
-            if (puffs != null) puffs.Begin(seconds);
         }
 
         /// <summary>途中で止める</summary>
@@ -65,6 +66,8 @@ namespace HalfAware
             {
                 flamed = true;
                 Play(lighterFlame);
+                // 火が点いてから煙が立ちはじめる
+                if (puffs != null) puffs.Begin(SmokeBeats.Total(drags));
             }
             if (nextDrag < drags && elapsed >= SmokeBeats.DragAt(nextDrag))
             {
@@ -73,11 +76,13 @@ namespace HalfAware
             }
             if (nextBlow < drags && elapsed >= SmokeBeats.BlowAt(nextBlow))
             {
+                var i = nextBlow;
                 nextBlow++;
                 Play(blow);
                 if (puffs != null) puffs.Blow();
+                if (Blew != null) Blew(i);
             }
-            if (elapsed < seconds) return;
+            if (elapsed < SmokeBeats.Total(drags)) return;
             elapsed = -1f;
         }
 

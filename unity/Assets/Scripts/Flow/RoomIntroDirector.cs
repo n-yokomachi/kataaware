@@ -17,10 +17,6 @@ namespace HalfAware
         [Header("カードの間。遊びながら詰められるよう Inspector に出してある")]
         [Tooltip("カードを出したまま止まっている秒数。読む時間")]
         [SerializeField] float holdSeconds = 1.95f;
-        [Tooltip("カードとカードのあいだ、部屋が見えている秒数")]
-        [SerializeField] float gapSeconds = 1.8f;
-        [Tooltip("煙草を取ってから最初のカードまでの秒数")]
-        [SerializeField] float leadInSeconds = 0.8f;
         [Tooltip("煙草を取った直後、正面へ向き直すのにかける秒数")]
         [SerializeField] float aimSeconds = 2.5f;
 
@@ -39,14 +35,11 @@ namespace HalfAware
         /// <summary>座って始めたときの体の向き。煙草のあいだはここへ戻す</summary>
         float seatedYaw;
 
-        /// <summary>煙草を取ってから吸い終わるまでの秒数。瞬きの回数から決まる</summary>
-        public float SmokeSeconds
-        {
-            get
-            {
-                return aimSeconds + leadInSeconds + (holdSeconds + gapSeconds) * Mathf.Max(1, cards.Length);
-            }
-        }
+        /// <summary>何服吸うか。カードの枚数と同じにして、1 服に 1 枚を当てる</summary>
+        public int Drags { get { return Mathf.Max(1, cards.Length); } }
+
+        /// <summary>煙草を取ってから吸い終わるまでの秒数</summary>
+        public float SmokeSeconds { get { return aimSeconds + SmokeBeats.Total(Drags); } }
 
         void OnEnable()
         {
@@ -101,17 +94,23 @@ namespace HalfAware
             if (player != null) player.CanLook = false;
             try
             {
-                if (cigarette != null) cigarette.Light(SmokeSeconds);
-                flow.Freeze(aimSeconds + leadInSeconds + FreezeMargin);
+                flow.Freeze(aimSeconds + FreezeMargin);
                 yield return AimForward(player);
-                yield return new WaitForSeconds(leadInSeconds);
-                foreach (var card in cards)
+                // 向き直してから火を点ける。以後はこの時刻表どおりに音と煙とカードが並ぶ
+                if (cigarette != null) cigarette.Light(Drags);
+                var started = Time.time;
+                for (var i = 0; i < Drags; i++)
                 {
                     if (flow.Completed) yield break;
-                    flow.Freeze(holdSeconds + gapSeconds + FreezeMargin);
-                    yield return Show(card);
-                    yield return new WaitForSeconds(gapSeconds);
+                    var at = started + SmokeBeats.CardAt(i);
+                    flow.Freeze(at - Time.time + holdSeconds + FreezeMargin);
+                    while (Time.time < at) yield return null;
+                    yield return Show(cards[i]);
                 }
+                // 最後に吐き終わってから、少し置いて独白へ
+                var until = started + SmokeBeats.Total(Drags);
+                flow.Freeze(until - Time.time + FreezeMargin);
+                while (Time.time < until) yield return null;
             }
             finally
             {

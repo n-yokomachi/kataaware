@@ -492,11 +492,11 @@ namespace HalfAware.EditorTools
                 new Color(0.88f, 0.87f, 0.84f, 0.34f), new Color(0.80f, 0.80f, 0.78f, 0.62f));
             main.gravityModifier = new ParticleSystem.MinMaxCurve(0.0012f);   // ゆっくり沈む
             main.simulationSpace = ParticleSystemSimulationSpace.World;
-            main.maxParticles = 420;
+            main.maxParticles = 180;
 
             var em = ps.emission;
             em.enabled = true;
-            em.rateOverTime = 22f;
+            em.rateOverTime = 9f;
 
             var shape = ps.shape;
             shape.enabled = true;
