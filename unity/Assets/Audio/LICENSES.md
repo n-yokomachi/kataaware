@@ -1,22 +1,40 @@
 # 音の出典
 
-足音とジッポとチップは CC0 1.0（パブリックドメインの献呈）。
-煙草の 3 つ（吸う・吐く・火）と雨と扉はオーナーが用意したもので、**出典と許諾は未記入**。
-公開までに埋めること。
+出どころは 2 つ。足音とジッポとチップは CC0 1.0（パブリックドメインの献呈）、
+煙草の 3 つ（吸う・吐く・火）と雨と扉は Pixabay。
+
+## Pixabay Content License
+
+https://pixabay.com/service/license-summary/
+
+- **表記は要らない。** 出典を書く義務は無い（書けば喜ばれる、とある）
+- 取り消されない・世界中で・期限なし・非独占・使用料なしで、落として・使って・
+  複製して・作り変えてよい。商用でも非商用でもよい
+- **単体で売ったり配ったりしてはいけない。** 音のファイルそのものを、
+  素材として売る／配る／素材サイトへ出す、はできない
+- ほかの素材や編集と組み合わせて「新しい作品」になっていれば単体扱いにならない。
+  ゲームに組み込んで鳴らすのはこちらに当たる
+- 商標・ロゴ・見分けのつく人物を含むものは、商用や誤解を招く使い方に制限がある
+
+この repo に置いてあるのは**切り出して整えたあとの物**で、ゲームの一部として鳴らしている。
+ただし **`Assets/Audio/` の中身を音素材として取り出して配るのは禁止**にあたる。
 
 | ファイル | 出典 | 許諾 | 加工 |
 |---|---|---|---|
 | `Step1`〜`Step5.wav` | Kenney RPG Audio（https://kenney.nl/assets/rpg-audio）の `footstep00/02/04/06/08.ogg` | CC0 1.0 | モノラル 44.1kHz へ、末尾を落として頂点を −6dB に揃えた |
 | `LighterClick.wav` | OpenGameArt「Zippo click sound」（https://opengameart.org/content/zippo-click-sound）作者 dawith | CC0 1.0 | 金属音の当たりだけを 0.060〜0.320 秒で切り出し、頂点 −3dB |
-| `Drag.wav` | オーナーが用意した `crackle` | — | 前後の無音を落として頂点 −8dB |
-| `Blow.wav` | オーナーが用意した `blow` | — | 同上 |
-| `LighterFlame.wav` | オーナーが用意した `flint` | — | 前後の無音を落として頂点 −5dB |
+| `Drag.wav` | Pixabay の `crackle`。作品名と作者は未記入 | Pixabay Content License | 前後の無音を落として頂点 −8dB |
+| `Blow.wav` | Pixabay の `blow`。作品名と作者は未記入 | Pixabay Content License | 同上 |
+| `LighterFlame.wav` | Pixabay の `flint`。作品名と作者は未記入 | Pixabay Content License | 前後の無音を落として頂点 −5dB |
 | `ChipPull.wav` | OpenGameArt「Sound Effects Pack」（https://opengameart.org/content/sound-effects-pack）作者 OwlishMedia の `Technology/plugpull.wav` | CC0 1.0 | 0.02〜0.40 秒、頂点 −6dB |
 | `JackPull.wav` | 同上パックの `Technology/plugpull2.wav` | CC0 1.0 | 3.33 秒から 0.50 秒を切り出し、再生速度 0.85 倍で低く伸ばし、前後の無音を落として頂点 −6dB |
-| `RainLoop.wav` | オーナーが用意した `dragon-studio-copyright-free-rain-sounds`（Pixabay） | 出典元の表記どおり copyright free。**正確な許諾は未記入。公開までに埋めること** | 60 秒地点から 24 秒を切り出し、モノラル 22.05kHz へ。末尾 1.5 秒を頭に重ねて輪にし、実効値を −22dBFS に揃えた |
-| `DoorShut.wav` | オーナーが用意した `dragon-studio-open-and-close-door`（Pixabay） | 出典元の表記どおり copyright free。**正確な許諾は未記入。公開までに埋めること** | モノラル 44.1kHz へ、頭から 2.15 秒を切り出して末尾 0.1 秒を落とし、頂点を −3dB に揃えた。開けると閉めるが 1 つに入っている（開ける 〜0.5 秒、間 〜1.0 秒、閉まる 1.45〜1.65 秒） |
+| `RainLoop.wav` | Pixabay `dragon-studio-copyright-free-rain-sounds-331497` | Pixabay Content License | 60 秒地点から 24 秒を切り出し、モノラル 22.05kHz へ。末尾 1.5 秒を頭に重ねて輪にし、実効値を −22dBFS に揃えた |
+| `DoorShut.wav` | Pixabay `dragon-studio-open-and-close-door-405453` | Pixabay Content License | モノラル 44.1kHz へ、頭から 2.15 秒を切り出して末尾 0.1 秒を落とし、頂点を −3dB に揃えた。開けると閉めるが 1 つに入っている（開ける 〜0.5 秒、間 〜1.0 秒、閉まる 1.45〜1.65 秒） |
 
 切り出しの手順は ffmpeg で、`docs/` ではなくここに残す。素材そのものは repo に置かず、加工後の物だけを置いている。
+
+煙草の 3 つは Pixabay のどの作品かまで辿れていない。**作品名と作者を控えておくこと。**
+表記の義務は無いので公開の妨げにはならないが、差し替えや問い合わせのときに要る。
 
 ## 使うところ
 
