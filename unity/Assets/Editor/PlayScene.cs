@@ -5,36 +5,54 @@ using UnityEngine;
 namespace HalfAware.EditorTools
 {
     /// <summary>
-    /// 場面を開いて再生する近道。どの場面を開いていても、
-    /// メニューひとつで自室から、あるいは路地裏から始められる
+    /// 場面の一覧。タブとして開いておけば、そこから直に開いて再生できる。
+    /// どの場面を開いていても、押した場面から始められる
     /// </summary>
-    public static class PlayScene
+    public sealed class SceneWindow : EditorWindow
     {
-        const string Room = "Assets/Scenes/Room.unity";
-        const string Alley = "Assets/Scenes/Alley.unity";
-
-        [MenuItem("HalfAware/Play the room _F5", false, 100)]
-        public static void PlayRoom()
+        struct Entry
         {
-            Open(Room, true);
+            public string title;
+            public string path;
+            public string note;
         }
 
-        [MenuItem("HalfAware/Play the alley _F6", false, 101)]
-        public static void PlayAlley()
+        static readonly Entry[] Scenes =
         {
-            Open(Alley, true);
+            new Entry { title = "自室", path = "Assets/Scenes/Room.unity", note = "場面 1。ロンドンの安宿。煙草と記憶の抜き取り" },
+            new Entry { title = "路地裏", path = "Assets/Scenes/Alley.unity", note = "場面 2。グレビル・ストリートとブリーディング・ハート・ヤード" },
+        };
+
+        [MenuItem("HalfAware/Scenes", false, 0)]
+        public static void Show()
+        {
+            var w = GetWindow<SceneWindow>("Scenes");
+            w.minSize = new Vector2(240f, 140f);
+            w.Focus();
         }
 
-        [MenuItem("HalfAware/Open the room", false, 120)]
-        public static void OpenRoom()
+        void OnGUI()
         {
-            Open(Room, false);
-        }
+            var open = EditorSceneManager.GetActiveScene().path;
+            EditorGUILayout.Space(6f);
+            for (var i = 0; i < Scenes.Length; i++)
+            {
+                var e = Scenes[i];
+                var here = e.path == open;
+                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                EditorGUILayout.LabelField(here ? e.title + "（開いている）" : e.title, EditorStyles.boldLabel);
+                EditorGUILayout.LabelField(e.note, EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.BeginHorizontal();
+                if (GUILayout.Button("開く")) Open(e.path, false);
+                if (GUILayout.Button("開いて再生")) Open(e.path, true);
+                EditorGUILayout.EndHorizontal();
+                EditorGUILayout.EndVertical();
+                EditorGUILayout.Space(4f);
+            }
 
-        [MenuItem("HalfAware/Open the alley", false, 121)]
-        public static void OpenAlley()
-        {
-            Open(Alley, false);
+            EditorGUILayout.Space(4f);
+            using (new EditorGUI.DisabledScope(!EditorApplication.isPlaying))
+                if (GUILayout.Button("再生を止める")) EditorApplication.isPlaying = false;
         }
 
         /// <summary>場面を開く。再生中なら一度止めてから。保存は本人に訊く</summary>

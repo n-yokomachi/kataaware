@@ -746,13 +746,14 @@ namespace HalfAware.EditorTools
             var roadWet = new Bank { Texel = 0.22f };
             var stoneDamp = new Bank { Texel = 0.42f };
             var stoneWet = new Bank { Texel = 0.42f };
+            // 少し大きめに戻す。輪郭が自由になったので、広くても染みには見えない
             var rng = new System.Random(7720);
 
             for (var z = StreetSouth + 3f; z < StreetNorth - 2f; z += (float)(2.6 + rng.NextDouble() * 3.4))
             {
                 var x = (float)(rng.NextDouble() * 2.0 - 1.0) * (StreetHalf - 0.9f);
-                var w = (float)(0.7 + rng.NextDouble() * 1.5);
-                var d = (float)(0.5 + rng.NextDouble() * 1.2);
+                var w = (float)(0.9 + rng.NextDouble() * 1.9);
+                var d = (float)(0.7 + rng.NextDouble() * 1.5);
                 var kerb = Mathf.Abs(x) > RoadHalf;
                 var y = kerb ? KerbRise + 0.006f : 0.006f;
                 Pool(kerb ? stoneDamp : roadDamp, kerb ? stoneWet : roadWet, y, x, z, w, d, rng);
@@ -778,37 +779,44 @@ namespace HalfAware.EditorTools
 
             // 濡れた縁は地面より少し暗いだけ。水面はさらに暗く、艶を上げる。
             // 暗くしすぎると黒い穴に見えるので、下の地面が透けて見える明るさに留める
-            roadDamp.Emit(parent, "DampRoad", WetMat("DampRoad", "AlleyAsphalt", 0.86f, 0.28f), false, Generated);
-            stoneDamp.Emit(parent, "DampStone", WetMat("DampStone", "AlleyCobble", 0.86f, 0.28f), false, Generated);
-            roadWet.Emit(parent, "WetRoad", WetMat("WetRoad", "AlleyAsphalt", 0.70f, 0.80f), false, Generated);
-            stoneWet.Emit(parent, "WetStone", WetMat("WetStone", "AlleyCobble", 0.70f, 0.80f), false, Generated);
+            // 暗さで見せない。濡れているのは艶と映り込みで伝える
+            roadDamp.Emit(parent, "DampRoad", WetMat("DampRoad", "AlleyAsphalt", 0.94f, 0.30f), false, Generated);
+            stoneDamp.Emit(parent, "DampStone", WetMat("DampStone", "AlleyCobble", 0.94f, 0.30f), false, Generated);
+            roadWet.Emit(parent, "WetRoad", WetMat("WetRoad", "AlleyAsphalt", 0.86f, 0.82f), false, Generated);
+            stoneWet.Emit(parent, "WetStone", WetMat("WetStone", "AlleyCobble", 0.86f, 0.82f), false, Generated);
         }
 
         /// <summary>
-        /// 水たまり 1 つ。四角のままだと紙を敷いたように見えるので、
-        /// 大きさの違う面を 3 枚ずらして重ねて輪郭を崩す。
-        /// 濡れた縁を一回り大きく敷き、その上に水面を置く
+        /// 水たまり 1 つ。四角を並べると床に黒い四角が乗っているようにしか見えない。
+        /// 中心から放射に縁を取り、うねりを 2 つ重ねて丸でも四角でもない輪郭にする。
+        /// 濡れた縁を一回り外へ敷いて、乾いた地面へなだらかに繋ぐ
         /// </summary>
         static void Pool(Bank damp, Bank wet, float y, float cx, float cz, float w, float d, System.Random rng)
         {
-            var parts = new Vector4[3];
-            parts[0] = new Vector4(cx, cz, w, d);
-            for (var i = 1; i < 3; i++)
+            var n = 11 + rng.Next(6);
+            var rim = new Vector2[n];
+            var edge = new Vector2[n];
+            var phase = (float)(rng.NextDouble() * Mathf.PI * 2.0);
+            var wob1 = (float)(0.16 + rng.NextDouble() * 0.20);
+            var wob2 = (float)(0.08 + rng.NextDouble() * 0.14);
+            var lean = (float)(rng.NextDouble() * Mathf.PI);
+            for (var i = 0; i < n; i++)
             {
-                var sw = w * (float)(0.35 + rng.NextDouble() * 0.45);
-                var sd = d * (float)(0.35 + rng.NextDouble() * 0.45);
-                parts[i] = new Vector4(cx + (float)(rng.NextDouble() - 0.5) * w * 0.6f,
-                    cz + (float)(rng.NextDouble() - 0.5) * d * 0.6f, sw, sd);
+                var a = Mathf.PI * 2f * i / n;
+                var r = 1f + Mathf.Sin(a * 2f + phase) * wob1 + Mathf.Sin(a * 3f - phase * 1.7f) * wob2;
+                // 楕円を少し倒して、縦横のどちらにも寄らせない
+                var ex = Mathf.Cos(a) * w * 0.5f * r;
+                var ez = Mathf.Sin(a) * d * 0.5f * r;
+                var px = cx + ex * Mathf.Cos(lean) - ez * Mathf.Sin(lean);
+                var pz = cz + ex * Mathf.Sin(lean) + ez * Mathf.Cos(lean);
+                rim[i] = new Vector2(px, pz);
+                // 縁は外へ 0.18 ほど広げる
+                var ox = px - cx; var oz = pz - cz;
+                var len = Mathf.Max(0.001f, Mathf.Sqrt(ox * ox + oz * oz));
+                edge[i] = new Vector2(px + ox / len * 0.18f, pz + oz / len * 0.18f);
             }
-            for (var i = 0; i < parts.Length; i++)
-            {
-                var q = parts[i];
-                // 濡れた縁。水面より一回り大きく、少しだけ下
-                damp.FaceY(y, q.x - q.z * 0.5f - 0.16f, q.x + q.z * 0.5f + 0.16f,
-                    q.y - q.w * 0.5f - 0.16f, q.y + q.w * 0.5f + 0.16f, 1);
-                wet.FaceY(y + 0.004f, q.x - q.z * 0.5f, q.x + q.z * 0.5f,
-                    q.y - q.w * 0.5f, q.y + q.w * 0.5f, 1);
-            }
+            damp.FanY(new Vector3(cx, y, cz), edge);
+            wet.FanY(new Vector3(cx, y + 0.004f, cz), rim);
         }
 
         /// <summary>

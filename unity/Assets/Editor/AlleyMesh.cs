@@ -77,6 +77,31 @@ namespace HalfAware.EditorTools
                     x0 * Texel, z0 * Texel);
         }
 
+        /// <summary>
+        /// 水平に寝かせた多角形。中心と縁の点から扇に張る。
+        /// 四角を並べると床に黒い四角が乗っているようにしか見えないので、
+        /// 水たまりのような自然な輪郭はこれで作る。縁は上から見て左回りに渡す
+        /// </summary>
+        public void FanY(Vector3 centre, Vector2[] rim)
+        {
+            if (rim == null || rim.Length < 3) return;
+            var c = verts.Count;
+            verts.Add(centre);
+            uvs.Add(new Vector2(centre.x * Texel, centre.z * Texel));
+            for (var i = 0; i < rim.Length; i++)
+            {
+                verts.Add(new Vector3(rim[i].x, centre.y, rim[i].y));
+                uvs.Add(new Vector2(rim[i].x * Texel, rim[i].y * Texel));
+            }
+            for (var i = 0; i < rim.Length; i++)
+            {
+                var a = c + 1 + i;
+                var b = c + 1 + (i + 1) % rim.Length;
+                // 上を向かせる。FaceY と同じく、上から見て右回りが表
+                tris.Add(c); tris.Add(b); tris.Add(a);
+            }
+        }
+
         /// <summary>箱ひとつ。6 面とも外を向く</summary>
         public void Box(Vector3 centre, Vector3 size)
         {
