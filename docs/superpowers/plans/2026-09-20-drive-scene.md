@@ -333,7 +333,7 @@ namespace HalfAware
         public const string Radio = "drive.radio";
         /// <summary>上着のポケット。同じく帯は進まない</summary>
         public const string Pocket = "drive.pocket";
-        /// <summary>給油計。同じく帯は進まない</summary>
+        /// <summary>燃料計。同じく帯は進まない</summary>
         public const string Fuel = "drive.fuel";
 
         /// <summary>i 番目の帯で出す独白の段</summary>
@@ -1093,7 +1093,7 @@ namespace HalfAware.EditorTools
             new[]
             {
                 "ナーヴ・ターミナルのローカルストレージにデータを保存した。日は暮れていた",
-                "自動運転に任せて、私は腕組みをしながら考える",
+                "自動運転に任せて私は腕組みをしながら考える",
             },
             new[]
             {
@@ -1112,7 +1112,8 @@ namespace HalfAware.EditorTools
             },
             new[]
             {
-                "この匂いを覚えている。あの記憶の中で嗅いだ匂いだ",
+                "この匂いを覚えている",
+                "あの記憶の中で嗅いだ匂いだ",
             },
         };
 
@@ -1123,7 +1124,7 @@ namespace HalfAware.EditorTools
             "アクセスログの写し。エディンバラから少し離れた田舎町の名がある",
             "ルームミラー。角度が悪くて、自分の顔は映らない",
             "メーターの脇に、誰のものとも知れない古い写真立てが挟んである",
-            "窓を開けて、大きく息を吸い込んだ",
+            "窓を開けて大きく息を吸い込んだ",
         };
 
         /// <summary>きっかけの対象の印に出す文</summary>
@@ -1145,13 +1146,19 @@ namespace HalfAware.EditorTools
 
             var entries = new List<ScriptEntry>();
 
-            // ガレージ。運転席のドアを調べると乗り込む
+            // ガレージ。運転席のドアを調べると乗り込む。乗り込めばガレージには戻れないので、
+            // 見た目や進行が変わる対象として二択で確かめる（場面 1 の扉・場面 2 のテーブルと同じ扱い）
             entries.Add(new ScriptEntry
             {
                 id = DriveIds.Door,
                 label = "車に乗り込む",
                 lines = new[] { "ボロのオフロード車。ドアの立て付けは相変わらず悪い" },
                 hints = new ScriptHint[0],
+                choice = new ScriptChoice
+                {
+                    question = "車に乗り込む",
+                    afterYes = new string[0],
+                },
             });
 
             // 帯ごとのきっかけ。対象の文のあとに、DriveDirector が段を積む
@@ -1191,7 +1198,7 @@ namespace HalfAware.EditorTools
             entries.Add(new ScriptEntry
             {
                 id = DriveIds.Fuel,
-                label = "給油計を見る",
+                label = "燃料計を見る",
                 lines = new[] { "半分を切っている。町に着くまでは保つ" },
                 hints = new ScriptHint[0],
             });
@@ -1271,7 +1278,7 @@ namespace HalfAware.Tests
                 var entry = script.Find(id);
                 Assert.AreEqual(id, entry.id, id + " が文面に無い");
                 Assert.Greater(entry.Lines.Count, 0, id + " に文が無い");
-                Assert.IsNotEmpty(entry.Label, id + " に印の文が無い");
+                Assert.IsNotEmpty(entry.label, id + " に印の文が無い");
             }
         }
 
@@ -1292,7 +1299,7 @@ namespace HalfAware.Tests
         {
             var entry = Load().Find(DriveIds.Door);
             Assert.AreEqual(DriveIds.Door, entry.id);
-            Assert.IsNotEmpty(entry.Label);
+            Assert.IsNotEmpty(entry.label);
         }
 
         [Test]
@@ -1301,13 +1308,48 @@ namespace HalfAware.Tests
             var ids = Load().Ids();
             CollectionAssert.AllItemsAreUnique(ids);
         }
+
+        // ガレージの扉だけ、乗り込めば後戻りできないので二択で確かめる（場面 1 の扉・場面 2 のテーブルと同じ扱い）。
+        // それ以外が誤って二択を出すと SceneProgress.Examine が Done に加えなくなり、
+        // きっかけの対象（drive.window など）を調べても帯や場面が終わらなくなる
+        [Test]
+        public void EverythingJustSpeaks()
+        {
+            var script = Load();
+            var door = script.Find(DriveIds.Door);
+            Assert.That(door.Asks, Is.True, DriveIds.Door + " は二択を出す");
+            Assert.That(door.choice.question, Is.EqualTo("車に乗り込む"));
+
+            foreach (var id in script.Ids())
+            {
+                if (id == DriveIds.Door) continue;
+                Assert.IsFalse(script.Find(id).Asks, id + " が二択を出そうとしている");
+            }
+        }
+
+        // NoIdIsUsedTwice は重複が無いことしか見ない。id の集合そのものを固定して、
+        // ラジオや上着のポケットのような、どの帯にも属さない対象が抜け落ちるのに気づけるようにする
+        [Test]
+        public void ItHoldsEveryIdOfScene8()
+        {
+            var want = new System.Collections.Generic.List<string> { DriveIds.Door };
+            for (var i = 0; i < DriveIds.Triggers.Count; i++)
+            {
+                want.Add(DriveIds.Triggers[i]);
+                want.Add(DriveIds.Page(i));
+            }
+            want.Add(DriveIds.Radio);
+            want.Add(DriveIds.Pocket);
+            want.Add(DriveIds.Fuel);
+            Assert.That(Load().Ids(), Is.EquivalentTo(want));
+        }
     }
 }
 ```
 
 - [ ] **Step 4: テストが通ることを確かめる**
 
-Expected: `failed: 0`。296 件。
+Expected: `failed: 0`。298 件。
 
 - [ ] **Step 5: commit**
 
@@ -1538,7 +1580,7 @@ Expected: 0 件。`PlayerController` に `CanMove` / `Yaw` / `Pitch` が無け�
 
 - [ ] **Step 3: テストを走らせて崩れていないことを確かめる**
 
-Expected: `failed: 0`。296 件のまま。
+Expected: `failed: 0`。298 件のまま。
 
 - [ ] **Step 4: commit**
 
@@ -1809,7 +1851,7 @@ Expected: 0 件。
 
 - [ ] **Step 5: テストを走らせる**
 
-Expected: `failed: 0`。296 件のまま。テストは足していない。
+Expected: `failed: 0`。298 件のまま。テストは足していない。
 
 - [ ] **Step 6: commit**
 
@@ -1901,7 +1943,7 @@ return "帯 " + f.GetValue(d) + " / 走行 " + w.Travelled.ToString("F1") + " / 
 - [ ] **Step 3: テストを全部走らせる**
 
 `run_tests`（EditMode）→ `get_test_job`。
-Expected: `failed: 0`。296 件。
+Expected: `failed: 0`。298 件。
 
 - [ ] **Step 4: 組み立て直して保存する**
 
