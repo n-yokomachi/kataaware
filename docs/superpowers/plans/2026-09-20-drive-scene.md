@@ -1085,7 +1085,7 @@ namespace HalfAware.EditorTools
     /// </summary>
     public static class WriteDriveScript
     {
-        public const string Path = "Assets/Data/DriveScript.asset";
+        const string Path = "Assets/Data/DriveScript.asset";
 
         /// <summary>帯ごとの独白。DriveIds.Triggers と同じ並び</summary>
         public static readonly string[][] BandPages =
@@ -1137,13 +1137,12 @@ namespace HalfAware.EditorTools
         };
 
         [MenuItem("HalfAware/Write the drive script", false, 220)]
-        public static void Menu()
-        {
-            Write();
-        }
-
         public static void Write()
         {
+            var asset = AssetDatabase.LoadAssetAtPath<RoomScript>(Path);
+            var made = asset == null;
+            if (made) asset = ScriptableObject.CreateInstance<RoomScript>();
+
             var entries = new List<ScriptEntry>();
 
             // ガレージ。運転席のドアを調べると乗り込む
@@ -1197,45 +1196,50 @@ namespace HalfAware.EditorTools
                 hints = new ScriptHint[0],
             });
 
-            var asset = AssetDatabase.LoadAssetAtPath<RoomScript>(Path);
-            if (asset == null)
-            {
-                asset = ScriptableObject.CreateInstance<RoomScript>();
-                AssetDatabase.CreateAsset(asset, Path);
-            }
             var so = new SerializedObject(asset);
             var list = so.FindProperty("entries");
             list.arraySize = entries.Count;
-            for (var i = 0; i < entries.Count; i++) Fill(list.GetArrayElementAtIndex(i), entries[i]);
+            for (var i = 0; i < entries.Count; i++)
+            {
+                var e = list.GetArrayElementAtIndex(i);
+                e.FindPropertyRelative("id").stringValue = entries[i].id;
+                e.FindPropertyRelative("label").stringValue = entries[i].label;
+                Fill(e.FindPropertyRelative("lines"), entries[i].lines);
+                e.FindPropertyRelative("hints").arraySize = 0;
+                var choice = e.FindPropertyRelative("choice");
+                choice.FindPropertyRelative("question").stringValue = entries[i].choice.question ?? "";
+                Fill(choice.FindPropertyRelative("afterYes"), entries[i].choice.afterYes);
+            }
             so.ApplyModifiedPropertiesWithoutUndo();
+
+            if (made)
+            {
+                if (!AssetDatabase.IsValidFolder("Assets/Data")) AssetDatabase.CreateFolder("Assets", "Data");
+                AssetDatabase.CreateAsset(asset, Path);
+            }
             EditorUtility.SetDirty(asset);
             AssetDatabase.SaveAssets();
             Debug.Log(string.Format("場面 8 の文面を書き出した。{0} 項目 → {1}", entries.Count, Path));
         }
 
-        static void Fill(SerializedProperty at, ScriptEntry entry)
+        static void Fill(SerializedProperty list, string[] values)
         {
-            at.FindPropertyRelative("id").stringValue = entry.id;
-            at.FindPropertyRelative("label").stringValue = entry.label ?? "";
-            var lines = at.FindPropertyRelative("lines");
-            lines.arraySize = entry.lines == null ? 0 : entry.lines.Length;
-            for (var i = 0; i < lines.arraySize; i++)
-                lines.GetArrayElementAtIndex(i).stringValue = entry.lines[i];
-            at.FindPropertyRelative("hints").arraySize = 0;
-            at.FindPropertyRelative("choice").FindPropertyRelative("question").stringValue = "";
-            at.FindPropertyRelative("choice").FindPropertyRelative("afterYes").arraySize = 0;
+            var n = values == null ? 0 : values.Length;
+            list.arraySize = n;
+            for (var i = 0; i < n; i++) list.GetArrayElementAtIndex(i).stringValue = values[i];
         }
     }
 }
 ```
 
-`WriteAlleyScript.cs` の `Fill` と同じ書き方になっているか照らし合わせ、違っていれば既存に合わせる（既存が正）。
+**`Fill` は既存の `WriteAlleyScript.cs` と形が違う。** 実物は `Fill(SerializedProperty list, string[] values)` という文字列の並びだけを埋める狭い関数で、`id` / `label` / `hints` / `choice.question` は呼び出し側の繰り返しの中で直に入れる。上のコードはそれに合わせてある。迷ったら既存が正。
 
 - [ ] **Step 2: コンパイルして書き出す**
 
 `mcpforunity://editor/state` を確かめてからコンパイル。`read_console`（types: error）が 0 件であることを確かめ、
 `execute_menu_item`（`HalfAware/Write the drive script`）。
-Expected: ログに「場面 8 の文面を書き出した。19 項目 → Assets/Data/DriveScript.asset」。
+Expected: ログに「場面 8 の文面を書き出した。14 項目 → Assets/Data/DriveScript.asset」。
+内訳はドア 1、きっかけと段が 5 帯ぶんで 10、任意の対象 3。
 
 - [ ] **Step 3: アセットのテストを書く**
 
