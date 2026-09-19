@@ -45,9 +45,27 @@ namespace HalfAware
             SetSubtitle(null);
             SetPrompt(null);
             SetCenter(null);
+            Cover(fadeLayer);
             SetFade(0f);
             SetCurtain(false);
             SetLog(null);
+        }
+
+        /// <summary>
+        /// 画面の実寸を拡大率で割って丸めるので、キャンバスは画面より 1 ピクセルほど
+        /// 小さくなることがある。幕をぴったり張ると端に地が覗くので、少し外へはみ出させる
+        /// </summary>
+        const float Overscan = 8f;
+
+        /// <summary>幕を画面いっぱい、少しはみ出させて張る</summary>
+        static void Cover(Image layer)
+        {
+            if (layer == null) return;
+            var rect = layer.rectTransform;
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = new Vector2(-Overscan, -Overscan);
+            rect.offsetMax = new Vector2(Overscan, Overscan);
         }
 
         /// <summary>
@@ -161,11 +179,7 @@ namespace HalfAware
         public void SetCurtain(bool covered)
         {
             if (curtainLayer == null) return;
-            var rect = curtainLayer.rectTransform;
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
+            Cover(curtainLayer);
             SetAlpha(curtainLayer, covered ? 1f : 0f);
         }
 

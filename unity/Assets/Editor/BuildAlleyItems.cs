@@ -25,6 +25,12 @@ namespace HalfAware.EditorTools
 
         /// <summary>看板の判定点を置く高さ。立っているときの目線に合わせる</summary>
         const float SignEyeLevel = PlayerController.StandingEyeHeight;
+
+        /// <summary>
+        /// 判定点を壁から通りの側へ引き出す距離。看板は壁に貼ってあるので、
+        /// そのままの x に置くとピンが壁や看板そのものに埋もれて見えなくなる
+        /// </summary>
+        const float SignReach = 1.35f;
         const float BoardRadius = 3.2f;
         const float TableRadius = 2.6f;
 
@@ -44,15 +50,24 @@ namespace HalfAware.EditorTools
                 Put(parent, "Sign" + i, signs[i], script, AlleyIds.Sign(i), SignRadius, false, false);
 
             var board = Find(root, "Boards/SignYardName");
-            if (board != null) Put(parent, "YardBoard", board.position, script, AlleyIds.Board, BoardRadius, false, true);
+            if (board != null) Put(parent, "YardBoard", ReadFrom(board), script, AlleyIds.Board, BoardRadius, false, true);
 
             var stallSign = Find(root, "Boards/SignMemories");
-            if (stallSign != null) Put(parent, "StallSign", stallSign.position, script, AlleyIds.StallSign, BoardRadius, false, true);
+            if (stallSign != null) Put(parent, "StallSign", ReadFrom(stallSign), script, AlleyIds.StallSign, BoardRadius, false, true);
 
             Stall(parent, root, script);
 
             Wire(root, script, parent);
             Debug.Log(string.Format("場面 2 の対象を立てた。看板 {0} 枚、表示板と露店の看板とテーブル", signs.Count));
+        }
+
+        /// <summary>
+        /// 板の判定点。板は壁に貼ってあるので、読む人の居る側へ少し引き出す。
+        /// BuildAlley の Board は絵の乗る面を -forward に向けているので、そちらが読む側
+        /// </summary>
+        static Vector3 ReadFrom(Transform board)
+        {
+            return board.position - board.forward * 0.75f;
         }
 
         /// <summary>
@@ -81,8 +96,8 @@ namespace HalfAware.EditorTools
                 // 端に寄らないよう、通りを等分した位置から拾う
                 var k = Mathf.RoundToInt((found.Count - 1) * (i + 0.5f) / want);
                 var at = found[Mathf.Clamp(k, 0, found.Count - 1)].position;
-                // 壁の位置はそのまま、高さだけ目線に下ろす
-                spots.Add(new Vector3(at.x, SignEyeLevel, at.z));
+                // 高さは目線に下ろし、壁から通りの側へ引き出す
+                spots.Add(new Vector3(at.x - Mathf.Sign(at.x) * SignReach, SignEyeLevel, at.z));
             }
             return spots;
         }
@@ -94,8 +109,9 @@ namespace HalfAware.EditorTools
             var spin = Quaternion.Euler(0f, yaw, 0f);
             var at = new Vector3(BuildAlley.MyStallX, 0f, BuildAlley.MyStallZ);
 
-            // テーブルの天面は 0.81。手前の縁あたりを調べさせる
-            var table = at + spin * new Vector3(0f, 0.85f, -0.55f);
+            // テーブルの天面は 0.81。手前の縁の少し上に置く。
+            // 天面に合わせるとピンが卓に埋まって見えない
+            var table = at + spin * new Vector3(0f, 1.06f, -0.62f);
             Put(parent, "Table", table, script, AlleyIds.Table, TableRadius, true, true);
 
             // 並べるチップ。はじめは伏せておき、置いたときに出す

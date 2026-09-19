@@ -61,6 +61,74 @@ namespace HalfAware.Tests
             StringAssert.EndsWith("、", parts[0]);
         }
 
+        /// <summary>路地裏の看板くらいの長さ。2 行では到底収まらない</summary>
+        const string Long =
+            "一世紀前まではモダニズムからポストモダニズムへの過渡期にあった建築物が大窓を並べ、" +
+            "落ち着いた都会の一角をなしていたというこの通りも、今ではそのほとんどに、" +
+            "瞼の裏に焼き付くような極彩色のネオンが熱帯植物のように絡みついている";
+
+        [Test]
+        public void ALongLineIsBrokenAsOftenAsItNeeds()
+        {
+            var parts = SubtitleBox.Wrap(Long, 40).Split('\n');
+            Assert.That(parts.Length, Is.GreaterThan(2), "2 行で止めない");
+            Assert.AreEqual(Long, string.Join("", parts), "字は 1 つも落とさない");
+        }
+
+        [Test]
+        public void NoLineRunsPastTheWidth()
+        {
+            foreach (var line in SubtitleBox.Wrap(Long, 40).Split('\n'))
+                Assert.LessOrEqual(ListFormat.Units(line), 40, "幅からはみ出した: " + line);
+        }
+
+        [Test]
+        public void TheLinesComeOutEvenlyLong()
+        {
+            var parts = SubtitleBox.Wrap(Long, 40).Split('\n');
+            var least = int.MaxValue;
+            var most = 0;
+            foreach (var line in parts)
+            {
+                var n = ListFormat.Units(line);
+                if (n < least) least = n;
+                if (n > most) most = n;
+            }
+            Assert.LessOrEqual(most - least, 16, "最後の行だけ極端に短くしない");
+        }
+
+        [Test]
+        public void KatakanaWordsAreNotSplitDownTheMiddle()
+        {
+            var text = "あれがナーヴ・ターミナルのジャックに入り込むと、ファイアウォールを立てていない人間は抜かれる";
+            foreach (var line in SubtitleBox.Wrap(text, 40).Split('\n'))
+            {
+                StringAssert.DoesNotEndWith("ファイアウォ", line);
+                StringAssert.DoesNotEndWith("ナー", line);
+                StringAssert.DoesNotEndWith("ジャ", line);
+            }
+        }
+
+        [Test]
+        public void ItLooksElsewhereBeforeSplittingACompound()
+        {
+            // 「産業革命」のような熟語の真ん中より、助詞の後ろで切ってほしい
+            var text = "倫敦を発端とした近年のインプラント革命は世界にとって再びの産業革命でもあった";
+            foreach (var line in SubtitleBox.Wrap(text, 40).Split('\n'))
+                StringAssert.DoesNotEndWith("産業革", line);
+        }
+
+        [Test]
+        public void ALineNeverEndsWithAnOpeningBracket()
+        {
+            var text = "買い手は短いものを選べるが、主人公は仕事として「最後まで観る」ので説明はしない";
+            foreach (var line in SubtitleBox.Wrap(text, 24).Split('\n'))
+            {
+                Assert.AreNotEqual('「', line[line.Length - 1]);
+                Assert.AreNotEqual('『', line[line.Length - 1]);
+            }
+        }
+
         [Test]
         public void ALineNeverStartsWithClosingPunctuation()
         {
