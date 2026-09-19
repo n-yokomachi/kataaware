@@ -23,7 +23,7 @@
 - `refresh_unity` は `refresh_triggered: false` を返してコンパイルが走らないことがある。そのときは `execute_code` で `UnityEditor.AssetDatabase.Refresh(UnityEditor.ImportAssetOptions.ForceSynchronousImport); UnityEditor.Compilation.CompilationPipeline.RequestScriptCompilation();` を叩く
 - Game ビューの大きさを変えない。確認用のカメラを作るときは `cam.enabled = false` と `HideFlags.HideAndDontSave` を付ける
 - 秒数・文章量はオーナーが決める。この計画で入れるのは仮置きの値だけで、勝手に詰めない
-- **帯はコードでは 0 から数える。** 設計書は読み物なので帯 1〜5 と書いてあるが、`Triggers[i]` も `Page(i)` も `Enter(i)` も 0 始まりで、設計書の「帯 1」がここでは 0 番にあたる。この計画の表もコメントもログの文言も、すべて 0 始まりで揃える
+- **帯はコードでは 0 から数える。** 設計書は読み物なので帯 1〜5 と書いてあるが、`Triggers[i]` も `Page(i)` も `Dress(i)` も 0 始まりで、設計書の「帯 1」がここでは 0 番にあたる。この計画の表もコメントもログの文言も、すべて 0 始まりで揃える
 
 **Unity の EditMode テストの流儀:**
 
@@ -1368,7 +1368,8 @@ namespace HalfAware
         {
             if (which < 0 || which >= route.Count)
             {
-                // 最後の帯の先は無い。走らせたまま場面が閉じるのを待つ
+                // 普通はここへ来ない。最後の帯は余韻で段取りを止めるので、
+                // その先を並べにくることが無い。念のため止めておく
                 world.Rolling = false;
                 return;
             }
@@ -1397,6 +1398,7 @@ namespace HalfAware
 - **帯を跨ぐときに `clock.Reset()` を呼ばない。** 呼ぶと `Beat` が `Running` に戻り、`Dark()` が 0 を返して、黒が 1 フレームで終わる。明けるフェードは一度も走らない。`Reset` は `Board` の一度だけ
 - **`flow.Completed` で手を引く。** `SceneFlow.Complete()` は `hud.SetFade(1f)` と `FadeTo(1f, …)` で同じ暗幕を書く。`DriveDirector` は実行順 -5 なのでそれを毎フレーム上書きしてしまい、「続く」が明るいまま出る
 - **`TakeSwap` を `band = shown` より先に置く。** 秒数を全部 0 にされたとき、同じフレームで入れ替えと引き渡しの両方が起きる必要がある
+- **最後の帯の余韻は流れない。** `Held` が最初の `Afterglow` のフレームで下りるので、窓を開けた最後の行のあとは、5 秒黙って走らずにそのまま場面が閉じる。最後の帯だけ `afterglow` を触っても効かないということなので、オーナーが尺を決めるときはそれを承知で
 
 - [ ] **Step 2: コンパイルを通す**
 
@@ -1624,7 +1626,7 @@ shaken.localPosition = rest + new Vector3(
 ```
 
 `Rough` は帯ごとの値で、`DriveBand.rough` として Task 1 で定義済み。
-`DriveDirector.Enter` での受け渡しも Task 7 で済んでいる（`world.Rough = Now.rough;`）ので、
+`DriveDirector.Dress` での受け渡しも Task 7 で済んでいる（`world.Rough = next.rough;`）ので、
 ここでやるのは `DriveWorld` 側に `Rough` と揺れを足すところまで。
 
 - [ ] **Step 3: 前腕を出す**
