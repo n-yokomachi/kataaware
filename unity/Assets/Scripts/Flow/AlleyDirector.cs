@@ -38,6 +38,8 @@ namespace HalfAware
         [SerializeField] float fadeSeconds = 1.0f;
         [Tooltip("暗転したまま置く秒数")]
         [SerializeField] float blackSeconds = 0.5f;
+        [Tooltip("買い手が浮かび上がる秒数")]
+        [SerializeField] float buyerFade = 0.55f;
 
         SignQueue signs;
         bool selling;
@@ -122,6 +124,7 @@ namespace HalfAware
             for (var i = 0; i < MarketSale.Count; i++)
             {
                 ShowBuyer(i);
+                StartCoroutine(Appear(i, buyerFade));
                 flow.Say(MarketSale.Lines(i));
                 yield return Spoken(MarketSale.PutsSmokes(i), MarketSale.Smokes(i));
                 // 買い手が去る。暗転しているあいだに、持っていったぶんを引く
@@ -189,7 +192,45 @@ namespace HalfAware
         void ShowBuyer(int which)
         {
             for (var i = 0; i < buyers.Length; i++)
-                if (buyers[i] != null) buyers[i].SetActive(i == which);
+            {
+                if (buyers[i] == null) continue;
+                buyers[i].SetActive(i == which);
+                if (i == which) Tint(buyers[i], 0f);     // 出したては透明。Appear で濃くする
+            }
+        }
+
+        /// <summary>
+        /// 買い手が浮かび上がる。ぱっと現れると人が湧いたように見える。
+        /// マテリアルは 3 人で共通なので、濃さは描画部ごとの上書きで持たせる
+        /// </summary>
+        IEnumerator Appear(int which, float seconds)
+        {
+            if (which < 0 || which >= buyers.Length || buyers[which] == null) yield break;
+            var who = buyers[which];
+            if (seconds <= 0f) { Tint(who, 1f); yield break; }
+            for (var t = 0f; t < seconds; t += Time.deltaTime)
+            {
+                if (who == null || !who.activeSelf) yield break;
+                Tint(who, t / seconds);
+                yield return null;
+            }
+            if (who != null) Tint(who, 1f);
+        }
+
+        static readonly int BaseColour = Shader.PropertyToID("_BaseColor");
+        MaterialPropertyBlock paint;
+
+        /// <summary>買い手の濃さ。0 で透明、1 で元の色</summary>
+        void Tint(GameObject who, float amount)
+        {
+            var r = who.GetComponent<Renderer>();
+            if (r == null) return;
+            if (paint == null) paint = new MaterialPropertyBlock();
+            r.GetPropertyBlock(paint);
+            var colour = r.sharedMaterial == null ? Color.black : r.sharedMaterial.GetColor(BaseColour);
+            colour.a *= Mathf.Clamp01(amount);
+            paint.SetColor(BaseColour, colour);
+            r.SetPropertyBlock(paint);
         }
 
         /// <summary>卓の上の煙草を count 個見せる</summary>

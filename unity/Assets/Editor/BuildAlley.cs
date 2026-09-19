@@ -1254,6 +1254,8 @@ namespace HalfAware.EditorTools
         /// </summary>
         static void Put(List<Spot> spots, Vector3 at, float yaw, int pose, System.Random rng, bool force = false)
         {
+            // 店の入口の前には立たせない。扉を塞いでいると入れない店に見える
+            if (!force && AtDoor(at.x, at.z, DoorClear)) { Skipped++; return; }
             // 壁に寄りかかる姿勢は背中をつけるので、近づいてよい。
             // 場所が決まっている置き方（売り手・椅子）は物との当たりを見ない。
             // そこに卓や樽があるのは承知の上で置いている
@@ -1492,11 +1494,16 @@ namespace HalfAware.EditorTools
             }
             m.SetTexture("_BaseMap", null);
             m.SetColor("_BaseColor", new Color(0.072f, 0.078f, 0.092f, 1f));
-            m.SetFloat("_Surface", 0f);
+            // 現れるときに濃さを上げていくので、透かせる側で作る
+            m.SetFloat("_Surface", 1f);
+            m.SetFloat("_Blend", 0f);
+            m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            m.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            m.SetFloat("_ZWrite", 1f);
             m.SetFloat("_Smoothness", 0.10f);
             m.SetFloat("_Metallic", 0f);
-            m.DisableKeyword("_SURFACE_TYPE_TRANSPARENT");
-            m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Geometry;
+            m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
             EditorUtility.SetDirty(m);
             return m;
         }
@@ -1741,6 +1748,7 @@ namespace HalfAware.EditorTools
                     var edge = rng.NextDouble() < 0.5 ? YardSouth + 1.0f : YardNorth - 1.0f;
                     var z = Mathf.Lerp(edge, LaneZ, (float)rng.NextDouble() * 0.55f);
                     if (Mathf.Abs(z - LaneZ) < AisleHalf + 0.30f) continue;
+                    if (AtDoor(x, z, DoorClear)) continue;
                     var roll = rng.NextDouble();
                     if (roll < 0.34) { Sacks(sack, new Vector3(x, 0.02f, z), rng); Occupy(x, z, 0.7f); }
                     else if (roll < 0.62) { Pallets(board, new Vector3(x, 0.02f, z), rng); Occupy(x, z, 0.6f); }
@@ -2574,6 +2582,28 @@ namespace HalfAware.EditorTools
 
         /// <summary>歩ける筋の半幅。ここだけは何も置かない</summary>
         public const float AisleHalf = 1.5f;
+
+        /// <summary>
+        /// 店の入口。このまわりには出店もごみも人も置かない。
+        /// 入れない店が並んでいると、そこだけ張りぼてに見える
+        /// </summary>
+        static readonly Vector2[] Doors =
+        {
+            new Vector2(-31.65f, 37.60f),   // ビストロ。西の壁、刷り物の脇
+            new Vector2(-24.60f, 26.30f),   // タバーン。南の口、吊り看板の下
+            new Vector2(-21.00f, 43.60f),   // レストラン。北の日除けの下
+        };
+
+        /// <summary>入口の前を空けておく半径</summary>
+        public const float DoorClear = 2.30f;
+
+        /// <summary>そこは店の入口の前か。そうなら何も置かない</summary>
+        static bool AtDoor(float x, float z, float room)
+        {
+            for (var i = 0; i < Doors.Length; i++)
+                if ((new Vector2(x, z) - Doors[i]).magnitude < room) return true;
+            return false;
+        }
         /// <summary>自分の露店の場所。いちばん奥の、入って右手</summary>
         public const float MyStallX = -28.8f;
         public const float MyStallZ = 41.0f;
@@ -2609,6 +2639,7 @@ namespace HalfAware.EditorTools
                         if (px < TerraceEast + 1.2f && pz < TerraceNorth + 1.2f) continue;
                         if (pz < TavernTerraceNorth + 1.2f) continue;
                         if (px > RestaurantWest - 1.2f && pz > RestaurantTerraceSouth - 1.2f) continue;
+                        if (AtDoor(px, pz, DoorClear)) continue;
                         if (!Free(px, pz, 1.4f)) continue;
                         // 正面は筋の側。北の列は南を向き、南の列は北を向く
                         var face = (sideZ > 0 ? 0f : 180f) + (float)(rng.NextDouble() * 40.0 - 20.0);
@@ -3169,10 +3200,12 @@ namespace HalfAware.EditorTools
             metal.Box(new Vector3(hx, 3.85f, YardSouth + 0.14f), new Vector3(0.14f, 0.7f, 0.14f));
             for (var i = -1; i <= 1; i += 2)
                 metal.Box(new Vector3(hx + i * 0.55f, 3.15f, YardSouth + 1.35f), new Vector3(0.05f, 0.8f, 0.05f));
+            // 表裏 2 枚で覚っているので背板は付けない。
+            // 付けると 2 枚の背板が同じ位置に重なってちらつく
             Board(signs, "SignTavern", "SignTavern",
-                new Vector3(hx, 2.48f, YardSouth + 1.35f), Vector3.forward, new Vector2(1.6f, 1.0f));
+                new Vector3(hx, 2.48f, YardSouth + 1.35f), Vector3.forward, new Vector2(1.6f, 1.0f), false, false);
             Board(signs, "SignTavern.B", "SignTavern",
-                new Vector3(hx, 2.48f, YardSouth + 1.29f), Vector3.back, new Vector2(1.6f, 1.0f));
+                new Vector3(hx, 2.48f, YardSouth + 1.29f), Vector3.back, new Vector2(1.6f, 1.0f), false, false);
             // レストランの看板。日除けの上、中庭を向く
             Board(signs, "SignRestaurant", "SignRestaurant",
                 new Vector3((RestaurantWest + RestaurantEast) * 0.5f, 3.92f, YardNorth - 0.42f),
@@ -3561,11 +3594,13 @@ namespace HalfAware.EditorTools
             var armZ = LaneZ - 2.6f;
             Board(parent, "SignYardArrow", "SignYardArrow",
                 new Vector3(-StreetHalf + 1.45f, 3.05f, armZ), Vector3.back, new Vector2(2.9f, 1.27f), true, false);
+            // 裏面は絵を左右に返す。返さないと、裏から見た矢が小路と逆を指す
             Board(parent, "SignYardArrow.N", "SignYardArrow",
-                new Vector3(-StreetHalf + 1.45f, 3.05f, armZ + 0.07f), Vector3.forward, new Vector2(2.9f, 1.27f), true, false);
-            // 小道の口の脇。通りを歩きながら読める高さに
-            Board(parent, "SignYardName", "SignYardName",
-                new Vector3(-StreetHalf + 0.10f, 2.35f, LaneZ - 2.45f), Vector3.right, new Vector2(1.9f, 0.6f));
+                new Vector3(-StreetHalf + 1.45f, 3.05f, armZ + 0.07f), Vector3.forward, new Vector2(2.9f, 1.27f), true, false, true);
+            // 小道の口の脇にも銀板を掛けていたが、すぐ横の案内の矢と
+            // 同じことを書いていて重い。案内の矢だけ残す。
+            // 調べる対象は BuildAlleyItems で矢の方へ移してある
+
             // 小道を抜けた先。ヤードから振り返ったときに読める
             Board(parent, "SignYardName.Lane", "SignYardName",
                 new Vector3(LaneWest + 0.7f, 2.9f, LaneZ - LaneHalf + 0.06f), Vector3.forward, new Vector2(1.9f, 0.6f));
@@ -3705,7 +3740,7 @@ namespace HalfAware.EditorTools
         /// 呼ぶ側が角度を書くと必ずどれかが裏返るので、角度は受け取らない
         /// </summary>
         static void Board(Transform parent, string name, string texture, Vector3 at, Vector3 face, Vector2 size,
-            bool glowing = false, bool backing = true)
+            bool glowing = false, bool backing = true, bool mirror = false)
         {
             var tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/" + texture + ".png");
             if (tex == null) { Debug.LogWarning("テクスチャが無い: " + texture); return; }
@@ -3715,7 +3750,7 @@ namespace HalfAware.EditorTools
             go.transform.localPosition = at;
             go.transform.localRotation = Quaternion.LookRotation(-face.normalized, Vector3.up);
             go.transform.localScale = new Vector3(size.x, size.y, 1f);
-            go.GetComponent<MeshRenderer>().sharedMaterial = BoardMat(texture, tex, glowing);
+            go.GetComponent<MeshRenderer>().sharedMaterial = BoardMat(texture, tex, glowing, mirror);
             Object.DestroyImmediate(go.GetComponent<Collider>());
 
             if (!backing) return;
@@ -3735,9 +3770,9 @@ namespace HalfAware.EditorTools
         /// 板のマテリアル。灯りを受ける Lit だと絵が出なかったので unlit で貼り、
         /// 明るさは色で落としてある。暗い路地で読める程度に留める
         /// </summary>
-        static Material BoardMat(string texture, Texture2D tex, bool glowing = false)
+        static Material BoardMat(string texture, Texture2D tex, bool glowing = false, bool mirror = false)
         {
-            var path = Materials + "Board_" + texture + (glowing ? "_lit" : "") + ".mat";
+            var path = Materials + "Board_" + texture + (glowing ? "_lit" : "") + (mirror ? "_flip" : "") + ".mat";
             var m = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (m == null || m.shader == null || m.shader.name != "Universal Render Pipeline/Unlit")
             {
@@ -3745,10 +3780,13 @@ namespace HalfAware.EditorTools
                     AssetDatabase.CreateFolder("Assets/Materials", "Alley");
                 if (m != null) AssetDatabase.DeleteAsset(path);
                 m = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-                m.name = "Board_" + texture + (glowing ? "_lit" : "");
+                m.name = "Board_" + texture + (glowing ? "_lit" : "") + (mirror ? "_flip" : "");
                 AssetDatabase.CreateAsset(m, path);
             }
             m.SetTexture("_BaseMap", tex);
+            // 裏面は形を返さず絵を返す。形を返すと面の向きが裏になって消える
+            m.SetTextureScale("_BaseMap", new Vector2(mirror ? -1f : 1f, 1f));
+            m.SetTextureOffset("_BaseMap", new Vector2(mirror ? 1f : 0f, 0f));
             m.SetColor("_BaseColor", glowing ? new Color(1.45f, 1.45f, 1.50f, 1f) : new Color(0.85f, 0.85f, 0.85f, 1f));
             m.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Back);
             EditorUtility.SetDirty(m);

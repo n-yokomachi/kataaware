@@ -27,7 +27,14 @@ namespace HalfAware.EditorTools
         const float ReadReach = 0.75f;
 
         /// <summary>壁と平行に近づく板で、ピンを横へ寄せる距離</summary>
-        const float BoardAside = 1.05f;
+        const float BoardAside = 1.30f;
+
+        /// <summary>
+        /// 案内の矢から、小道の内側へピンを出すずれ。
+        /// 矢は歩道の上へ突き出していて、正面に置くと板の裏になる。
+        /// 小道（x は -4.3 より西、z 33.1〜36.9）の口へ飛び出させる
+        /// </summary>
+        static readonly Vector3 LaneSide = new Vector3(-1.30f, -0.78f, 1.55f);
 
         public static void Build(Transform root)
         {
@@ -51,11 +58,12 @@ namespace HalfAware.EditorTools
                 signs++;
             }
 
-            // 小路の口の表示板は西の壁に貼ってあり、通りを北へ歩いて近づく。
-            // 正面に置くと板の裏側になってピンが見えないので、南（歩いてくる側）へ寄せる
-            var yardBoard = Find(root, "Boards/SignYardName");
+            // 小路の口の表示板。ピンは板の正面ではなく、
+            // 小路の内側へ飛び出す位置に置く。正面だと板の裏になって見えない
+            var yardBoard = Find(root, "Boards/SignYardArrow");
             if (yardBoard != null)
-                Put(parent, "YardBoard", ReadFrom(yardBoard, -BoardAside), script, AlleyIds.Board, BoardRadius, false, true);
+                Put(parent, "YardBoard", yardBoard.position + LaneSide,
+                    script, AlleyIds.Board, BoardRadius, false, true);
 
             var stallSign = Find(root, "Boards/SignMemories");
             if (stallSign != null) Put(parent, "StallSign", ReadFrom(stallSign), script, AlleyIds.StallSign, BoardRadius, false, true);
@@ -84,7 +92,13 @@ namespace HalfAware.EditorTools
         /// </summary>
         static Vector3 ReadFrom(Transform board, float sideways)
         {
-            return board.position - board.forward * ReadReach + board.right * sideways;
+            return ReadFrom(board, sideways, ReadReach);
+        }
+
+        /// <summary>前へ出す距離も指定する</summary>
+        static Vector3 ReadFrom(Transform board, float sideways, float reach)
+        {
+            return board.position - board.forward * reach + board.right * sideways;
         }
 
         /// <summary>自分の露店。テーブル・チップ・煙草・買い手・売るときに立つ場所</summary>
@@ -120,6 +134,7 @@ namespace HalfAware.EditorTools
                     spin * Quaternion.Euler(0f, -22f + i * 19f, 0f));
             }
 
+            Dressing(Child(parent, "Dressing"), at, spin);
             Buyers = MakeBuyers(Child(parent, "Buyers"), at, spin, yaw);
 
             // 売るときに立つ場所。テーブルの向こう、店の内側
@@ -150,7 +165,9 @@ namespace HalfAware.EditorTools
             var men = new[] { "M_Suit", "M_Worker" };
             var women = new[] { "W_Formal", "W_Casual" };
             var poses = new[] { 1, 2, 0 };
-            var sway = new[] { -0.12f, 0.10f, -0.04f };
+            // 看板の幅（1.5 m）の内側に収める。
+            // 外へ外れると、看板と人が別々に見えて花が無い
+            var sway = new[] { -0.26f, 0.22f, -0.06f };
             var man = 0;
             var lady = 0;
             for (var i = 0; i < made.Length; i++)
@@ -168,6 +185,56 @@ namespace HalfAware.EditorTools
                 made[i] = go;
             }
             return made;
+        }
+
+        /// <summary>
+        /// 卓の上の小物。市の品を退けたので、代わりに商売の道具を置く。
+        /// チップを並べる前から出しっ放しにしておく
+        /// </summary>
+        static void Dressing(Transform parent, Vector3 at, Quaternion spin)
+        {
+            // チップを入れておく浅い箱。左奇に置く
+            var box = new GameObject("ChipCase");
+            box.transform.SetParent(parent, false);
+            box.transform.position = at + spin * new Vector3(-0.54f, 0.812f, -0.34f);
+            box.transform.rotation = spin * Quaternion.Euler(0f, -11f, 0f);
+            Part(box.transform, "Floor", new Vector3(0f, 0.006f, 0f), new Vector3(0.235f, 0.012f, 0.145f), CaseMat());
+            for (var i = -1; i <= 1; i += 2)
+            {
+                Part(box.transform, "Side" + i, new Vector3(i * 0.112f, 0.022f, 0f), new Vector3(0.012f, 0.044f, 0.145f), CaseMat());
+                Part(box.transform, "End" + i, new Vector3(0f, 0.022f, i * 0.067f), new Vector3(0.235f, 0.044f, 0.012f), CaseMat());
+            }
+            // 箱の中に残っているチップ。立てて差してある
+            for (var i = 0; i < 4; i++)
+            {
+                var slot = (i - 1.5f) * 0.038f;
+                var chip = new GameObject("Spare" + i);
+                chip.transform.SetParent(box.transform, false);
+                chip.transform.localPosition = new Vector3(slot, 0.033f, 0f);
+                chip.transform.localRotation = Quaternion.Euler(0f, i % 2 == 0 ? 2f : -3f, 0f);
+                Part(chip.transform, "Body", Vector3.zero, new Vector3(0.015f, 0.046f, 0.034f), ChipMat());
+                Part(chip.transform, "Label", new Vector3(-0.0085f, 0.014f, 0f), new Vector3(0.002f, 0.010f, 0.026f), LabelMat());
+            }
+            // 数えに使う帳面と、重しのボルト
+            var pad = new GameObject("Ledger");
+            pad.transform.SetParent(parent, false);
+            pad.transform.position = at + spin * new Vector3(0.58f, 0.812f, -0.30f);
+            pad.transform.rotation = spin * Quaternion.Euler(0f, 14f, 0f);
+            Part(pad.transform, "Paper", new Vector3(0f, 0.004f, 0f), new Vector3(0.150f, 0.008f, 0.205f), LabelMat());
+            Part(pad.transform, "Weight", new Vector3(0.02f, 0.014f, -0.04f), new Vector3(0.036f, 0.020f, 0.036f), BrassMat());
+        }
+
+        /// <summary>チップの箱。使い込んだ鉄</summary>
+        static Material CaseMat()
+        {
+            return Shared("Assets/Materials/Room/PanelDark.mat", "ChipCase",
+                new Color(0.085f, 0.088f, 0.098f), 0.30f, 0.25f);
+        }
+
+        /// <summary>端の接点の金。重しにも使う</summary>
+        static Material BrassMat()
+        {
+            return Solid("ChipContacts", new Color(0.520f, 0.430f, 0.185f), 0.74f, 0.85f);
         }
 
         /// <summary>そこの床の高さ。中庭の敷石は 0.02 で、素のままだと足が沈む</summary>

@@ -26,13 +26,17 @@ namespace HalfAware
                  "帆布の屋根は音を吸うので、石の小道だけを入れる")]
         [SerializeField] Bounds[] echoWalls = new Bounds[0];
         [Tooltip("屋根の下での響きの強さ。dB。0 が最大、-10000 で無音")]
-        [SerializeField] float echoRoom = -700f;
+        [SerializeField] float echoRoom = -180f;
         [Tooltip("外での響きの強さ。dB")]
         [SerializeField] float echoOutside = -10000f;
         [Tooltip("響きの長さ。秒。低い屋根の下なので短く")]
-        [SerializeField] float echoDecay = 0.85f;
+        [SerializeField] float echoDecay = 1.35f;
         [Tooltip("高い方の残り具合。dB。石と金けの屋根なので明るめに残す")]
-        [SerializeField] float echoBright = -300f;
+        [SerializeField] float echoBright = -120f;
+        [Tooltip("初期反射の強さ。dB。壁に近いので強めに")]
+        [SerializeField] float echoReflect = -240f;
+        [Tooltip("残響の強さ。dB")]
+        [SerializeField] float echoLevel = 380f;
 
         float volume = -1f;
         /// <summary>今どれだけ屋根の下に寄っているか。0 が外、1 が屋根の下</summary>
@@ -88,6 +92,9 @@ namespace HalfAware
             echo.room = Room(echoOutside, echoRoom, ringing);
             echo.roomHF = echoBright;
             echo.decayTime = echoDecay;
+            // 反射そのものも上げる。room だけ上げても、響きは薄いまま
+            echo.reflectionsLevel = Room(-10000f, echoReflect, ringing);
+            echo.reverbLevel = Room(-10000f, echoLevel, ringing);
             // 外では切っておく。掛けっぱなしにすると通り全体が屋内に聞こえる
             var wanted = ringing > 0.002f;
             if (echo.enabled != wanted) echo.enabled = wanted;

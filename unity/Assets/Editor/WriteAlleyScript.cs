@@ -92,7 +92,7 @@ namespace HalfAware.EditorTools
             entries.Add(new ScriptEntry
             {
                 id = AlleyIds.StallSign,
-                label = "看板を読む",
+                label = "自分の露店の看板を見る",
                 lines = new[]
                 {
                     "『記憶売ります』の看板。200年前のSF小説からとった宣伝文句だ。かつてはフィクションだったその言葉が、今や小汚い露店で現実になっている",
@@ -107,7 +107,7 @@ namespace HalfAware.EditorTools
                 label = "チップを置く",
                 lines = new[]
                 {
-                    "傷だらけのテーブル。ここに並べれば、あとは向こうから寄ってくる",
+                    "傷だらけのテーブル。ここにメモリーチップを並べておけば、あとは向こうから寄ってくる",
                 },
                 hints = new ScriptHint[0],
                 choice = new ScriptChoice
