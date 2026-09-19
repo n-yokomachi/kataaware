@@ -20,7 +20,7 @@ namespace HalfAware
         public float rough;
         /// <summary>独白を送り切ってから黒へ切り替わるまでの秒数。黙って走る</summary>
         public float afterglow;
-        /// <summary>黒のまま置く秒数。仮眠（帯 3 の末尾）だけ長く取る</summary>
+        /// <summary>黒のまま置く秒数。仮眠にあたる切れ目だけ長く取る</summary>
         public float black;
         /// <summary>黒から次の帯へ浮かび上がる秒数</summary>
         public float fadeIn;
