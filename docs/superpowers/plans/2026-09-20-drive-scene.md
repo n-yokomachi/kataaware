@@ -1758,7 +1758,7 @@ return report;
 
 `Update` の末尾で `player.EyeOffset` にずれを入れる。`Rough` は Task 5 で済んでいるので、ここでやるのは揺れの部分だけ。
 
-**`DriveWorld` に `[DefaultExecutionOrder(-20)]` を付ける。** 既定の 0 のままだと `PlayerController`（-10）がその フレームの `EyeOffset` を読んだ後に書くことになり、揺れが 1 フレーム遅れる。`EyeSway` と同じ -20 にすれば `DriveDirector`（-5）より先に走るので、帯を跨ぐフレームでは古い走行距離で進んだ後に `DriveDirector` が巻き戻して置き直す。描画はその後なので食い違わない。
+**`DriveWorld` に `[DefaultExecutionOrder(-20)]` を付ける。** 既定の 0 のままだと `PlayerController`（-10）がそのフレームの `EyeOffset` を読んだ後に書くことになり、揺れが 1 フレーム遅れる。`EyeSway` と同じ -20 にすれば `DriveDirector`（-5）より先に走るので、帯を跨ぐフレームでは古い走行距離で進んだ後に `DriveDirector` が巻き戻して置き直す。描画はその後なので食い違わない。
 
 - [ ] **Step 3: 前腕を出す**
 
