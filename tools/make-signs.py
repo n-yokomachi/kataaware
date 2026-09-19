@@ -102,8 +102,7 @@ def street_name(size):
     im = plate(size, (232, 228, 218), 11)
     d = ImageDraw.Draw(im)
     border(d, size, (150, 36, 32), int(16 * SS), max(2, int(7 * SS)))
-    centred(d, size, [('GREVILLE STREET', 96, 0.44)], (28, 26, 26))
-    centred(d, size, [('EC1', 52, 0.76)], (150, 36, 32))
+    centred(d, size, [('GREVILLE STREET', 96, 0.5)], (28, 26, 26))
     return weather(im, 12)
 
 
@@ -133,10 +132,9 @@ SIGNS = {
         ('EST. 1871', 44, 0.74),
     ], base=(30, 22, 18), trim=(186, 140, 62))),
     'SignNotice': (WIDE, lambda s: painted(s, 41, [
-        ('CITY OF LONDON', 62, 0.24),
-        ('NANOMACHINE ADVISORY', 74, 0.46),
-        ('FIREWALL YOUR TERMINAL', 50, 0.68),
-        ('BY ORDER', 40, 0.84),
+        ('NANOMACHINE ADVISORY', 80, 0.32),
+        ('FIREWALL YOUR TERMINAL', 54, 0.56),
+        ('BY ORDER', 42, 0.76),
     ], base=(18, 22, 34), ink=(214, 222, 236), trim=(108, 132, 186))),
     'SignFitting': (WIDE, lambda s: painted(s, 51, [
         ('NERVE TERMINAL', 86, 0.30),

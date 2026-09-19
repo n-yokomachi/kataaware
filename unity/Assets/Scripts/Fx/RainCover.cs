@@ -25,18 +25,34 @@ namespace HalfAware
         [Tooltip("響く範囲。空なら屋根の範囲をそのまま使う。" +
                  "帆布の屋根は音を吸うので、石の小道だけを入れる")]
         [SerializeField] Bounds[] echoWalls = new Bounds[0];
+        // 響きの既定値。ここが唯一の出どころで、
+        // BuildAlleyItems が組み直すたびにこの値をシーンへ書き戻す。
+        // 覆いは低くて短い石の小道なので、あるかないか分かる程度に留める。
+        // 強く掛けると通り全体が地下道に聞こえる
+
+        /// <summary>屋根の下での響きの強さ。dB。0 が最大、-10000 で無音</summary>
+        public const float RoomDefault = -700f;
+        /// <summary>響きの長さ。秒</summary>
+        public const float DecayDefault = 0.75f;
+        /// <summary>高い方の残り具合。dB。下げるほど籠もって目立たなくなる</summary>
+        public const float BrightDefault = -600f;
+        /// <summary>初期反射の強さ。dB</summary>
+        public const float ReflectDefault = -900f;
+        /// <summary>残響の強さ。dB</summary>
+        public const float LevelDefault = 60f;
+
         [Tooltip("屋根の下での響きの強さ。dB。0 が最大、-10000 で無音")]
-        [SerializeField] float echoRoom = -180f;
+        [SerializeField] float echoRoom = RoomDefault;
         [Tooltip("外での響きの強さ。dB")]
         [SerializeField] float echoOutside = -10000f;
         [Tooltip("響きの長さ。秒。低い屋根の下なので短く")]
-        [SerializeField] float echoDecay = 1.35f;
-        [Tooltip("高い方の残り具合。dB。石と金けの屋根なので明るめに残す")]
-        [SerializeField] float echoBright = -120f;
-        [Tooltip("初期反射の強さ。dB。壁に近いので強めに")]
-        [SerializeField] float echoReflect = -240f;
+        [SerializeField] float echoDecay = DecayDefault;
+        [Tooltip("高い方の残り具合。dB")]
+        [SerializeField] float echoBright = BrightDefault;
+        [Tooltip("初期反射の強さ。dB")]
+        [SerializeField] float echoReflect = ReflectDefault;
         [Tooltip("残響の強さ。dB")]
-        [SerializeField] float echoLevel = 380f;
+        [SerializeField] float echoLevel = LevelDefault;
 
         float volume = -1f;
         /// <summary>今どれだけ屋根の下に寄っているか。0 が外、1 が屋根の下</summary>

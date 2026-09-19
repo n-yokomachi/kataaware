@@ -133,7 +133,12 @@ namespace HalfAware.EditorTools
 
             // 買い手 B が置いていく煙草。
             // 並べるのではなく、人が卓に置くとおりに 3 × 2 で積む。
-            // チップの列の脇、買い手の手が届くあたり
+            //
+            // 売り買いのあいだ、私は卓の売り手側（局所 z +0.95）に立って -z を向く。
+            // つまり手前は z の大きい側。卓の手前の縁 z 0.004 のすぐ内側、
+            // z -0.10 に置く。奥はチップと帳面で、置かれても目に入らない。
+            // x は 0.13〜0.31 の帯で、端末と皿のあいだを空けてある。
+            // 数や間隔を動かすと帯もずれるので、CheckAlley が毎回かぶりを見る
             var smokes = Child(parent, "Smokes");
             Smokes = new GameObject[6];
             for (var i = 0; i < Smokes.Length; i++)
@@ -141,7 +146,7 @@ namespace HalfAware.EditorTools
                 var col = i % 3;
                 var tier = i / 3;
                 Smokes[i] = Pack(smokes, "Smoke" + i,
-                    at + spin * new Vector3(0.40f + col * 0.062f, 0.822f + tier * 0.024f, -0.46f),
+                    at + spin * new Vector3(0.130f + col * 0.074f, 0.822f + tier * 0.024f, -0.10f),
                     spin * Quaternion.Euler(0f, 4f - col * 3f + tier * 6f, 0f));
             }
 
@@ -207,7 +212,7 @@ namespace HalfAware.EditorTools
             // チップを入れておく浅い箱。左奇に置く
             var box = new GameObject("ChipCase");
             box.transform.SetParent(parent, false);
-            box.transform.position = at + spin * new Vector3(-0.54f, 0.812f, -0.34f);
+            box.transform.position = at + spin * new Vector3(-0.54f, 0.812f, -0.36f);
             box.transform.rotation = spin * Quaternion.Euler(0f, -11f, 0f);
             Part(box.transform, "Floor", new Vector3(0f, 0.006f, 0f), new Vector3(0.235f, 0.012f, 0.145f), CaseMat());
             for (var i = -1; i <= 1; i += 2)
@@ -232,7 +237,7 @@ namespace HalfAware.EditorTools
             Part(pad, "Weight", new Vector3(0.02f, 0.014f, -0.04f), new Vector3(0.036f, 0.020f, 0.036f), BrassMat());
 
             // チップを読む端末。小さな画面が点いている
-            var reader = Prop(parent, "Reader", at, spin, new Vector3(-0.06f, 0.812f, -0.06f), -8f);
+            var reader = Prop(parent, "Reader", at, spin, new Vector3(-0.06f, 0.812f, -0.14f), -8f);
             Part(reader, "Body", new Vector3(0f, 0.022f, 0f), new Vector3(0.215f, 0.044f, 0.145f), CaseMat());
             Part(reader, "Screen", new Vector3(0f, 0.045f, -0.012f), new Vector3(0.150f, 0.003f, 0.082f), ScreenMat());
             Part(reader, "Slot", new Vector3(0f, 0.030f, 0.075f), new Vector3(0.062f, 0.014f, 0.006f), ChipMat());
@@ -242,7 +247,7 @@ namespace HalfAware.EditorTools
                     new Vector3(0.085f, 0.014f, 0.014f), ChipMat());
 
             // 銀貨を放る皿
-            var dish = Prop(parent, "CoinDish", at, spin, new Vector3(0.30f, 0.812f, -0.03f), 22f);
+            var dish = Prop(parent, "CoinDish", at, spin, new Vector3(0.46f, 0.812f, -0.12f), 22f);
             Part(dish, "Floor", new Vector3(0f, 0.005f, 0f), new Vector3(0.130f, 0.010f, 0.130f), BrassMat());
             for (var i = -1; i <= 1; i += 2)
             {
@@ -259,21 +264,22 @@ namespace HalfAware.EditorTools
             Part(mug, "Handle", new Vector3(0.046f, 0.050f, 0f), new Vector3(0.022f, 0.034f, 0.012f), CaseMat());
 
             // 予備の箱を重ねてある
-            var stack = Prop(parent, "Stack", at, spin, new Vector3(-0.92f, 0.812f, -0.10f), -17f);
+            var stack = Prop(parent, "Stack", at, spin, new Vector3(-0.92f, 0.812f, -0.14f), -17f);
             for (var i = 0; i < 3; i++)
                 Part(stack, "Case" + i, new Vector3(i * 0.008f, 0.014f + i * 0.026f, i * 0.006f),
                     new Vector3(0.225f, 0.026f, 0.140f), CaseMat());
 
             // 金をしまう缶。蓋は半ば開いている
-            var tin = Prop(parent, "Tin", at, spin, new Vector3(-0.62f, 0.812f, 0.02f), 9f);
+            var tin = Prop(parent, "Tin", at, spin, new Vector3(-0.62f, 0.812f, -0.12f), 9f);
             Part(tin, "Body", new Vector3(0f, 0.030f, 0f), new Vector3(0.155f, 0.060f, 0.105f), BrassMat());
             Part(tin, "Lid", new Vector3(0.03f, 0.063f, -0.01f), new Vector3(0.160f, 0.008f, 0.110f), CaseMat());
 
             // 拭い布と、投げ出した工具
-            var rag = Prop(parent, "Rag", at, spin, new Vector3(0.66f, 0.812f, 0.04f), -31f);
+            var rag = Prop(parent, "Rag", at, spin, new Vector3(-0.85f, 0.812f, -0.66f), -31f);
             Part(rag, "Cloth", new Vector3(0f, 0.008f, 0f), new Vector3(0.185f, 0.016f, 0.125f), TarpMat());
             Part(rag, "Fold", new Vector3(0.03f, 0.020f, 0.02f), new Vector3(0.105f, 0.014f, 0.070f), TarpMat());
-            var tool = Prop(parent, "Tool", at, spin, new Vector3(0.06f, 0.812f, -0.72f), 66f);
+            // 手前の縁は煙草の置き場に空けておく。工具は左へ寄せる
+            var tool = Prop(parent, "Tool", at, spin, new Vector3(-0.33f, 0.812f, -0.68f), 66f);
             Part(tool, "Grip", new Vector3(0f, 0.010f, 0f), new Vector3(0.070f, 0.020f, 0.020f), ChipMat());
             Part(tool, "Shaft", new Vector3(0.068f, 0.008f, 0f), new Vector3(0.075f, 0.007f, 0.007f), BrassMat());
         }
@@ -396,6 +402,13 @@ namespace HalfAware.EditorTools
             walls.GetArrayElementAtIndex(0).boundsValue = new Bounds(
                 new Vector3((BuildAlley.LaneWest + -BuildAlley.StreetHalf) * 0.5f, 1.6f, BuildAlley.LaneZ),
                 new Vector3(Mathf.Abs(BuildAlley.LaneWest + BuildAlley.StreetHalf) + 0.6f, 3.6f, BuildAlley.LaneHalf * 2f + 0.6f));
+            // 強さは RainCover の定数が出どころ。
+            // シーンに古い値が残っていると効きすぎるので、組み直すたびに書き戻す
+            cso.FindProperty("echoRoom").floatValue = RainCover.RoomDefault;
+            cso.FindProperty("echoDecay").floatValue = RainCover.DecayDefault;
+            cso.FindProperty("echoBright").floatValue = RainCover.BrightDefault;
+            cso.FindProperty("echoReflect").floatValue = RainCover.ReflectDefault;
+            cso.FindProperty("echoLevel").floatValue = RainCover.LevelDefault;
             cso.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(cover);
             EditorUtility.SetDirty(src.gameObject);

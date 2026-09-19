@@ -14,6 +14,7 @@ namespace HalfAware.EditorTools
     /// - 調べる対象のピンが物の中に埋まっていないか
     /// - 文面の id と、シーンに立てた対象の id が食い違っていないか
     /// - 人が床に立っているか（浮いたり沈んだりしていないか）
+    /// - 自分の卓に並べた物が、互いにかぶったり縁からはみ出したりしていないか
     /// </summary>
     public static class CheckAlley
     {
@@ -39,6 +40,7 @@ namespace HalfAware.EditorTools
             bad += Pins(root);
             bad += Ids(root);
             bad += Feet(root);
+            bad += Table(root);
             if (bad == 0) Debug.Log("見直し: 気になるところは無し");
             else Debug.LogWarning("見直し: 気になるところ " + bad + " 件。上を参照");
         }
@@ -229,6 +231,128 @@ namespace HalfAware.EditorTools
             Debug.LogWarning(string.Format("見直し: 人の最下点が {0}（{1} のあたり）。床にめり込んでいる",
                 low.ToString("F3"), at.ToString("F1")));
             return 1;
+        }
+
+        /// <summary>
+        /// 自分の卓の上。並べた物が互いにかぶっていないか、縁からはみ出していないかを見る。
+        ///
+        /// 卓の上の物は手で座標を決めているので、ひとつ動かすと隣と重なる。
+        /// 目で見ても 2 mm のめり込みは分からないから、ここで数える。
+        /// 露店は傾いて立っているので、mesh の頂点を露店の向きへ直してから比べる
+        /// </summary>
+        static int Table(Transform root)
+        {
+            var market = root.Find("Market/MyStall");
+            var items = root.Find("Items");
+            if (market == null || items == null) return 0;
+            var top = market.Find("Stall/Table");
+            if (top == null) { Debug.LogWarning("見直し: 自分の卓が無い"); return 1; }
+
+            var at = new Vector3(BuildAlley.MyStallX, 0f, BuildAlley.MyStallZ);
+            var inv = Quaternion.Inverse(Quaternion.Euler(0f, BuildAlley.MyStallYaw, 0f));
+            var board = Flat(top.gameObject, at, inv);
+
+            var names = new List<string>();
+            var rects = new List<Rect>();
+            var highs = new List<Vector2>();
+            foreach (var group in new[] { "Dressing", "Chips", "Smokes" })
+            {
+                var g = items.Find(group);
+                if (g == null) continue;
+                foreach (Transform c in g)
+                {
+                    var r = Flat(c.gameObject, at, inv);
+                    if (r.width < 0f) continue;
+                    names.Add(group + "/" + c.name);
+                    rects.Add(r);
+                    highs.Add(Tall(c.gameObject, at));
+                }
+            }
+
+            var bad = 0;
+            // 触れているだけなら見過ごす。1 mm より深く食い込んでいたら知らせる
+            const float bite = 0.001f;
+            for (var i = 0; i < rects.Count; i++)
+            {
+                for (var j = i + 1; j < rects.Count; j++)
+                {
+                    var over = Overlap(rects[i], rects[j]);
+                    if (over <= bite) continue;
+                    // 積んである物は上から見れば必ず重なる。高さが離れていれば咎めない
+                    if (Mathf.Min(highs[i].y, highs[j].y) - Mathf.Max(highs[i].x, highs[j].x) <= bite) continue;
+                    Debug.LogWarning(string.Format("見直し: 卓の上で {0} と {1} が {2:F3} m かぶっている",
+                        names[i], names[j], over));
+                    bad++;
+                }
+                if (board.width < 0f) continue;
+                var over2 = Outside(board, rects[i]);
+                if (over2 <= bite) continue;
+                Debug.LogWarning(string.Format("見直し: {0} が卓から {1:F3} m はみ出している。物 x {2:F3}〜{3:F3} z {4:F3}〜{5:F3} / 卓 x {6:F3}〜{7:F3} z {8:F3}〜{9:F3}",
+                    names[i], over2, rects[i].xMin, rects[i].xMax, rects[i].yMin, rects[i].yMax,
+                    board.xMin, board.xMax, board.yMin, board.yMax));
+                bad++;
+            }
+            return bad;
+        }
+
+        /// <summary>
+        /// 露店から見て上から見下ろした四角。Rect の y は奥行き（z）として使う。
+        /// 伏せてある物も見たいので、隠れている renderer も含める
+        /// </summary>
+        static Rect Flat(GameObject go, Vector3 at, Quaternion inv)
+        {
+            var lo = new Vector2(float.MaxValue, float.MaxValue);
+            var hi = new Vector2(float.MinValue, float.MinValue);
+            foreach (var mf in go.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (mf.sharedMesh == null || !mf.sharedMesh.isReadable) continue;
+                var m = mf.transform.localToWorldMatrix;
+                var vs = mf.sharedMesh.vertices;
+                for (var i = 0; i < vs.Length; i++)
+                {
+                    var p = inv * (m.MultiplyPoint3x4(vs[i]) - at);
+                    lo = Vector2.Min(lo, new Vector2(p.x, p.z));
+                    hi = Vector2.Max(hi, new Vector2(p.x, p.z));
+                }
+            }
+            if (hi.x < lo.x) return new Rect(0f, 0f, -1f, -1f);
+            return new Rect(lo, hi - lo);
+        }
+
+        /// <summary>高さの幅。x が下、y が上</summary>
+        static Vector2 Tall(GameObject go, Vector3 at)
+        {
+            var lo = float.MaxValue;
+            var hi = float.MinValue;
+            foreach (var mf in go.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (mf.sharedMesh == null || !mf.sharedMesh.isReadable) continue;
+                var m = mf.transform.localToWorldMatrix;
+                var vs = mf.sharedMesh.vertices;
+                for (var i = 0; i < vs.Length; i++)
+                {
+                    var y = m.MultiplyPoint3x4(vs[i]).y - at.y;
+                    lo = Mathf.Min(lo, y); hi = Mathf.Max(hi, y);
+                }
+            }
+            return new Vector2(lo, hi);
+        }
+
+        /// <summary>二つの四角が重なっている深さ。重なっていなければ 0</summary>
+        static float Overlap(Rect a, Rect b)
+        {
+            var x = Mathf.Min(a.xMax, b.xMax) - Mathf.Max(a.xMin, b.xMin);
+            var z = Mathf.Min(a.yMax, b.yMax) - Mathf.Max(a.yMin, b.yMin);
+            if (x <= 0f || z <= 0f) return 0f;
+            return Mathf.Min(x, z);
+        }
+
+        /// <summary>inner が outer からはみ出している一番大きな量</summary>
+        static float Outside(Rect outer, Rect inner)
+        {
+            return Mathf.Max(
+                Mathf.Max(outer.xMin - inner.xMin, inner.xMax - outer.xMax),
+                Mathf.Max(outer.yMin - inner.yMin, inner.yMax - outer.yMax));
         }
     }
 }
