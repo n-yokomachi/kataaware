@@ -488,7 +488,8 @@ namespace HalfAware.EditorTools
         {
             var west = LaneWest;
             var east = -StreetHalf;
-            paving.FaceY(0.02f, west - 0.5f, east + 0.5f, LaneZ - LaneHalf - 0.3f, LaneZ + LaneHalf + 0.3f, 1);
+            // 西の端はちょうど LaneWest。ヤードの床と重ねない
+            paving.FaceY(0.02f, west, east + 0.5f, LaneZ - LaneHalf - 0.3f, LaneZ + LaneHalf + 0.3f, 1);
             brick.FaceZ(LaneZ - LaneHalf, west, east, 0f, WallHeight, 1);
             brick.FaceZ(LaneZ + LaneHalf, west, east, 0f, WallHeight, -1);
             for (var i = 0; i < 4; i++)
@@ -502,8 +503,14 @@ namespace HalfAware.EditorTools
         /// <summary>ヤード。敷石を敷き、四方の囲いは別に組む</summary>
         static void YardShell(Bank brick, Bank stone, Bank paving)
         {
-            // 壁の内側へ少し潜らせる。継ぎ目で床が抜けて見えないように
-            paving.FaceY(0.02f, YardWest - 0.4f, LaneWest + 0.4f, YardSouth - 0.4f, YardNorth + 0.4f, 1);
+            // 壁の内側へ少し潜らせる。継ぎ目で床が抜けて見えないように。
+            // ただし小路の口だけは潜らせず、ちょうど LaneWest で止める。
+            // 同じ高さの面が 2 枚重なると、歩くたびにどちらが手前か入れ替わって絵がちらつく
+            var mouth0 = LaneZ - LaneHalf - 0.3f;
+            var mouth1 = LaneZ + LaneHalf + 0.3f;
+            paving.FaceY(0.02f, YardWest - 0.4f, LaneWest + 0.4f, YardSouth - 0.4f, mouth0, 1);
+            paving.FaceY(0.02f, YardWest - 0.4f, LaneWest, mouth0, mouth1, 1);
+            paving.FaceY(0.02f, YardWest - 0.4f, LaneWest + 0.4f, mouth1, YardNorth + 0.4f, 1);
         }
 
         // ---- 付属物 --------------------------------------------------------
