@@ -126,12 +126,12 @@ Material:
     - _Smoothness: 0.1
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
-    - _SrcBlend: 1
+    - _SrcBlend: 5
     - _SrcBlendAlpha: 1
     - _Surface: 1
     - _WorkflowMode: 1
     - _XRMotionVectorsPass: 1
-    - _ZWrite: 0
+    - _ZWrite: 1
     m_Colors:
     - _BaseColor: {r: 0.072, g: 0.078, b: 0.092, a: 1}
     - _Color: {r: 0.071999975, g: 0.07799999, b: 0.09199997, a: 1}

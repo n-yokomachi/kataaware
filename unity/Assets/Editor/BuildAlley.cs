@@ -3694,13 +3694,16 @@ namespace HalfAware.EditorTools
         static void StreetSigns(Transform parent)
         {
             // 名前、絵、南から数えた z、側（1 で東の壁）、高さ、大きさ
+            // シナリオの順に、南から北へ並べる。
+            // 歩いて先に目に入った板から読めば、地の文が書かれた順に流れる。
+            // 板と文の対応は固定で、i 番目の板に i 番目の段が紐づく
             var plates = new[]
             {
-                new { tex = "SignStreetName", z = 2.6f,  side = 1,  y = 2.62f, size = new Vector2(2.00f, 0.625f) },
-                new { tex = "SignFitting",    z = 9.2f,  side = -1, y = 2.22f, size = new Vector2(1.86f, 0.93f) },
-                new { tex = "SignChemist",    z = 14.6f, side = 1,  y = 2.22f, size = new Vector2(1.86f, 0.93f) },
-                new { tex = "SignPawn",       z = 20.8f, side = -1, y = 2.22f, size = new Vector2(1.86f, 0.93f) },
-                new { tex = "SignNotice",     z = 27.6f, side = 1,  y = 2.26f, size = new Vector2(1.86f, 0.93f) },
+                new { tex = "SignStreetName", z = 3.2f,  side = 1,  y = 2.62f, size = new Vector2(2.00f, 0.625f) },
+                new { tex = "SignChemist",    z = 9.6f,  side = -1, y = 2.22f, size = new Vector2(1.86f, 0.93f) },
+                new { tex = "SignFitting",    z = 15.4f, side = 1,  y = 2.22f, size = new Vector2(1.86f, 0.93f) },
+                new { tex = "SignPawn",       z = 21.6f, side = -1, y = 2.22f, size = new Vector2(1.86f, 0.93f) },
+                new { tex = "SignNotice",     z = 28.2f, side = 1,  y = 2.26f, size = new Vector2(1.86f, 0.93f) },
             };
             for (var i = 0; i < plates.Length; i++)
             {

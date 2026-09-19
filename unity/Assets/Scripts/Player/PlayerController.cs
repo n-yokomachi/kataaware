@@ -61,6 +61,12 @@ namespace HalfAware
         public bool LogPressed { get; private set; }
 
         /// <summary>
+        /// ログをさかのぼる向き。1 で古い方へ、-1 で新しい方へ、0 で据え置き。
+        /// 車輪と上下の矢印の両方を見る
+        /// </summary>
+        public int LogStep { get; private set; }
+
+        /// <summary>
         /// このフレームで押された数字。1〜4。押されていなければ 0。
         /// Tab の一覧から場面を選ぶのに使う。入力の割り当ては増やさず鍵盤を直に見る
         /// </summary>
@@ -130,10 +136,31 @@ namespace HalfAware
 
         void OnDisable() => actions.FindActionMap("Player", true).Disable();
 
+        /// <summary>
+        /// ログをさかのぼる入力。専用の割り当ては作らず、車輪と上下の矢印を直に見る。
+        /// ログを開いている間しか使わないので、歩きの入力とは取り合わない
+        /// </summary>
+        static int ReadLogStep()
+        {
+            var mouse = UnityEngine.InputSystem.Mouse.current;
+            if (mouse != null)
+            {
+                var wheel = mouse.scroll.ReadValue().y;
+                if (wheel > 0.01f) return 1;      // 手前に回すと古い方へ
+                if (wheel < -0.01f) return -1;
+            }
+            var keys = UnityEngine.InputSystem.Keyboard.current;
+            if (keys == null) return 0;
+            if (keys.upArrowKey.wasPressedThisFrame || keys.pageUpKey.wasPressedThisFrame) return 1;
+            if (keys.downArrowKey.wasPressedThisFrame || keys.pageDownKey.wasPressedThisFrame) return -1;
+            return 0;
+        }
+
         void Update()
         {
             InteractPressed = false;
             LogPressed = false;
+            LogStep = ReadLogStep();
             MenuPick = 0;
             ChoiceStep = 0;
             if (CursorLocked)

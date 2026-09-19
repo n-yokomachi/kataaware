@@ -90,6 +90,10 @@ namespace HalfAware
         float frozenUntil;
         bool dazeReleased;
         bool logOpen;
+        /// <summary>ログを新しい方からいくつ飛ばして出しているか</summary>
+        int logBack;
+        /// <summary>ログを開く前に歩けたか。閉じたときに戻す</summary>
+        bool walkedBefore;
         Vector3 seatedSpot;
         Vector3 chairSpot;
         Choice choice;
@@ -194,6 +198,12 @@ namespace HalfAware
         /// <summary>次のフレームで調べる操作を 1 回起こす。E キーの代わりに、再生中の動作確認から SendMessage で呼ぶ</summary>
         public void PressInteract() => pendingInteract = true;
 
+        /// <summary>まだ古い文が残っているときの知らせ。無ければ何も出さない</summary>
+        static string Older(int rest)
+        {
+            return rest <= 0 ? "" : "\n\n…ほか " + rest + " 件";
+        }
+
         /// <summary>字幕を積む。場面固有の演出から呼ぶ。ログにも残す</summary>
         public void Say(IReadOnlyList<string> lines)
         {
@@ -207,9 +217,23 @@ namespace HalfAware
         void Update()
         {
             // ログと場面の一覧は、場面を終えたあとでも開ける
-            if (player.LogPressed) logOpen = !logOpen;
+            if (player.LogPressed)
+            {
+                logOpen = !logOpen;
+                if (logOpen)
+                {
+                    // 開いたら必ず最新から。前に見ていた位置を覚えていると戸惑う
+                    logBack = 0;
+                    walkedBefore = player.CanMove;
+                    player.CanMove = false;
+                }
+                else player.CanMove = walkedBefore;
+            }
             if (logOpen)
             {
+                // 車輪と矢印でさかのぼる。これ以上古いものが無ければ止まる
+                if (player.LogStep > 0 && log.Older(MessageLog.Page, logBack) > 0) logBack++;
+                else if (player.LogStep < 0 && logBack > 0) logBack--;
                 var jump = SceneMenu.Target(player.MenuPick, SceneManager.GetActiveScene().name);
                 if (jump != null)
                 {
@@ -218,7 +242,9 @@ namespace HalfAware
                 }
             }
             hud.SetLog(logOpen
-                ? log.Compose(HudView.LogLines) + SceneMenu.Compose(SceneManager.GetActiveScene().name)
+                ? log.Compose(MessageLog.Page, logBack)
+                  + Older(log.Older(MessageLog.Page, logBack))
+                  + SceneMenu.Compose(SceneManager.GetActiveScene().name)
                 : null);
             if (Completed) return;
             var frozen = Frozen || logOpen;

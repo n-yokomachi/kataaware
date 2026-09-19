@@ -7,7 +7,9 @@ namespace HalfAware
     /// <summary>
     /// 場面 2 の演出。看板の読み順と、チップを置いてからの売り買いを持つ。
     ///
-    /// 看板はどれから読んでも決めた順に流れる。テーブルで「はい」を選ぶと、
+    /// 看板と地の文の対応は固定。i 番目の板に i 番目の段が紐づく。
+    /// 板はシナリオの順に南から北へ並べてあるので、歩いた順に読めば書かれた順に流れる。
+    /// テーブルで「はい」を選ぶと、
     /// 暗転して露店の内側へ回り、買い手が順に来る。買い手が去るたびに暗転して、
     /// テーブルの上のチップが減る。
     ///
@@ -41,7 +43,6 @@ namespace HalfAware
         [Tooltip("買い手が浮かび上がる秒数")]
         [SerializeField] float buyerFade = 0.55f;
 
-        SignQueue signs;
         bool selling;
         /// <summary>暗転しているあいだだけ立てる。ここで場面が閉じるのを止める</summary>
         bool holding;
@@ -54,7 +55,6 @@ namespace HalfAware
                 enabled = false;
                 return;
             }
-            signs = new SignQueue(Pages());
             Show(0);
             ShowBuyer(-1);
             ShowSmokes(0);
@@ -75,21 +75,6 @@ namespace HalfAware
             if (holding) flow.Freeze(0.25f);
         }
 
-        /// <summary>文面から看板の段を順に拾う。無くなったところで終わり</summary>
-        IReadOnlyList<IReadOnlyList<string>> Pages()
-        {
-            var pages = new List<IReadOnlyList<string>>();
-            if (script == null) return pages;
-            for (var i = 0; ; i++)
-            {
-                var entry = script.Find(AlleyIds.Page(i));
-                if (entry.id == null) break;
-                pages.Add(entry.Lines);
-            }
-            if (pages.Count == 0) Debug.LogWarning("AlleyDirector: 看板の段が文面に無い", this);
-            return pages;
-        }
-
         void Examined(IInteractable item)
         {
             if (item == null) return;
@@ -98,8 +83,13 @@ namespace HalfAware
                 if (!selling) StartCoroutine(Sell());
                 return;
             }
-            // 看板はどれでも同じ列から引く
-            if (AlleyIds.IsSign(item.Id)) flow.Say(signs.Next());
+            // 板と地の文は 1 対 1。街路名の板なら街路名の段が出る
+            var which = AlleyIds.SignNumber(item.Id);
+            if (which < 0) return;
+            if (script == null) { Debug.LogWarning("AlleyDirector: 文面が未接続", this); return; }
+            var page = script.Find(AlleyIds.Page(which));
+            if (page.id == null) { Debug.LogWarning("AlleyDirector: 段が文面に無い: " + AlleyIds.Page(which), this); return; }
+            flow.Say(page.Lines);
         }
 
         /// <summary>

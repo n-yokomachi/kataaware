@@ -78,6 +78,7 @@ namespace HalfAware.EditorTools
             Stall(parent, script);
 
             Wire(root, script);
+            Echo();
             Debug.Log(string.Format("場面 2 の対象を立てた。通りの板 {0} 枚、チップ {1} 枚、煙草 {2} 個、買い手 {3} 人",
                 signs, MarketSale.Chips, Smokes.Length, Buyers.Length));
         }
@@ -131,17 +132,17 @@ namespace HalfAware.EditorTools
             }
 
             // 買い手 B が置いていく煙草。
-            // チップの列のすぐ手前、卓の真ん中へ並べる。
-            // 端に置くと「これな」で何が増えたのか分からない
+            // 並べるのではなく、人が卓に置くとおりに 3 × 2 で積む。
+            // チップの列の脇、買い手の手が届くあたり
             var smokes = Child(parent, "Smokes");
             Smokes = new GameObject[6];
             for (var i = 0; i < Smokes.Length; i++)
             {
-                var row = i / 3;
-                var slot = (i % 3 - 1) * 0.098f;
+                var col = i % 3;
+                var tier = i / 3;
                 Smokes[i] = Pack(smokes, "Smoke" + i,
-                    at + spin * new Vector3(slot, 0.822f, -0.56f + row * 0.10f),
-                    spin * Quaternion.Euler(0f, -16f + i * 11f, 0f));
+                    at + spin * new Vector3(0.40f + col * 0.062f, 0.822f + tier * 0.024f, -0.46f),
+                    spin * Quaternion.Euler(0f, 4f - col * 3f + tier * 6f, 0f));
             }
 
             Dressing(Child(parent, "Dressing"), at, spin);
@@ -365,6 +366,42 @@ namespace HalfAware.EditorTools
             go.transform.localScale = size;
             go.GetComponent<MeshRenderer>().sharedMaterial = mat;
             Object.DestroyImmediate(go.GetComponent<Collider>());
+        }
+
+        /// <summary>
+        /// 小道の響きを繋ぎ直す。
+        ///
+        /// 一度手で繋いだだけだと、シーンを組み直すたびに外れて黙る。
+        /// 実際、繋いだつもりで鳴っていなかった。組み立てのたびにここで揃える
+        /// </summary>
+        static void Echo()
+        {
+            var cover = Object.FindFirstObjectByType<RainCover>();
+            if (cover == null) { Debug.LogWarning("RainCover が見つからない。足音の響きを繋げない"); return; }
+            var steps = Object.FindFirstObjectByType<Footsteps>();
+            if (steps == null) { Debug.LogWarning("Footsteps が見つからない"); return; }
+            var so = new SerializedObject(steps);
+            var src = so.FindProperty("source").objectReferenceValue as AudioSource;
+            if (src == null) { Debug.LogWarning("足音の AudioSource が未接続"); return; }
+
+            var filter = src.GetComponent<AudioReverbFilter>();
+            if (filter == null) filter = src.gameObject.AddComponent<AudioReverbFilter>();
+            filter.reverbPreset = AudioReverbPreset.User;
+
+            var cso = new SerializedObject(cover);
+            cso.FindProperty("echo").objectReferenceValue = filter;
+            var walls = cso.FindProperty("echoWalls");
+            walls.arraySize = 1;
+            // 石に囲まれた小道だけ。ヤードの帆布の屋根は音を吸うので入れない
+            walls.GetArrayElementAtIndex(0).boundsValue = new Bounds(
+                new Vector3((BuildAlley.LaneWest + -BuildAlley.StreetHalf) * 0.5f, 1.6f, BuildAlley.LaneZ),
+                new Vector3(Mathf.Abs(BuildAlley.LaneWest + BuildAlley.StreetHalf) + 0.6f, 3.6f, BuildAlley.LaneHalf * 2f + 0.6f));
+            cso.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(cover);
+            EditorUtility.SetDirty(src.gameObject);
+            EditorUtility.SetDirty(filter);
+            var b = walls.GetArrayElementAtIndex(0).boundsValue;
+            Debug.Log("足音の響きを繋いだ。響く範囲 " + b.min.ToString("F1") + " 〜 " + b.max.ToString("F1"));
         }
 
         /// <summary>AlleyDirector を SceneFlow の隣に置いて、繋ぎ直す</summary>

@@ -25,6 +25,17 @@ namespace HalfAware
             return id != null && id.StartsWith("street.sign");
         }
 
+        /// <summary>
+        /// 看板の id から何枚目かを取る。看板でなければ -1。
+        /// 板と地の文はこの番号で 1 対 1 に紐づく
+        /// </summary>
+        public static int SignNumber(string id)
+        {
+            if (!IsSign(id)) return -1;
+            int n;
+            return int.TryParse(id.Substring("street.sign".Length), out n) ? n : -1;
+        }
+
         /// <summary>看板を読んだときに出す段か。段には調べる対象が紐づかない</summary>
         public static bool IsPage(string id)
         {

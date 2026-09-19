@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace HalfAware
 {
@@ -34,12 +35,35 @@ namespace HalfAware
             foreach (var line in newLines) Add(line);
         }
 
-        /// <summary>新しいものが下に来る形で 1 つの文字列にする。最大 max 行</summary>
-        public string Compose(int max)
+        /// <summary>1 頁に出す文の数</summary>
+        public const int Page = 8;
+
+        /// <summary>
+        /// 新しいものから並べて 1 つの文字列にする。文と文のあいだは 1 行空ける。
+        ///
+        /// back は新しい方からいくつ飛ばすか。さかのぼるのに使う。
+        /// 範囲を外れたら、あるところまでで止める
+        /// </summary>
+        public string Compose(int max, int back)
         {
             if (lines.Count == 0) return string.Empty;
-            var from = max > 0 && lines.Count > max ? lines.Count - max : 0;
-            return string.Join("\n", lines.GetRange(from, lines.Count - from).ToArray());
+            if (max <= 0) max = lines.Count;
+            back = Mathf.Clamp(back, 0, Mathf.Max(0, lines.Count - 1));
+            var newest = lines.Count - 1 - back;
+            var made = new System.Text.StringBuilder();
+            for (var i = newest; i >= 0 && newest - i < max; i--)
+            {
+                if (made.Length > 0) made.Append("\n\n");
+                made.Append(lines[i]);
+            }
+            return made.ToString();
+        }
+
+        /// <summary>さかのぼれる残りの文の数</summary>
+        public int Older(int max, int back)
+        {
+            if (max <= 0) return 0;
+            return Mathf.Max(0, lines.Count - back - max);
         }
 
         public void Clear()
