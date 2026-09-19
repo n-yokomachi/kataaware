@@ -662,7 +662,7 @@ namespace HalfAware
 
 - [ ] **Step 4: テストが通ることを確かめる**
 
-Expected: `failed: 0`。281 件。
+Expected: `failed: 0`。283 件。
 
 - [ ] **Step 5: commit**
 
@@ -826,7 +826,7 @@ namespace HalfAware
 
 - [ ] **Step 4: テストが通ることを確かめる**
 
-Expected: `failed: 0`。289 件。
+Expected: `failed: 0`。291 件。
 
 落ちたら実装を直す。**テストの期待値を実装に寄せて黙らせない。**
 
@@ -926,7 +926,7 @@ Expected: 0 件。
 
 - [ ] **Step 3: テストを走らせて崩れていないことを確かめる**
 
-Expected: `failed: 0`。289 件のまま。
+Expected: `failed: 0`。291 件のまま。
 
 - [ ] **Step 4: commit**
 
@@ -1188,7 +1188,7 @@ namespace HalfAware.Tests
 
 - [ ] **Step 4: テストが通ることを確かめる**
 
-Expected: `failed: 0`。293 件。
+Expected: `failed: 0`。295 件。
 
 - [ ] **Step 5: commit**
 
@@ -1251,18 +1251,23 @@ namespace HalfAware
 
         DriveRoute route;
         readonly BandClock clock = new BandClock();
+        /// <summary>段取りを刻んでいる帯。黒のあいだも、終わる側のまま置く</summary>
         int band = -1;
+        /// <summary>景色を並べてある帯。黒へ入った時点で次へ進む</summary>
+        int shown = -1;
         bool aboard;
 
         /// <summary>
-        /// 今の帯の値。DriveRoute は並びの問い合わせにだけ使い、秒数はここから直に読む。
+        /// i 番目の帯の値。DriveRoute は並びの問い合わせにだけ使い、秒数はここから直に読む。
         /// 秒数はオーナーが再生しながら Inspector で決めるので、
         /// Awake で写し取ると触っても効かなくなる
         /// </summary>
-        DriveBand Now
+        DriveBand At(int i)
         {
-            get { return band >= 0 && band < bands.Length ? bands[band] : new DriveBand(); }
+            return i >= 0 && i < bands.Length ? bands[i] : new DriveBand();
         }
+
+        DriveBand Now { get { return At(band); } }
 
         void Awake()
         {
@@ -1276,6 +1281,8 @@ namespace HalfAware
             world.Rolling = false;
             world.Dress(-1);
             ShowTrigger(-1);
+            band = -1;
+            shown = -1;
             flow.Examined += Examined;
         }
 
@@ -1286,22 +1293,32 @@ namespace HalfAware
 
         void Update()
         {
-            if (!aboard) return;
+            // 場面が閉じ始めたら手を引く。SceneFlow.Complete も同じ暗幕を書くので、
+            // 毎フレーム Dark を書き戻すと「続く」が明るいまま出る
+            if (!aboard || flow.Completed) return;
 
             // 独白を送り切ったか。積んだ字幕が尽きたところで余韻へ移る
             if (clock.Beat == DriveBeat.Talking && !flow.Talking) clock.Spoken();
 
-            clock.Tick(Time.deltaTime, Now);
-            hud.SetFade(clock.Dark(Now));
+            // 最後の帯には次が無い。余韻まで来たら段取りを止め、閉じるのを SceneFlow に渡す
+            if (route.IsLast(band) && clock.Beat == DriveBeat.Afterglow) { flow.Held = false; return; }
+            flow.Held = true;
 
-            // 黒へ入った一度だけ、次の帯を並べる
-            if (clock.TakeSwap()) Enter(band + 1);
+            // 黒と明けの秒数は「終わる側」の帯のもの。仮眠は帯 2 の末尾の暗転にあたる
+            var closing = Now;
+            clock.Tick(Time.deltaTime, closing);
+            hud.SetFade(clock.Dark(closing));
+
+            // 黒へ入った一度だけ、景色を先に入れ替える。段取りはまだ終わる側のまま。
+            // ここで clock.Reset を呼んではいけない。黒が 1 フレームで終わる
+            if (clock.TakeSwap()) Dress(band + 1);
 
             // 黒と明けのあいだは操作を止める。字幕は積んでいないので送りは関わらない
             if (clock.Beat == DriveBeat.Black || clock.Beat == DriveBeat.FadingIn) flow.Freeze(0.25f);
 
-            // 最後の帯の独白まで済んだら、場面を閉じてよい
-            flow.Held = !(route.IsLast(band) && clock.Beat == DriveBeat.Afterglow);
+            // 明け切ったら、段取りも次の帯へ渡す。
+            // TakeSwap より後に置く。秒数が全部 0 のとき、同じフレームで両方進む必要がある
+            if (clock.Beat == DriveBeat.Running) band = shown;
         }
 
         void Examined(IInteractable item)
@@ -1309,6 +1326,9 @@ namespace HalfAware
             if (item == null) return;
             if (item.Id == DriveIds.Door) { Board(); return; }
             if (!aboard || band < 0) return;
+            // 走っている最中にしか始めない。時計が受け付けない段で段を積むと、
+            // 独白だけ流れて帯が終わらなくなる
+            if (clock.Beat != DriveBeat.Running) return;
             // その帯のきっかけでなければ、対象そのものの文だけで終わる。
             // band を先に弾いておくのは、BandOf の「見つからない」も -1 で返るため。
             // 両方 -1 のまま比べると、どの対象を調べても通ってしまう
@@ -1334,11 +1354,17 @@ namespace HalfAware
             }
             player.CanMove = false;
             world.Rolling = true;
-            Enter(0);
+            Dress(0);
+            band = 0;
+            // 組み直すのは場面の頭でだけ。帯を跨ぐときには呼ばない
+            clock.Reset();
         }
 
-        /// <summary>which 番目の帯に入る。黒のあいだに呼ぶ</summary>
-        void Enter(int which)
+        /// <summary>
+        /// which 番目の帯の景色を並べる。段取りの時計には触らない。
+        /// 黒のあいだに呼ばれるので、入れ替えそのものは見えない
+        /// </summary>
+        void Dress(int which)
         {
             if (which < 0 || which >= route.Count)
             {
@@ -1346,13 +1372,13 @@ namespace HalfAware
                 world.Rolling = false;
                 return;
             }
-            band = which;
-            clock.Reset();
-            world.Speed = Now.speed;
-            world.Rough = Now.rough;
-            world.Dress(band);
+            shown = which;
+            var next = At(which);
+            world.Speed = next.speed;
+            world.Rough = next.rough;
+            world.Dress(which);
             world.Rewind();
-            ShowTrigger(band);
+            ShowTrigger(which);
         }
 
         /// <summary>which 番目の帯のきっかけだけ出す。-1 でどれも出さない</summary>
@@ -1365,6 +1391,13 @@ namespace HalfAware
 }
 ```
 
+**この形になっている理由**（Task 3 のレビューで一度壊れたので、崩さない）:
+
+- **`band` と `shown` を分ける。** `band` は段取りを刻んでいる帯、`shown` は景色を並べてある帯。黒のあいだだけ食い違う。黒と明けの秒数は「終わる側」の帯のものなので、`band` は明け切るまで動かさない。ここを一緒にすると、仮眠（帯 2 の末尾）が帯 3 の短い秒数で明けてしまう
+- **帯を跨ぐときに `clock.Reset()` を呼ばない。** 呼ぶと `Beat` が `Running` に戻り、`Dark()` が 0 を返して、黒が 1 フレームで終わる。明けるフェードは一度も走らない。`Reset` は `Board` の一度だけ
+- **`flow.Completed` で手を引く。** `SceneFlow.Complete()` は `hud.SetFade(1f)` と `FadeTo(1f, …)` で同じ暗幕を書く。`DriveDirector` は実行順 -5 なのでそれを毎フレーム上書きしてしまい、「続く」が明るいまま出る
+- **`TakeSwap` を `band = shown` より先に置く。** 秒数を全部 0 にされたとき、同じフレームで入れ替えと引き渡しの両方が起きる必要がある
+
 - [ ] **Step 2: コンパイルを通す**
 
 `mcpforunity://editor/state` を確かめてからコンパイル。`read_console`（types: error）。
@@ -1372,7 +1405,7 @@ Expected: 0 件。`PlayerController` に `CanMove` / `Yaw` / `Pitch` が無け�
 
 - [ ] **Step 3: テストを走らせて崩れていないことを確かめる**
 
-Expected: `failed: 0`。293 件のまま。
+Expected: `failed: 0`。295 件のまま。
 
 - [ ] **Step 4: commit**
 
@@ -1630,7 +1663,7 @@ Expected: 0 件。
 
 - [ ] **Step 5: テストを走らせる**
 
-Expected: `failed: 0`。293 件のまま。テストは足していない。
+Expected: `failed: 0`。295 件のまま。テストは足していない。
 
 - [ ] **Step 6: commit**
 
@@ -1716,7 +1749,7 @@ return "帯 " + f.GetValue(d) + " / 走行 " + w.Travelled.ToString("F1") + " / 
 - [ ] **Step 3: テストを全部走らせる**
 
 `run_tests`（EditMode）→ `get_test_job`。
-Expected: `failed: 0`。293 件。
+Expected: `failed: 0`。295 件。
 
 - [ ] **Step 4: 組み立て直して保存する**
 
