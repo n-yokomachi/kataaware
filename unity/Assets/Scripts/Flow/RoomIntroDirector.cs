@@ -102,7 +102,7 @@ namespace HalfAware
                 for (var i = 0; i < Drags; i++)
                 {
                     if (flow.Completed) yield break;
-                    var at = started + SmokeBeats.CardAt(i);
+                    var at = started + SmokeBeats.CardAt(i, Drags);
                     flow.Freeze(at - Time.time + holdSeconds + FreezeMargin);
                     while (Time.time < at) yield return null;
                     yield return Show(cards[i]);

@@ -39,6 +39,12 @@ namespace HalfAware
         /// <summary>最後に吐き終わってから独白までの間</summary>
         public const float TailSeconds = 1.40f;
 
+        /// <summary>
+        /// 最後の一服だけ、吸う前と吐く前に置く間。
+        /// ここで一拍おくと、終わりに向かっているのが伝わる
+        /// </summary>
+        public const float LastPauseSeconds = 0.85f;
+
         public static float FlameAt { get { return ClickAt + FlameAfterClick; } }
 
         /// <summary>煙が立ちはじめる時刻。火の音が鳴り終わってから</summary>
@@ -50,29 +56,40 @@ namespace HalfAware
         public static float FirstDragAt { get { return FlameAt + FirstDragAfterFlame; } }
         public static float Cycle { get { return DragSeconds + HoldSeconds + BlowSeconds + RestSeconds; } }
 
-        /// <summary>i 服目に吸い始める時刻。0 から数える</summary>
-        public static float DragAt(int i)
+        /// <summary>最後の一服か</summary>
+        public static bool IsLast(int i, int drags)
         {
-            return FirstDragAt + Cycle * Mathf.Max(0, i);
+            return drags > 0 && i == drags - 1;
         }
 
-        /// <summary>i 服目を吐き始める時刻</summary>
-        public static float BlowAt(int i)
+        /// <summary>
+        /// i 服目に吸い始める時刻。0 から数える。
+        /// 最後の一服だけ、吸い始める前に一拍おく
+        /// </summary>
+        public static float DragAt(int i, int drags)
         {
-            return DragAt(i) + DragSeconds + HoldSeconds;
+            var at = FirstDragAt + Cycle * Mathf.Max(0, i);
+            return IsLast(i, drags) ? at + LastPauseSeconds : at;
+        }
+
+        /// <summary>i 服目を吐き始める時刻。最後の一服だけ、吐く前にもう一拍おく</summary>
+        public static float BlowAt(int i, int drags)
+        {
+            var at = DragAt(i, drags) + DragSeconds + HoldSeconds;
+            return IsLast(i, drags) ? at + LastPauseSeconds : at;
         }
 
         /// <summary>i 服目のカードを出す時刻。吐き始めてすぐ暗くする</summary>
-        public static float CardAt(int i)
+        public static float CardAt(int i, int drags)
         {
-            return BlowAt(i) + CardAfterBlow;
+            return BlowAt(i, drags) + CardAfterBlow;
         }
 
         /// <summary>drags 服ぶんを吸い終えて、独白に移るまでの長さ</summary>
         public static float Total(int drags)
         {
             if (drags <= 0) return FirstDragAt;
-            return BlowAt(drags - 1) + BlowSeconds + TailSeconds;
+            return BlowAt(drags - 1, drags) + BlowSeconds + TailSeconds;
         }
     }
 }

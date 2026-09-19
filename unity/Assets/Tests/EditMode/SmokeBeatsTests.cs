@@ -4,6 +4,12 @@ namespace HalfAware.Tests
 {
     public class SmokeBeatsTests
     {
+        /// <summary>間を挟まないときの、i 服目に吸い始める時刻</summary>
+        static float Plain(int i)
+        {
+            return SmokeBeats.FirstDragAt + SmokeBeats.Cycle * i;
+        }
+
         [Test]
         public void TheLidOpensBeforeTheFlame()
         {
@@ -15,20 +21,21 @@ namespace HalfAware.Tests
         public void SheBreathesInBeforeSheBreathesOut()
         {
             for (var i = 0; i < 4; i++)
-                Assert.Less(SmokeBeats.DragAt(i), SmokeBeats.BlowAt(i));
+                Assert.Less(SmokeBeats.DragAt(i, 4), SmokeBeats.BlowAt(i, 4));
         }
 
         [Test]
         public void TheDragsComeOneCycleApart()
         {
-            Assert.AreEqual(SmokeBeats.Cycle, SmokeBeats.DragAt(2) - SmokeBeats.DragAt(1), 1e-4f);
-            Assert.AreEqual(SmokeBeats.Cycle, SmokeBeats.BlowAt(3) - SmokeBeats.BlowAt(2), 1e-4f);
+            // 最後の一服には間が入るので、途中どうしで測る
+            Assert.AreEqual(SmokeBeats.Cycle, SmokeBeats.DragAt(2, 5) - SmokeBeats.DragAt(1, 5), 1e-4f);
+            Assert.AreEqual(SmokeBeats.Cycle, SmokeBeats.BlowAt(3, 5) - SmokeBeats.BlowAt(2, 5), 1e-4f);
         }
 
         [Test]
         public void OneBlowFinishesBeforeTheNextDrag()
         {
-            Assert.LessOrEqual(SmokeBeats.BlowAt(0) + SmokeBeats.BlowSeconds, SmokeBeats.DragAt(1),
+            Assert.LessOrEqual(SmokeBeats.BlowAt(0, 3) + SmokeBeats.BlowSeconds, SmokeBeats.DragAt(1, 3),
                 "吐き終わってから次を吸う");
         }
 
@@ -37,8 +44,10 @@ namespace HalfAware.Tests
         {
             for (var i = 0; i < SmokeBeats.Drags; i++)
             {
-                Assert.AreEqual(SmokeBeats.CardAfterBlow, SmokeBeats.CardAt(i) - SmokeBeats.BlowAt(i), 1e-4f);
-                Assert.Less(SmokeBeats.CardAt(i), SmokeBeats.BlowAt(i) + SmokeBeats.BlowSeconds,
+                Assert.AreEqual(SmokeBeats.CardAfterBlow,
+                    SmokeBeats.CardAt(i, SmokeBeats.Drags) - SmokeBeats.BlowAt(i, SmokeBeats.Drags), 1e-4f);
+                Assert.Less(SmokeBeats.CardAt(i, SmokeBeats.Drags),
+                    SmokeBeats.BlowAt(i, SmokeBeats.Drags) + SmokeBeats.BlowSeconds,
                     "まだ吐いている最中に暗くなる");
             }
         }
@@ -47,7 +56,7 @@ namespace HalfAware.Tests
         public void TheWholeThingCoversEveryDrag()
         {
             var total = SmokeBeats.Total(SmokeBeats.Drags);
-            var last = SmokeBeats.BlowAt(SmokeBeats.Drags - 1) + SmokeBeats.BlowSeconds;
+            var last = SmokeBeats.BlowAt(SmokeBeats.Drags - 1, SmokeBeats.Drags) + SmokeBeats.BlowSeconds;
             Assert.Greater(total, last, "最後に吐き終わってからも間がある");
             Assert.AreEqual(SmokeBeats.TailSeconds, total - last, 1e-4f);
         }
@@ -70,6 +79,39 @@ namespace HalfAware.Tests
         {
             Assert.AreEqual(3, SmokeBeats.Drags);
         }
+
+        [Test]
+        public void OnlyTheLastOneIsTheLast()
+        {
+            Assert.IsTrue(SmokeBeats.IsLast(2, 3));
+            Assert.IsFalse(SmokeBeats.IsLast(1, 3));
+            Assert.IsFalse(SmokeBeats.IsLast(0, 0), "吸わないなら最後も無い");
+        }
+
+        [Test]
+        public void SheTakesABreathBeforeTheLastDrag()
+        {
+            Assert.AreEqual(Plain(0), SmokeBeats.DragAt(0, 3), 1e-4f, "途中の一服はそのまま");
+            Assert.AreEqual(SmokeBeats.LastPauseSeconds, SmokeBeats.DragAt(2, 3) - Plain(2), 1e-4f);
+        }
+
+        [Test]
+        public void SheHoldsItLongerBeforeTheLastBlow()
+        {
+            var held = SmokeBeats.DragSeconds + SmokeBeats.HoldSeconds;
+            Assert.AreEqual(held, SmokeBeats.BlowAt(0, 3) - SmokeBeats.DragAt(0, 3), 1e-4f, "途中はそのまま");
+            Assert.AreEqual(held + SmokeBeats.LastPauseSeconds,
+                SmokeBeats.BlowAt(2, 3) - SmokeBeats.DragAt(2, 3), 1e-4f);
+        }
+
+        [Test]
+        public void ThePausesPushTheEndingBack()
+        {
+            var plain = Plain(SmokeBeats.Drags - 1) + SmokeBeats.DragSeconds + SmokeBeats.HoldSeconds
+                + SmokeBeats.BlowSeconds + SmokeBeats.TailSeconds;
+            Assert.AreEqual(SmokeBeats.LastPauseSeconds * 2f, SmokeBeats.Total(SmokeBeats.Drags) - plain, 1e-4f);
+        }
+
         [Test]
         public void TheSmokeStartsOnlyAfterTheFlameHasSounded()
         {

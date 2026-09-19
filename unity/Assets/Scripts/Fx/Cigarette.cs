@@ -75,12 +75,12 @@ namespace HalfAware
                 smoked = true;
                 if (puffs != null) puffs.Begin(SmokeBeats.Total(drags));
             }
-            if (nextDrag < drags && elapsed >= SmokeBeats.DragAt(nextDrag))
+            if (nextDrag < drags && elapsed >= SmokeBeats.DragAt(nextDrag, drags))
             {
                 nextDrag++;
                 Play(drag);
             }
-            if (nextBlow < drags && elapsed >= SmokeBeats.BlowAt(nextBlow))
+            if (nextBlow < drags && elapsed >= SmokeBeats.BlowAt(nextBlow, drags))
             {
                 var i = nextBlow;
                 nextBlow++;
