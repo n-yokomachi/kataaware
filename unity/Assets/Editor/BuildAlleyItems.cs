@@ -216,12 +216,81 @@ namespace HalfAware.EditorTools
                 Part(chip.transform, "Label", new Vector3(-0.0085f, 0.014f, 0f), new Vector3(0.002f, 0.010f, 0.026f), LabelMat());
             }
             // 数えに使う帳面と、重しのボルト
-            var pad = new GameObject("Ledger");
-            pad.transform.SetParent(parent, false);
-            pad.transform.position = at + spin * new Vector3(0.58f, 0.812f, -0.30f);
-            pad.transform.rotation = spin * Quaternion.Euler(0f, 14f, 0f);
-            Part(pad.transform, "Paper", new Vector3(0f, 0.004f, 0f), new Vector3(0.150f, 0.008f, 0.205f), LabelMat());
-            Part(pad.transform, "Weight", new Vector3(0.02f, 0.014f, -0.04f), new Vector3(0.036f, 0.020f, 0.036f), BrassMat());
+            var pad = Prop(parent, "Ledger", at, spin, new Vector3(0.62f, 0.812f, -0.62f), 14f);
+            Part(pad, "Paper", new Vector3(0f, 0.004f, 0f), new Vector3(0.150f, 0.008f, 0.205f), LabelMat());
+            Part(pad, "Weight", new Vector3(0.02f, 0.014f, -0.04f), new Vector3(0.036f, 0.020f, 0.036f), BrassMat());
+
+            // チップを読む端末。小さな画面が点いている
+            var reader = Prop(parent, "Reader", at, spin, new Vector3(-0.06f, 0.812f, -0.06f), -8f);
+            Part(reader, "Body", new Vector3(0f, 0.022f, 0f), new Vector3(0.215f, 0.044f, 0.145f), CaseMat());
+            Part(reader, "Screen", new Vector3(0f, 0.045f, -0.012f), new Vector3(0.150f, 0.003f, 0.082f), ScreenMat());
+            Part(reader, "Slot", new Vector3(0f, 0.030f, 0.075f), new Vector3(0.062f, 0.014f, 0.006f), ChipMat());
+            // 卓の向こうへ垂れている線
+            for (var i = 0; i < 3; i++)
+                Part(reader, "Cable" + i, new Vector3(-0.11f - i * 0.075f, 0.010f, 0.03f + i * 0.055f),
+                    new Vector3(0.085f, 0.014f, 0.014f), ChipMat());
+
+            // 銀貨を放る皿
+            var dish = Prop(parent, "CoinDish", at, spin, new Vector3(0.30f, 0.812f, -0.03f), 22f);
+            Part(dish, "Floor", new Vector3(0f, 0.005f, 0f), new Vector3(0.130f, 0.010f, 0.130f), BrassMat());
+            for (var i = -1; i <= 1; i += 2)
+            {
+                Part(dish, "Rim" + i, new Vector3(i * 0.062f, 0.014f, 0f), new Vector3(0.010f, 0.018f, 0.130f), BrassMat());
+                Part(dish, "Edge" + i, new Vector3(0f, 0.014f, i * 0.062f), new Vector3(0.130f, 0.018f, 0.010f), BrassMat());
+            }
+            for (var i = 0; i < 5; i++)
+                Part(dish, "Coin" + i, new Vector3((i % 3 - 1) * 0.026f, 0.012f + i * 0.003f, (i / 3) * 0.028f - 0.014f),
+                    new Vector3(0.022f, 0.004f, 0.022f), BrassMat());
+
+            // 冷めた茶の入ったマグ
+            var mug = Prop(parent, "Mug", at, spin, new Vector3(0.92f, 0.812f, -0.18f), 0f);
+            Part(mug, "Body", new Vector3(0f, 0.042f, 0f), new Vector3(0.072f, 0.084f, 0.072f), CaseMat());
+            Part(mug, "Handle", new Vector3(0.046f, 0.050f, 0f), new Vector3(0.022f, 0.034f, 0.012f), CaseMat());
+
+            // 予備の箱を重ねてある
+            var stack = Prop(parent, "Stack", at, spin, new Vector3(-0.92f, 0.812f, -0.10f), -17f);
+            for (var i = 0; i < 3; i++)
+                Part(stack, "Case" + i, new Vector3(i * 0.008f, 0.014f + i * 0.026f, i * 0.006f),
+                    new Vector3(0.225f, 0.026f, 0.140f), CaseMat());
+
+            // 金をしまう缶。蓋は半ば開いている
+            var tin = Prop(parent, "Tin", at, spin, new Vector3(-0.62f, 0.812f, 0.02f), 9f);
+            Part(tin, "Body", new Vector3(0f, 0.030f, 0f), new Vector3(0.155f, 0.060f, 0.105f), BrassMat());
+            Part(tin, "Lid", new Vector3(0.03f, 0.063f, -0.01f), new Vector3(0.160f, 0.008f, 0.110f), CaseMat());
+
+            // 拭い布と、投げ出した工具
+            var rag = Prop(parent, "Rag", at, spin, new Vector3(0.66f, 0.812f, 0.04f), -31f);
+            Part(rag, "Cloth", new Vector3(0f, 0.008f, 0f), new Vector3(0.185f, 0.016f, 0.125f), TarpMat());
+            Part(rag, "Fold", new Vector3(0.03f, 0.020f, 0.02f), new Vector3(0.105f, 0.014f, 0.070f), TarpMat());
+            var tool = Prop(parent, "Tool", at, spin, new Vector3(0.06f, 0.812f, -0.72f), 66f);
+            Part(tool, "Grip", new Vector3(0f, 0.010f, 0f), new Vector3(0.070f, 0.020f, 0.020f), ChipMat());
+            Part(tool, "Shaft", new Vector3(0.068f, 0.008f, 0f), new Vector3(0.075f, 0.007f, 0.007f), BrassMat());
+        }
+
+        /// <summary>小物ひとつの入れ物を作る。位置は露店から見た局所で渡す</summary>
+        static Transform Prop(Transform parent, string name, Vector3 at, Quaternion spin, Vector3 local, float turn)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.position = at + spin * local;
+            go.transform.rotation = spin * Quaternion.Euler(0f, turn, 0f);
+            return go.transform;
+        }
+
+        /// <summary>端末の画面。卓の上で唯一、自分で光るもの</summary>
+        static Material ScreenMat()
+        {
+            var m = Solid("ChipScreen", new Color(0.075f, 0.130f, 0.120f), 0.55f, 0f);
+            m.SetColor("_EmissionColor", new Color(0.090f, 0.520f, 0.430f));
+            m.EnableKeyword("_EMISSION");
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// <summary>拭い布と敷布。市の帆布と同じ色合い</summary>
+        static Material TarpMat()
+        {
+            return Solid("StallCloth", new Color(0.130f, 0.118f, 0.105f), 0.16f, 0f);
         }
 
         /// <summary>チップの箱。使い込んだ鉄</summary>
