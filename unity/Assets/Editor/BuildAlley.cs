@@ -7,41 +7,45 @@ namespace HalfAware.EditorTools
     /// <summary>
     /// 場面 2 の路地裏を組む。グレビル・ストリートの入口から北へ歩き、
     /// 途中の小路を西へ折れ、ブリーディング・ハート・ヤードへ入る一本道。
-    /// 迷う余地は作らない。形はすべてここに数値で置いてあり、作り直しても同じ物が出る
+    /// 迷う余地は作らない。
+    ///
+    /// 面は素材ごとに 1 枚の mesh へ焼く（<see cref="Bank"/>）。箱を並べる作りだと
+    /// 絵が寸法に合わせて伸びてしまい、壁が書き割りに見える。
+    /// 当たり判定は見た目と分け、見えない箱で通りの輪郭だけ囲う
     /// </summary>
     public static class BuildAlley
     {
         public const string Materials = "Assets/Materials/Alley/";
-        public const string Generated = "Assets/Models/generated/";
+        public const string Generated = "Assets/Models/generated/alley/";
 
         // ---- 一本道の寸法。メートル ----------------------------------------
 
-        /// <summary>通りの半幅。両側の建物はここに面が来る</summary>
-        public const float StreetHalf = 4.5f;
-        /// <summary>通りの手前の端。ここより南は建物で塞ぐ</summary>
-        public const float StreetSouth = -5f;
-        /// <summary>通りの奥の端。ここも塞いで、小路へ折れるほかない形にする</summary>
-        public const float StreetNorth = 40f;
+        /// <summary>車道の半幅</summary>
+        public const float RoadHalf = 3.2f;
+        /// <summary>歩道を含めた通りの半幅。建物の面はここに来る</summary>
+        public const float StreetHalf = 4.9f;
+        public const float StreetSouth = -6f;
+        public const float StreetNorth = 42f;
 
-        /// <summary>小路の中心の z</summary>
         public const float LaneZ = 35f;
-        /// <summary>小路の半幅</summary>
         public const float LaneHalf = 1.6f;
-        /// <summary>小路の西の端。ここからヤード</summary>
         public const float LaneWest = -16f;
 
         public const float YardWest = -32f;
         public const float YardSouth = 26f;
         public const float YardNorth = 44f;
 
-        /// <summary>建物の高さ。空はほとんど見えない</summary>
-        public const float WallHeight = 14f;
-        /// <summary>壁の厚み</summary>
-        public const float WallThick = 1.2f;
+        public const float WallHeight = 16f;
+        public const float WallThick = 1.4f;
 
-        /// <summary>歩道の幅と高さ</summary>
-        public const float KerbWidth = 1.1f;
-        public const float KerbRise = 0.14f;
+        /// <summary>歩道の高さ</summary>
+        public const float KerbRise = 0.16f;
+
+        /// <summary>1 階の高さ。2 階から上はこれ</summary>
+        public const float GroundFloor = 3.8f;
+        public const float UpperFloor = 2.9f;
+
+        // ---- 組み立て ------------------------------------------------------
 
         [MenuItem("HalfAware/Build the alley")]
         public static void BuildMenu()
@@ -51,130 +55,595 @@ namespace HalfAware.EditorTools
                 Debug.LogError("再生中は組み直さない。止めてからもう一度");
                 return;
             }
+            if (!AssetDatabase.IsValidFolder("Assets/Models/generated/alley"))
+                AssetDatabase.CreateFolder("Assets/Models/generated", "alley");
+
             var root = Root("Alley");
-            Street(Child(root, "Street"));
-            Lane(Child(root, "Lane"));
-            Yard(Child(root, "Yard"));
+            // 前の作りで残っている束を落とす
+            Prune(root, new[] { "Shell", "Fixtures", "Lamps", "Puddles", "Neon", "Market", "Boards", "Bounds" });
+            Shell(Child(root, "Shell"));
+            Fixtures(Child(root, "Fixtures"));
+            Lamps(Child(root, "Lamps"));
+            Puddles(Child(root, "Puddles"));
             Neon(Child(root, "Neon"));
             Market(Child(root, "Market"));
             Boards(Child(root, "Boards"));
+            Bounds(Child(root, "Bounds"));
             Rain();
             var temp = GameObject.Find("TempGround");
             if (temp != null) Object.DestroyImmediate(temp);
             Place(root);
             Selection.activeGameObject = root.gameObject;
             Mark(root.gameObject);
+            AssetDatabase.SaveAssets();
+            Debug.Log("路地裏を組み直した");
         }
 
-        // ---- 通り ----------------------------------------------------------
+        // ---- 皮 ------------------------------------------------------------
 
         /// <summary>
-        /// 通り。路面と歩道を敷き、両側に建物の面を立てる。
-        /// 面は 1 枚にせず、奥行きと高さを振った塊を並べる。同じ壁が続くと歩いた実感が出ない
+        /// 通り・小路・ヤードの面をまとめて張る。素材ごとに溜めてから焼くので、
+        /// 出来上がるのは素材の数だけの mesh になる
         /// </summary>
-        static void Street(Transform parent)
+        static void Shell(Transform parent)
         {
             Clear(parent);
-            var length = StreetNorth - StreetSouth;
-            var mid = (StreetNorth + StreetSouth) * 0.5f;
-            Box(parent, "Road", new Vector3(0f, -0.05f, mid), new Vector3(StreetHalf * 2f, 0.1f, length), "Asphalt");
-            Kerb(parent, "Kerb.W", -StreetHalf + KerbWidth * 0.5f, StreetSouth, StreetNorth);
-            Kerb(parent, "Kerb.E", StreetHalf - KerbWidth * 0.5f, StreetSouth, StreetNorth);
+            var road = new Bank { Texel = 0.22f };
+            var paving = new Bank { Texel = 0.42f };
+            var brick = new Bank { Texel = 0.55f };
+            var stone = new Bank { Texel = 0.40f };
+            var metal = new Bank { Texel = 0.60f };
+            var glass = new Bank { Texel = 0.50f };
+            var warm = new Bank { Texel = 0.50f };
+            var cold = new Bank { Texel = 0.50f };
 
-            // 西側。小路の口だけ空ける
-            Fronts(parent, "Front.W", -StreetHalf - WallThick * 0.5f, StreetSouth, LaneZ - LaneHalf, -1);
-            Fronts(parent, "Front.W2", -StreetHalf - WallThick * 0.5f, LaneZ + LaneHalf, StreetNorth, -1);
-            Fronts(parent, "Front.E", StreetHalf + WallThick * 0.5f, StreetSouth, StreetNorth, 1);
-
-            // 行き止まり。北へ抜けさせない
-            Box(parent, "Head", new Vector3(0f, WallHeight * 0.5f, StreetNorth + WallThick * 0.5f),
-                new Vector3(StreetHalf * 2f + WallThick * 2f, WallHeight, WallThick), "Brick");
-            // 振り返ったときの背。ここから来たことにする
-            Box(parent, "Back", new Vector3(0f, WallHeight * 0.5f, StreetSouth - WallThick * 0.5f),
-                new Vector3(StreetHalf * 2f + WallThick * 2f, WallHeight, WallThick), "Brick");
-        }
-
-        /// <summary>歩道。縁石ぶんだけ持ち上げた細長い箱</summary>
-        static void Kerb(Transform parent, string name, float x, float from, float to)
-        {
-            var mid = (from + to) * 0.5f;
-            Box(parent, name, new Vector3(x, KerbRise * 0.5f, mid),
-                new Vector3(KerbWidth, KerbRise, to - from), "Kerb");
-        }
-
-        /// <summary>
-        /// 建物の面を、奥行きと高さを振りながら並べる。
-        /// side は通りのどちら側か。1 が東、-1 が西
-        /// </summary>
-        static void Fronts(Transform parent, string name, float x, float from, float to, int side)
-        {
-            var group = Child(parent, name);
-            var rng = new System.Random(name.GetHashCode());
-            var z = from;
-            var i = 0;
-            while (z < to - 0.01f)
+            Ground(road, paving, stone);
+            for (var s = 0; s < 2; s++)
             {
-                var span = Mathf.Min((float)(5.5 + rng.NextDouble() * 4.5), to - z);
-                var height = (float)(WallHeight * (0.72 + rng.NextDouble() * 0.28));
-                var depth = (float)(WallThick * (0.8 + rng.NextDouble() * 0.9));
-                var mid = z + span * 0.5f;
-                Box(group, "Block" + i, new Vector3(x + side * (depth - WallThick) * 0.5f, height * 0.5f, mid),
-                    new Vector3(depth, height, span), i % 2 == 0 ? "Brick" : "Facade");
-                // 1 階の張り出し。庇と窓の下枠のぶん、面に段を作る
-                Box(group, "Sill" + i, new Vector3(x - side * 0.35f, 1.9f, mid),
-                    new Vector3(0.7f, 0.35f, span * 0.92f), "Ledge");
-                z += span;
-                i++;
+                var side = s == 0 ? -1 : 1;
+                Facades(brick, stone, metal, glass, warm, cold, side);
+            }
+            LaneShell(brick, stone, paving);
+            YardShell(brick, stone, paving);
+
+            road.Emit(parent, "Road", Mat("Asphalt"), false, Generated);
+            paving.Emit(parent, "Paving", Mat("Cobble"), false, Generated);
+            brick.Emit(parent, "Brick", Mat("Brick"), false, Generated);
+            stone.Emit(parent, "Stone", Mat("Concrete"), false, Generated);
+            metal.Emit(parent, "MetalShell", Mat("Metal"), false, Generated);
+            glass.Emit(parent, "Glass", Mat("Glass"), false, Generated);
+            warm.Emit(parent, "WindowWarm", GlowMat(new Color(1.00f, 0.74f, 0.42f), 1.35f), false, Generated);
+            cold.Emit(parent, "WindowCold", GlowMat(new Color(0.48f, 0.68f, 1.00f), 1.15f), false, Generated);
+        }
+
+        /// <summary>路面と歩道。車道は縁石ぶん低くして、排水口を等間隔に落とす</summary>
+        static void Ground(Bank road, Bank paving, Bank stone)
+        {
+            road.FaceY(0f, -RoadHalf, RoadHalf, StreetSouth, StreetNorth, 1);
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1 : 1;
+                var inner = side * RoadHalf;
+                var outer = side * StreetHalf;
+                var x0 = Mathf.Min(inner, outer);
+                var x1 = Mathf.Max(inner, outer);
+                paving.FaceY(KerbRise, x0, x1, StreetSouth, StreetNorth, 1);
+                stone.FaceX(inner, StreetSouth, StreetNorth, 0f, KerbRise, -side);
+                for (var z = StreetSouth + 5f; z < StreetNorth - 3f; z += 9f)
+                    stone.Box(new Vector3(inner - side * 0.26f, 0.015f, z), new Vector3(0.44f, 0.03f, 0.7f));
+            }
+            // 車道の書き込み。真ん中の破線と、蓋と、点検口
+            var rng = new System.Random(2400);
+            for (var z = StreetSouth + 2f; z < StreetNorth - 2f; z += 3.2f)
+                stone.Box(new Vector3(0f, 0.012f, z), new Vector3(0.16f, 0.024f, 1.5f));
+            for (var z = StreetSouth + 7f; z < StreetNorth - 5f; z += (float)(10.0 + rng.NextDouble() * 6.0))
+            {
+                var x = (float)(rng.NextDouble() * 2.0 - 1.0) * (RoadHalf - 1.0f);
+                stone.Box(new Vector3(x, 0.014f, z), new Vector3(0.78f, 0.028f, 0.78f));
+                stone.Box(new Vector3(x, 0.026f, z), new Vector3(0.58f, 0.026f, 0.58f));
             }
         }
 
-        // ---- 小路 ----------------------------------------------------------
-
-        /// <summary>通りから西へ折れる小路。人ひとりぶんの幅で、両側は高い壁</summary>
-        static void Lane(Transform parent)
+        /// <summary>建物の割り</summary>
+        struct Unit
         {
-            Clear(parent);
-            var length = -StreetHalf - LaneWest;
-            var mid = (LaneWest - StreetHalf) * 0.5f;
-            Box(parent, "Road", new Vector3(mid, -0.05f, LaneZ), new Vector3(length, 0.1f, LaneHalf * 2f), "Asphalt");
-            Box(parent, "Wall.S", new Vector3(mid, WallHeight * 0.5f, LaneZ - LaneHalf - WallThick * 0.5f),
-                new Vector3(length, WallHeight, WallThick), "Brick");
-            Box(parent, "Wall.N", new Vector3(mid, WallHeight * 0.5f, LaneZ + LaneHalf + WallThick * 0.5f),
-                new Vector3(length, WallHeight, WallThick), "Brick");
-            // 小路の天井。空を切って、抜けた先のヤードを明るく見せる
-            Box(parent, "Arch", new Vector3(mid + length * 0.30f, 4.6f, LaneZ),
-                new Vector3(length * 0.40f, 0.6f, LaneHalf * 2f + WallThick * 2f), "Brick");
+            public float z0;
+            public float z1;
+            public float height;
+            public int ground;
+            public int floors;
         }
 
-        // ---- ヤード --------------------------------------------------------
+        static List<Unit> Units(float from, float to, System.Random rng)
+        {
+            var list = new List<Unit>();
+            var z = from;
+            while (z < to - 0.5f)
+            {
+                var span = Mathf.Min((float)(6.0 + rng.NextDouble() * 4.0), to - z);
+                if (to - (z + span) < 3.5f) span = to - z;
+                var u = new Unit();
+                u.z0 = z;
+                u.z1 = z + span;
+                u.floors = 3 + rng.Next(3);
+                u.height = GroundFloor + UpperFloor * u.floors;
+                u.ground = rng.Next(3);
+                list.Add(u);
+                z += span;
+            }
+            return list;
+        }
 
         /// <summary>
-        /// ブリーディング・ハート・ヤード。四方を建物に囲まれた中庭で、
-        /// 入口は小路の口ひとつだけ。奥（西）の端に自分の露店を置く
+        /// 片側の建物の面。1 階は店先かシャッターか戸口、2 階から上は窓を並べる。
+        /// 面を平らのままにせず、付柱・胴蛇腹・窓台・軒で段を作る
         /// </summary>
-        static void Yard(Transform parent)
+        static void Facades(Bank brick, Bank stone, Bank metal, Bank glass, Bank warm, Bank cold, int side)
         {
-            Clear(parent);
-            var width = LaneWest - YardWest;
-            var depth = YardNorth - YardSouth;
-            var midX = (LaneWest + YardWest) * 0.5f;
-            var midZ = (YardNorth + YardSouth) * 0.5f;
-            Box(parent, "Ground", new Vector3(midX, -0.05f, midZ), new Vector3(width, 0.1f, depth), "Cobble");
-            Box(parent, "Wall.W", new Vector3(YardWest - WallThick * 0.5f, WallHeight * 0.5f, midZ),
-                new Vector3(WallThick, WallHeight, depth + WallThick * 2f), "Brick");
-            Box(parent, "Wall.S", new Vector3(midX, WallHeight * 0.5f, YardSouth - WallThick * 0.5f),
-                new Vector3(width, WallHeight, WallThick), "Brick");
-            Box(parent, "Wall.N", new Vector3(midX, WallHeight * 0.5f, YardNorth + WallThick * 0.5f),
-                new Vector3(width, WallHeight, WallThick), "Brick");
-            // 東の壁は小路の口ぶんだけ空ける
-            var southSpan = (LaneZ - LaneHalf) - YardSouth;
-            Box(parent, "Wall.E.S", new Vector3(LaneWest + WallThick * 0.5f, WallHeight * 0.5f, YardSouth + southSpan * 0.5f),
-                new Vector3(WallThick, WallHeight, southSpan), "Brick");
-            var northSpan = YardNorth - (LaneZ + LaneHalf);
-            Box(parent, "Wall.E.N", new Vector3(LaneWest + WallThick * 0.5f, WallHeight * 0.5f, YardNorth - northSpan * 0.5f),
-                new Vector3(WallThick, WallHeight, northSpan), "Brick");
+            var wx = side * StreetHalf;
+            var inward = -side;
+            var rng = new System.Random(side > 0 ? 8801 : 8802);
+            var runs = new List<Vector2>();
+            if (side < 0)
+            {
+                runs.Add(new Vector2(StreetSouth, LaneZ - LaneHalf));
+                runs.Add(new Vector2(LaneZ + LaneHalf, StreetNorth));
+            }
+            else
+            {
+                runs.Add(new Vector2(StreetSouth, StreetNorth));
+            }
+            foreach (var run in runs)
+                foreach (var u in Units(run.x, run.y, rng))
+                    Facade(brick, stone, metal, glass, warm, cold, side, wx, inward, u, rng);
         }
 
+        static void Facade(Bank brick, Bank stone, Bank metal, Bank glass, Bank warm, Bank cold,
+            int side, float wx, int inward, Unit u, System.Random rng)
+        {
+            var pil = 0.34f;
+            var z0 = u.z0 + pil;
+            var z1 = u.z1 - pil;
+            var holes = new List<Vector4>();
+
+            var shopY0 = 0.42f;
+            var shopY1 = GroundFloor - 0.75f;
+            if (u.ground == 0)
+            {
+                holes.Add(new Vector4(z0 + 0.35f, z1 - 1.55f, shopY0, shopY1));
+                holes.Add(new Vector4(z1 - 1.25f, z1 - 0.35f, 0f, shopY1 - 0.15f));
+            }
+            else if (u.ground == 2)
+            {
+                var c = (z0 + z1) * 0.5f;
+                holes.Add(new Vector4(c - 0.55f, c + 0.55f, 0f, 2.25f));
+            }
+
+            var openings = new List<Vector4>();
+            for (var f = 0; f < u.floors; f++)
+            {
+                var fy = GroundFloor + UpperFloor * f;
+                var sill = fy + 0.80f;
+                var head = sill + 1.55f;
+                var span = z1 - z0;
+                var count = Mathf.Max(1, Mathf.FloorToInt(span / 2.05f));
+                var pitch = span / count;
+                for (var i = 0; i < count; i++)
+                {
+                    var c = z0 + pitch * (i + 0.5f);
+                    var w = Mathf.Min(1.10f, pitch * 0.55f);
+                    openings.Add(new Vector4(c - w * 0.5f, c + w * 0.5f, sill, head));
+                }
+            }
+            holes.AddRange(openings);
+
+            brick.FaceXHoles(wx, u.z0, u.z1, 0f, u.height, inward, holes);
+
+            var depth = 0.13f;
+            var back = wx + side * depth;   // 掘り込みは建物の側へ
+            foreach (var o in openings)
+            {
+                Reveal(stone, wx, back, o);
+                var lit = rng.NextDouble();
+                var bank = lit < 0.42 ? warm : lit < 0.60 ? cold : glass;
+                bank.FaceX(back, o.x, o.y, o.z, o.w, inward);
+                stone.Box(new Vector3(wx + inward * 0.06f, o.z - 0.07f, (o.x + o.y) * 0.5f),
+                    new Vector3(0.13f, 0.09f, o.y - o.x + 0.24f));
+                stone.Box(new Vector3(wx + inward * 0.04f, o.w + 0.09f, (o.x + o.y) * 0.5f),
+                    new Vector3(0.10f, 0.12f, o.y - o.x + 0.30f));
+            }
+
+            if (u.ground == 0) Shopfront(stone, metal, warm, wx, back, z0, z1, shopY0, shopY1, inward);
+            else if (u.ground == 1) Shutter(metal, wx, z0, z1, inward);
+            else Doorway(stone, metal, wx, back, holes[0], inward);
+
+            stone.Box(new Vector3(wx + inward * 0.11f, u.height * 0.5f, u.z0 + pil * 0.5f),
+                new Vector3(0.22f, u.height, pil));
+            stone.Box(new Vector3(wx + inward * 0.11f, u.height * 0.5f, u.z1 - pil * 0.5f),
+                new Vector3(0.22f, u.height, pil));
+            for (var f = 0; f <= u.floors; f++)
+            {
+                var y = f == 0 ? GroundFloor - 0.30f : GroundFloor + UpperFloor * f - 0.24f;
+                if (y > u.height - 0.4f) break;
+                stone.Box(new Vector3(wx + inward * 0.13f, y, (u.z0 + u.z1) * 0.5f),
+                    new Vector3(0.26f, f == 0 ? 0.30f : 0.16f, u.z1 - u.z0));
+            }
+            stone.Box(new Vector3(wx + inward * 0.22f, u.height + 0.18f, (u.z0 + u.z1) * 0.5f),
+                new Vector3(0.44f, 0.36f, u.z1 - u.z0 + 0.16f));
+            brick.Box(new Vector3(wx + inward * 0.04f, u.height + 0.70f, (u.z0 + u.z1) * 0.5f),
+                new Vector3(0.28f, 0.68f, u.z1 - u.z0));
+        }
+
+        /// <summary>窓の抜けの内側。四方の返しを張って、壁に厚みを持たせる</summary>
+        static void Reveal(Bank bank, float wx, float back, Vector4 o)
+        {
+            var x0 = Mathf.Min(wx, back);
+            var x1 = Mathf.Max(wx, back);
+            bank.FaceZ(o.x, x0, x1, o.z, o.w, 1);
+            bank.FaceZ(o.y, x0, x1, o.z, o.w, -1);
+            bank.FaceY(o.w, x0, x1, o.x, o.y, -1);
+            bank.FaceY(o.z, x0, x1, o.x, o.y, 1);
+        }
+
+        /// <summary>店先。大きな硝子の奥に灯りを置き、上に庇を掛ける</summary>
+        static void Shopfront(Bank stone, Bank metal, Bank warm, float wx, float back,
+            float z0, float z1, float y0, float y1, int inward)
+        {
+            var gz0 = z0 + 0.35f;
+            var gz1 = z1 - 1.55f;
+            Reveal(stone, wx, back, new Vector4(gz0, gz1, y0, y1));
+            warm.FaceX(back, gz0, gz1, y0, y1, inward);
+            for (var z = gz0 + 1.2f; z < gz1 - 0.2f; z += 1.2f)
+                metal.Box(new Vector3(wx + inward * 0.12f, (y0 + y1) * 0.5f, z), new Vector3(0.12f, y1 - y0, 0.07f));
+            metal.Box(new Vector3(wx + inward * 0.12f, y0, (gz0 + gz1) * 0.5f), new Vector3(0.16f, 0.12f, gz1 - gz0));
+            var lip = 0.85f;
+            metal.Box(new Vector3(wx + inward * (lip * 0.5f), y1 + 0.42f, (z0 + z1) * 0.5f),
+                new Vector3(lip, 0.10f, z1 - z0 - 0.2f));
+            metal.Box(new Vector3(wx + inward * lip, y1 + 0.20f, (z0 + z1) * 0.5f),
+                new Vector3(0.08f, 0.44f, z1 - z0 - 0.2f));
+            stone.Box(new Vector3(wx + inward * 0.30f, 0.09f, z1 - 0.8f), new Vector3(0.6f, 0.18f, 1.5f));
+        }
+
+        /// <summary>下ろしたシャッター。横の筋を刻んで波板にする</summary>
+        static void Shutter(Bank metal, float wx, float z0, float z1, int inward)
+        {
+            var y1 = GroundFloor - 0.75f;
+            metal.FaceX(wx + inward * 0.10f, z0 + 0.2f, z1 - 0.2f, 0.06f, y1, inward);
+            for (var y = 0.20f; y < y1; y += 0.22f)
+                metal.Box(new Vector3(wx + inward * 0.14f, y, (z0 + z1) * 0.5f), new Vector3(0.09f, 0.06f, z1 - z0 - 0.4f));
+            metal.Box(new Vector3(wx + inward * 0.16f, y1 + 0.12f, (z0 + z1) * 0.5f), new Vector3(0.22f, 0.24f, z1 - z0 - 0.3f));
+        }
+
+        /// <summary>戸口。奥まった扉と把手</summary>
+        static void Doorway(Bank stone, Bank metal, float wx, float back, Vector4 o, int inward)
+        {
+            Reveal(stone, wx, back, o);
+            metal.FaceX(back, o.x, o.y, o.z, o.w, inward);
+            metal.Box(new Vector3(back + inward * 0.06f, 1.05f, o.y - 0.14f), new Vector3(0.09f, 0.28f, 0.05f));
+            stone.Box(new Vector3(wx + inward * 0.08f, o.w + 0.14f, (o.x + o.y) * 0.5f),
+                new Vector3(0.18f, 0.18f, o.y - o.x + 0.4f));
+        }
+
+        /// <summary>小路。両側は煉瓦で、上に渡した梁と迫り出した 2 階で空を切る</summary>
+        static void LaneShell(Bank brick, Bank stone, Bank paving)
+        {
+            var west = LaneWest;
+            var east = -StreetHalf;
+            paving.FaceY(0.02f, west, east, LaneZ - LaneHalf, LaneZ + LaneHalf, 1);
+            brick.FaceZ(LaneZ - LaneHalf, west, east, 0f, WallHeight, 1);
+            brick.FaceZ(LaneZ + LaneHalf, west, east, 0f, WallHeight, -1);
+            for (var i = 0; i < 4; i++)
+            {
+                var x = west + (east - west) * (0.18f + i * 0.2f);
+                stone.Box(new Vector3(x, 4.4f, LaneZ), new Vector3(0.42f, 0.5f, LaneHalf * 2f + 0.2f));
+            }
+            brick.Box(new Vector3((west + east) * 0.5f, 6.6f, LaneZ), new Vector3(east - west, 4.2f, LaneHalf * 2f + 0.3f));
+        }
+
+        /// <summary>ヤード。四方を囲む面と、敷石と、見下ろす窓</summary>
+        static void YardShell(Bank brick, Bank stone, Bank paving)
+        {
+            paving.FaceY(0.02f, YardWest, LaneWest, YardSouth, YardNorth, 1);
+            brick.FaceX(YardWest, YardSouth, YardNorth, 0f, WallHeight, 1);
+            brick.FaceZ(YardSouth, YardWest, LaneWest, 0f, WallHeight, 1);
+            brick.FaceZ(YardNorth, YardWest, LaneWest, 0f, WallHeight, -1);
+            brick.FaceX(LaneWest, YardSouth, LaneZ - LaneHalf, 0f, WallHeight, -1);
+            brick.FaceX(LaneWest, LaneZ + LaneHalf, YardNorth, 0f, WallHeight, -1);
+            var rng = new System.Random(5150);
+            for (var f = 0; f < 4; f++)
+            {
+                var y = 3.2f + f * 2.8f;
+                for (var z = YardSouth + 2f; z < YardNorth - 1.5f; z += 2.4f)
+                {
+                    if (rng.NextDouble() < 0.45) continue;
+                    stone.Box(new Vector3(YardWest + 0.12f, y, z), new Vector3(0.24f, 1.3f, 0.95f));
+                }
+            }
+            for (var f = 0; f < 3; f++)
+            {
+                var y = 3.4f + f * 2.8f;
+                for (var x = YardWest + 2f; x < LaneWest - 1.5f; x += 2.6f)
+                {
+                    if (rng.NextDouble() < 0.5) continue;
+                    stone.Box(new Vector3(x, y, YardSouth + 0.12f), new Vector3(0.95f, 1.3f, 0.24f));
+                    if (rng.NextDouble() < 0.5)
+                        stone.Box(new Vector3(x, y, YardNorth - 0.12f), new Vector3(0.95f, 1.3f, 0.24f));
+                }
+            }
+        }
+
+        // ---- 付属物 --------------------------------------------------------
+
+        /// <summary>
+        /// 面に付く物。樋、非常階段、室外機、そして通りを渡る電線。
+        /// これが無いと、いくら窓を彫っても書き割りのままになる
+        /// </summary>
+        static void Fixtures(Transform parent)
+        {
+            Clear(parent);
+            var metal = new Bank { Texel = 0.7f };
+            var rng = new System.Random(3300);
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1 : 1;
+                var wx = side * StreetHalf;
+                var inward = -side;
+                for (var z = StreetSouth + 3f; z < StreetNorth - 2f; z += (float)(4.0 + rng.NextDouble() * 3.0))
+                {
+                    if (side < 0 && z > LaneZ - LaneHalf - 1f && z < LaneZ + LaneHalf + 1f) continue;
+                    var roll = rng.NextDouble();
+                    if (roll < 0.34) Downpipe(metal, wx, z, inward, (float)(9.0 + rng.NextDouble() * 5.0));
+                    else if (roll < 0.62) Aircon(metal, wx, z, inward, (float)(3.4 + rng.NextDouble() * 6.0));
+                    else FireEscape(metal, wx, z, inward);
+                }
+            }
+            Cables(metal, rng);
+            Clutter(metal, rng);
+            metal.Emit(parent, "Fixtures", Mat("Metal"), false, Generated);
+            Lanterns(Child(parent, "Lanterns"));
+        }
+
+        /// <summary>雨樋。壁から少し浮かせ、受け金具を等間隔に打つ</summary>
+        static void Downpipe(Bank b, float wx, float z, int inward, float height)
+        {
+            var x = wx + inward * 0.16f;
+            b.Box(new Vector3(x, height * 0.5f, z), new Vector3(0.16f, height, 0.16f));
+            for (var y = 1.2f; y < height; y += 1.8f)
+                b.Box(new Vector3(wx + inward * 0.08f, y, z), new Vector3(0.16f, 0.07f, 0.26f));
+            b.Box(new Vector3(x + inward * 0.12f, 0.22f, z), new Vector3(0.36f, 0.16f, 0.16f));
+        }
+
+        /// <summary>室外機。壁に据えた箱と、受けの腕</summary>
+        static void Aircon(Bank b, float wx, float z, int inward, float y)
+        {
+            var x = wx + inward * 0.42f;
+            b.Box(new Vector3(x, y, z), new Vector3(0.74f, 0.62f, 0.86f));
+            b.Box(new Vector3(wx + inward * 0.20f, y - 0.36f, z), new Vector3(0.40f, 0.07f, 0.9f));
+            for (var i = -2; i <= 2; i++)
+                b.Box(new Vector3(x + inward * 0.36f, y + i * 0.11f, z), new Vector3(0.05f, 0.05f, 0.7f));
+        }
+
+        /// <summary>非常階段。2 層の踊り場と手摺、斜めの段</summary>
+        static void FireEscape(Bank b, float wx, float z, int inward)
+        {
+            var from = 4.2f;
+            for (var f = 0; f < 2; f++)
+            {
+                var y = from + f * UpperFloor;
+                var x = wx + inward * 0.75f;
+                b.Box(new Vector3(x, y, z), new Vector3(1.5f, 0.08f, 2.6f));
+                b.Box(new Vector3(x + inward * 0.70f, y + 0.52f, z), new Vector3(0.06f, 1.04f, 2.6f));
+                for (var i = -1; i <= 1; i += 2)
+                    b.Box(new Vector3(x, y + 0.52f, z + i * 1.28f), new Vector3(1.5f, 1.04f, 0.06f));
+                b.Box(new Vector3(x + inward * 0.70f, y + 1.02f, z), new Vector3(0.1f, 0.07f, 2.6f));
+                var step = 8;
+                for (var i = 0; i < step; i++)
+                {
+                    var t = (i + 0.5f) / step;
+                    b.Box(new Vector3(x + inward * (0.1f + t * 1.1f), y + 0.12f + t * (UpperFloor - 0.3f), z + 1.0f),
+                        new Vector3(0.26f, 0.05f, 0.7f));
+                }
+            }
+        }
+
+        /// <summary>通りを渡す電線。真ん中を少し垂らす</summary>
+        static void Cables(Bank b, System.Random rng)
+        {
+            for (var z = StreetSouth + 6f; z < StreetNorth - 4f; z += (float)(6.5 + rng.NextDouble() * 3.0))
+            {
+                var y = (float)(6.4 + rng.NextDouble() * 2.6);
+                var sag = (float)(0.35 + rng.NextDouble() * 0.5);
+                var seg = 6;
+                for (var i = 0; i < seg; i++)
+                {
+                    var t0 = (float)i / seg;
+                    var t1 = (float)(i + 1) / seg;
+                    var x0 = Mathf.Lerp(-StreetHalf, StreetHalf, t0);
+                    var x1 = Mathf.Lerp(-StreetHalf, StreetHalf, t1);
+                    var y0 = y - sag * 4f * t0 * (1f - t0);
+                    var y1 = y - sag * 4f * t1 * (1f - t1);
+                    b.Box(new Vector3((x0 + x1) * 0.5f, (y0 + y1) * 0.5f, z),
+                        new Vector3(x1 - x0, Mathf.Max(0.05f, Mathf.Abs(y1 - y0) + 0.05f), 0.05f));
+                }
+            }
+        }
+
+        /// <summary>路上の物。車止めと、積んだ木箱</summary>
+        static void Clutter(Bank b, System.Random rng)
+        {
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1 : 1;
+                var x = side * (RoadHalf + 0.45f);
+                for (var z = StreetSouth + 4f; z < StreetNorth - 3f; z += 5.5f)
+                {
+                    b.Box(new Vector3(x, KerbRise + 0.42f, z), new Vector3(0.16f, 0.84f, 0.16f));
+                    b.Box(new Vector3(x, KerbRise + 0.86f, z), new Vector3(0.22f, 0.07f, 0.22f));
+                }
+                for (var z = StreetSouth + 6f; z < StreetNorth - 4f; z += (float)(7.0 + rng.NextDouble() * 5.0))
+                {
+                    if (side < 0 && z > LaneZ - 3f && z < LaneZ + 3f) continue;
+                    var wx = side * (StreetHalf - 0.55f);
+                    var pile = 1 + rng.Next(3);
+                    for (var i = 0; i < pile; i++)
+                    {
+                        var w = (float)(0.42 + rng.NextDouble() * 0.28);
+                        b.Box(new Vector3(wx - side * (float)(rng.NextDouble() * 0.3), KerbRise + w * 0.5f + i * w * 0.9f,
+                                z + (float)(rng.NextDouble() - 0.5) * 0.8f),
+                            new Vector3(w, w, w));
+                    }
+                }
+            }
+        }
+
+        /// <summary>電線から下がる提灯。小さいが、通りの奥行きを作る</summary>
+        static void Lanterns(Transform parent)
+        {
+            Clear(parent);
+            var rng = new System.Random(9110);
+            var tint = new Color[]
+            {
+                new Color(1.00f, 0.42f, 0.30f), new Color(1.00f, 0.78f, 0.36f),
+                new Color(0.42f, 0.86f, 1.00f), new Color(1.00f, 0.36f, 0.62f),
+            };
+            for (var z = StreetSouth + 6.5f; z < StreetNorth - 4f; z += (float)(3.0 + rng.NextDouble() * 2.0))
+            {
+                var x = (float)(rng.NextDouble() * 2f - 1f) * (StreetHalf - 1.2f);
+                var y = (float)(5.4 + rng.NextDouble() * 1.4);
+                var col = tint[rng.Next(tint.Length)];
+                var g = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                g.name = "Lantern";
+                g.transform.SetParent(parent, false);
+                g.transform.localPosition = new Vector3(x, y, z);
+                g.transform.localScale = new Vector3(0.24f, 0.17f, 0.24f);
+                g.GetComponent<MeshRenderer>().sharedMaterial = GlowMat(col, 1.5f);
+                Object.DestroyImmediate(g.GetComponent<Collider>());
+            }
+        }
+
+
+        // ---- 街灯と水たまり ------------------------------------------------
+
+        /// <summary>
+        /// 壁付けの街灯。ネオンだけでは路面が沈むので、上から白い灯りを落とす。
+        /// 雨に濡れた路面がここで初めて光る
+        /// </summary>
+        static void Lamps(Transform parent)
+        {
+            Clear(parent);
+            var metal = new Bank { Texel = 0.7f };
+            var n = 0;
+            for (var z = StreetSouth + 5f; z < StreetNorth - 3f; z += 11f)
+            {
+                for (var s = 0; s < 2; s++)
+                {
+                    var side = s == 0 ? -1 : 1;
+                    if (side < 0 && z > LaneZ - 3f && z < LaneZ + 3f) continue;
+                    var wx = side * StreetHalf;
+                    var inward = -side;
+                    var y = 5.2f;
+                    var arm = 1.35f;
+                    metal.Box(new Vector3(wx + inward * arm * 0.5f, y, z), new Vector3(arm, 0.09f, 0.09f));
+                    metal.Box(new Vector3(wx + inward * 0.25f, y - 0.42f, z), new Vector3(0.5f, 0.09f, 0.08f));
+                    metal.Box(new Vector3(wx + inward * arm, y - 0.18f, z), new Vector3(0.44f, 0.30f, 0.44f));
+                    var head = new GameObject("Lamp" + n++);
+                    head.transform.SetParent(parent, false);
+                    head.transform.localPosition = new Vector3(wx + inward * arm, y - 0.36f, z);
+                    var glass = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    glass.name = "Glass";
+                    glass.transform.SetParent(head.transform, false);
+                    glass.transform.localScale = new Vector3(0.34f, 0.06f, 0.34f);
+                    glass.GetComponent<MeshRenderer>().sharedMaterial = GlowMat(new Color(1.00f, 0.92f, 0.78f), 2.4f);
+                    Object.DestroyImmediate(glass.GetComponent<Collider>());
+                    var l = head.AddComponent<Light>();
+                    l.type = LightType.Point;
+                    l.color = new Color(1.00f, 0.90f, 0.76f);
+                    l.range = 14f;
+                    l.intensity = 26f;
+                    l.shadows = LightShadows.None;
+                }
+            }
+            metal.Emit(parent, "Brackets", Mat("Metal"), false, Generated);
+        }
+
+        /// <summary>
+        /// 水たまり。路面より少しだけ上に、よく光る面を置く。
+        /// 雨の夜は、路面そのものより水の照り返しで見えている
+        /// </summary>
+        static void Puddles(Transform parent)
+        {
+            Clear(parent);
+            var bank = new Bank { Texel = 0.35f };
+            var rng = new System.Random(7720);
+            for (var z = StreetSouth + 3f; z < StreetNorth - 2f; z += (float)(2.6 + rng.NextDouble() * 3.4))
+            {
+                var x = (float)(rng.NextDouble() * 2.0 - 1.0) * (StreetHalf - 0.9f);
+                var w = (float)(0.9 + rng.NextDouble() * 2.6);
+                var d = (float)(0.7 + rng.NextDouble() * 2.2);
+                var y = Mathf.Abs(x) > RoadHalf ? KerbRise + 0.008f : 0.008f;
+                bank.FaceY(y, x - w * 0.5f, x + w * 0.5f, z - d * 0.5f, z + d * 0.5f, 1);
+            }
+            for (var x = YardWest + 1.5f; x < LaneWest - 1f; x += (float)(2.0 + rng.NextDouble() * 2.5))
+            {
+                var z = LaneZ + (float)(rng.NextDouble() * 2.0 - 1.0) * 1.3f;
+                var w = (float)(0.8 + rng.NextDouble() * 1.8);
+                var d = (float)(0.6 + rng.NextDouble() * 1.4);
+                bank.FaceY(0.028f, x - w * 0.5f, x + w * 0.5f, z - d * 0.5f, z + d * 0.5f, 1);
+            }
+            bank.Emit(parent, "Puddles", Mat("Puddle"), false, Generated);
+        }
+
+        // ---- 当たり判定 ----------------------------------------------------
+
+        /// <summary>
+        /// 見えない箱で通りの輪郭を囲う。見た目の mesh には当たりを付けない。
+        /// 面の彫りが細かいので、そのまま当てると引っ掛かって歩けなくなる
+        /// </summary>
+        static void Bounds(Transform parent)
+        {
+            Clear(parent);
+            Blocker(parent, "Ground.Street", new Vector3(0f, -0.5f, (StreetSouth + StreetNorth) * 0.5f),
+                new Vector3(StreetHalf * 2f, 1f, StreetNorth - StreetSouth));
+            Blocker(parent, "Ground.Lane", new Vector3((LaneWest - StreetHalf) * 0.5f, -0.48f, LaneZ),
+                new Vector3(-StreetHalf - LaneWest, 1f, LaneHalf * 2f));
+            Blocker(parent, "Ground.Yard", new Vector3((YardWest + LaneWest) * 0.5f, -0.48f, (YardSouth + YardNorth) * 0.5f),
+                new Vector3(LaneWest - YardWest, 1f, YardNorth - YardSouth));
+
+            var h = WallHeight;
+            Blocker(parent, "Wall.E", new Vector3(StreetHalf + 0.5f, h * 0.5f, (StreetSouth + StreetNorth) * 0.5f),
+                new Vector3(1f, h, StreetNorth - StreetSouth));
+            Blocker(parent, "Wall.W.S", new Vector3(-StreetHalf - 0.5f, h * 0.5f, (StreetSouth + LaneZ - LaneHalf) * 0.5f),
+                new Vector3(1f, h, LaneZ - LaneHalf - StreetSouth));
+            Blocker(parent, "Wall.W.N", new Vector3(-StreetHalf - 0.5f, h * 0.5f, (LaneZ + LaneHalf + StreetNorth) * 0.5f),
+                new Vector3(1f, h, StreetNorth - LaneZ - LaneHalf));
+            Blocker(parent, "Wall.Head", new Vector3(0f, h * 0.5f, StreetNorth + 0.5f), new Vector3(StreetHalf * 2f + 2f, h, 1f));
+            Blocker(parent, "Wall.Back", new Vector3(0f, h * 0.5f, StreetSouth - 0.5f), new Vector3(StreetHalf * 2f + 2f, h, 1f));
+
+            Blocker(parent, "Lane.S", new Vector3((LaneWest - StreetHalf) * 0.5f, h * 0.5f, LaneZ - LaneHalf - 0.5f),
+                new Vector3(-StreetHalf - LaneWest, h, 1f));
+            Blocker(parent, "Lane.N", new Vector3((LaneWest - StreetHalf) * 0.5f, h * 0.5f, LaneZ + LaneHalf + 0.5f),
+                new Vector3(-StreetHalf - LaneWest, h, 1f));
+
+            Blocker(parent, "Yard.W", new Vector3(YardWest - 0.5f, h * 0.5f, (YardSouth + YardNorth) * 0.5f),
+                new Vector3(1f, h, YardNorth - YardSouth + 2f));
+            Blocker(parent, "Yard.S", new Vector3((YardWest + LaneWest) * 0.5f, h * 0.5f, YardSouth - 0.5f),
+                new Vector3(LaneWest - YardWest, h, 1f));
+            Blocker(parent, "Yard.N", new Vector3((YardWest + LaneWest) * 0.5f, h * 0.5f, YardNorth + 0.5f),
+                new Vector3(LaneWest - YardWest, h, 1f));
+            Blocker(parent, "Yard.E.S", new Vector3(LaneWest + 0.5f, h * 0.5f, (YardSouth + LaneZ - LaneHalf) * 0.5f),
+                new Vector3(1f, h, LaneZ - LaneHalf - YardSouth));
+            Blocker(parent, "Yard.E.N", new Vector3(LaneWest + 0.5f, h * 0.5f, (LaneZ + LaneHalf + YardNorth) * 0.5f),
+                new Vector3(1f, h, YardNorth - LaneZ - LaneHalf));
+        }
+
+        static void Blocker(Transform parent, string name, Vector3 centre, Vector3 size)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = centre;
+            var c = go.AddComponent<BoxCollider>();
+            c.size = size;
+        }
 
         // ---- ネオン --------------------------------------------------------
 
@@ -232,24 +701,37 @@ namespace HalfAware.EditorTools
             Clear(parent);
             var plates = new List<Plate>
             {
-                new Plate("NeonNerve",  -1,  2.5f, 4.6f, true,  1.35f),
-                new Plate("NeonChiba",   1,  5.0f, 5.4f, false, 1.60f),
-                new Plate("NeonNoodle",  1,  8.5f, 3.9f, true,  1.30f),
-                new Plate("NeonRafu",   -1, 11.5f, 6.2f, false, 1.25f),
-                new Plate("NeonJack",   -1, 14.5f, 4.1f, true,  1.45f),
-                new Plate("NeonBar",     1, 17.0f, 7.0f, false, 1.30f),
-                new Plate("NeonMemory",  1, 20.5f, 4.4f, true,  1.35f),
-                new Plate("NeonClinic", -1, 23.5f, 5.8f, false, 1.55f),
-                new Plate("NeonChiba",  -1, 26.5f, 3.8f, true,  1.40f),
-                new Plate("NeonNerve",   1, 29.0f, 6.6f, false, 1.20f),
-                new Plate("NeonBar",    -1, 31.5f, 4.5f, true,  1.30f),
-                new Plate("NeonNoodle",  1, 33.5f, 5.0f, true,  1.35f),
-                new Plate("NeonMemory", -1, 37.5f, 6.0f, false, 1.25f),
-                new Plate("NeonJack",    1, 38.0f, 3.9f, true,  1.40f),
+                new Plate("NeonNerve",  -1,  1.5f,  4.7f, true,  1.55f),
+                new Plate("NeonChiba",   1,  2.4f,  5.6f, false, 1.75f),
+                new Plate("NeonRafu",    1,  3.6f, 10.4f, false, 2.35f),
+                new Plate("NeonNoodle",  1,  6.2f,  4.0f, true,  1.45f),
+                new Plate("NeonBar",    -1,  6.8f,  9.6f, false, 2.10f),
+                new Plate("NeonJack",   -1,  8.6f,  4.2f, true,  1.60f),
+                new Plate("NeonClinic",  1,  9.8f,  6.4f, false, 1.70f),
+                new Plate("NeonMemory", -1, 11.4f,  7.2f, false, 1.55f),
+                new Plate("NeonChiba",  -1, 12.6f,  4.1f, true,  1.50f),
+                new Plate("NeonBar",     1, 13.4f,  4.5f, true,  1.45f),
+                new Plate("NeonNerve",   1, 15.2f,  8.6f, false, 2.20f),
+                new Plate("NeonRafu",   -1, 16.6f,  4.4f, true,  1.50f),
+                new Plate("NeonNoodle", -1, 18.2f,  7.4f, false, 1.60f),
+                new Plate("NeonMemory",  1, 19.0f,  4.2f, true,  1.55f),
+                new Plate("NeonJack",    1, 21.6f,  6.8f, false, 1.75f),
+                new Plate("NeonClinic", -1, 22.4f,  4.3f, true,  1.55f),
+                new Plate("NeonBar",    -1, 24.0f, 10.2f, false, 2.30f),
+                new Plate("NeonChiba",   1, 25.2f,  4.1f, true,  1.50f),
+                new Plate("NeonNerve",  -1, 27.0f,  4.6f, true,  1.50f),
+                new Plate("NeonNoodle",  1, 28.2f,  7.8f, false, 1.65f),
+                new Plate("NeonMemory", -1, 29.6f,  9.4f, false, 2.15f),
+                new Plate("NeonJack",    1, 30.4f,  4.4f, true,  1.55f),
+                new Plate("NeonRafu",    1, 33.0f,  6.2f, false, 1.60f),
+                new Plate("NeonClinic",  1, 34.6f,  4.2f, true,  1.60f),
+                new Plate("NeonChiba",  -1, 37.2f,  8.2f, false, 1.70f),
+                new Plate("NeonBar",     1, 37.8f,  4.5f, true,  1.45f),
+                new Plate("NeonNerve",  -1, 39.4f,  4.3f, true,  1.50f),
+                new Plate("NeonMemory",  1, 40.6f,  9.0f, false, 2.05f),
             };
             for (var i = 0; i < plates.Count; i++) Sign(parent, "Sign" + i, plates[i]);
             Tubes(Child(parent, "Tubes"));
-            Windows(Child(parent, "Windows"));
         }
 
         /// <summary>
@@ -295,80 +777,9 @@ namespace HalfAware.EditorTools
         /// <summary>光る帯をひとつ。細い箱に自発光のマテリアルを貼るだけ</summary>
         static void Strip(Transform parent, string name, Vector3 centre, Vector3 size, Color col)
         {
-            var go = Box(parent, name, centre, size, "Ledge");
+            var go = Box(parent, name, centre, size, "Metal");
             go.GetComponent<MeshRenderer>().sharedMaterial = GlowMat(col, 1.9f);
             Object.DestroyImmediate(go.GetComponent<Collider>());
-        }
-
-        /// <summary>
-        /// 建物の窓。上の方は暗い板のままだと書き割りに見えるので、
-        /// 灯りの点いた窓をまばらに入れる。1 面ぶんを 1 枚の mesh にまとめて軽くする
-        /// </summary>
-        static void Windows(Transform parent)
-        {
-            Clear(parent);
-            for (var s2 = 0; s2 < 2; s2++)
-            {
-                var side = s2 == 0 ? -1 : 1;
-                var x = side * (StreetHalf - 0.05f);
-                var warm = new List<Vector3>();
-                var cold = new List<Vector3>();
-                var rng = new System.Random(4000 + s2);
-                for (var z = StreetSouth + 1.6f; z < StreetNorth - 1.2f; z += 1.9f)
-                {
-                    for (var y = 3.4f; y < WallHeight - 1.2f; y += 2.3f)
-                    {
-                        var roll = rng.NextDouble();
-                        if (roll < 0.52) continue;
-                        (roll < 0.80 ? warm : cold).Add(new Vector3(x, y, z));
-                    }
-                }
-                Pane(parent, "Window.Warm." + s2, warm, side, new Color(1.00f, 0.72f, 0.38f), 0.55f);
-                Pane(parent, "Window.Cold." + s2, cold, side, new Color(0.46f, 0.66f, 1.00f), 0.50f);
-            }
-        }
-
-        /// <summary>窓を並べた 1 枚の板。面は通りの中央を向く</summary>
-        static void Pane(Transform parent, string name, List<Vector3> at, int side, Color col, float glow)
-        {
-            if (at.Count == 0) return;
-            var verts = new List<Vector3>();
-            var tris = new List<int>();
-            var uvs = new List<Vector2>();
-            var w = 0.62f;
-            var h = 0.95f;
-            foreach (var c in at)
-            {
-                var i = verts.Count;
-                verts.Add(new Vector3(c.x, c.y - h * 0.5f, c.z - w * 0.5f));
-                verts.Add(new Vector3(c.x, c.y + h * 0.5f, c.z - w * 0.5f));
-                verts.Add(new Vector3(c.x, c.y + h * 0.5f, c.z + w * 0.5f));
-                verts.Add(new Vector3(c.x, c.y - h * 0.5f, c.z + w * 0.5f));
-                uvs.Add(new Vector2(0f, 0f)); uvs.Add(new Vector2(0f, 1f));
-                uvs.Add(new Vector2(1f, 1f)); uvs.Add(new Vector2(1f, 0f));
-                if (side < 0)
-                {
-                    tris.Add(i); tris.Add(i + 1); tris.Add(i + 2);
-                    tris.Add(i); tris.Add(i + 2); tris.Add(i + 3);
-                }
-                else
-                {
-                    tris.Add(i); tris.Add(i + 2); tris.Add(i + 1);
-                    tris.Add(i); tris.Add(i + 3); tris.Add(i + 2);
-                }
-            }
-            var mesh = new Mesh();
-            mesh.name = name;
-            mesh.SetVertices(verts);
-            mesh.SetUVs(0, uvs);
-            mesh.SetTriangles(tris, 0);
-            mesh.RecalculateNormals();
-            mesh.RecalculateBounds();
-            ProcMesh.Save(mesh, Generated + name.Replace('.', '_') + ".asset");
-            var go = new GameObject(name);
-            go.transform.SetParent(parent, false);
-            go.AddComponent<MeshFilter>().sharedMesh = AssetDatabase.LoadAssetAtPath<Mesh>(Generated + name.Replace('.', '_') + ".asset");
-            go.AddComponent<MeshRenderer>().sharedMaterial = GlowMat(col, glow);
         }
 
         /// <summary>色だけの自発光マテリアル。同じ色は使い回す</summary>
@@ -415,7 +826,7 @@ namespace HalfAware.EditorTools
             if (!p.blade) return;
             // 壁まで繋ぐ腕
             Box(parent, name + ".Arm", new Vector3(wallX - p.side * reach * 0.5f, p.y + high * 0.5f - 0.1f, p.z),
-                new Vector3(reach, 0.08f, 0.08f), "Ledge");
+                new Vector3(reach, 0.08f, 0.08f), "Metal");
             // 通りへ落ちる色。突き出した物にだけ付ける
             var lamp = new GameObject(name + ".Lamp");
             lamp.transform.SetParent(parent, false);
@@ -423,8 +834,8 @@ namespace HalfAware.EditorTools
             var l = lamp.AddComponent<Light>();
             l.type = LightType.Point;
             l.color = NeonTint(p.texture);
-            l.range = 11f;
-            l.intensity = 7.5f;
+            l.range = 12f;
+            l.intensity = 18f;
             l.shadows = LightShadows.None;
         }
 
@@ -596,8 +1007,8 @@ namespace HalfAware.EditorTools
                 var l = g.AddComponent<Light>();
                 l.type = LightType.Point;
                 l.color = new Color(1.00f, 0.79f, 0.52f);
-                l.range = 9f;
-                l.intensity = 5.5f;
+                l.range = 10f;
+                l.intensity = 14f;
                 l.shadows = LightShadows.None;
             }
         }
@@ -753,7 +1164,7 @@ namespace HalfAware.EditorTools
             if (player == null) return;
             var cc = player.GetComponent<CharacterController>();
             if (cc != null) cc.enabled = false;
-            player.transform.position = new Vector3(0f, 0.05f, StreetSouth + 2.5f);
+            player.transform.position = new Vector3(0f, 0.1f, StreetSouth + 3f);
             player.transform.rotation = Quaternion.identity;
             if (cc != null) cc.enabled = true;
         }
@@ -770,6 +1181,17 @@ namespace HalfAware.EditorTools
             return go.transform;
         }
 
+        /// <summary>知らない子を落とす。組み方を変えたときに前の束が残らないように</summary>
+        static void Prune(Transform parent, string[] keep)
+        {
+            for (var i = parent.childCount - 1; i >= 0; i--)
+            {
+                var c = parent.GetChild(i);
+                if (System.Array.IndexOf(keep, c.name) >= 0) continue;
+                Object.DestroyImmediate(c.gameObject);
+            }
+        }
+
         static Transform Child(Transform parent, string name)
         {
             var t = parent.Find(name);
@@ -784,7 +1206,7 @@ namespace HalfAware.EditorTools
             for (var i = parent.childCount - 1; i >= 0; i--) Object.DestroyImmediate(parent.GetChild(i).gameObject);
         }
 
-        /// <summary>箱をひとつ置く。壁も路面もこれで足りる</summary>
+        /// <summary>箱をひとつ置く。露店のような細かい物はこれで足りる</summary>
         static GameObject Box(Transform parent, string name, Vector3 centre, Vector3 size, string material)
         {
             var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -796,39 +1218,54 @@ namespace HalfAware.EditorTools
             return go;
         }
 
-        /// <summary>色だけ決めたマテリアル。無ければ作って残す</summary>
+        /// <summary>
+        /// 素材ごとのマテリアル。同じ名前の絵があれば貼り、無ければ色だけで作る。
+        /// 絵は後から差し替えられるよう、組み直すたびに結び直す
+        /// </summary>
         static Material Mat(string name)
         {
             var path = Materials + name + ".mat";
             var m = AssetDatabase.LoadAssetAtPath<Material>(path);
-            if (m != null) return m;
-            if (!AssetDatabase.IsValidFolder("Assets/Materials/Alley"))
-                AssetDatabase.CreateFolder("Assets/Materials", "Alley");
-            var shader = Shader.Find("Universal Render Pipeline/Lit");
-            m = new Material(shader);
-            m.name = name;
+            if (m == null)
+            {
+                if (!AssetDatabase.IsValidFolder("Assets/Materials/Alley"))
+                    AssetDatabase.CreateFolder("Assets/Materials", "Alley");
+                m = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                m.name = name;
+                AssetDatabase.CreateAsset(m, path);
+            }
             Color col;
             float smooth;
             Tone(name, out col, out smooth);
-            m.SetColor("_BaseColor", col);
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/Alley" + name + ".png");
+            if (tex != null)
+            {
+                m.SetTexture("_BaseMap", tex);
+                m.SetColor("_BaseColor", Color.white);
+            }
+            else
+            {
+                m.SetTexture("_BaseMap", null);
+                m.SetColor("_BaseColor", col);
+            }
             if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", smooth);
-            if (m.HasProperty("_Metallic")) m.SetFloat("_Metallic", 0f);
-            AssetDatabase.CreateAsset(m, path);
-            AssetDatabase.SaveAssets();
+            if (m.HasProperty("_Metallic")) m.SetFloat("_Metallic", name == "Metal" ? 0.55f : 0f);
+            EditorUtility.SetDirty(m);
             return m;
         }
 
-        /// <summary>素材ごとの色と艶。雨に濡れているので路面だけ強く光らせる</summary>
+        /// <summary>素材ごとの色と艶。雨に濡れているので路面と敷石だけ強く光らせる</summary>
         static void Tone(string name, out Color col, out float smooth)
         {
             switch (name)
             {
-                case "Asphalt": col = new Color(0.055f, 0.060f, 0.075f); smooth = 0.66f; break;
-                case "Cobble": col = new Color(0.075f, 0.075f, 0.085f); smooth = 0.46f; break;
-                case "Kerb": col = new Color(0.115f, 0.115f, 0.125f); smooth = 0.55f; break;
-                case "Brick": col = new Color(0.105f, 0.085f, 0.085f); smooth = 0.18f; break;
-                case "Facade": col = new Color(0.085f, 0.090f, 0.105f); smooth = 0.22f; break;
-                case "Ledge": col = new Color(0.135f, 0.130f, 0.130f); smooth = 0.20f; break;
+                case "Asphalt": col = new Color(0.125f, 0.132f, 0.155f); smooth = 0.72f; break;
+                case "Cobble": col = new Color(0.135f, 0.138f, 0.150f); smooth = 0.58f; break;
+                case "Brick": col = new Color(0.165f, 0.130f, 0.118f); smooth = 0.18f; break;
+                case "Concrete": col = new Color(0.185f, 0.186f, 0.192f); smooth = 0.24f; break;
+                case "Metal": col = new Color(0.095f, 0.098f, 0.105f); smooth = 0.46f; break;
+                case "Glass": col = new Color(0.030f, 0.036f, 0.048f); smooth = 0.86f; break;
+                case "Puddle": col = new Color(0.045f, 0.050f, 0.062f); smooth = 0.96f; break;
                 case "Tarp": col = new Color(0.150f, 0.145f, 0.130f); smooth = 0.30f; break;
                 case "TarpMine": col = new Color(0.135f, 0.115f, 0.100f); smooth = 0.30f; break;
                 case "Timber": col = new Color(0.130f, 0.105f, 0.080f); smooth = 0.15f; break;
