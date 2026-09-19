@@ -55,6 +55,7 @@ namespace HalfAware.EditorTools
             Street(Child(root, "Street"));
             Lane(Child(root, "Lane"));
             Yard(Child(root, "Yard"));
+            Neon(Child(root, "Neon"));
             var temp = GameObject.Find("TempGround");
             if (temp != null) Object.DestroyImmediate(temp);
             Place(root);
@@ -169,6 +170,292 @@ namespace HalfAware.EditorTools
             var northSpan = YardNorth - (LaneZ + LaneHalf);
             Box(parent, "Wall.E.N", new Vector3(LaneWest + WallThick * 0.5f, WallHeight * 0.5f, YardNorth - northSpan * 0.5f),
                 new Vector3(WallThick, WallHeight, northSpan), "Brick");
+        }
+
+
+        // ---- ネオン --------------------------------------------------------
+
+        /// <summary>看板のひと枚。どちら側の壁に、どの高さで、面をどちらへ向けるか</summary>
+        struct Plate
+        {
+            public string texture;
+            public int side;      // 1 が東の壁、-1 が西の壁
+            public float z;
+            public float y;
+            public bool blade;    // true なら壁から突き出して通りの上下を向く
+            public float scale;   // 1 で幅 1.1 メートル
+
+            public Plate(string texture, int side, float z, float y, bool blade, float scale)
+            {
+                this.texture = texture;
+                this.side = side;
+                this.z = z;
+                this.y = y;
+                this.blade = blade;
+                this.scale = scale;
+            }
+        }
+
+        /// <summary>看板の地の色。光の色をここから採る</summary>
+        static Color NeonTint(string texture)
+        {
+            switch (texture)
+            {
+                case "NeonNerve": return new Color(1.00f, 0.16f, 0.67f);
+                case "NeonChiba": return new Color(0.16f, 0.92f, 1.00f);
+                case "NeonMemory": return new Color(1.00f, 0.59f, 0.12f);
+                case "NeonJack": return new Color(0.27f, 1.00f, 0.47f);
+                case "NeonRafu": return new Color(1.00f, 0.24f, 0.24f);
+                case "NeonBar": return new Color(0.67f, 0.43f, 1.00f);
+                case "NeonNoodle": return new Color(1.00f, 0.86f, 0.24f);
+                case "NeonClinic": return new Color(0.35f, 0.78f, 1.00f);
+                default: return Color.white;
+            }
+        }
+
+        /// <summary>縦長の絵か。縦なら高さが幅の倍になる</summary>
+        static bool Tall(string texture)
+        {
+            return texture == "NeonNerve" || texture == "NeonMemory"
+                || texture == "NeonRafu" || texture == "NeonBar";
+        }
+
+        /// <summary>
+        /// 通りのネオン。壁に貼る物と、突き出して通りの上下を向く物を混ぜる。
+        /// 突き出した物には灯りを付ける。濡れた路面に色が落ちて、通りが極彩色になる
+        /// </summary>
+        static void Neon(Transform parent)
+        {
+            Clear(parent);
+            var plates = new List<Plate>
+            {
+                new Plate("NeonNerve",  -1,  2.5f, 4.6f, true,  1.35f),
+                new Plate("NeonChiba",   1,  5.0f, 5.4f, false, 1.60f),
+                new Plate("NeonNoodle",  1,  8.5f, 3.9f, true,  1.30f),
+                new Plate("NeonRafu",   -1, 11.5f, 6.2f, false, 1.25f),
+                new Plate("NeonJack",   -1, 14.5f, 4.1f, true,  1.45f),
+                new Plate("NeonBar",     1, 17.0f, 7.0f, false, 1.30f),
+                new Plate("NeonMemory",  1, 20.5f, 4.4f, true,  1.35f),
+                new Plate("NeonClinic", -1, 23.5f, 5.8f, false, 1.55f),
+                new Plate("NeonChiba",  -1, 26.5f, 3.8f, true,  1.40f),
+                new Plate("NeonNerve",   1, 29.0f, 6.6f, false, 1.20f),
+                new Plate("NeonBar",    -1, 31.5f, 4.5f, true,  1.30f),
+                new Plate("NeonNoodle",  1, 33.5f, 5.0f, true,  1.35f),
+                new Plate("NeonMemory", -1, 37.5f, 6.0f, false, 1.25f),
+                new Plate("NeonJack",    1, 38.0f, 3.9f, true,  1.40f),
+            };
+            for (var i = 0; i < plates.Count; i++) Sign(parent, "Sign" + i, plates[i]);
+            Tubes(Child(parent, "Tubes"));
+            Windows(Child(parent, "Windows"));
+        }
+
+        /// <summary>
+        /// 面に這わせる管。看板のあいだを繋いで、壁そのものを光らせる。
+        /// 「熱帯植物のように絡みついている」のはこちらの仕事で、看板だけでは足りない
+        /// </summary>
+        static void Tubes(Transform parent)
+        {
+            Clear(parent);
+            var tint = new Color[]
+            {
+                new Color(1.00f, 0.16f, 0.67f), new Color(0.16f, 0.92f, 1.00f),
+                new Color(1.00f, 0.59f, 0.12f), new Color(0.27f, 1.00f, 0.47f),
+                new Color(0.67f, 0.43f, 1.00f), new Color(1.00f, 0.86f, 0.24f),
+            };
+            var rng = new System.Random(20260919);
+            var n = 0;
+            for (var s2 = 0; s2 < 2; s2++)
+            {
+                var side = s2 == 0 ? -1 : 1;
+                var x = side * (StreetHalf - 0.06f);
+                var z = StreetSouth + 1f;
+                while (z < StreetNorth - 2f)
+                {
+                    var span = (float)(3.0 + rng.NextDouble() * 5.0);
+                    var y = (float)(2.2 + rng.NextDouble() * 8.0);
+                    var col = tint[rng.Next(tint.Length)];
+                    // 横に長く這う管
+                    Strip(parent, "Tube" + n++, new Vector3(x, y, z + span * 0.5f),
+                        new Vector3(0.06f, 0.09f, span), col);
+                    // ときどき縦へ折れる
+                    if (rng.NextDouble() < 0.45)
+                    {
+                        var drop = (float)(1.5 + rng.NextDouble() * 3.5);
+                        Strip(parent, "Tube" + n++, new Vector3(x, y - drop * 0.5f, z + span),
+                            new Vector3(0.06f, drop, 0.09f), col);
+                    }
+                    z += span + (float)(0.8 + rng.NextDouble() * 2.5);
+                }
+            }
+        }
+
+        /// <summary>光る帯をひとつ。細い箱に自発光のマテリアルを貼るだけ</summary>
+        static void Strip(Transform parent, string name, Vector3 centre, Vector3 size, Color col)
+        {
+            var go = Box(parent, name, centre, size, "Ledge");
+            go.GetComponent<MeshRenderer>().sharedMaterial = GlowMat(col, 1.9f);
+            Object.DestroyImmediate(go.GetComponent<Collider>());
+        }
+
+        /// <summary>
+        /// 建物の窓。上の方は暗い板のままだと書き割りに見えるので、
+        /// 灯りの点いた窓をまばらに入れる。1 面ぶんを 1 枚の mesh にまとめて軽くする
+        /// </summary>
+        static void Windows(Transform parent)
+        {
+            Clear(parent);
+            for (var s2 = 0; s2 < 2; s2++)
+            {
+                var side = s2 == 0 ? -1 : 1;
+                var x = side * (StreetHalf - 0.05f);
+                var warm = new List<Vector3>();
+                var cold = new List<Vector3>();
+                var rng = new System.Random(4000 + s2);
+                for (var z = StreetSouth + 1.6f; z < StreetNorth - 1.2f; z += 1.9f)
+                {
+                    for (var y = 3.4f; y < WallHeight - 1.2f; y += 2.3f)
+                    {
+                        var roll = rng.NextDouble();
+                        if (roll < 0.52) continue;
+                        (roll < 0.80 ? warm : cold).Add(new Vector3(x, y, z));
+                    }
+                }
+                Pane(parent, "Window.Warm." + s2, warm, side, new Color(1.00f, 0.72f, 0.38f), 0.55f);
+                Pane(parent, "Window.Cold." + s2, cold, side, new Color(0.46f, 0.66f, 1.00f), 0.50f);
+            }
+        }
+
+        /// <summary>窓を並べた 1 枚の板。面は通りの中央を向く</summary>
+        static void Pane(Transform parent, string name, List<Vector3> at, int side, Color col, float glow)
+        {
+            if (at.Count == 0) return;
+            var verts = new List<Vector3>();
+            var tris = new List<int>();
+            var uvs = new List<Vector2>();
+            var w = 0.62f;
+            var h = 0.95f;
+            foreach (var c in at)
+            {
+                var i = verts.Count;
+                verts.Add(new Vector3(c.x, c.y - h * 0.5f, c.z - w * 0.5f));
+                verts.Add(new Vector3(c.x, c.y + h * 0.5f, c.z - w * 0.5f));
+                verts.Add(new Vector3(c.x, c.y + h * 0.5f, c.z + w * 0.5f));
+                verts.Add(new Vector3(c.x, c.y - h * 0.5f, c.z + w * 0.5f));
+                uvs.Add(new Vector2(0f, 0f)); uvs.Add(new Vector2(0f, 1f));
+                uvs.Add(new Vector2(1f, 1f)); uvs.Add(new Vector2(1f, 0f));
+                if (side < 0)
+                {
+                    tris.Add(i); tris.Add(i + 1); tris.Add(i + 2);
+                    tris.Add(i); tris.Add(i + 2); tris.Add(i + 3);
+                }
+                else
+                {
+                    tris.Add(i); tris.Add(i + 2); tris.Add(i + 1);
+                    tris.Add(i); tris.Add(i + 3); tris.Add(i + 2);
+                }
+            }
+            var mesh = new Mesh();
+            mesh.name = name;
+            mesh.SetVertices(verts);
+            mesh.SetUVs(0, uvs);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            ProcMesh.Save(mesh, Generated + name.Replace('.', '_') + ".asset");
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.AddComponent<MeshFilter>().sharedMesh = AssetDatabase.LoadAssetAtPath<Mesh>(Generated + name.Replace('.', '_') + ".asset");
+            go.AddComponent<MeshRenderer>().sharedMaterial = GlowMat(col, glow);
+        }
+
+        /// <summary>色だけの自発光マテリアル。同じ色は使い回す</summary>
+        static Material GlowMat(Color col, float glow)
+        {
+            var key = string.Format("Glow_{0:000}_{1:000}_{2:000}_{3:00}",
+                (int)(col.r * 255), (int)(col.g * 255), (int)(col.b * 255), (int)(glow * 10));
+            var path = Materials + key + ".mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m != null) return m;
+            if (!AssetDatabase.IsValidFolder("Assets/Materials/Alley"))
+                AssetDatabase.CreateFolder("Assets/Materials", "Alley");
+            m = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            m.name = key;
+            m.SetColor("_BaseColor", new Color(col.r * glow, col.g * glow, col.b * glow, 1f));
+            AssetDatabase.CreateAsset(m, path);
+            AssetDatabase.SaveAssets();
+            return m;
+        }
+
+        /// <summary>看板を 1 枚立てる。突き出す物には壁までの腕と灯りを足す</summary>
+        static void Sign(Transform parent, string name, Plate p)
+        {
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/" + p.texture + ".png");
+            if (tex == null) { Debug.LogWarning("テクスチャが無い: " + p.texture); return; }
+            var wide = Tall(p.texture) ? p.scale : p.scale * 2f;
+            var high = Tall(p.texture) ? p.scale * 2f : p.scale;
+            var wallX = p.side * StreetHalf;
+            var reach = p.blade ? 0.95f : 0.12f;
+            var x = wallX - p.side * reach;
+
+            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            go.name = name;
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = new Vector3(x, p.y, p.z);
+            // 突き出す物は通りの上下を向き、貼る物は通りの中央を向く
+            go.transform.localRotation = p.blade
+                ? Quaternion.identity
+                : Quaternion.Euler(0f, p.side > 0 ? 90f : -90f, 0f);
+            go.transform.localScale = new Vector3(wide, high, 1f);
+            go.GetComponent<MeshRenderer>().sharedMaterial = NeonMat(p.texture, tex);
+            Object.DestroyImmediate(go.GetComponent<Collider>());
+
+            if (!p.blade) return;
+            // 壁まで繋ぐ腕
+            Box(parent, name + ".Arm", new Vector3(wallX - p.side * reach * 0.5f, p.y + high * 0.5f - 0.1f, p.z),
+                new Vector3(reach, 0.08f, 0.08f), "Ledge");
+            // 通りへ落ちる色。突き出した物にだけ付ける
+            var lamp = new GameObject(name + ".Lamp");
+            lamp.transform.SetParent(parent, false);
+            lamp.transform.localPosition = new Vector3(x - p.side * 0.5f, p.y, p.z);
+            var l = lamp.AddComponent<Light>();
+            l.type = LightType.Point;
+            l.color = NeonTint(p.texture);
+            l.range = 11f;
+            l.intensity = 7.5f;
+            l.shadows = LightShadows.None;
+        }
+
+        /// <summary>
+        /// 自分で光る看板のマテリアル。足し算で重ねるので、滲みが背景へそのまま乗る。
+        /// 裏からも見えるように面の切り落としは切ってある
+        /// </summary>
+        static Material NeonMat(string texture, Texture2D tex)
+        {
+            var path = Materials + "Neon_" + texture + ".mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                if (!AssetDatabase.IsValidFolder("Assets/Materials/Alley"))
+                    AssetDatabase.CreateFolder("Assets/Materials", "Alley");
+                m = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+                m.name = "Neon_" + texture;
+                AssetDatabase.CreateAsset(m, path);
+            }
+            m.SetTexture("_BaseMap", tex);
+            m.SetColor("_BaseColor", new Color(1.7f, 1.7f, 1.7f, 1f));
+            m.SetFloat("_Surface", 1f);
+            m.SetFloat("_Blend", 0f);
+            m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            m.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.One);
+            m.SetFloat("_ZWrite", 0f);
+            m.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Off);
+            m.SetFloat("_AlphaClip", 0f);
+            m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            m.DisableKeyword("_ALPHATEST_ON");
+            m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+            EditorUtility.SetDirty(m);
+            AssetDatabase.SaveAssets();
+            return m;
         }
 
         // ---- 置き方 --------------------------------------------------------
