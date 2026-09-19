@@ -13,6 +13,7 @@ namespace HalfAware.EditorTools
     /// 道はタイルを環にして流す（<see cref="RoadRing"/>／<see cref="DriveWorld"/>）。
     /// 沿道は帯ごとの入れ物に分け、その下をタイルと同じ枚数の区切りに割る。
     /// 区切りを道と同じ環に乗せるので、沿道と道の継ぎ目は勝手に揃う。
+    /// 対向車だけは同じ形の入れ物を別に持ち、道より速い環に乗せる。
     ///
     /// 帯はここでは 0 から数える。設計書が「帯 1」と呼ぶものが 0 番にあたる
     /// </summary>
@@ -70,11 +71,12 @@ namespace HalfAware.EditorTools
             shapes.Clear();
 
             var root = Root("Drive");
-            Prune(root, new[] { "Car", "Road", "Roadsides", "Garage", "Items" });
+            Prune(root, new[] { "Car", "Road", "Roadsides", "Oncoming", "Garage", "Items" });
             Stage();
             Car(Child(root, "Car"));
             Road(Child(root, "Road"));
             Roadsides(Child(root, "Roadsides"));
+            Traffic(Child(root, "Oncoming"));
             Garage(root);
             Items(root);
             Wire(root);
@@ -83,7 +85,7 @@ namespace HalfAware.EditorTools
             Selection.activeGameObject = root.gameObject;
             Mark(root.gameObject);
             AssetDatabase.SaveAssets();
-            Debug.Log(string.Format("車と道を組んだ。タイル {0} 枚 × {1} m（前 {2} / 後ろ {3}）、沿道 {4} 帯 × {0} 区切り",
+            Debug.Log(string.Format("車と道を組んだ。タイル {0} 枚 × {1} m（前 {2} / 後ろ {3}）、沿道と対向車が {4} 帯 × {0} 区切りずつ",
                 TileCount, TileLength, Ahead, Behind, Bands));
         }
 
@@ -172,9 +174,11 @@ namespace HalfAware.EditorTools
 
             trim.Box(new Vector3(0f, 0.92f, 0.72f), new Vector3(1.72f, 0.26f, 0.42f));
             glass.Box(new Vector3(-0.38f, 1.02f, 0.60f), new Vector3(0.34f, 0.14f, 0.03f));
-            Wheel(trim, new Vector3(-0.38f, 1.02f, 0.44f), 0.36f, 0.035f, 68f);
-            // 上を後ろへ倒す。屋根が前へ被さる向きにすると、外が見えなくなる
-            glass.Box(new Vector3(0f, 1.32f, 0.86f), new Vector3(1.66f, 0.62f, 0.02f), Quaternion.Euler(-22f, 0f, 0f));
+            // メーターより 0.05 手前へ引く。前後を揃えると輪の向こう端が計器の面と擦れる
+            Wheel(trim, new Vector3(-0.38f, 1.02f, 0.39f), 0.36f, 0.035f, 68f);
+            // 上を後ろへ倒す。屋根が前へ被さる向きにすると、外が見えなくなる。
+            // 上の縁は天井の板の中へ差し込む。背を縮めずに下げると、下の縁が計器盤から離れて隙間が開く
+            glass.Box(new Vector3(0f, 1.279f, 0.884f), new Vector3(1.66f, 0.49f, 0.02f), Quaternion.Euler(-22f, 0f, 0f));
             trim.Box(new Vector3(-0.86f, 0.86f, 0.10f), new Vector3(0.08f, 0.72f, 1.30f));
             trim.Box(new Vector3(0.86f, 0.86f, 0.10f), new Vector3(0.08f, 0.72f, 1.30f));
             seat.Box(new Vector3(0.42f, 0.62f, -0.06f), new Vector3(0.52f, 0.10f, 0.52f));
@@ -304,17 +308,10 @@ namespace HalfAware.EditorTools
         static void Roadsides(Transform parent)
         {
             Clear(parent);
-            var n = TileCount;
             for (var b = 0; b < Bands; b++)
             {
                 var band = Child(parent, "Band" + b);
-                var slices = new Transform[n];
-                for (var i = 0; i < n; i++)
-                {
-                    var slice = Child(band, "Slice" + i);
-                    slice.localPosition = new Vector3(0f, 0f, RoadRing.Slot(i, n, TileLength, 0f, Behind));
-                    slices[i] = slice;
-                }
+                var slices = Slices(band);
                 if (b == 0) Outskirts(slices);
                 else if (b == 1) Motorway(slices);
                 else if (b == 2) Trunk(slices);
@@ -323,6 +320,54 @@ namespace HalfAware.EditorTools
                 // 帯を出し分けるのは DriveWorld.Dress。組んだ直後は頭の帯だけ見せる
                 band.gameObject.SetActive(b == 0);
             }
+        }
+
+        /// <summary>
+        /// 対向車。沿道と同じ帯と区切りの形に割るが、入れ物は別に持つ。
+        ///
+        /// すれ違う車は自分の速さと相手の速さの和で近づいてくる。沿道と同じ環に乗せると
+        /// 道と同じ速さでしか流れず、隣を並んで走っているようにしか見えない。
+        /// DriveWorld が oncomingRate を掛けた距離でこちらだけ別に流す。
+        ///
+        /// 中身があるのは帯 1 だけだが、入れ物と区切りは 5 帯ぶん揃えて作る。
+        /// Place は childCount を環の大きさに使うので、数が揃っていないと繋ぎ替えで狂う
+        /// </summary>
+        static void Traffic(Transform parent)
+        {
+            Clear(parent);
+            var dots = Shape("Oncoming", 0.5f, b =>
+            {
+                b.Box(new Vector3(-0.76f, 0.72f, 0f), new Vector3(0.26f, 0.16f, 0.10f));
+                b.Box(new Vector3(0.76f, 0.72f, 0f), new Vector3(0.26f, 0.16f, 0.10f));
+            });
+            for (var b = 0; b < Bands; b++)
+            {
+                var band = Child(parent, "Band" + b);
+                var slices = Slices(band);
+                // 60 は 180 を割り切る。割り切らないと一周に一度だけ続けざまにすれ違う
+                if (b == 1)
+                    Along(slices, 60f, (slice, z, k) =>
+                        Piece(slice, "Oncoming" + k, dots, Glow(new Color(0.92f, 0.94f, 1f), 3.4f))
+                            .localPosition = new Vector3(-2.4f, 0f, z));
+                band.gameObject.SetActive(b == 0);
+            }
+        }
+
+        /// <summary>
+        /// 帯の入れ物の下に、タイルと同じ枚数の区切りを割る。
+        /// 入れ物の直下には区切り以外を置かない。1 つ混ざるだけで環の大きさが変わる
+        /// </summary>
+        static Transform[] Slices(Transform band)
+        {
+            var n = TileCount;
+            var all = new Transform[n];
+            for (var i = 0; i < n; i++)
+            {
+                var slice = Child(band, "Slice" + i);
+                slice.localPosition = new Vector3(0f, 0f, RoadRing.Slot(i, n, TileLength, 0f, Behind));
+                all[i] = slice;
+            }
+            return all;
         }
 
         /// <summary>帯 0。倫敦の外れ。高架の脚とネオン、濡れた路面</summary>
@@ -345,7 +390,7 @@ namespace HalfAware.EditorTools
                     .localPosition = new Vector3(at, 3.2f, z)));
         }
 
-        /// <summary>帯 1。夜の高速。街灯と、対向車のヘッドライト</summary>
+        /// <summary>帯 1。夜の高速。街灯だけ。対向車は別の環に乗るので Traffic が持つ</summary>
         static void Motorway(Transform[] slices)
         {
             var post = Shape("LampPost", 0.4f, b =>
@@ -356,11 +401,6 @@ namespace HalfAware.EditorTools
                 b.Box(new Vector3(0.62f, 7.14f, 0f), new Vector3(1.30f, 0.12f, 0.12f));
             });
             var head = Shape("LampHead", 0.5f, b => b.Box(new Vector3(1.18f, 7.02f, 0f), new Vector3(0.62f, 0.12f, 0.26f)));
-            var dots = Shape("Oncoming", 0.5f, b =>
-            {
-                b.Box(new Vector3(-0.76f, 0.72f, 0f), new Vector3(0.26f, 0.16f, 0.10f));
-                b.Box(new Vector3(0.76f, 0.72f, 0f), new Vector3(0.26f, 0.16f, 0.10f));
-            });
 
             Along(slices, 36f, (slice, z, k) => Sides("Lamp" + k, 4.6f, (at, side, name) =>
             {
@@ -371,9 +411,6 @@ namespace HalfAware.EditorTools
                 Piece(lamp, "Post", post, Mat("Metal"));
                 Piece(lamp, "Head", head, Glow(new Color(1f, 0.72f, 0.36f), 3.0f));
             }));
-            Along(slices, 60f, (slice, z, k) =>
-                Piece(slice, "Oncoming" + k, dots, Glow(new Color(0.92f, 0.94f, 1f), 3.4f))
-                    .localPosition = new Vector3(-2.4f, 0f, z));
         }
 
         /// <summary>帯 2。深夜の幹線。木立だけ</summary>
@@ -383,13 +420,20 @@ namespace HalfAware.EditorTools
             for (var v = 0; v < trees.Length; v++) trees[v] = TreeMesh(v);
             // 種を決め打ちにして、組み直しても同じ画になるようにする
             var rnd = new System.Random(20260920);
-            Scatter(slices, 12f, 3.6f, rnd, (slice, z, k) => Sides("Tree" + k, 5.8f, (at, side, name) =>
+            for (var s = 0; s < 2; s++)
             {
-                var t = Piece(slice, name, trees[(k + side) % trees.Length], Mat("Tree"));
-                t.localPosition = new Vector3(at + (float)rnd.NextDouble() * 1.4f * (side == 0 ? -1f : 1f), 0f, z);
-                t.localRotation = Quaternion.Euler(0f, (float)rnd.NextDouble() * 360f, 0f);
-                t.localScale = Vector3.one * (0.78f + (float)rnd.NextDouble() * 0.5f);
-            }));
+                var side = s == 0 ? -1f : 1f;
+                var tag = s == 0 ? "L" : "R";
+                // 右は刻みを半分ずらす。左右を同じ位置に立てると、道を挟んで木が対で並んで見える。
+                // ばらつきも左右で別に引くので、揺らぎまで揃うことはない
+                Scatter(slices, 12f, 3.6f, s * 6f, rnd, (slice, z, k) =>
+                {
+                    var t = Piece(slice, "Tree" + tag + k, trees[(k + s) % trees.Length], Mat("Tree"));
+                    t.localPosition = new Vector3((5.8f + (float)rnd.NextDouble() * 1.4f) * side, 0f, z);
+                    t.localRotation = Quaternion.Euler(0f, (float)rnd.NextDouble() * 360f, 0f);
+                    t.localScale = Vector3.one * (0.78f + (float)rnd.NextDouble() * 0.5f);
+                });
+            }
         }
 
         /// <summary>木 1 本。夜明け前の逆光では影にしかならないので、塊だけ作る</summary>
@@ -417,7 +461,8 @@ namespace HalfAware.EditorTools
             {
                 for (var s = 0; s < 2; s++)
                 {
-                    var x = s == 0 ? -4.4f : 4.4f;
+                    // 路肩は ±4.7 まで。石垣は道の縁より外に立つものなので、跨がせない
+                    var x = s == 0 ? -5.2f : 5.2f;
                     b.Box(new Vector3(x, 0.40f, TileLength * 0.5f), new Vector3(0.46f, 0.80f, TileLength));
                     b.Box(new Vector3(x, 0.85f, TileLength * 0.5f), new Vector3(0.54f, 0.10f, TileLength));
                 }
@@ -425,8 +470,8 @@ namespace HalfAware.EditorTools
             // 牧草地は路肩より下げる。同じ高さだと面が重なってちらつく
             var field = Shape("Pasture", 0.12f, b =>
             {
-                b.FaceY(-0.06f, -46f, -4.2f, 0f, TileLength, 1);
-                b.FaceY(-0.06f, 4.2f, 46f, 0f, TileLength, 1);
+                b.FaceY(-0.06f, -46f, -4.6f, 0f, TileLength, 1);
+                b.FaceY(-0.06f, 4.6f, 46f, 0f, TileLength, 1);
             });
             for (var i = 0; i < slices.Length; i++)
             {
@@ -497,9 +542,10 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// Along と同じだが、刻みから wobble まで前後にばらけさせる。
         /// 木立のように並んで見えては困るものに使う。環の上で畳むので、
-        /// 一周したところで並びは繋がったままになる
+        /// 一周したところで並びは繋がったままになる。
+        /// phase は並び全体をずらす量で、左右で対にならないようにするのに使う
         /// </summary>
-        static void Scatter(Transform[] slices, float spacing, float wobble, System.Random rnd,
+        static void Scatter(Transform[] slices, float spacing, float wobble, float phase, System.Random rnd,
             System.Action<Transform, float, int> put)
         {
             if (slices.Length == 0 || spacing <= 0f) return;
@@ -510,7 +556,7 @@ namespace HalfAware.EditorTools
                 return;
             }
             for (var k = 0; k < count; k++)
-                Drop(slices, k * spacing + ((float)rnd.NextDouble() - 0.5f) * 2f * wobble, k, put);
+                Drop(slices, k * spacing + phase + ((float)rnd.NextDouble() - 0.5f) * 2f * wobble, k, put);
         }
 
         /// <summary>環の上の位置を、区切りの番号と区切りの中の z に割る</summary>
@@ -537,8 +583,36 @@ namespace HalfAware.EditorTools
         /// <summary>調べる対象。Task 9 で立てる</summary>
         static void Items(Transform root) { }
 
-        /// <summary>DriveWorld と DriveDirector への繋ぎ込み。Task 9 でやる</summary>
-        static void Wire(Transform root) { }
+        /// <summary>
+        /// DriveWorld にタイルと沿道と対向車を渡す。private な [SerializeField] なので
+        /// SerializedObject 越しに書く。DriveDirector と調べる対象の繋ぎ込みは Task 9
+        /// </summary>
+        static void Wire(Transform root)
+        {
+            var world = root.GetComponent<DriveWorld>();
+            if (world == null) world = root.gameObject.AddComponent<DriveWorld>();
+            var so = new SerializedObject(world);
+            Fill(so.FindProperty("tiles"), Kids(root.Find("Road")));
+            Fill(so.FindProperty("roadsides"), Kids(root.Find("Roadsides")));
+            Fill(so.FindProperty("oncoming"), Kids(root.Find("Oncoming")));
+            // 寸法は組み立てとひとつの数から出す。Inspector で別々に持つと片方だけ直して隙間が開く
+            so.FindProperty("tileLength").floatValue = TileLength;
+            so.FindProperty("behind").floatValue = Behind;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        static Transform[] Kids(Transform parent)
+        {
+            var all = new Transform[parent.childCount];
+            for (var i = 0; i < all.Length; i++) all[i] = parent.GetChild(i);
+            return all;
+        }
+
+        static void Fill(SerializedProperty row, Transform[] all)
+        {
+            row.arraySize = all.Length;
+            for (var i = 0; i < all.Length; i++) row.GetArrayElementAtIndex(i).objectReferenceValue = all[i];
+        }
 
         // ---- 道具 ----------------------------------------------------------
 
