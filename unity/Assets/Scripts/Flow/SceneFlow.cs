@@ -40,10 +40,12 @@ namespace HalfAware
         [SerializeField] float cardLiftSeconds = 1.8f;
         [Tooltip("出て行くときに 1 度鳴らす音。扉の開け閉めなど")]
         [SerializeField] AudioSource exitSound;
-        [Tooltip("その音を鳴らしてから暗転を始めるまでの秒数")]
-        [SerializeField] float exitSoundSeconds = 1.7f;
+        [Tooltip("その音を鳴らしてから暗転するまでの秒数。扉が閉まる瞬間に合わせる")]
+        [SerializeField] float exitSoundSeconds = 1.45f;
         [Tooltip("次の場面へ渡す前に暗転するか。見出しを挟んで切り替えるときに使う")]
-        [SerializeField] bool fadeOutToNext;
+        [SerializeField] bool cutToBlack;
+        [Tooltip("暗転してから次の場面を読むまでの秒数。音の余韻はここで鳴り切る")]
+        [SerializeField] float blackHoldSeconds = 0.55f;
 
         [Header("座って始める")]
         [Tooltip("座っているときの目線の高さ")]
@@ -359,8 +361,13 @@ namespace HalfAware
                 hud.SetCenter(ToBeContinued);
                 yield break;
             }
-            // 見出しを挟んで渡すときだけ、先に黒く落とす
-            if (fadeOutToNext) yield return hud.FadeTo(1f, FadeSeconds);
+            // 見出しを挟んで渡すときだけ、先に黒く落とす。
+            // 薄れさせると扉の閉まる音と合わないので、そこは切り替える
+            if (cutToBlack)
+            {
+                hud.SetFade(1f);
+                if (blackHoldSeconds > 0f) yield return new WaitForSeconds(blackHoldSeconds);
+            }
             else yield return null;
             SceneManager.LoadScene(SceneExit.Target(nextScene));
         }

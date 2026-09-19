@@ -16336,8 +16336,9 @@ MonoBehaviour:
   cardSeconds: 2.4
   cardLiftSeconds: 1.8
   exitSound: {fileID: 1282060287}
-  exitSoundSeconds: 1.75
-  fadeOutToNext: 1
+  exitSoundSeconds: 1.45
+  cutToBlack: 1
+  blackHoldSeconds: 0.55
   seatEyeHeight: 1.1
   standAfter: cigarette
   standSpot: {fileID: 1890007234}
@@ -16382,7 +16383,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: HalfAware::HalfAware.RoomIntroDirector
   holdSeconds: 1.95
   aimSeconds: 2.5
-  liftSeconds: 1.4
+  liftSeconds: 2.9
+  settleSeconds: 1.1
   flow: {fileID: 835399815}
   hud: {fileID: 230293359}
   cigarette: {fileID: 12771891}

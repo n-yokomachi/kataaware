@@ -21,6 +21,8 @@ namespace HalfAware
         [SerializeField] float aimSeconds = 2.5f;
         [Tooltip("最後のカードから明けるのにかける秒数。ここだけは切り替えずに戻す")]
         [SerializeField] float liftSeconds = 1.4f;
+        [Tooltip("明けきってから独白までにおくひと呼吸。秒")]
+        [SerializeField] float settleSeconds = 1.1f;
 
         [SerializeField] SceneFlow flow;
         [SerializeField] HudView hud;
@@ -111,8 +113,9 @@ namespace HalfAware
                     while (Time.time < at) yield return null;
                     yield return Show(cards[i], last);
                 }
-                // 最後に吐き終わってから、少し置いて独白へ
-                var until = started + SmokeBeats.Total(Drags);
+                // 最後に吐き終わってから、少し置いて独白へ。
+                // 明けに時刻表より手間取ったときは、明け終わりから数え直す
+                var until = SmokeBeats.Settle(Time.time, started + SmokeBeats.Total(Drags), settleSeconds);
                 flow.Freeze(until - Time.time + FreezeMargin);
                 while (Time.time < until) yield return null;
             }

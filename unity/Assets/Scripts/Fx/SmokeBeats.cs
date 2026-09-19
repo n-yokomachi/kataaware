@@ -85,6 +85,16 @@ namespace HalfAware
             return BlowAt(i, drags) + CardAfterBlow;
         }
 
+        /// <summary>
+        /// 明けきってからひと呼吸おく。カードから明けるのに時刻表より手間取ったら、
+        /// 明け終わったところから数え直す。独白が明けに食い込まないように
+        /// </summary>
+        public static float Settle(float now, float scheduled, float breath)
+        {
+            var after = now + Mathf.Max(0f, breath);
+            return scheduled > after ? scheduled : after;
+        }
+
         /// <summary>drags 服ぶんを吸い終えて、独白に移るまでの長さ</summary>
         public static float Total(int drags)
         {

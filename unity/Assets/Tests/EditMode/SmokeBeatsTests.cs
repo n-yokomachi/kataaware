@@ -126,5 +126,25 @@ namespace HalfAware.Tests
         {
             Assert.AreEqual(SmokeBeats.FlameAt + SmokeBeats.FlameSeconds, SmokeBeats.SmokeAt(0f), 1e-4f);
         }
+
+        [Test]
+        public void SettleKeepsTheTimetableWhenTheLiftIsQuick()
+        {
+            // 予定より早く明けたら、予定どおりに独白へ移る
+            Assert.That(SmokeBeats.Settle(10f, 14f, 1.1f), Is.EqualTo(14f).Within(1e-4f));
+        }
+
+        [Test]
+        public void SettleWaitsAfterASlowLift()
+        {
+            // 予定を過ぎてから明けたら、明け終わりからひと呼吸おく
+            Assert.That(SmokeBeats.Settle(16f, 14f, 1.1f), Is.EqualTo(17.1f).Within(1e-4f));
+        }
+
+        [Test]
+        public void SettleNeverGoesBackwards()
+        {
+            Assert.That(SmokeBeats.Settle(16f, 14f, -5f), Is.EqualTo(16f).Within(1e-4f));
+        }
     }
 }

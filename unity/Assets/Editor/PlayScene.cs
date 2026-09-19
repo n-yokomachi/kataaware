@@ -24,7 +24,7 @@ namespace HalfAware.EditorTools
         };
 
         [MenuItem("HalfAware/Scenes", false, 0)]
-        public static void Show()
+        public static void Open()
         {
             var w = GetWindow<SceneWindow>("Scenes");
             w.minSize = new Vector2(240f, 140f);
