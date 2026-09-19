@@ -99,7 +99,7 @@ namespace HalfAware.Tests
             var band = Band();
             clock.Trigger();
             clock.Spoken();
-            Run(clock, band, 5.1f + 0.9f);
+            Run(clock, band, 5.1f + 0.9f);          // 余韻 5 と黒 0.8 を越える
             Assert.AreEqual(DriveBeat.FadingIn, clock.Beat);
             var first = clock.Dark(band);
             Run(clock, band, 0.7f);
