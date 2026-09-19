@@ -13,6 +13,7 @@ namespace HalfAware
     public sealed class PlayerController : MonoBehaviour
     {
         public const float WalkSpeed = 1.4f;         // m/s。歩きの一巡とほぼ同じ速さ
+        public const float RunSpeed = 3.0f;          // m/s。Shift を押している間
         public const float StandingEyeHeight = 1.6f;
         public const float PitchLimit = 80f;         // 度
         public const float LookSensitivity = 0.126f; // 度 / ピクセル。試作の 0.0022 rad/px と同じ
@@ -29,6 +30,15 @@ namespace HalfAware
         InputAction interact;
         InputAction logToggle;
         float pitch;
+
+        /// <summary>走っているときの速さ。押している間だけ上げる</summary>
+        public static float Speed(bool running)
+        {
+            return running ? RunSpeed : WalkSpeed;
+        }
+
+        /// <summary>今このフレームで走っているか。動作確認から読む</summary>
+        public bool Running { get; private set; }
 
         /// <summary>false の間は見回しだけできる（座っている、演出中など）</summary>
         public bool CanMove { get; set; } = true;
@@ -158,7 +168,11 @@ namespace HalfAware
         void Walk(Vector2 input)
         {
             var local = Vector3.ClampMagnitude(new Vector3(input.x, 0f, input.y), 1f);
-            body.SimpleMove(transform.TransformDirection(local) * WalkSpeed);
+            // Shift を押している間だけ速くする。入力の割り当てを増やさず、鍵盤を直に見る
+            var keys = Keyboard.current;
+            Running = local.sqrMagnitude > 0.01f && keys != null
+                && (keys.leftShiftKey.isPressed || keys.rightShiftKey.isPressed);
+            body.SimpleMove(transform.TransformDirection(local) * Speed(Running));
         }
     }
 }
