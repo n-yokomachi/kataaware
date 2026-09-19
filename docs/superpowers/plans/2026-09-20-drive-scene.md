@@ -1419,8 +1419,15 @@ namespace HalfAware
             // 独白を送り切ったか。積んだ字幕が尽きたところで余韻へ移る
             if (clock.Beat == DriveBeat.Talking && !flow.Talking) clock.Spoken();
 
-            // 最後の帯には次が無い。余韻まで来たら段取りを止め、閉じるのを SceneFlow に渡す
-            if (route.IsLast(band) && clock.Beat == DriveBeat.Afterglow) { flow.Held = false; return; }
+            // 最後の帯には次の景色が無い。ただし余韻は流す。
+            // 送り切った瞬間に場面が閉じると、窓を開けた最後の一行のあとが忙しない。
+            // 黒へ移る手前まで来たところで、閉じるのを SceneFlow に渡す
+            if (route.IsLast(band) && clock.Beat != DriveBeat.Running && clock.Beat != DriveBeat.Talking)
+            {
+                clock.Tick(Time.deltaTime, Now);
+                flow.Held = clock.Beat == DriveBeat.Afterglow;
+                return;
+            }
             flow.Held = true;
 
             // 黒と明けの秒数は「終わる側」の帯のもの。仮眠は帯 2 の末尾の暗転にあたる
@@ -1449,6 +1456,8 @@ namespace HalfAware
         void Examined(IInteractable item)
         {
             if (item == null) return;
+            // ガレージのドアは二択を出す。「はい」を選んだあとに Examined が鳴るので、
+            // ここへ来た時点で乗ると決まっている
             if (item.Id == DriveIds.Door) { Board(); return; }
             if (!aboard || band < 0) return;
             // 走っている最中にしか始めない。時計が受け付けない段で段を積むと、
@@ -1520,7 +1529,7 @@ namespace HalfAware
 - **帯を跨ぐときに `clock.Reset()` を呼ばない。** 呼ぶと `Beat` が `Running` に戻り、`Dark()` が 0 を返して、黒が 1 フレームで終わる。明けるフェードは一度も走らない。`Reset` は `Board` の一度だけ
 - **`flow.Completed` で手を引く。** `SceneFlow.Complete()` は `hud.SetFade(1f)` と `FadeTo(1f, …)` で同じ暗幕を書く。`DriveDirector` は実行順 -5 なのでそれを毎フレーム上書きしてしまい、「続く」が明るいまま出る
 - **`TakeSwap` を `band = shown` より先に置く。** 秒数を全部 0 にされたとき、同じフレームで入れ替えと引き渡しの両方が起きる必要がある
-- **最後の帯の余韻は流れない。** `Held` が最初の `Afterglow` のフレームで下りるので、窓を開けた最後の行のあとは、5 秒黙って走らずにそのまま場面が閉じる。最後の帯だけ `afterglow` を触っても効かないということなので、オーナーが尺を決めるときはそれを承知で
+- **最後の帯は余韻まで流してから閉じる。** 送り切った瞬間に閉じると、窓を開けた最後の一行のあとが忙しない。余韻が明けて黒へ移ろうとするところで `Held` を下ろし、あとの暗転は `SceneFlow.Complete` に任せる。`black` と `fadeIn` は最後の帯では使われない
 
 - [ ] **Step 2: コンパイルを通す**
 
@@ -1823,7 +1832,7 @@ git commit -m "feat: let me look around, feel the road, and fold my arms"
 
 - [ ] **Step 1: 実装する**
 
-`[MenuItem("HalfAware/Check the drive", false, 235)]` と `public static void Run(Transform root)` を置く。見るのは次の 7 つで、それぞれ問題の数を返す。
+`[MenuItem("HalfAware/Check the drive", false, 235)]` と `public static void Run(Transform root)` を置く。見るのは次の 9 つで、それぞれ問題の数を返す。
 
 1. **タイルの環** — ここで見るのは `RoadRing` の計算ではなく、**シーンに立っている実物**。計算そのものは `RoadRingTests` が 601 点で確かめているので、ここで数え直しても落ちない。見るのは次の三つ。
    - タイルの入れ物に空きや欠けが無いか。空きがあると 20 m の穴が環に乗って回り、16 m/s なら 11 秒ごとに正面へ飛んでくる
@@ -1835,6 +1844,8 @@ git commit -m "feat: let me look around, feel the road, and fold my arms"
 5. **id の食い違い** — シーンの `Interactable` の id と `DriveScript` の id を突き合わせる。`DriveIds.IsPage` は対象を持たないので飛ばす。`CheckAlley.Ids` と同じ
 6. **帯ときっかけの対応** — `DriveDirector.bands` の `trigger` が `DriveIds.Triggers` と同じ並びか、どの帯にもちょうど一つ割り当たっているか。欠けていたら「〈帯の名前〉にきっかけが無い」、重複していたら「きっかけが二つの帯で使われている: id」。警告に数字でなく `DriveBand.name` を出すのは、オーナーが 1 始まりの設計書を横に置いて読むため。`name` の説明にも「ログと見直しで使う」と書いてある
 7. **きっかけの対象がシーンにあるか** — `bands[i].trigger` と同じ id の `Interactable` が `triggers[i]` の下にあるか
+8. **文面の数が揃っているか** — `WriteDriveScript` の `BandPages` / `TriggerLines` / `TriggerLabels` の長さが`DriveIds.Triggers.Count` と同じか。`Triggers` が減ったときに、余った文が黙って書き出されなくなるのを捕まえる。EditMode テストからは `Assembly-CSharp-Editor` の中が見えないので、ここでしか見られない
+9. **アセットが今の文面と合っているか** — `DriveScript.asset` の中身が、いま `WriteDriveScript` が書き出すものと一致するか。アセットは Inspector で直に触れてしまうので、書き出しを走らせ忘れたまま commit されたのを捕まえる
 
 最後に `bad == 0` なら `Debug.Log("見直し: 気になるところは無し")`、そうでなければ `Debug.LogWarning("見直し: 気になるところ " + bad + " 件。上を参照")`。
 
