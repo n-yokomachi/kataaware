@@ -26,7 +26,9 @@ namespace HalfAware
         [SerializeField] Transform[] roadsides = new Transform[0];
         [Tooltip("対向車。帯ごとの入れ物。中身は沿道と同じく区切りに割る")]
         [SerializeField] Transform[] oncoming = new Transform[0];
-        [Tooltip("対向車が流れる速さ。道の何倍か。1 だと並んで走っているように見える")]
+        [Tooltip("対向車が流れる速さ。道の何倍か。1 だと並んで走っているように見える。" +
+            "走った距離に掛けるので、対向車の速さはこちらの速さに連れて変わる。" +
+            "対向車を出すのが速さの変わらない帯 1 だけのうちは構わないが、ほかの帯にも出すなら見直す")]
         [SerializeField] float oncomingRate = 2.2f;
 
         /// <summary>走る速さ。m/s。0 で止まる</summary>
@@ -65,9 +67,11 @@ namespace HalfAware
                 for (var i = 0; i < n; i++) Slide(dressed.GetChild(i), i, n, Travelled);
             }
             // 対向車だけは別の環。速く流さないと、並んで走っているように見える
-            if (rushing == null) return;
-            var m = rushing.childCount;
-            for (var i = 0; i < m; i++) Slide(rushing.GetChild(i), i, m, Travelled * oncomingRate);
+            if (rushing != null)
+            {
+                var m = rushing.childCount;
+                for (var i = 0; i < m; i++) Slide(rushing.GetChild(i), i, m, Travelled * oncomingRate);
+            }
         }
 
         /// <summary>

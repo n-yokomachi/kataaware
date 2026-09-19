@@ -38,8 +38,47 @@ namespace HalfAware.EditorTools
         public const float DirtHalf = 2.3f;
         /// <summary>路肩。片側</summary>
         public const float Shoulder = 1.2f;
-        /// <summary>路肩の落ち込み。舗装と同じ高さだと縁が読めない</summary>
+        /// <summary>
+        /// 路肩の落ち込み。舗装と地続きに見せないための段。
+        /// 座ったままの目線では舗装の面に隠れて段の立ち上がりそのものは見えないので、
+        /// 縁を読ませているのは高さではなく色の違い（Verge）の方
+        /// </summary>
         public const float ShoulderDrop = 0.05f;
+
+        /// <summary>
+        /// 道の中心の x。車は原点から動かせないので、走る車線の真ん中が原点に来るよう
+        /// 道の方をずらす。英国なので左側通行。車線 1 本ぶん右へ寄せると、
+        /// 中心線も対向車線も車の右側に来る。
+        /// 右ハンドルの国を左ハンドルに変えるなら、この符号と車内の左右を返すだけで済む
+        /// </summary>
+        public const float LaneOffset = RoadHalf * 0.5f;
+
+        /// <summary>対向車線の真ん中。世界の x</summary>
+        public const float OncomingX = LaneOffset + RoadHalf * 0.5f;
+
+        /// <summary>対向車が流れる速さ。道の何倍か。DriveWorld へそのまま渡す</summary>
+        public const float OncomingRate = 2.2f;
+
+        // ---- 路面に重ねる面の高さ ------------------------------------------
+        //
+        // 同じ平面に何枚も重ねるので、上下の順と間隔をここで一箇所に決める。
+        // 近すぎると遠くで深度が潰れてちらつき、順を違えると下の絵が消える。
+        // 手前 0.1 / 奥 1000 の深度では 100 m あたりで 6 mm ほどが限界なので、
+        // 隣り合う面はどれも 8 mm 以上あける
+
+        /// <summary>沿道より下に敷く地面。道だけが明るい帯に見えないように</summary>
+        public const float VergeY = -0.12f;
+        /// <summary>帯 0 の濡れた照り返し。白線の下に敷く</summary>
+        public const float SheenY = 0.008f;
+        /// <summary>白線。照り返しより上でないと、帯 0 だけ線が消える</summary>
+        public const float PaintY = 0.020f;
+        /// <summary>帯 4 の土。白線を覆い隠す高さが要る</summary>
+        public const float EarthY = 0.036f;
+        /// <summary>帯 4 の轍。土の上</summary>
+        public const float RutY = 0.050f;
+
+        /// <summary>空と霧の色。カメラの背景と揃える</summary>
+        public static readonly Color Sky = new Color(0.055f, 0.060f, 0.082f);
 
         /// <summary>帯の数</summary>
         public const int Bands = 5;
@@ -122,18 +161,27 @@ namespace HalfAware.EditorTools
         /// </summary>
         static void Stage()
         {
-            var cam = Loose("Main Camera");
-            cam.tag = "MainCamera";
-            cam.transform.position = new Vector3(0f, 1.18f, 0f);
-            cam.transform.rotation = Quaternion.identity;
+            // カメラは本来 Player の持ち物（BuildAlley.Place と同じ構え）。場面 8 の rig は Task 9 で入る。
+            // それまでの間に合わせとしてシーンに直に 1 つ置き、rig が来たらそちらへ譲る。
+            // 両方に札と AudioListener を持たせると、耳が二つになって警告が出続ける
+            var rig = GameObject.Find("Player/Main Camera");
+            var cam = rig != null ? rig : Loose("Main Camera");
+            if (rig == null)
+            {
+                cam.tag = "MainCamera";
+                cam.transform.position = new Vector3(0f, 1.18f, 0f);
+                cam.transform.rotation = Quaternion.identity;
+                if (cam.GetComponent<AudioListener>() == null) cam.AddComponent<AudioListener>();
+            }
             var c = cam.GetComponent<Camera>();
             if (c == null) c = cam.AddComponent<Camera>();
             c.clearFlags = CameraClearFlags.SolidColor;
-            c.backgroundColor = new Color(0.035f, 0.040f, 0.058f);
-            c.nearClipPlane = 0.05f;
+            c.backgroundColor = Sky;
+            // 車内で一番近いのは天井の板の 0.31 m。手前を 0.1 まで引くと、
+            // 路面に重ねた面の深度の余裕がそのぶん増える
+            c.nearClipPlane = 0.1f;
             c.farClipPlane = 1000f;
             c.fieldOfView = 70f;
-            if (cam.GetComponent<AudioListener>() == null) cam.AddComponent<AudioListener>();
             EditorUtility.SetDirty(c);
 
             var sun = Loose("Directional Light");
@@ -149,7 +197,8 @@ namespace HalfAware.EditorTools
 
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
-            RenderSettings.fogColor = new Color(0.055f, 0.060f, 0.082f);
+            // 背景と同じ色。違えると、地面が霧に溶け切ったところに横一線の継ぎ目が出る
+            RenderSettings.fogColor = Sky;
             RenderSettings.fogDensity = 0.014f;
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.070f, 0.078f, 0.105f);
@@ -173,16 +222,18 @@ namespace HalfAware.EditorTools
             var glass = new Bank { Texel = 0.8f };
 
             trim.Box(new Vector3(0f, 0.92f, 0.72f), new Vector3(1.72f, 0.26f, 0.42f));
-            glass.Box(new Vector3(-0.38f, 1.02f, 0.60f), new Vector3(0.34f, 0.14f, 0.03f));
+            // 英国なので右ハンドル。運転席が道の中心線側に来る（LaneOffset と対）
+            glass.Box(new Vector3(0.38f, 1.02f, 0.60f), new Vector3(0.34f, 0.14f, 0.03f));
             // メーターより 0.05 手前へ引く。前後を揃えると輪の向こう端が計器の面と擦れる
-            Wheel(trim, new Vector3(-0.38f, 1.02f, 0.39f), 0.36f, 0.035f, 68f);
+            Wheel(trim, new Vector3(0.38f, 1.02f, 0.39f), 0.36f, 0.035f, 68f);
             // 上を後ろへ倒す。屋根が前へ被さる向きにすると、外が見えなくなる。
             // 上の縁は天井の板の中へ差し込む。背を縮めずに下げると、下の縁が計器盤から離れて隙間が開く
             glass.Box(new Vector3(0f, 1.279f, 0.884f), new Vector3(1.66f, 0.49f, 0.02f), Quaternion.Euler(-22f, 0f, 0f));
             trim.Box(new Vector3(-0.86f, 0.86f, 0.10f), new Vector3(0.08f, 0.72f, 1.30f));
             trim.Box(new Vector3(0.86f, 0.86f, 0.10f), new Vector3(0.08f, 0.72f, 1.30f));
-            seat.Box(new Vector3(0.42f, 0.62f, -0.06f), new Vector3(0.52f, 0.10f, 0.52f));
-            seat.Box(new Vector3(0.42f, 0.94f, 0.22f), new Vector3(0.52f, 0.54f, 0.10f));
+            // 助手席は運転席の反対、道の外側
+            seat.Box(new Vector3(-0.42f, 0.62f, -0.06f), new Vector3(0.52f, 0.10f, 0.52f));
+            seat.Box(new Vector3(-0.42f, 0.94f, 0.22f), new Vector3(0.52f, 0.54f, 0.10f));
             trim.Box(new Vector3(0f, 1.52f, 0.10f), new Vector3(1.72f, 0.06f, 1.60f));
             glass.Box(new Vector3(0f, 1.44f, 0.74f), new Vector3(0.28f, 0.08f, 0.02f));
 
@@ -237,11 +288,13 @@ namespace HalfAware.EditorTools
             Clear(parent);
             var n = TileCount;
             var surface = TileMesh();
+            var ground = GroundMesh();
             var paint = PaintMesh();
             for (var i = 0; i < n; i++)
             {
                 var tile = Piece(parent, "Tile" + i, surface, Mat("Asphalt"));
                 tile.localPosition = new Vector3(0f, 0f, RoadRing.Slot(i, n, TileLength, 0f, Behind));
+                Piece(tile, "Ground", ground, Mat("Verge"));
                 Piece(tile, "Line", paint, Mat("RoadLine"));
             }
         }
@@ -259,16 +312,34 @@ namespace HalfAware.EditorTools
         static Mesh TileMesh()
         {
             var bank = new Bank { Texel = 0.5f };
-            bank.FaceY(0f, -RoadHalf, RoadHalf, 0f, TileLength, 1);
+            bank.FaceY(0f, Lane(-RoadHalf), Lane(RoadHalf), 0f, TileLength, 1);
+            return Bake(bank, "RoadTile");
+        }
+
+        /// <summary>
+        /// 舗装の外の地面と路肩。タイルと同じ形なので同じ環に乗る。
+        ///
+        /// 舗装しか敷かないと、その外は霧の色のまま抜ける。霧は路面より明るい色なので、
+        /// 道だけが地平まで明るい帯として浮き、高架の脚も木立も何も無い所に立って見える。
+        /// ここを暗く塞ぐのが目的で、帯 3 の牧草地（-0.06）と帯 4 の土の下に来る高さに置く。
+        ///
+        /// 舗装と別の mesh にしてあるのは、路肩と地面に舗装と違う色を持たせるため。
+        /// 段の立ち上がりは外向きのままにする。運転席からは舗装の面に隠れて見えないが、
+        /// 内向きに返すと道の塊が裏返り、ガレージから歩いて近づいたときに中身が見える
+        /// </summary>
+        static Mesh GroundMesh()
+        {
+            var bank = new Bank { Texel = 0.25f };
+            bank.FaceY(VergeY, Lane(-24f), Lane(24f), 0f, TileLength, 1);
             for (var s = 0; s < 2; s++)
             {
                 var side = s == 0 ? -1f : 1f;
-                var inner = RoadHalf * side;
-                var outer = (RoadHalf + Shoulder) * side;
+                var inner = Lane(RoadHalf * side);
+                var outer = Lane((RoadHalf + Shoulder) * side);
                 bank.FaceY(-ShoulderDrop, Mathf.Min(inner, outer), Mathf.Max(inner, outer), 0f, TileLength, 1);
                 bank.FaceX(inner, 0f, TileLength, -ShoulderDrop, 0f, s == 0 ? -1 : 1);
             }
-            return Bake(bank, "RoadTile");
+            return Bake(bank, "RoadGround");
         }
 
         /// <summary>
@@ -278,17 +349,16 @@ namespace HalfAware.EditorTools
         /// </summary>
         static Mesh PaintMesh()
         {
-            const float lift = 0.006f;
             const float dash = 2f;
             const float step = 5f;
             var bank = new Bank { Texel = 0.5f };
             for (var s = 0; s < 2; s++)
             {
-                var x = (RoadHalf - 0.18f) * (s == 0 ? -1f : 1f);
-                bank.FaceY(lift, x - 0.05f, x + 0.05f, 0f, TileLength, 1);
+                var x = Lane((RoadHalf - 0.18f) * (s == 0 ? -1f : 1f));
+                bank.FaceY(PaintY, x - 0.05f, x + 0.05f, 0f, TileLength, 1);
             }
             for (var z = 0f; z + dash <= TileLength + 0.001f; z += step)
-                bank.FaceY(lift, -0.06f, 0.06f, z, z + dash, 1);
+                bank.FaceY(PaintY, Lane(-0.06f), Lane(0.06f), z, z + dash, 1);
             return Bake(bank, "RoadLine");
         }
 
@@ -348,7 +418,7 @@ namespace HalfAware.EditorTools
                 if (b == 1)
                     Along(slices, 60f, (slice, z, k) =>
                         Piece(slice, "Oncoming" + k, dots, Glow(new Color(0.92f, 0.94f, 1f), 3.4f))
-                            .localPosition = new Vector3(-2.4f, 0f, z));
+                            .localPosition = new Vector3(OncomingX, 0f, z));
                 band.gameObject.SetActive(b == 0);
             }
         }
@@ -375,7 +445,7 @@ namespace HalfAware.EditorTools
         {
             var pier = Shape("Pier", 0.45f, b => b.Box(new Vector3(0f, 3.0f, 0f), new Vector3(1.10f, 6.0f, 1.10f)));
             var board = Shape("NeonBoard", 0.5f, b => b.Box(Vector3.zero, new Vector3(0.12f, 1.10f, 2.60f)));
-            var sheen = Shape("Sheen", 0.25f, b => b.FaceY(0.012f, -RoadHalf, RoadHalf, 0f, TileLength, 1));
+            var sheen = Shape("Sheen", 0.25f, b => b.FaceY(SheenY, Lane(-RoadHalf), Lane(RoadHalf), 0f, TileLength, 1));
             var hues = new[]
             {
                 new Color(1f, 0.30f, 0.34f), new Color(0.36f, 0.72f, 1f), new Color(0.44f, 1f, 0.62f),
@@ -429,7 +499,7 @@ namespace HalfAware.EditorTools
                 Scatter(slices, 12f, 3.6f, s * 6f, rnd, (slice, z, k) =>
                 {
                     var t = Piece(slice, "Tree" + tag + k, trees[(k + s) % trees.Length], Mat("Tree"));
-                    t.localPosition = new Vector3((5.8f + (float)rnd.NextDouble() * 1.4f) * side, 0f, z);
+                    t.localPosition = new Vector3(Lane((5.8f + (float)rnd.NextDouble() * 1.4f) * side), 0f, z);
                     t.localRotation = Quaternion.Euler(0f, (float)rnd.NextDouble() * 360f, 0f);
                     t.localScale = Vector3.one * (0.78f + (float)rnd.NextDouble() * 0.5f);
                 });
@@ -461,8 +531,8 @@ namespace HalfAware.EditorTools
             {
                 for (var s = 0; s < 2; s++)
                 {
-                    // 路肩は ±4.7 まで。石垣は道の縁より外に立つものなので、跨がせない
-                    var x = s == 0 ? -5.2f : 5.2f;
+                    // 路肩は道の中心から ±4.7 まで。石垣は道の縁より外に立つものなので、跨がせない
+                    var x = Lane(s == 0 ? -5.2f : 5.2f);
                     b.Box(new Vector3(x, 0.40f, TileLength * 0.5f), new Vector3(0.46f, 0.80f, TileLength));
                     b.Box(new Vector3(x, 0.85f, TileLength * 0.5f), new Vector3(0.54f, 0.10f, TileLength));
                 }
@@ -470,13 +540,25 @@ namespace HalfAware.EditorTools
             // 牧草地は路肩より下げる。同じ高さだと面が重なってちらつく
             var field = Shape("Pasture", 0.12f, b =>
             {
-                b.FaceY(-0.06f, -46f, -4.6f, 0f, TileLength, 1);
-                b.FaceY(-0.06f, 4.6f, 46f, 0f, TileLength, 1);
+                b.FaceY(-0.06f, Lane(-46f), Lane(-(RoadHalf + Shoulder)), 0f, TileLength, 1);
+                b.FaceY(-0.06f, Lane(RoadHalf + Shoulder), Lane(46f), 0f, TileLength, 1);
+            });
+            // 石垣は 20 m ずつの一様な押し出しなので、それだけでは何も流れて見えない。
+            // 区切りに 1 つ門を入れると、区切りの長さがそのまま間隔になって必ず 180 を割り切る
+            var gate = Shape("FieldGate", 0.5f, b =>
+            {
+                for (var i = 0; i < 2; i++)
+                    b.Box(new Vector3(0f, 0.62f, i * 3.0f), new Vector3(0.16f, 1.24f, 0.16f));
+                for (var i = 0; i < 3; i++)
+                    b.Box(new Vector3(0f, 0.34f + i * 0.34f, 1.5f), new Vector3(0.07f, 0.07f, 3.0f));
             });
             for (var i = 0; i < slices.Length; i++)
             {
                 Piece(slices[i], "Pasture", field, Mat("Grass"));
                 Piece(slices[i], "Wall", wall, Mat("Stone"));
+                // 運転席が右なので、近いのは左の石垣。門もそちら側に置く
+                Piece(slices[i], "Gate", gate, Mat("Metal"))
+                    .localPosition = new Vector3(Lane(-5.2f), 0f, 8.5f);
             }
         }
 
@@ -485,27 +567,30 @@ namespace HalfAware.EditorTools
         {
             // 舗装のタイルはそのまま下に敷いてあるので、土の面で覆い隠す。
             // 帯 4 だけタイルを差し替える手は取らない。タイルは 1 種しか無い
-            var earth = Shape("Earth", 0.2f, b => b.FaceY(0.020f, -16f, 16f, 0f, TileLength, 1));
+            var earth = Shape("Earth", 0.2f, b => b.FaceY(EarthY, Lane(-16f), Lane(16f), 0f, TileLength, 1));
             var ruts = Shape("Ruts", 0.3f, b =>
             {
-                b.FaceY(0.026f, -DirtHalf, DirtHalf, 0f, TileLength, 1);
-                b.Box(new Vector3(-0.95f, 0.030f, TileLength * 0.5f), new Vector3(0.52f, 0.02f, TileLength));
-                b.Box(new Vector3(0.95f, 0.030f, TileLength * 0.5f), new Vector3(0.52f, 0.02f, TileLength));
+                b.FaceY(RutY, Lane(-DirtHalf), Lane(DirtHalf), 0f, TileLength, 1);
+                b.Box(new Vector3(Lane(-0.95f), RutY + 0.004f, TileLength * 0.5f), new Vector3(0.52f, 0.02f, TileLength));
+                b.Box(new Vector3(Lane(0.95f), RutY + 0.004f, TileLength * 0.5f), new Vector3(0.52f, 0.02f, TileLength));
             });
             // 2.5 は 20 を割り切るので、区切り 1 つぶんの麦をそのまま全部の区切りで使い回せる
             var wheat = Shape("Wheat", 0.4f, b =>
             {
                 var rnd = new System.Random(4021);
+                // 株は 0.70 角の箱で、y まわりに回すと角が最大 0.495 はみ出す。
+                // 一番内側の列を 3.9 に置き、ばらつきも外向きだけにして、轍の側へ倒れ込ませない
                 for (var z = 1.25f; z < TileLength; z += 2.5f)
                     for (var s = 0; s < 2; s++)
-                        foreach (var x in new[] { 3.6f, 5.0f, 7.2f })
+                        foreach (var x in new[] { 3.9f, 5.2f, 7.3f })
                         {
-                            var at = x * (s == 0 ? -1f : 1f);
+                            var side = s == 0 ? -1f : 1f;
                             for (var i = 0; i < 2; i++)
                             {
                                 var high = 0.90f + (float)rnd.NextDouble() * 0.20f;
-                                var off = ((float)rnd.NextDouble() - 0.5f) * 0.8f;
-                                b.Box(new Vector3(at + off, high * 0.5f, z + off * 0.6f),
+                                var away = (float)rnd.NextDouble() * 0.8f;
+                                b.Box(new Vector3(Lane((x + away) * side), high * 0.5f,
+                                        z + ((float)rnd.NextDouble() - 0.5f) * 0.5f),
                                     new Vector3(0.70f, high, 0.70f),
                                     Quaternion.Euler(0f, (float)rnd.NextDouble() * 90f, 0f));
                             }
@@ -568,11 +653,17 @@ namespace HalfAware.EditorTools
             put(slices[i], p - i * TileLength, k);
         }
 
-        /// <summary>道の左右へ 1 つずつ。side は 0 が左、1 が右</summary>
+        /// <summary>道の中心から測った x を、世界の x へ直す</summary>
+        static float Lane(float x)
+        {
+            return LaneOffset + x;
+        }
+
+        /// <summary>道の中心から左右へ 1 つずつ。x は道の中心からの距離。side は 0 が左、1 が右</summary>
         static void Sides(string name, float x, System.Action<float, int, string> put)
         {
-            put(-x, 0, name + "L");
-            put(x, 1, name + "R");
+            put(Lane(-x), 0, name + "L");
+            put(Lane(x), 1, name + "R");
         }
 
         // ---- Task 9 以降 ---------------------------------------------------
@@ -598,6 +689,7 @@ namespace HalfAware.EditorTools
             // 寸法は組み立てとひとつの数から出す。Inspector で別々に持つと片方だけ直して隙間が開く
             so.FindProperty("tileLength").floatValue = TileLength;
             so.FindProperty("behind").floatValue = Behind;
+            so.FindProperty("oncomingRate").floatValue = OncomingRate;
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
@@ -664,13 +756,16 @@ namespace HalfAware.EditorTools
             return go.transform;
         }
 
-        /// <summary>シーンに直に置く物。カメラと日射しは Drive の下に入れない</summary>
+        /// <summary>
+        /// シーンに直に置く物。カメラと日射しは Drive の下に入れない。
+        /// 根だけを見るのは、GameObject.Find が Player の下の同じ名前を掴んでしまうため。
+        /// 掴んだうえで根へ引き出すと、rig からカメラを抜き取ることになる
+        /// </summary>
         static GameObject Loose(string name)
         {
-            var go = GameObject.Find(name);
-            if (go == null) go = new GameObject(name);
-            go.transform.SetParent(null, true);
-            return go;
+            foreach (var go in SceneManager.GetActiveScene().GetRootGameObjects())
+                if (go.name == name) return go;
+            return new GameObject(name);
         }
 
         /// <summary>知らない子を落とす。組み方を変えたときに前の束が残らないように</summary>
@@ -715,7 +810,19 @@ namespace HalfAware.EditorTools
             Color col;
             float smooth;
             Tone(name, out col, out smooth);
-            m.SetColor("_BaseColor", col);
+            // 絵があれば貼る。無ければ色だけ。組み直すたびに結び直すので、
+            // Assets/Textures へ置くだけで差し替わる（BuildAlley と同じ構え）
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/Drive" + name + ".png");
+            if (tex != null)
+            {
+                m.SetTexture("_BaseMap", tex);
+                m.SetColor("_BaseColor", new Color(1f, 1f, 1f, col.a));
+            }
+            else
+            {
+                m.SetTexture("_BaseMap", null);
+                m.SetColor("_BaseColor", col);
+            }
             if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", smooth);
             if (m.HasProperty("_Metallic")) m.SetFloat("_Metallic", name == "Metal" ? 0.50f : 0f);
             if (col.a < 1f) SeeThrough(m);
@@ -751,6 +858,8 @@ namespace HalfAware.EditorTools
                 case "Asphalt": col = new Color(0.115f, 0.118f, 0.132f); smooth = 0.16f; break;
                 // 塗り直されていない白線。真っ白だと夜の道で浮く
                 case "RoadLine": col = new Color(0.520f, 0.510f, 0.470f); smooth = 0.10f; break;
+                // 舗装の外の地面と路肩。舗装より暗く、少し土を帯びた色にして道の縁を読ませる
+                case "Verge": col = new Color(0.078f, 0.074f, 0.066f); smooth = 0.06f; break;
                 case "Concrete": col = new Color(0.150f, 0.150f, 0.155f); smooth = 0.10f; break;
                 // 濡れた路面。艶だけの面は映る物が無いと穴に見えるので、地の明るさを持たせる
                 case "Sheen": col = new Color(0.100f, 0.108f, 0.128f); smooth = 0.86f; break;
