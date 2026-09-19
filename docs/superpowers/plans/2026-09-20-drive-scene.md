@@ -1600,7 +1600,27 @@ Prune → Scene → Car → Road → Roadsides → Garage → Items → Wire →
 
 - [ ] **Step 3: 沿道を帯ごとに作る**
 
-`Roadsides/Band0`〜`Band4` の 5 つの入れ物を作り、それぞれの下に沿道の物を並べる。**沿道もタイルと同じ環に乗せる**ので、各帯の物はタイルの子にする。
+`Roadsides/Band0`〜`Band4` の 5 つの入れ物を作る。
+
+**沿道の物をタイルの子にしてはいけない。** 子にすると `DriveWorld.Dress` が空の入れ物を切り替えるだけになり、5 帯ぶんの沿道が同時に出る（麦畑にネオンが立つ）。逆に入れ物の直下へじかに並べると `Dress` は効くが、沿道が一切動かない。
+
+正しいのは、各入れ物の下に**タイルと同じ枚数の区切り**を作り、その中にその帯の物を並べる形。`DriveWorld.Place` が、出ている帯の区切りを道と同じ環に乗せる。
+
+```
+Roadsides/
+  Band0/  Slice0 … Slice8     ← タイルが 9 枚なら区切りも 9 つ
+  Band1/  Slice0 … Slice8
+  …
+```
+
+`Place` は `dressed.childCount` を環の大きさに使う。そこから外せない条件が二つある。
+
+1. **区切りの数はタイルの枚数とぴったり同じ。** 5 つしか作らないと沿道の環が 100 m になり、道が 140 m 先まで伸びているのに、70 m 手前で物が何も無いところから湧いて見える
+2. **入れ物の直下に区切り以外を置かない。** 帯ぜんたいを照らす灯りや、対向車をまとめる親を 1 つ混ぜただけで環が 10 になり、区切りが道の継ぎ目から全部ずれる
+
+区切りの中の物は、その区切りの原点から見た局所の位置で置く。原点はタイルと同じく手前（-z）端なので、局所 z は 0〜20 に収める。
+
+**沿道の間隔は 180 m（タイル 9 枚 × 20 m）を割り切る数にする。** 環はこの長さで一周し、同じ 9 枚の並びが繰り返されるので、割り切れない間隔は一周ごとに一箇所だけ詰まる。35 m 間隔の街灯なら 35 m が 5 回と 5 m が 1 回になり、16 m/s では 11 秒ごとに街灯が一本だけ倍の速さで飛んでくる。下の表の数はすべて 180 の約数にしてある。**目分量で動かすときもこの条件を外さない。**
 
 | 帯 | 沿道に並べるもの |
 |---|---|
@@ -1738,6 +1758,8 @@ return report;
 
 `Update` の末尾で `player.EyeOffset` にずれを入れる。`Rough` は Task 5 で済んでいるので、ここでやるのは揺れの部分だけ。
 
+**`DriveWorld` に `[DefaultExecutionOrder(-20)]` を付ける。** 既定の 0 のままだと `PlayerController`（-10）がその フレームの `EyeOffset` を読んだ後に書くことになり、揺れが 1 フレーム遅れる。`EyeSway` と同じ -20 にすれば `DriveDirector`（-5）より先に走るので、帯を跨ぐフレームでは古い走行距離で進んだ後に `DriveDirector` が巻き戻して置き直す。描画はその後なので食い違わない。
+
 - [ ] **Step 3: 前腕を出す**
 
 `unity/Assets/Scripts/Player/Forearm.cs` と `ForearmView.cs` を読む。場面 1 でどう置いているかを `BuildProps.cs` か `BuildAlley.cs` で調べ、同じ作りで運転席に置く。
@@ -1803,11 +1825,12 @@ git commit -m "feat: let me look around, feel the road, and fold my arms"
    - タイルの入れ物に空きや欠けが無いか。空きがあると 20 m の穴が環に乗って回り、16 m/s なら 11 秒ごとに正面へ飛んでくる
    - 各タイルの `localPosition.z` が `RoadRing.Slot(i, n, tileLength, 0f, behind)` と合っているか。`BuildDrive` も同じ式で置く
    - 各タイルの mesh の z 方向の長さが `tileLength` とぴったりか、原点が手前（-z）端にあるか。中央や奥端に原点があると、環は正しいのに地平へ穴が空く
-2. **沿道が道に出ていないか** — 各帯の沿道の物の mesh 頂点を車の向きへ直し、`|x| < 道幅の半分` に入る頂点があれば「沿道の物が道に出ている: 名前」
-3. **ピンが埋まっていないか** — `Physics.OverlapSphere(it.Position + up * 0.17f, 0.12f)` と `ClosestPoint` で包含を見る。`CheckAlley.Pins` と同じ
-4. **id の食い違い** — シーンの `Interactable` の id と `DriveScript` の id を突き合わせる。`DriveIds.IsPage` は対象を持たないので飛ばす。`CheckAlley.Ids` と同じ
-5. **帯ときっかけの対応** — `DriveDirector.bands` の `trigger` が `DriveIds.Triggers` と同じ並びか、どの帯にもちょうど一つ割り当たっているか。欠けていたら「〈帯の名前〉にきっかけが無い」、重複していたら「きっかけが二つの帯で使われている: id」。警告に数字でなく `DriveBand.name` を出すのは、オーナーが 1 始まりの設計書を横に置いて読むため。`name` の説明にも「ログと見直しで使う」と書いてある
-6. **きっかけの対象がシーンにあるか** — `bands[i].trigger` と同じ id の `Interactable` が `triggers[i]` の下にあるか
+2. **沿道の環** — 各帯の入れ物の区切りの数がタイルの枚数と同じか。違えば「帯〈名前〉の区切りが N 個。タイルは M 枚」。入れ物の直下に区切り以外が混ざっていないかも見る。1 つ混ざるだけで沿道が道の継ぎ目から全部ずれる
+3. **沿道が道に出ていないか** — 各帯の沿道の物の mesh 頂点を車の向きへ直し、`|x| < 道幅の半分` に入る頂点があれば「沿道の物が道に出ている: 名前」
+4. **ピンが埋まっていないか** — `Physics.OverlapSphere(it.Position + up * 0.17f, 0.12f)` と `ClosestPoint` で包含を見る。`CheckAlley.Pins` と同じ
+5. **id の食い違い** — シーンの `Interactable` の id と `DriveScript` の id を突き合わせる。`DriveIds.IsPage` は対象を持たないので飛ばす。`CheckAlley.Ids` と同じ
+6. **帯ときっかけの対応** — `DriveDirector.bands` の `trigger` が `DriveIds.Triggers` と同じ並びか、どの帯にもちょうど一つ割り当たっているか。欠けていたら「〈帯の名前〉にきっかけが無い」、重複していたら「きっかけが二つの帯で使われている: id」。警告に数字でなく `DriveBand.name` を出すのは、オーナーが 1 始まりの設計書を横に置いて読むため。`name` の説明にも「ログと見直しで使う」と書いてある
+7. **きっかけの対象がシーンにあるか** — `bands[i].trigger` と同じ id の `Interactable` が `triggers[i]` の下にあるか
 
 最後に `bad == 0` なら `Debug.Log("見直し: 気になるところは無し")`、そうでなければ `Debug.LogWarning("見直し: 気になるところ " + bad + " 件。上を参照")`。
 
