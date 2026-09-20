@@ -86,6 +86,18 @@ def clouds(size, seed, octaves=4, blur=1.0):
     return tile_blur(acc, blur)
 
 
+def spread(grey, gain):
+    """
+    明るさの地図の幅を広げる。128 を中立として増減を gain 倍する。
+
+    clouds が返す斑はもともと 116〜138 ほどの幅しか持たない。平均を作る重ね方の
+    ためで、そのまま tint に渡すと二色の中ほどばかりが出て、斑が絵に残らない。
+    低い描画解像度では細かい模様が画素に届かないので、絵に残ってほしいのは
+    この大きな斑の方になる
+    """
+    return grey.point(lambda v: max(0, min(255, int(128 + (v - 128) * gain))))
+
+
 def tint(size, grey, lo, hi):
     """明るさの地図を色に直す。lo が暗い側、hi が明るい側"""
     return Image.composite(Image.new('RGB', size, hi), Image.new('RGB', size, lo), grey)
@@ -320,40 +332,73 @@ def seat():
 
 def body():
     """
-    褪せて白茶けた塗り。**平均の明るさは動かさない。**
+    ボンネットの塗り。褪せた緑。**平らな一色にしない。**
 
-    この面だけは夜の場面で浮くほど明るく塗ってあり（BuildDrive.Tone の但し書き）、
-    暗くすると前の縁が路面に溶けて車体が消える。絵で足すのは斑と傷だけ
+    この面は夜の帯（0〜2）では明暗だけで読ませる必要があり、平均を下げると
+    前の縁が路面に溶けて車体が消える（BuildDrive.Tone の但し書き）。ところが
+    帯 4 が朝になってからは、同じ平均が朝日の下で白茶けた無彩の板になり、
+    塗ったボンネットではなく下地のままの鉄板に見えていた。実際に測って、
+    帯 4 の天板は (121,121,114)、彩度にして 5% しか無かった。
+
+    **平均は夜のために残し、彩りと斑で昼を直す。** やることは三つ。
+
+      - 色を付ける。褪せた苔色の緑。黄金色の畑と土の道が暖色なので、寒色を置くと
+        塗った面だと一目で分かる。**彩度を上げすぎない。** 絵の平均で 30% まで振った
+        ときは、朝日の下で畑のあいだに芝生を敷いたように見えた。20% あたりに留める
+      - 大きな斑を入れる。描画解像度が 1/3 なので、細かい汚れは画素に届かない。
+        絵 1 枚がボンネットの上でおよそ 1.1 m を覆うから、30〜60 画素の塊が
+        画面の 10 画素ほどになる。ここが「塗った板」と「下地の板」を分ける
+      - 明暗の幅を広く取る。夜に読ませているのは平均ではなく明るい側で、
+        日に灼けて白茶けたところが残っていれば、平均を落としても縁は消えない
+
+    錆・泥はね・擦り傷は、その斑の上に重ねる
     """
     size = (SIZE, SIZE)
-    base = Image.blend(noise(size, 7717, 116, 150, 0.8), clouds(size, 4231, 5, 3.0), 0.66)
-    im = tint(size, base, (158, 158, 150), (208, 210, 200))
-    # 褪せ。日に灼けた斑を大きく取る
-    im = shade(im, blot(size, 4801, 8, 56, 42, 18.0, +1), 0.30)
-    im = shade(im, blot(size, 4903, 10, 44, 48, 16.0, -1), 0.34)
+    rng = random.Random(9091)
+    # **粗い斑を先に置く。** octave を 3 までに抑えて大きな塊だけ残す。
+    # 細かい方まで混ぜると、低い描画解像度では平均へ潰れて何も残らない
+    broad = spread(clouds(size, 4231, 3, 7.0), 7.5)
+    # 褪せた緑と、日に灼けて白茶けたところ。この幅がそのまま夜の読みやすさになる
+    im = tint(size, broad, (92, 106, 84), (212, 214, 192))
+    # 塗りの肌。細かい粒を薄く重ねる。無いと斑だけの絵になって、樹脂に見える
+    im = shade(im, noise(size, 7717, 104, 152, 0.9), 0.16)
+    # 日に灼けて白く粉を吹いたところ。天面の塗りは上から抜けるので、斑に重ねる
+    im = shade(im, blot(size, 4801, 7, 60, 52, 20.0, +1), 0.34)
+    # 影の溜まり。斑の谷をさらに落として、塊の輪郭を立てる
+    im = shade(im, blot(size, 4903, 9, 48, 56, 17.0, -1), 0.38)
     # 錆の吹き。塗りの下から出るので、縁をぼかしたまま色を乗せる
     rust = Image.new('L', size, 0)
     rw = Wrap(rust)
-    rng = random.Random(9091)
-    for _ in range(6):
+    for _ in range(9):
         x, y = rng.randrange(SIZE), rng.randrange(SIZE)
-        r = rng.randint(8, 24)
-        rw.ellipse([x - r, y - r * 0.4, x + r, y + r * 0.4], fill=rng.randint(70, 150))
-    rust = tile_blur(rust, 7.0)
-    im = Image.composite(Image.new('RGB', size, (128, 92, 62)), im, rust)
+        r = rng.randint(9, 26)
+        rw.ellipse([x - r, y - r * 0.4, x + r, y + r * 0.4], fill=rng.randint(80, 170))
+    rust = tile_blur(rust, 6.0)
+    im = Image.composite(Image.new('RGB', size, (122, 78, 48)), im, rust)
     w = Wrap(im)
-    # 擦り傷。前後に走る向きで揃える
-    for _ in range(18):
+    # 塗りの剥げ。下の鉄が出るところだけ明るく、縁は錆びる。
+    # **夜に縁を残しているのはこの粒。** 平均を落としたぶんをここが補う
+    for _ in range(11):
         x, y = rng.randrange(SIZE), rng.randrange(SIZE)
-        ln = rng.randint(14, 44)
-        a = math.pi * 0.5 + rng.uniform(-0.16, 0.16)
+        r = rng.uniform(0.9, 2.4)
+        # 縁が錆びてから地が出る。**輪をはっきり描かない。** 濃い輪を回すと、
+        # 剥げではなく塗り分けた丸が並ぶ
+        w.ellipse([x - r - 0.9, y - r * 0.7 - 0.9, x + r + 0.9, y + r * 0.7 + 0.9],
+                  fill=(134, 108, 80))
+        w.ellipse([x - r, y - r * 0.7, x + r, y + r * 0.7], fill=(190, 188, 172))
+    # 擦り傷。前後に走る向きで揃える
+    for _ in range(20):
+        x, y = rng.randrange(SIZE), rng.randrange(SIZE)
+        ln = rng.randint(16, 52)
+        a = math.pi * 0.5 + rng.uniform(-0.14, 0.14)
         w.line([(x, y), (x + ln * math.cos(a), y + ln * math.sin(a))],
-               fill=(204, 206, 198), width=1)
+               fill=(186, 188, 172), width=1)
     # 泥はね。未舗装路を走る車なので、細かい粒を散らす
-    mud = blot(size, 6101, 18, 9, 48, 3.0, -1)
-    im = shade(im, mud, 0.26)
+    im = shade(im, blot(size, 6101, 22, 10, 56, 3.0, -1), 0.30)
     im = tile_blur(im, 0.55)
-    return aim(im, (182, 184, 176))
+    # **平均は夜が決める。** 朝の見え方は彩りと斑が持つので、ここで明るさを削らない。
+    # 灰の (182,184,176) から、明るさを 15% ほど落として緑へ寄せたところ
+    return aim(im, (160, 177, 140))
 
 
 # ---- 計器 ---------------------------------------------------------------
@@ -632,7 +677,12 @@ def dirt():
                fill=(v, v - 8, v - 18), width=rng.randint(1, 2))
     im = Image.blend(im, tile_blur(im, 1.4), 0.55)
     im = shade(im, blot(size, 4231, 16, 40, 40, 8.0), 0.26)
-    return aim(im, (124, 94, 58))
+    # **赤を上げて青を抜いた。** 帯 4 の霧は一乗で掛かるので、一番近い路面
+    # （ボンネットの先、およそ 10 m）でも 8% の白が乗る。霧は足し算で入るから、
+    # 絵を暗くしても色は戻らない。戻るのは赤を足したときだけ。
+    # (124,94,58) のままでは画面が (123,107,90)、彩度にして 26% しか無く、
+    # 黄金色の畑のあいだを乾いた舗装が抜けていくように見えていた
+    return aim(im, (152, 94, 38))
 
 
 def rut():
@@ -665,7 +715,9 @@ def rut():
         w.ellipse([x - r, y - r * 0.6, x + r, y + r * 0.6], fill=(v, v - 10, v - 24))
     im = Image.blend(im, tile_blur(im, 2.2), 0.7)
     im = shade(im, blot(size, 8837, 12, 52, 38, 10.0), 0.24)
-    return aim(im, (148, 116, 74))
+    # 土（dirt）と同じ理由で赤を上げて青を抜く。運転席から見えている路面は
+    # ほとんどがこの轍なので、霧に色を明け渡して困るのはこちらの方が大きい
+    return aim(im, (180, 116, 46))
 
 
 def torn():
