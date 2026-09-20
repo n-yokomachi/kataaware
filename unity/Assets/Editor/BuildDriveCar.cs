@@ -1404,7 +1404,6 @@ namespace HalfAware.EditorTools
             LogCopy(paper, gap);
             CoatOnSeat(cloth, gap, plate, paper);
             RearMirror(trim, steel, gap, lens);
-            PhotoStand(trim, steel, paper, gap);
             RadioSet(steel, gap, paper, tail);
             FuelDial(trim, gap, scale, pointer);
             CigarettePack(parent);
@@ -1650,57 +1649,6 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// メーターの脇の古い写真立て。判定点 (0.16, 1.23, 0.62)。
-        ///
-        /// **計器盤の天板には置けない。** 判定点そのものはメーターの塊
-        /// （x 0.10〜0.66 / y 1.247〜1.391）の中で、その前の天板は運転席の目から見ると
-        /// 塊と庇に丸ごと隠れる。**庇が効く。** 庇の奥の下の縁（y 1.4304 / z 0.4439）を
-        /// 掠める線が天板と交わるのが z 0.725 で、塊の前の面（z 0.71）とのあいだに
-        /// 15 mm しか残らない。天板に何を立てても運転席からは見えない。
-        ///
-        /// 見えるのは塊より下と手前で、そこにあるのが中央の操作盤の天板（y 1.26）になる。
-        /// 塊の左の下の角と操作盤の天板のあいだへ、文面どおり「挟んで」立てる。
-        /// 判定点からは 0.16 m、印を向いたときの画面では中心から 17 度のところに来る。
-        ///
-        /// 面はメーターの板と同じ 14 度で起こし、左へ 28 度ひねって運転席へ向ける。
-        /// **揃えると計器盤の部品に見える。** 斜めなのが、後から挟んだものの印になる。
-        /// ひねりが 9 度だったときは、面が計器の裏の灯り（x 0.38）に対してほとんど
-        /// 横を向いていて、夜の帯で写真が黒い窪みにしか見えなかった。28 度まで回すと
-        /// 灯りとの向きの積が 0.16 から 0.46 になり、暗い車内で写真だけが浮く。
-        ///
-        /// 右の端（x 0.1415）は絵の中の速度計の左の縁（x 0.1606）の手前で止める。
-        /// 中身は人の形が二つ。目から 0.48 m なので、顔が 12 mm で 4 画素、
-        /// 肩幅 22 mm で 8 画素になる。**顔を描き込む余地は無い。** 淡い紙の上に
-        /// 暗い塊を四つ置いて、人が二人写っているというところまでで止める
-        /// </summary>
-        static void PhotoStand(Bank trim, Bank steel, Bank paper, Bank gap)
-        {
-            var lean = Quaternion.Euler(14f, -28f, 3f);
-            var at = new Vector3(0.096f, 1.312f, 0.500f);
-            var front = lean * Vector3.back;
-            var right = lean * Vector3.right;
-            var up = lean * Vector3.up;
-            // 台紙。下端が中央の操作盤の天板（1.26）に着く
-            trim.Box(at, new Vector3(0.088f, 0.100f, 0.013f), lean);
-            // 褪せた写真の面
-            var print = at + front * 0.0085f;
-            paper.Box(print, new Vector3(0.068f, 0.074f, 0.004f), lean);
-            // 中の人影。滲んだ塊として置く。左が大きく、右が半歩下がる
-            var skin = print + front * 0.003f;
-            gap.Box(skin - right * 0.013f - up * 0.012f, new Vector3(0.022f, 0.034f, 0.003f), lean);
-            gap.Box(skin - right * 0.013f + up * 0.013f, new Vector3(0.012f, 0.012f, 0.003f), lean);
-            gap.Box(skin + right * 0.014f - up * 0.015f, new Vector3(0.019f, 0.028f, 0.003f), lean);
-            gap.Box(skin + right * 0.014f + up * 0.008f, new Vector3(0.011f, 0.011f, 0.003f), lean);
-            // 枠。塗った鉄で四辺を回す。**暗い車内で写真立てだと読めるのはこの四本の線による**
-            for (var i = 0; i < 2; i++)
-            {
-                var d = i == 0 ? -1f : 1f;
-                steel.Box(print + up * (d * 0.042f), new Vector3(0.088f, 0.011f, 0.007f), lean);
-                steel.Box(print + right * (d * 0.039f), new Vector3(0.010f, 0.095f, 0.007f), lean);
-            }
-        }
-
-        /// <summary>
         /// ラジオ。判定点 (-0.02, 1.19, 0.70)。
         ///
         /// 中央の操作盤（<see cref="Dash"/>）に、暗い面と摘み二つと押しボタンの列は既にある。
@@ -1818,10 +1766,25 @@ namespace HalfAware.EditorTools
         static void CigarettePack(Transform parent)
         {
             var pack = Child(parent, "CigarettePack");
-            // 玉縁の天面（1.30）へ寝かせる。箱の厚みの半分だけ持ち上げる
-            pack.localPosition = new Vector3(0.722f, 1.311f, 0.560f);
-            // 少し振る。天板と平行に置くと、置いたのではなく嵌めたものに見える
-            pack.localRotation = Quaternion.Euler(0f, 16f, 0f);
+            // **写真立てのあったところ。** 中央の操作盤の天板（1.26）へ寝かせ、
+            // 箱の厚みの半分だけ持ち上げる。
+            //
+            // 計器盤の天板には置けない。判定点そのものはメーターの塊
+            // （x 0.10〜0.66 / y 1.247〜1.391）の中で、その前の天板は運転席の目から見ると
+            // 塊と庇に丸ごと隠れる。庇の奥の下の縁（y 1.4304 / z 0.4439）を掠める線が
+            // 天板と交わるのが z 0.725 で、塊の前の面（z 0.71）とのあいだに 15 mm しか残らない。
+            // 見えるのは塊より下と手前、つまりここになる
+            pack.localPosition = new Vector3(0.140f, 1.271f, 0.545f);
+            // 少し振り、手前を持ち上げて傾ける。
+            //
+            // **平らに寝かせると読めない。** 天板と同じ向きの面は同じだけ灯りを受けるので、
+            // 実測で箱 13.9 に対して周りの天板 12.2 ── 1.7 しか違わなかった。
+            // ここにあった写真立てが読めていたのは、面を計器の裏の灯り（x 0.38 / y 1.36）へ
+            // 向けていたからで、同じ手を当てる。手前を 16 度起こすと上の面が灯りを正面から
+            // 受け、箱の縁にも影の線が出る
+            pack.localRotation = Quaternion.Euler(-16f, -22f, 4f);
+            // 起こしたぶん、奥の角が天板へ潜らないように持ち上げる
+            pack.localPosition += new Vector3(0f, 0.008f, 0f);
             var box = GameObject.CreatePrimitive(PrimitiveType.Cube);
             box.name = "Box";
             box.transform.SetParent(pack, false);

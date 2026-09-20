@@ -96,7 +96,10 @@ namespace HalfAware
             "止まったままの音が入るので、0 のときはどちらも出さない")]
         [SerializeField] float ignitionHold = 0f;
         [Tooltip("エンジンだけ掛かっているときの震え。走行中の粗さ 1.0 に対する割合")]
-        [SerializeField] float idleRough = 0.55f;
+        [SerializeField] float idleRough = 0.70f;
+        [Tooltip("イグニッションを鳴らし始めてから車体が震え出すまで。秒。" +
+            "鍵を回し切ってエンジンが掛かるところに合わせる")]
+        [SerializeField] float shakeAt = 5f;
         [Tooltip("座ってから左右に振れる角度。度。片側の値。90 で前方 180 度")]
         [SerializeField] float seatedYawLimit = 90f;
         // **秒数はここの既定が正。** 組み立て（BuildDrive.Wire）は DriveDirector を
@@ -457,7 +460,13 @@ namespace HalfAware
             // 明けた絵と走り出しの音がぴったり揃う。
             // 音より黒の方が長いときは、鳴らし始めたその場で黒へ落とす
             var lit = sound != null ? sound.IgnitionSeconds : 0f;
-            yield return Wait(Mathf.Max(0f, lit - pullHold));
+            // **掛かったところで震え出す。** 鍵を回している間は静かで、
+            // 掛かってから黒へ落ちるまで、走行中よりおさえた震えが続く
+            var black = Mathf.Max(0f, lit - pullHold);
+            var quake = Mathf.Min(shakeAt, black);
+            yield return Wait(quake);
+            world.Idling = idleRough;
+            yield return Wait(black - quake);
 
             // 鳴らし終えてから黒へ落ちるまでに間を置きたいときだけ、その間を埋める。
             // **間が 0 なら何も出さない。** 1 フレームだけ震えて鳴って消えるのは、

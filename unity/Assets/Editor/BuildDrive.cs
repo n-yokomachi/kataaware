@@ -978,12 +978,11 @@ namespace HalfAware.EditorTools
             triggerItems[0] = Put(parent, "Chips", new Vector3(-0.42f, 1.15f, -0.02f), script, DriveIds.Chips, ItemRadius, false);
             // 煙草の箱の上。**位置は箱に合わせてある。**
             //
-            // 一度は計器盤の中ほど（0.06, 1.30, 0.50）に置いていて、「見づらい」と差し戻された。
-            // 燃料計の隣へ移したが、そこも狭い。目（SeatAt + EyeLead）は計器盤の塊の上端より
-            // 0.14 高いだけなので、塊の右脇の天板は塊の壁に隠れて運転席から見えない。
-            // 手前の玉縁まで戻して初めて箱が丸ごと出る。ここがその位置。
-            // 場面 1・2 と同じ箱を寝かせて置いてあるので、立てていたときより背が低い
-            triggerItems[1] = Put(parent, "Cigar", new Vector3(0.722f, 1.311f, 0.560f), script, DriveIds.Cigar, ItemRadius, false);
+            // 計器盤の中ほど（0.06, 1.30, 0.50）は「見づらい」、燃料計の隣（0.722）は
+            // 玉縁まで戻して初めて丸ごと見える狭さだった。いまは写真立てのあった
+            // 中央の操作盤の天板に寝かせてある。印の高さ（判定点 + 0.17）が
+            // 庇の下へ入らないよう、箱の中心より 36 mm 下げて置いてある
+            triggerItems[1] = Put(parent, "Cigar", new Vector3(0.140f, 1.235f, 0.545f), script, DriveIds.Cigar, ItemRadius, false);
             // 窓だけ必須。最後の景色に入るまで伏せてあるので、それまで場面は閉じない。
             // ドアの内張りは x 0.82〜0.90。0.84 に置くと印が内張りの中に入る。
             // **真横より少し前。** z 0.10 は目（z 0.22）より後ろで、印を見るのに
