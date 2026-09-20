@@ -31,15 +31,15 @@ Material:
     - _Grit: 150
     - _Rill: 0.92
     - _Sand: 0.44
-    - _Smear: 1.6
+    - _Smear: 0.62
     - _Spray: 0.5
     - _Veil: 0.19
     - _Wiped: 0
     m_Colors:
-    - _BaseColor: {r: 0.186, g: 0.183, b: 0.176, a: 1}
-    - _Dart: {r: 0.042, g: 0.15, b: 4.2, a: 0.0048}
-    - _Down: {r: 0.212, g: 0.46, b: 0.4, a: 0.007}
-    - _Glint: {r: 0.285, g: 0.275, b: 0.255, a: 1}
-    - _Up: {r: 0.106, g: 0.78, b: 3.2, a: 0.0064}
+    - _BaseColor: {r: 0.104, g: 0.106, b: 0.112, a: 1}
+    - _Dart: {r: 0.038, g: 0.15, b: 4.2, a: 0.0023}
+    - _Down: {r: 0.196, g: 0.46, b: 0.4, a: 0.0032}
+    - _Glint: {r: 0.126, g: 0.128, b: 0.136, a: 1}
+    - _Up: {r: 0.098, g: 0.78, b: 3.2, a: 0.0029}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

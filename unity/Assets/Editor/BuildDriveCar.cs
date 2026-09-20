@@ -432,7 +432,14 @@ namespace HalfAware.EditorTools
         ///
         /// 粒は筋に譲る。1 画素が 4.7 mm ぶんある解像度では、実物どおりの
         /// 2〜5 mm の水滴は円として描けないので、砂目（_Sand）として敷き、
-        /// 読める太さを持てる筋（_Up / _Down）とちぎれて飛ぶ水（_Dart）を主役にする。
+        /// 筋（_Up / _Down）とちぎれて飛ぶ水（_Dart）を主役にする。
+        ///
+        /// **筋は細く、暗く。** 一度「流れが分からない」と言われて半幅を倍（6.2 mm）に
+        /// 取り、水の色と _Smear を上げたが、今度は「気持ち悪い。なんでそんな白いの」と
+        /// 差し戻された。_Smear は後ろの色に掛け算するので、路面のような中間の明るさの上では
+        /// 筋がそのまま白へ飛ぶ。夜のガラスの水は自分で光らない。
+        /// 半幅は 3 mm ほどへ戻し、水の色は空（0.115）より暗く、
+        /// 筋の頭も空をわずかに上回る程度に留めてある。列の間隔も詰めて本数で見せる。
         ///
         /// ---- 三度目の詰め -----------------------------------------------------
         ///
@@ -449,13 +456,13 @@ namespace HalfAware.EditorTools
         static Material WaterMat()
         {
             var m = WetGlass("CarWater");
-            m.SetColor("_BaseColor", new Color(0.186f, 0.183f, 0.176f, 1f));
-            m.SetColor("_Glint", new Color(0.285f, 0.275f, 0.255f, 1f));
+            m.SetColor("_BaseColor", new Color(0.104f, 0.106f, 0.112f, 1f));
+            m.SetColor("_Glint", new Color(0.126f, 0.128f, 0.136f, 1f));
             m.SetFloat("_Veil", 0.13f);
             m.SetFloat("_Sand", 0.36f);
             m.SetFloat("_Rill", 0.90f);
             m.SetFloat("_Spray", 0.46f);
-            m.SetFloat("_Smear", 1.60f);
+            m.SetFloat("_Smear", 0.62f);
             m.SetFloat("_Grit", 150f);
             m.SetFloat("_Creep", 0.52f);
             // **走行風で外へ開く量を 0.22 から 0.30 へ。** 太らせた筋を真っ直ぐ上へ
@@ -470,9 +477,9 @@ namespace HalfAware.EditorTools
             // ちぎれて飛ぶ水はいちばん細く、いちばん速い（間口を 0.20 秒で抜ける）。
             // **半幅はどれも 1 画素（3.8 mm）を超えるところまで太らせてある。**
             // 細いほど本物らしいが、載らない太さの筋は明滅にしかならない
-            m.SetVector("_Up", new Vector4(0.124f, 0.50f, 2.45f, 0.0062f));
-            m.SetVector("_Down", new Vector4(0.212f, 0.46f, 0.56f, 0.0084f));
-            m.SetVector("_Dart", new Vector4(0.046f, 0.125f, 3.10f, 0.0046f));
+            m.SetVector("_Up", new Vector4(0.112f, 0.50f, 2.45f, 0.0028f));
+            m.SetVector("_Down", new Vector4(0.196f, 0.46f, 0.56f, 0.0036f));
+            m.SetVector("_Dart", new Vector4(0.042f, 0.125f, 3.10f, 0.0022f));
             EditorUtility.SetDirty(m);
             return m;
         }
@@ -494,22 +501,22 @@ namespace HalfAware.EditorTools
         static Material SideWaterMat()
         {
             var m = WetGlass("CarSideWater");
-            m.SetColor("_BaseColor", new Color(0.186f, 0.183f, 0.176f, 1f));
-            m.SetColor("_Glint", new Color(0.285f, 0.275f, 0.255f, 1f));
+            m.SetColor("_BaseColor", new Color(0.104f, 0.106f, 0.112f, 1f));
+            m.SetColor("_Glint", new Color(0.126f, 0.128f, 0.136f, 1f));
             m.SetFloat("_Veil", 0.19f);
             m.SetFloat("_Sand", 0.44f);
             m.SetFloat("_Rill", 0.92f);
             m.SetFloat("_Spray", 0.50f);
-            m.SetFloat("_Smear", 1.60f);
+            m.SetFloat("_Smear", 0.62f);
             m.SetFloat("_Grit", 150f);
             // 砂目も後ろへ引かれる。板の uv の縦がそちらを向いている
             m.SetFloat("_Creep", 0.70f);
             m.SetFloat("_Fan", 0.14f);
             m.SetFloat("_Wiped", 0f);
             m.SetFloat("_Fall", 0.18f);
-            m.SetVector("_Up", new Vector4(0.106f, 0.78f, 3.20f, 0.0064f));
-            m.SetVector("_Down", new Vector4(0.212f, 0.46f, 0.40f, 0.0070f));
-            m.SetVector("_Dart", new Vector4(0.042f, 0.150f, 4.20f, 0.0048f));
+            m.SetVector("_Up", new Vector4(0.098f, 0.78f, 3.20f, 0.0029f));
+            m.SetVector("_Down", new Vector4(0.196f, 0.46f, 0.40f, 0.0032f));
+            m.SetVector("_Dart", new Vector4(0.038f, 0.150f, 4.20f, 0.0023f));
             EditorUtility.SetDirty(m);
             return m;
         }
