@@ -22,7 +22,7 @@ https://pixabay.com/service/license-summary/
 | ファイル | 出典 | 許諾 | 加工 |
 |---|---|---|---|
 | `Step1`〜`Step5.wav` | Kenney RPG Audio（https://kenney.nl/assets/rpg-audio）の `footstep00/02/04/06/08.ogg` | CC0 1.0 | モノラル 44.1kHz へ、末尾を落として頂点を −6dB に揃えた |
-| `Concrete1`〜`Concrete4.wav` | 同上（`Step2` / `Step5` / `Step1` / `Step3` から作り直し） | CC0 1.0 | `tools/make-steps.py`。360Hz より下を落とし、1.2kHz より上を 2.6 倍に持ち上げ、時定数 48ms で尾を詰めて 0.165 秒へ切り、頂点 −6dB |
+| `Concrete1`〜`Concrete4.wav` | 同上（`Step2` / `Step5` / `Step1` / `Step3` から作り直し） | CC0 1.0 | `tools/make-steps.py`。190Hz より下を落とし、1.2kHz より上を 1.9 倍に持ち上げ、素のまま 0.62 倍を混ぜ、時定数 62ms で尾を詰めて 0.200 秒へ切り、頂点 −6dB |
 | `LighterClick.wav` | OpenGameArt「Zippo click sound」（https://opengameart.org/content/zippo-click-sound）作者 dawith | CC0 1.0 | 金属音の当たりだけを 0.060〜0.320 秒で切り出し、頂点 −3dB |
 | `Drag.wav` | Pixabay の `crackle`。作品名と作者は未記入 | Pixabay Content License | 前後の無音を落として頂点 −8dB |
 | `Blow.wav` | Pixabay の `blow`。作品名と作者は未記入 | Pixabay Content License | 同上 |
@@ -31,6 +31,12 @@ https://pixabay.com/service/license-summary/
 | `JackPull.wav` | 同上パックの `Technology/plugpull2.wav` | CC0 1.0 | 3.33 秒から 0.50 秒を切り出し、再生速度 0.85 倍で低く伸ばし、前後の無音を落として頂点 −6dB |
 | `RainLoop.wav` | Pixabay `dragon-studio-copyright-free-rain-sounds-331497` | Pixabay Content License | 60 秒地点から 24 秒を切り出し、モノラル 22.05kHz へ。末尾 1.5 秒を頭に重ねて輪にし、実効値を −22dBFS に揃えた |
 | `DoorShut.wav` | Pixabay `dragon-studio-open-and-close-door-405453` | Pixabay Content License | モノラル 44.1kHz へ、頭から 2.15 秒を切り出して末尾 0.1 秒を落とし、頂点を −3dB に揃えた。開けると閉めるが 1 つに入っている（開ける 〜0.5 秒、間 〜1.0 秒、閉まる 1.45〜1.65 秒） |
+| `CarDoorOpen.wav` | Pixabay `dragon-studio-open-car-door-372469` | Pixabay Content License | モノラル 44.1kHz へ、頭の無音を落として末尾 60ms を落とした。0.92 秒 |
+| `CarDoorShut.wav` | Pixabay `freesound_community-car-door-close-6929` | Pixabay Content License | モノラル 44.1kHz へ、頭の無音を落とした。0.55 秒 |
+| `Ignition.wav` | Pixabay `freesound_community-keys-in-the-ignition-101951` | Pixabay Content License | モノラル 44.1kHz へ、頭の無音を落とした。6.72 秒 |
+| `PullAway.wav` | Pixabay `freesound_community-car-driving-interior-perspective-51388` | Pixabay Content License | 冒頭 6 秒。ステレオ 44.1kHz へ、頭 0.15 秒で立ち上げ、末尾 0.6 秒で落として次の走行音へ渡す |
+| `DriveSealed.wav` | Pixabay `freesound_community-car-driving-ambience-6365` | Pixabay Content License | ステレオ 44.1kHz へ。頭 0.5 秒を尻へ被せて輪にした。13.23 秒 |
+| `DriveGravel.wav` | Pixabay `freesound_community-driving-a-truck-in-gravel-58271` | Pixabay Content License | 20 秒地点から 12 秒。ステレオ 44.1kHz へ。頭 0.75 秒を尻へ被せて輪にした。11.25 秒 |
 
 切り出しの手順は ffmpeg で、`docs/` ではなくここに残す。素材そのものは repo に置かず、加工後の物だけを置いている。
 
@@ -42,7 +48,27 @@ https://pixabay.com/service/license-summary/
 - 足音は `Footsteps`。進んだ距離を積んで 0.88 メートルごとに 1 つ鳴らす。直前と同じ物は選ばず、音量と高さを少し振る
 - 場面 2（小道）と場面 1（自室）は `Step1`〜`Step5`、場面 8（共用ガレージ）は `Concrete1`〜`Concrete4`。
   同じ足音を裸のコンクリートの上で鳴らすと床が土に聞こえるので、場面 8 だけ作り直してある。
-  ガレージの反響は素材に焼かず、足元の `AudioReverbFilter`（`ParkingLot`）に持たせる
+  ガレージの反響は素材に焼かず、足元の `AudioReverbFilter` に持たせる
+
+## 車の音
+
+`DriveSound` が持つ。乗り込みの単発（ドアを開ける・閉める・イグニッション・動き出し）と、
+走行音の輪（舗装・未舗装）。**足音とは別の入れ物に置いてある。** 足音の入れ物には
+`AudioReverbFilter` が付いていて、同じ入れ物の AudioSource は全部そこを通る。
+走行音まで通すと、車の中にいるあいだずっとコンクリートの車庫の響きが乗る。
+
+鳴る順は、ドアを開ける → 目が運転席へ滑る → ドアを閉める → イグニッション →
+黒へ切り替えて動き出しの音 → フェードインして走行音の輪。秒数はどれも `DriveDirector` の
+値で、オーナーが実画面を見てから決める。
+
+**輪の二本は大きさが揃っていない。** 実効値で舗装が −35dB、未舗装が −25dB と 10dB 開いている。
+素材の頂点は動かさない決まりなので、差は `DriveSound` の音量（舗装 0.75 / 未舗装 0.30）で吸収する。
+
+輪の継ぎ目は頭を尻へ被せて消してある。頭と尻 0.25 秒の実効値の差は舗装で 1.4dB、
+未舗装で 2.4dB なので、そのまま `loop` に掛けて段は出ない。
+
+**どの帯で未舗装を鳴らすかは `DriveBand.gravel` が決める。** `rough`（揺れ幅）から
+割り出さない。明け方の丘陵は所々荒れていて `rough` が 1.6 あるが、道そのものは舗装されている。
 - 雨は `RainLoop`。プレイヤーの頭上で輪にして流し、`RainCover` が屋根の下で音量を 35% まで絞る
 - インプラントジャックを抜く音は `JackPull`。`PullTimeline` の引き抜く段の頭で 1 度だけ鳴らす。チップを抜く音と同じパックから採ったが、低く伸ばして生々しさを足してある
 - 扉は `DoorShut`。自室を出るときに 1 度だけ鳴らし、1.75 秒おいてから暗転へ移る

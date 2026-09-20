@@ -775,11 +775,11 @@ namespace HalfAware.EditorTools
         /// </summary>
         static readonly DriveBand[] Route =
         {
-            new DriveBand { name = "倫敦の外れ", trigger = DriveIds.Chips, speed = 16f, rough = 1.0f, afterglow = 5f, black = 0.8f, fadeIn = 1.4f, sky = Night },
+            new DriveBand { name = "倫敦の市街", trigger = DriveIds.Chips, speed = 16f, rough = 1.0f, afterglow = 5f, black = 0.8f, fadeIn = 1.4f, sky = Night },
             new DriveBand { name = "夜の高速", trigger = DriveIds.Log, speed = 28f, rough = 1.0f, afterglow = 5f, black = 0.8f, fadeIn = 1.4f, sky = Lit },
             new DriveBand { name = "深夜の幹線", trigger = DriveIds.Mirror, speed = 24f, rough = 1.0f, afterglow = 5f, black = 3.5f, fadeIn = 2.6f, sky = Deep },
             new DriveBand { name = "明け方の丘陵", trigger = DriveIds.Photo, speed = 20f, rough = 1.6f, afterglow = 5f, black = 0.8f, fadeIn = 1.6f, sky = Dawn },
-            new DriveBand { name = "朝靄の未舗装路", trigger = DriveIds.Window, speed = 11f, rough = 4.5f, afterglow = 5f, black = 0.8f, fadeIn = 1.4f, sky = Morning },
+            new DriveBand { name = "朝靄の未舗装路", trigger = DriveIds.Window, speed = 11f, rough = 4.5f, gravel = true, afterglow = 5f, black = 0.8f, fadeIn = 1.4f, sky = Morning },
         };
 
         /// <summary>帯ごとのきっかけの対象。Items が立てて Wire が DriveDirector へ渡す</summary>
@@ -1043,6 +1043,7 @@ namespace HalfAware.EditorTools
             pso.ApplyModifiedPropertiesWithoutUndo();
 
             Feet(player.transform, body);
+            CarSound(player.transform);
 
             // 当たりを入れたまま動かすと床や壁に押し出されて狙った場所に立たない（BuildAlley.Place と同じ）
             body.enabled = false;
@@ -1053,26 +1054,29 @@ namespace HalfAware.EditorTools
             Marks(Flow(walker, Screen()));
         }
 
+        // 響きの強さ。**一度弱いと差し戻されている。** 下の値は二度目で、
+        // 括弧内が一度目。もう一段強めるなら EchoDecay と EchoLevel から上げる
+
+        /// <summary>ガレージの響きの広さ。ミリベル。場面 2 の小道は -700（一度目 -520）</summary>
+        const float EchoRoom = -360f;
+        /// <summary>高音の残り。コンクリートは高音を返すので小道の -600 より上げる（一度目 -320）</summary>
+        const float EchoBright = -220f;
+        /// <summary>尾を引く長さ。秒。小道は 0.75（一度目 1.15）</summary>
+        const float EchoDecay = 1.70f;
+        /// <summary>初期反射の強さ。ミリベル。小道は -900（一度目 -680）</summary>
+        const float EchoReflect = -500f;
+        /// <summary>残響そのものの強さ。ミリベル。小道は 60（一度目 105）</summary>
+        const float EchoLevel = 180f;
+
         /// <summary>
         /// 場面 8 の足音の素材。**場面 1・2 の Step1〜5 とは別物。**
         ///
         /// あちらは Kenney の柔らかい足音で、濡れた石畳と土のためにある。測ると
         /// 2.5kHz 以上が 700Hz 以下より 11〜15dB 弱く、裸のコンクリートの上で鳴らすと
         /// 床が土に聞こえる。同じ素材（CC0）から唸りを抜いて打音を持ち上げ、
-        /// 尾を詰めたものが Concrete1〜4（`tools/make-steps.py`）。
+        /// 重心を下げたものが Concrete1〜4（`tools/make-steps.py`）。
         /// 出どころと加工は Assets/Audio/LICENSES.md に控えてある
         /// </summary>
-        /// <summary>ガレージの響きの広さ。ミリベル。場面 2 の小道は -700</summary>
-        const float EchoRoom = -520f;
-        /// <summary>高音の残り。コンクリートは高音を返すので、小道の -600 より上げる</summary>
-        const float EchoBright = -320f;
-        /// <summary>尾を引く長さ。秒。小道は 0.75</summary>
-        const float EchoDecay = 1.15f;
-        /// <summary>初期反射の強さ。ミリベル。小道は -900</summary>
-        const float EchoReflect = -680f;
-        /// <summary>残響そのものの強さ。ミリベル。小道は 60</summary>
-        const float EchoLevel = 105f;
-
         static readonly string[] ConcreteSteps =
         {
             "Assets/Audio/Concrete1.wav", "Assets/Audio/Concrete2.wav",
@@ -1092,6 +1096,65 @@ namespace HalfAware.EditorTools
         /// 場面 2 の `RainCover` のように屋根の下で切り替える必要は無い。
         /// ここは端から端までひと続きの箱で、響きの変わる場所が無い
         /// </summary>
+        /// <summary>
+        /// 乗り込みと走行の音。**足音とは別の入れ物に置く。**
+        ///
+        /// 足音の入れ物には <see cref="AudioReverbFilter"/> が付いていて、
+        /// 同じ入れ物の AudioSource は全部そこを通る。走行音まで通すと、
+        /// 車の中にいるあいだずっとコンクリートの車庫の響きが乗る。
+        ///
+        /// どれも 2D。耳も音源も同じ運転席にあるので、距離で減らす意味が無い。
+        /// 単発と輪で入れ物を分けるのは、輪を鳴らしたまま単発を重ねるため
+        /// </summary>
+        static void CarSound(Transform player)
+        {
+            var go = new GameObject("Motor");
+            go.transform.SetParent(player, false);
+            var shots = go.AddComponent<AudioSource>();
+            shots.playOnAwake = false;
+            shots.loop = false;
+            shots.spatialBlend = 0f;
+
+            var wheels = new GameObject("Road");
+            wheels.transform.SetParent(go.transform, false);
+            var road = wheels.AddComponent<AudioSource>();
+            road.playOnAwake = false;
+            road.loop = true;
+            road.spatialBlend = 0f;
+
+            var sound = go.AddComponent<DriveSound>();
+            var so = new SerializedObject(sound);
+            so.FindProperty("oneShot").objectReferenceValue = shots;
+            so.FindProperty("road").objectReferenceValue = road;
+            for (var i = 0; i < DriveClips.Length; i += 2)
+                so.FindProperty(DriveClips[i]).objectReferenceValue = Sound(DriveClips[i + 1]);
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>
+        /// 乗り込みと走行の音の素材。DriveSound の値の名と、その素材の組。
+        ///
+        /// 輪の二本は継ぎ目を消してある。頭 0.5〜0.75 秒を尻へ被せてあるので、
+        /// そのまま loop に掛けて段が出ない。素材の切り出しと出どころは
+        /// Assets/Audio/LICENSES.md に控えてある
+        /// </summary>
+        static readonly string[] DriveClips =
+        {
+            "doorOpen", "Assets/Audio/CarDoorOpen.wav",
+            "doorShut", "Assets/Audio/CarDoorShut.wav",
+            "ignition", "Assets/Audio/Ignition.wav",
+            "pullAway", "Assets/Audio/PullAway.wav",
+            "paved", "Assets/Audio/DriveSealed.wav",
+            "gravel", "Assets/Audio/DriveGravel.wav",
+        };
+
+        static AudioClip Sound(string path)
+        {
+            var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(path);
+            if (clip == null) Debug.LogWarning("音の素材が無い: " + path);
+            return clip;
+        }
+
         static void Feet(Transform player, CharacterController body)
         {
             var feet = new GameObject("Feet");
@@ -1103,9 +1166,10 @@ namespace HalfAware.EditorTools
             src.loop = false;
             // 耳と同じ体に付いているので、距離で減らさない
             src.spatialBlend = 0f;
-            // 場面 2 の 0.55 より下げる。あちらは雨の音の上で鳴らすので大きく要るが、
-            // ここは無音の車庫で、同じ音量だと足音だけが画面から浮く
-            src.volume = 0.38f;
+            // 場面 2 は 0.55。あちらは雨の音の上で鳴らすので大きく要る。
+            // ここは無音の車庫なので一度 0.38 まで下げたが、「軽い」と差し戻された。
+            // 素材そのものも重心を下げてある（tools/make-steps.py）
+            src.volume = 0.52f;
 
             // **既製の ParkingLot を当てない。** あれは room も roomHF も -1000 で、
             // 高音が丸ごと落ちるので、無音のガレージではほとんど何も聞こえない。
@@ -1379,6 +1443,7 @@ namespace HalfAware.EditorTools
             dso.FindProperty("garageOnly").objectReferenceValue = garageOnly != null ? garageOnly.gameObject : null;
             // 足音。乗り込んだら止める。Player の下にあるのでガレージと一緒には消えない
             dso.FindProperty("feet").objectReferenceValue = Object.FindFirstObjectByType<Footsteps>(FindObjectsInactive.Include);
+            dso.FindProperty("sound").objectReferenceValue = Object.FindFirstObjectByType<DriveSound>(FindObjectsInactive.Include);
             var folded = Look(root, "Car/ArmsFolded");
             var onWheel = Look(root, "Car/ArmsOnWheel");
             dso.FindProperty("folded").objectReferenceValue = folded != null ? folded.gameObject : null;
@@ -1426,6 +1491,7 @@ namespace HalfAware.EditorTools
                 e.FindPropertyRelative("trigger").stringValue = Route[i].trigger;
                 e.FindPropertyRelative("speed").floatValue = Route[i].speed;
                 e.FindPropertyRelative("rough").floatValue = Route[i].rough;
+                e.FindPropertyRelative("gravel").boolValue = Route[i].gravel;
                 e.FindPropertyRelative("afterglow").floatValue = Route[i].afterglow;
                 e.FindPropertyRelative("black").floatValue = Route[i].black;
                 e.FindPropertyRelative("fadeIn").floatValue = Route[i].fadeIn;

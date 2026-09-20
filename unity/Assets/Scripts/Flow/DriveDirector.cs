@@ -45,6 +45,24 @@ namespace HalfAware
         [Tooltip("ガレージの床を歩く足音。乗り込んだら止める")]
         [SerializeField] Footsteps feet;
 
+        [Header("乗り込み")]
+        [Tooltip("ドア・イグニッション・動き出しと走行音")]
+        [SerializeField] DriveSound sound;
+        [Tooltip("ドアを開けてから目が動き出すまで。秒")]
+        [SerializeField] float doorHold = 0.45f;
+        [Tooltip("立ち位置から運転席まで目を滑らせる秒数")]
+        [SerializeField] float seatMove = 1.6f;
+        [Tooltip("運転席に着いてからドアを閉めるまで。秒")]
+        [SerializeField] float sitHold = 0.5f;
+        [Tooltip("ドアを閉めてからイグニッションまで。秒")]
+        [SerializeField] float shutHold = 0.8f;
+        [Tooltip("イグニッションから黒へ切り替わるまで。秒")]
+        [SerializeField] float ignitionHold = 3.2f;
+        [Tooltip("黒のまま置く秒数。ここで車の動き出す音が流れる")]
+        [SerializeField] float pullHold = 4.6f;
+        [Tooltip("黒から一つ目の景色へ浮かび上がる秒数")]
+        [SerializeField] float pullFade = 1.8f;
+
         [Header("腕")]
         [Tooltip("腕組みの腕。手動運転の帯だけ伏せる")]
         [SerializeField] GameObject folded;
@@ -79,6 +97,10 @@ namespace HalfAware
         /// <summary>景色を並べてある帯。黒へ入った時点で次へ進む</summary>
         int shown = -1;
         bool aboard;
+        /// <summary>乗り込みの最中。aboard はこの一連が終わってから立てる</summary>
+        bool boarding;
+        /// <summary>場面が閉じたときに走行音を止めた</summary>
+        bool hushed;
         /// <summary>最後の帯の余韻が明けた。あとは SceneFlow が閉じるのを待つだけ</summary>
         bool handedOver;
 
@@ -132,7 +154,14 @@ namespace HalfAware
         {
             // 場面が閉じ始めたら手を引く。SceneFlow.Complete も同じ暗幕を書くので、
             // 毎フレーム Dark を書き戻すと「続く」が明るいまま出る
-            if (!aboard || flow.Completed) return;
+            if (flow.Completed)
+            {
+                // 場面が閉じたら走行音も切る。輪なので、放っておくと
+                // 「続く」の字幕の裏で走り続ける
+                if (!hushed && sound != null) { sound.Hush(); hushed = true; }
+                return;
+            }
+            if (!aboard) return;
 
             // 一度渡したら二度と押さえ直さない。上げ直すと、余韻の途中で任意の対象を
             // 読み始めた人が読み終えたとき、閉じられないまま走り続けることになる
@@ -201,12 +230,29 @@ namespace HalfAware
             flow.Say(page.Lines);
         }
 
-        /// <summary>乗り込む。ガレージを伏せ、運転席に据えて走り出す</summary>
+        /// <summary>乗り込む。一連の演出は Boarding が持つ</summary>
         void Board()
         {
-            if (aboard) return;
-            aboard = true;
-            if (garage != null) garage.SetActive(false);
+            if (aboard || boarding) return;
+            boarding = true;
+            StartCoroutine(Boarding());
+        }
+
+        /// <summary>
+        /// 乗り込みの一連。ドアを開ける音 → 目が運転席へ滑る → ドアを閉める音 →
+        /// イグニッション → 黒へ切り替え、動き出しの音 → フェードインして一つ目の景色。
+        ///
+        /// **aboard はこの一連が終わってから立てる。** 立てた時点で Update が
+        /// hud.SetFade を毎フレーム書き始めるので、先に立てるとここで置いた黒が
+        /// 次のフレームに上書きされて、暗転そのものが出ない。
+        ///
+        /// 代わりに flow.Held を先頭で立てる。garage.door は場面を閉じる対象なので、
+        /// 「はい」を選んだ時点で SceneFlow が閉じにかかる。Update の flow.Held = true は
+        /// aboard が立つまで走らないため、ここで押さえないと演出の途中で場面が終わる
+        /// </summary>
+        System.Collections.IEnumerator Boarding()
+        {
+            flow.Held = true;
             if (garageOnly != null) garageOnly.SetActive(false);
             // **足音は自分で止める。** Footsteps は CharacterController の velocity を見ていて、
             // PlayerController は CanMove が false のあいだ Move を一度も呼ばない。
@@ -214,26 +260,91 @@ namespace HalfAware
             // 走行中ずっとコンクリートの足音が鳴る。伏せる先がガレージではなく
             // プレイヤーの下にあるので、garage.SetActive(false) では消えない
             if (feet != null) feet.enabled = false;
-            if (seat != null)
-            {
-                // seat は足元ではなく目の位置。PlayerController は毎フレーム
-                // eye を足元から EyeHeight だけ上へ置き直すので、ここで 0 にして
-                // seat をそのまま目の高さにする。立っていたときの 1.6 のままだと
-                // 目が屋根（1.52）の上へ突き抜け、車内のどの対象も判定の距離から外れて、
-                // 帯 0 のきっかけすら調べられなくなる。
-                // 車内は座ったまま歩かないので、足元の高さはもう誰も使わない
-                player.EyeHeight = 0f;
-                player.transform.position = seat.position;
-                player.Yaw = seat.eulerAngles.y;
-                player.Pitch = 0f;
-            }
             player.CanMove = false;
-            world.Rolling = true;
+
+            if (sound != null) sound.DoorOpen();
+            yield return Wait(doorHold);
+
+            // 目を運転席へ滑らせる。
+            //
+            // seat は足元ではなく目の位置。PlayerController は毎フレーム eye を
+            // 足元から EyeHeight だけ上へ置き直すので、EyeHeight を 0 にして
+            // 足元そのものを目として扱う。立っていたときの 1.6 のままだと目が屋根（1.52）の
+            // 上へ突き抜け、車内のどの対象も判定の距離から外れて、
+            // 一つ目のきっかけすら調べられなくなる。車内は座ったまま歩かないので、
+            // 足元の高さはもう誰も使わない。
+            //
+            // **切り替える前に、今の目の高さを足元へ写す。** 写さずに EyeHeight だけ
+            // 0 にすると、その 1 フレームで目が 1.6 m 落ちてから滑り始める
+            var from = player.transform.position + Vector3.up * player.EyeHeight;
+            player.EyeHeight = 0f;
+            player.transform.position = from;
+            var to = seat != null ? seat.position : from;
+            var yawFrom = player.Yaw;
+            var yawTo = seat != null ? seat.eulerAngles.y : yawFrom;
+            var pitchFrom = player.Pitch;
+            for (var t = 0f; t < seatMove; t += Time.deltaTime)
+            {
+                var k = Ease(seatMove <= 0f ? 1f : t / seatMove);
+                player.transform.position = Vector3.Lerp(from, to, k);
+                player.Yaw = Mathf.LerpAngle(yawFrom, yawTo, k);
+                player.Pitch = Mathf.Lerp(pitchFrom, 0f, k);
+                flow.Freeze(FreezeStep);
+                yield return null;
+            }
+            player.transform.position = to;
+            player.Yaw = yawTo;
+            player.Pitch = 0f;
+            yield return Wait(sitHold);
+
+            if (sound != null) sound.DoorShut();
+            yield return Wait(shutHold);
+            if (sound != null) sound.Ignition();
+            yield return Wait(ignitionHold);
+
+            // 黒へは切り替えで入る。場面 1 のドアを閉める暗転と同じ扱い
+            hud.SetFade(1f);
+            if (sound != null) sound.PullAway();
+            if (garage != null) garage.SetActive(false);
             if (cabin != null) cabin.SetActive(true);
+            world.Rolling = true;
             Dress(0);
             band = 0;
             // 組み直すのは場面の頭でだけ。帯を跨ぐときには呼ばない
             clock.Reset();
+            yield return Wait(pullHold);
+
+            // 明けるのはフェードイン。走行音はここから
+            if (sound != null) sound.Road(At(0).gravel);
+            for (var t = 0f; t < pullFade; t += Time.deltaTime)
+            {
+                hud.SetFade(pullFade <= 0f ? 0f : 1f - t / pullFade);
+                flow.Freeze(FreezeStep);
+                yield return null;
+            }
+            hud.SetFade(0f);
+            boarding = false;
+            aboard = true;
+        }
+
+        /// <summary>演出のあいだ送りを止めておく長さ。秒。毎フレーム延長する</summary>
+        const float FreezeStep = 0.25f;
+
+        /// <summary>演出の間。待っているあいだも送りを止めておく</summary>
+        System.Collections.IEnumerator Wait(float seconds)
+        {
+            for (var t = 0f; t < seconds; t += Time.deltaTime)
+            {
+                flow.Freeze(FreezeStep);
+                yield return null;
+            }
+        }
+
+        /// <summary>両端を緩めた 0〜1。目が急に動き出したり止まったりしないように</summary>
+        static float Ease(float k)
+        {
+            k = Mathf.Clamp01(k);
+            return k * k * (3f - 2f * k);
         }
 
         /// <summary>
@@ -260,6 +371,9 @@ namespace HalfAware
             // 走っている最中に時間帯が変わると、夜から朝へ切り替わるその一瞬が見える
             ShowSky(which);
             At(which).sky.Apply(sun, eye, beams);
+            // 走行音も黒のあいだに入れ替える。舗装のまま続く帯では鳴らし直さない。
+            // 乗り込みのときだけ Boarding が明けてから鳴らすので、ここでは出さない
+            if (aboard && sound != null) sound.Road(At(which).gravel);
         }
 
         /// <summary>which 番目の帯の空の物だけ出す。-1 でどれも出さない</summary>

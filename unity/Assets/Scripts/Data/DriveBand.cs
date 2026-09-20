@@ -141,6 +141,14 @@ namespace HalfAware
         public float speed;
         /// <summary>路面の粗さ。1 が舗装、未舗装はもっと大きい。車体の揺れ幅に掛かる</summary>
         public float rough;
+        /// <summary>
+        /// 土と轍の道か。走行音をどちらの輪にするかがこれで決まる。
+        ///
+        /// <see cref="rough"/> から割り出さない。あちらは揺れ幅で、値の大小と
+        /// 「舗装かどうか」は別のこと。明け方の丘陵は所々荒れていて rough が 1.6 あるが、
+        /// 道そのものは舗装されている
+        /// </summary>
+        public bool gravel;
         /// <summary>独白を送り切ってから黒へ切り替わるまでの秒数。黙って走る</summary>
         public float afterglow;
         /// <summary>黒のまま置く秒数。仮眠にあたる切れ目だけ長く取る</summary>
