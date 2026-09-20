@@ -13,10 +13,25 @@ namespace HalfAware.EditorTools
     {
         readonly List<Vector3> verts = new List<Vector3>();
         readonly List<Vector2> uvs = new List<Vector2>();
+        readonly List<Vector2> roots = new List<Vector2>();
         readonly List<int> tris = new List<int>();
 
         /// <summary>1 メートルあたり絵を何回繰り返すか</summary>
         public float Texel = 0.5f;
+
+        /// <summary>
+        /// 根からの高さを uv1 に持たせる。麦だけが立てる。
+        ///
+        /// 地面が起伏すると、頂点の y だけでは根からの高さが分からない。丘の上の株は
+        /// y が丸ごと持ち上がるので、y を高さとして読むシェーダーは株ぜんたいを
+        /// 穂先として扱い、撓むかわりに横へ滑る。
+        /// 立てているあいだ、uv1 には (根からの高さ。m, 株の背に対する割合) が入る
+        /// </summary>
+        public bool Rooted;
+        /// <summary>根の高さ。Rooted のあいだ、置く物ごとに書き換える</summary>
+        public float RootY;
+        /// <summary>その物の背。割合を出すのに使う。0 以下なら割合は 0</summary>
+        public float RootHigh = 1f;
 
         public int Count { get { return tris.Count / 3; } }
 
@@ -34,8 +49,34 @@ namespace HalfAware.EditorTools
             uvs.Add(new Vector2(uOffset + wide, vOffset));
             uvs.Add(new Vector2(uOffset + wide, vOffset + high));
             uvs.Add(new Vector2(uOffset, vOffset + high));
+            Root(a); Root(b); Root(c); Root(d);
             tris.Add(i); tris.Add(i + 1); tris.Add(i + 2);
             tris.Add(i); tris.Add(i + 2); tris.Add(i + 3);
+        }
+
+        /// <summary>
+        /// 四隅で面を 1 枚。uv は呼ぶ側が渡す。
+        ///
+        /// Quad は隅どうしの距離から uv を振るので、起伏のある面を升目に割ると、
+        /// 斜面のぶんだけ uv が伸びて、隣の升と継ぎ目でずれる。
+        /// 地面のように升を並べて張る面はこちらを使う
+        /// </summary>
+        public void Patch(Vector3 a, Vector3 b, Vector3 c, Vector3 d,
+            Vector2 ua, Vector2 ub, Vector2 uc, Vector2 ud)
+        {
+            var i = verts.Count;
+            verts.Add(a); verts.Add(b); verts.Add(c); verts.Add(d);
+            uvs.Add(ua); uvs.Add(ub); uvs.Add(uc); uvs.Add(ud);
+            Root(a); Root(b); Root(c); Root(d);
+            tris.Add(i); tris.Add(i + 1); tris.Add(i + 2);
+            tris.Add(i); tris.Add(i + 2); tris.Add(i + 3);
+        }
+
+        void Root(Vector3 v)
+        {
+            if (!Rooted) return;
+            var up = v.y - RootY;
+            roots.Add(new Vector2(up, RootHigh > 0f ? Mathf.Clamp01(up / RootHigh) : 0f));
         }
 
         /// <summary>
@@ -225,6 +266,7 @@ namespace HalfAware.EditorTools
             if (verts.Count > 65000) mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
             mesh.SetVertices(verts);
             mesh.SetUVs(0, uvs);
+            if (roots.Count == verts.Count) mesh.SetUVs(1, roots);
             mesh.SetTriangles(tris, 0);
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();

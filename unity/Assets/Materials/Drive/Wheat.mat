@@ -38,7 +38,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: f6644da6d2b8f904a81877c6cf336bea, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
@@ -101,6 +101,7 @@ Material:
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
     - _BumpScale: 1
+    - _Canopy: 0.35
     - _ClearCoatMask: 0
     - _ClearCoatSmoothness: 0
     - _Cull: 2
@@ -113,12 +114,19 @@ Material:
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
-    - _Glow: 0.38
+    - _Glow: 0.7
+    - _GroundHigh: 0.75
+    - _GustAcross: 0.11
+    - _GustAlong: 0.31415927
+    - _GustDeep: 0.35
+    - _GustRate: 0.85
     - _Metallic: 0
     - _OcclusionStrength: 1
     - _Parallax: 0.005
     - _QueueOffset: 0
     - _ReceiveShadows: 1
+    - _Rooted: 1
+    - _ShadeDeep: 0.12
     - _Smoothness: 0.1
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
@@ -127,23 +135,23 @@ Material:
     - _Surface: 0
     - _SwayAcross: 0.44
     - _SwayAlong: 0.62831855
-    - _SwayAmp: 0.1
+    - _SwayAmp: 0.14
     - _SwayFlutter: 0.32
     - _SwayFlutterRate: 5.2
-    - _SwayHigh: 1.05
+    - _SwayHigh: 1.18
     - _SwayPhase: 0
     - _SwayRate: 2.2
     - _SwayShift: 0
     - _SwaySide: 0.4
     - _WorkflowMode: 1
-    - _Wrap: 0.6
+    - _Wrap: 0.52
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 0.55, g: 0.41, b: 0.145, a: 1}
+    - _BaseColor: {r: 0.6, g: 0.425, b: 0.14, a: 1}
     - _Color: {r: 0.21499997, g: 0.17999998, b: 0.09499996, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
-    - _TipColor: {r: 0.87, g: 0.72, b: 0.33, a: 1}
+    - _TipColor: {r: 0.96, g: 0.79, b: 0.35, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

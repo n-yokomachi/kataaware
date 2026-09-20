@@ -352,6 +352,270 @@ def dials():
     return im
 
 
+# ---- 帯 4。畑と未舗装路 -------------------------------------------------
+
+def wheat():
+    """
+    麦の株の面。下端が根、上端が穂先。横へだけ繰り返す。
+
+    シェーダーは縦を「根からの高さの割合」で引くので、株の背に関わらず
+    絵の下端が根、上端が穂先に来る。天面は割合 1 のところを引くので、
+    上から見たときは穂先の行だけが並ぶ。
+
+    **色はここが持たない。** 黄金色は WheatMat の根元色と穂先色が持っていて、
+    この絵は明暗だけを預かる。平均を中庸（128）に寄せてあり、シェーダーが
+    2 倍して albedo に掛ける。色まで焼き込むと、色を詰めるつまみが二箇所に割れる
+    """
+    size = (SIZE, SIZE)
+    rng = random.Random(3307)
+    # 地。根元ほど暗い。株の隙間には日が届かないので、下へ行くほど落とす
+    im = Image.new('RGB', size)
+    px = im.load()
+    base = clouds(size, 4411, 4, 1.2).load()
+    for y in range(SIZE):
+        v = 1.0 - y / float(SIZE - 1)          # 1 が上（穂先）
+        deep = 0.30 + 0.46 * v * v
+        for x in range(SIZE):
+            k = deep * (0.82 + base[x, y] / 255.0 * 0.36)
+            c = int(min(255, max(0, k * 255)))
+            px[x, y] = (c, c, c)
+    w = Wrap(im)
+    # 茎。少しずつ傾けて、縦に真っ直ぐ並ばないようにする
+    stalks = 34
+    ear = int(SIZE * 0.36)                     # ここから上が穂
+    for i in range(stalks):
+        x0 = (i + rng.uniform(-0.35, 0.35)) * SIZE / float(stalks)
+        lean = rng.uniform(-6.0, 6.0)
+        tone = rng.uniform(0.55, 1.0)
+        top = ear - rng.randint(0, int(SIZE * 0.10))
+        pts = []
+        for k in range(9):
+            t = k / 8.0
+            pts.append((x0 + lean * t * t, SIZE - (SIZE - top) * t))
+        col = int(120 + 110 * tone)
+        w.line(pts, fill=(col, col, col), width=2 if tone > 0.8 else 1)
+        # 穂。茎の先に少し太い塊を置き、その上に芒を数本立てる
+        tx, ty = pts[-1]
+        eh = rng.randint(int(SIZE * 0.16), int(SIZE * 0.30))
+        bright = int(150 + 105 * rng.uniform(0.6, 1.0))
+        for k in range(7):
+            t = k / 6.0
+            yy = ty - eh * t
+            half = (1.6 + 2.6 * math.sin(math.pi * (0.15 + 0.85 * t))) * (1.0 - 0.25 * t)
+            tail = int(bright * (0.72 + 0.28 * t))
+            w.line([(tx - half, yy), (tx + half, yy)], fill=(tail, tail, tail), width=2)
+        for k in range(3):
+            aw = rng.uniform(-5.0, 5.0)
+            w.line([(tx, ty - eh), (tx + aw, ty - eh - rng.randint(8, 20))],
+                   fill=(bright, bright, bright), width=1)
+    # **一番上の数行に横のむらを入れる。** 箱の天面はここ一行だけを引くので、
+    # 一様だと蓋が平らな板に見える。穂を上から覗いた粗さをここへ焼いておく
+    w = Wrap(im)
+    for _ in range(260):
+        x = rng.randrange(SIZE)
+        y = rng.randint(0, int(SIZE * 0.09))
+        v = rng.randint(96, 255)
+        w.line([(x, y), (x + rng.uniform(-1.5, 1.5), y + rng.randint(3, 10))],
+               fill=(v, v, v), width=rng.randint(1, 3))
+    # 低い解像度で潰れないよう、ぼかしは軽く
+    im = Image.blend(im, tile_blur(im, 0.8), 0.45)
+    return aim(im, (128, 128, 128))
+
+
+def field():
+    """
+    畑の地。株のあいだから覗く面と、株の届かない遠くの丘を覆う絵。
+
+    真上からではなく浅い角度で見るので、条播きの筋を道と同じ向きに通す。
+    uv は道を横切る向きが u、道に沿う向きが v（BuildDrive.FieldTexel）なので、
+    筋は縦線として描く。上下左右へ繰り返す。
+
+    **株の絵と同じく、色はここが持たない。** 地も株と同じシェーダーで塗るので、
+    黄金色は FieldMat の色が持つ。平均は中庸（128）
+    """
+    size = (SIZE, SIZE)
+    rng = random.Random(9151)
+    # 熟れ具合のむら。これが遠くの丘に斑を作って、一枚の板に見せない
+    patch = clouds(size, 2237, 5, 2.4)
+    im = tint(size, patch, (84, 84, 84), (176, 176, 176))
+    w = Wrap(im)
+    # 条播きの筋。0.6 m 間隔にあたる 23 画素ごと。
+    # **薄く通す。** 濃く引くと、浅い角度で見たときに畑ではなく板張りに見える
+    for i in range(11):
+        x = i * SIZE / 11.0 + rng.uniform(-2.0, 2.0)
+        w.line([(x, -4), (x + rng.uniform(-6, 6), SIZE + 4)], fill=(186, 186, 186), width=1)
+        w.line([(x + 9, -4), (x + 9 + rng.uniform(-6, 6), SIZE + 4)], fill=(96, 96, 96), width=1)
+    im = Image.blend(im, tile_blur(im, 2.0), 0.75)
+    w = Wrap(im)
+    # 穂の粒。筋だけだと縞の板になるので、細かい点を撒いて面を荒らす
+    for _ in range(1100):
+        x, y = rng.randrange(SIZE), rng.randrange(SIZE)
+        v = rng.randint(150, 235)
+        w.line([(x, y), (x + rng.uniform(-1, 1), y - rng.randint(2, 5))], fill=(v, v, v), width=1)
+    im = shade(im, blot(size, 7717, 14, 46, 46, 9.0), 0.34)
+    return aim(im, (128, 128, 128))
+
+
+def dirt():
+    """
+    未舗装路の土。乾いて白茶けた地面に、小石と車の擦った跡。
+
+    **灰にしない。** 朝日は 11 度から薙ぐので路面に直に当たる光は弱く、
+    青い空の環境光が勝つ。絵の側を土の色へ振り切っておかないと、
+    黄金色の畑のあいだを灰色の帯が抜けていくことになる
+    """
+    size = (SIZE, SIZE)
+    rng = random.Random(6619)
+    grain = Image.blend(noise(size, 1811, 96, 190, 0.6), clouds(size, 5507, 5, 1.8), 0.55)
+    im = tint(size, grain, (76, 56, 34), (188, 154, 108))
+    w = Wrap(im)
+    # 小石。粒を置いて、上側だけ明るくする
+    for _ in range(140):
+        x, y = rng.randrange(SIZE), rng.randrange(SIZE)
+        r = rng.uniform(1.2, 3.4)
+        v = rng.randint(150, 210)
+        w.ellipse([x - r, y - r * 0.8, x + r, y + r * 0.8], fill=(v, v - 14, v - 34))
+        w.ellipse([x - r, y - r * 0.9, x + r * 0.5, y - r * 0.1],
+                  fill=(min(255, v + 34), v + 16, v - 12))
+    # 引きずった跡。道は z 方向に流れるので筋も縦へ向くが、
+    # 端まで通すと板目になる。短く切って途中で絶えさせる
+    for _ in range(22):
+        x = rng.randrange(SIZE)
+        y = rng.randrange(SIZE)
+        ln = rng.randint(24, 80)
+        v = rng.randint(74, 112)
+        w.line([(x, y), (x + rng.uniform(-6, 6), y + ln)],
+               fill=(v, v - 8, v - 18), width=rng.randint(1, 2))
+    im = Image.blend(im, tile_blur(im, 1.4), 0.55)
+    im = shade(im, blot(size, 4231, 16, 40, 40, 8.0), 0.26)
+    return aim(im, (124, 94, 58))
+
+
+def rut():
+    """
+    車輪の通る筋。**土より明るい。**
+
+    夏の朝の乾いた農道で、轍は埃が磨かれて白茶ける。湿った暗い轍として描くと、
+    黄金色の畑のあいだを暗い溝が抜けることになり、道が水路に見える。
+    踏み固められているので小石は路肩へ弾かれて残らない
+    """
+    size = (SIZE, SIZE)
+    rng = random.Random(2903)
+    grain = Image.blend(noise(size, 3313, 108, 176, 1.1), clouds(size, 7727, 5, 2.6), 0.6)
+    im = tint(size, grain, (96, 72, 46), (206, 174, 128))
+    w = Wrap(im)
+    # 轍の溝。縦に通るが、板目に見えないよう本数を抑えて薄く引く
+    for _ in range(14):
+        x = rng.randrange(SIZE)
+        v = rng.randint(58, 92)
+        w.line([(x, -4), (x + rng.uniform(-9, 9), SIZE + 4)], fill=(v, v - 6, v - 14), width=1)
+    for _ in range(9):
+        x = rng.randrange(SIZE)
+        v = rng.randint(138, 176)
+        w.line([(x, -4), (x + rng.uniform(-9, 9), SIZE + 4)], fill=(v, v - 12, v - 30), width=1)
+    # 泥のはねと乾いた斑。踏み固めた面なので粒立ちは残さない
+    for _ in range(70):
+        x, y = rng.randrange(SIZE), rng.randrange(SIZE)
+        r = rng.uniform(1.5, 5.0)
+        v = rng.randint(96, 150)
+        w.ellipse([x - r, y - r * 0.6, x + r, y + r * 0.6], fill=(v, v - 10, v - 24))
+    im = Image.blend(im, tile_blur(im, 2.2), 0.7)
+    im = shade(im, blot(size, 8837, 12, 52, 38, 10.0), 0.24)
+    return aim(im, (148, 116, 74))
+
+
+def torn():
+    """
+    千切れ雲。原作の「真っ白な千切れ雲と、まだ薄青い高い空」。
+
+    層雲の一枚板ではなく、切れ切れの積雲にする。芯を白く抜いて縁を毛羽立たせ、
+    小さな千切れも散らす。空の板は下から見上げるので、透けるところは
+    まるごと抜く（α 0）。上下左右へ繰り返す
+    """
+    size = (512, 512)
+    rng = random.Random(5477)
+    a = Image.new('L', size, 0)
+    w = Wrap(a)
+
+    def puff(cx, cy, span, tall, seed):
+        """積雲ひとつ。丸を重ねて、上を盛り上げ下を平らにする"""
+        r2 = random.Random(seed)
+        lumps = int(span / 7) + 5
+        for _ in range(lumps):
+            t = r2.uniform(-1.0, 1.0)
+            x = cx + t * span
+            lift = (1.0 - t * t) * tall
+            r = r2.uniform(span * 0.14, span * 0.34) * (0.5 + 0.7 * (1.0 - abs(t)))
+            y = cy - r2.uniform(0.0, lift)
+            w.ellipse([x - r, y - r * 0.82, x + r, y + r * 0.82], fill=r2.randint(228, 255))
+        # 底。平らに切り揃える
+        for _ in range(lumps // 2):
+            t = r2.uniform(-0.9, 0.9)
+            x = cx + t * span
+            r = r2.uniform(span * 0.10, span * 0.22)
+            w.ellipse([x - r, cy - r * 0.34, x + r, cy + r * 0.30], fill=r2.randint(196, 236))
+
+    for i in range(5):
+        puff(rng.randrange(512), rng.randrange(512), rng.uniform(46, 96), rng.uniform(30, 64), 700 + i)
+    for i in range(9):
+        puff(rng.randrange(512), rng.randrange(512), rng.uniform(16, 34), rng.uniform(9, 20), 800 + i)
+    # 千切れ。小さな欠片をばら撒く
+    for _ in range(40):
+        x, y = rng.randrange(512), rng.randrange(512)
+        r = rng.uniform(2.5, 9.0)
+        w.ellipse([x - r, y - r * rng.uniform(0.28, 0.5), x + r, y + r * rng.uniform(0.28, 0.5)],
+                  fill=rng.randint(120, 210))
+    # 縁を毛羽立たせる。斑を掛けてから縁だけ削る
+    a = tile_blur(a, 2.2)
+    ragged = clouds(size, 6121, 5, 1.6)
+    ap = a.load()
+    rp = ragged.load()
+    for y in range(512):
+        for x in range(512):
+            v = ap[x, y]
+            if v == 0:
+                continue
+            k = 0.45 + rp[x, y] / 255.0 * 1.15
+            ap[x, y] = min(255, max(0, int(v * k)))
+    a = tile_blur(a, 1.1)
+    # 芯は白く抜く。α が 200 止まりだと、真っ白な雲にならない
+    a = a.point(lambda v: min(255, int(v * 1.45)))
+    # 底はわずかに影る。真っ白のままだと切り絵に見える
+    sh = clouds(size, 9311, 4, 2.2).point(lambda v: 210 + v // 6)
+    body = Image.composite(Image.new('RGB', size, (255, 255, 255)),
+                           Image.new('RGB', size, (222, 230, 244)), sh)
+    im = body.convert('RGBA')
+    im.putalpha(a)
+    return im
+
+
+def skyhaze():
+    """
+    地平に敷く朝靄の板。
+
+    帯 4 の空はカメラの塗り潰し（一色）なので、そのままでは天頂も地平も同じ青になる。
+    原作の「まだ薄青い高い空」を出すには上を深く、地平を白く抜きたい。
+    天頂を沈める板は置けない（板は水平なので、低い仰角には届かない）ので、
+    逆に地平の側を明るい靄で塗る。空の色そのものを深い青へ落としておけば、
+    見上げるほど青が深くなる。
+
+    絵は一様でよいが、まったくの平面だと帯が出るので薄い斑を入れる。
+    α は抜かない。濃さは板の色（_BaseColor）と仰角の薄れが決める
+    """
+    size = (64, 64)
+    body = tint(size, clouds(size, 3733, 3, 1.6), (236, 236, 240), (255, 255, 255))
+    im = body.convert('RGBA')
+    im.putalpha(Image.new('L', size, 255))
+    return im
+
+
+def save_plain(im, name):
+    """Drive を冠さない名前で保存する。雲の絵は帯をまたいで名前が決まっている"""
+    path = os.path.join(OUT, name + '.png')
+    im.save(path)
+    print('%-24s %dx%d' % (os.path.basename(path), im.size[0], im.size[1]))
+
+
 def main():
     if not os.path.isdir(OUT):
         raise SystemExit('テクスチャの置き場が無い: ' + OUT)
@@ -360,6 +624,12 @@ def main():
     save(seat(), 'CarSeat')
     save(body(), 'CarBody')
     save(dials(), 'CarDials')
+    save(wheat(), 'Wheat')
+    save(field(), 'Field')
+    save(dirt(), 'Dirt')
+    save(rut(), 'Rut')
+    save_plain(torn(), 'CloudTorn')
+    save_plain(skyhaze(), 'SkyHaze')
 
 
 if __name__ == '__main__':

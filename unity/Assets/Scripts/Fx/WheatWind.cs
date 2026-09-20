@@ -20,8 +20,8 @@ namespace HalfAware
     /// </summary>
     public static class WheatWind
     {
-        /// <summary>穂先の振れ幅。m。微風なので、1.3 m の株がおよそ 4 度傾くところに置く</summary>
-        public const float Amp = 0.10f;
+        /// <summary>穂先の振れ幅。m。微風なので、1.18 m の株がおよそ 7 度傾くところに置く</summary>
+        public const float Amp = 0.14f;
         /// <summary>細かい震えの割合。Amp に対して</summary>
         public const float Flutter = 0.32f;
         /// <summary>x 方向の波数。rad/m。波長およそ 14.3 m。x は区切りを跨いでも続くので端数でよい</summary>
@@ -37,13 +37,47 @@ namespace HalfAware
         /// <summary>細かい震えの速さ。rad/s。0.83 Hz</summary>
         public const float FlutterRate = 5.2f;
         /// <summary>
-        /// 重みが 1 に届く高さ。m。株の背は 1.00〜1.50 なので、
+        /// 重みが 1 に届く高さ。m。株の背は 0.72〜1.18 なので、
         /// 背の低い株はここに届かず、そのぶん揺れが浅くなる。
         /// BuildDrive.Furrows が振る背の上端と揃えること
         /// </summary>
-        public const float High = 1.05f;
+        public const float High = 1.18f;
         /// <summary>z 方向の振れの割合。x より浅くして、穂先が小さな楕円を描くようにする</summary>
         public const float Side = 0.40f;
+
+        // ---- 風のむら ------------------------------------------------------
+        //
+        // 上の波だけだと、畑ぜんたいが同じ強さで一様に揺れる。オーナーの言う
+        // 「ある程度の塊で横になびかせる」には、もっと長い波で振れ幅そのものを
+        // 撫でてやる必要がある。塊の大きさは x に 57 m、z に 20 m。
+        // 振れ幅に (1 + Gust·sin) を掛けるので、Reach もそのぶん広がる
+
+        /// <summary>風のむらの深さ。振れ幅に対する増減</summary>
+        public const float Gust = 0.35f;
+        /// <summary>むらの x 方向の波数。rad/m。波長およそ 57 m</summary>
+        public const float GustAcross = 0.11f;
+        /// <summary>
+        /// むらの z 方向の波数。rad/m。波長ちょうど 20 m。
+        /// 区切りの長さと同じなので、継ぎ目でむらが途切れない
+        /// </summary>
+        public const float GustAlong = 0.31415927f;
+        /// <summary>むらの進む速さ。rad/s。0.14 Hz。畑を撫でていくのが見える遅さ</summary>
+        public const float GustRate = 0.85f;
+        /// <summary>
+        /// むらが明るさを動かす深さ。
+        ///
+        /// **これは揺れではないので <see cref="Reach"/> には効かない。** 麦が風に倒れると
+        /// 日の当たる面の向きが変わり、畑の上を明暗の帯が渡っていく。頂点を動かすだけでは
+        /// その帯が出ず、遠い畑は風が吹いていないように見える。
+        /// 数をここに置いてあるのは、シェーダーと揃っていることを一箇所で読めるようにするため
+        /// </summary>
+        public const float Shade = 0.12f;
+
+        /// <summary>その点の風のむら。-1〜1</summary>
+        public static float Gusting(float x, float z, float t)
+        {
+            return Mathf.Sin(x * GustAcross + z * GustAlong + t * GustRate);
+        }
 
         /// <summary>
         /// 根からの高さの重み。根は動かさない。
@@ -65,15 +99,19 @@ namespace HalfAware
             var slow = phase + t * Rate;
             var quick = phase * 2f + t * FlutterRate;
             var w = Weight(y);
+            // むらは振れ幅そのものに掛ける。別の揺れとして足すと、
+            // 塊でなびくのではなく二つの波が重なって細かく震えて見える
+            var amp = Amp * (1f + Gust * Gusting(x, z, t));
             return new Vector2(
-                (Mathf.Sin(slow) + Mathf.Sin(quick) * Flutter) * Amp * w,
-                Mathf.Cos(slow) * Amp * Side * w);
+                (Mathf.Sin(slow) + Mathf.Sin(quick) * Flutter) * amp * w,
+                Mathf.Cos(slow) * amp * Side * w);
         }
 
         /// <summary>
         /// 穂先が横（x）へ振れうる最大。m。
-        /// 見直しが、麦の立っている位置からこれだけ轍の側へ寄せて見るのに使う
+        /// 見直しが、麦の立っている位置からこれだけ轍の側へ寄せて見るのに使う。
+        /// むら（<see cref="Gust"/>）が振れ幅に掛かるので、そのぶんも含める
         /// </summary>
-        public static float Reach { get { return Amp * (1f + Flutter); } }
+        public static float Reach { get { return Amp * (1f + Flutter) * (1f + Gust); } }
     }
 }

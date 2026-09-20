@@ -137,6 +137,11 @@ namespace HalfAware.EditorTools
                 existing.indexFormat = mesh.indexFormat;
                 existing.SetVertices(new List<Vector3>(mesh.vertices));
                 existing.SetUVs(0, new List<Vector2>(mesh.uv));
+                // uv1 は麦の根の高さ。持たない形の方が多いので、有るときだけ写す。
+                // 写さないと、組み直したときに前の資産の uv1 が残って揺れの重みが狂う
+                var up = mesh.uv2;
+                if (up != null && up.Length == mesh.vertexCount) existing.SetUVs(1, new List<Vector2>(up));
+                else existing.SetUVs(1, new List<Vector2>());
                 existing.SetTriangles(mesh.triangles, 0);
                 var normals = mesh.normals;
                 if (normals != null && normals.Length == mesh.vertexCount) existing.SetNormals(normals);

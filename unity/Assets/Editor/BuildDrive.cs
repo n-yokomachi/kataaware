@@ -103,10 +103,67 @@ namespace HalfAware.EditorTools
         /// 株の根（0）よりわずかに下。根を浮かせないためにここまで上げてある
         /// </summary>
         public const float FieldY = -0.02f;
-        /// <summary>畑が持ち上がり始める距離。道の中心から、m。ここより内側は平ら</summary>
-        public const float SwellFrom = 14f;
-        /// <summary>畑の持ち上がり。距離の二乗に掛ける。58 m で 1.7 m ほど上がる</summary>
-        public const float SwellRate = 0.00055f;
+        /// <summary>畑が平らでいる距離。道の中心から、m。ここより内側は起伏を付けない</summary>
+        public const float SwellFrom = 12f;
+        /// <summary>
+        /// 起伏が立ち上がり切るまでの距離。m。SwellFrom のところで滑らかに 0 へ落とす。
+        /// 段で繋ぐと、道の脇に土手が立ち上がったように見える
+        /// </summary>
+        public const float SwellEase = 16f;
+        /// <summary>丘ぜんたいの持ち上がり。SwellFrom から先の距離の二乗に掛ける</summary>
+        public const float SwellRate = 0.00042f;
+        /// <summary>
+        /// 主な背の高さ。m。**この場面の地平はこれが決める。**
+        /// 座った目（1.55）から 78 m 先に 8 m ほどの背が来るので、稜線は水平から
+        /// およそ 5 度上がったところに出る。ここより先の地面はこの背に隠れるので、
+        /// 畑の外れ（<see cref="FieldHalf"/>）が絵に出ることは無い
+        /// </summary>
+        public const float CrestHigh = 6.6f;
+        /// <summary>主な背までの距離。SwellFrom から、m</summary>
+        public const float CrestAt = 66f;
+        /// <summary>主な背の広がり。m。大きくするほど緩い斜面になる</summary>
+        public const float CrestWide = 34f;
+        /// <summary>
+        /// 手前のうねりの高さ。m。背が一つだけだと斜面が一枚の板に見えるので、
+        /// 途中にもう一段だけ入れて稜線を重ねる
+        /// </summary>
+        public const float FoldHigh = 1.2f;
+        /// <summary>手前のうねりまでの距離。SwellFrom から、m</summary>
+        public const float FoldAt = 35f;
+        /// <summary>手前のうねりの広がり。m</summary>
+        public const float FoldWide = 18f;
+        /// <summary>
+        /// 畝の深さ。その場の丘の高さに対する割合。道際では丘が 0 なので畝も出ない。
+        /// これが無いと稜線が定規を当てた曲線になる
+        /// </summary>
+        public const float FurrowDeep = 0.20f;
+        /// <summary>
+        /// 畝の位相が道から遠ざかる向きに進む割合。rad/m。
+        /// 0 にすると畝が道と平行な縞になるので、斜めに走らせる
+        /// </summary>
+        public const float FurrowSlant = 0.13f;
+        /// <summary>
+        /// 畑の地を割る升目の、道からの距離。m。
+        /// 起伏を追わせるので 1 枚の面では張れない。近くは細かく、遠くは粗く割る
+        /// </summary>
+        public static readonly float[] FieldRows =
+        {
+            4.8f, 6f, 7.5f, 9.5f, 12f, 15f, 18f, 22f, 26f, 31f, 37f,
+            44f, 52f, 61f, 71f, 82f, 94f, 107f, 121f, 135f, FieldHalf,
+        };
+        /// <summary>畑の地の升目を z 方向に割る数。畝（20 m でひと回り）を追える細かさが要る</summary>
+        public const int FieldSteps = 10;
+        /// <summary>
+        /// 畑の地の絵の刻み。1 m あたり。TileLength を掛けて整数にならないと、
+        /// 区切りの継ぎ目で絵柄が途切れる。0.15 × 20 = 3
+        /// </summary>
+        public const float FieldTexel = 0.15f;
+        /// <summary>
+        /// 株の絵の刻み。1 m あたり。株は箱なので、面の横幅だけがこれで決まる。
+        /// 縦は根からの高さの割合（uv1）で引くので、株の背に関わらず根が絵の下端、
+        /// 穂先が上端に来る。2.0 なら 0.5 m にひと並び、麦としておよそ 1 m に 12 本
+        /// </summary>
+        public const float WheatTexel = 2.0f;
         /// <summary>
         /// 帯 4 の畑の広がり。道の中心から片側、m。
         /// 霧が畳む距離（帯 4 の density 0.017 でおよそ 100 m）より十分遠くまで敷く。
@@ -198,24 +255,36 @@ namespace HalfAware.EditorTools
         /// </summary>
         static readonly DriveSky Morning = new DriveSky
         {
-            sky = new Color(0.500f, 0.600f, 0.780f),
-            haze = new Color(0.500f, 0.600f, 0.780f),
+            // **地平の色ではない。** 地平は靄の板（Clouds の Haze）が白く抜くので、
+            // ここは見上げたときの高い空の色。原作の「まだ薄青い高い空」にあたる
+            sky = new Color(0.400f, 0.520f, 0.800f),
+            // **ここだけ霧の色を空から離してある。** ふつうは揃えるもので、
+            // 揃えないと地面が霧に溶け切ったところに横一線の継ぎ目が出る。
+            // 畑が丘（<see cref="CrestHigh"/>）を持ってからは、溶け切る手前で必ず
+            // 稜線が視界を塞ぐので、その継ぎ目が絵に出ない。空いた自由を使って
+            // 靄を暖かい白へ寄せる。朝靄は青くなく、日の当たった水気の色をしている
+            haze = new Color(0.700f, 0.665f, 0.615f),
             // 0.017 だと 60 m で 6 割方溶けて、畑の広がりも丘の起伏も見えない。
             // 原作は「緩やかな湾曲を描いて広がる小麦畑」なので、遠くまで抜かす。
             // 0.008 なら 60 m で 8 割、150 m の畑の端でもまだ 2 割残る
             density = 0.008f,
-            sun = new Color(1.00f, 0.88f, 0.70f),
-            power = 1.15f,
-            // 11 度。低いまま畑を薙ぐ。ここを 30 度に上げると株の天面しか当たらず、
-            // 畑が真上から照らした平らな板になる。
+            sun = new Color(1.00f, 0.86f, 0.64f),
+            // **1.15 では足りなかった。** 日射しが 14 度から入るので、上を向いた面が
+            // 直に受けるのは 0.24 ぶんしかない。残りは青い環境光が埋めることになり、
+            // 実際に測ると未舗装路が (0.28, 0.26, 0.26) の無彩色、つまり灰色の舗装に見えた。
+            // 1.40 まで上げて初めて土の色が青い環境光に勝つ
+            power = 1.40f,
+            // 14 度。低いまま畑を薙ぐ。ここを 30 度に上げると株の天面しか当たらず、
+            // 畑が真上から照らした平らな板になる。逆に 11 度まで下げると、
+            // 水平な面（道と畑の地）に届く光が足りず、地面から色が抜ける。
             //
             // 298 度は**後ろ寄りの右**から差す向き。倫敦から北へ走っているので日は右手だが、
             // そこをさらに後ろへ回してある。前の右に置くと畑が逆光になり、
             // 前を向いたときに見えるのが株の陰の面ばかりになって、黄金色がどこにも出ない。
             // 後ろへ回すと、前を向いても脇の窓から見ても日の当たった面が手前を向く
-            aim = new Vector3(11f, 298f, 0f),
-            lift = new Color(0.40f, 0.46f, 0.56f),
-            ground = new Color(0.26f, 0.22f, 0.16f),
+            aim = new Vector3(14f, 298f, 0f),
+            lift = new Color(0.38f, 0.42f, 0.50f),
+            ground = new Color(0.30f, 0.25f, 0.17f),
         };
 
         /// <summary>
@@ -1188,6 +1257,7 @@ namespace HalfAware.EditorTools
             Clear(parent);
             var nano = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/CloudLayer.png");
             var torn = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/CloudTorn.png");
+            var mist = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/SkyHaze.png");
             if (nano == null || torn == null) Debug.LogWarning("雲の絵が無い");
             for (var b = 0; b < Bands; b++)
             {
@@ -1198,6 +1268,21 @@ namespace HalfAware.EditorTools
                         new Color(0.030f, 0.026f, 0.042f, 0.94f), 0.078f, 0.30f, new Vector2(0.0034f, 0.0012f));
                 else if (b == Bands - 1 && torn != null)
                 {
+                    // 朝靄。地平の側だけを明るく抜く。
+                    //
+                    // 空はカメラの塗り潰しの一色なので、そのままでは地平も天頂も同じ青になる。
+                    // 原作の「まだ薄青い高い空」を出すには上を深く、地平を白くしたい。
+                    // 天頂を沈める板は置けない。板は水平なので、低い仰角には板の縁の外しか無く、
+                    // 高いところへ置くほど届く仰角が上がる。実際 300 m に置いた板は
+                    // 仰角 31 度から下が空になり、屋根に切られた窓（上は 21 度まで）には
+                    // 一度も映らなかった。そこで逆を取り、地平の側を靄で塗る。
+                    //
+                    // **薄れの上下を入れ替えて渡している。** 低い側（0.34 ＝ 20 度）で消え、
+                    // 高い側（0.045 ＝ 2.6 度）で濃さのまま。板の縁は 26/680 ＝ 2.2 度なので、
+                    // 濃さのままになる仰角はその外側にある
+                    if (mist != null)
+                        Deck(band, "Haze", mist, 26f, 680f, 0.0008f,
+                            new Color(0.820f, 0.800f, 0.760f, 0.72f), 0.34f, 0.045f, Vector2.zero);
                     // 千切れ雲。二層に分けるのは、遠近だけでは高さが出ないため。
                     // 別々の速さで流れる二枚が重なって初めて「高い空」に見える。
                     // **絵の刻みは粗く取る。** 細かく繰り返すと、浅い角度で見たときに
@@ -1411,26 +1496,66 @@ namespace HalfAware.EditorTools
         {
             // 舗装のタイルはそのまま下に敷いてあるので、土の面で覆い隠す。
             // 帯 4 だけタイルを差し替える手は取らない。タイルは 1 種しか無い。
-            // ±5.4 は路肩の段（±4.7）のすぐ外。ここより広げると土色が畑の下へ回り込み、
-            // 黄金色が道の際で途切れて見える
-            var earth = Shape("Earth", 0.2f, b => b.FaceY(EarthY, Lane(-5.4f), Lane(5.4f), 0f, TileLength, 1));
+            // ±4.9 は路肩の段（±4.7）のすぐ外。ここより広げると土色が畑の下へ回り込み、
+            // 黄金色が道の際で途切れる。実際 ±5.4 で敷いたときは、轍と麦のあいだに
+            // 3 m 余りの裸地が延びて、農道ではなく採石場の取り付け道路に見えた
+            var earth = Shape("Earth", 0.2f, b => b.FaceY(EarthY, Lane(-4.9f), Lane(4.9f), 0f, TileLength, 1));
             var ruts = Shape("Ruts", 0.3f, b =>
             {
                 b.FaceY(RutY, Lane(-DirtHalf), Lane(DirtHalf), 0f, TileLength, 1);
                 b.Box(new Vector3(Lane(-0.95f), RutY + 0.004f, TileLength * 0.5f), new Vector3(0.52f, 0.02f, TileLength));
                 b.Box(new Vector3(Lane(0.95f), RutY + 0.004f, TileLength * 0.5f), new Vector3(0.52f, 0.02f, TileLength));
             });
-            // 畑の地。株のあいだから覗く面。
+            // 畑の地。株のあいだから覗く面で、丘の形を持っているのはこちら。
+            //
             // **株だけでは畑にならない。** 遠くの株は霧に畳まれて消えるので、地の面が無いと
-            // 畑の向こうに路肩の地面（Verge）の暗い色がそのまま出て、刈り取った跡に見える
-            var field = Shape("Field", 0.14f, b =>
+            // 畑の向こうに路肩の地面（Verge）の暗い色がそのまま出て、刈り取った跡に見える。
+            // 起伏を追わせるため 1 枚の面では張れず、<see cref="FieldRows"/> の升目に割る。
+            // uv は升の座標からじかに振る（Bank.Patch）。隅どうしの距離から振ると、
+            // 斜面のぶんだけ伸びて隣の升と継ぎ目がずれる
+            var field = Shape("Field", FieldTexel, b =>
             {
-                b.FaceY(FieldY, Lane(-FieldHalf), Lane(-4.8f), 0f, TileLength, 1);
-                b.FaceY(FieldY, Lane(4.8f), Lane(FieldHalf), 0f, TileLength, 1);
+                // 株と同じシェーダーで塗るので、読まれる uv1 を空にしない。
+                // 根の高さは使わないが（_Rooted 0）、無い頂点の流れを読ませない方が安全
+                b.Rooted = true;
+                b.RootY = 0f;
+                b.RootHigh = 1f;
+                var dz = TileLength / FieldSteps;
+                for (var s = 0; s < 2; s++)
+                {
+                    var side = s == 0 ? -1f : 1f;
+                    for (var c = 0; c + 1 < FieldRows.Length; c++)
+                    {
+                        // 面を上へ向けるには x の小さい側から回す。
+                        // 左側は道から遠いほど x が小さくなるので、そこで入れ替わる
+                        var dA = FieldRows[c];
+                        var dB = FieldRows[c + 1];
+                        if (side < 0f) { var swap = dA; dA = dB; dB = swap; }
+                        var xA = Lane(dA * side);
+                        var xB = Lane(dB * side);
+                        for (var k = 0; k < FieldSteps; k++)
+                        {
+                            var z0 = k * dz;
+                            var z1 = z0 + dz;
+                            b.Patch(
+                                new Vector3(xA, FieldY + Land(dA, z1), z1),
+                                new Vector3(xB, FieldY + Land(dB, z1), z1),
+                                new Vector3(xB, FieldY + Land(dB, z0), z0),
+                                new Vector3(xA, FieldY + Land(dA, z0), z0),
+                                new Vector2(xA * FieldTexel, -z1 * FieldTexel),
+                                new Vector2(xB * FieldTexel, -z1 * FieldTexel),
+                                new Vector2(xB * FieldTexel, -z0 * FieldTexel),
+                                new Vector2(xA * FieldTexel, -z0 * FieldTexel));
+                        }
+                    }
+                }
             });
-            var wheat = Shape("Wheat", 0.4f, b =>
+            var wheat = Shape("Wheat", WheatTexel, b =>
             {
                 var rnd = new System.Random(4021);
+                // 根からの高さを uv1 に持たせる。丘の上の株は y が丸ごと持ち上がるので、
+                // y を高さとして読むシェーダーは撓むかわりに横へ滑る
+                b.Rooted = true;
                 // 列ごとに、道からの距離・株の大きさ・列の中の刻みを持つ。
                 //
                 // **近くを詰めるのが要。** 疎に置くと株のあいだから地の面が覗いて、
@@ -1438,60 +1563,116 @@ namespace HalfAware.EditorTools
                 // 遠い列は大きく粗くして、面として繋がっていればよいことにする。
                 // 刻みはどれも 20 を割り切る数にして、区切りの継ぎ目で列が詰まらないようにする。
                 //
-                // 背は実物どおり 0.78〜1.04。目線（1.55）より低くして見下ろせるようにする。
-                // 1.0〜1.5 まで上げると、一番内側の列の穂先がちょうど目の高さに来て、
-                // 道の両脇に黄金の壁が立つ。原作は「広がる小麦畑」なので、それでは逆。
+                // **遠い列の株を太らせすぎない。** 一株の幅が背の 4 倍を越えると、
+                // 側面が横長の板になり、丘が瓦を葺いたように見える。実際 58 m の列を
+                // 幅 6.2 で置いたときは、畑の向こう半分が屋根瓦の重なりになった。
+                // 幅は背（1 m 前後）の 4 倍までに抑え、そのぶん列を増やして面を埋める。
                 //
-                // 「低いと天面ばかり見えて箱の集まりになる」のは一番内側の数列だけで、
-                // 20 m も離れれば見込む角は 2 度を切り、見えるのは株の側面になる。
-                // 手前で天面が目立つぶんは、地面の起伏（Swell）と薄い霧で畑として繋げる。
+                // 一番外の三列は丘の稜線のためにある。地の面だけで稜線を作ると、
+                // 空との境が升目の縁そのままの折れ線になる。株を乗せて縁を毛羽立たせる。
+                //
+                // 背は実物どおり 0.72〜1.18。目線（1.55）より低くして見下ろせるようにする。
                 // WheatWind.High はこの上端と揃えること。
                 //
                 // 株は箱で、y まわりに回すと角が半幅の 1.414 倍まではみ出す。
-                // 一番内側の列を 3.85 に置き、ばらつきを外向きだけにして、轍の側へ倒れ込ませない。
+                // 一番内側の列を 3.75 に置き、ばらつきを外向きだけにして、轍の側へ倒れ込ませない。
                 // 風でさらに WheatWind.Reach だけ振れるぶんは見直しが見る
-                var at = new[] { 3.75f, 4.5f, 5.4f, 6.5f, 7.8f, 9.4f, 11.4f, 14.0f, 17.5f, 22.0f, 28.0f, 36.0f, 46.0f, 58.0f };
-                var wide = new[] { 0.45f, 0.50f, 0.55f, 0.65f, 0.80f, 0.95f, 1.20f, 1.50f, 1.90f, 2.45f, 3.10f, 4.00f, 5.00f, 6.20f };
-                var step = new[] { 0.50f, 0.50f, 0.625f, 0.625f, 0.80f, 1.00f, 1.25f, 1.25f, 2.00f, 2.50f, 2.50f, 2.50f, 2.50f, 2.50f };
+                var at = new[]
+                {
+                    3.75f, 4.5f, 5.4f, 6.5f, 7.8f, 9.4f, 11.4f, 14.0f, 17.5f, 21.5f,
+                    26.0f, 31.5f, 38.0f, 46.0f, 56.0f, 68.0f, 83.0f, 101.0f, 122.0f,
+                };
+                var wide = new[]
+                {
+                    0.45f, 0.50f, 0.55f, 0.65f, 0.80f, 0.95f, 1.20f, 1.40f, 1.60f, 1.80f,
+                    2.00f, 2.20f, 2.40f, 2.70f, 3.00f, 3.40f, 3.80f, 4.20f, 4.60f,
+                };
+                var step = new[]
+                {
+                    0.50f, 0.50f, 0.625f, 0.625f, 0.80f, 1.00f, 1.25f, 1.25f, 1.25f, 2.00f,
+                    2.00f, 2.00f, 2.00f, 2.50f, 2.50f, 2.50f, 4.00f, 4.00f, 5.00f,
+                };
                 for (var c = 0; c < at.Length; c++)
+                {
+                    // 道からの距離のばらつき。
+                    //
+                    // 近い列は株の幅ぶんだけ。**外向きにしか振らない。** 内向きに振ると
+                    // 一番内側の列が轍へ寄る。遠い列は次の列との間をほぼ埋めるまで散らす。
+                    // 同じ距離に整列させると、丘の斜面に横縞の段が出て段々畑に見える
+                    var spread = c < 9 || c + 1 >= at.Length
+                        ? wide[c] * 0.9f
+                        : (at[c + 1] - at[c]) * 0.85f;
+                    // 傾ける角と沈める深さ。太い株ほど浅くする。
+                    // 傾けるのは、天面が揃って一枚の板に見えるのを崩すため。
+                    // 傾けた角が地面から浮くので、そのぶん沈めて根元を隠す
+                    var lean = 6f / (1f + wide[c] * 0.5f);
+                    var sink = 0.05f + wide[c] * 0.02f;
                     for (var z = step[c] * 0.5f; z < TileLength; z += step[c])
                         for (var s = 0; s < 2; s++)
                         {
                             var side = s == 0 ? -1f : 1f;
-                            var high = 0.78f + (float)rnd.NextDouble() * 0.26f;
-                            var from = at[c] + (float)rnd.NextDouble() * wide[c] * 0.9f;
-                            b.Box(new Vector3(Lane(from * side), Swell(from) + high * 0.5f,
-                                    z + ((float)rnd.NextDouble() - 0.5f) * step[c] * 0.7f),
-                                new Vector3(wide[c], high, wide[c]),
-                                Quaternion.Euler(0f, (float)rnd.NextDouble() * 90f, 0f));
+                            var high = 0.72f + (float)rnd.NextDouble() * 0.46f;
+                            // 株の太さも振る。列ごとに同じ太さで並べると、
+                            // 手前の畑が畝ではなく畳の目に見える
+                            var thick = wide[c] * (0.75f + (float)rnd.NextDouble() * 0.5f);
+                            var from = at[c] + (float)rnd.NextDouble() * spread;
+                            var atZ = z + ((float)rnd.NextDouble() - 0.5f) * step[c] * 0.7f;
+                            var ground = Land(from, atZ);
+                            b.RootY = ground;
+                            b.RootHigh = high;
+                            b.Box(new Vector3(Lane(from * side), ground + high * 0.5f - sink, atZ),
+                                new Vector3(thick, high, thick),
+                                Quaternion.Euler(
+                                    ((float)rnd.NextDouble() - 0.5f) * 2f * lean,
+                                    (float)rnd.NextDouble() * 90f,
+                                    ((float)rnd.NextDouble() - 0.5f) * 2f * lean));
                         }
+                }
             });
             var crop = WheatMat();
+            var loam = FieldMat();
             for (var i = 0; i < slices.Length; i++)
             {
                 Piece(slices[i], "Earth", earth, Mat("Dirt"));
                 Piece(slices[i], "Ruts", ruts, Mat("Rut"));
-                Piece(slices[i], "Field", field, Mat("Field"));
+                Piece(slices[i], "Field", field, loam);
                 Piece(slices[i], "Wheat", wheat, crop);
             }
         }
 
         /// <summary>
-        /// 畑のうねり。道から離れるほど、緩やかに持ち上がる。
+        /// 畑の起伏。道から離れるほど持ち上がり、途中に二つの背を持つ。
         ///
         /// 原作の「緩やかな湾曲を描いて広がる小麦畑」。平らなままだと地平が定規を当てた
         /// ような直線になり、畑ではなく黄色い板が敷いてあるように見える。
-        /// 二乗で効かせるので、近くはほとんど上がらず、遠くだけが背を持つ。
         ///
-        /// **近い列（<see cref="SwellFrom"/> より内側）は上げない。** 株の揺れは根からの
-        /// 高さで重みを付けているので、根そのものを持ち上げると株ぜんたいが 1 の重みになり、
-        /// 撓むかわりに横へ滑る。目の届く手前の列だけは根を地面に置いておく。
-        /// 遠い列は畑の面として見えればよく、40 m 先で 0.1 m 滑っても読めない
+        /// 形は三つの足し合わせ。全体を二乗で持ち上げる坂と、<see cref="CrestAt"/> の
+        /// 主な背、<see cref="FoldAt"/> の手前のうねり。背を二つ重ねるのは、
+        /// 一本調子の坂だと稜線が一本しか出ず、斜面が板に見えるため。
+        ///
+        /// z は区切りの中の座標。畝は区切りの長さ（20 m）でちょうどひと回りするので、
+        /// 区切りの継ぎ目で地面が段にならない。**変えるなら 20 m を割り切る波長から選ぶこと。**
+        ///
+        /// 道際（<see cref="SwellFrom"/> の内側）は 0 のままにする。轍も土も平らな面なので、
+        /// ここが動くと路面と畑の境に隙間が空く
         /// </summary>
-        static float Swell(float from)
+        public static float Land(float from, float z)
         {
-            if (from <= SwellFrom) return 0f;
-            return SwellRate * (from * from - SwellFrom * SwellFrom);
+            var t = from - SwellFrom;
+            if (t <= 0f) return 0f;
+            var rise = SwellRate * t * t
+                + CrestHigh * Bump((t - CrestAt) / CrestWide)
+                + FoldHigh * Bump((t - FoldAt) / FoldWide);
+            var high = Mathf.SmoothStep(0f, 1f, t / SwellEase) * rise;
+            // 畝は丘の高さに掛ける。道際で丘が 0 なら畝も出ない
+            return high * (1f + FurrowDeep *
+                Mathf.Sin(z * (2f * Mathf.PI / TileLength) + from * FurrowSlant));
+        }
+
+        /// <summary>釣鐘。1 を頂点に、±1 で 1/e まで落ちる</summary>
+        static float Bump(float u)
+        {
+            return Mathf.Exp(-u * u);
         }
 
         // ---- 沿道の並べ方 --------------------------------------------------
@@ -2464,29 +2645,80 @@ namespace HalfAware.EditorTools
         /// </summary>
         static Material WheatMat()
         {
+            // 黄金色。**この場面のほかの色（どれも 0.2 前後）から大きく外している。**
+            // 朝の日射しを受けて初めて成り立つ色で、帯 4 のほかには出てこない
+            // 根元は 0.520 から上げた。遠くの株は絵が mip で平均へ潰れ、
+            // 見えているのは根元色と穂先色の中ほどになる。根元が暗いと、
+            // 丘の上の畑だけが色を失って手前と別の素材に見える
+            return Crop("Wheat", "DriveWheat", true,
+                new Color(0.600f, 0.425f, 0.140f), new Color(0.960f, 0.790f, 0.350f));
+        }
+
+        /// <summary>
+        /// 畑の地のマテリアル。**株と同じシェーダーで塗る。**
+        ///
+        /// URP の Lit で塗っていたときは、上を向いた面が青い環境光ばかりを受けて
+        /// 灰色に転び、株の黄金色との境が畑の中ほどに横線として出た。同じ灯りの式で
+        /// 塗れば、株の切れる先から地へそのまま繋がる。
+        /// 株ではないので uv1 を持たず、揺れもしない（_Rooted 0）
+        /// </summary>
+        static Material FieldMat()
+        {
+            // 株より一段落とす。同じ明るさにすると畑が一枚の板になり、立っている感じが消える
+            return Crop("FieldCrop", "DriveField", false,
+                new Color(0.500f, 0.350f, 0.120f), new Color(0.800f, 0.640f, 0.280f));
+        }
+
+        /// <summary>
+        /// 畑を塗るマテリアル。ほかの素材と違って URP の Lit を使わない。
+        ///
+        /// 要るものが三つある。ひとつは頂点をずらして微風になびかせること。株は区切り 1 つに
+        /// 300 近くを 1 枚の mesh へ焼いてあるので、Transform では動かせない。
+        /// ひとつは光の回り込みで、箱で作った株は面の向きが四方向しか無く、
+        /// 素の Lambert だと日射しに背を向けた面が真っ黒に落ちて畑が市松模様に見える。
+        /// もうひとつは上を向いた面の扱いで、箱の天面は嘘なので、そこに穂が立っている
+        /// ものとして光を足す（_Canopy）。足さないと畑が瓦葺きに見える。
+        ///
+        /// **絵は明暗だけを持ち、色はここが持つ。** 絵にも色を焼くと、黄金色を詰めるつまみが
+        /// 二箇所に割れる。絵の平均は中庸（0.5）で、シェーダーが 2 倍して掛ける。
+        ///
+        /// 揺れの数は <see cref="WheatWind"/> から取る。見直しが同じ数を読んで、
+        /// なびいた穂先が轍へ倒れ込まないかを測る
+        /// </summary>
+        static Material Crop(string name, string picture, bool rooted, Color root, Color tip)
+        {
             var shader = Shader.Find("HalfAware/Wheat");
             if (shader == null)
             {
                 Debug.LogWarning("HalfAware/Wheat が見つからない。麦はなびかない");
                 return Mat("Field");
             }
-            var path = Materials + "Wheat.mat";
+            var path = Materials + name + ".mat";
             var m = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (m == null)
             {
                 m = new Material(shader);
-                m.name = "Wheat";
+                m.name = name;
                 AssetDatabase.CreateAsset(m, path);
             }
             // 組み直すたびに結び直す。前に URP の Lit で作ってあっても差し替わる
             m.shader = shader;
-            // 黄金色。**この場面のほかの色（どれも 0.2 前後）から大きく外している。**
-            // 朝の日射しを受けて初めて成り立つ色で、帯 4 のほかには出てこない
-            m.SetColor("_BaseColor", new Color(0.550f, 0.410f, 0.145f));
-            m.SetColor("_TipColor", new Color(0.870f, 0.720f, 0.330f));
-            m.SetFloat("_Wrap", 0.60f);
-            m.SetFloat("_Glow", 0.38f);
-            m.SetFloat("_SwayAmp", WheatWind.Amp);
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/" + picture + ".png");
+            if (tex == null) Debug.LogWarning("畑の絵が無い: Assets/Textures/" + picture + ".png");
+            m.SetTexture("_BaseMap", tex);
+            m.SetColor("_BaseColor", root);
+            m.SetColor("_TipColor", tip);
+            // 回り込みは 0.60 から下げた。強いほど畑が平らになり、日射しの向きが読めなくなる
+            m.SetFloat("_Wrap", 0.52f);
+            // 透かしは 0.48 から上げた。**日陰の面の色を決めているのはこれ。**
+            // 低いと、日射しに背を向けた面が空の青い環境光だけになる。実際に測ったところ
+            // 80 m 先の畑は (0.119, 0.084, 0.094) と青が緑を上回っていて、黄金色ではなかった。
+            // 穂は薄く、朝の低い日射しを実際に透かすので、色の選び方としても外れていない
+            m.SetFloat("_Glow", 0.70f);
+            m.SetFloat("_Canopy", 0.35f);
+            m.SetFloat("_Rooted", rooted ? 1f : 0f);
+            m.SetFloat("_GroundHigh", 0.75f);
+            m.SetFloat("_SwayAmp", rooted ? WheatWind.Amp : 0f);
             m.SetFloat("_SwayFlutter", WheatWind.Flutter);
             m.SetFloat("_SwayAcross", WheatWind.Across);
             m.SetFloat("_SwayAlong", WheatWind.Along);
@@ -2494,6 +2726,11 @@ namespace HalfAware.EditorTools
             m.SetFloat("_SwayFlutterRate", WheatWind.FlutterRate);
             m.SetFloat("_SwayHigh", WheatWind.High);
             m.SetFloat("_SwaySide", WheatWind.Side);
+            m.SetFloat("_GustDeep", WheatWind.Gust);
+            m.SetFloat("_GustAcross", WheatWind.GustAcross);
+            m.SetFloat("_GustAlong", WheatWind.GustAlong);
+            m.SetFloat("_GustRate", WheatWind.GustRate);
+            m.SetFloat("_ShadeDeep", WheatWind.Shade);
             // 時刻はずらさない。絵を撮るときだけ外から動かす
             m.SetFloat("_SwayShift", 0f);
             EditorUtility.SetDirty(m);
@@ -2568,18 +2805,21 @@ namespace HalfAware.EditorTools
                 case "Tree": col = new Color(0.045f, 0.042f, 0.040f); smooth = 0.08f; break;
                 case "Stone": col = new Color(0.165f, 0.162f, 0.150f); smooth = 0.08f; break;
                 case "Grass": col = new Color(0.062f, 0.085f, 0.052f); smooth = 0.08f; break;
-                // 麦はここに無い。URP の Lit ではなく HalfAware/Wheat で塗るので、
-                // 色は WheatMat が持っている
+                // 畑は株も地もここに無い。URP の Lit ではなく HalfAware/Wheat で塗るので、
+                // 色は WheatMat と FieldMat が持っている。
                 //
-                // 畑の地。株のあいだから覗く面なので、株より暗く沈んだ金色にする。
-                // 株と同じ明るさにすると畑が一枚の板になり、立っている感じが消える
+                // この "Field" は、そのシェーダーが見つからなかったときの控え。
+                // 絵（DriveField.png）は明暗だけしか持たないので、ここへ落ちると
+                // 畑が灰色になる。そうなっていたら、黄金色を詰める前にシェーダーを探すこと
                 case "Field": col = new Color(0.400f, 0.300f, 0.125f); smooth = 0.06f; break;
-                // 土と轍は帯 4 でしか使わない。夜の帯の暗さに合わせる必要が無いので、
-                // 朝日の下で土の色に見えるところまで上げてある。ここを 0.1 台へ戻すと、
-                // 黄金色の畑のあいだを灰色の帯が抜けていくことになる
-                case "Dirt": col = new Color(0.300f, 0.238f, 0.160f); smooth = 0.06f; break;
-                // 踏み固められた轍。地の土より暗く湿っている
-                case "Rut": col = new Color(0.215f, 0.168f, 0.118f); smooth = 0.14f; break;
+                // 土と轍は帯 4 でしか使わない。どちらも絵（DriveDirt／DriveRut）を持つので、
+                // 画面に出る明るさは絵の平均が持つ。ここの色は絵が無いときの控え。
+                // 夜の帯の暗さに合わせる必要が無いので、朝日の下で土に見えるところまで上げてある
+                case "Dirt": col = new Color(0.486f, 0.369f, 0.227f); smooth = 0.06f; break;
+                // 轍。**地の土より明るい。** 夏の朝の乾いた農道で、車輪の通る筋は
+                // 埃が磨かれて白茶ける。湿った暗い轍にすると、黄金色の畑のあいだを
+                // 暗い溝が抜けることになり、道が水路に見える
+                case "Rut": col = new Color(0.580f, 0.455f, 0.290f); smooth = 0.10f; break;
                 default: col = new Color(0.12f, 0.12f, 0.13f); smooth = 0.30f; break;
             }
         }
