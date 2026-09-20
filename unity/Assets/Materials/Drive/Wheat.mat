@@ -130,7 +130,7 @@ Material:
     - _SwayAmp: 0.1
     - _SwayFlutter: 0.32
     - _SwayFlutterRate: 5.2
-    - _SwayHigh: 1.5
+    - _SwayHigh: 1.05
     - _SwayPhase: 0
     - _SwayRate: 2.2
     - _SwayShift: 0

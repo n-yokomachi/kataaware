@@ -41,7 +41,7 @@ namespace HalfAware
         /// 背の低い株はここに届かず、そのぶん揺れが浅くなる。
         /// BuildDrive.Furrows が振る背の上端と揃えること
         /// </summary>
-        public const float High = 1.50f;
+        public const float High = 1.05f;
         /// <summary>z 方向の振れの割合。x より浅くして、穂先が小さな楕円を描くようにする</summary>
         public const float Side = 0.40f;
 
