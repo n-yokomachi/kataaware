@@ -21,6 +21,8 @@ namespace HalfAware.EditorTools
         {
             new Entry { title = "自室", path = "Assets/Scenes/Room.unity", note = "場面 1。ロンドンの安宿。煙草と記憶の抜き取り" },
             new Entry { title = "路地裏", path = "Assets/Scenes/Alley.unity", note = "場面 2。グレビル・ストリートとブリーディング・ハート・ヤード" },
+            new Entry { title = "自室・接続", path = "Assets/Scenes/Connect.unity", note = "場面 3。売上を書き足し、ジャックを繋いで潜る" },
+            new Entry { title = "車内", path = "Assets/Scenes/Drive.unity", note = "場面 8。ガレージから乗り込み、3 つの景色を抜ける" },
         };
 
         [MenuItem("HalfAware/Scenes", false, 0)]
