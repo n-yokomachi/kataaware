@@ -184,7 +184,7 @@ namespace HalfAware.EditorTools
 
             trim.Emit(parent, "CarTrim", Mat("CarTrim"), false, Generated);
             seat.Emit(parent, "CarSeat", Mat("CarSeat"), false, Generated);
-            glass.Emit(parent, "CarGlass", Mat("CarGlass"), false, Generated);
+            glass.Emit(parent, "CarGlass", PaneMat(), false, Generated);
             body.Emit(parent, "CarBody", Mat("CarBody"), false, Generated);
             steel.Emit(parent, "CarSteel", Mat("CarSteel"), false, Generated);
             gap.Emit(parent, "CarGap", Mat("CarGap"), false, Generated);
@@ -790,6 +790,32 @@ namespace HalfAware.EditorTools
         /// **手前へ出す量はどれも 1 cm 以上取る。** それより薄いと、この解像度では
         /// 面に描いた模様と見分けが付かない
         /// </summary>
+        /// <summary>
+        /// 風防のガラス。**ドアのガラスや隣の車と同じにしない。**
+        ///
+        /// 計器の裏の灯り（DialLamp）は運転席の目と x が同じ 0.38 にあり、
+        /// 10 度寝た風防に映った像がちょうど視線の正面へ乗る。艶 0.85 の鏡面ローブが
+        /// そこで丸い橙の塊になり、道の消失点に光源が浮いているように見えていた。
+        /// オーナーの「前方にオレンジ色の光源が見える。丸いやつ」がこれ。
+        ///
+        /// 灯りの側は動かせない。あれはハンドルの上側に段を付けるために測って置いた
+        /// ものなので（<see cref="Car"/> の長い説明）、ずらすと手元の見え方を測り直す
+        /// ことになる。艶を落とす手もあるが、CarGlass はドアのガラスと隣の車でも
+        /// 使い回しているので、そちらまで曇る。
+        ///
+        /// 風防だけ別のマテリアルにして、**灯りからの鏡面を切る**。地の色も透け方も
+        /// CarGlass と同じなので、見た目で変わるのはあの塊が消えることだけ。
+        /// 夜の場面なので、切って失うのは日射しのぎらつきくらいしかない
+        /// </summary>
+        static Material PaneMat()
+        {
+            var m = Mat("CarPane");
+            m.SetFloat("_SpecularHighlights", 0f);
+            m.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
         static void Dash(Bank trim, Bank steel, Bank gap)
         {
             // 天板の後ろの縁の玉縁。角のままだと、真上から見て一枚の板に潰れる

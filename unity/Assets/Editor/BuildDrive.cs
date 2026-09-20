@@ -2069,6 +2069,9 @@ namespace HalfAware.EditorTools
                 // 継ぎ目と窪み。絵を持たず、ただ暗い。板と板の境をこれで引く
                 case "CarGap": col = new Color(0.020f, 0.019f, 0.021f); smooth = 0.05f; break;
                 case "CarGlass": col = new Color(0.55f, 0.60f, 0.66f, 0.12f); smooth = 0.85f; break;
+                // 風防だけ。地も透け方も CarGlass と同じで、灯りからの鏡面だけ切ってある
+                // （BuildDriveCar.PaneMat）。同じにしないのは、ドアのガラスと隣の車まで曇るため
+                case "CarPane": col = new Color(0.55f, 0.60f, 0.66f, 0.12f); smooth = 0.85f; break;
                 // ボンネット。褪せた緑の塗りの鉄板。
                 // **ここだけ夜の場面の中で浮くほど明るい。** 車内の色（0.09）で塗ると、
                 // 実際に組んで測ったところ画面では路面と同じ明るさになり、ボンネットが丸ごと道に溶けた。
