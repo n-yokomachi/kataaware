@@ -827,6 +827,9 @@ def smoothstep(a, b, x):
     return t * t * (3.0 - 2.0 * t)
 
 
+# **書き出していない。** 前照灯の照らしは絵をやめ、
+# Headlamp.shader が円錐の式から直に描くようになった（2026-09-21）。
+# 関数は残してあるので、絵に戻すなら main の save をひとつ足せば効く
 def beam():
     """
     前照灯が路面を照らした跡。帯 0〜3 に敷く。
@@ -1162,7 +1165,6 @@ def main():
     save(field(), 'Field')
     save(dirt(), 'Dirt')
     save(rut(), 'Rut')
-    save(beam(), 'Beam')
     save(pool(), 'Pool')
     save(smear(), 'Smear')
     save(oilstain(), 'OilStain')

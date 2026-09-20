@@ -740,21 +740,6 @@ namespace HalfAware.EditorTools
             return SeatAt.y - 0.15f * (z - EyeLead);
         }
 
-        // ---- 前照灯の照らし。メートル ----------------------------------------
-        //
-        // 板の寸法。絵（tools/make-drive.py の beam）はこの寸法を前提に描いてある。
-        // ここを動かすなら絵の方の wide / deep / near も揃えること
-
-        /// <summary>照らしの板の幅。遠くで開くぶんまで含む</summary>
-        public const float BeamWide = 16f;
-        /// <summary>照らしの板の長さ</summary>
-        public const float BeamDeep = 44f;
-        /// <summary>
-        /// 照らしの板の手前の端。z。ボンネットの鼻先（2.48）のすぐ先。
-        /// ここより手前は前照灯より後ろなので、そもそも照らされない
-        /// </summary>
-        public const float BeamFrom = 2.6f;
-
         /// <summary>メーターの絵を貼る板の大きさ。テクスチャの縦横比（512 × 128）と揃える</summary>
         public const float DialWide = 0.48f;
         public const float DialHigh = 0.12f;
@@ -2017,6 +2002,24 @@ namespace HalfAware.EditorTools
             m.SetFloat("_SwaySide", WheatWind.Side);
             m.SetFloat("_GustDeep", WheatWind.Gust);
             m.SetFloat("_GustAcross", WheatWind.GustAcross);
+            // 遠くで均す仕組み。**ここで書かないと組み直しでシェーダーの既定へ戻る。**
+            // 麦が「汚い」と言われた原因は、遠くで株と地が画素ごとに入れ替わる砂嵐だった。
+            // 絵の明暗を遠くで 1 倍へ詰め、株の根元だけ埋め、地と株を一つの面へ寄せる。
+            // 根拠は Wheat.shader のコメントにある
+            m.SetFloat("_DetailDeep", 0.38f);
+            m.SetFloat("_DetailFade", 0.86f);
+            m.SetFloat("_FarFill", 0.22f);
+            m.SetFloat("_FarFrom", 6f);
+            m.SetFloat("_FarTo", 45f);
+            m.SetFloat("_FarGroundGain", 2.15f);
+            m.SetFloat("_FarCropGain", 0.92f);
+            // そよぎの長い波。斜めの波だけだと、z 方向の波長が区切り 20 m を
+            // 割り切る必要があって 19 m までしか伸ばせない。z を持たない波を足して、
+            // 道と平行な長い帯が畑を渡るようにする。取り分の和は 1 で、Reach は崩れない
+            m.SetFloat("_GustSlant", 0.60f);
+            m.SetFloat("_GustRoll", 0.40f);
+            m.SetFloat("_RollAcross", 0.80f);
+            m.SetFloat("_RollRate", -0.45f);
             m.SetFloat("_GustAlong", WheatWind.GustAlong);
             m.SetFloat("_GustRate", WheatWind.GustRate);
             m.SetFloat("_ShadeDeep", WheatWind.Shade);
