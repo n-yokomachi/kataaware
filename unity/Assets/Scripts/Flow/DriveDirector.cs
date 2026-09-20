@@ -47,12 +47,16 @@ namespace HalfAware
         [Header("煙草")]
         [Tooltip("火を点けて一服する一連。場面 1 と同じ仕組みを使い回す")]
         [SerializeField] Cigarette cigarette;
+        [Tooltip("煙。一服のあとも暗転まで出し続ける")]
+        [SerializeField] SmokePuffs smoke;
         [Tooltip("何服吸うか")]
         [SerializeField] int drags = 1;
-        [Tooltip("吸い終わってから窓を下ろすまで。秒")]
-        [SerializeField] float afterSmoke = 0.6f;
-        [Tooltip("窓を下ろし終えてから独白が出るまで。秒")]
-        [SerializeField] float afterWindow = 0.8f;
+        [Tooltip("吐き終わってから独白が出るまで。秒")]
+        [SerializeField] float afterSmoke = 0.8f;
+
+        [Header("家")]
+        [Tooltip("小麦畑の農家。独白を送り切るまで伏せておく")]
+        [SerializeField] GameObject crofts;
         [Tooltip("ガレージの床を歩く足音。乗り込んだら止める")]
         [SerializeField] Footsteps feet;
 
@@ -184,7 +188,13 @@ namespace HalfAware
             if (handedOver) { flow.Held = false; return; }
 
             // 独白を送り切ったか。積んだ字幕が尽きたところで余韻へ移る
-            if (clock.Beat == DriveBeat.Talking && !flow.Talking) clock.Spoken();
+            if (clock.Beat == DriveBeat.Talking && !flow.Talking)
+            {
+                clock.Spoken();
+                // ここで家が現れる。小麦だけの畑を走ってきて、
+                // 独白を読み終えたところで人の住むところに差し掛かる
+                if (crofts != null) crofts.SetActive(true);
+            }
 
             // 速さと粗さは秒数と同じ扱いで、毎フレーム渡す。
             // Dress のときだけ渡すと、再生しながら Inspector で速さを触っても
@@ -262,17 +272,42 @@ namespace HalfAware
         {
             while (flow.Talking) yield return null;
             cigarette.Light(drags);
+
+            // **窓は吸ってから吐くまでの間に開ける。** 火を点ける → 吸う →
+            // 窓が下りる → 吐く、の順。SmokeBeats の時刻表から、一服目を吸い終わる
+            // ところを割り出して鳴らす。Cigarette 自身は窓を知らないので、
+            // 掛け合わせはここで持つ
+            var lit = Time.time;
+            var openAt = SmokeBeats.DragAt(0, drags) + SmokeBeats.DragSeconds;
+            var opened = false;
             while (cigarette.Smoking)
             {
+                if (!opened && Time.time - lit >= openAt)
+                {
+                    opened = true;
+                    if (sound != null) sound.WindowDown();
+                }
                 flow.Freeze(FreezeStep);
                 yield return null;
             }
+            // 吸い終わりが早すぎて窓を鳴らしそびれたときの保険
+            if (!opened && sound != null) sound.WindowDown();
+
+            // **煙は消さない。** 一服ぶんで切ると、独白のあいだ煙が無い車内になる。
+            // 暗転までは吸っている扱いにして、そこで Dress が畳む
+            if (smoke != null) smoke.Begin(SmokeSeconds);
+
             yield return Wait(afterSmoke);
-            if (sound != null) sound.WindowDown();
-            yield return Wait((sound != null ? sound.WindowSeconds : 0f) + afterWindow);
             clock.Trigger();
             Speak();
         }
+
+        /// <summary>
+        /// 一服したあと煙を出し続ける長さ。秒。
+        /// 独白を読む速さはプレイヤー次第なので、余韻の長さから見ても余る値を置く。
+        /// 暗転のところで Dress が畳むので、長すぎて困ることは無い
+        /// </summary>
+        const float SmokeSeconds = 600f;
 
         /// <summary>今の景色の独白を積む</summary>
         void Speak()
@@ -361,6 +396,9 @@ namespace HalfAware
             // まだ掛かっていないエンジンで車が揺れることになる
             yield return Wait(sound != null ? sound.IgnitionSeconds : 0f);
             world.Idling = idleRough;
+            // **エンジンを鳴らし続ける。** 鍵を回し終えたところで音が切れると、
+            // 止まったように聞こえる。走り出すまでの間をこれで埋める
+            if (sound != null) sound.Idle(true);
             yield return Wait(ignitionHold);
 
             // 黒へは切り替えで入る。場面 1 のドアを閉める暗転と同じ扱い
@@ -370,6 +408,8 @@ namespace HalfAware
             world.Rolling = true;
             // 走り出したら揺れは路面が持つ。残すと二重に揺れる
             world.Idling = 0f;
+            // 動き出しの音に渡す。止まっているエンジンの輪はここまで
+            if (sound != null) sound.Idle(false);
             Dress(0);
             band = 0;
             // 組み直すのは場面の頭でだけ。帯を跨ぐときには呼ばない
@@ -439,6 +479,10 @@ namespace HalfAware
             // 雨は景色が持つ。風防の水とワイパーも音も、降っている景色でだけ出す
             if (rainRig != null) rainRig.SetActive(At(which).rain);
             if (aboard && sound != null) sound.Weather(At(which).rain);
+            // 煙は景色を跨がない。黒のあいだに畳む
+            if (smoke != null) smoke.Cancel();
+            // 家は独白を送り切ってから出す。景色に入った時点では小麦だけ
+            if (crofts != null) crofts.SetActive(false);
         }
 
         /// <summary>which 番目の帯の空の物だけ出す。-1 でどれも出さない</summary>

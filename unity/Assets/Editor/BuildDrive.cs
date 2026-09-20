@@ -1092,46 +1092,29 @@ namespace HalfAware.EditorTools
             Marks(Flow(walker, Screen()));
         }
 
-        // 響きの値。**「もっと空間に響いている感じ」と差し戻されている。**
+        // 響きの値。**場面 2 の小道とまったく同じにする。**
         //
-        // 強さだけ上げても広さは出ない。広い場所だと分かるのは、音が返ってくるまでの
-        // 間と、高音が尾のあいだどれだけ残るかで、そこを触るのが要る。
+        // ここは二度ひどい目に遭っている。一度目は既製の ParkingLot で、
+        // 高音が丸ごと落ちてほとんど鳴らなかった。二度目は「広さを出す」つもりで
+        // 尾を 2.6 秒、残響を 520、直の音を -140 まで落とし、返りを 20ms / 38ms 遅らせた。
+        // 結果は「足音そのものが良く聞こえない」「反響音が先になっている」
+        // 「反響音がぶつ切り」。直の音を削ったうえに大きく遅れた尾を重ねたので、
+        // 足音より響きの方が前に出ていた。
         //
-        //   - 返ってくるまでの間（EchoEarlyDelay / EchoLateDelay）。壁までの距離がこれで伝わる。
-        //     14 × 21 の車庫なら、いちばん近い壁でも 5 m ほど離れている
-        //   - 高音の残り（EchoDecayHF）。既定の 0.5 では高音が先に消えて、
-        //     尾が籠もった唸りになる。裸のコンクリートは高音を返すので 1 に近づける
-        //   - 尾の長さ（EchoDecay）。空の車庫は実際 2 秒を超えて鳴る
-        //
-        // 強すぎると言われたら EchoLevel と EchoDecay から下げる
+        // **広さは値をいじって作るものではない。** 場面 2 の小道は同じ RainCover の
+        // 値で自然に響いている。同じ数を置き、遅れも高音の残りも既定のままにする。
+        // 変えたくなったら、まず場面 2 を鳴らして聴き比べること
 
-        /// <summary>響きの広さ。ミリベル。場面 2 の小道は -700</summary>
-        const float EchoRoom = -220f;
-        /// <summary>高音の残り。コンクリートは高音を返すので小道の -600 より上げる</summary>
-        const float EchoBright = -120f;
-        /// <summary>尾を引く長さ。秒。小道は 0.75</summary>
-        const float EchoDecay = 2.60f;
-        /// <summary>
-        /// 尾のあいだ高音がどれだけ残るか。低音の尾に対する割合。
-        /// 既定の 0.5 では高音が先に落ちて、響きが壁の向こうの唸りに聞こえる
-        /// </summary>
-        const float EchoDecayHF = 0.92f;
-        /// <summary>初期反射の強さ。ミリベル。小道は -900</summary>
-        const float EchoReflect = -420f;
-        /// <summary>
-        /// 最初の反射が返ってくるまで。秒。壁までの距離がここに出る。
-        /// 音は 1 秒で 340 m 進むので、0.020 秒は往復 6.8 m にあたる
-        /// </summary>
-        const float EchoEarlyDelay = 0.020f;
-        /// <summary>残響そのものの強さ。ミリベル。小道は 60</summary>
-        const float EchoLevel = 520f;
-        /// <summary>初期反射のあと、尾が立ち上がるまで。秒。長いほど広い場所に聞こえる</summary>
-        const float EchoLateDelay = 0.038f;
-        /// <summary>
-        /// 直の音の残し方。ミリベル。0 が素のまま。
-        /// 少しだけ落として、響きの側を前に出す
-        /// </summary>
-        const float EchoDry = -140f;
+        /// <summary>響きの広さ。ミリベル。場面 2 の小道と同じ（RainCover.RoomDefault）</summary>
+        const float EchoRoom = -700f;
+        /// <summary>高音の残り。ミリベル。場面 2 と同じ（RainCover.BrightDefault）</summary>
+        const float EchoBright = -600f;
+        /// <summary>尾を引く長さ。秒。場面 2 と同じ（RainCover.DecayDefault）</summary>
+        const float EchoDecay = 0.75f;
+        /// <summary>初期反射の強さ。ミリベル。場面 2 と同じ（RainCover.ReflectDefault）</summary>
+        const float EchoReflect = -900f;
+        /// <summary>残響そのものの強さ。ミリベル。場面 2 と同じ（RainCover.LevelDefault）</summary>
+        const float EchoLevel = 60f;
 
         /// <summary>
         /// 場面 8 の足音の素材。**場面 1・2 の Step1〜5 とは別物。**
@@ -1172,7 +1155,13 @@ namespace HalfAware.EditorTools
         /// </summary>
         static void Smoke(Transform player, Transform eye)
         {
-            var puffs = BuildProps.BuildSmoke(eye).GetComponent<SmokePuffs>();
+            var made = BuildProps.BuildSmoke(eye);
+            var puffs = made.GetComponent<SmokePuffs>();
+            // **煙は右へ流す。** 運転席は右側で、窓も右にある。
+            // BuildProps は左右へ漂う程度（±0.018）に置いているが、
+            // 窓を開けて走っている車の中では、煙は開いた窓の方へ持っていかれる
+            var vel = made.GetComponent<ParticleSystem>().velocityOverLifetime;
+            vel.x = new ParticleSystem.MinMaxCurve(0.10f, 0.26f);
 
             var go = new GameObject("Cigarette");
             go.transform.SetParent(player, false);
@@ -1235,11 +1224,21 @@ namespace HalfAware.EditorTools
             weather.loop = true;
             weather.spatialBlend = 0f;
 
+            // エンジンだけ掛かっている音。走行音とは別に持つ。
+            // イグニッションのあと黒へ落ちるまでの間がここで埋まる
+            var stand = new GameObject("Idle");
+            stand.transform.SetParent(go.transform, false);
+            var idle = stand.AddComponent<AudioSource>();
+            idle.playOnAwake = false;
+            idle.loop = true;
+            idle.spatialBlend = 0f;
+
             var sound = go.AddComponent<DriveSound>();
             var so = new SerializedObject(sound);
             so.FindProperty("oneShot").objectReferenceValue = shots;
             so.FindProperty("road").objectReferenceValue = road;
             so.FindProperty("weather").objectReferenceValue = weather;
+            so.FindProperty("motor").objectReferenceValue = idle;
             for (var i = 0; i < DriveClips.Length; i += 2)
                 so.FindProperty(DriveClips[i]).objectReferenceValue = Sound(DriveClips[i + 1]);
             so.ApplyModifiedPropertiesWithoutUndo();
@@ -1261,6 +1260,7 @@ namespace HalfAware.EditorTools
             "paved", "Assets/Audio/DriveSealed.wav",
             "gravel", "Assets/Audio/DriveGravel.wav",
             "rain", "Assets/Audio/RainWipers.wav",
+            "idle", "Assets/Audio/Idle.wav",
             "windowDown", "Assets/Audio/WindowDown.wav",
         };
 
@@ -1282,10 +1282,9 @@ namespace HalfAware.EditorTools
             src.loop = false;
             // 耳と同じ体に付いているので、距離で減らさない
             src.spatialBlend = 0f;
-            // 場面 2 は 0.55。あちらは雨の音の上で鳴らすので大きく要る。
-            // ここは無音の車庫なので一度 0.38 まで下げたが、「軽い」と差し戻された。
-            // 素材そのものも重心を下げてある（tools/make-steps.py）
-            src.volume = 0.52f;
+            // 場面 2 と同じ 0.55。あちらは雨の音の上で鳴らすので大きく要るが、
+            // ここも「足音そのものが良く聞こえない」と差し戻されているので下げない
+            src.volume = 0.55f;
 
             // **既製の ParkingLot を当てない。** あれは room も roomHF も -1000 で、
             // 高音が丸ごと落ちるので、無音のガレージではほとんど何も聞こえない。
@@ -1297,17 +1296,13 @@ namespace HalfAware.EditorTools
             // 強すぎると言われたら decay と reverbLevel から下げる
             var echo = feet.AddComponent<AudioReverbFilter>();
             echo.reverbPreset = AudioReverbPreset.User;
-            echo.dryLevel = EchoDry;
+            // **遅れも高音の残りも触らない。** 触った版で「反響音が先になっている」
+            // 「ぶつ切り」と差し戻された。直の音（dryLevel）も 0 のまま残す
             echo.room = EchoRoom;
             echo.roomHF = EchoBright;
             echo.decayTime = EchoDecay;
-            echo.decayHFRatio = EchoDecayHF;
             echo.reflectionsLevel = EchoReflect;
-            echo.reflectionsDelay = EchoEarlyDelay;
             echo.reverbLevel = EchoLevel;
-            echo.reverbDelay = EchoLateDelay;
-            echo.diffusion = 100f;
-            echo.density = 100f;
 
             var steps = feet.AddComponent<Footsteps>();
             var so = new SerializedObject(steps);
@@ -1563,6 +1558,7 @@ namespace HalfAware.EditorTools
             dso.FindProperty("feet").objectReferenceValue = Object.FindFirstObjectByType<Footsteps>(FindObjectsInactive.Include);
             dso.FindProperty("sound").objectReferenceValue = Object.FindFirstObjectByType<DriveSound>(FindObjectsInactive.Include);
             dso.FindProperty("cigarette").objectReferenceValue = Object.FindFirstObjectByType<Cigarette>(FindObjectsInactive.Include);
+            dso.FindProperty("smoke").objectReferenceValue = Object.FindFirstObjectByType<SmokePuffs>(FindObjectsInactive.Include);
             // 風防の水とワイパー。BuildDriveCar が Drive/Car/Rain として組む。
             // **無くても知らせない。** まだ作っていない段では毎回組むたびに知らせが出る。
             // DriveDirector は null を見て何もしないので、無いまま走っても止まらない

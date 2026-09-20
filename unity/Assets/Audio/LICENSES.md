@@ -22,7 +22,7 @@ https://pixabay.com/service/license-summary/
 | ファイル | 出典 | 許諾 | 加工 |
 |---|---|---|---|
 | `Step1`〜`Step5.wav` | Kenney RPG Audio（https://kenney.nl/assets/rpg-audio）の `footstep00/02/04/06/08.ogg` | CC0 1.0 | モノラル 44.1kHz へ、末尾を落として頂点を −6dB に揃えた |
-| `Concrete1`〜`Concrete4.wav` | 同上（`Step2` / `Step5` / `Step1` / `Step3` から作り直し）＋合成した低い打ち | CC0 1.0 | `tools/make-steps.py`。190Hz より下を落とし、1.2kHz より上を 1.5 倍に持ち上げ、素のまま 0.80 倍を混ぜ、時定数 62ms で尾を詰めて 0.200 秒へ切る。そこへ 92Hz の正弦を 48ms で減衰させた低い打ちを頂点の 0.50 倍で重ね、頂点 −6dB。300Hz 以下の実効値が重ねる前の +13〜16dB |
+| `Concrete1`〜`Concrete4.wav` | 同上（`Step2` / `Step5` / `Step1` / `Step3` から作り直し） | CC0 1.0 | `tools/make-steps.py`。360Hz より下を落とし、1.2kHz より上を 2.6 倍に持ち上げ、時定数 48ms で尾を詰めて 0.165 秒へ切り、頂点 −6dB |
 | `LighterClick.wav` | OpenGameArt「Zippo click sound」（https://opengameart.org/content/zippo-click-sound）作者 dawith | CC0 1.0 | 金属音の当たりだけを 0.060〜0.320 秒で切り出し、頂点 −3dB |
 | `Drag.wav` | Pixabay の `crackle`。作品名と作者は未記入 | Pixabay Content License | 前後の無音を落として頂点 −8dB |
 | `Blow.wav` | Pixabay の `blow`。作品名と作者は未記入 | Pixabay Content License | 同上 |
@@ -38,6 +38,7 @@ https://pixabay.com/service/license-summary/
 | `DriveSealed.wav` | Pixabay `freesound_community-car-driving-ambience-6365` | Pixabay Content License | ステレオ 44.1kHz へ。頭 0.5 秒を尻へ被せて輪にした。13.23 秒 |
 | `DriveGravel.wav` | Pixabay `freesound_community-driving-a-truck-in-gravel-58271` | Pixabay Content License | 20 秒地点から 12 秒。ステレオ 44.1kHz へ。頭 0.75 秒を尻へ被せて輪にした。11.25 秒 |
 | `RainWipers.wav` | Pixabay `tommylynn-interior-car-in-rain-with-wipers-369260` | Pixabay Content License | 6 秒地点から 13.879 秒。ステレオ 44.1kHz へ。頭 0.6 秒を尻へ被せて輪にした。**長さはワイパーの周期で決めてある**（包絡線の自己相関で 0.9485 秒。その 14 倍の 13.279 秒）。秒数で切ると払う拍が輪の継ぎ目で飛ぶ |
+| `Idle.wav` | Pixabay `freesound_community-car-keys-in-ignition-starting-stopping-engine-31102` | Pixabay Content License | 28 秒地点から 8.6 秒。モノラル 44.1kHz へ。頭 0.6 秒を尻へ被せて輪にした。8.00 秒。イグニッションのあと走り出すまでの間を埋める |
 | `WindowDown.wav` | Pixabay `freesound_community-car-window-down-103833` | Pixabay Content License | 1.85 秒地点から 4.45 秒。モノラル 44.1kHz へ。素材は 8.94 秒あるが、窓が動いているのは 2〜6 秒だけ |
 
 切り出しの手順は ffmpeg で、`docs/` ではなくここに残す。素材そのものは repo に置かず、加工後の物だけを置いている。
@@ -85,11 +86,12 @@ Kenney の足音はどれも柔らかい地面のもので、2.5kHz 以上が 70
 10.9〜15.5dB 弱い。裸のコンクリートは逆に高い打ちつけが勝つ。
 `tools/make-steps.py` で唸りを抜いて打音を持ち上げ、偏りを +2.5 / −0.3 / −3.0 / −7.7dB へ寄せた。
 
-**低い打ちは合成して足している。** 二度「軽い」と差し戻されて分かったのは、
-素材に低い成分がそもそも無いということ。Kenney の足音は柔らかい地面のもので、
-低い帯域が録れていない。残す・削るをどう振っても無いものは出てこないので、
-92Hz の正弦を減衰させた打ちを合成して重ねてある。重さを増減するのは
-`tools/make-steps.py` の `THUMP_GAIN`（0.30 で低い側が素の +12dB、0.50 で +16dB、0.62 で +18dB）。
+**重さを足そうとして二度失敗し、素に戻してある。** 「軽い」と言われて落とす端を下げ、
+さらに 92Hz の低い打ちを合成して重ねたが、三度目は「足音そのものが良く聞こえない」
+「反響音が先になっている」「ぶつ切り」と差し戻された。軽く聞こえていた本当の原因は
+素材ではなく反響の掛け方で、直の音を −140 まで削ったうえに大きく遅らせた尾を
+重ねていたこと。素材は素のまま（360Hz / 2.6 倍 / 0.165 秒）へ戻し、
+反響は場面 2 の小道と同じ値に揃えてある。
 
 **5 つ全部は使っていない。** `Step4` は元から高域がいちばん少なく、持ち上げても
 素材に無いものは出てこないので落とした。4 つ目（`Step3` 由来）だけ鈍いのはわざとで、

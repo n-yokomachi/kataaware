@@ -23,6 +23,8 @@ namespace HalfAware
         [SerializeField] AudioSource road;
         [Tooltip("雨とワイパー。走行音に重ねる輪")]
         [SerializeField] AudioSource weather;
+        [Tooltip("エンジンだけ掛かっている音。止まっているあいだの輪")]
+        [SerializeField] AudioSource motor;
 
         [Header("単発")]
         [SerializeField] AudioClip doorOpen;
@@ -40,14 +42,21 @@ namespace HalfAware
         [SerializeField] AudioClip gravel;
         [Tooltip("雨とワイパー。ワイパーの周期 0.9485 秒の 14 倍で輪にしてある")]
         [SerializeField] AudioClip rain;
+        [Tooltip("エンジンだけ掛かっている音")]
+        [SerializeField] AudioClip idle;
 
         [Header("大きさ")]
         [SerializeField] float shotVolume = 0.85f;
+        // **走行音は一度「もう少し大きめに」と差し戻されている。**
+        // 上げるときは二本の差を保つこと。素材の実効値が舗装 -35dB、未舗装 -25dB で
+        // 10dB 開いているので、同じ値を入れると未舗装だけ飛び出す
         [Tooltip("舗装の輪。素材が 10dB 小さいぶんここで持ち上げる")]
-        [SerializeField] float pavedVolume = 0.75f;
-        [SerializeField] float gravelVolume = 0.30f;
+        [SerializeField] float pavedVolume = 1.00f;
+        [SerializeField] float gravelVolume = 0.42f;
         [Tooltip("雨とワイパー。走行音に重ねるので控えめに")]
-        [SerializeField] float rainVolume = 0.45f;
+        [SerializeField] float rainVolume = 0.55f;
+        [Tooltip("エンジンだけ掛かっている音")]
+        [SerializeField] float idleVolume = 0.60f;
 
         /// <summary>暗転の黒のあいだに流す音の長さ。秒。黒を何秒置くか決めるのに使う</summary>
         public float PullAwaySeconds { get { return pullAway != null ? pullAway.length : 0f; } }
@@ -63,6 +72,27 @@ namespace HalfAware
         public void Ignition() { Shot(ignition); }
         public void PullAway() { Shot(pullAway); }
         public void WindowDown() { Shot(windowDown); }
+
+        /// <summary>
+        /// エンジンだけ掛かっている音。イグニッションのあと、走り出すまでの間を埋める。
+        /// **これが無いと音が切れる。** 鍵を回し終えたところで静かになり、
+        /// 「音声止めた？」と差し戻された
+        /// </summary>
+        public void Idle(bool running)
+        {
+            if (motor == null) return;
+            if (!running)
+            {
+                if (motor.isPlaying) motor.Stop();
+                return;
+            }
+            if (idle == null) return;
+            motor.volume = idleVolume;
+            if (motor.clip == idle && motor.isPlaying) return;
+            motor.clip = idle;
+            motor.loop = true;
+            motor.Play();
+        }
 
         /// <summary>雨の輪。走行音に重ねる。降っていない景色では止める</summary>
         public void Weather(bool wet)
@@ -101,6 +131,7 @@ namespace HalfAware
         {
             if (road != null && road.isPlaying) road.Stop();
             if (weather != null && weather.isPlaying) weather.Stop();
+            if (motor != null && motor.isPlaying) motor.Stop();
         }
 
         void Shot(AudioClip clip)
