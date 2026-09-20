@@ -56,7 +56,8 @@ namespace HalfAware.Tests
                 var cap = Shift * Dirt;
                 var at = " travelled=" + travelled;
                 Assert.LessOrEqual(Mathf.Abs(o.y), cap + 1e-5f, "上下は振れ幅を超えない" + at);
-                Assert.LessOrEqual(Mathf.Abs(o.x), cap * RoadShake.SideShare + 1e-5f, "左右は上下より小さい" + at);
+                Assert.LessOrEqual(Mathf.Abs(o.x), cap * RoadShake.SideShare + 1e-5f,
+                    "左右は振れ幅に決めた割合を掛けた分を超えない" + at);
             }
         }
 
@@ -69,6 +70,27 @@ namespace HalfAware.Tests
             for (var step = 0; step <= 4000; step++)
                 most = Mathf.Max(most, Mathf.Abs(At(step * 0.37f, Tarmac).Offset.y));
             Assert.Greater(most, Shift * 0.85f, "振れ幅の 85% までは使う");
+        }
+
+        [Test]
+        public void TheSideOfTheShakeUsesMostOfItsOwnWidth()
+        {
+            // 上の上限と粗さの掛け算だけでは、左右をまるごと 0 にしても 12 個とも通る。
+            // 上下と同じように、下からも押さえておく
+            var most = 0f;
+            for (var step = 0; step <= 4000; step++)
+                most = Mathf.Max(most, Mathf.Abs(At(step * 0.37f, Tarmac).Offset.x));
+            Assert.Greater(most, Shift * RoadShake.SideShare * 0.85f, "左右も自分の振れ幅の 85% までは使う");
+        }
+
+        [Test]
+        public void TheFastestPartStaysUnderThirtyFramesWorth()
+        {
+            // いちばん速い成分の振動数は 速さ × rate × 係数 / 2π。
+            // 30 fps で折り返さないのは 15 Hz まで。Route でいちばん速い帯は 28 m/s。
+            // 係数を後から上げたときに、ここで止める
+            var top = 28f * Rate * RoadShake.TopHarmonic / (2f * Mathf.PI);
+            Assert.Less(top, 15f, "28 m/s でもいちばん速い成分は 15 Hz に収まる（今 " + top.ToString("F2") + " Hz）");
         }
 
         [Test]

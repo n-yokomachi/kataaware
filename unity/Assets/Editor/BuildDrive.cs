@@ -61,6 +61,24 @@ namespace HalfAware.EditorTools
         /// <summary>対向車が流れる速さ。道の何倍か。DriveWorld へそのまま渡す</summary>
         public const float OncomingRate = 2.2f;
 
+        /// <summary>
+        /// 車体の揺れの幅。m。粗さ 1（舗装）のときの値で、帯ごとの rough が掛かる。
+        ///
+        /// **これも組み立てが持つ。** DriveWorld は組み直しても作り直されない `Drive` の根に
+        /// 付いているので、Inspector で触った値は帯の秒数と違って残る。残ること自体は
+        /// 都合が良いが、残るか消えるかが付いている場所で決まるのは覚えていられない。
+        /// ほかの値と同じく Wire が毎回書き戻すことにして、揃えてある。
+        /// オーナーが実画面で決めたら、帯の秒数と同じくここへ書き写す
+        /// </summary>
+        public const float Shake = 0.004f;
+
+        /// <summary>
+        /// 揺れの速さ。走った距離に掛ける。1.0 で基本の波長がおよそ 6.3 m。
+        /// 16 m/s で 2.5 Hz、28 m/s で 4.5 Hz にあたる。
+        /// これより小さくすると、路面の凹凸ではなく船のような漂いに見える
+        /// </summary>
+        public const float ShakeRate = 1.0f;
+
         // ---- 路面に重ねる面の高さ ------------------------------------------
         //
         // 同じ平面に何枚も重ねるので、上下の順と間隔をここで一箇所に決める。
@@ -130,8 +148,11 @@ namespace HalfAware.EditorTools
         public const float StainY = GarageFloorY + 0.010f;
         /// <summary>排水口の受け</summary>
         public const float DrainY = GarageFloorY + 0.014f;
-        /// <summary>排水口の格子</summary>
-        public const float GrateY = GarageFloorY + 0.020f;
+        /// <summary>
+        /// 排水口の格子。棒の中心の高さなので、受けとの間は棒の厚みの半分だけ縮む。
+        /// 0.020 だと棒の底が受けとちょうど同じ面に乗って、両面を描く場面で取り合う
+        /// </summary>
+        public const float GrateY = GarageFloorY + 0.024f;
 
         /// <summary>区画 1 つの幅。車 1 台ぶん。14 m の床に 5 つ取れる</summary>
         public const float BayWide = 2.9f;
@@ -1475,6 +1496,8 @@ namespace HalfAware.EditorTools
             // 揺れは DriveWorld が PlayerController.EyeOffset へ渡す。
             // 場面 8 では EyeSway を付けないので、そこを書くのはここひとつだけ
             so.FindProperty("player").objectReferenceValue = Object.FindFirstObjectByType<PlayerController>();
+            so.FindProperty("shake").floatValue = Shake;
+            so.FindProperty("shakeRate").floatValue = ShakeRate;
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(world);
 
