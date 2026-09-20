@@ -1,8 +1,10 @@
 using System.Collections.Generic;
+using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 namespace HalfAware.EditorTools
 {
@@ -83,6 +85,77 @@ namespace HalfAware.EditorTools
         /// <summary>帯の数</summary>
         public const int Bands = 5;
 
+        // ---- ガレージ。メートル ---------------------------------------------
+
+        /// <summary>床の中心。車は原点にいるので、後ろへ寄せて歩く間を取る</summary>
+        public static readonly Vector3 GarageAt = new Vector3(0f, 0f, -2f);
+        /// <summary>床の広さ。x 方向</summary>
+        public const float GarageWide = 14f;
+        /// <summary>床の広さ。z 方向。柱の割り付けでいう長辺はこちら</summary>
+        public const float GarageDeep = 16f;
+        /// <summary>天井の高さ</summary>
+        public const float GarageHigh = 2.9f;
+        /// <summary>壁・床・天井の厚み</summary>
+        public const float GarageThick = 0.25f;
+        /// <summary>
+        /// 床の面の高さ。
+        ///
+        /// 道のタイルは y 0 のまま z -30 から先へ敷いてあり、<see cref="PaintY"/> の
+        /// 白線が 0.020 まで上がる。DriveWorld には道を伏せる手立てが無いので、
+        /// ガレージの中にも舗装がそのまま重なっている。床をちょうど 0 に置くと
+        /// 同じ高さの面が二枚重なってちらつくので、白線より上へ逃がす。
+        /// 2 cm の段は歩いていても分からないし、壁の外からは見えない
+        /// </summary>
+        public const float GarageFloorY = 0.040f;
+        /// <summary>柱の一辺</summary>
+        public const float PillarSide = 0.35f;
+        /// <summary>シャッターの幅</summary>
+        public const float ShutterWide = 4.2f;
+        /// <summary>シャッターの高さ</summary>
+        public const float ShutterHigh = 2.6f;
+        /// <summary>天井の灯りの色</summary>
+        public static readonly Color GarageLamp = new Color(0.62f, 0.66f, 0.72f);
+
+        /// <summary>立ち位置。運転席のドア側から近づく。ここから車まで約 8 m</summary>
+        public static readonly Vector3 StandAt = new Vector3(4.2f, 0f, -7f);
+        /// <summary>立ち位置の向き。度</summary>
+        public const float StandYaw = -28f;
+        /// <summary>
+        /// 運転席。ハンドルの真後ろ。x 0 に座るとハンドルが横に 44 度ずれて見える。
+        /// 右ハンドルなので正の側で、<see cref="LaneOffset"/> と対になっている
+        /// </summary>
+        public static readonly Vector3 SeatAt = new Vector3(0.38f, 1.18f, 0f);
+
+        // ---- 調べる対象と繋ぎ先 ----------------------------------------------
+
+        public const string ScriptPath = "Assets/Data/DriveScript.asset";
+        const string ActionsPath = "Assets/InputSystem_Actions.inputactions";
+        const string FontPath = "Assets/Fonts/NotoSansJP-Regular SDF.asset";
+
+        /// <summary>車内の対象を拾える距離。座ったまま手の届く範囲</summary>
+        const float ItemRadius = 1.4f;
+        /// <summary>ガレージのドア。歩いて近づくので、車内の対象より少し遠くから拾える</summary>
+        const float DoorRadius = 1.6f;
+        /// <summary>目は顔にあるので体の前へ出す。PlayerController の eyeLead と同じ値</summary>
+        const float EyeLead = 0.22f;
+
+        /// <summary>
+        /// 帯の値。<see cref="DriveIds.Triggers"/> と同じ並び。
+        /// **秒数も速さもすべて仮置きで、オーナーが実画面を見てから決める。**
+        /// 帯 2 の黒と明けだけ長いのが仮眠にあたる
+        /// </summary>
+        static readonly DriveBand[] Route =
+        {
+            new DriveBand { name = "倫敦の外れ", trigger = DriveIds.Chips, speed = 16f, rough = 1.0f, afterglow = 5f, black = 0.8f, fadeIn = 1.4f },
+            new DriveBand { name = "夜の高速", trigger = DriveIds.Log, speed = 28f, rough = 1.0f, afterglow = 5f, black = 0.8f, fadeIn = 1.4f },
+            new DriveBand { name = "深夜の幹線", trigger = DriveIds.Mirror, speed = 24f, rough = 1.0f, afterglow = 5f, black = 3.5f, fadeIn = 2.6f },
+            new DriveBand { name = "明け方の丘陵", trigger = DriveIds.Photo, speed = 20f, rough = 1.6f, afterglow = 5f, black = 0.8f, fadeIn = 1.6f },
+            new DriveBand { name = "朝靄の未舗装路", trigger = DriveIds.Window, speed = 11f, rough = 4.5f, afterglow = 5f, black = 0.8f, fadeIn = 1.4f },
+        };
+
+        /// <summary>帯ごとのきっかけの対象。Items が立てて Wire が DriveDirector へ渡す</summary>
+        static GameObject[] triggerItems = new GameObject[0];
+
         /// <summary>タイルの枚数</summary>
         public static int TileCount { get { return RoadRing.Needed(Ahead, TileLength, Behind); } }
 
@@ -111,6 +184,9 @@ namespace HalfAware.EditorTools
 
             var root = Root("Drive");
             Prune(root, new[] { "Car", "Road", "Roadsides", "Oncoming", "Garage", "Items" });
+            // Stage より先に呼ぶ。Stage は Player/Main Camera があればそちらへ譲るので、
+            // 後から rig を作ると札と AudioListener が二つずつになる
+            Rig();
             Stage();
             Car(Child(root, "Car"));
             Road(Child(root, "Road"));
@@ -126,6 +202,10 @@ namespace HalfAware.EditorTools
             AssetDatabase.SaveAssets();
             Debug.Log(string.Format("車と道を組んだ。タイル {0} 枚 × {1} m（前 {2} / 後ろ {3}）、沿道と対向車が {4} 帯 × {0} 区切りずつ",
                 TileCount, TileLength, Ahead, Behind, Bands));
+            Debug.Log(string.Format("ガレージ {0} × {1} × 高さ {2}。立ち位置 {3} から運転席 {4} まで約 {5:F1} m、調べる対象 {6} 個",
+                GarageWide, GarageDeep, GarageHigh, StandAt.ToString("F1"), SeatAt.ToString("F2"),
+                Vector3.Distance(new Vector3(StandAt.x, 0f, StandAt.z), new Vector3(SeatAt.x, 0f, SeatAt.z)),
+                Object.FindObjectsByType<Interactable>(FindObjectsInactive.Include, FindObjectsSortMode.None).Length));
         }
 
         /// <summary>
@@ -241,9 +321,10 @@ namespace HalfAware.EditorTools
             seat.Emit(parent, "CarSeat", Mat("CarSeat"), false, Generated);
             glass.Emit(parent, "CarGlass", Mat("CarGlass"), false, Generated);
 
-            // 視点の置き場。DriveDirector へ繋ぐのは Task 9
+            // 視点の置き場。DriveDirector.seat へ繋ぐ。
+            // ハンドルの真後ろに寄せてあるので、座ると輪が正面に来る
             var eye = Child(parent, "Seat");
-            eye.localPosition = new Vector3(0f, 1.18f, 0f);
+            eye.localPosition = SeatAt;
             eye.localRotation = Quaternion.identity;
         }
 
@@ -666,17 +747,386 @@ namespace HalfAware.EditorTools
             put(Lane(x), 1, name + "R");
         }
 
-        // ---- Task 9 以降 ---------------------------------------------------
-
-        /// <summary>ガレージ。Task 9 で組む</summary>
-        static void Garage(Transform root) { }
-
-        /// <summary>調べる対象。Task 9 で立てる</summary>
-        static void Items(Transform root) { }
+        // ---- ガレージ --------------------------------------------------------
 
         /// <summary>
-        /// DriveWorld にタイルと沿道と対向車を渡す。private な [SerializeField] なので
-        /// SerializedObject 越しに書く。DriveDirector と調べる対象の繋ぎ込みは Task 9
+        /// 車を入れてある共用のガレージ。プレイヤーは隅に立ち、歩いて運転席のドアまで来る。
+        /// 乗り込んだ時点で DriveDirector が丸ごと伏せるので、入れ物はひとつにまとめる。
+        ///
+        /// **壁は省けない。** 道のタイルは y 0 のまま z -30 から 150 まで敷いてあり、
+        /// DriveWorld には道を伏せる手立てが無い（Dress(-1) が消すのは沿道だけ）。
+        /// 壁が無いと、ガレージに立っている間ずっと道が左右へ突き抜けて見える。
+        ///
+        /// 面はどれも Box で作る。板 1 枚で立てると内側から見た面が裏になり、
+        /// 絵が出ないうえに MeshCollider の光線も素通りする
+        /// </summary>
+        static void Garage(Transform root)
+        {
+            var parent = Child(root, "Garage");
+            Clear(parent);
+            parent.gameObject.SetActive(true);
+            parent.localPosition = Vector3.zero;
+
+            var halfX = GarageWide * 0.5f;
+            var halfZ = GarageDeep * 0.5f;
+            var skin = GarageThick * 0.5f;
+            // 壁は床の面から天井の面まで。中心と高さをここで一度だけ出す
+            var midY = (GarageFloorY + GarageHigh) * 0.5f;
+            var tall = GarageHigh - GarageFloorY;
+            var front = GarageAt.z + halfZ + skin;
+
+            var floor = new Bank { Texel = 0.5f };
+            floor.Box(new Vector3(GarageAt.x, GarageFloorY - skin, GarageAt.z),
+                new Vector3(GarageWide, GarageThick, GarageDeep));
+
+            var walls = new Bank { Texel = 0.5f };
+            // 長辺の壁。四隅を覆うので、z 方向は厚みのぶん伸ばす
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                walls.Box(new Vector3(GarageAt.x + side * (halfX + skin), midY, GarageAt.z),
+                    new Vector3(GarageThick, tall, GarageDeep + GarageThick * 2f));
+            }
+            walls.Box(new Vector3(GarageAt.x, midY, GarageAt.z - halfZ - skin),
+                new Vector3(GarageWide, tall, GarageThick));
+            // 前の壁はシャッターの口を空けて、左右とまぐさだけ立てる
+            var jamb = halfX - ShutterWide * 0.5f;
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                walls.Box(new Vector3(GarageAt.x + side * (ShutterWide * 0.5f + jamb * 0.5f), midY, front),
+                    new Vector3(jamb, tall, GarageThick));
+            }
+            walls.Box(new Vector3(GarageAt.x, (ShutterHigh + GarageHigh) * 0.5f, front),
+                new Vector3(ShutterWide, GarageHigh - ShutterHigh, GarageThick));
+
+            var roof = new Bank { Texel = 0.5f };
+            roof.Box(new Vector3(GarageAt.x, GarageHigh + skin, GarageAt.z),
+                new Vector3(GarageWide, GarageThick, GarageDeep));
+
+            // 柱は四隅と長辺の中ほど。壁から部屋の側へ出して、面の中に埋もれないようにする
+            var posts = new Bank { Texel = 0.5f };
+            var inset = halfX - PillarSide * 0.5f;
+            var rows = new[] { GarageAt.z - halfZ + PillarSide * 0.5f, GarageAt.z, GarageAt.z + halfZ - PillarSide * 0.5f };
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                for (var i = 0; i < rows.Length; i++)
+                    posts.Box(new Vector3(GarageAt.x + side * inset, midY, rows[i]),
+                        new Vector3(PillarSide, tall, PillarSide));
+            }
+
+            // シャッターは壁の厚みの中へ収める。壁と同じ面に置くと、縁でちらつく
+            var door = new Bank { Texel = 0.5f };
+            door.Box(new Vector3(GarageAt.x, (GarageFloorY + ShutterHigh) * 0.5f, front),
+                new Vector3(ShutterWide, ShutterHigh - GarageFloorY, GarageThick * 0.5f));
+
+            // 当たりは壁と床に要る。歩いて出られては困るし、床が無いと落ちる
+            floor.Emit(parent, "Floor", Mat("GarageFloor"), true, Generated);
+            walls.Emit(parent, "Walls", Mat("GarageWall"), true, Generated);
+            roof.Emit(parent, "Ceiling", Mat("Concrete"), true, Generated);
+            posts.Emit(parent, "Pillars", Mat("Concrete"), true, Generated);
+            door.Emit(parent, "Shutter", Mat("Shutter"), true, Generated);
+
+            Lamps(parent);
+        }
+
+        /// <summary>
+        /// 天井の灯り。2 本。強さと届く範囲は仮置きで、オーナーが実画面を見てから決める。
+        /// 影を落とさせないのは、WebGL で影を持つ灯りを増やすと重くなるため
+        /// </summary>
+        static void Lamps(Transform parent)
+        {
+            var tube = Shape("GarageTube", 0.5f, b => b.Box(Vector3.zero, new Vector3(0.18f, 0.08f, 2.40f)));
+            var lit = Glow(GarageLamp, 1.6f);
+            for (var s = 0; s < 2; s++)
+            {
+                var lamp = Child(parent, "Lamp" + s);
+                lamp.localPosition = new Vector3(s == 0 ? -3.0f : 3.0f, 2.8f, -2.0f);
+                Piece(lamp, "Tube", tube, lit);
+                var bulb = new GameObject("Light");
+                bulb.transform.SetParent(lamp, false);
+                var l = bulb.AddComponent<Light>();
+                l.type = LightType.Point;
+                l.color = GarageLamp;
+                l.intensity = 2.6f;
+                l.range = 16f;
+                l.shadows = LightShadows.None;
+            }
+        }
+
+        // ---- 調べる対象 ------------------------------------------------------
+
+        /// <summary>
+        /// 調べる対象。判定点は物の少し手前に置く。位置は右ハンドルの車のもので、
+        /// 運転席のドアと窓は x の正の側、助手席と上着のポケットは負の側にある。
+        /// <see cref="LaneOffset"/> を裏返して左ハンドルにするなら、ここの x もまとめて裏返す。
+        ///
+        /// **必須にするのは garage.door と drive.window の 2 つだけ。** 最後の帯で窓の独白を
+        /// 送り切ったところで SceneFlow が場面を閉じる前提になっている。ほかに必須を足すと、
+        /// 閉じられないまま BandClock が一巡して戻り、古い入れ替えの知らせで
+        /// 範囲の外を並べにいって走りが止まる。
+        ///
+        /// **二択を出すのも garage.door だけ。** SceneFlow.CloseChoice は最後に
+        /// player.CanMove = standUp == null || standUp.Standing と書く。standAfter が空の
+        /// この場面では standUp が null なので、どの二択を閉じてもプレイヤーが歩けるようになる。
+        /// ドアは直後に Board が false へ戻すので構わないが、ほかの対象に二択を足すと
+        /// 走っている車から歩いて降りられる。DriveDirector は Board のあと二度と CanMove を書かない
+        /// </summary>
+        static void Items(Transform root)
+        {
+            var parent = Child(root, "Items");
+            Clear(parent);
+            var script = AssetDatabase.LoadAssetAtPath<RoomScript>(ScriptPath);
+            if (script == null)
+                Debug.LogWarning("場面 8 の文面が無い。先に HalfAware/Write the drive script を走らせる: " + ScriptPath);
+
+            // ガレージのドアだけは歩いて近づくので、ほかより遠くから拾える
+            Put(parent, "Door", new Vector3(0.92f, 1.05f, 0.10f), script, DriveIds.Door, DoorRadius, true);
+
+            triggerItems = new GameObject[Bands];
+            triggerItems[0] = Put(parent, "Chips", new Vector3(-0.42f, 0.78f, -0.02f), script, DriveIds.Chips, ItemRadius, false);
+            triggerItems[1] = Put(parent, "Log", new Vector3(-0.42f, 0.80f, 0.24f), script, DriveIds.Log, ItemRadius, false);
+            triggerItems[2] = Put(parent, "Mirror", new Vector3(0f, 1.42f, 0.72f), script, DriveIds.Mirror, ItemRadius, false);
+            triggerItems[3] = Put(parent, "Photo", new Vector3(0.16f, 1.00f, 0.62f), script, DriveIds.Photo, ItemRadius, false);
+            // 窓だけ必須。帯 4 に入るまで伏せてあるので、それまで場面は閉じない
+            triggerItems[4] = Put(parent, "Window", new Vector3(0.84f, 1.00f, 0.10f), script, DriveIds.Window, ItemRadius, true);
+            // きっかけはその帯に入るまで出さない。出し分けるのは DriveDirector.ShowTrigger
+            for (var i = 0; i < triggerItems.Length; i++) triggerItems[i].SetActive(false);
+
+            // 帯を問わず置く、読んでも帯が進まない対象
+            Put(parent, "Radio", new Vector3(-0.02f, 0.96f, 0.70f), script, DriveIds.Radio, ItemRadius, false);
+            Put(parent, "Pocket", new Vector3(-0.10f, 0.70f, -0.30f), script, DriveIds.Pocket, ItemRadius, false);
+            Put(parent, "Fuel", new Vector3(0.46f, 1.02f, 0.58f), script, DriveIds.Fuel, ItemRadius, false);
+        }
+
+        /// <summary>
+        /// 調べる対象をひとつ立てる。どれも一度調べたら終わりで、前提は持たない。
+        /// 二択は文面の側（DriveScript）が持つので、ここでは何も決めない
+        /// </summary>
+        static GameObject Put(Transform parent, string name, Vector3 at, RoomScript script,
+            string id, float radius, bool required)
+        {
+            var go = new GameObject("Interactable_" + name);
+            go.transform.SetParent(parent, false);
+            go.transform.position = at;
+            // Interactable の OnValidate は AddComponent の中で走るので、
+            // ここで「id がない」と一度警告が出る。id はこの直後に入れている
+            var item = go.AddComponent<Interactable>();
+            var so = new SerializedObject(item);
+            so.FindProperty("id").stringValue = id;
+            so.FindProperty("script").objectReferenceValue = script;
+            so.FindProperty("radius").floatValue = radius;
+            so.FindProperty("required").boolValue = required;
+            so.FindProperty("once").boolValue = true;
+            so.FindProperty("after").arraySize = 0;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            return go;
+        }
+
+        // ---- プレイヤーと画面と進行 -------------------------------------------
+
+        /// <summary>
+        /// プレイヤーの rig・画面・進行の入れ物。ほかの場面では手で置いてあるものを、
+        /// 場面 8 は空のシーンから組み上げるのでここで作る。
+        ///
+        /// 組み直すたびに作り直す。手で触った値は残らないが、そのぶん
+        /// どの端末で組んでも同じものが立つ。Stage より先に呼ぶこと
+        /// </summary>
+        static void Rig()
+        {
+            // Task 8 が間に合わせに置いた根のカメラを落とす。
+            // 残したまま rig を足すと、MainCamera の札と AudioListener が二つずつになる
+            Drop("Main Camera");
+            Drop("Player");
+            Drop("Hud");
+            Drop("SceneFlow");
+
+            var player = new GameObject("Player");
+            var body = player.AddComponent<CharacterController>();
+            body.height = 1.7f;
+            body.radius = 0.3f;
+            body.center = new Vector3(0f, 0.85f, 0f);
+            body.slopeLimit = 45f;
+            body.stepOffset = 0.3f;
+            body.skinWidth = 0.08f;
+            body.minMoveDistance = 0.001f;
+
+            var eye = new GameObject("Main Camera");
+            eye.transform.SetParent(player.transform, false);
+            eye.transform.localPosition = new Vector3(0f, PlayerController.StandingEyeHeight, EyeLead);
+            eye.transform.localRotation = Quaternion.identity;
+            eye.tag = "MainCamera";
+            eye.AddComponent<Camera>();
+            // 耳は場面にひとつだけ。カメラと同じ所へ付ける
+            eye.AddComponent<AudioListener>();
+
+            var walker = player.AddComponent<PlayerController>();
+            var pso = new SerializedObject(walker);
+            var actions = AssetDatabase.LoadAssetAtPath<UnityEngine.InputSystem.InputActionAsset>(ActionsPath);
+            if (actions == null) Debug.LogWarning("入力の割り当てが無い: " + ActionsPath);
+            pso.FindProperty("actions").objectReferenceValue = actions;
+            pso.FindProperty("eye").objectReferenceValue = eye.transform;
+            pso.FindProperty("eyeLead").floatValue = EyeLead;
+            pso.ApplyModifiedPropertiesWithoutUndo();
+
+            // 当たりを入れたまま動かすと床や壁に押し出されて狙った場所に立たない（BuildAlley.Place と同じ）
+            body.enabled = false;
+            player.transform.position = new Vector3(StandAt.x, GarageFloorY + 0.06f, StandAt.z);
+            player.transform.rotation = Quaternion.Euler(0f, StandYaw, 0f);
+            body.enabled = true;
+
+            Flow(walker, Screen());
+        }
+
+        /// <summary>同じ名前の根を落とす</summary>
+        static void Drop(string name)
+        {
+            foreach (var go in SceneManager.GetActiveScene().GetRootGameObjects())
+                if (go.name == name) Object.DestroyImmediate(go);
+        }
+
+        /// <summary>
+        /// 字幕・印・暗転・幕・ログ。作りも値もほかの場面の Hud に揃えてある。
+        /// 並び順がそのまま重なりの順になるので、暗転より後に中央の文字を置く
+        /// </summary>
+        static HudView Screen()
+        {
+            var go = new GameObject("Hud", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(HudView));
+            var canvas = go.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            var scaler = go.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1280f, 720f);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 0.5f;
+
+            var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
+            if (font == null) Debug.LogWarning("字の形が無い: " + FontPath);
+
+            var band = Layer(go.transform, "SubtitleBand", new Color(0f, 0f, 0f, 0.75f), true);
+            Frame(band, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f),
+                new Vector2(0f, 40f), new Vector2(0f, 120f));
+            var subtitle = Line(band, "Subtitle", font, 28f, Color.white, TextAlignmentOptions.Left);
+            Frame(subtitle.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f),
+                Vector2.zero, new Vector2(-160f, -24f));
+
+            var prompt = Line(go.transform, "Prompt", font, 22f, Color.white, TextAlignmentOptions.Center);
+            Frame(prompt.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                new Vector2(0f, -40f), new Vector2(800f, 40f));
+
+            var log = Layer(go.transform, "LogPanel", new Color(0.02f, 0.02f, 0.025f, 0.88f), true);
+            Frame(log, new Vector2(0.07f, 0.07f), new Vector2(0.93f, 0.93f), new Vector2(0.5f, 0.5f),
+                Vector2.zero, Vector2.zero);
+            var title = Line(log, "Title", font, 22.4f, new Color(0.62f, 0.64f, 0.68f), TextAlignmentOptions.TopLeft);
+            title.text = "ログ　　Tab で閉じる";
+            Frame(title.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
+                new Vector2(0f, -22f), new Vector2(-76f, 48f));
+            var logText = Line(log, "Text", font, 24.08f, new Color(0.86f, 0.87f, 0.89f), TextAlignmentOptions.TopLeft);
+            Frame(logText.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f),
+                new Vector2(0f, -28f), new Vector2(-80f, -116f));
+            log.gameObject.SetActive(false);
+
+            var fade = Layer(go.transform, "Fade", new Color(0f, 0f, 0f, 0f), false);
+            Frame(fade, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            var curtain = Layer(go.transform, "Curtain", new Color(0f, 0f, 0f, 1f), false);
+            Frame(curtain, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            curtain.gameObject.SetActive(false);
+
+            var centre = Line(go.transform, "Center", font, 40f, Color.white, TextAlignmentOptions.Center);
+            Frame(centre.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                Vector2.zero, new Vector2(1000f, 80f));
+
+            var hud = go.GetComponent<HudView>();
+            var so = new SerializedObject(hud);
+            so.FindProperty("subtitleBand").objectReferenceValue = band.gameObject;
+            so.FindProperty("subtitleText").objectReferenceValue = subtitle;
+            so.FindProperty("subtitleRowHeight").floatValue = 44f;
+            so.FindProperty("subtitlePadding").floatValue = 34f;
+            so.FindProperty("promptText").objectReferenceValue = prompt;
+            so.FindProperty("centerText").objectReferenceValue = centre;
+            so.FindProperty("fadeLayer").objectReferenceValue = fade.GetComponent<Image>();
+            so.FindProperty("curtainLayer").objectReferenceValue = curtain.GetComponent<Image>();
+            so.FindProperty("logPanel").objectReferenceValue = log.gameObject;
+            so.FindProperty("logText").objectReferenceValue = logText;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            return hud;
+        }
+
+        /// <summary>塗り潰しの層</summary>
+        static RectTransform Layer(Transform parent, string name, Color col, bool blocks)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            go.transform.SetParent(parent, false);
+            var img = go.GetComponent<Image>();
+            img.color = col;
+            img.raycastTarget = blocks;
+            return go.GetComponent<RectTransform>();
+        }
+
+        /// <summary>文字の層</summary>
+        static TMP_Text Line(Transform parent, string name, TMP_FontAsset font, float size, Color col, TextAlignmentOptions align)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            go.transform.SetParent(parent, false);
+            var text = go.GetComponent<TextMeshProUGUI>();
+            if (font != null) text.font = font;
+            text.fontSize = size;
+            text.color = col;
+            text.alignment = align;
+            text.text = "";
+            return text;
+        }
+
+        /// <summary>層の位置と大きさ。アンカーとピボットをまとめて決める</summary>
+        static void Frame(RectTransform rect, Vector2 min, Vector2 max, Vector2 pivot, Vector2 at, Vector2 size)
+        {
+            rect.anchorMin = min;
+            rect.anchorMax = max;
+            rect.pivot = pivot;
+            rect.anchoredPosition = at;
+            rect.sizeDelta = size;
+        }
+
+        /// <summary>
+        /// 場面の進行。SceneFlow と DriveDirector を同じ入れ物に置く（AlleyDirector と同じ構え）。
+        ///
+        /// **standAfter は空のままにする。** 何か入れると Stand が毎フレーム player.CanMove を
+        /// 書くので、Board が false にしたものを歩ける側へ戻してしまう。
+        /// 車内は座ったままなので、立ち上がりの段取りはそもそも要らない
+        /// </summary>
+        static SceneFlow Flow(PlayerController player, HudView hud)
+        {
+            var go = new GameObject("SceneFlow");
+            var flow = go.AddComponent<SceneFlow>();
+            go.AddComponent<DriveDirector>();
+            var so = new SerializedObject(flow);
+            so.FindProperty("player").objectReferenceValue = player;
+            so.FindProperty("hud").objectReferenceValue = hud;
+            // 眩暈は場面 1 のもの。車内では使わない
+            so.FindProperty("daze").objectReferenceValue = null;
+            so.FindProperty("maxAngle").floatValue = InteractionPicker.MaxAngle;
+            // 次の場面（場面 9）はまだ無い。必須を済ませたら「続く」で止まる
+            so.FindProperty("nextScene").stringValue = "";
+            so.FindProperty("openingCard").stringValue = "";
+            so.FindProperty("standAfter").stringValue = "";
+            so.FindProperty("standSpot").objectReferenceValue = null;
+            so.FindProperty("chairBlocker").objectReferenceValue = null;
+            so.FindProperty("chair").objectReferenceValue = null;
+            so.FindProperty("body").objectReferenceValue = null;
+            so.FindProperty("exitSound").objectReferenceValue = null;
+            so.FindProperty("cutToBlack").boolValue = false;
+            so.FindProperty("dazeUntil").stringValue = "";
+            so.ApplyModifiedPropertiesWithoutUndo();
+            return flow;
+        }
+
+        // ---- 繋ぎ込み --------------------------------------------------------
+
+        /// <summary>
+        /// DriveWorld にタイルと沿道と対向車を、DriveDirector にプレイヤー・画面・文面・
+        /// ガレージ・運転席・帯を渡す。private な [SerializeField] なので
+        /// SerializedObject 越しに書く
         /// </summary>
         static void Wire(Transform root)
         {
@@ -691,6 +1141,58 @@ namespace HalfAware.EditorTools
             so.FindProperty("behind").floatValue = Behind;
             so.FindProperty("oncomingRate").floatValue = OncomingRate;
             so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(world);
+
+            var flow = Object.FindFirstObjectByType<SceneFlow>();
+            if (flow == null) { Debug.LogWarning("SceneFlow が無い。DriveDirector を繋げない"); return; }
+            var director = flow.GetComponent<DriveDirector>();
+            if (director == null) director = flow.gameObject.AddComponent<DriveDirector>();
+            var dso = new SerializedObject(director);
+            dso.FindProperty("flow").objectReferenceValue = flow;
+            dso.FindProperty("hud").objectReferenceValue = Object.FindFirstObjectByType<HudView>();
+            dso.FindProperty("player").objectReferenceValue = Object.FindFirstObjectByType<PlayerController>();
+            dso.FindProperty("script").objectReferenceValue = AssetDatabase.LoadAssetAtPath<RoomScript>(ScriptPath);
+            dso.FindProperty("world").objectReferenceValue = world;
+            // 乗り込んだら丸ごと伏せる。ガレージの中身はこの入れ物ひとつに収めてある
+            var garage = Look(root, "Garage");
+            dso.FindProperty("garage").objectReferenceValue = garage != null ? garage.gameObject : null;
+            dso.FindProperty("seat").objectReferenceValue = Look(root, "Car/Seat");
+            FillBands(dso.FindProperty("bands"));
+            var picked = dso.FindProperty("triggers");
+            picked.arraySize = triggerItems.Length;
+            for (var i = 0; i < triggerItems.Length; i++)
+                picked.GetArrayElementAtIndex(i).objectReferenceValue = triggerItems[i];
+            dso.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(director);
+            EditorUtility.SetDirty(flow);
+        }
+
+        /// <summary>
+        /// 帯の値を書き込む。DriveBand は struct なので、配列の要素ごとに中身を並べ直す。
+        /// 秒数はすべて仮置きで、オーナーが再生しながら Inspector で決める
+        /// </summary>
+        static void FillBands(SerializedProperty row)
+        {
+            row.arraySize = Route.Length;
+            for (var i = 0; i < Route.Length; i++)
+            {
+                var e = row.GetArrayElementAtIndex(i);
+                e.FindPropertyRelative("name").stringValue = Route[i].name;
+                e.FindPropertyRelative("trigger").stringValue = Route[i].trigger;
+                e.FindPropertyRelative("speed").floatValue = Route[i].speed;
+                e.FindPropertyRelative("rough").floatValue = Route[i].rough;
+                e.FindPropertyRelative("afterglow").floatValue = Route[i].afterglow;
+                e.FindPropertyRelative("black").floatValue = Route[i].black;
+                e.FindPropertyRelative("fadeIn").floatValue = Route[i].fadeIn;
+            }
+        }
+
+        /// <summary>繋ぎ先を引く。黙って null を渡すと、再生して初めて気づくことになる</summary>
+        static Transform Look(Transform root, string path)
+        {
+            var t = root.Find(path);
+            if (t == null) Debug.LogWarning("繋ぎ先が見つからない: " + path);
+            return t;
         }
 
         static Transform[] Kids(Transform parent)
@@ -861,6 +1363,10 @@ namespace HalfAware.EditorTools
                 // 舗装の外の地面と路肩。舗装より暗く、少し土を帯びた色にして道の縁を読ませる
                 case "Verge": col = new Color(0.078f, 0.074f, 0.066f); smooth = 0.06f; break;
                 case "Concrete": col = new Color(0.150f, 0.150f, 0.155f); smooth = 0.10f; break;
+                // ガレージ。共用の車庫なので、床は油が染みて壁の塗りも褪せている
+                case "GarageFloor": col = new Color(0.098f, 0.096f, 0.094f); smooth = 0.14f; break;
+                case "GarageWall": col = new Color(0.128f, 0.128f, 0.133f); smooth = 0.07f; break;
+                case "Shutter": col = new Color(0.155f, 0.150f, 0.140f); smooth = 0.24f; break;
                 // 濡れた路面。艶だけの面は映る物が無いと穴に見えるので、地の明るさを持たせる
                 case "Sheen": col = new Color(0.100f, 0.108f, 0.128f); smooth = 0.86f; break;
                 case "Metal": col = new Color(0.085f, 0.088f, 0.095f); smooth = 0.26f; break;

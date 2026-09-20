@@ -169,6 +169,13 @@ namespace HalfAware
             if (garage != null) garage.SetActive(false);
             if (seat != null)
             {
+                // seat は足元ではなく目の位置。PlayerController は毎フレーム
+                // eye を足元から EyeHeight だけ上へ置き直すので、ここで 0 にして
+                // seat をそのまま目の高さにする。立っていたときの 1.6 のままだと
+                // 目が屋根（1.52）の上へ突き抜け、車内のどの対象も判定の距離から外れて、
+                // 帯 0 のきっかけすら調べられなくなる。
+                // 車内は座ったまま歩かないので、足元の高さはもう誰も使わない
+                player.EyeHeight = 0f;
                 player.transform.position = seat.position;
                 player.Yaw = seat.eulerAngles.y;
                 player.Pitch = 0f;
