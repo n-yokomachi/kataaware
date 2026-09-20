@@ -7,7 +7,10 @@ namespace HalfAware.Tests
     {
         const int Tiles = 8;
         const float Length = 20f;
-        const float Behind = -30f;
+        /// <summary>BuildDrive.Behind と同じ値。試す寸法と実際に敷く寸法を離さない</summary>
+        const float Behind = -70f;
+        /// <summary>BuildDrive.Ahead と同じ値。Behind と合わせて環一周が 180 m になる</summary>
+        const float Ahead = 110f;
 
         [Test]
         public void TilesSitOneLengthApart()
@@ -24,7 +27,7 @@ namespace HalfAware.Tests
         {
             // TilesSitOneLengthApart は travelled = 0 だけを見るので、環が回り込むところを
             // 一度も踏まない。隙間は回り込んだ瞬間に開くので、一周ぶん通して見ないと気づけない
-            var n = RoadRing.Needed(140f, Length, Behind);
+            var n = RoadRing.Needed(Ahead, Length, Behind);
             var span = n * Length;
             var zs = new float[n];
             // 刻みをタイルの長さの約数から外して、継ぎ目のあらゆる位相を通す
@@ -88,14 +91,18 @@ namespace HalfAware.Tests
         [Test]
         public void ItCountsHowManyTilesReachAhead()
         {
-            // 前 140 と後ろ 30 で 170 m。1 枚 20 m なら 9 枚
-            Assert.AreEqual(9, RoadRing.Needed(140f, Length, Behind));
-            Assert.GreaterOrEqual(RoadRing.Needed(140f, Length, Behind) * Length, 140f - Behind,
+            // 前 110 と後ろ 70 でちょうど 180 m。1 枚 20 m なら 9 枚
+            Assert.AreEqual(9, RoadRing.Needed(Ahead, Length, Behind));
+            Assert.GreaterOrEqual(RoadRing.Needed(Ahead, Length, Behind) * Length, Ahead - Behind,
                 "環の長さが見える範囲を覆っていないと、前の端に穴が空く");
+            // 沿道の間隔はどれも環一周を割り切る数にしてある。一周が 180 から動くと
+            // BuildDriveLand の間隔が全部成り立たなくなるので、ここで釘を打っておく
+            Assert.AreEqual(180f, RoadRing.Needed(Ahead, Length, Behind) * Length, 0.0001f,
+                "環一周は 180 m。沿道の間隔（60 / 45 / 36 / 30 / 20 / 12）の最小公倍数");
 
             // 寸法を変えても成り立たなければいけない関係。9 や 2 という数そのものではなく、
             // 「環の長さが見える範囲に届く」ことを見る
-            foreach (var w in new[] { new Vector3(140f, 20f, -30f), new Vector3(1f, 100f, -1f),
+            foreach (var w in new[] { new Vector3(Ahead, Length, Behind), new Vector3(1f, 100f, -1f),
                                       new Vector3(60f, 7f, -12f), new Vector3(200f, 33f, -5f) })
                 Assert.GreaterOrEqual(RoadRing.Needed(w.x, w.y, w.z) * w.y, w.x - w.z,
                     "環の長さが見える範囲に届いていない");

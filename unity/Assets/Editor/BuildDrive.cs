@@ -31,13 +31,36 @@ namespace HalfAware.EditorTools
         public const string ScenePath = "Assets/Scenes/Drive.unity";
 
         // ---- 道の寸法。メートル --------------------------------------------
+        //
+        // **前と後ろの割り振りだけを動かす。** 環一周の長さ（<see cref="Span"/>）は
+        // Ahead - Behind をタイルの長さで切り上げたものなので、前を縮めたぶんだけ
+        // 後ろを伸ばせば 180 m のまま動かない。180 は沿道の間隔（60 / 45 / 36 / 30 /
+        // 20 / 12）の最小公倍数で、ここを動かすと <c>BuildDriveLand.cs</c> の間隔を
+        // 一つ残らず引き直すことになる。タイルの枚数も区切りの数も変わらないので、
+        // レンダラーも三角も一つも増えない
 
         /// <summary>タイル 1 枚の長さ。2 の冪と相性の良い数にする。20 なら計算に丸めが入らない</summary>
         public const float TileLength = 20f;
-        /// <summary>前方にここまで途切れず敷く</summary>
-        public const float Ahead = 140f;
-        /// <summary>車の後ろにここまで残す。負の値</summary>
-        public const float Behind = -30f;
+        /// <summary>
+        /// 前方にここまで途切れず敷く。
+        ///
+        /// **140 から縮めた。** 後ろを伸ばすぶんをここから取れば環一周の長さが変わらない。
+        /// 縮めても絵がほとんど動かないのは、遠いところは霧が畳んでいるため。
+        /// 一番薄い帯 1（夜の高速）と帯 4（朝靄）でも、ここまで来ると 58% 霞む。
+        /// 道の先が地平の一点に集まるのも効いていて、110 m の路面は目線から
+        /// 0.8 度しか下がっていない。140 m（0.6 度）との差は数画素しかない
+        /// </summary>
+        public const float Ahead = 110f;
+        /// <summary>
+        /// 車の後ろにここまで残す。負の値。
+        ///
+        /// **-30 では近すぎた。** 環の端はタイルの刻みに乗るので、走っているあいだ
+        /// 後ろの端は Behind から Behind + TileLength までを行ったり来たりする。
+        /// -30 だと位相によっては車の 10 m 後ろで世界が切れていて、脇の窓から
+        /// 後ろを見ると小麦畑がそこで唐突に消えた。-70 なら悪いときでも 50 m、
+        /// 良いときで 70 m 後ろまで残る
+        /// </summary>
+        public const float Behind = -70f;
 
         /// <summary>舗装の半幅。道幅 7.0</summary>
         public const float RoadHalf = 3.5f;
