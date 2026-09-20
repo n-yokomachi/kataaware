@@ -1,17 +1,41 @@
 // 風防に乗った水。**車の外に降る雨ではなく、ガラスの面に付いた水の方を描く。**
 //
 // 場面 8 は運転席からの一人称で、走行中の画面はほとんど風防で埋まっている。
-// 外に粒を降らせても、目から 1 m 先を落ちる粒は 1 フレームで画面を横切るので
+// 外に粒を降らせても、目の前を 28 m/s で過ぎる粒は 1 フレームで画面を横切るので
 // 427 × 240 では線にすらならず、粒を増やすほど WebGL が重くなるだけだった。
 // 雨が降っていると分かるのはガラスの側で、溜まった水と、それを拭う羽根の二つで足りる。
 //
-// 板は一枚。粒も筋も薄膜も、画素ごとに升目の乱数から起こす。絵も持たないし、
+// 板は一枚。砂目も筋も薄膜も、画素ごとに乱数から起こす。絵も持たないし、
 // 粒ひとつに mesh を立てることもしない。
 //
-// **拭った跡は状態を持たずに出す。** 羽根の角度は centre + amp * sin(位相) で、
-// 位相と振り幅と速さはすべて Wipers が渡してくる。ある画素の角を羽根がいつ通ったかは
-// sin を逆に解けば出るので、前のフレームを憶えておく必要が無い。
-// 通った直後は 0、_WipeSpan.w 秒かけて 1（溜まりきり）へ戻る。
+// ---- 何を主役にするか -------------------------------------------------------
+//
+// **丸い粒を主役にしない。** はじめは 2〜3 cm の丸い粒をまばらに散らしていたが、
+// 白くて丸くて大きさの揃ったものが点々と貼り付いているだけになり、雨ではなく
+// 雪にしか読めなかった。実際にガラスに付く水滴は 2〜5 mm しかない。
+//
+// 1 画素はこの解像度で 4.7 mm ぶんあるので、2〜5 mm の粒は必ず 1 画素に満たない。
+// 丸を描こうとすると画素の網に掛からず、ちらついて消える。なので粒は「点」ではなく
+// **砂目**（<see cref="Sand"/>。滑らかな値雑音を閾値で抜いたもの）として置く。
+//
+// 読める大きさを持てるのは筋の方（<see cref="Rill"/>）で、こちらが主役になる。
+// 走行風で後ろ（上）へ引かれる細い筋と、重さで落ちる太い筋の二つを重ねる。
+// 長さは風防を縦に横切るほど取る。
+//
+// ---- 明るさ -----------------------------------------------------------------
+//
+// **水そのものは光らない。** 夜のガラスの水は、後ろの灯りを歪めて見せるもので、
+// 自分で白く光るものではない。地の色は夜の空（線形 0.115）に近い暗い灰に取ってある。
+// 空を背にすればほとんど出ず、街灯の溜まりや対向車の前照灯を背にすれば
+// そこだけ濁って見える。それが水の在り処になる。
+// 筋の頭だけは <c>_Glint</c> へ寄せて、集まった水が灯りを集めるところを作る。
+//
+// ---- 拭い跡 -----------------------------------------------------------------
+//
+// **状態を持たずに出す。** 羽根の角度は centre + amp * sin(位相) で、位相と振り幅と
+// 速さはすべて Wipers が渡してくる。ある画素の角を羽根がいつ通ったかは sin を
+// 逆に解けば出るので、前のフレームを憶えておく必要が無い。
+// 通った直後は 0、_WipeSpan.z 秒かけて 1（溜まりきり）へ戻る。
 //
 // 羽根の届かない内側・外側・振り幅の外は拭われないまま残る。実際の風防もそうで、
 // 隅に水が残っているほうが窓らしく見える。
@@ -22,14 +46,15 @@ Shader "HalfAware/Screenwater"
 {
     Properties
     {
-        [HDR] _BaseColor ("水の色", Color) = (0.62, 0.66, 0.72, 1)
-        _Veil ("薄膜の濃さ", Range(0, 1)) = 0.11
-        _Bead ("粒の濃さ", Range(0, 1)) = 0.62
-        _Rill ("流れる筋の濃さ", Range(0, 1)) = 0.5
-        _Grain ("1 m あたりの粒の升目", Float) = 13
-        _Runs ("1 m あたりの筋の列", Float) = 9
-        _Flow ("筋が上る速さ。m/s", Float) = 0.9
-        _Creep ("粒が上る速さ。m/s", Float) = 0.06
+        [HDR] _BaseColor ("水の色。線形。夜の空に近い暗さに取る", Color) = (0.175, 0.172, 0.166, 1)
+        [HDR] _Glint ("筋の頭の色。灯りを集めるところ", Color) = (0.26, 0.25, 0.23, 1)
+        _Veil ("薄膜の濃さ", Range(0, 1)) = 0.10
+        _Sand ("砂目の濃さ", Range(0, 1)) = 0.30
+        _Rill ("筋の濃さ", Range(0, 1)) = 0.85
+        _Grit ("1 m あたりの砂目の刻み", Float) = 110
+        _Creep ("砂目が後ろへ動く速さ。m/s", Float) = 0.05
+        _Up ("後ろへ引かれる筋。列の間隔 / 長さ / 速さ / 半幅。m", Vector) = (0.19, 0.50, 1.10, 0.0045)
+        _Down ("落ちる筋。列の間隔 / 長さ / 速さ / 半幅。m", Vector) = (0.30, 0.38, 0.22, 0.0075)
     }
 
     SubShader
@@ -51,16 +76,17 @@ Shader "HalfAware/Screenwater"
 
             CBUFFER_START(UnityPerMaterial)
                 half4 _BaseColor;
+                half4 _Glint;
                 half _Veil;
-                half _Bead;
+                half _Sand;
                 half _Rill;
-                float _Grain;
-                float _Runs;
-                float _Flow;
+                float _Grit;
                 float _Creep;
+                float4 _Up;
+                float4 _Down;
             CBUFFER_END
 
-            // ---- ワイパーから渡る値。Wipers.Push が置く -----------------------
+            // ---- ワイパーから渡る値。Wipers.Set が置く -----------------------
             // 板の uv は板の中心を原点にしたメートルなので、軸の位置もメートルで来る
 
             /// 羽根の軸。(一枚目の x, 一枚目の y, 二枚目の x, 二枚目の y)
@@ -81,6 +107,25 @@ Shader "HalfAware/Screenwater"
             {
                 p = float2(dot(p, float2(127.1, 311.7)), dot(p, float2(269.5, 183.3)));
                 return frac(sin(p) * 43758.5453);
+            }
+
+            /// <summary>
+            /// 滑らかな値雑音。升目の四隅を混ぜる。
+            ///
+            /// 砂目に円を描かないのは、狙う粒（2〜5 mm）が 1 画素（4.7 mm）に
+            /// 満たないため。円は画素の網に掛かるかどうかで出たり消えたりするが、
+            /// 滑らかな場を閾値で抜けば、粒より粗い網でも濃淡として残る
+            /// </summary>
+            float Value(float2 g)
+            {
+                float2 id = floor(g);
+                float2 f = frac(g);
+                f = f * f * (3.0 - 2.0 * f);
+                float a = Hash2(id).x;
+                float b = Hash2(id + float2(1.0, 0.0)).x;
+                float c = Hash2(id + float2(0.0, 1.0)).x;
+                float d = Hash2(id + float2(1.0, 1.0)).x;
+                return lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
             }
 
             /// <summary>
@@ -118,69 +163,69 @@ Shader "HalfAware/Screenwater"
             }
 
             /// <summary>
-            /// 丸い粒。溜まるにつれて升目ごとに順に現れ、少しずつ後ろへ上る。
-            ///
-            /// **升目の半分には立てない。** どの升目にも粒を置くと、大きさを振っても
-            /// 427 × 240 では等間隔に並んだ白い点の壁にしかならず、雪が貼り付いて見えた。
-            /// 疎らに、大きく、小さい粒ほど暗く。粒どうしの間が空いていないと
-            /// ガラスの向こうの道が読めない
+            /// 砂目。2〜5 mm の細かい水が面を覆っているところ。
+            /// 溜まるにつれて閾値が下がり、まばらな粒から一面の砂目へ移る
             /// </summary>
-            float Beads(float2 uv, float cells, float t, float wet, float seed)
+            float Sand(float2 uv, float cells, float t, float wet)
             {
-                float2 g = uv * cells + seed;
+                float2 g = uv * cells;
                 g.y -= t * _Creep * cells;
-                float2 id = floor(g);
-                float2 k = Hash2(id + seed);
-                if (k.x < 0.52) return 0.0;
-                // 一斉に出ると板が点滅する。升目ごとに出る頃合いをずらす
-                float when = frac(k.x * 7.31);
-                float born = smoothstep(when * 0.75, when * 0.75 + 0.25, wet);
-                if (born <= 0.0) return 0.0;
-                float2 off = (Hash2(id + 17.3 + seed) - 0.5) * 0.7;
-                // **大きさは二乗で振る。** 一様に振ると、どの粒も同じくらいの
-                // 中くらいの点になって、ガラスの水ではなく貼り付いた雪に見えた。
-                // 二乗にすれば小さい粒が大半を占め、たまに大きいのが混じる
-                float rad = (0.07 + 0.40 * k.y * k.y) * (0.5 + 0.5 * wet);
-                // 走っているので粒は縦に伸びる。x を詰めて縦長にする
-                float d = length((frac(g) - 0.5 - off) * float2(1.6, 1.0));
-                return born * smoothstep(rad, rad * 0.25, d) * (0.35 + 0.65 * k.y);
+                float n = Value(g) * 0.62 + Value(g * 2.1 + 19.0) * 0.38;
+                // **閾値は高く取る。** 場の半分を抜いていた頃は、砂目が迷彩の斑に育って
+                // 間口ぜんたいを覆い、道も対向車も読めなくなった。抜くのは上の四分の一だけ。
+                // wet = 0 では閾値が 1 を越えるので、拭った直後は一粒も残らない
+                return smoothstep(1.22 - 0.52 * wet, 1.44 - 0.52 * wet, n);
             }
 
             /// <summary>
-            /// 走っているあいだ後ろへ流れる筋。頭が丸く、下へ尾を引く。
-            /// 列ごとに速さを変える。揃えると板ぜんたいが一枚の絵として動いて見える
+            /// 流れる筋。x が総量、y が頭（灯りを集めるところ）。
+            ///
+            /// spec は (列の間隔, 一本の長さ, 流れる速さ, 半幅) でどれもメートル。
+            /// dir が +1 なら走行風で後ろ（上）へ引かれ、-1 なら重さで落ちる。
+            /// 尾は頭と反対側へ伸び、頭から離れるほど横へ逃げる。
+            /// 真っ直ぐな線を等間隔に引かせると、ガラスの水ではなく外を落ちる雨に見える
             /// </summary>
-            float Rills(float2 uv, float cells, float t, float wet, float seed)
+            float2 Rill(float2 p, float t, float4 spec, float dir, float wet, float seed)
             {
-                float2 g = uv * cells + seed;
-                float col = floor(g.x);
-                float2 h = Hash2(float2(col, 3.7 + seed));
-                float lane = frac(g.x) - 0.5;
-                float y = g.y - t * _Flow * cells * (0.55 + 0.9 * h.x) - h.y * 13.0;
-                float row = floor(y);
-                float f = frac(y);
-                float2 k = Hash2(float2(col, row));
-                // **筋はまばらに、短く。** どの升目にも長い尾を引かせると、板ぜんたいが
-                // 等間隔に並んだ縦線になり、ガラスに乗った水ではなく外を落ちる雨に見えた
-                if (k.x < 0.62) return 0.0;
-                float born = smoothstep(0.32, 0.78, wet);
-                if (born <= 0.0) return 0.0;
-                // 尾は真っ直ぐ下りない。頭から離れるほど横へ逃げる
-                float cx = lane + (h.y - 0.5) * 0.30 + (k.y - 0.5) * 0.5 * saturate(0.78 - f);
-                float head = smoothstep(0.22, 0.04, length(float2(cx * 2.2, (f - 0.80) * 1.3)));
-                float tail = smoothstep(0.11, 0.02, abs(cx)) * smoothstep(0.38, 0.78, f);
-                return born * max(head, tail * 0.40);
+                float pitch = spec.x;
+                float span = spec.y;
+                float speed = spec.z;
+                float wide = spec.w;
+
+                float gx = p.x / pitch + seed;
+                float col = floor(gx);
+                float2 h = Hash2(float2(col, 5.1 + seed));
+                float lane = frac(gx) - 0.5;
+                // 列ごとに速さを変える。揃えると板ぜんたいが一枚の絵として動いて見える
+                float s = p.y / span - dir * (t * speed / span) * (0.6 + 0.8 * h.x) + h.y * 11.0;
+                float row = floor(s);
+                float f = frac(s);
+                float2 k = Hash2(float2(col, row) + seed);
+                if (k.x < 0.45) return float2(0.0, 0.0);
+                float born = smoothstep(0.18, 0.62, wet);
+                if (born <= 0.0) return float2(0.0, 0.0);
+
+                // u は 1 が頭。後ろへ引かれる筋は上端が頭、落ちる筋は下端が頭
+                float u = dir > 0.0 ? f : 1.0 - f;
+                float cx = (lane + (h.y - 0.5) * 0.5 + (k.y - 0.5) * 0.9 * saturate(0.85 - u)) * pitch;
+                float rad = wide * (0.7 + 0.7 * k.y);
+                float body = smoothstep(rad, rad * 0.25, abs(cx));
+                float tail = body * smoothstep(0.03, 0.72, u) * (1.0 - smoothstep(0.93, 1.0, u));
+                float bulb = smoothstep(rad * 1.8, rad * 0.4,
+                    length(float2(cx, (u - 0.88) * span * 0.30)));
+                return float2(born * max(tail * 0.8, bulb), born * bulb);
             }
 
-            /// <summary>薄膜のむら。一様に掛けると窓ではなく曇りガラスになる</summary>
+            /// <summary>
+            /// 水の寄り。濃いところと薄いところを作る。
+            /// 升目から起こす砂目は放っておくと板ぜんたいに均して散るので、
+            /// これを掛けないと水ではなく規則正しい模様に見える
+            /// </summary>
             float Haze(float2 uv, float t)
             {
-                float2 g = uv * 2.6;
+                float2 g = uv * 2.4;
                 g.y -= t * 0.05;
-                float2 id = floor(g);
-                float2 f = frac(g) - 0.5;
-                float2 k = Hash2(id + 91.7);
-                return 0.55 + 0.45 * smoothstep(0.55, 0.12, length(f - (k - 0.5) * 0.7));
+                return 0.45 + 0.75 * Value(g);
             }
 
             struct Attributes
@@ -209,15 +254,16 @@ Shader "HalfAware/Screenwater"
                 float wet = Dried(i.uv, _WipePivot.xy);
                 if (_WipeSpan.w > 1.5) wet = min(wet, Dried(i.uv, _WipePivot.zw));
 
-                // むらは薄膜と粒の両方に掛ける。升目から起こす粒は放っておくと
-                // 板ぜんたいに均して散るので、濃いところと薄いところを作らないと
-                // 水ではなく規則正しい模様に見える
                 float blot = Haze(i.uv, t);
                 float m = _Veil * blot * wet;
-                m += _Bead * blot * Beads(i.uv, _Grain, t, wet, 0.0);
-                m += _Bead * 0.26 * Beads(i.uv, _Grain * 1.7, t, wet, 41.3);
-                m += _Rill * Rills(i.uv, _Runs, t, wet, 0.0);
-                return half4(_BaseColor.rgb, saturate(m) * _BaseColor.a);
+                m += _Sand * blot * Sand(i.uv, _Grit, t, wet);
+
+                float2 up = Rill(i.uv, t, _Up, 1.0, wet, 0.0);
+                float2 down = Rill(i.uv, t, _Down, -1.0, wet, 23.7);
+                m += _Rill * max(up.x, down.x);
+                float lit = saturate(_Rill * max(up.y, down.y));
+
+                return half4(lerp(_BaseColor.rgb, _Glint.rgb, lit), saturate(m) * _BaseColor.a);
             }
             ENDHLSL
         }

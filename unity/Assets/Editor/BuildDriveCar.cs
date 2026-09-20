@@ -266,12 +266,17 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// 風防に乗った水のマテリアル。
         ///
-        /// 色は線形で置く（<see cref="Paint"/> と同じ）。夜の空が 0.115 なので、
-        /// 粒は倍ほど明るくないと 427 × 240 では空に紛れる。街灯の橙を粒が集めるので、
-        /// 灰色そのものではなく暖色へ寄せてある。
+        /// 色は線形で置く（<see cref="Paint"/> と同じ）。
         ///
-        /// 薄膜（_Veil）は薄く。一様に濃くすると窓ではなく曇りガラスになり、
-        /// 道も対向車も霞んで場面が読めなくなる。見せているのは粒と筋の方
+        /// **地の色を夜の空（0.115）より上げない。** 粒を空より明るくしていた頃は、
+        /// 白くて丸いものが点々と浮いて、雨ではなく雪にしか読めなかった。
+        /// 夜のガラスの水は後ろの灯りを歪めて見せるもので、自分で光るものではない。
+        /// 空を背にすればほとんど出ず、街灯の溜まりや対向車の前照灯を背にすれば
+        /// そこだけ濁る。筋の頭（_Glint）だけ、集まった水が灯りを集めるぶん明るい。
+        ///
+        /// 粒は筋に譲る。1 画素が 4.7 mm ぶんある解像度では、実物どおりの
+        /// 2〜5 mm の水滴は円として描けないので、砂目（_Sand）として敷き、
+        /// 読める太さを持てる筋（_Up / _Down）を主役にする
         /// </summary>
         static Material WaterMat()
         {
@@ -286,14 +291,17 @@ namespace HalfAware.EditorTools
                 AssetDatabase.CreateAsset(m, path);
             }
             m.shader = shader;
-            m.SetColor("_BaseColor", new Color(0.30f, 0.28f, 0.25f, 1f));
-            m.SetFloat("_Veil", 0.12f);
-            m.SetFloat("_Bead", 0.42f);
-            m.SetFloat("_Rill", 0.45f);
-            m.SetFloat("_Grain", 12f);
-            m.SetFloat("_Runs", 7f);
-            m.SetFloat("_Flow", 0.9f);
-            m.SetFloat("_Creep", 0.06f);
+            m.SetColor("_BaseColor", new Color(0.175f, 0.172f, 0.166f, 1f));
+            m.SetColor("_Glint", new Color(0.26f, 0.25f, 0.23f, 1f));
+            m.SetFloat("_Veil", 0.10f);
+            m.SetFloat("_Sand", 0.30f);
+            m.SetFloat("_Rill", 0.85f);
+            m.SetFloat("_Grit", 110f);
+            m.SetFloat("_Creep", 0.05f);
+            // 列の間隔 / 一本の長さ / 流れる速さ / 半幅。どれもメートル。
+            // 後ろへ引かれる筋は細く長く速く、落ちる筋は太く短く遅い
+            m.SetVector("_Up", new Vector4(0.19f, 0.50f, 1.10f, 0.0045f));
+            m.SetVector("_Down", new Vector4(0.30f, 0.38f, 0.22f, 0.0075f));
             EditorUtility.SetDirty(m);
             return m;
         }
