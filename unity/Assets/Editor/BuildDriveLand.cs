@@ -1191,12 +1191,18 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// 農家ひと構えの間隔。m。片側ぶんの刻みで、左右は半刻みずらす。
         ///
-        /// **180 を割り切ること。** 割り切らないと、環が一周したところで一構えぶん
-        /// 間隔が飛ぶ（<see cref="Sow"/> が知らせて並べずに飛ばす）。
-        /// 60 なら左右あわせて 30 m にひと構えで、11 m/s で走る独白のあとの 10 秒
-        /// （110 m）に三つ四つが通り過ぎる。原作の「いくつかの家々」の密度
+        /// **環一周（<see cref="Span"/> 180 m）を割り切ること。** 割り切らないと、
+        /// 環が一周したところで一構えぶん間隔が飛ぶ
+        /// （<see cref="Sow"/> が知らせて並べずに飛ばす）。
+        /// 60 より大きくて 180 を割り切るのは 90 と 180 だけ。
+        ///
+        /// 90 なら片側 2 構え、左右あわせて 45 m にひと構え。走る速さは 11 m/s で、
+        /// 独白を送り切ってからの余韻が 10 秒＝110 m なので、そのあいだに二つか三つが
+        /// 通り過ぎる。**60 では多すぎた。** 環に 6 構えが並び、110 m に三つ四つが
+        /// 続けて来て、畑に散った農家ではなく街道沿いの集落に見えた。
+        /// 180 まで広げると環に 2 構えしか無く、余韻に一つか二つしか来ない
         /// </summary>
-        const float CroftStep = 60f;
+        const float CroftStep = 90f;
 
         /// <summary>
         /// 刻みから前後へばらけさせる幅。m。原作は「好き勝手な間隔で並んでいて」。
@@ -1224,6 +1230,24 @@ namespace HalfAware.EditorTools
 
         /// <summary>門の口の広さ。m。<see cref="Downs"/> の門と同じ寸法にしてある</summary>
         const float CroftGate = 3.0f;
+
+        /// <summary>
+        /// 農家をまとめて伏せる入れ物の名前。**区切り 1 つに 1 つ置く。**
+        ///
+        /// 小麦畑に入った直後は麦だけを見せ、独白を送り切ってから家を出す。
+        /// 出し分けるのは <c>DriveDirector</c> で、こちらは伏せた入れ物を用意するだけ。
+        ///
+        /// **帯の直下には置けない。** DriveWorld.Place は帯の childCount を環の枠の数に
+        /// 使うので、区切り以外を 1 つ混ぜるだけで環が 10 枠になり、道と沿道の継ぎ目が
+        /// 丸ごとずれる（<see cref="Slices"/> の説明と同じ理由）。区切りの下へ入れれば
+        /// 環の枠は 9 のままで、伏せても出しても並びは動かない。
+        /// 区切りは Place が走った距離で毎フレーム置き直すので、
+        /// 伏せているあいだも家は区切りに連れて正しい位置へ運ばれている。
+        ///
+        /// 農家の乗らない区切りにも空の入れ物を作る。出し分ける側が
+        /// 「どの区切りにも同じ名前の子が 1 つある」とだけ知っていればよくするため
+        /// </summary>
+        public const string CroftHolder = "Crofts";
 
         /// <summary>農家ひと構えの割り付け。環の上の位置、道からの距離、左右、描き分けの種</summary>
         public struct CroftPlot
@@ -1299,7 +1323,11 @@ namespace HalfAware.EditorTools
         ///
         /// **麦は避けてくれない。** 株は区切り 1 枚の mesh へ先に焼いてあり、どの区切りでも
         /// 同じ 1 枚を使い回すので、農家のところだけ株を抜くことはできない。
-        /// 足元が麦に埋まるのはそれで正しい――畑は母屋の壁際まで来ている
+        /// 足元が麦に埋まるのはそれで正しい――畑は母屋の壁際まで来ている。
+        ///
+        /// **家は伏せて置く。** 畑に入った直後は麦だけで、独白を送り切ってから家が現れる。
+        /// 焼いた 3 枚は区切りごとの入れ物（<see cref="CroftHolder"/>）へ入れて
+        /// 伏せておき、出すのは <c>DriveDirector</c> に任せる
         /// </summary>
         static void Crofts(Transform[] slices)
         {
@@ -1337,11 +1365,15 @@ namespace HalfAware.EditorTools
 
             for (var i = 0; i < slices.Length; i++)
             {
+                // 家は区切りの下の入れ物へ入れて、伏せたまま置く（<see cref="CroftHolder"/>）。
+                // 麦・土・轍は入れ物の外なので、伏せても畑はそのまま出たまま
+                var holder = Child(slices[i], CroftHolder);
                 // Emit は面が 1 枚も無ければ何も置かない。農家の乗らない区切りには
-                // レンダラーが増えない
-                banks[i].Wall.Emit(slices[i], "CroftHarl" + i, harl, false, Generated);
-                banks[i].Roof.Emit(slices[i], "CroftRoof" + i, lime, false, Generated);
-                banks[i].Dark.Emit(slices[i], "CroftShade" + i, shade, false, Generated);
+                // レンダラーが増えない。入れ物だけは空でも作る
+                banks[i].Wall.Emit(holder, "CroftHarl" + i, harl, false, Generated);
+                banks[i].Roof.Emit(holder, "CroftRoof" + i, lime, false, Generated);
+                banks[i].Dark.Emit(holder, "CroftShade" + i, shade, false, Generated);
+                holder.gameObject.SetActive(false);
             }
         }
 
