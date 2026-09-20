@@ -16,7 +16,9 @@ namespace HalfAware
         public const float RunSpeed = 3.0f;          // m/s。Shift を押している間
         public const float StandingEyeHeight = 1.6f;
         public const float PitchLimit = 80f;         // 度
-        public const float LookSensitivity = 0.126f; // 度 / ピクセル。試作の 0.0022 rad/px と同じ
+        // 度 / ピクセル。試作は 0.0022 rad/px（＝ 0.126）だったが、実画面で速すぎたので半分にした。
+        // **場面をまたいで効く。** 自室も路地裏も車内も同じ速さで振れる
+        public const float LookSensitivity = 0.063f;
 
         [SerializeField] InputActionAsset actions;
         [SerializeField] Transform eye;
