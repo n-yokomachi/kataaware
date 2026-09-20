@@ -268,15 +268,21 @@ namespace HalfAware.EditorTools
         ///
         /// 色は線形で置く（<see cref="Paint"/> と同じ）。
         ///
-        /// **地の色を夜の空（0.115）より上げない。** 粒を空より明るくしていた頃は、
+        /// **地の色を夜の空（0.115）から離しすぎない。** 粒を空よりずっと明るくしていた頃は、
         /// 白くて丸いものが点々と浮いて、雨ではなく雪にしか読めなかった。
         /// 夜のガラスの水は後ろの灯りを歪めて見せるもので、自分で光るものではない。
-        /// 空を背にすればほとんど出ず、街灯の溜まりや対向車の前照灯を背にすれば
-        /// そこだけ濁る。筋の頭（_Glint）だけ、集まった水が灯りを集めるぶん明るい。
+        ///
+        /// **ただし落としすぎると、今度は雨が降っていないように見える。** 0.175 まで下げた
+        /// ときがそれで、水はガラスに在るのに土砂降りには読めなかった。地の色は 0.186 まで
+        /// 戻し、足りないぶんは明るさではなく**量と動き**で出す。丸い塊に戻さない限り、
+        /// 空の 1.6 倍でも雪には見えない。
+        ///
+        /// にじみ（_Smear）は後ろの明るさに掛かるので、暗い空の上では何も起きない。
+        /// 街灯や対向車の前照灯を水が横切るところでだけ効く。
         ///
         /// 粒は筋に譲る。1 画素が 4.7 mm ぶんある解像度では、実物どおりの
         /// 2〜5 mm の水滴は円として描けないので、砂目（_Sand）として敷き、
-        /// 読める太さを持てる筋（_Up / _Down）を主役にする
+        /// 読める太さを持てる筋（_Up / _Down）とちぎれて飛ぶ水（_Dart）を主役にする
         /// </summary>
         static Material WaterMat()
         {
@@ -291,17 +297,22 @@ namespace HalfAware.EditorTools
                 AssetDatabase.CreateAsset(m, path);
             }
             m.shader = shader;
-            m.SetColor("_BaseColor", new Color(0.175f, 0.172f, 0.166f, 1f));
-            m.SetColor("_Glint", new Color(0.26f, 0.25f, 0.23f, 1f));
-            m.SetFloat("_Veil", 0.10f);
-            m.SetFloat("_Sand", 0.30f);
+            m.SetColor("_BaseColor", new Color(0.186f, 0.183f, 0.176f, 1f));
+            m.SetColor("_Glint", new Color(0.285f, 0.275f, 0.255f, 1f));
+            m.SetFloat("_Veil", 0.13f);
+            m.SetFloat("_Sand", 0.32f);
             m.SetFloat("_Rill", 0.85f);
-            m.SetFloat("_Grit", 110f);
-            m.SetFloat("_Creep", 0.05f);
+            m.SetFloat("_Spray", 0.34f);
+            m.SetFloat("_Smear", 1.60f);
+            m.SetFloat("_Grit", 150f);
+            m.SetFloat("_Creep", 0.38f);
+            m.SetFloat("_Fan", 0.22f);
             // 列の間隔 / 一本の長さ / 流れる速さ / 半幅。どれもメートル。
-            // 後ろへ引かれる筋は細く長く速く、落ちる筋は太く短く遅い
-            m.SetVector("_Up", new Vector4(0.19f, 0.50f, 1.10f, 0.0045f));
-            m.SetVector("_Down", new Vector4(0.30f, 0.38f, 0.22f, 0.0075f));
+            // 後ろへ引かれる筋は細く長く速く、落ちる筋は太く短く遅い。
+            // ちぎれて飛ぶ水はいちばん細く、いちばん速い（間口を 0.26 秒で抜ける）
+            m.SetVector("_Up", new Vector4(0.165f, 0.60f, 1.70f, 0.0030f));
+            m.SetVector("_Down", new Vector4(0.270f, 0.44f, 0.38f, 0.0052f));
+            m.SetVector("_Dart", new Vector4(0.058f, 0.115f, 2.40f, 0.0026f));
             EditorUtility.SetDirty(m);
             return m;
         }
@@ -882,6 +893,7 @@ namespace HalfAware.EditorTools
             PhotoStand(trim, steel, paper, gap);
             RadioSet(steel, gap, paper, tail);
             FuelDial(trim, gap, scale, pointer);
+            CigarettePack(paper, gap, gold);
             WindowCrank(plate, steel, gap);
 
             // 基板。暗い緑。内装（0.125）より暗く落として、助手席の座面（0.140）から切る
@@ -1268,6 +1280,43 @@ namespace HalfAware.EditorTools
                 Quaternion.LookRotation(swing, outward));
             // 針の軸
             Disc(scale, at + outward * 0.011f, outward, 0.0055f, 6);
+        }
+
+        /// <summary>
+        /// 煙草の箱。燃料計のすぐ外側、計器盤の天板の玉縁（<see cref="Dash"/>）の上。
+        ///
+        /// **もとは上着のポケットから覗かせていただけだった**（<see cref="CoatOnSeat"/>）。
+        /// 助手席の座面は運転席から遠くて暗く、そこへ 8 画素ぶん覗かせた紙の面では
+        /// 何を調べているのか読めない。箱そのものを、明るいところへ一つ出す。
+        ///
+        /// **置ける場所は見た目より狭い。** 目（0.38, 1.55, 0.22）は計器盤の塊
+        /// （<see cref="Binnacle"/>。x 0.10〜0.66・上端 1.41）より 0.14 高いだけなので、
+        /// 塊の右脇の天板（1.28）は塊の右の壁にほとんど隠れる。目から一点ずつ線を引いて
+        /// 測ると、天板の高さで隠れずに残るのは x 0.79 より外――つまり内張り（0.82）の
+        /// 中だけだった。前へ出すほど塊の陰は右へ伸びるので、前へ逃げる手も無い。
+        /// 手前の玉縁（z 0.51〜0.61・上端 1.30）の上まで戻すと陰は x 0.685 で止まり、
+        /// そこでようやく箱が丸ごと出る。ここが燃料計にいちばん近い置き場になる。
+        ///
+        /// **庇の下には入れられない。** 計器盤の庇（y 1.44〜1.48）は塊の天面を丸ごと覆うので、
+        /// 塊の上に立てた箱は庇の後ろの縁で帯状に切り取られる。
+        ///
+        /// 高さは 88 mm で実物どおり。目から 0.52 m なので画面では 28 画素になり、
+        /// 立った紙の箱として一目で読める。道の見える縁（z 0.58 で 1.496）へは 0.10 m 余る
+        /// </summary>
+        static void CigarettePack(Bank paper, Bank gap, Bank gold)
+        {
+            // 少し運転席の方へ振る。天板と平行に置くと、箱の正面が運転席から見えない
+            var lean = Quaternion.Euler(0f, 22f, 0f);
+            var at = new Vector3(0.722f, 1.344f, 0.565f);
+            // 箱。玉縁の天面（1.30）に立てる
+            paper.Box(at, new Vector3(0.056f, 0.088f, 0.023f), lean);
+            // 蓋の継ぎ目。一本入れないと、この解像度では白い角柱にしか見えない
+            gap.Box(at + lean * new Vector3(0f, 0.016f, 0f),
+                new Vector3(0.0585f, 0.010f, 0.0255f), lean);
+            // 開けた口から覗く銀紙。車内でいちばん明るい素材（端子と同じ）を 10 mm だけ使う。
+            // 暗い天板の上で最初に目へ入るのがここになる
+            gold.Box(at + lean * new Vector3(0f, 0.047f, -0.002f),
+                new Vector3(0.044f, 0.010f, 0.016f), lean);
         }
 
         /// <summary>

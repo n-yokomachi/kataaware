@@ -26,18 +26,22 @@ Material:
     m_Ints: []
     m_Floats:
     - _Bead: 0.42
-    - _Creep: 0.05
+    - _Creep: 0.38
+    - _Fan: 0.22
     - _Flow: 0.9
     - _Grain: 12
-    - _Grit: 110
+    - _Grit: 150
     - _Rill: 0.85
     - _Runs: 7
-    - _Sand: 0.3
-    - _Veil: 0.1
+    - _Sand: 0.32
+    - _Smear: 1.6
+    - _Spray: 0.34
+    - _Veil: 0.13
     m_Colors:
-    - _BaseColor: {r: 0.175, g: 0.172, b: 0.166, a: 1}
-    - _Down: {r: 0.3, g: 0.38, b: 0.22, a: 0.0075}
-    - _Glint: {r: 0.26, g: 0.25, b: 0.23, a: 1}
-    - _Up: {r: 0.19, g: 0.5, b: 1.1, a: 0.0045}
+    - _BaseColor: {r: 0.186, g: 0.183, b: 0.176, a: 1}
+    - _Dart: {r: 0.058, g: 0.115, b: 2.4, a: 0.0026}
+    - _Down: {r: 0.27, g: 0.44, b: 0.38, a: 0.0052}
+    - _Glint: {r: 0.285, g: 0.275, b: 0.255, a: 1}
+    - _Up: {r: 0.165, g: 0.6, b: 1.7, a: 0.003}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
