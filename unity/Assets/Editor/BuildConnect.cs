@@ -394,10 +394,12 @@ namespace HalfAware.EditorTools
         static void Wire(Transform socket, Renderer[] faces, Dictionary<string, GameObject> items)
         {
             var flow = Object.FindFirstObjectByType<SceneFlow>(FindObjectsInactive.Include);
+            TerminalScreen screen = null;
+            // 画面は机に並んだ 5 枚をひとつとして扱うので、入れ物の側に付ける
             var monitors = Look("Room/Monitors");
             if (monitors != null)
             {
-                var screen = monitors.GetComponent<TerminalScreen>();
+                screen = monitors.GetComponent<TerminalScreen>();
                 if (screen == null) screen = monitors.gameObject.AddComponent<TerminalScreen>();
                 var so = new SerializedObject(screen);
                 var row = so.FindProperty("faces");
@@ -406,7 +408,37 @@ namespace HalfAware.EditorTools
                 so.ApplyModifiedPropertiesWithoutUndo();
                 EditorUtility.SetDirty(screen);
             }
-            Plug(flow, socket);
+            var plug = Plug(flow, socket);
+            Director(flow, screen, plug, items);
+        }
+
+        /// <summary>
+        /// 段の進行。SceneFlow と同じ GameObject に置く。
+        /// 秒数と間合いは仮置きで、オーナーが再生しながら Inspector で決める
+        /// </summary>
+        static void Director(SceneFlow flow, TerminalScreen screen, JackPlug plug,
+            Dictionary<string, GameObject> items)
+        {
+            if (flow == null) { Debug.LogWarning("SceneFlow が無い。ConnectDirector を繋げない"); return; }
+            var director = flow.GetComponent<ConnectDirector>();
+            if (director == null) director = flow.gameObject.AddComponent<ConnectDirector>();
+            var so = new SerializedObject(director);
+            so.FindProperty("flow").objectReferenceValue = flow;
+            so.FindProperty("pose").objectReferenceValue = Object.FindFirstObjectByType<SeatedPose>(FindObjectsInactive.Include);
+            so.FindProperty("screen").objectReferenceValue = screen;
+            so.FindProperty("plug").objectReferenceValue = plug;
+            var blocker = Look("Room/Chair/Blocker");
+            so.FindProperty("chairBlocker").objectReferenceValue = blocker != null ? blocker.gameObject : null;
+            GameObject item;
+            so.FindProperty("jackItem").objectReferenceValue = items.TryGetValue(ConnectIds.Jack, out item) ? item : null;
+            so.FindProperty("monitorItem").objectReferenceValue = items.TryGetValue(ConnectIds.Monitor, out item) ? item : null;
+            so.FindProperty("script").objectReferenceValue = AssetDatabase.LoadAssetAtPath<RoomScript>(ScriptPath);
+            so.FindProperty("seatSpot").vector3Value = SeatAt;
+            so.FindProperty("seatEyeHeight").floatValue = SeatEyeHeight;
+            // モニターの方。部屋は z の正の向きに机が並んでいる
+            so.FindProperty("seatYaw").floatValue = 0f;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(director);
         }
 
         /// <summary>
@@ -417,10 +449,10 @@ namespace HalfAware.EditorTools
         /// 抜く側を詰め直したら組み直すだけで挿す側も付いてくる。
         /// 写し終えたら抜く側は落とす。id が同じなので、残すと両方が動く
         /// </summary>
-        static void Plug(SceneFlow flow, Transform socket)
+        static JackPlug Plug(SceneFlow flow, Transform socket)
         {
             var pro = Look("Player/Protagonist");
-            if (pro == null) return;
+            if (pro == null) return null;
             var pull = pro.GetComponent<JackPull>();
             var plug = pro.GetComponent<JackPlug>();
             if (plug == null) plug = pro.gameObject.AddComponent<JackPlug>();
@@ -450,6 +482,7 @@ namespace HalfAware.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(plug);
             if (pull != null) Object.DestroyImmediate(pull);
+            return plug;
         }
 
         /// <summary>曲げの配列を写す。BoneTurn は struct なので、要素ごとに並べ直す</summary>
