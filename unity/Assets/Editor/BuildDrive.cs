@@ -339,6 +339,51 @@ namespace HalfAware.EditorTools
         /// <summary>輪の芯までの半径。手を乗せる位置はここから出す</summary>
         public static float WheelRing { get { return WheelOuter * 0.5f - WheelThick * 0.5f; } }
 
+        // ---- 車内の面。メートル ----------------------------------------------
+        //
+        // 計器盤も内張りも、箱ひとつではなく面と縁と部品の集まりとして組む。
+        // 足す物はどれもこの四つの面から測る。天板と運転席側の面と腰の線が
+        // 揃っていないと、車内がその場しのぎの寄せ集めに見える
+
+        /// <summary>計器盤の天板。目線より 0.27 下</summary>
+        public const float DashTop = 1.28f;
+        /// <summary>計器盤の運転席を向いた面。物入れも吹き出し口もこの面に付く</summary>
+        public const float DashFace = 0.51f;
+        /// <summary>計器盤の前端。ここから先はボンネット</summary>
+        public const float DashNose = 0.97f;
+        /// <summary>内張りの上端。腰の線。左右と前で一本に通っている</summary>
+        public const float WaistY = 1.30f;
+        /// <summary>内張りの室内側の面。x の絶対値</summary>
+        public const float CardIn = 0.82f;
+        /// <summary>内張りの外側の面。x の絶対値。塞ぐ箱（<see cref="BlockHalfX"/> 0.92）より内</summary>
+        public const float CardOut = 0.90f;
+        /// <summary>天井の板の下端</summary>
+        public const float RoofLow = 1.88f;
+
+        /// <summary>
+        /// 運転席から道が見え始める下の縁の高さ。z を渡すと、その位置での境目を返す。
+        ///
+        /// 目（<see cref="SeatAt"/> + <see cref="EyeLead"/>）からボンネットの天板の前の角
+        /// （y 1.22 / z 2.42）へ引いた線。画面のここから上が道と空で、下はボンネットと計器盤になる。
+        /// 車内の物がこの線より上へ出れば、出たぶんだけ道が削れる。
+        ///
+        /// 計器盤に庇や取っ手を足すたびにここが詰まる。数ミリの食い込みは実画面では
+        /// 気づけないので、<see cref="CheckDrive"/> の見直し 14 が組むたびに測る
+        /// </summary>
+        public static float SightY(float z)
+        {
+            return SeatAt.y - 0.15f * (z - EyeLead);
+        }
+
+        /// <summary>メーターの絵を貼る板の大きさ。テクスチャの縦横比（512 × 128）と揃える</summary>
+        public const float DialWide = 0.48f;
+        public const float DialHigh = 0.12f;
+        /// <summary>
+        /// メーターの明るさ。Unlit なので、この値がそのまま画面に出る。
+        /// 夜の車内はどこも 0.1 を下回るので、針と目盛りだけが浮かび上がる
+        /// </summary>
+        public const float DialGain = 0.62f;
+
         /// <summary>
         /// 腕組みの前腕の中心。胸の前。
         ///
@@ -533,34 +578,73 @@ namespace HalfAware.EditorTools
             var seat = new Bank { Texel = 1.2f };
             var glass = new Bank { Texel = 0.8f };
             var body = new Bank { Texel = 0.9f };
+            // 塗った鉄。輻・取っ手・摘み・止めねじ。地の色が内装の 3 倍近く明るいので、
+            // 夜の帯でも形が残る。車内で唯一「明るい」素材として使う
+            var steel = new Bank { Texel = 2.2f };
+            // 継ぎ目と窪み。絵は持たず、ただ暗い。板と板の境をここで引く
+            var gap = new Bank { Texel = 1.0f };
+            // メーターの板。**Texel は 1 から動かさない。** DialMat が _BaseMap_ST で
+            // uv を畳み直すときに、実寸がそのまま uv になっていることを当てにしている
+            var dials = new Bank { Texel = 1f };
 
             // 計器盤。天板は 1.28 で、目線より 0.27 下。この差がそのままボンネットの見える量になる。
             // 上げればボンネットが隠れ、下げれば計器盤が薄くなって乗用車に戻る
             trim.Box(new Vector3(0f, 1.13f, 0.74f), new Vector3(1.72f, 0.30f, 0.46f));
-            // 英国なので右ハンドル。運転席が道の中心線側に来る（LaneOffset と対）
-            glass.Box(new Vector3(0.38f, 1.25f, 0.60f), new Vector3(0.34f, 0.14f, 0.03f));
+            Dash(trim, steel, gap);
+            // 英国なので右ハンドル。メーターは運転席の真上（LaneOffset と対）
+            Binnacle(trim, dials);
             // メーターより 0.05 手前へ引く。前後を揃えると輪の向こう端が計器の面と擦れる
-            Wheel(trim, WheelAt, WheelOuter, WheelThick, WheelLean);
+            Wheel(trim, steel, WheelAt, WheelOuter, WheelThick, WheelLean);
             // 上を後ろへ倒す。屋根が前へ被さる向きにすると、外が見えなくなる。
             // 古いオフロード車のガラスはほとんど立っているので、乗用車の 22 度から 10 度へ起こした。
             // 起こすと同じ間口でもガラスが縦に広がり、天井の縁が視界から退く。
             // 上の縁は天井の板の中へ差し込む。背を縮めずに下げると、下の縁が計器盤から離れて隙間が開く
             glass.Box(new Vector3(0f, 1.590f, 0.905f), new Vector3(1.66f, 0.63f, 0.02f), Quaternion.Euler(-10f, 0f, 0f));
             // ドアの内張り。上端 1.30 を計器盤の天板と揃える。腰の線が左右と前で一本に通ると箱に見える
-            trim.Box(new Vector3(-0.86f, 1.02f, 0.10f), new Vector3(0.08f, 0.56f, 1.30f));
-            trim.Box(new Vector3(0.86f, 1.02f, 0.10f), new Vector3(0.08f, 0.56f, 1.30f));
-            // 助手席は運転席の反対、道の外側
-            seat.Box(new Vector3(-0.42f, 0.99f, -0.06f), new Vector3(0.52f, 0.10f, 0.52f));
-            seat.Box(new Vector3(-0.42f, 1.31f, 0.22f), new Vector3(0.52f, 0.54f, 0.10f));
+            for (var s = 0; s < 2; s++) DoorCard(trim, steel, gap, s == 0 ? -1f : 1f);
+            Pillars(trim);
+            PassengerSeat(seat, steel);
             // 天井。目線との間を 0.33 取る。乗用車だったときの 0.31 より広い
             trim.Box(new Vector3(0f, 1.91f, 0.10f), new Vector3(1.72f, 0.06f, 1.60f));
             glass.Box(new Vector3(0f, 1.83f, 0.74f), new Vector3(0.28f, 0.08f, 0.02f));
+            // 助手席の上の吊り手。オフロード車の助手席には必ず付いている
+            steel.Box(new Vector3(-0.80f, 1.812f, 0.30f), new Vector3(0.036f, 0.036f, 0.26f));
+            for (var i = 0; i < 2; i++)
+                steel.Box(new Vector3(-0.83f, 1.846f, 0.30f + (i == 0 ? -0.13f : 0.13f)),
+                    new Vector3(0.05f, 0.07f, 0.045f));
             Bonnet(body);
 
             trim.Emit(parent, "CarTrim", Mat("CarTrim"), false, Generated);
             seat.Emit(parent, "CarSeat", Mat("CarSeat"), false, Generated);
             glass.Emit(parent, "CarGlass", Mat("CarGlass"), false, Generated);
             body.Emit(parent, "CarBody", Mat("CarBody"), false, Generated);
+            steel.Emit(parent, "CarSteel", Mat("CarSteel"), false, Generated);
+            gap.Emit(parent, "CarGap", Mat("CarGap"), false, Generated);
+            dials.Emit(parent, "CarDials", DialMat(), false, Generated);
+
+            // 計器の裏の明かり。**この場面で車内に足す灯りはこれ一つだけ。**
+            //
+            // 帯 0〜2 の車内には明暗しか手掛かりが無く、素材の地を明るくしただけでは
+            // ハンドルも計器盤も同じ値に並んで消える（実際に測って、輪と天板と内張りが
+            // どれも 18 前後に並んだ）。実際の車と同じく、計器の裏の明かりが手元だけを
+            // 照らすことにすれば、輪の上側と天板に段が付く。
+            //
+            // 届く範囲は 1.10 m。座席から先へは届かないので、道にも沿道にも掛からない。
+            // 影は落とさせない。WebGL で影を持つ灯りを増やすと重くなる。
+            //
+            // **強さが極端に小さいのは書き間違いではない。** 灯りから輪までが 0.27 m しか
+            // 離れておらず、距離の二乗で効くので 14 倍に増える。0.06 でも輪が白く飛んで、
+            // 画面ぜんたいが滲んだ。実際に測って決めた値がこれで、
+            // 帯 1 の輪の上側が 17 から 45 へ、内張り（19）と分かれるところ
+            var backlight = Child(parent, "DialLamp");
+            backlight.localPosition = new Vector3(WheelAt.x, 1.36f, 0.50f);
+            var lit = backlight.GetComponent<Light>();
+            if (lit == null) lit = backlight.gameObject.AddComponent<Light>();
+            lit.type = LightType.Point;
+            lit.color = new Color(1f, 0.74f, 0.42f);
+            lit.intensity = 0.0025f;
+            lit.range = 1.10f;
+            lit.shadows = LightShadows.None;
 
             // 視点の置き場。DriveDirector.seat へ繋ぐ。
             // ハンドルの真後ろに寄せてあるので、座ると輪が正面に来る
@@ -569,6 +653,217 @@ namespace HalfAware.EditorTools
             eye.localRotation = Quaternion.identity;
 
             Arms(parent);
+        }
+
+        /// <summary>
+        /// 計器盤の作り込み。箱一つの天板と面を、部品の集まりに割る。
+        ///
+        /// 下を向いたときに画面を埋めるのは天板と運転席側の面の二つで、
+        /// どちらも板一枚のままだと段ボールの箱に見える。天板には縁・物置き・曇り止め、
+        /// 面には物入れ・吹き出し口・中央の操作盤・スイッチを置く。
+        ///
+        /// **手前へ出す量はどれも 1 cm 以上取る。** それより薄いと、この解像度では
+        /// 面に描いた模様と見分けが付かない
+        /// </summary>
+        static void Dash(Bank trim, Bank steel, Bank gap)
+        {
+            // 天板の後ろの縁の玉縁。角のままだと、真上から見て一枚の板に潰れる
+            trim.Box(new Vector3(0f, 1.285f, DashFace + 0.050f), new Vector3(1.72f, 0.030f, 0.100f));
+
+            // 天板の物置き。助手席の前。暗い底を浮かせて、四辺を縁で囲う
+            const float trayX = -0.47f;
+            const float trayZ = 0.685f;
+            const float trayW = 0.58f;
+            const float trayD = 0.21f;
+            gap.Box(new Vector3(trayX, DashTop + 0.004f, trayZ), new Vector3(trayW, 0.008f, trayD));
+            for (var i = 0; i < 2; i++)
+            {
+                var d = i == 0 ? -1f : 1f;
+                trim.Box(new Vector3(trayX + d * (trayW * 0.5f + 0.015f), DashTop + 0.010f, trayZ),
+                    new Vector3(0.030f, 0.020f, trayD + 0.060f));
+                trim.Box(new Vector3(trayX, DashTop + 0.010f, trayZ + d * (trayD * 0.5f + 0.015f)),
+                    new Vector3(trayW + 0.060f, 0.020f, 0.030f));
+            }
+
+            // 曇り止めの吹き出し。ガラスの下の縁に沿って二列。
+            // ガラスはこの位置で既に y 1.65 まで上がっているので、羽根と取り合わない
+            for (var i = 0; i < 2; i++)
+            {
+                var x = i == 0 ? -0.50f : 0.26f;
+                gap.Box(new Vector3(x, DashTop + 0.003f, 0.895f), new Vector3(0.44f, 0.006f, 0.055f));
+                for (var k = 0; k < 4; k++)
+                    trim.Box(new Vector3(x - 0.165f + k * 0.110f, DashTop + 0.008f, 0.895f),
+                        new Vector3(0.022f, 0.016f, 0.065f));
+            }
+
+            // 助手席の掴まり手。オフロード車の助手席にはこれが要る。
+            // 高さ 1.365 は道の見える縁（SightY(0.62) = 1.49）の下
+            steel.Box(new Vector3(-0.50f, 1.345f, 0.62f), new Vector3(0.30f, 0.040f, 0.040f));
+            for (var i = 0; i < 2; i++)
+                steel.Box(new Vector3(-0.50f + (i == 0 ? -0.130f : 0.130f), 1.308f, 0.62f),
+                    new Vector3(0.050f, 0.075f, 0.050f));
+
+            // 物入れの蓋。継ぎ目のぶん一回り小さく、掛け金を下に付ける
+            trim.Box(new Vector3(-0.47f, 1.135f, DashFace - 0.016f), new Vector3(0.52f, 0.210f, 0.032f));
+            steel.Box(new Vector3(-0.47f, 1.046f, DashFace - 0.030f), new Vector3(0.110f, 0.034f, 0.030f));
+
+            // 吹き出し口。左右の端に一つずつ
+            Vent(trim, steel, gap, -0.695f, 1.165f, 0.200f, 0.115f);
+            Vent(trim, steel, gap, 0.695f, 1.165f, 0.200f, 0.115f);
+
+            // 中央の操作盤。無線機の面と摘みと切り替え
+            trim.Box(new Vector3(-0.01f, 1.130f, DashFace - 0.022f), new Vector3(0.320f, 0.260f, 0.044f));
+            gap.Box(new Vector3(-0.01f, 1.196f, DashFace - 0.040f), new Vector3(0.250f, 0.075f, 0.020f));
+            for (var i = 0; i < 2; i++)
+                steel.Box(new Vector3(-0.01f + (i == 0 ? -0.105f : 0.105f), 1.100f, DashFace - 0.056f),
+                    new Vector3(0.050f, 0.050f, 0.030f));
+            for (var k = 0; k < 3; k++)
+                steel.Box(new Vector3(-0.09f + k * 0.080f, 1.030f, DashFace - 0.052f),
+                    new Vector3(0.056f, 0.036f, 0.022f));
+
+            // 運転席側のスイッチの列。暗い座に鉄の摘みが四つ並ぶ
+            gap.Box(new Vector3(0.325f, 1.075f, DashFace - 0.008f), new Vector3(0.300f, 0.062f, 0.016f));
+            for (var k = 0; k < 4; k++)
+                steel.Box(new Vector3(0.220f + k * 0.070f, 1.075f, DashFace - 0.024f),
+                    new Vector3(0.052f, 0.044f, 0.026f));
+
+            // 露わな止めねじ。板を継いであることを隠さないのが、この車の作りにあたる
+            for (var i = 0; i < 2; i++)
+                for (var k = 0; k < 2; k++)
+                    steel.Box(new Vector3(i == 0 ? -0.820f : 0.820f, k == 0 ? 1.005f : 1.255f, DashFace - 0.008f),
+                        new Vector3(0.020f, 0.020f, 0.014f));
+        }
+
+        /// <summary>
+        /// 吹き出し口ひとつ。奥の暗がりを面より手前へ出し、周りを枠で囲って、
+        /// 手前に羽根を渡す。窪みそのものを掘る代わりに、暗い面と枠で窪んで見せている
+        /// </summary>
+        static void Vent(Bank trim, Bank steel, Bank gap, float x, float y, float wide, float high)
+        {
+            gap.Box(new Vector3(x, y, DashFace - 0.008f), new Vector3(wide, high, 0.016f));
+            for (var i = 0; i < 2; i++)
+            {
+                var d = i == 0 ? -1f : 1f;
+                trim.Box(new Vector3(x + d * (wide * 0.5f + 0.012f), y, DashFace - 0.020f),
+                    new Vector3(0.024f, high + 0.048f, 0.040f));
+                trim.Box(new Vector3(x, y + d * (high * 0.5f + 0.012f), DashFace - 0.020f),
+                    new Vector3(wide + 0.048f, 0.024f, 0.040f));
+            }
+            for (var k = 0; k < 3; k++)
+                steel.Box(new Vector3(x, y - high * 0.5f + high * (k + 0.5f) / 3f, DashFace - 0.022f),
+                    new Vector3(wide - 0.010f, 0.012f, 0.012f));
+        }
+
+        /// <summary>
+        /// メーターの塊と庇。**夜の車内で自分から光っているのはここだけ。**
+        ///
+        /// 灯りを一つも足さずに、Unlit の絵一枚でそれを出す。帯 0〜2 の暗さでは
+        /// 明暗しか手掛かりが無いので、針と目盛りが浮かぶだけで車内の向きが読める。
+        ///
+        /// 傾きも高さも、道の見える縁（<see cref="SightY"/>）と、調べる対象の印が
+        /// 埋まらない隙間の二つで挟まれている。塊の上端は縁より 92 mm 下、
+        /// 庇の上端は 30 mm 下で、印（drive.photo / drive.fuel）からは 9 mm 以上離してある。
+        /// **動かすなら両方を測り直すこと。** どちらも組み立て時の見直しが拾う
+        /// </summary>
+        static void Binnacle(Bank trim, Bank dials)
+        {
+            var lean = Quaternion.Euler(14f, 0f, 0f);
+            var pod = new Vector3(WheelAt.x, 1.320f, 0.615f);
+            trim.Box(pod, new Vector3(0.560f, 0.140f, 0.160f), lean);
+            trim.Box(new Vector3(pod.x, 1.4585f, 0.5195f), new Vector3(0.600f, 0.018f, 0.160f), lean);
+            Panel(dials, pod + lean * new Vector3(0f, 0f, -0.0825f), DialWide, DialHigh, lean);
+        }
+
+        /// <summary>
+        /// 絵を一度だけ貼る板。<see cref="Bank.Quad"/> をじかに呼ぶのは、Box にすると
+        /// 横の小口にまで同じ絵が引き伸ばされるため。
+        /// 角の順は Bank.FaceZ の裏向き（-z）と揃えてあり、u は右から左へ流れる。
+        /// 裏返して戻すのは貼る側（<see cref="DialMat"/>）の役目
+        /// </summary>
+        static void Panel(Bank bank, Vector3 centre, float wide, float high, Quaternion rot)
+        {
+            var hw = wide * 0.5f;
+            var hh = high * 0.5f;
+            System.Func<float, float, Vector3> at =
+                (sx, sy) => centre + rot * new Vector3(hw * sx, hh * sy, 0f);
+            bank.Quad(at(1f, -1f), at(-1f, -1f), at(-1f, 1f), at(1f, 1f));
+        }
+
+        /// <summary>
+        /// ドアの内張り。side は -1 が助手席側、1 が運転席側。
+        ///
+        /// **窓の下枠が要。** 板一枚だけだと脇が抜けたままで、車に乗っているのではなく
+        /// 屋根の付いた台に座っているように見える。枠を回して初めて「窓」になる。
+        /// 外へ出す量は塞ぐ箱（<see cref="BlockHalfX"/> 0.92）の内に収め、
+        /// ガレージのドアの印（x 0.92）を食わない
+        /// </summary>
+        static void DoorCard(Bank trim, Bank steel, Bank gap, float side)
+        {
+            trim.Box(new Vector3(side * 0.86f, 1.02f, 0.10f), new Vector3(0.08f, 0.56f, 1.30f));
+            trim.Box(new Vector3(side * 0.858f, 1.325f, 0.115f), new Vector3(0.094f, 0.050f, 1.37f));
+            // 内張りの継ぎ目。上下二枚に割る
+            gap.Box(new Vector3(side * 0.816f, 1.055f, 0.10f), new Vector3(0.020f, 0.014f, 1.28f));
+            // 引き手。腰の線のすぐ下に前後へ渡す
+            steel.Box(new Vector3(side * 0.797f, 1.190f, 0.28f), new Vector3(0.036f, 0.038f, 0.200f));
+            for (var i = 0; i < 2; i++)
+                steel.Box(new Vector3(side * 0.808f, 1.190f, 0.28f + (i == 0 ? -0.115f : 0.115f)),
+                    new Vector3(0.030f, 0.056f, 0.036f));
+            // 窓の回し手。前寄りに付ける。電動の窓はこの年式の車には無い
+            steel.Box(new Vector3(side * 0.802f, 1.120f, 0.52f), new Vector3(0.028f, 0.076f, 0.076f));
+            steel.Box(new Vector3(side * 0.790f, 1.078f, 0.556f), new Vector3(0.024f, 0.030f, 0.088f));
+            // 物入れ。下半分の窪みと、その下の棚
+            gap.Box(new Vector3(side * 0.812f, 0.885f, -0.02f), new Vector3(0.020f, 0.150f, 0.62f));
+            trim.Box(new Vector3(side * 0.800f, 0.805f, -0.02f), new Vector3(0.046f, 0.030f, 0.66f));
+            // 止めねじ。四隅
+            for (var i = 0; i < 2; i++)
+                for (var k = 0; k < 2; k++)
+                    steel.Box(new Vector3(side * 0.812f, i == 0 ? 0.790f : 1.268f, -0.42f + k * 0.94f),
+                        new Vector3(0.016f, 0.020f, 0.020f));
+        }
+
+        /// <summary>
+        /// 柱と窓の上枠。脇の抜けを前後と上から囲う。
+        ///
+        /// 前の柱はガラスの間口（|x| 0.83）の外に立てるので、正面の道は削らない。
+        /// 目の右 35 度に来て画面の端に映るが、それは実際の車でもそう見えるもので、
+        /// 削っているのは道ではなく脇の抜けの方
+        /// </summary>
+        static void Pillars(Bank trim)
+        {
+            var rake = Quaternion.Euler(-10f, 0f, 0f);
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                // 前の柱。ガラスと同じ傾き。下は計器盤の角、上は天井の板へ差し込む
+                trim.Box(new Vector3(side * 0.865f, 1.585f, 0.905f), new Vector3(0.085f, 0.640f, 0.085f), rake);
+                // 後ろの柱。これが無いと、脇の窓が後ろへ抜けたまま終わる
+                trim.Box(new Vector3(side * 0.865f, 1.590f, -0.615f), new Vector3(0.085f, 0.620f, 0.140f));
+                // 窓の上枠。柱と柱を天井の下で繋ぐ
+                trim.Box(new Vector3(side * 0.865f, 1.850f, 0.130f), new Vector3(0.085f, 0.075f, 1.400f));
+            }
+        }
+
+        /// <summary>
+        /// 助手席。座面・土手・背もたれ・枕・枠。
+        ///
+        /// **背もたれは座面の後ろに立てる。** これまで前（z 0.22）に立っていて、
+        /// 座席が後ろを向いていた。脇を向いたときに真っ先に目に入るのがこの席なので、
+        /// 向きが逆だと車内ぜんたいが読めなくなる
+        /// </summary>
+        static void PassengerSeat(Bank seat, Bank steel)
+        {
+            const float x = -0.42f;
+            seat.Box(new Vector3(x, 0.985f, 0.06f), new Vector3(0.54f, 0.13f, 0.50f));
+            for (var i = 0; i < 2; i++)
+                seat.Box(new Vector3(x + (i == 0 ? -0.235f : 0.235f), 1.025f, 0.06f),
+                    new Vector3(0.07f, 0.11f, 0.46f));
+            seat.Box(new Vector3(x, 1.300f, -0.240f), new Vector3(0.50f, 0.58f, 0.13f));
+            seat.Box(new Vector3(x, 1.675f, -0.265f), new Vector3(0.24f, 0.15f, 0.11f));
+            for (var i = 0; i < 2; i++)
+                steel.Box(new Vector3(x + (i == 0 ? -0.07f : 0.07f), 1.605f, -0.258f),
+                    new Vector3(0.018f, 0.060f, 0.018f));
+            // 床の滑り台に載った枠
+            steel.Box(new Vector3(x, 0.905f, 0.06f), new Vector3(0.46f, 0.055f, 0.44f));
         }
 
         /// <summary>
@@ -685,9 +980,13 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// ハンドルの輪。Bank に丸い形は無いので、短い箱を円周に並べて繋ぐ。
         /// lean は x 軸まわりに倒す角。オフロード車なので輪はバスに近いところまで寝ている。
-        /// 立てるとメーターを真正面から塞ぐ
+        /// 立てるとメーターを真正面から塞ぐ。
+        ///
+        /// **輪と輻を別の素材に分ける。** 輪は黒い樹脂、輻と芯は塗った鉄で、
+        /// 地の明るさが 3 倍近く違う。夜の帯では明暗しか手掛かりが無く、
+        /// 全部を同じ黒で塗ると、手前に大きく映っているはずのハンドルが丸ごと消える
         /// </summary>
-        static void Wheel(Bank bank, Vector3 centre, float outer, float thick, float lean)
+        static void Wheel(Bank rim, Bank spoke, Vector3 centre, float outer, float thick, float lean)
         {
             const int seg = 20;
             var tilt = Quaternion.Euler(lean, 0f, 0f);
@@ -699,16 +998,21 @@ namespace HalfAware.EditorTools
                 var a = (i + 0.5f) / seg * Mathf.PI * 2f;
                 var at = new Vector3(Mathf.Cos(a) * ring, Mathf.Sin(a) * ring, 0f);
                 var rot = tilt * Quaternion.Euler(0f, 0f, a * Mathf.Rad2Deg + 90f);
-                bank.Box(centre + tilt * at, new Vector3(chord, thick, thick), rot);
+                rim.Box(centre + tilt * at, new Vector3(chord, thick, thick), rot);
             }
-            bank.Box(centre, new Vector3(0.11f, 0.11f, 0.045f), tilt);
+            spoke.Box(centre, new Vector3(0.11f, 0.11f, 0.045f), tilt);
+            // 警笛の押し。芯の面から手前へ出す。輪が寝ているので「手前」は上になる。
+            // ここだけ輪と同じ黒い樹脂にする。芯まで鉄で塗ると、昼の帯で
+            // 白い塊が手前に立っているようにしか見えない
+            rim.Box(centre + tilt * new Vector3(0f, 0f, -0.028f),
+                new Vector3(0.075f, 0.075f, 0.016f), tilt);
             // 輪だけだと宙に浮いた環にしか見えない
             for (var i = 0; i < 3; i++)
             {
                 var a = (90f + i * 120f) * Mathf.Deg2Rad;
                 var at = new Vector3(Mathf.Cos(a), Mathf.Sin(a), 0f) * ring * 0.5f;
                 var rot = tilt * Quaternion.Euler(0f, 0f, a * Mathf.Rad2Deg);
-                bank.Box(centre + tilt * at, new Vector3(ring, 0.022f, 0.018f), rot);
+                spoke.Box(centre + tilt * at, new Vector3(ring, 0.022f, 0.018f), rot);
             }
         }
 
@@ -2106,6 +2410,40 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
+        /// メーターの面のマテリアル。ほかの素材と違って Unlit で貼る。
+        ///
+        /// 灯りを一つも足さずに「夜に自分で光っているもの」を車内へ置ける。
+        /// <see cref="DialGain"/> がそのまま画面の明るさになるので、
+        /// 針と目盛りだけが浮いて、盤の地は夜の車内に沈んだままになる。
+        ///
+        /// 絵は板いっぱいに一度だけ貼る。Bank は実寸に Texel を掛けた uv を振るので、
+        /// Texel 1 の板に対しては uv がそのまま長さ（m）になる。それを _BaseMap_ST で
+        /// 0〜1 へ畳み直す。横の倍率が負なのは、Bank の -z 向きの面が u を
+        /// 右から左へ流すため（<see cref="Panel"/>）
+        /// </summary>
+        static Material DialMat()
+        {
+            var shader = Shader.Find("Universal Render Pipeline/Unlit");
+            var path = Materials + "CarDials.mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                m = new Material(shader);
+                m.name = "CarDials";
+                AssetDatabase.CreateAsset(m, path);
+            }
+            m.shader = shader;
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/DriveCarDials.png");
+            if (tex == null) Debug.LogWarning("メーターの絵が無い: Assets/Textures/DriveCarDials.png");
+            m.SetTexture("_BaseMap", tex);
+            m.SetColor("_BaseColor", new Color(DialGain, DialGain, DialGain, 1f));
+            m.SetTextureScale("_BaseMap", new Vector2(-1f / DialWide, 1f / DialHigh));
+            m.SetTextureOffset("_BaseMap", new Vector2(1f, 0f));
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// <summary>
         /// 麦のマテリアル。ほかの素材と違って URP の Lit を使わない。
         ///
         /// 要るものが二つある。ひとつは頂点をずらして微風になびかせること。株は区切り 1 つに
@@ -2176,8 +2514,16 @@ namespace HalfAware.EditorTools
         {
             switch (name)
             {
-                case "CarTrim": col = new Color(0.085f, 0.082f, 0.090f); smooth = 0.18f; break;
-                case "CarSeat": col = new Color(0.115f, 0.098f, 0.090f); smooth = 0.10f; break;
+                // 内装。絵（DriveCarTrim.png）を貼るので、画面に出る明るさは絵の平均が持つ。
+                // ここの色は絵が無いときの控えで、絵と同じ明るさに合わせてある。
+                // 乗用車だった頃の 0.085 から上げたのは、暗いだけの面では夜に形が読めないため
+                case "CarTrim": col = new Color(0.125f, 0.121f, 0.128f); smooth = 0.18f; break;
+                case "CarSeat": col = new Color(0.140f, 0.121f, 0.106f); smooth = 0.10f; break;
+                // 塗った鉄。輻・取っ手・摘み・止めねじ。**車内で唯一明るい素材。**
+                // 内装の 2.3 倍あるので、夜の帯でも輪郭が残る
+                case "CarSteel": col = new Color(0.288f, 0.262f, 0.208f); smooth = 0.28f; break;
+                // 継ぎ目と窪み。絵を持たず、ただ暗い。板と板の境をこれで引く
+                case "CarGap": col = new Color(0.020f, 0.019f, 0.021f); smooth = 0.05f; break;
                 case "CarGlass": col = new Color(0.55f, 0.60f, 0.66f, 0.12f); smooth = 0.85f; break;
                 // ボンネット。褪せて白茶けた塗りの鉄板。
                 // **ここだけ夜の場面の中で浮くほど明るい。** 車内の色（0.09）で塗ると、

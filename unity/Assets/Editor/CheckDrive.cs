@@ -110,6 +110,7 @@ namespace HalfAware.EditorTools
             bad += Drift();
             bad += Walk(root);
             bad += Ladder(root);
+            bad += Sight(root);
             if (bad == 0) Debug.Log("見直し: 気になるところは無し");
             else Debug.LogWarning("見直し: 気になるところ " + bad + " 件。上を参照");
         }
@@ -860,6 +861,61 @@ namespace HalfAware.EditorTools
                 else
                     Debug.LogWarning(string.Format("見直し: {0}の {1} と {2} が {3:F4} m しか離れていない（{4:F3} m 要る）。遠くでちらつく",
                         what, stack[i], stack[i + 1], apart, gap));
+                bad++;
+            }
+            return bad;
+        }
+
+        // ---- 14. 車内の物が道を削っていないか ----------------------------------
+
+        /// <summary>ガラスの間口の中だけ見る。柱も内張りもこの外に置いてある</summary>
+        const float SightHalfX = 0.78f;
+
+        /// <summary>
+        /// ここより上は見ない。天井・鏡・窓の上枠は、道ではなく空を隠すために置いてある
+        /// </summary>
+        const float SightLid = 1.70f;
+
+        /// <summary>
+        /// 車内の物が、運転席から道の見え始める縁（<see cref="BuildDrive.SightY"/>）より
+        /// 上へ出ていないか。
+        ///
+        /// 目からボンネットの天板の前の角へ引いた線が、画面のどこから先が道になるかの
+        /// 境目にあたる。下に収まっている物は計器盤かボンネットを隠すだけで済むが、
+        /// 上へ出れば出たぶんだけ道が削れる。
+        ///
+        /// 計器盤に庇や取っ手や吊り手を足すたびに、ここは黙って詰まる。
+        /// 数ミリの食い込みは絵を撮っても分からないので、組むたびに測る。
+        ///
+        /// ボンネットは境目そのものなので、計器盤の前端（<see cref="BuildDrive.DashNose"/>）
+        /// より前は見ない。目より後ろも見ない
+        /// </summary>
+        static int Sight(Transform root)
+        {
+            var car = root.Find("Car");
+            if (car == null) { Debug.LogWarning("見直し: Car が無い。道の見える縁を測れない"); return 1; }
+            var bad = 0;
+            foreach (var mf in car.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (mf.sharedMesh == null) continue;
+                var m = mf.transform.localToWorldMatrix;
+                var verts = mf.sharedMesh.vertices;
+                var over = 0f;
+                var at = Vector3.zero;
+                for (var i = 0; i < verts.Length; i++)
+                {
+                    var p = m.MultiplyPoint3x4(verts[i]);
+                    if (Mathf.Abs(p.x) > SightHalfX || p.y > SightLid) continue;
+                    if (p.z < BuildDrive.EyeLead || p.z > BuildDrive.DashNose) continue;
+                    var up = p.y - BuildDrive.SightY(p.z);
+                    if (up <= over) continue;
+                    over = up;
+                    at = p;
+                }
+                if (over <= 0f) continue;
+                Debug.LogWarning(string.Format(
+                    "見直し: 車内の {0} が道の見える縁より {1:F3} m 高い（{2}）。そのぶん道が削れる",
+                    mf.name, over, at.ToString("F3")), mf.gameObject);
                 bad++;
             }
             return bad;
