@@ -105,7 +105,7 @@ namespace HalfAware.EditorTools
         /// 帯ごとの入れ物と、その下の区切り。
         ///
         /// 沿道の物をタイルの子にしてはいけない。子にすると Dress が空の入れ物を
-        /// 切り替えるだけになり、5 帯ぶんが同時に出る。入れ物の直下へじかに並べると
+        /// 切り替えるだけになり、帯ぜんたいが同時に出る。入れ物の直下へじかに並べると
         /// Dress は効くが、今度は沿道が一切動かない。
         ///
         /// Place は dressed.childCount を環の大きさに使うので、区切りの数はタイルの枚数と
@@ -119,11 +119,15 @@ namespace HalfAware.EditorTools
             {
                 var band = Child(parent, "Band" + b);
                 var slices = Slices(band);
-                if (b == 0) Outskirts(slices);
+                // **未舗装路は必ず最後の帯。添字を決め打ちにしない。**
+                // 景色の数はシナリオの改訂で動く。番号で書くと、帯を減らしたときに
+                // 末尾が途中の帯の中身になり、朝の畑がどこにも出なくなる。
+                // CheckDrive.OnRoad も同じ数え方（Bands - 1）で轍の幅に切り替えている
+                if (b == Bands - 1) Furrows(slices);
+                else if (b == 0) Outskirts(slices);
                 else if (b == 1) Motorway(slices);
                 else if (b == 2) Trunk(slices);
-                else if (b == 3) Downs(slices);
-                else Furrows(slices);
+                else Downs(slices);
                 // 帯を出し分けるのは DriveWorld.Dress。組んだ直後は頭の帯だけ見せる
                 band.gameObject.SetActive(b == 0);
             }
@@ -136,7 +140,7 @@ namespace HalfAware.EditorTools
         /// 道と同じ速さでしか流れず、隣を並んで走っているようにしか見えない。
         /// DriveWorld が oncomingRate を掛けた距離でこちらだけ別に流す。
         ///
-        /// 中身があるのは帯 1 だけだが、入れ物と区切りは 5 帯ぶん揃えて作る。
+        /// 中身があるのは帯 1 だけだが、入れ物と区切りは帯の数だけ揃えて作る。
         /// Place は childCount を環の大きさに使うので、数が揃っていないと繋ぎ替えで狂う
         /// </summary>
         static void Traffic(Transform parent)
@@ -771,9 +775,10 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 環の上の位置を、区切りの番号と区切りの中の z に割る。<see cref="Drop"/> の mesh 版
+        /// 環の上の位置を、区切りの番号と区切りの中の z に割る。<see cref="Drop"/> の mesh 版。
+        /// 物を置かずに素材へ焼く沿道（市街のビルと畑の農家）はどれもここを通る
         /// </summary>
-        static void Put(CityBanks[] banks, float ring, System.Action<CityBanks, float> draw)
+        static void Put<T>(T[] banks, float ring, System.Action<T, float> draw)
         {
             var p = ring % Span;
             if (p < 0f) p += Span;
@@ -804,7 +809,7 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 市街の壁と窓のマテリアル。<see cref="Mat"/> を通さない。
+        /// 色だけの Lit のマテリアル。市街のビルと畑の農家が使う。<see cref="Mat"/> を通さない。
         /// あちらは名前から色を引くので、色を足すには BuildDrive の表を触ることになる。
         ///
         /// **絵は貼らない。** 描画解像度 427 × 240 では、窓の格子より細かい絵柄は
@@ -977,19 +982,22 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 帯 4。朝靄の未舗装路。黄金色の小麦畑と土の轍。
+        /// 最後の帯。朝靄の未舗装路。黄金色の小麦畑と土の轍、畑に建つ農家。
         ///
         /// 原作の「朝靄の中で、緩やかな湾曲を描いて広がる小麦畑が黄金色に微風になびいている」。
         /// **畑は視界を埋めるところまで広げる。** 道の脇に麦を数本立てただけでは、
         /// 窓を開けて息を吸い込む場面にならない。株は 40 m まで、地の面は 150 m まで敷いて、
         /// その先は霧が畳む。なびかせるのは株のマテリアル（HalfAware/Wheat）で、
         /// 株ごとに Transform を持たせる手は取れない。区切り 1 つに 600 を越える札が
-        /// 1 枚の mesh へ焼かれているため
+        /// 1 枚の mesh へ焼かれているため。
+        ///
+        /// 農家は <see cref="Crofts"/>。独白を送り切ってから暗転までの余韻に
+        /// 通り過ぎるのはこれで、麦だけでは「町に着いた」ところにならない
         /// </summary>
         static void Furrows(Transform[] slices)
         {
             // 舗装のタイルはそのまま下に敷いてあるので、土の面で覆い隠す。
-            // 帯 4 だけタイルを差し替える手は取らない。タイルは 1 種しか無い。
+            // この帯だけタイルを差し替える手は取らない。タイルは 1 種しか無い。
             // ±4.9 は路肩の段（±4.7）のすぐ外。ここより広げると土色が畑の下へ回り込み、
             // 黄金色が道の際で途切れる。実際 ±5.4 で敷いたときは、轍と麦のあいだに
             // 3 m 余りの裸地が延びて、農道ではなく採石場の取り付け道路に見えた
@@ -1175,6 +1183,424 @@ namespace HalfAware.EditorTools
                 Piece(slices[i], "Field", field, loam);
                 Piece(slices[i], "Wheat", wheat, crop);
             }
+            Crofts(slices);
+        }
+
+        // ---- 畑に建つ農家 --------------------------------------------------
+
+        /// <summary>
+        /// 農家ひと構えの間隔。m。片側ぶんの刻みで、左右は半刻みずらす。
+        ///
+        /// **180 を割り切ること。** 割り切らないと、環が一周したところで一構えぶん
+        /// 間隔が飛ぶ（<see cref="Sow"/> が知らせて並べずに飛ばす）。
+        /// 60 なら左右あわせて 30 m にひと構えで、11 m/s で走る独白のあとの 10 秒
+        /// （110 m）に三つ四つが通り過ぎる。原作の「いくつかの家々」の密度
+        /// </summary>
+        const float CroftStep = 60f;
+
+        /// <summary>
+        /// 刻みから前後へばらけさせる幅。m。原作は「好き勝手な間隔で並んでいて」。
+        /// 刻みどおりに並べると、畑に建つ農家ではなく街道沿いの宿場に見える。
+        /// 環の上で畳むので、一周しても並びは繋がったまま
+        /// </summary>
+        const float CroftWobble = 14f;
+
+        /// <summary>
+        /// 母屋の道からの距離。m。
+        ///
+        /// **奥は稜線より内側に留める。** 主な背は道から 78 m のところに出るので
+        /// （<see cref="CrestAt"/> ＋ <see cref="SwellFrom"/>）、そこを越えて置くと
+        /// 丘の裏に落ちて屋根の先だけが覗く。
+        /// 手前は、構えの境（母屋の 10 m ほど手前）が道際の裸地まで下りてこない距離まで
+        /// </summary>
+        const float CroftNear = 22f;
+        const float CroftFar = 48f;
+
+        /// <summary>軒の出。m。白い屋根の下に鼻隠しの暗い線を一本入れて、屋根の縁を読ませる</summary>
+        const float CroftEaves = 0.30f;
+
+        /// <summary>窓と戸口を壁から浮かせる量。m。壁と同じ面に置くと深度で削り合う</summary>
+        const float CroftProud = 0.04f;
+
+        /// <summary>門の口の広さ。m。<see cref="Downs"/> の門と同じ寸法にしてある</summary>
+        const float CroftGate = 3.0f;
+
+        /// <summary>農家ひと構えの割り付け。環の上の位置、道からの距離、左右、描き分けの種</summary>
+        public struct CroftPlot
+        {
+            public float ring;
+            public float from;
+            public float side;
+            public int seed;
+        }
+
+        /// <summary>
+        /// 農家の割り付け。**組み立てとは別に呼べる形にしてある。**
+        ///
+        /// 一構えずつ素材へ焼くので、組み上がった mesh からは一軒ごとの位置が読めない。
+        /// 環が一周したところで並びが飛んでいないかを数で検める術がここしか無く、
+        /// 組み立てのときに控えを静的な入れ物へ残す手は取れない。
+        /// Editor の静的な値はスクリプトを組み直すたびに消えるので、
+        /// 組み直したあとで検めようとすると空になっている。
+        /// 種を決め打ちにして、いつ呼んでも同じ並びを引き直す
+        /// </summary>
+        public static List<CroftPlot> CroftPlan()
+        {
+            var all = new List<CroftPlot>();
+            var rnd = new System.Random(20260922);
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                // 左右で半刻みずらす。揃えると道を挟んで家が対で並び、
+                // 畑に散った農家ではなく門前町の並びになる
+                Sow(CroftStep, CroftWobble, s == 0 ? 0f : CroftStep * 0.5f, rnd, (ring, k) =>
+                    all.Add(new CroftPlot
+                    {
+                        ring = ring,
+                        // 道からの距離は一つおきに手前と奥を引く。**一様に引いてはいけない。**
+                        // 実際、一様に引いたときは片側の三軒が三軒とも 36 m より先に固まり、
+                        // 近くを通り過ぎる家が一軒も無かった。遠い家は畑の向こうの点景で、
+                        // 「家々が通り過ぎる」という絵を作るのは近い家の方
+                        from = Mathf.Lerp(CroftNear, CroftFar, (k % 2 + (float)rnd.NextDouble()) * 0.5f),
+                        side = side,
+                        // 中身には別の乱数を渡す。区切りを索く順に描くことになるので、
+                        // 一つの乱数を使い回すと並べ方を一つ直しただけで集落が丸ごと変わる
+                        seed = rnd.Next(),
+                    }));
+            }
+            return all;
+        }
+
+        /// <summary>
+        /// 農家を焼く先。素材ごとに 1 つ持ち、区切り 1 つぶんをまとめて 1 枚の mesh にする
+        /// </summary>
+        sealed class CroftBanks
+        {
+            /// <summary>漆喰を掛けた石の壁と煙突、石垣の胴</summary>
+            public readonly Bank Wall = new Bank { Texel = 0.3f };
+            /// <summary>白い屋根。母屋も納屋も同じ白で塗る</summary>
+            public readonly Bank Roof = new Bank { Texel = 0.3f };
+            /// <summary>暗いもの。窓・戸口・鼻隠し・笠石・門・生け垣・防風の木立</summary>
+            public readonly Bank Dark = new Bank { Texel = 0.4f };
+        }
+
+        /// <summary>
+        /// 畑に建つ農家。母屋と納屋、構えの境（石垣か生け垣）、門、防風の木立。
+        ///
+        /// 原作の「麦畑を突っ切った先にはいくつかの家々が好き勝手な間隔で並んでいて、
+        /// どれも清潔感のある白い屋根をしている」。**白い屋根は原作が名指しで挙げている
+        /// ただ一つの特徴なので、母屋も納屋も同じ白で塗る。** 黄金色の畑に白が点々と
+        /// 続くことそのものが、この場面の終いの絵になる。
+        ///
+        /// **一軒ずつ物を置いてはいけない。** 区切りごとに素材 3 枚（壁・屋根・暗いもの）へ
+        /// 焼く。市街のビル（<see cref="City"/>）と同じ構えで、置き方も <see cref="Put"/> を
+        /// 通す。物で置けばひと構えに十を越えるレンダラーが要り、この帯は麦だけでもう
+        /// 36 枚ある。焼けば、農家が乗った区切りだけが素材 3 枚ぶん増える。
+        ///
+        /// **麦は避けてくれない。** 株は区切り 1 枚の mesh へ先に焼いてあり、どの区切りでも
+        /// 同じ 1 枚を使い回すので、農家のところだけ株を抜くことはできない。
+        /// 足元が麦に埋まるのはそれで正しい――畑は母屋の壁際まで来ている
+        /// </summary>
+        static void Crofts(Transform[] slices)
+        {
+            var banks = new CroftBanks[slices.Length];
+            for (var i = 0; i < banks.Length; i++) banks[i] = new CroftBanks();
+            foreach (var plot in CroftPlan())
+            {
+                var p = plot;
+                Put(banks, p.ring, (c, z) => Stead(c, new System.Random(p.seed), p.side, p.from, z));
+            }
+
+            // 漆喰を掛けた石の壁。**石そのものの色（<see cref="Mat"/> の Stone、0.165）では暗すぎる。**
+            // あちらは薄明の帯のために置いた値で、この帯は日射しが 1.46 倍で入る。
+            // 黄金色の畑（画面で 177,145,75）の中に 0.165 の壁を置くと、屋根の下が
+            // 影絵になって、白い屋根だけが畑に浮いて見える
+            var harl = CityMat("CroftHarl", new Color(0.300f, 0.286f, 0.258f), 0.06f);
+            // 白い屋根。原作の「清潔感のある白い屋根」。**壁より確かに明るくする。**
+            //
+            // 0.556 で置いたときは、日を受ける流れが霧を通したところで画面 213、
+            // 壁が 184 にしかならず、屋根と壁が同じ一枚の灰色に見えた。
+            // 霧（20 m で 15%、40 m で 27%）がどちらも靄の白へ寄せるので、
+            // 素の色の差はそのぶん詰まる。詰まったあとで差が残る値にしてある。
+            // 棟を境に片流れずつ明暗が割れるので、屋根そのものが日の向きを教える
+            var lime = CityMat("CroftRoof", new Color(0.630f, 0.626f, 0.600f), 0.10f);
+            // 暗いもの。窓の硝子も生け垣も木立も、この距離では暗い塊としてしか読めない。
+            // 一枚にまとめれば素材が増えない。わずかに緑へ寄せてあるのは、
+            // 木立と生け垣の方が量として多いため。
+            //
+            // **0.062 では穴になる。** 右手の構えは道を向いた面に日が回らないので
+            // （日は後ろ寄りの右から差す）、家も垣も木立もまとめて日陰に入る。
+            // そこへ真っ黒に近い素材を置くと、脇を過ぎるあいだ右の畑に黒い帯が乗る。
+            // 0.085 まで上げても、硝子は日の当たる壁（画面 184）に対して 49〜95 に留まり、
+            // 窓が窓として読める暗さは変わらない
+            var shade = CityMat("CroftShade", new Color(0.085f, 0.095f, 0.072f), 0.08f);
+
+            for (var i = 0; i < slices.Length; i++)
+            {
+                // Emit は面が 1 枚も無ければ何も置かない。農家の乗らない区切りには
+                // レンダラーが増えない
+                banks[i].Wall.Emit(slices[i], "CroftHarl" + i, harl, false, Generated);
+                banks[i].Roof.Emit(slices[i], "CroftRoof" + i, lime, false, Generated);
+                banks[i].Dark.Emit(slices[i], "CroftShade" + i, shade, false, Generated);
+            }
+        }
+
+        /// <summary>
+        /// ひと構え。母屋を据えて、納屋と境と門と木立をその周りへ置く。
+        ///
+        /// 向きは左右で変える。**日射しの向きが決まっているので、揃えると片側が丸損になる。**
+        ///
+        /// 日は後ろ寄りの右（方位 298 度）から差すので、明るいのは +x を向いた面
+        /// （日射しの 86%）と -z を向いた面（46%）だけ。
+        /// 左手の家は棟を道と平行にすれば、道を向いた屋根の流れが +x を向いて明るい。
+        /// 右手の家は同じことをすると道を向いた流れが -x になり、白い屋根がどこにも
+        /// 出ない。実際に組んで見たところ、右手の家は屋根も壁も日陰の一色の塊だった。
+        /// 棟を道と直交させれば、近づいてくるあいだ見えている流れが -z を向いて明るく、
+        /// 戸口の並ぶ面も同じ -z を向く。
+        ///
+        /// それでも四軒に一軒ほどは逆を取る。全部を同じ向きに揃えると、
+        /// 畑に並んだ家がどれも同じ角度の同じ絵になる
+        /// </summary>
+        static void Stead(CroftBanks c, System.Random rnd, float side, float from, float at)
+        {
+            var cross = rnd.NextDouble() < (side < 0f ? 0.28 : 0.78);
+            var turn = (cross ? 90f : side < 0f ? 0f : 180f) + ((float)rnd.NextDouble() - 0.5f) * 44f;
+            var rot = Quaternion.Euler(0f, turn, 0f);
+
+            // 母屋。軒は低く、棟は高く取る。イギリスの田舎家は一階半で、
+            // 二階の窓は妻の面に出る
+            var wide = 7.0f + (float)rnd.NextDouble() * 3.2f;
+            var deep = 5.6f + (float)rnd.NextDouble() * 2.0f;
+            Roost(c, rnd, new Vector3(Lane(from * side), 0f, at), rot,
+                wide, deep, 2.95f + (float)rnd.NextDouble() * 0.55f, 2.0f + (float)rnd.NextDouble() * 0.9f, true);
+
+            // 納屋。**母屋と平行にしない。** 揃えると二棟が一つの長い建屋に見えて、
+            // 農家ではなく倉庫になる。道から見て母屋の向こうへ置くので、
+            // 手前の構えが納屋に塞がれることもない
+            if (rnd.NextDouble() < 0.80)
+            {
+                var back = from + 3.2f + (float)rnd.NextDouble() * 7.5f;
+                var along = at + (rnd.Next(2) == 0 ? -1f : 1f) * (7f + (float)rnd.NextDouble() * 6f);
+                Roost(c, rnd, new Vector3(Lane(back * side), 0f, along),
+                    Quaternion.Euler(0f, turn + 90f + ((float)rnd.NextDouble() - 0.5f) * 40f, 0f),
+                    5.0f + (float)rnd.NextDouble() * 2.0f, 8.0f + (float)rnd.NextDouble() * 4.0f,
+                    2.5f + (float)rnd.NextDouble() * 0.5f, 1.4f + (float)rnd.NextDouble() * 0.6f, false);
+            }
+
+            // 構えの境と門。道の側へ一筋通す。**門の口は必ず空ける。**
+            // 一本の垣で塞ぐと、農家ではなく畑の囲いになって、そこに人が住んでいる
+            // ことが読めない。道から農道が入る口があって初めて構えになる
+            Bound(c, rnd, side, Mathf.Max(10f, from - wide * 0.5f - 3.5f - (float)rnd.NextDouble() * 3f), at,
+                12f + (float)rnd.NextDouble() * 6f, rnd.NextDouble() < 0.58);
+
+            // 防風の木立。**麦の丈（1 m 前後）を確かに越える背があるのはこれと建屋だけ。**
+            // 石垣は畑に沈んでほとんど見えないので、構えの輪郭を上で作るのは木立の役。
+            // 北の風を切るので、農家の一方の側へ寄せて並べる
+            var grove = 1 + rnd.Next(3);
+            var groveAt = from + 2f + (float)rnd.NextDouble() * 9f;
+            var groveZ = at + (rnd.Next(2) == 0 ? -1f : 1f) * (5f + (float)rnd.NextDouble() * 5f);
+            for (var t = 0; t < grove; t++)
+                Shelter(c, rnd, groveAt + ((float)rnd.NextDouble() - 0.5f) * 5f,
+                    groveZ + (t - (grove - 1) * 0.5f) * (3.4f + (float)rnd.NextDouble() * 1.6f), side);
+        }
+
+        /// <summary>
+        /// 建屋 1 棟。漆喰の壁に切妻の白い屋根。
+        ///
+        /// **窓は道を向いた面と妻の両面に並べる。** 車は原点で +z を向いたまま動かないので、
+        /// 近づいてくるあいだ画面に入るのは妻の面、脇を過ぎるときは道を向いた面になる。
+        /// 棟を横にした家では役割が入れ替わるだけで、どちらも要る。
+        ///
+        /// home が false なら納屋。窓は持たず、道を向いた面に大きな戸口がひとつ
+        /// </summary>
+        static void Roost(CroftBanks c, System.Random rnd, Vector3 at, Quaternion rot,
+            float wide, float deep, float eave, float rise, bool home)
+        {
+            var w = wide * 0.5f;
+            var d = deep * 0.5f;
+            // **斜面に建つので、一点だけ測って据えてはいけない。** 畑は 1 m につき
+            // 0.2 m 落ちるところがあり、間口 10 m の建屋では隅どうしで 1 m 以上違う。
+            // 足元は一番低い隅の下まで下ろし、軒と窓は一番高い隅から測る。
+            // 均すと、上り側で壁が畑に埋まるか、下り側で床が畑から浮く
+            float low, high;
+            Footing(at, rot, w, d, out low, out high);
+            var foot = low - 0.7f;
+            var top = high + eave;
+            var peak = top + rise;
+            System.Func<float, float, float, Vector3> P = (lx, ly, lz) => at + rot * new Vector3(lx, ly, lz);
+
+            // 壁。天と底は張らない。天は屋根が覆い、底は畑の下にある
+            c.Wall.Quad(P(w, foot, d), P(w, foot, -d), P(w, top, -d), P(w, top, d));
+            c.Wall.Quad(P(-w, foot, -d), P(-w, foot, d), P(-w, top, d), P(-w, top, -d));
+            c.Wall.Quad(P(-w, foot, d), P(w, foot, d), P(w, top, d), P(-w, top, d));
+            c.Wall.Quad(P(w, foot, -d), P(-w, foot, -d), P(-w, top, -d), P(w, top, -d));
+            // 妻。三角形なので、四隅のうち二つを棟の一点に重ねる
+            c.Wall.Quad(P(-w, top, d), P(w, top, d), P(0f, peak, d), P(0f, peak, d));
+            c.Wall.Quad(P(w, top, -d), P(-w, top, -d), P(0f, peak, -d), P(0f, peak, -d));
+
+            // 屋根。軒の出のぶんだけ流れを伸ばすので、軒先は壁の天より下へ垂れる
+            var ex = w + CroftEaves;
+            var ey = peak - rise / w * ex;
+            var ez = d + CroftEaves;
+            c.Roof.Quad(P(0f, peak, ez), P(ex, ey, ez), P(ex, ey, -ez), P(0f, peak, -ez));
+            c.Roof.Quad(P(-ex, ey, ez), P(0f, peak, ez), P(0f, peak, -ez), P(-ex, ey, -ez));
+            // 鼻隠し。**白い屋根と白い空のあいだに線が要る。** 朝靄で地平が白く飛ぶので、
+            // 縁の無い白い屋根は靄に溶けて、屋根の形そのものが読めなくなる
+            c.Dark.Quad(P(ex, ey - 0.16f, ez), P(ex, ey - 0.16f, -ez), P(ex, ey, -ez), P(ex, ey, ez));
+            c.Dark.Quad(P(-ex, ey - 0.16f, -ez), P(-ex, ey - 0.16f, ez), P(-ex, ey, ez), P(-ex, ey, -ez));
+
+            if (home)
+            {
+                // 煙突。妻の上へ立てる。片方だけの家も混ぜる
+                for (var s = 0; s < 2; s++)
+                {
+                    if (s == 1 && rnd.NextDouble() < 0.45) continue;
+                    var stack = 1.0f + (float)rnd.NextDouble() * 0.8f;
+                    var cz = (s == 0 ? 1f : -1f) * (d - 0.40f);
+                    c.Wall.Box(P(0f, peak - 0.4f + stack * 0.5f, cz),
+                        new Vector3(0.80f, stack + 0.8f, 0.74f), rot);
+                }
+                // 道を向いた面の窓と戸口。一階半なので窓は一段しか入らない
+                var cols = wide > 8.4f ? 3 : 2;
+                for (var k = 0; k < cols; k++)
+                    Sash(c.Dark, P, w + CroftProud,
+                        Mathf.Lerp(-d + 1.15f, d - 1.15f, k / (float)(cols - 1)), 0.84f, high + 0.95f, 1.10f);
+                var dk = rnd.Next(cols - 1);
+                Sash(c.Dark, P, w + CroftProud,
+                    Mathf.Lerp(-d + 1.15f, d - 1.15f, (dk + 0.5f) / (cols - 1)), 0.92f, high, 1.98f);
+                // 妻の面。下は一階、上は屋根裏の窓
+                for (var s = 0; s < 2; s++)
+                {
+                    var gz = (s == 0 ? 1f : -1f) * (d + CroftProud);
+                    Gable(c.Dark, P, gz, s == 0, 0.86f, high + 0.95f, 1.10f);
+                    Gable(c.Dark, P, gz, s == 0, 0.80f, top + 0.30f, 0.86f);
+                }
+            }
+            else
+            {
+                // 納屋の戸口。大きく開けて暗く落とす。壁の面に一つ暗い口があるだけで、
+                // 窓の無い箱が納屋に見える
+                Sash(c.Dark, P, w + CroftProud, 0f, Mathf.Min(3.2f, wide * 0.46f),
+                    high, Mathf.Min(eave - 0.35f, 2.6f));
+            }
+        }
+
+        /// <summary>
+        /// 建屋の足元。footprint の四隅と中を測って、畑の面の一番低いところと
+        /// 一番高いところを返す。<see cref="Land"/> は道からの距離と区切りの中の z で引く
+        /// </summary>
+        static void Footing(Vector3 at, Quaternion rot, float w, float d, out float low, out float high)
+        {
+            low = float.MaxValue;
+            high = float.MinValue;
+            for (var i = -1; i <= 1; i++)
+                for (var k = -1; k <= 1; k++)
+                {
+                    var p = at + rot * new Vector3(w * i, 0f, d * k);
+                    var y = Turf(p.x, p.z);
+                    low = Mathf.Min(low, y);
+                    high = Mathf.Max(high, y);
+                }
+        }
+
+        /// <summary>畑の面の高さ。x は世界の x、z は区切りの中の z</summary>
+        static float Turf(float x, float z)
+        {
+            return FieldY + Land(Mathf.Abs(x - LaneOffset), z);
+        }
+
+        /// <summary>局所の +x を向いた面に貼る一枚。窓も戸口も納屋の口もこれで置く</summary>
+        static void Sash(Bank bank, System.Func<float, float, float, Vector3> P,
+            float x, float z, float wide, float y0, float high)
+        {
+            var h = wide * 0.5f;
+            bank.Quad(P(x, y0, z + h), P(x, y0, z - h), P(x, y0 + high, z - h), P(x, y0 + high, z + h));
+        }
+
+        /// <summary>妻の面に貼る一枚。plus が true なら +z の側</summary>
+        static void Gable(Bank bank, System.Func<float, float, float, Vector3> P,
+            float z, bool plus, float wide, float y0, float high)
+        {
+            var h = wide * 0.5f;
+            if (plus) bank.Quad(P(-h, y0, z), P(h, y0, z), P(h, y0 + high, z), P(-h, y0 + high, z));
+            else bank.Quad(P(h, y0, z), P(-h, y0, z), P(-h, y0 + high, z), P(h, y0 + high, z));
+        }
+
+        /// <summary>
+        /// 構えの境。石垣か生け垣を道と平行に一筋、真ん中を門のぶんだけ空けて。
+        ///
+        /// **石垣は <see cref="Downs"/> の石垣と同じ組み方にする。** 厚み 0.46 の胴に
+        /// 0.54 の笠石。あちらは牧草地の境でこちらは畑の境だが、同じ地方の同じ石を
+        /// 積んだものなので、寸法を違えると別の土地の垣に見える。
+        /// 背だけは 0.80 から 1.25 へ上げた。麦の丈が 1 m 前後あるので、
+        /// あの背では畑に丸ごと沈んで一本の線も出ない。
+        ///
+        /// 笠石を暗い方の素材で焼くのは、市街の軒（<see cref="Raise"/>）と同じ理由。
+        /// 胴と同じ色では、麦の穂先から出ている僅か 20 cm が壁として読めない。
+        ///
+        /// 生け垣を混ぜるのは背のため。1.7 m あれば麦を確かに越える
+        /// </summary>
+        static void Bound(CroftBanks c, System.Random rnd, float side, float from, float at, float run, bool hedge)
+        {
+            var x = Lane(from * side);
+            var thick = hedge ? 1.05f : 0.46f;
+            var stand = hedge ? 1.62f + (float)rnd.NextDouble() * 0.34f : 1.25f;
+            for (var s = 0; s < 2; s++)
+            {
+                var a0 = s == 0 ? at - run * 0.5f : at + CroftGate * 0.5f;
+                var a1 = s == 0 ? at - CroftGate * 0.5f : at + run * 0.5f;
+                if (a1 - a0 < 0.6f) continue;
+                // **一続きの箱で置かない。** 麦の穂先から出ているのは上の 20〜60 cm だけなので、
+                // 一本の水平な線として出る。そこが一分の狂いも無く真っ直ぐだと、
+                // 生け垣でも石垣でもなく畑に置いた板に見える。
+                // 3 つに割って背をわずかに振ると、天端が凸凹になる
+                var lumps = Mathf.Max(1, Mathf.RoundToInt((a1 - a0) / 4.5f));
+                for (var q = 0; q < lumps; q++)
+                {
+                    var z0 = Mathf.Lerp(a0, a1, q / (float)lumps);
+                    var z1 = Mathf.Lerp(a0, a1, (q + 1) / (float)lumps);
+                    // 斜面に乗るので、胴は一番低いところまで下ろし、天は一番高いところから測る
+                    var low = Mathf.Min(Turf(x, z0), Mathf.Min(Turf(x, (z0 + z1) * 0.5f), Turf(x, z1)));
+                    var top = Mathf.Max(Turf(x, z0), Mathf.Max(Turf(x, (z0 + z1) * 0.5f), Turf(x, z1)))
+                        + stand * (0.88f + (float)rnd.NextDouble() * 0.24f);
+                    var mid = (z0 + z1) * 0.5f;
+                    var bank = hedge ? c.Dark : c.Wall;
+                    bank.Box(new Vector3(x, (low - 0.4f + top) * 0.5f, mid),
+                        new Vector3(thick, top - low + 0.4f, z1 - z0 + 0.06f));
+                    if (!hedge)
+                        c.Dark.Box(new Vector3(x, top + 0.05f, mid),
+                            new Vector3(thick + 0.08f, 0.10f, z1 - z0 + 0.06f));
+                }
+            }
+            // 門。**<see cref="Downs"/> の門と同じ寸法。** 二本の柱に三本の横木
+            var foot = Turf(x, at) - 0.10f;
+            for (var i = 0; i < 2; i++)
+                c.Dark.Box(new Vector3(x, foot + 0.62f, at + (i == 0 ? -1f : 1f) * CroftGate * 0.5f),
+                    new Vector3(0.16f, 1.24f, 0.16f));
+            for (var i = 0; i < 3; i++)
+                c.Dark.Box(new Vector3(x, foot + 0.34f + i * 0.34f, at),
+                    new Vector3(0.07f, 0.07f, CroftGate));
+        }
+
+        /// <summary>
+        /// 防風の木立 1 本。<see cref="TreeMesh"/> と同じ考えで、塊だけを積む。
+        /// 逆光でも順光でも、この距離では枝葉は一つの暗い塊にしかならない
+        /// </summary>
+        static void Shelter(CroftBanks c, System.Random rnd, float from, float at, float side)
+        {
+            var x = Lane(from * side);
+            var foot = Turf(x, at) - 0.2f;
+            var high = 3.4f + (float)rnd.NextDouble() * 2.2f;
+            var turn = Quaternion.Euler(0f, (float)rnd.NextDouble() * 90f, 0f);
+            c.Dark.Box(new Vector3(x, foot + high * 0.30f, at), new Vector3(0.36f, high * 0.60f, 0.36f));
+            for (var i = 0; i < 3; i++)
+            {
+                var wide = (2.3f - i * 0.55f) * (0.8f + (float)rnd.NextDouble() * 0.4f);
+                c.Dark.Box(new Vector3(x + ((float)rnd.NextDouble() - 0.5f) * 0.6f,
+                        foot + high * 0.52f + i * high * 0.17f,
+                        at + ((float)rnd.NextDouble() - 0.5f) * 0.6f),
+                    new Vector3(wide, high * 0.22f, wide), turn);
+            }
         }
 
         /// <summary>
@@ -1250,6 +1676,26 @@ namespace HalfAware.EditorTools
             }
             for (var k = 0; k < count; k++)
                 Drop(slices, k * spacing + phase + ((float)rnd.NextDouble() - 0.5f) * 2f * wobble, k, put);
+        }
+
+        /// <summary>
+        /// <see cref="Scatter"/> の mesh 版。物を置かずに、環の上の位置だけを返す。
+        ///
+        /// 素材へ焼く沿道は区切りの Transform を先に決められないので、位置を受け取った側が
+        /// <see cref="Put"/> で区切りへ割る。割り切るかどうかの見方は Scatter と同じで、
+        /// 環の長さを割り切らない刻みは並べずに飛ばす
+        /// </summary>
+        static void Sow(float spacing, float wobble, float phase, System.Random rnd,
+            System.Action<float, int> put)
+        {
+            var count = Mathf.RoundToInt(Span / spacing);
+            if (spacing <= 0f || count <= 0 || Mathf.Abs(count * spacing - Span) > 0.001f)
+            {
+                Debug.LogWarning(string.Format("沿道の間隔 {0} m が環の長さ {1} m を割り切らない。並べずに飛ばす", spacing, Span));
+                return;
+            }
+            for (var k = 0; k < count; k++)
+                put(k * spacing + phase + ((float)rnd.NextDouble() - 0.5f) * 2f * wobble, k);
         }
 
         /// <summary>環の上の位置を、区切りの番号と区切りの中の z に割る</summary>
