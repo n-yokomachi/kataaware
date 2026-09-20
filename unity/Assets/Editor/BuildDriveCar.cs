@@ -14,6 +14,19 @@ namespace HalfAware.EditorTools
     /// </summary>
     public static partial class BuildDrive
     {
+        // ---- 風防。メートル --------------------------------------------------
+        //
+        // ガラスと、その上に乗る水と、水を拭うワイパーの三つが同じ面に並ぶので、
+        // 面の寸法はここ一箇所に置く。三つのどれか一つだけ動かすと、
+        // 水が浮くかワイパーがガラスを突き抜ける
+
+        /// <summary>風防の中心</summary>
+        public static readonly Vector3 GlassAt = new Vector3(0f, 1.590f, 0.905f);
+        /// <summary>風防の幅と丈と厚み</summary>
+        public static readonly Vector3 GlassSize = new Vector3(1.66f, 0.63f, 0.02f);
+        /// <summary>風防の傾き。上を後ろへ 10 度倒す</summary>
+        public static readonly Quaternion GlassLean = Quaternion.Euler(-10f, 0f, 0f);
+
         // ---- 車内 ----------------------------------------------------------
 
         /// <summary>
@@ -62,7 +75,7 @@ namespace HalfAware.EditorTools
             // 古いオフロード車のガラスはほとんど立っているので、乗用車の 22 度から 10 度へ起こした。
             // 起こすと同じ間口でもガラスが縦に広がり、天井の縁が視界から退く。
             // 上の縁は天井の板の中へ差し込む。背を縮めずに下げると、下の縁が計器盤から離れて隙間が開く
-            glass.Box(new Vector3(0f, 1.590f, 0.905f), new Vector3(1.66f, 0.63f, 0.02f), Quaternion.Euler(-10f, 0f, 0f));
+            glass.Box(GlassAt, GlassSize, GlassLean);
             // ドアの内張り。上端 1.30 を計器盤の天板と揃える。腰の線が左右と前で一本に通ると箱に見える
             for (var s = 0; s < 2; s++) DoorCard(trim, steel, gap, s == 0 ? -1f : 1f);
             Pillars(trim);
@@ -147,6 +160,142 @@ namespace HalfAware.EditorTools
             eye.localRotation = Quaternion.identity;
 
             Arms(parent);
+            Rain(parent);
+        }
+
+        // ---- 風防の雨 --------------------------------------------------------
+
+        /// <summary>ワイパーの軸の高さ。風防の中心から下へ。下の縁の 2 cm 上</summary>
+        const float WiperY = -0.295f;
+        /// <summary>ワイパーの軸の x。運転席側と助手席側。二枚とも同じ向きに振る</summary>
+        const float WiperNear = 0.36f;
+        const float WiperFar = -0.30f;
+        /// <summary>ガラスの外面から羽根までと、羽根から水の板まで。風防の面に立てた法線の向き</summary>
+        const float BladeOut = 0.018f;
+        const float FilmOut = 0.034f;
+
+        /// <summary>
+        /// 風防に付いた雨と、それを拭うワイパー。**帯 1（夜の高速）でだけ出す。**
+        ///
+        /// 入れ物ひとつ（Rain）に収めて伏せておく。出し入れは DriveDirector がやる。
+        ///
+        /// **車の外に粒を降らせない。** 運転席からの一人称なので、走行中の画面は
+        /// ほとんど風防で埋まっている。目から 1 m 先を落ちる粒は 1 フレームで画面を
+        /// 横切るから 427 × 240 では線にもならず、粒を増やすほど WebGL が重くなるだけになる。
+        /// 雨が降っていると分かるのはガラスの側で、乗った水と羽根の二つで足りる。
+        ///
+        /// 水は板一枚（<see cref="Pane"/>）で、粒も筋も薄膜も画素ごとに起こす
+        /// （<c>HalfAware/Screenwater</c>）。絵も持たないし、粒ひとつに mesh も立てない。
+        /// 三角は水の板が 2 枚、羽根が 36 枚ずつで、合わせて 74 枚しかない。
+        ///
+        /// **羽根は伏せたところではボンネットの陰に隠れる。** 軸を下の縁へ置いてあるので、
+        /// 伏せた角（-84 度）では道の見え始める縁（<see cref="SightY"/>）よりずっと下にあり、
+        /// 振り上げるにつれてボンネットの向こうから現れる。実際の車もそう見える。
+        /// 見直し 14 が測っているのはこの伏せた姿勢の方
+        /// </summary>
+        static void Rain(Transform parent)
+        {
+            var rain = Child(parent, "Rain");
+            rain.localPosition = GlassAt;
+            rain.localRotation = GlassLean;
+
+            // 羽根。腕も羽根も 1 つの mesh に焼いて、2 本で使い回す。
+            // レンダラーを増やさないよう、塗った鉄でまとめて塗る。夜の空（0.115）より
+            // 暗く沈むので、空を横切っても路面を横切っても影として読める
+            var shape = Shape("CarWiper", 2.2f, Blade);
+            var arms = new Transform[2];
+            for (var i = 0; i < arms.Length; i++)
+            {
+                var arm = Piece(rain, "Wiper" + i, shape, Mat("CarSteel"));
+                arm.localPosition = new Vector3(i == 0 ? WiperNear : WiperFar, WiperY, BladeOut);
+                arms[i] = arm;
+            }
+
+            // 水。ガラスと同じ間口に板を一枚。羽根より外へ置く。
+            // 内へ入れると羽根が水に霞んで、ガラスの内側を拭いているように見える
+            var film = Piece(rain, "Film", Pane("CarWater", GlassSize.x, GlassSize.y), WaterMat());
+            film.localPosition = new Vector3(0f, 0f, FilmOut);
+
+            var run = rain.GetComponent<Wipers>();
+            if (run == null) run = rain.gameObject.AddComponent<Wipers>();
+            var so = new SerializedObject(run);
+            Fill(so.FindProperty("blades"), arms);
+            so.ApplyModifiedPropertiesWithoutUndo();
+            // 伏せた角へ据えておく。組み上がった場面はまだガレージの中で、
+            // 雨も降っていない。エディタで開いたときの見え方も組み立ての責任
+            run.Set(-Mathf.PI * 0.5f, 0f);
+            rain.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// ワイパー 1 本。軸を原点に、真上（+y）へ伸ばす。振るのは <see cref="Wipers"/>。
+        ///
+        /// 軸の覆い・腕・羽根の三つに割る。一本の棒だと、この解像度でも
+        /// 画面を横切る 4 画素の直線にしかならず、車に付いている物に見えない。
+        /// 羽根だけガラス寄りへ 1.2 cm 下げて、腕から浮かせる
+        /// </summary>
+        static void Blade(Bank bank)
+        {
+            bank.Box(new Vector3(0f, 0.012f, 0.004f), new Vector3(0.044f, 0.044f, 0.024f));
+            bank.Box(new Vector3(0f, 0.145f, 0.008f), new Vector3(0.018f, 0.230f, 0.014f));
+            bank.Box(new Vector3(0f, 0.295f, -0.004f),
+                new Vector3(0.026f, Wipers.Reach - 0.09f, 0.018f));
+        }
+
+        /// <summary>
+        /// 立てた板 1 枚。uv は板の中心を原点にしたメートルで振る。
+        ///
+        /// <see cref="Card"/> と同じ手だが、あちらは寝かせた板で、uv も左下を原点に取る。
+        /// 風防の水は軸からの角と距離で拭い跡を出すので、原点が中心に来ていないと
+        /// ワイパーの軸の位置を渡せない。
+        ///
+        /// **四隅だけで張る。** 中を割ると、割った先の頂点が道の見える縁
+        /// （<see cref="SightY"/>）とガラスの上の縁のあいだに落ちて、見直し 14 が鳴る
+        /// </summary>
+        static Mesh Pane(string name, float wide, float high)
+        {
+            var hw = wide * 0.5f;
+            var hh = high * 0.5f;
+            return Shape(name, 1f, b => b.Patch(
+                new Vector3(hw, -hh, 0f), new Vector3(-hw, -hh, 0f),
+                new Vector3(-hw, hh, 0f), new Vector3(hw, hh, 0f),
+                new Vector2(hw, -hh), new Vector2(-hw, -hh),
+                new Vector2(-hw, hh), new Vector2(hw, hh)));
+        }
+
+        /// <summary>
+        /// 風防に乗った水のマテリアル。
+        ///
+        /// 色は線形で置く（<see cref="Paint"/> と同じ）。夜の空が 0.115 なので、
+        /// 粒は倍ほど明るくないと 427 × 240 では空に紛れる。街灯の橙を粒が集めるので、
+        /// 灰色そのものではなく暖色へ寄せてある。
+        ///
+        /// 薄膜（_Veil）は薄く。一様に濃くすると窓ではなく曇りガラスになり、
+        /// 道も対向車も霞んで場面が読めなくなる。見せているのは粒と筋の方
+        /// </summary>
+        static Material WaterMat()
+        {
+            var shader = Shader.Find("HalfAware/Screenwater");
+            if (shader == null) Debug.LogWarning("HalfAware/Screenwater が見つからない。風防に水が乗らない");
+            var path = Materials + "CarWater.mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                m = new Material(shader);
+                m.name = "CarWater";
+                AssetDatabase.CreateAsset(m, path);
+            }
+            m.shader = shader;
+            m.SetColor("_BaseColor", new Color(0.30f, 0.28f, 0.25f, 1f));
+            m.SetFloat("_Veil", 0.12f);
+            m.SetFloat("_Bead", 0.42f);
+            m.SetFloat("_Rill", 0.45f);
+            m.SetFloat("_Grain", 12f);
+            m.SetFloat("_Runs", 7f);
+            m.SetFloat("_Flow", 0.9f);
+            m.SetFloat("_Creep", 0.06f);
+            EditorUtility.SetDirty(m);
+            return m;
         }
 
         /// <summary>
