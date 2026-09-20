@@ -228,7 +228,7 @@ namespace HalfAware
 `run_tests`（EditMode）→ `get_test_job`。
 Expected: `failed: 0`。既存の 261 件に 6 件足して 267 件。
 
-- [ ] **Step 6: commit**
+- [ ] **Step 7: commit**
 
 ```bash
 git add unity/Assets/Scripts/Data/DriveBand.cs unity/Assets/Scripts/Data/DriveBand.cs.meta unity/Assets/Tests/EditMode/DriveRouteTests.cs unity/Assets/Tests/EditMode/DriveRouteTests.cs.meta
@@ -1771,7 +1771,7 @@ Oncoming/
 
 形はすべて `Bank.Box` の組み合わせで済ませる。細部はオーナーが実画面を見てから詰めるので、ここでは輪郭だけ作る。
 
-- [ ] **Step 4: 組み立ててコンパイルを通す**
+- [ ] **Step 5: 組み立ててコンパイルを通す**
 
 `mcpforunity://editor/state` を確かめてから `execute_menu_item`（`HalfAware/Build the drive`）。
 `read_console`（types: error, warning）。
@@ -1895,7 +1895,20 @@ git commit -m "feat: park the car in the garage and give me things to look at"
 - Modify: `unity/Assets/Editor/BuildDrive.cs`
 - Modify: `unity/Assets/Scripts/Flow/DriveDirector.cs`
 
-- [ ] **Step 1: 視線移動を繋ぐ**
+- [ ] **Step 1: 乗り込む前に車へ入れないようにする／暗転の字を明朝へ戻す**
+
+**車に当たり判定が無い。** Task 8 は歩くプレイヤーが居なかったので `collide: false` で作ってある。そのままだとガレージで車体をすり抜けられ、目線 1.64 が屋根の面（1.49〜1.55）を貫く。
+
+塞ぐ箱を **`Car` ではなく `Drive/Garage` の下に**置く。おおよそ x ±0.90、y 0.04〜1.55、z -0.70〜0.93。`Garage` の下に置けば `garage.SetActive(false)` で乗り込んだ瞬間に消えるので、座ったあとの `CharacterController` が生きた当たり判定の中に座ることにならない。場面 1 の `SceneFlow.chairBlocker` と同じ考え方。
+
+これは見た目の話ではなく**進行の話でもある**。常時出している `drive.radio` / `drive.pocket` / `drive.fuel` は、車の外の立てる位置から 0.71〜1.04 m で届いてしまう。`once: true` なので乗る前に読んでしまうと、走行中は二度と出ない。
+
+**`Center` 層のフォントが違う。** 暗転に出る「続く」が Noto Sans になっている。`Alley.unity` も `Room.unity` も `Center` だけ `Assets/Fonts/ShipporiMincho-Regular SDF.asset` を使い、ほかの層は Noto Sans。台詞はゴシック、暗転中の字は明朝、という取り決めのとおりに直す。
+`FontPath` の隣に明朝の定数を足し、`Center` にだけ渡す。
+
+**`Stage()` の取り残し。** `Rig()` が必ず `Player/Main Camera` を作るようになったので、`Loose("Main Camera")` と `if (rig == null)` の分岐はもう通らない。落として、カメラはリグのもので描画の設定だけここで見る、と書き直す。
+
+- [ ] **Step 2: 視線移動を繋ぐ**
 
 `unity/Assets/Scripts/Player/HeadTurn.cs` と `EyeSway.cs` を読み、`Alley.unity` でプレイヤーにどう付いているかを `execute_code` で調べる。
 
@@ -1909,7 +1922,7 @@ return report;
 
 同じ並びを `BuildDrive` のプレイヤーにも作る。車内では移動しないので `PlayerController.CanMove` は乗り込んだ時点で false になるが、**見回しは効いたままにする**（`AlleyDirector.Seat()` と同じで、`CanMove` は移動だけを止める）。乗り込んだあと見回せることを Task 12 の通しで確かめる。
 
-- [ ] **Step 2: 車体の揺れを繋ぐ**
+- [ ] **Step 3: 車体の揺れを繋ぐ**
 
 **目の位置は自分で書かない。** `PlayerController` が毎フレーム `eye.localPosition = new Vector3(0f, EyeHeight, eyeLead) + EyeOffset` と書き直しているので、`localPosition` を直に触ると上書きされるか、こちらが勝った場合は `EyeHeight` を初回の値で固めてしまう。`EyeSway` の説明文がその理由をそのまま書いている。
 
@@ -1935,7 +1948,7 @@ return report;
 
 **`DriveWorld` に `[DefaultExecutionOrder(-20)]` を付ける。** 既定の 0 のままだと `PlayerController`（-10）がそのフレームの `EyeOffset` を読んだ後に書くことになり、揺れが 1 フレーム遅れる。`EyeSway` と同じ -20 にすれば `DriveDirector`（-5）より先に走るので、帯を跨ぐフレームでは古い走行距離で進んだ後に `DriveDirector` が巻き戻して置き直す。描画はその後なので食い違わない。
 
-- [ ] **Step 3: 前腕を出す**
+- [ ] **Step 4: 前腕を出す**
 
 `unity/Assets/Scripts/Player/Forearm.cs` と `ForearmView.cs` を読む。場面 1 でどう置いているかを `BuildProps.cs` か `BuildAlley.cs` で調べ、同じ作りで運転席に置く。
 
@@ -1969,7 +1982,7 @@ if (onWheel != null) onWheel.SetActive(driving);
 `read_console`（types: error）。
 Expected: 0 件。
 
-- [ ] **Step 5: テストを走らせる**
+- [ ] **Step 6: テストを走らせる**
 
 Expected: `failed: 0`。298 件のまま。テストは足していない。
 
@@ -1994,7 +2007,7 @@ git commit -m "feat: let me look around, feel the road, and fold my arms"
 
 - [ ] **Step 1: 実装する**
 
-`[MenuItem("HalfAware/Check the drive", false, 235)]` と `public static void Run(Transform root)` を置く。見るのは次の 9 つで、それぞれ問題の数を返す。
+`[MenuItem("HalfAware/Check the drive", false, 235)]` と `public static void Run(Transform root)` を置く。見るのは次の 11 個で、それぞれ問題の数を返す。
 
 1. **タイルの環** — ここで見るのは `RoadRing` の計算ではなく、**シーンに立っている実物**。計算そのものは `RoadRingTests` が 601 点で確かめているので、ここで数え直しても落ちない。見るのは次の三つ。
    - タイルの入れ物に空きや欠けが無いか。空きがあると 20 m の穴が環に乗って回り、16 m/s なら 11 秒ごとに正面へ飛んでくる
@@ -2007,7 +2020,9 @@ git commit -m "feat: let me look around, feel the road, and fold my arms"
 6. **帯ときっかけの対応** — `DriveDirector.bands` の `trigger` が `DriveIds.Triggers` と同じ並びか、どの帯にもちょうど一つ割り当たっているか。欠けていたら「〈帯の名前〉にきっかけが無い」、重複していたら「きっかけが二つの帯で使われている: id」。警告に数字でなく `DriveBand.name` を出すのは、オーナーが 1 始まりの設計書を横に置いて読むため。`name` の説明にも「ログと見直しで使う」と書いてある
 7. **きっかけの対象がシーンにあるか** — `bands[i].trigger` と同じ id の `Interactable` が `triggers[i]` の下にあるか
 8. **文面の数が揃っているか** — `WriteDriveScript` の `BandPages` / `TriggerLines` / `TriggerLabels` の長さが`DriveIds.Triggers.Count` と同じか。`Triggers` が減ったときに、余った文が黙って書き出されなくなるのを捕まえる。EditMode テストからは `Assembly-CSharp-Editor` の中が見えないので、ここでしか見られない
-9. **アセットが今の文面と合っているか** — `DriveScript.asset` の中身が、いま `WriteDriveScript` が書き出すものと一致するか。アセットは Inspector で直に触れてしまうので、書き出しを走らせ忘れたまま commit されたのを捕まえる
+9. **乗る前に車内の物へ届かないか** — ガレージで立てるいくつかの位置から `InteractionPicker.Select` を実際に呼び、`drive.` で始まる id が返らないことを見る。届くと `once: true` のせいで走行中に二度と出ない
+10. **HUD のフォント** — `Center` だけ明朝、ほかは Noto Sans になっているか。暗転中の字だけ書体が違うのは取り決めで、手で写すと落ちやすい
+11. **アセットが今の文面と合っているか** — `DriveScript.asset` の中身が、いま `WriteDriveScript` が書き出すものと一致するか。アセットは Inspector で直に触れてしまうので、書き出しを走らせ忘れたまま commit されたのを捕まえる
 
 最後に `bad == 0` なら `Debug.Log("見直し: 気になるところは無し")`、そうでなければ `Debug.LogWarning("見直し: 気になるところ " + bad + " 件。上を参照")`。
 
@@ -2088,6 +2103,7 @@ git commit -m "feat: put the drive in the running order"
 2. 各帯の独白の行数と本文（`WriteDriveScript.BandPages`）も仮置きで、原作からの抜きであること
 3. 帯ごとのきっかけの割り当て（チップ / ログ / ミラー / 写真立て / 窓）も仮の割り当てであること
 4. 沿道の物は輪郭だけで、密度も形も詰めていないこと
-5. **余韻は任意の対象を読んでいるあいだ止まる。** 秒数を詰めているときに「5 秒」の帯が 20 秒に見えたら、Inspector の値が効いていないのではなく、字幕が出ていないかを先に確かめる
+5. **Inspector で詰めた帯の秒数は、組み直すと消える。** `Rig()` が毎回 `SceneFlow` ごと作り直すので、`DriveDirector` に入れた値も一緒に消える。決まった値は `BuildDrive` の表へ書き戻す
+6. **余韻は任意の対象を読んでいるあいだ止まる。** 秒数を詰めているときに「5 秒」の帯が 20 秒に見えたら、Inspector の値が効いていないのではなく、字幕が出ていないかを先に確かめる
 
 `docs/superpowers/specs/2026-09-20-drive-scene-design.md` 9 節に挙げた「後続に委ねる事項」はこの計画では手を付けない。
