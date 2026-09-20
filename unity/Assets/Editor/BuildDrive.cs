@@ -801,9 +801,11 @@ namespace HalfAware.EditorTools
         // 深夜の幹線と明け方の丘陵が落ちた。Deep と Dawn の空はもう誰も使わないが、
         // 戻すときのために残してある。
         //
-        // **明けるのはフェードではなく切り替え。** 設計書に「各シーンの切り替えは
-        // フェードではなく瞬間的な切り替えとする」とあるので fadeIn は 0。
-        // 黒へ入るのは元から切り替えなので、出入りとも一瞬になる。
+        // **景色の切り替えに暗転を挟まない。** 黒も明けも 0 秒で、
+        // 絵と音がその場で入れ替わる。設計書の「フェードではなく瞬間的な切り替え」を
+        // 突き詰めた形で、黒を 0.8 秒置いていたのもやめた。
+        // 入れ替えそのものは黒のあいだにやる作りなので、
+        // 0 秒でも同じフレームのうちに済む（BandClock が段取りを保つ）。
         //
         // 最後の景色の余韻が 30 秒なのは、独白のあと家々が通り過ぎるところを
         // 映してから暗転するため（設計書 7.2）。**10 秒では足りなかった。**
@@ -811,9 +813,9 @@ namespace HalfAware.EditorTools
         // それだけで 10 秒掛かる。30 秒で 330 m 進み、90 m 刻みの農家が三つ四つ通る
         static readonly DriveBand[] Route =
         {
-            new DriveBand { name = "倫敦の市街", trigger = DriveIds.Chips, speed = 16f, rough = 1.0f, afterglow = 5f, black = 0.8f, fadeIn = 0f, sky = Night },
-            new DriveBand { name = "夜の高速", trigger = DriveIds.Cigar, speed = 28f, rough = 1.0f, rain = true, afterglow = 5f, black = 0.8f, fadeIn = 0f, sky = Lit },
-            new DriveBand { name = "朝靄の未舗装路", trigger = DriveIds.Window, speed = 11f, rough = 4.5f, gravel = true, afterglow = 30f, black = 0.8f, fadeIn = 0f, sky = Morning },
+            new DriveBand { name = "倫敦の市街", trigger = DriveIds.Chips, speed = 16f, rough = 1.0f, afterglow = 5f, black = 0f, fadeIn = 0f, sky = Night },
+            new DriveBand { name = "夜の高速", trigger = DriveIds.Cigar, speed = 28f, rough = 1.0f, rain = true, afterglow = 5f, black = 0f, fadeIn = 0f, sky = Lit },
+            new DriveBand { name = "朝靄の未舗装路", trigger = DriveIds.Window, speed = 11f, rough = 4.5f, gravel = true, afterglow = 30f, black = 0f, fadeIn = 0f, sky = Morning },
         };
 
         /// <summary>帯ごとのきっかけの対象。Items が立てて Wire が DriveDirector へ渡す</summary>
