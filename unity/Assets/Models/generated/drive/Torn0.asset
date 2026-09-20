@@ -6,7 +6,7 @@ Mesh:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Earth
+  m_Name: Torn0
   serializedVersion: 12
   m_SubMeshes:
   - serializedVersion: 2
@@ -17,8 +17,8 @@ Mesh:
     firstVertex: 0
     vertexCount: 4
     localAABB:
-      m_Center: {x: 1.75, y: 0.036, z: 10}
-      m_Extent: {x: 5.4, y: 0, z: 10}
+      m_Center: {x: 0, y: 88, z: 0}
+      m_Extent: {x: 680, y: 0, z: 680}
   m_Shapes:
     vertices: []
     shapes: []
@@ -97,7 +97,7 @@ Mesh:
       format: 0
       dimension: 0
     m_DataSize: 128
-    _typelessdata: 9a9969c0bc74133d0000a041000000000000803f0000000048e13abf00008040cdcce440bc74133d0000a041000000000000803f000000003e0ab73f00008040cdcce440bc74133d00000000000000000000803f000000003e0ab73f000000419a9969c0bc74133d00000000000000000000803f0000000048e13abf00000041
+    _typelessdata: 00002ac40000b04200002ac400000000000080bf0000000079e986c079e986c000002a440000b04200002ac400000000000080bf0000000079e9864079e986c000002a440000b04200002a4400000000000080bf0000000079e9864079e9864000002ac40000b04200002a4400000000000080bf0000000079e986c079e98640
   m_CompressedMesh:
     m_Vertices:
       m_NumItems: 0
@@ -151,8 +151,8 @@ Mesh:
       m_BitSize: 0
     m_UVInfo: 0
   m_LocalAABB:
-    m_Center: {x: 1.75, y: 0.036, z: 10}
-    m_Extent: {x: 5.4, y: 0, z: 10}
+    m_Center: {x: 0, y: 88, z: 0}
+    m_Extent: {x: 680, y: 0, z: 680}
   m_MeshUsageFlags: 0
   m_CookingOptions: 30
   m_BakedConvexCollisionMesh: 

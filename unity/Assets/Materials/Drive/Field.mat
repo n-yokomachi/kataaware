@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-6708307049868164233
+--- !u!114 &-4997262741312923097
 MonoBehaviour:
   m_ObjectHideFlags: 11
   m_CorrespondingSourceObject: {fileID: 0}
@@ -20,8 +20,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Wheat
-  m_Shader: {fileID: 4800000, guid: 4269db3a6fd0b19458d6927439521e3b, type: 3}
+  m_Name: Field
+  m_Shader: {fileID: 4800000, guid: 933532a4fcc9baf4fa0491de14d08ed7, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -30,7 +30,8 @@ Material:
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
-  stringTagMap: {}
+  stringTagMap:
+    RenderType: Opaque
   disabledShaderPasses:
   - MOTIONVECTORS
   m_LockedProperties: 
@@ -113,37 +114,24 @@ Material:
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
-    - _Glow: 0.38
     - _Metallic: 0
     - _OcclusionStrength: 1
     - _Parallax: 0.005
     - _QueueOffset: 0
     - _ReceiveShadows: 1
-    - _Smoothness: 0.1
+    - _Smoothness: 0.06
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
     - _Surface: 0
-    - _SwayAcross: 0.44
-    - _SwayAlong: 0.62831855
-    - _SwayAmp: 0.1
-    - _SwayFlutter: 0.32
-    - _SwayFlutterRate: 5.2
-    - _SwayHigh: 1.5
-    - _SwayPhase: 0
-    - _SwayRate: 2.2
-    - _SwayShift: 0
-    - _SwaySide: 0.4
     - _WorkflowMode: 1
-    - _Wrap: 0.6
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 0.55, g: 0.41, b: 0.145, a: 1}
-    - _Color: {r: 0.21499997, g: 0.17999998, b: 0.09499996, a: 1}
+    - _BaseColor: {r: 0.4, g: 0.3, b: 0.125, a: 1}
+    - _Color: {r: 0.39999998, g: 0.29999998, b: 0.12499998, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
-    - _TipColor: {r: 0.87, g: 0.72, b: 0.33, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

@@ -98,9 +98,135 @@ namespace HalfAware.EditorTools
         public const float RutY = 0.050f;
         /// <summary>帯 3 の牧草地。路肩より下げる。同じ高さだと面が重なってちらつく</summary>
         public const float PastureY = -0.06f;
+        /// <summary>
+        /// 帯 4 の畑の地。路肩の地面（<see cref="VergeY"/> -0.12）より 0.10 上で、
+        /// 株の根（0）よりわずかに下。根を浮かせないためにここまで上げてある
+        /// </summary>
+        public const float FieldY = -0.02f;
+        /// <summary>畑が持ち上がり始める距離。道の中心から、m。ここより内側は平ら</summary>
+        public const float SwellFrom = 14f;
+        /// <summary>畑の持ち上がり。距離の二乗に掛ける。58 m で 1.7 m ほど上がる</summary>
+        public const float SwellRate = 0.00055f;
+        /// <summary>
+        /// 帯 4 の畑の広がり。道の中心から片側、m。
+        /// 霧が畳む距離（帯 4 の density 0.017 でおよそ 100 m）より十分遠くまで敷く。
+        /// 脇の窓から見たとき、畑の外の何かが見えてはいけない
+        /// </summary>
+        public const float FieldHalf = 150f;
 
-        /// <summary>空と霧の色。カメラの背景と揃える</summary>
-        public static readonly Color Sky = new Color(0.055f, 0.060f, 0.082f);
+        // ---- 帯ごとの空と灯り -------------------------------------------------
+        //
+        // **どれも仮置き。オーナーが実画面を見てから決める。**
+        //
+        // RenderSettings はシーンにひとつしか無いので、ここで一度置くだけでは
+        // 全部の帯が同じ時間帯になる。値は帯ごとに持って、暗転の裏で
+        // DriveDirector が差し替える（<see cref="DriveSky.Apply"/>）。
+        //
+        // 帯 0 から帯 4 へ向かって、倫敦の黒雲から抜けて空が開いていく。
+        // 帯 3 は夜と朝の橋渡しで、空が開き始めたところであって朝ではない。
+        // 日射しの向きは、帯 3 と帯 4 だけ前の右（東）から低く入れる。
+        // 倫敦から北へ走っているので、日が昇るのは右手になる
+
+        /// <summary>帯 0。倫敦の外れ。ナノマシンの黒雲とネオンの照り返し</summary>
+        static readonly DriveSky Night = new DriveSky
+        {
+            sky = new Color(0.055f, 0.060f, 0.082f),
+            haze = new Color(0.055f, 0.060f, 0.082f),
+            density = 0.014f,
+            sun = new Color(0.60f, 0.68f, 0.92f),
+            power = 0.55f,
+            aim = new Vector3(24f, 152f, 0f),
+            lift = new Color(0.070f, 0.078f, 0.105f),
+            ground = new Color(0.035f, 0.036f, 0.045f),
+        };
+
+        /// <summary>帯 1。夜の高速。街灯の橙が一定の間隔で流れる。倫敦の雲から抜けたので、霧は薄い</summary>
+        static readonly DriveSky Lit = new DriveSky
+        {
+            sky = new Color(0.044f, 0.046f, 0.062f),
+            haze = new Color(0.044f, 0.046f, 0.062f),
+            density = 0.012f,
+            sun = new Color(0.54f, 0.60f, 0.86f),
+            power = 0.42f,
+            aim = new Vector3(28f, 168f, 0f),
+            // 街灯の橙が回り込む。上を少し暖色へ寄せる
+            lift = new Color(0.064f, 0.060f, 0.072f),
+            ground = new Color(0.030f, 0.028f, 0.030f),
+        };
+
+        /// <summary>
+        /// 帯 2。深夜の幹線。**この場面で一番暗い。** 街灯が絶え、前照灯だけになる。
+        /// 木立は空より暗く落として影絵にする。ここだけは、明るくすると幹線に見えなくなる
+        /// </summary>
+        static readonly DriveSky Deep = new DriveSky
+        {
+            sky = new Color(0.026f, 0.028f, 0.040f),
+            haze = new Color(0.026f, 0.028f, 0.040f),
+            density = 0.020f,
+            sun = new Color(0.34f, 0.38f, 0.58f),
+            power = 0.22f,
+            aim = new Vector3(34f, 186f, 0f),
+            lift = new Color(0.034f, 0.036f, 0.050f),
+            ground = new Color(0.016f, 0.016f, 0.020f),
+        };
+
+        /// <summary>
+        /// 帯 3。明け方の丘陵。薄明と霧。低い位置からの光。
+        /// 空が開き始めたところで、まだ朝ではない。霧はこの帯が一番濃い
+        /// </summary>
+        static readonly DriveSky Dawn = new DriveSky
+        {
+            sky = new Color(0.150f, 0.152f, 0.185f),
+            haze = new Color(0.150f, 0.152f, 0.185f),
+            density = 0.026f,
+            sun = new Color(0.80f, 0.56f, 0.44f),
+            power = 0.62f,
+            // 5 度。地平すれすれから薙ぐ。石垣の側面だけが赤く当たる。
+            // 向きは帯 4 と揃える。日の昇る場所が帯を跨いで飛ぶと、夜明けが繋がらない
+            aim = new Vector3(5f, 294f, 0f),
+            lift = new Color(0.145f, 0.150f, 0.180f),
+            ground = new Color(0.052f, 0.048f, 0.046f),
+        };
+
+        /// <summary>
+        /// 帯 4。朝靄の未舗装路。原作の「真っ白な千切れ雲と、まだ薄青い高い空」。
+        ///
+        /// **霧の色は空と同じにしてある。** 離すと、畑が霧に溶け切ったところに
+        /// 横一線の継ぎ目が出る。同じ色にしておけば、畑はそのまま空へ溶けて消える。
+        /// 朝靄はその溶け方そのもので、別の色として描くものではない。
+        /// 高さは雲の層（<see cref="Clouds"/>）が遠近で見せる
+        /// </summary>
+        static readonly DriveSky Morning = new DriveSky
+        {
+            sky = new Color(0.500f, 0.600f, 0.780f),
+            haze = new Color(0.500f, 0.600f, 0.780f),
+            density = 0.017f,
+            sun = new Color(1.00f, 0.88f, 0.70f),
+            power = 1.15f,
+            // 11 度。低いまま畑を薙ぐ。ここを 30 度に上げると株の天面しか当たらず、
+            // 畑が真上から照らした平らな板になる。
+            //
+            // 298 度は**後ろ寄りの右**から差す向き。倫敦から北へ走っているので日は右手だが、
+            // そこをさらに後ろへ回してある。前の右に置くと畑が逆光になり、
+            // 前を向いたときに見えるのが株の陰の面ばかりになって、黄金色がどこにも出ない。
+            // 後ろへ回すと、前を向いても脇の窓から見ても日の当たった面が手前を向く
+            aim = new Vector3(11f, 298f, 0f),
+            lift = new Color(0.40f, 0.46f, 0.56f),
+            ground = new Color(0.26f, 0.22f, 0.16f),
+        };
+
+        /// <summary>
+        /// 乗り込む前。ガレージの中。
+        ///
+        /// ガレージには天井の灯りが二つある。そこへ帯 4 のような朝の日射しを入れると
+        /// 壁も床も白く飛ぶので、乗り込む前は夜のままにしておく。
+        ///
+        /// **帯 0 と同じ値にしてある。** 乗り込むところには暗転が無く、ドアを調べた
+        /// その場でガレージが伏せて走り出す。ここで色が変われば、切り替わる瞬間が
+        /// そのまま見える。帯を跨ぐときの差し替えが黒のあいだに隠れるのとは事情が違う。
+        /// 帯 0 と別に名前を付けてあるのは、帯 0 を触ってもガレージが連れて動かないため
+        /// </summary>
+        public static readonly DriveSky GarageSky = Night;
 
         /// <summary>帯の数</summary>
         public const int Bands = 5;
@@ -263,11 +389,11 @@ namespace HalfAware.EditorTools
         /// </summary>
         static readonly DriveBand[] Route =
         {
-            new DriveBand { name = "倫敦の外れ", trigger = DriveIds.Chips, speed = 16f, rough = 1.0f, afterglow = 5f, black = 0.8f, fadeIn = 1.4f },
-            new DriveBand { name = "夜の高速", trigger = DriveIds.Log, speed = 28f, rough = 1.0f, afterglow = 5f, black = 0.8f, fadeIn = 1.4f },
-            new DriveBand { name = "深夜の幹線", trigger = DriveIds.Mirror, speed = 24f, rough = 1.0f, afterglow = 5f, black = 3.5f, fadeIn = 2.6f },
-            new DriveBand { name = "明け方の丘陵", trigger = DriveIds.Photo, speed = 20f, rough = 1.6f, afterglow = 5f, black = 0.8f, fadeIn = 1.6f },
-            new DriveBand { name = "朝靄の未舗装路", trigger = DriveIds.Window, speed = 11f, rough = 4.5f, afterglow = 5f, black = 0.8f, fadeIn = 1.4f },
+            new DriveBand { name = "倫敦の外れ", trigger = DriveIds.Chips, speed = 16f, rough = 1.0f, afterglow = 5f, black = 0.8f, fadeIn = 1.4f, sky = Night },
+            new DriveBand { name = "夜の高速", trigger = DriveIds.Log, speed = 28f, rough = 1.0f, afterglow = 5f, black = 0.8f, fadeIn = 1.4f, sky = Lit },
+            new DriveBand { name = "深夜の幹線", trigger = DriveIds.Mirror, speed = 24f, rough = 1.0f, afterglow = 5f, black = 3.5f, fadeIn = 2.6f, sky = Deep },
+            new DriveBand { name = "明け方の丘陵", trigger = DriveIds.Photo, speed = 20f, rough = 1.6f, afterglow = 5f, black = 0.8f, fadeIn = 1.6f, sky = Dawn },
+            new DriveBand { name = "朝靄の未舗装路", trigger = DriveIds.Window, speed = 11f, rough = 4.5f, afterglow = 5f, black = 0.8f, fadeIn = 1.4f, sky = Morning },
         };
 
         /// <summary>帯ごとのきっかけの対象。Items が立てて Wire が DriveDirector へ渡す</summary>
@@ -300,7 +426,7 @@ namespace HalfAware.EditorTools
             shapes.Clear();
 
             var root = Root("Drive");
-            Prune(root, new[] { "Car", "Road", "Roadsides", "Oncoming", "Garage", "Items" });
+            Prune(root, new[] { "Car", "Road", "Roadsides", "Oncoming", "Sky", "Garage", "Items" });
             // Stage より先に呼ぶ。Stage は Player/Main Camera があればそちらへ譲るので、
             // 後から rig を作ると札と AudioListener が二つずつになる
             Rig();
@@ -309,6 +435,7 @@ namespace HalfAware.EditorTools
             Road(Child(root, "Road"));
             Roadsides(Child(root, "Roadsides"));
             Traffic(Child(root, "Oncoming"));
+            Clouds(root);
             Garage(root);
             Items(root);
             Wire(root);
@@ -357,7 +484,11 @@ namespace HalfAware.EditorTools
         /// 日射し・霧と、カメラのレンダリングの設定。組み直すたびに結び直すので、手で触った値は残らない。
         /// カメラそのものは作らない。Rig が Player の下に必ず 1 つ作るので、ここで見るのは
         /// そのレンダリングの設定だけ。必ず Rig の後に呼ぶ。
-        /// 道は z 160 で終わる。霧が無いと世界の端がそのまま見える
+        /// 道は z 160 で終わる。霧が無いと世界の端がそのまま見える。
+        ///
+        /// 空と灯りそのものは帯ごとに持つ（<see cref="DriveSky"/>）。ここで置くのは
+        /// 乗り込む前のガレージのぶんで、再生を始めた最初のフレームに映るのもこれになる。
+        /// 走り出したあとは DriveDirector が暗転の裏で差し替える
         /// </summary>
         static void Stage()
         {
@@ -366,8 +497,6 @@ namespace HalfAware.EditorTools
             if (c == null) Debug.LogWarning("Player/Main Camera が無い。Stage は Rig の後に呼ぶ");
             else
             {
-                c.clearFlags = CameraClearFlags.SolidColor;
-                c.backgroundColor = Sky;
                 // 車内で一番近いのは天井の板の 0.33 m。手前を 0.1 まで引くと、
                 // 路面に重ねた面の深度の余裕がそのぶん増える
                 c.nearClipPlane = 0.1f;
@@ -378,26 +507,13 @@ namespace HalfAware.EditorTools
 
             var sun = Loose("Directional Light");
             sun.transform.position = new Vector3(0f, 8f, 0f);
-            sun.transform.rotation = Quaternion.Euler(24f, 152f, 0f);
             var l = sun.GetComponent<Light>();
             if (l == null) l = sun.AddComponent<Light>();
             l.type = LightType.Directional;
-            l.color = new Color(0.60f, 0.68f, 0.92f);
-            l.intensity = 0.55f;
             l.shadows = LightShadows.Soft;
+            // 色・強さ・向きは帯が持つ。ここではガレージのぶんを置くだけ
+            GarageSky.Apply(l, c);
             EditorUtility.SetDirty(l);
-
-            RenderSettings.fog = true;
-            RenderSettings.fogMode = FogMode.ExponentialSquared;
-            // 背景と同じ色。違えると、地面が霧に溶け切ったところに横一線の継ぎ目が出る
-            RenderSettings.fogColor = Sky;
-            RenderSettings.fogDensity = 0.014f;
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.070f, 0.078f, 0.105f);
-            RenderSettings.ambientEquatorColor = new Color(0.055f, 0.058f, 0.078f);
-            RenderSettings.ambientGroundColor = new Color(0.035f, 0.036f, 0.045f);
-            RenderSettings.skybox = null;
-            RenderSettings.sun = l;
         }
 
         // ---- 車内 ----------------------------------------------------------
@@ -742,6 +858,95 @@ namespace HalfAware.EditorTools
             }
         }
 
+        // ---- 空に浮かべる雲 ---------------------------------------------------
+
+        /// <summary>
+        /// 帯ごとの空の物。今は雲だけ。
+        ///
+        /// 帯 0 は原作の「クラッカーたちが撒き散らすクラック用のナノマシンの黒雲」、
+        /// 帯 4 は「倫敦のナノマシンの黒雲とは違い、真っ白な千切れ雲」。
+        /// **この二つは対になっている。** 片方だけ外すと、原作が対比で書いている
+        /// 倫敦と田舎町の差が、色の違いだけになる。
+        ///
+        /// 沿道の入れ物には入れられない。あの下には区切りしか置けず（<see cref="CheckDrive"/>）、
+        /// 区切りに入れれば道と同じ速さで手前へ流れて、雲まで時速 40 km で走ることになる。
+        /// 動きは <see cref="CloudDrift"/> が絵のほうをずらして出す。
+        ///
+        /// **板の広さには上限がある。** カメラの奥は 1000 m なので、四隅までの距離が
+        /// そこを越えると空が切り落とされて直線が出る。半幅は 700 m までに留めること
+        /// </summary>
+        static void Clouds(Transform root)
+        {
+            var parent = Child(root, "Sky");
+            Clear(parent);
+            var nano = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/CloudLayer.png");
+            var torn = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/CloudTorn.png");
+            if (nano == null || torn == null) Debug.LogWarning("雲の絵が無い");
+            for (var b = 0; b < Bands; b++)
+            {
+                var band = Child(parent, "Band" + b);
+                // ナノマシンの黒雲。低く垂れて、高架の上をそのまま塞ぐ
+                if (b == 0 && nano != null)
+                    Deck(band, "Nano", nano, 30f, 420f, 0.010f,
+                        new Color(0.030f, 0.026f, 0.042f, 0.94f), 0.078f, 0.30f, new Vector2(0.0034f, 0.0012f));
+                else if (b == Bands - 1 && torn != null)
+                {
+                    // 千切れ雲。二層に分けるのは、遠近だけでは高さが出ないため。
+                    // 別々の速さで流れる二枚が重なって初めて「高い空」に見える。
+                    // **絵の刻みは粗く取る。** 細かく繰り返すと、浅い角度で見たときに
+                    // 雲ではなく空に散った点々になる。1 枚がおよそ 160 m になる刻みにしてある
+                    Deck(band, "Torn0", torn, 88f, 680f, 0.0062f,
+                        new Color(1f, 1f, 1f, 0.90f), 0.135f, 0.42f, new Vector2(0.0016f, 0.0006f));
+                    Deck(band, "Torn1", torn, 155f, 680f, 0.0034f,
+                        new Color(0.94f, 0.96f, 1f, 0.55f), 0.232f, 0.58f, new Vector2(0.0008f, 0.0003f));
+                }
+                // 出し分けるのは DriveDirector。組んだ直後は頭の帯だけ見せる
+                band.gameObject.SetActive(b == 0);
+            }
+        }
+
+        /// <summary>
+        /// 雲の層 1 枚。下から見上げるので面は下へ向ける。
+        /// low は絵が消え切る仰角の sin で、板の縁の仰角（high / 半幅）より上に取ること。
+        /// 下回ると、空を横切る板の縁がそのまま線になって出る
+        /// </summary>
+        static void Deck(Transform parent, string name, Texture2D tex, float high, float half, float texel,
+            Color tint, float low, float full, Vector2 drift)
+        {
+            var bank = new Bank { Texel = texel };
+            bank.FaceY(high, -half, half, -half, half, -1);
+            var go = bank.Emit(parent, name, CloudMat(name, tex, tint, low, full), false, Generated);
+            if (go == null) return;
+            var drifter = go.AddComponent<CloudDrift>();
+            var so = new SerializedObject(drifter);
+            so.FindProperty("speed").vector2Value = drift;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>
+        /// 雲のマテリアル。層ごとに 1 枚ずつ作る。CloudDrift が層ごとに別の絵をずらすので、
+        /// 共有すると全部の層が一緒に動く
+        /// </summary>
+        static Material CloudMat(string name, Texture2D tex, Color tint, float low, float full)
+        {
+            var path = Materials + "Cloud" + name + ".mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                m = new Material(Shader.Find("HalfAware/SkyCloud"));
+                m.name = "Cloud" + name;
+                AssetDatabase.CreateAsset(m, path);
+            }
+            // 組み直すたびに結び直す。手で触った値は残らない
+            m.shader = Shader.Find("HalfAware/SkyCloud");
+            m.SetTexture("_BaseMap", tex);
+            m.SetColor("_BaseColor", tint);
+            m.SetFloat("_HazeLow", low);
+            m.SetFloat("_HazeHigh", full);
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
         /// <summary>
         /// 帯の入れ物の下に、タイルと同じ枚数の区切りを割る。
         /// 入れ物の直下には区切り以外を置かない。1 つ混ざるだけで環の大きさが変わる
@@ -885,46 +1090,96 @@ namespace HalfAware.EditorTools
             }
         }
 
-        /// <summary>帯 4。朝靄の未舗装路。麦畑と土の轍</summary>
+        /// <summary>
+        /// 帯 4。朝靄の未舗装路。黄金色の小麦畑と土の轍。
+        ///
+        /// 原作の「朝靄の中で、緩やかな湾曲を描いて広がる小麦畑が黄金色に微風になびいている」。
+        /// **畑は視界を埋めるところまで広げる。** 道の脇に麦を数本立てただけでは、
+        /// 窓を開けて息を吸い込む場面にならない。株は 40 m まで、地の面は 150 m まで敷いて、
+        /// その先は霧が畳む。なびかせるのは株のマテリアル（HalfAware/Wheat）で、
+        /// 株ごとに Transform を持たせる手は取れない。区切り 1 つに 200 近い株が
+        /// 1 枚の mesh へ焼かれているため
+        /// </summary>
         static void Furrows(Transform[] slices)
         {
             // 舗装のタイルはそのまま下に敷いてあるので、土の面で覆い隠す。
-            // 帯 4 だけタイルを差し替える手は取らない。タイルは 1 種しか無い
-            var earth = Shape("Earth", 0.2f, b => b.FaceY(EarthY, Lane(-16f), Lane(16f), 0f, TileLength, 1));
+            // 帯 4 だけタイルを差し替える手は取らない。タイルは 1 種しか無い。
+            // ±5.4 は路肩の段（±4.7）のすぐ外。ここより広げると土色が畑の下へ回り込み、
+            // 黄金色が道の際で途切れて見える
+            var earth = Shape("Earth", 0.2f, b => b.FaceY(EarthY, Lane(-5.4f), Lane(5.4f), 0f, TileLength, 1));
             var ruts = Shape("Ruts", 0.3f, b =>
             {
                 b.FaceY(RutY, Lane(-DirtHalf), Lane(DirtHalf), 0f, TileLength, 1);
                 b.Box(new Vector3(Lane(-0.95f), RutY + 0.004f, TileLength * 0.5f), new Vector3(0.52f, 0.02f, TileLength));
                 b.Box(new Vector3(Lane(0.95f), RutY + 0.004f, TileLength * 0.5f), new Vector3(0.52f, 0.02f, TileLength));
             });
-            // 2.5 は 20 を割り切るので、区切り 1 つぶんの麦をそのまま全部の区切りで使い回せる
+            // 畑の地。株のあいだから覗く面。
+            // **株だけでは畑にならない。** 遠くの株は霧に畳まれて消えるので、地の面が無いと
+            // 畑の向こうに路肩の地面（Verge）の暗い色がそのまま出て、刈り取った跡に見える
+            var field = Shape("Field", 0.14f, b =>
+            {
+                b.FaceY(FieldY, Lane(-FieldHalf), Lane(-4.8f), 0f, TileLength, 1);
+                b.FaceY(FieldY, Lane(4.8f), Lane(FieldHalf), 0f, TileLength, 1);
+            });
             var wheat = Shape("Wheat", 0.4f, b =>
             {
                 var rnd = new System.Random(4021);
-                // 株は 0.70 角の箱で、y まわりに回すと角が最大 0.495 はみ出す。
-                // 一番内側の列を 3.9 に置き、ばらつきも外向きだけにして、轍の側へ倒れ込ませない
-                for (var z = 1.25f; z < TileLength; z += 2.5f)
-                    for (var s = 0; s < 2; s++)
-                        foreach (var x in new[] { 3.9f, 5.2f, 7.3f })
+                // 列ごとに、道からの距離・株の大きさ・列の中の刻みを持つ。
+                //
+                // **近くを詰めるのが要。** 疎に置くと株のあいだから地の面が覗いて、
+                // 畑ではなく箱を並べた原っぱに見える。近い列は株を小さく刻みを細かく、
+                // 遠い列は大きく粗くして、面として繋がっていればよいことにする。
+                // 刻みはどれも 20 を割り切る数にして、区切りの継ぎ目で列が詰まらないようにする。
+                //
+                // 背が 1.10〜1.45 あるのは、目線（1.55）との差を詰めるため。低い株を
+                // 見下ろすと天面ばかりが目に入り、畑ではなく箱の集まりに見える。
+                // WheatWind.High はこの上端と揃えること。
+                //
+                // 株は箱で、y まわりに回すと角が半幅の 1.414 倍まではみ出す。
+                // 一番内側の列を 3.85 に置き、ばらつきを外向きだけにして、轍の側へ倒れ込ませない。
+                // 風でさらに WheatWind.Reach だけ振れるぶんは見直しが見る
+                var at = new[] { 3.75f, 4.5f, 5.4f, 6.5f, 7.8f, 9.4f, 11.4f, 14.0f, 17.5f, 22.0f, 28.0f, 36.0f, 46.0f, 58.0f };
+                var wide = new[] { 0.45f, 0.50f, 0.55f, 0.65f, 0.80f, 0.95f, 1.20f, 1.50f, 1.90f, 2.45f, 3.10f, 4.00f, 5.00f, 6.20f };
+                var step = new[] { 0.50f, 0.50f, 0.625f, 0.625f, 0.80f, 1.00f, 1.25f, 1.25f, 2.00f, 2.50f, 2.50f, 2.50f, 2.50f, 2.50f };
+                for (var c = 0; c < at.Length; c++)
+                    for (var z = step[c] * 0.5f; z < TileLength; z += step[c])
+                        for (var s = 0; s < 2; s++)
                         {
                             var side = s == 0 ? -1f : 1f;
-                            for (var i = 0; i < 2; i++)
-                            {
-                                var high = 0.90f + (float)rnd.NextDouble() * 0.20f;
-                                var away = (float)rnd.NextDouble() * 0.8f;
-                                b.Box(new Vector3(Lane((x + away) * side), high * 0.5f,
-                                        z + ((float)rnd.NextDouble() - 0.5f) * 0.5f),
-                                    new Vector3(0.70f, high, 0.70f),
-                                    Quaternion.Euler(0f, (float)rnd.NextDouble() * 90f, 0f));
-                            }
+                            var high = 1.00f + (float)rnd.NextDouble() * 0.50f;
+                            var from = at[c] + (float)rnd.NextDouble() * wide[c] * 0.9f;
+                            b.Box(new Vector3(Lane(from * side), Swell(from) + high * 0.5f,
+                                    z + ((float)rnd.NextDouble() - 0.5f) * step[c] * 0.7f),
+                                new Vector3(wide[c], high, wide[c]),
+                                Quaternion.Euler(0f, (float)rnd.NextDouble() * 90f, 0f));
                         }
             });
+            var crop = WheatMat();
             for (var i = 0; i < slices.Length; i++)
             {
                 Piece(slices[i], "Earth", earth, Mat("Dirt"));
                 Piece(slices[i], "Ruts", ruts, Mat("Rut"));
-                Piece(slices[i], "Wheat", wheat, Mat("Wheat"));
+                Piece(slices[i], "Field", field, Mat("Field"));
+                Piece(slices[i], "Wheat", wheat, crop);
             }
+        }
+
+        /// <summary>
+        /// 畑のうねり。道から離れるほど、緩やかに持ち上がる。
+        ///
+        /// 原作の「緩やかな湾曲を描いて広がる小麦畑」。平らなままだと地平が定規を当てた
+        /// ような直線になり、畑ではなく黄色い板が敷いてあるように見える。
+        /// 二乗で効かせるので、近くはほとんど上がらず、遠くだけが背を持つ。
+        ///
+        /// **近い列（<see cref="SwellFrom"/> より内側）は上げない。** 株の揺れは根からの
+        /// 高さで重みを付けているので、根そのものを持ち上げると株ぜんたいが 1 の重みになり、
+        /// 撓むかわりに横へ滑る。目の届く手前の列だけは根を地面に置いておく。
+        /// 遠い列は畑の面として見えればよく、40 m 先で 0.1 m 滑っても読めない
+        /// </summary>
+        static float Swell(float from)
+        {
+            if (from <= SwellFrom) return 0f;
+            return SwellRate * (from * from - SwellFrom * SwellFrom);
         }
 
         // ---- 沿道の並べ方 --------------------------------------------------
@@ -1651,6 +1906,15 @@ namespace HalfAware.EditorTools
             dso.FindProperty("onWheel").objectReferenceValue = onWheel != null ? onWheel.gameObject : null;
             // 手動で運転するのは最後の帯だけ
             dso.FindProperty("drivenBand").intValue = Bands - 1;
+            // 空と灯り。帯ごとの値は bands が持ち、差し替える先をここで渡す。
+            // 日射しとカメラは Drive の下に無いので、名前で引く
+            var lamp = GameObject.Find("Directional Light");
+            dso.FindProperty("sun").objectReferenceValue = lamp != null ? lamp.GetComponent<Light>() : null;
+            var view = GameObject.Find("Player/Main Camera");
+            dso.FindProperty("eye").objectReferenceValue = view != null ? view.GetComponent<Camera>() : null;
+            FillSky(dso.FindProperty("garageSky"), GarageSky);
+            var overhead = Look(root, "Sky");
+            Fill(dso.FindProperty("skies"), overhead != null ? Kids(overhead) : new Transform[0]);
             FillBands(dso.FindProperty("bands"));
             var picked = dso.FindProperty("triggers");
             picked.arraySize = triggerItems.Length;
@@ -1678,7 +1942,22 @@ namespace HalfAware.EditorTools
                 e.FindPropertyRelative("afterglow").floatValue = Route[i].afterglow;
                 e.FindPropertyRelative("black").floatValue = Route[i].black;
                 e.FindPropertyRelative("fadeIn").floatValue = Route[i].fadeIn;
+                FillSky(e.FindPropertyRelative("sky"), Route[i].sky);
             }
+        }
+
+        /// <summary>空と灯りを 1 つ書き込む。DriveSky も struct なので中身を並べ直す</summary>
+        static void FillSky(SerializedProperty at, DriveSky from)
+        {
+            if (at == null) return;
+            at.FindPropertyRelative("sky").colorValue = from.sky;
+            at.FindPropertyRelative("haze").colorValue = from.haze;
+            at.FindPropertyRelative("density").floatValue = from.density;
+            at.FindPropertyRelative("sun").colorValue = from.sun;
+            at.FindPropertyRelative("power").floatValue = from.power;
+            at.FindPropertyRelative("aim").vector3Value = from.aim;
+            at.FindPropertyRelative("lift").colorValue = from.lift;
+            at.FindPropertyRelative("ground").colorValue = from.ground;
         }
 
         /// <summary>繋ぎ先を引く。黙って null を渡すと、再生して初めて気づくことになる</summary>
@@ -1826,6 +2105,55 @@ namespace HalfAware.EditorTools
             return m;
         }
 
+        /// <summary>
+        /// 麦のマテリアル。ほかの素材と違って URP の Lit を使わない。
+        ///
+        /// 要るものが二つある。ひとつは頂点をずらして微風になびかせること。株は区切り 1 つに
+        /// 200 近くを 1 枚の mesh へ焼いてあるので、Transform では動かせない。
+        /// もうひとつは光の回り込みで、箱で作った株は面の向きが四方向しか無く、
+        /// 素の Lambert だと日射しに背を向けた面が真っ黒に落ちて畑が市松模様に見える。
+        ///
+        /// 揺れの数は <see cref="WheatWind"/> から取る。見直しが同じ数を読んで、
+        /// なびいた穂先が轍へ倒れ込まないかを測る
+        /// </summary>
+        static Material WheatMat()
+        {
+            var shader = Shader.Find("HalfAware/Wheat");
+            if (shader == null)
+            {
+                Debug.LogWarning("HalfAware/Wheat が見つからない。麦はなびかない");
+                return Mat("Field");
+            }
+            var path = Materials + "Wheat.mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                m = new Material(shader);
+                m.name = "Wheat";
+                AssetDatabase.CreateAsset(m, path);
+            }
+            // 組み直すたびに結び直す。前に URP の Lit で作ってあっても差し替わる
+            m.shader = shader;
+            // 黄金色。**この場面のほかの色（どれも 0.2 前後）から大きく外している。**
+            // 朝の日射しを受けて初めて成り立つ色で、帯 4 のほかには出てこない
+            m.SetColor("_BaseColor", new Color(0.550f, 0.410f, 0.145f));
+            m.SetColor("_TipColor", new Color(0.870f, 0.720f, 0.330f));
+            m.SetFloat("_Wrap", 0.60f);
+            m.SetFloat("_Glow", 0.38f);
+            m.SetFloat("_SwayAmp", WheatWind.Amp);
+            m.SetFloat("_SwayFlutter", WheatWind.Flutter);
+            m.SetFloat("_SwayAcross", WheatWind.Across);
+            m.SetFloat("_SwayAlong", WheatWind.Along);
+            m.SetFloat("_SwayRate", WheatWind.Rate);
+            m.SetFloat("_SwayFlutterRate", WheatWind.FlutterRate);
+            m.SetFloat("_SwayHigh", WheatWind.High);
+            m.SetFloat("_SwaySide", WheatWind.Side);
+            // 時刻はずらさない。絵を撮るときだけ外から動かす
+            m.SetFloat("_SwayShift", 0f);
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
         /// <summary>透ける面にする。向こうが見えないと車内が箱にしか見えない</summary>
         static void SeeThrough(Material m)
         {
@@ -1886,10 +2214,18 @@ namespace HalfAware.EditorTools
                 case "Tree": col = new Color(0.045f, 0.042f, 0.040f); smooth = 0.08f; break;
                 case "Stone": col = new Color(0.165f, 0.162f, 0.150f); smooth = 0.08f; break;
                 case "Grass": col = new Color(0.062f, 0.085f, 0.052f); smooth = 0.08f; break;
-                case "Wheat": col = new Color(0.215f, 0.180f, 0.095f); smooth = 0.10f; break;
-                case "Dirt": col = new Color(0.135f, 0.112f, 0.085f); smooth = 0.06f; break;
+                // 麦はここに無い。URP の Lit ではなく HalfAware/Wheat で塗るので、
+                // 色は WheatMat が持っている
+                //
+                // 畑の地。株のあいだから覗く面なので、株より暗く沈んだ金色にする。
+                // 株と同じ明るさにすると畑が一枚の板になり、立っている感じが消える
+                case "Field": col = new Color(0.400f, 0.300f, 0.125f); smooth = 0.06f; break;
+                // 土と轍は帯 4 でしか使わない。夜の帯の暗さに合わせる必要が無いので、
+                // 朝日の下で土の色に見えるところまで上げてある。ここを 0.1 台へ戻すと、
+                // 黄金色の畑のあいだを灰色の帯が抜けていくことになる
+                case "Dirt": col = new Color(0.300f, 0.238f, 0.160f); smooth = 0.06f; break;
                 // 踏み固められた轍。地の土より暗く湿っている
-                case "Rut": col = new Color(0.098f, 0.082f, 0.066f); smooth = 0.14f; break;
+                case "Rut": col = new Color(0.215f, 0.168f, 0.118f); smooth = 0.14f; break;
                 default: col = new Color(0.12f, 0.12f, 0.13f); smooth = 0.30f; break;
             }
         }

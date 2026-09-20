@@ -13,6 +13,10 @@ namespace HalfAware
     /// 黒へは切り替えで入り、明けるときだけフェードする。
     /// 場面 1 のドアを閉める暗転と同じ扱い。
     ///
+    /// 時間帯（空・霧・日射し）も帯ごとに持っていて、Dress が黒のあいだに差し替える。
+    /// RenderSettings はシーンにひとつしか無いので、組み立てで一度置くだけでは
+    /// 全部の帯が同じ時間帯になり、朝の小麦畑まで夜のまま出る。
+    ///
     /// 帯の並びは Awake で写し取る。秒数は bands から毎フレーム直に読むので、
     /// 再生しながら Inspector で触れば効く。ただし配列の長さを再生中に変えると、
     /// route の数え方（Count・IsLast・BandOf）は古いまま取り残される
@@ -43,6 +47,16 @@ namespace HalfAware
         [SerializeField] GameObject onWheel;
         [Tooltip("手動で運転する帯。0 から数える")]
         [SerializeField] int drivenBand = 4;
+
+        [Header("空と灯り")]
+        [Tooltip("日射し。帯ごとに色と強さと向きを差し替える")]
+        [SerializeField] Light sun;
+        [Tooltip("背景を塗るカメラ")]
+        [SerializeField] Camera eye;
+        [Tooltip("乗り込む前の空と灯り。ガレージの天井の灯りを塗り潰さない明るさに留める")]
+        [SerializeField] DriveSky garageSky;
+        [Tooltip("帯ごとの空の物。雲など。帯と同じ並び。中身の無い帯は空の入れ物")]
+        [SerializeField] Transform[] skies = new Transform[0];
 
         [Header("帯")]
         [Tooltip("景色の帯。DriveIds.Triggers と同じ並びにする")]
@@ -87,6 +101,10 @@ namespace HalfAware
             world.Dress(-1);
             ShowTrigger(-1);
             Arms(-1);
+            // 走り出す前はガレージの中。ここへ帯の空を入れると、天井の灯りが二つある
+            // 室内に朝日が差して壁も床も白く飛ぶ。空の物も出さない
+            ShowSky(-1);
+            garageSky.Apply(sun, eye);
             // 車内の対象はガレージからでも距離が届いてしまう。乗り込むまで伏せておく
             if (cabin != null) cabin.SetActive(false);
             band = -1;
@@ -223,6 +241,17 @@ namespace HalfAware
             world.Rewind();
             ShowTrigger(which);
             Arms(which);
+            // 空と灯りもここで差し替える。**黒のあいだに呼ばれるのが要る。**
+            // 走っている最中に時間帯が変わると、夜から朝へ切り替わるその一瞬が見える
+            ShowSky(which);
+            At(which).sky.Apply(sun, eye);
+        }
+
+        /// <summary>which 番目の帯の空の物だけ出す。-1 でどれも出さない</summary>
+        void ShowSky(int which)
+        {
+            for (var i = 0; i < skies.Length; i++)
+                if (skies[i] != null) skies[i].gameObject.SetActive(i == which);
         }
 
         /// <summary>which 番目の帯のきっかけだけ出す。-1 でどれも出さない</summary>

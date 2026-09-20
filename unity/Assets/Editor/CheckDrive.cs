@@ -229,7 +229,11 @@ namespace HalfAware.EditorTools
         /// あとは道の中心（LaneOffset）を引くだけでよい。
         ///
         /// 帯 4 だけは道が轍の幅まで細る（DirtHalf）。麦はその外に立てる約束なので、
-        /// 舗装の幅で見ると必ず引っかかる
+        /// 舗装の幅で見ると必ず引っかかる。
+        ///
+        /// 麦はさらに風でなびく。**頂点の位置だけでは足りない。** 止まっているときは
+        /// 道の外にいても、なびいた瞬間だけ轍へ倒れ込むことがあり、それは絵を撮っても写らない。
+        /// 穂先が横へ振れる幅（WheatWind.Reach）を足して見る
         /// </summary>
         static int OnRoad(Transform root)
         {
@@ -245,6 +249,8 @@ namespace HalfAware.EditorTools
                 {
                     if (mf.sharedMesh == null) continue;
                     if (System.Array.IndexOf(Paving, mf.name) >= 0) continue;
+                    // なびく物は振れ幅のぶんだけ道へ寄せて見る
+                    var reach = mf.name == "Wheat" ? WheatWind.Reach : 0f;
                     var into = 0f;
                     var low = 0f;
                     var m = mf.transform.localToWorldMatrix;
@@ -253,14 +259,15 @@ namespace HalfAware.EditorTools
                     {
                         var p = m.MultiplyPoint3x4(verts[i]);
                         if (p.y > Clearance) continue;
-                        var deep = half - Mathf.Abs(p.x - BuildDrive.LaneOffset);
+                        var deep = half + reach - Mathf.Abs(p.x - BuildDrive.LaneOffset);
                         if (deep <= into) continue;
                         into = deep;
                         low = p.y;
                     }
                     if (into <= 0f) continue;
-                    Debug.LogWarning(string.Format("見直し: 沿道の物が道に出ている: 帯「{0}」の {1}。{2:F3} m 食い込んでいる（高さ {3:F2}）",
-                        BandName(b), mf.name, into, low), mf.gameObject);
+                    Debug.LogWarning(string.Format(
+                        "見直し: 沿道の物が道に出ている: 帯「{0}」の {1}。{2:F3} m 食い込んでいる（高さ {3:F2}、風の振れ {4:F3} を含む）",
+                        BandName(b), mf.name, into, low, reach), mf.gameObject);
                     bad++;
                 }
             }
