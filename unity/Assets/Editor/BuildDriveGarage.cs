@@ -149,12 +149,13 @@ namespace HalfAware.EditorTools
             Row(paint, BackBayZ, 6, -1f);
             paint.Emit(parent, "BayPaint", Mat("BayPaint"), false, Generated);
 
-            // 油染み。**「水たまりに見える」と言われた所。**
+            // 油溜まり。**濡れて灯りを映す面として置く。**
             //
-            // 落とす場所を「床が空いているところ」から「車から油が落ちるところ」へ
-            // 変えてある。停まっている車の機関の下、空いた区画の真ん中、通路で
-            // 何度も切り返す所。油は車の下に落ちるものなので、そこにしか無い。
-            // 絵と形は Stain が持つ
+            // 落とす場所は「床が空いているところ」ではなく「車から油が落ちるところ」。
+            // 停まっている車の機関の下、空いた区画の真ん中、通路で何度も切り返す所。
+            // 油は車の下に落ちるものなので、そこにしか無い。
+            // 輪郭は <see cref="Stain"/>、濃さと薄膜の虹は絵、水気は艶が持つ
+            // （<see cref="BuildDrive.Tone"/> の "OilStain"）
             var oil = new Bank { Texel = 1f };
             // 空いている 4 番の区画の真ん中。**歩く線が横切る。**
             // 車の居ない区画に油だけが残っているのが、共用の車庫のいちばんの説明になる
@@ -237,48 +238,87 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 油染み 1 つ。
+        /// 床の油溜まり 1 つ。
         ///
-        /// **これまでは輪郭を崩した扇に、ほぼ真っ黒（0.030）を一様に塗っていた。**
-        /// 実画面では床に開いた穴か、でなければ水たまりにしか見えない。
-        /// オーナーの第一声が「あの黒いのは水たまり？」で、そのとおりだった。
-        /// 濃さが均一で、縁が切り立っていて、色が無い。水の見え方そのものになっている。
+        /// **輪郭に角を立てない。** 16 の角それぞれに乱数の伸びを掛けていたので、
+        /// 縁が折れ線のまま出て、床に貼った多角形にしか見えなかった。
+        /// オーナーの言葉は「オイルだまりは曲線で作るように。角があるとわかりづらい」。
         ///
-        /// 直したのは絵の方（`tools/make-drive.py` の `oilstain`）で、薄膜の虹・
-        /// 染みてぼけた縁・焦茶の芯の三つを持たせてある。ここで変えたのは uv の振り方。
+        /// 形は二段で作る。まず大小の丸をいくつか重ね、角度ごとにいちばん遠い丸の縁を
+        /// 採って、重なった形の外側だけを輪郭にする。丸はどれも溜まりの中心を含ませるので、
+        /// 輪郭は角度の一価の関数になり、中心からの扇でそのまま張れる。
+        /// そのうえから低い波を二つ掛けて縁を崩す。角ごとの乱数と違って、
+        /// 波は隣の角と繋がっているので折れ目が出ない。刻みは 64。
         ///
-        /// <see cref="Bank.FanY"/> は uv を世界の位置から振るので、絵を貼ると
-        /// 染みごとに絵のどこが出るか分からず、芯も縁も揃わない。
-        /// <see cref="Bank.Patch"/> で 0〜1 の uv をじかに渡し、絵 1 枚をそのまま 1 つの
-        /// 染みに写す。大きさを変えても芯と輪と虹の割合は変わらない。
+        /// **半透明の面を何枚も重ねて溜まりに見せる手は使わない。** 重なったところだけ
+        /// 二度塗りになって濃く出る。重なりは輪郭として一枚の面が持つ。
         ///
-        /// 判子を押したように揃わないよう、種ごとに uv を 90 度ずつ回して裏返す。
-        /// 縁の崩れも同じ種から引くので、形と絵の崩れがそろって動く
+        /// uv は縁がちょうど絵の外周へ来るように振る（<see cref="Bank.Patch"/> で
+        /// 0〜1 をじかに渡す）。<see cref="Bank.FanY"/> の、世界の位置から振る uv では
+        /// 溜まりごとに絵のどこが出るか分からず、芯も縁も揃わない。
+        /// 絵の α は外周までに 0 へ落ちているので、面の縁そのものは画面に出ない。
+        ///
+        /// **逆に、縁より内側で α が残ると面の縁が直に出る。** 角が見えていたもう一つの
+        /// 理由がこれで、角ごとに違う伸びを同じ物差しで uv へ写していたため、
+        /// 伸びの短い角では絵がまだ濃いところで面が切れていた。角度によらず縁を
+        /// 絵の外周へ写せば、どこで切れても縁は透けている。
+        ///
+        /// 判子を押したように揃わないよう、種ごとに uv を 90 度ずつ回して裏返す
         /// </summary>
         static void Stain(Bank bank, float x, float z, float span, int seed)
         {
-            const int n = 16;
+            // 縁の刻み。64 なら 5.6 度ごとで、1 m の溜まりでも縁の折れが 3 cm に満たない
+            const int n = 64;
+            // 絵の外周を uv のどこへ置くか。0.5 より少し外にすると、面の縁では
+            // α が完全に 0 になっている。内へ入れると絵の濃いところで面が切れる
+            const float edge = 0.51f;
             var rnd = new System.Random(seed);
-            // 縁の最大の伸び。uv を畳む物差しになるので、実際に使う伸びより少し広く取る
-            const float reach = 1.32f;
-            var rim = new Vector2[n];
-            for (var i = 0; i < n; i++)
+            // 溜まりを作る丸。芯が 1 つと、垂れて広がった 2〜3 つ。
+            // **どれも溜まりの中心を含ませる**（離れ < 半径）。外すと、その丸の接する
+            // 角度で輪郭が跳んで、無くしたはずの角が戻る
+            var lobes = 3 + rnd.Next(2);
+            var away = new Vector2[lobes];
+            var wide = new float[lobes];
+            away[0] = Vector2.zero;
+            wide[0] = span * 0.70f;
+            for (var i = 1; i < lobes; i++)
             {
-                var a = Mathf.PI * 2f * i / n;
-                var r = span * (0.72f + (float)rnd.NextDouble() * 0.52f);
-                rim[i] = new Vector2(x + Mathf.Cos(a) * r, z + Mathf.Sin(a) * r * 1.18f);
+                var a = Mathf.PI * 2f * (i + (float)rnd.NextDouble() - 0.5f) / lobes;
+                var far = span * (0.20f + (float)rnd.NextDouble() * 0.18f);
+                away[i] = new Vector2(Mathf.Cos(a) * far, Mathf.Sin(a) * far);
+                wide[i] = far + span * (0.26f + (float)rnd.NextDouble() * 0.20f);
             }
             var turn = rnd.Next(4) * 90f * Mathf.Deg2Rad;
             var flip = rnd.Next(2) == 0 ? 1f : -1f;
-            System.Func<Vector2, Vector2> fold = at =>
+            var wave = (float)rnd.NextDouble() * Mathf.PI * 2f;
+            var ripple = (float)rnd.NextDouble() * Mathf.PI * 2f;
+            var rim = new Vector3[n];
+            var fold = new Vector2[n];
+            for (var i = 0; i < n; i++)
             {
-                var dx = (at.x - x) / (span * reach);
-                var dz = (at.y - z) / (span * reach * 1.18f);
+                var a = Mathf.PI * 2f * i / n;
+                var ux = Mathf.Cos(a);
+                var uz = Mathf.Sin(a);
+                var r = 0f;
+                for (var k = 0; k < lobes; k++)
+                {
+                    // 中心から引いた線が丸の縁を抜けるところ。遠い方を採る
+                    var along = away[k].x * ux + away[k].y * uz;
+                    var reach = wide[k] * wide[k] - (away[k].sqrMagnitude - along * along);
+                    if (reach <= 0f) continue;
+                    var hit = along + Mathf.Sqrt(reach);
+                    if (hit > r) r = hit;
+                }
+                // 低い波で縁を崩す。3 周と 5 周を重ねると、丸のままにも見えず、
+                // 角ごとの乱数のように折れもしない
+                r *= 1f + 0.085f * Mathf.Sin(a * 3f + wave) + 0.050f * Mathf.Sin(a * 5f + ripple);
+                // 溜まりは車の進む向きへ流れる。z へわずかに伸ばす
+                rim[i] = new Vector3(x + ux * r, StainY, z + uz * r * 1.14f);
                 var c = Mathf.Cos(turn);
                 var s = Mathf.Sin(turn);
-                return new Vector2(0.5f + (dx * c - dz * s) * 0.5f * flip,
-                    0.5f + (dx * s + dz * c) * 0.5f);
-            };
+                fold[i] = new Vector2(0.5f + (ux * c - uz * s) * edge * flip,
+                    0.5f + (ux * s + uz * c) * edge);
+            }
             var mid = new Vector3(x, StainY, z);
             var uc = new Vector2(0.5f, 0.5f);
             // 扇に張る。Patch は a→b→c と a→c→d を出すので、縁を 2 つずつ渡せば
@@ -287,11 +327,9 @@ namespace HalfAware.EditorTools
             // 素直に i → i+2 の順で渡すと面が下を向いて、床から何も見えなくなる
             for (var i = 0; i < n; i += 2)
             {
-                var b = rim[i];
-                var c = rim[(i + 1) % n];
-                var d = rim[(i + 2) % n];
-                bank.Patch(mid, new Vector3(d.x, StainY, d.y), new Vector3(c.x, StainY, c.y),
-                    new Vector3(b.x, StainY, b.y), uc, fold(d), fold(c), fold(b));
+                var b = (i + 2) % n;
+                var c = (i + 1) % n;
+                bank.Patch(mid, rim[b], rim[c], rim[i], uc, fold[b], fold[c], fold[i]);
             }
         }
 
@@ -563,34 +601,87 @@ namespace HalfAware.EditorTools
         ///
         /// 三つで一組にする。押しボタンの箱・上げ下げの巻き取り機・足元の光電管。
         /// どれか一つだけだと壁に付いた謎の箱にしか見えないが、
-        /// 三つが電線で繋がっていると「シャッターの仕掛け」として読める
+        /// 三つが電線で繋がっていると「シャッターの仕掛け」として読める。
+        ///
+        /// **大きさを上げた。** 箱が 0.20 × 0.30、ボタンが 62 × 50 mm、光電管のレンズに
+        /// 至っては 10 × 48 × 30 mm しかなく、歩いてきても壁の斑にしか見えなかった。
+        /// 実物の押しボタン箱は 0.30 × 0.45 ほどあり、ボタンは掌で押す大きさをしている。
+        /// 光電管も、車の通る口に据える物なので拳ほどの箱に載っている。
+        ///
+        /// **箱と光電管の筐体は CarSteel で塗る。** Metal（0.085）は壁（0.128）より
+        /// 暗いので、暗がりでは壁と一体になって輪郭が出ない。塗った鉄（0.288）は
+        /// この場面でいちばん明るい素材で、壁の前に置くと形がそのまま読める。
+        /// 露わな配管と巻き取り機だけは Metal のまま残す。全部が明るいと、
+        /// どれが触る物なのか分からなくなる
         /// </summary>
         static void Controls(Transform parent)
         {
             var metal = new Bank { Texel = 1.4f };
             var dark = new Bank { Texel = 1.0f };
             var knob = new Bank { Texel = 2.2f };
+            var shell = new Bank { Texel = 1.4f };
             // 前の壁の内側の面。壁は厚み 0.25 の真ん中が front に来る
             var wall = GarageAt.z + GarageDeep * 0.5f;
             var jamb = ShutterWide * 0.5f;
 
             // 押しボタンの箱。シャッターの右の柱側。立って手の届く高さ
             var boxX = jamb + 0.45f;
-            metal.Box(new Vector3(boxX, 1.24f, wall - 0.055f), new Vector3(0.20f, 0.30f, 0.110f));
-            dark.Box(new Vector3(boxX, 1.24f, wall - 0.113f), new Vector3(0.155f, 0.245f, 0.010f));
-            // 上げる・止める・下げるの三つ。押しボタンなので座から少し出る
+            const float caseW = 0.34f;
+            const float caseH = 0.54f;
+            const float caseD = 0.13f;
+            const float caseY = 1.24f;
+            shell.Box(new Vector3(boxX, caseY, wall - caseD * 0.5f), new Vector3(caseW, caseH, caseD));
+            // 庇。天井の灯りを受けて上の縁が光るので、箱の輪郭が壁から切り離される
+            shell.Box(new Vector3(boxX, caseY + caseH * 0.5f + 0.022f, wall - 0.095f),
+                new Vector3(caseW + 0.07f, 0.040f, 0.190f));
+            // 座。ボタンの並ぶ暗い面
+            var seat = wall - caseD - 0.006f;
+            dark.Box(new Vector3(boxX, caseY - 0.02f, seat), new Vector3(caseW - 0.07f, caseH - 0.12f, 0.012f));
+            // 上げる・止める・下げるの三つ。押しボタンなので座から大きく出る。
+            // 掌で押す大きさにすると、三つ並んでいること自体が遠目にも読める
             for (var i = 0; i < 3; i++)
-                knob.Box(new Vector3(boxX, 1.325f - i * 0.085f, wall - 0.126f),
-                    new Vector3(0.062f, 0.050f, 0.028f));
-            // 通電を示す小さな灯り。**ガレージで唯一、自分で光っている物。**
-            // 天井の灯りが届かないシャッターの際に、一点だけ緑が点いている
+                knob.Box(new Vector3(boxX, 1.33f - i * 0.125f, seat - 0.031f),
+                    new Vector3(0.105f, 0.085f, 0.050f));
+            // 通電を示す灯り。**ガレージで唯一、自分で光っている物。**
+            // 歩いてくる先で一点だけ緑が点いていて、そこに何か付いていると分かる。
+            // 30 mm 角から 70 mm 角へ。遠くからでも点として消えない大きさが要る
             var pilot = Piece(Child(parent, "ShutterPilot"), "Lamp",
-                Shape("PilotLamp", 1f, b => b.Box(Vector3.zero, new Vector3(0.030f, 0.030f, 0.014f))),
-                Glow(new Color(0.42f, 0.95f, 0.50f), 1.9f));
-            pilot.position = new Vector3(boxX, 1.398f, wall - 0.122f);
-            // 電線の管。箱から天井へ立ち上げ、シャッターの上を横へ渡す
-            metal.Box(new Vector3(boxX, (1.39f + GarageHigh) * 0.5f, wall - 0.035f),
-                new Vector3(0.045f, GarageHigh - 1.39f, 0.045f));
+                Shape("PilotLamp", 1f, b => b.Box(Vector3.zero, new Vector3(0.070f, 0.070f, 0.016f))),
+                Glow(new Color(0.42f, 0.95f, 0.50f), 2.2f));
+            pilot.position = new Vector3(boxX, 1.44f, seat - 0.014f);
+            // 灯りの座。緑が壁に直に浮かないよう、暗い面の上へ載せる
+            dark.Box(new Vector3(boxX, 1.44f, seat - 0.004f), new Vector3(0.110f, 0.110f, 0.010f));
+            // 箱の上の防滴灯。**ボタンを見つけさせているのはこれ。**
+            //
+            // 天井の灯りは壁から 1.7 m 離れた真上にあるので、壁に当たる光は斜めに薄まる。
+            // 箱のところだけ 0.7 m の近さから照らす灯りを足すと、暗い壁の中で
+            // そこだけ明るい溜まりになり、歩いてくる先で真っ先に目に入る。
+            // 車庫の出入口の脇に灯りが一つ点いているのは、実際にそうなっている造作でもある
+            var lampY = 2.20f;
+            shell.Box(new Vector3(boxX, lampY + 0.135f, wall - 0.125f), new Vector3(0.320f, 0.045f, 0.250f));
+            shell.Box(new Vector3(boxX, lampY, wall - 0.045f), new Vector3(0.280f, 0.230f, 0.090f));
+            Piece(Child(parent, "ShutterLamp"), "Pane",
+                Shape("DoorLamp", 1f, b => b.Box(Vector3.zero, new Vector3(0.230f, 0.155f, 0.030f))),
+                Glow(GarageLamp, 1.6f)).position = new Vector3(boxX, lampY, wall - 0.105f);
+            var bulb = new GameObject("Light");
+            bulb.transform.SetParent(Child(parent, "ShutterLamp"), false);
+            // **壁から 0.45 離す。** 灯りを壁の際に置くと、壁を向いた面（箱の座・ボタンの頭）
+            // には光が斜めにしか当たらず、いちばん見せたいボタンが暗いまま残る。
+            // 庇の付いた灯りは前へ投げるものなので、光の出どころを前へ出しても嘘にならない
+            bulb.transform.localPosition = new Vector3(boxX, lampY - 0.15f, wall - 0.45f);
+            var glowLight = bulb.AddComponent<Light>();
+            glowLight.type = LightType.Point;
+            glowLight.color = GarageLamp;
+            // 弱くて近い。強くすると箱の面が飛んで、ボタンの三つが一つの白い塊になる
+            glowLight.intensity = 1.7f;
+            glowLight.range = 5f;
+            glowLight.shadows = LightShadows.None;
+
+            // 電線の管。箱から天井へ立ち上げ、シャッターの上を横へ渡す。
+            // 途中で防滴灯を貫くので、灯りへ電気が行っているようにも見える
+            var top = caseY + caseH * 0.5f + 0.04f;
+            metal.Box(new Vector3(boxX, (top + GarageHigh) * 0.5f, wall - 0.035f),
+                new Vector3(0.045f, GarageHigh - top, 0.045f));
             metal.Box(new Vector3((boxX + 0f) * 0.5f, GarageHigh - 0.075f, wall - 0.035f),
                 new Vector3(boxX + 0.045f, 0.045f, 0.045f));
 
@@ -605,26 +696,34 @@ namespace HalfAware.EditorTools
                     new Vector3(0.100f, 0.320f, 0.320f));
 
             // 足元の光電管。シャッターの両脇に向かい合わせで一対。
-            // 一つでは「箱」だが、向かい合って二つあると光の線を渡しているのが読める
+            // 一つでは「箱」だが、向かい合って二つあると光の線を渡しているのが読める。
+            //
+            // **床の上の設備として組み直した。** 筐体を拳ほどの箱にして、据え付けの
+            // 台座に載せる。目の高さも 0.30 から 0.42 へ上げた。車の口に据える物なので、
+            // 実物も膝より下には付いていない
             for (var s = 0; s < 2; s++)
             {
                 var side = s == 0 ? -1f : 1f;
-                var x = side * (jamb - 0.10f);
-                metal.Box(new Vector3(x, 0.30f, wall - 0.110f), new Vector3(0.090f, 0.170f, 0.100f));
-                metal.Box(new Vector3(x, 0.14f, wall - 0.110f), new Vector3(0.055f, 0.160f, 0.055f));
-                // 目。向かい合う側を向く。赤い小さな面
-                dark.Box(new Vector3(x - side * 0.048f, 0.30f, wall - 0.110f),
-                    new Vector3(0.010f, 0.100f, 0.060f));
+                var x = side * (jamb - 0.14f);
+                var near = wall - 0.135f;
+                // 台座・柱・筐体。下から順に細く、上でまた太くする
+                shell.Box(new Vector3(x, GarageFloorY + 0.018f, near), new Vector3(0.240f, 0.036f, 0.210f));
+                shell.Box(new Vector3(x, 0.20f, near), new Vector3(0.110f, 0.330f, 0.110f));
+                shell.Box(new Vector3(x, 0.42f, near), new Vector3(0.190f, 0.260f, 0.170f));
+                // 目。向かい合う側を向く。窪みを彫って、そこへ赤いレンズを嵌める
+                dark.Box(new Vector3(x - side * 0.090f, 0.42f, near),
+                    new Vector3(0.020f, 0.150f, 0.115f));
                 var eye = Piece(Child(parent, "ShutterEye" + s), "Lens",
-                    Shape("EyeLens", 1f, b => b.Box(Vector3.zero, new Vector3(0.010f, 0.048f, 0.030f))),
-                    Glow(new Color(0.95f, 0.30f, 0.26f), 1.4f));
-                eye.position = new Vector3(x - side * 0.055f, 0.30f, wall - 0.110f);
+                    Shape("EyeLens", 1f, b => b.Box(Vector3.zero, new Vector3(0.016f, 0.125f, 0.092f))),
+                    Glow(new Color(0.95f, 0.30f, 0.26f), 1.7f));
+                eye.position = new Vector3(x - side * 0.099f, 0.42f, near);
                 // 管。柱に沿って上へ逃がす
-                metal.Box(new Vector3(x, 1.00f, wall - 0.035f), new Vector3(0.040f, 1.24f, 0.040f));
+                metal.Box(new Vector3(x, 1.06f, wall - 0.035f), new Vector3(0.040f, 1.12f, 0.040f));
             }
 
             metal.Emit(parent, "ShutterGear", Mat("Metal"), false, Generated);
             dark.Emit(parent, "ShutterFace", Mat("CarGap"), false, Generated);
+            shell.Emit(parent, "ShutterCases", Mat("CarSteel"), false, Generated);
             knob.Emit(parent, "ShutterButtons", Mat("CarSteel"), false, Generated);
         }
 
@@ -713,7 +812,7 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 天井の灯り。**区画の列に合わせて 2 列。**
+        /// 天井の灯り。**区画の列に合わせて 2 列と、シャッターの手前にもう 1 列。**
         ///
         /// 1 列のときは (±3.0, 2.80, -2.00) に 2 本だけで、奥行き 16 m のうち
         /// 真ん中しか照らしていなかった。21 m に伸ばして列を 2 つにした以上、
@@ -723,14 +822,29 @@ namespace HalfAware.EditorTools
         /// 灯りの真下に車の屋根が来て、光がそこで止まる。通路の縁に吊れば、
         /// 同じ灯りが車の前半分と通路の両方を照らす。実際の車庫もそう吊ってある。
         ///
-        /// 管は x の向きに寝かせる。列が横一線に並んで、二つの列だと一目で分かる。
+        /// **三つめの列はシャッターの手前。** 二列のときは、いちばん前の灯りでも
+        /// シャッターから 7.1 m 離れていた。灯りの range は 13 あっても減衰は距離の
+        /// 二乗で効くので、7 m 先の壁に届くのは真下の 1/6 しかない。前の壁も、
+        /// 押しボタンの箱も、足元の光電管も、そこにある物として読めないまま沈んでいた。
+        /// <see cref="ShutterLampZ"/> に吊ると壁まで 1.7 m で、前の壁が
+        /// ガレージでいちばん明るい面になる。歩いてくる先に明るい壁があること自体が、
+        /// そこに何か付いていると気づかせる手掛かりになる。
+        ///
+        /// 管は x の向きに寝かせる。列が横一線に並んで、三つの列だと一目で分かる。
         /// 影を落とさせないのは、WebGL で影を持つ灯りを増やすと重くなるため
+        /// （<see cref="Lamps"/> だけで 9 灯になる。描画は Forward+ なので、
+        /// 1 つの mesh に載る灯りの数は頭打ちにならない）
         /// </summary>
         static void Lamps(Transform parent)
         {
             var tube = Shape("GarageTube", 0.5f, b => b.Box(Vector3.zero, new Vector3(2.40f, 0.08f, 0.18f)));
             var lit = Glow(GarageLamp, 1.6f);
-            var rows = new[] { AisleTo + 1.30f, AisleFrom - 1.30f };
+            // 並びは変えない。前の二列が Lamp0*・Lamp1* のままになるよう、足すのは後ろへ
+            var rows = new[] { AisleTo + 1.30f, AisleFrom - 1.30f, ShutterLampZ };
+            // **シャッターの列だけ強い。** ほかの二列は床（真下 2.76 m）を照らすが、
+            // この列は前の壁（斜め 2.2 m）を照らす。壁は立っているので光が斜めに当たり、
+            // 同じ強さでは床ほど明るくならない。歩いてくる先の壁が読める強さに上げる
+            var power = new[] { 4.6f, 4.6f, 6.2f };
             var across = new[] { -4.6f, 0f, 4.6f };
             for (var r = 0; r < rows.Length; r++)
                 for (var k = 0; k < across.Length; k++)
@@ -751,7 +865,7 @@ namespace HalfAware.EditorTools
                     // **8.0 から下げた。** 2 本が 6 本になったので、同じ強さのままだと
                     // 重なったところで床が飛ぶ。灯りの真下で床が 52 前後に来るところは
                     // 変えずに、本数のぶんだけ 1 本を弱める
-                    l.intensity = 4.6f;
+                    l.intensity = power[r];
                     l.range = 13f;
                     l.shadows = LightShadows.None;
                 }

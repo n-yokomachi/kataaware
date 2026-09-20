@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Glow_107_242_127_18
+  m_Name: Glow_242_076_066_17
   m_Shader: {fileID: 4800000, guid: 650dd9526735d5b46b79224bc6e94025, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -52,11 +52,11 @@ Material:
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 0.798, g: 1.805, b: 0.95, a: 1}
-    - _Color: {r: 0.798, g: 1.805, b: 0.95, a: 1}
+    - _BaseColor: {r: 1.615, g: 0.51000005, b: 0.442, a: 1}
+    - _Color: {r: 1.615, g: 0.51, b: 0.44199997, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
---- !u!114 &9207350078821712372
+--- !u!114 &3353699197920964826
 MonoBehaviour:
   m_ObjectHideFlags: 11
   m_CorrespondingSourceObject: {fileID: 0}

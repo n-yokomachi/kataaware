@@ -503,6 +503,15 @@ namespace HalfAware.EditorTools
         public const float ShutterHigh = 2.6f;
         /// <summary>天井の灯りの色</summary>
         public static readonly Color GarageLamp = new Color(0.62f, 0.66f, 0.72f);
+        /// <summary>
+        /// シャッターの手前に吊る灯りの列の z。前の壁の内側の面から 1.7 m。
+        ///
+        /// 区画の列に合わせた二列（z -1.2 と -9.7）はどちらもシャッターから 7 m 以上
+        /// 離れていて、前の壁も操作盤も光電管も闇に沈んでいた。ここは前の列の
+        /// 止め線（<see cref="BayZ"/> + <see cref="BayDeep"/>/2 ＝ 2.7）より前なので、
+        /// 停めてある車の屋根に光を止められることも無い
+        /// </summary>
+        public static float ShutterLampZ { get { return GarageAt.z + GarageDeep * 0.5f - 1.7f; } }
 
         // ---- ガレージの飾り -------------------------------------------------
         //
@@ -1838,13 +1847,20 @@ namespace HalfAware.EditorTools
                 case "Shutter": col = new Color(0.155f, 0.150f, 0.140f); smooth = 0.24f; break;
                 // 区画の線と番号。塗り直されていない白なので、床よりわずかに明るい程度
                 case "BayPaint": col = new Color(0.310f, 0.300f, 0.262f); smooth = 0.08f; break;
-                // 油染み。**α を 1 未満にするのはここだけの事情。**
+                // 油溜まり。**α を 1 未満にするのはここだけの事情。**
                 //
                 // 濃さも色も虹も絵（DriveOilStain.png）が持っていて、ここの色は使われない。
                 // ただし <see cref="Mat"/> は α が 1 を切ったときだけ <see cref="SeeThrough"/> を
                 // 通すので、1 のままだと絵の α が捨てられて、縁の切り立った黒い塊に戻る。
-                // 0.96 は「ほぼそのまま、でも透ける」ための値で、濃さを決めているのではない
-                case "OilStain": col = new Color(0.030f, 0.029f, 0.031f, 0.96f); smooth = 0.52f; break;
+                // 0.96 は「ほぼそのまま、でも透ける」ための値で、濃さを決めているのではない。
+                //
+                // **艶は濡れた舗装（Sheen）と同じところまで上げた。** 0.52 では映り込みの
+                // 広がりが床（0.14）と大差なく、天井の灯りが溜まりの上で滲むだけで
+                // 終わっていた。溜まりが溜まりに見えるのは、暗いからではなく、
+                // そこだけ灯りを映すからで、映り込みの鋭さがそのまま水気に読める。
+                // 映り込みは天井の 9 灯から直に来る（RenderSettings の映り込みは
+                // <see cref="DriveSky.Apply"/> が切ってあるので、環境の側からは来ない）
+                case "OilStain": col = new Color(0.030f, 0.029f, 0.031f, 0.96f); smooth = 0.86f; break;
                 // 排水口の受け。中は見えないので、ただ暗い
                 case "Drain": col = new Color(0.040f, 0.039f, 0.038f); smooth = 0.14f; break;
                 // 隣の車に掛かった覆い。埃をかぶった帆布
