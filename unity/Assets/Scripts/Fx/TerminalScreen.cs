@@ -8,12 +8,15 @@ namespace HalfAware
     /// **面のマテリアルはこの場面のために複製したものを当てる。**
     /// 場面 1 と共有すると、こちらで灯した画面が向こうでも灯る。
     /// 複製したマテリアルでは emission を有効にしておく。
-    /// 切ってあると <see cref="MaterialPropertyBlock"/> から色を渡しても効かない
+    /// 切ってあると <see cref="MaterialPropertyBlock"/> から色を渡しても効かない。
+    ///
+    /// **面は 1 枚ではなく机に並んだ 5 枚をまとめて持つ。** 5 枚でひとつの作業机なので、
+    /// 点くときは 5 枚とも点く。1 枚だけ灯すと、残りの 4 枚が壊れているように見える
     /// </summary>
     public sealed class TerminalScreen : MonoBehaviour
     {
-        [Tooltip("画面の面。ここのマテリアルを触る")]
-        [SerializeField] Renderer face;
+        [Tooltip("画面の面。ここのマテリアルを触る。机に並んだぶんを全部渡す")]
+        [SerializeField] Renderer[] faces = new Renderer[0];
         [Tooltip("消えているときの色")]
         [SerializeField] Color off = new Color(0.035f, 0.040f, 0.045f);
         [Tooltip("点いているときの色")]
@@ -59,14 +62,19 @@ namespace HalfAware
 
         void Paint(float level)
         {
-            if (face == null) return;
-            face.GetPropertyBlock(block);
+            if (faces == null) return;
             var lit = Color.Lerp(off, glow, level);
-            block.SetColor(BaseColor, lit);
-            block.SetColor(Emission, lit * level);
-            // 流すのは縦だけ。横へずらすと行が切れて読めない絵になる
-            block.SetVector(BaseMapST, new Vector4(1f, 1f, 0f, -offset));
-            face.SetPropertyBlock(block);
+            for (var i = 0; i < faces.Length; i++)
+            {
+                var face = faces[i];
+                if (face == null) continue;
+                face.GetPropertyBlock(block);
+                block.SetColor(BaseColor, lit);
+                block.SetColor(Emission, lit * level);
+                // 流すのは縦だけ。横へずらすと行が切れて読めない絵になる
+                block.SetVector(BaseMapST, new Vector4(1f, 1f, 0f, -offset));
+                face.SetPropertyBlock(block);
+            }
         }
     }
 }

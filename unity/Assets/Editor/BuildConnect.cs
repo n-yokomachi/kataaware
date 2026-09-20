@@ -1,0 +1,557 @@
+using System.Collections.Generic;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+namespace HalfAware.EditorTools
+{
+    /// <summary>
+    /// 場面 3（自室・接続）を、場面 1 の <c>Room.unity</c> から組み直す。
+    ///
+    /// **部屋の地形と小物の出処は Room.unity ひとつだけ。** 同じ部屋を二度組むと、
+    /// 片方だけ直したときに朝の部屋と夕方の部屋で寸法が食い違う。
+    ///
+    /// **開いたらその場で Connect.unity へ名前を移す。** 以降の書き換えはすべて
+    /// 複製の側に載る。Room.unity を保存すると場面 1 が丸ごと壊れる。
+    ///
+    /// 詰め直しは「場面 1 のものを落とす」「夕方の状態に置き直す」「場面 3 のものを足す」の順。
+    /// 落とすのが先なのは、JackPull と JackPlug が同じ id で動くため
+    /// </summary>
+    public static class BuildConnect
+    {
+        public const string RoomPath = "Assets/Scenes/Room.unity";
+        public const string ScenePath = "Assets/Scenes/Connect.unity";
+        public const string ScriptPath = "Assets/Data/ConnectScript.asset";
+        public const string Materials = "Assets/Materials/Connect";
+        public const string FacePath = Materials + "/TerminalFace.mat";
+        public const string RowsPath = "Assets/Textures/TerminalRows.png";
+        public const string PlugPath = "Assets/Audio/JackPlug.wav";
+
+        /// <summary>手首の骨。ジャックはここから肘掛けへ移り、挿すと帰ってくる</summary>
+        const string WristPath = "Player/Protagonist/CharacterArmature/Root/Body/Hips/Abdomen"
+            + "/Torso/Chest/Shoulder.R/UpperArm.R/LowerArm.R/Wrist.R";
+        /// <summary>左の手のひら。掴んでいる間ジャックを預ける</summary>
+        const string HoldPath = "Player/Protagonist/CharacterArmature/Root/Body/Hips/Abdomen"
+            + "/Torso/Chest/Shoulder.L/UpperArm.L/LowerArm.L/Wrist.L/JackHold";
+        /// <summary>手首に残す受け口の名前</summary>
+        const string SocketName = "JackSocket";
+
+        /// <summary>戸口の内側。場面 2 の暗転から、ここで部屋の奥を向いて明ける</summary>
+        static readonly Vector3 StartAt = new Vector3(0.80f, 0.05f, -2.45f);
+        /// <summary>腰を下ろす場所。場面 1 が座って始まるのと同じ点</summary>
+        static readonly Vector3 SeatAt = new Vector3(1.50f, 0.05f, 1.20f);
+        /// <summary>ソファの上の売上メモ</summary>
+        static readonly Vector3 NoteAt = new Vector3(-2.40f, 0.67f, 0.19f);
+        /// <summary>椅子。座面ではなく、立って見下ろせる高さに置く</summary>
+        static readonly Vector3 ChairAt = new Vector3(1.50f, 0.75f, 1.20f);
+        /// <summary>モニター。monitor / list / dive は順に開くので同じ点でよい</summary>
+        static readonly Vector3 ScreenAt = new Vector3(1.50f, 1.10f, 2.42f);
+
+        /// <summary>座ったときの目線の高さ。ConnectDirector へ渡す</summary>
+        public const float SeatEyeHeight = 1.1f;
+        public const float ItemRadius = 2f;
+        /// <summary>ジャックだけ近い。腕の上のものを部屋の向こうから拾わせない</summary>
+        public const float JackRadius = 1.2f;
+
+        /// <summary>消えている画面の色。TerminalScreen の off と揃える。点いた色はあちらが持つ</summary>
+        static readonly Color ScreenOff = new Color(0.035f, 0.040f, 0.045f);
+
+        // ---- 組み立て ------------------------------------------------------
+
+        [MenuItem("HalfAware/Build the connect scene", false, 240)]
+        public static void BuildMenu()
+        {
+            if (EditorApplication.isPlaying)
+            {
+                Debug.LogError("再生中は組み直さない。止めてからもう一度");
+                return;
+            }
+            if (!Rename()) return;
+
+            Strip();
+            Flow();
+            Stand();
+            var socket = Park();
+            var items = Items();
+            var faces = Screens();
+            Wire(socket, faces, items);
+
+            var scene = EditorSceneManager.GetActiveScene();
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            AssetDatabase.SaveAssets();
+            Check(faces, items);
+            Debug.Log(string.Format("夕方の部屋を組んだ。調べる対象 {0} 個（頭から開くのは {1} 個）、画面 {2} 枚。"
+                + "立ち位置 {3} から椅子 {4} まで約 {5:F1} m",
+                items.Count, Open(items), faces.Length, StartAt.ToString("F2"), SeatAt.ToString("F2"),
+                Vector3.Distance(new Vector3(StartAt.x, 0f, StartAt.z), new Vector3(SeatAt.x, 0f, SeatAt.z))));
+        }
+
+        /// <summary>
+        /// 場面 1 を開いて、その場で Connect.unity として名前を移す。
+        ///
+        /// **開いてから名前を移すまでのあいだは何も触らない。** ここで手を入れると、
+        /// 保存が途中で失敗したときに場面 1 が書き換わったまま残る。
+        /// 未保存のシーンが開いているときは何もしない。開き直すと黙って消える
+        /// </summary>
+        static bool Rename()
+        {
+            for (var i = 0; i < SceneManager.sceneCount; i++)
+            {
+                var other = SceneManager.GetSceneAt(i);
+                if (!other.isDirty) continue;
+                Debug.LogError("開いているシーンに未保存の変更がある。保存するか捨ててからもう一度: " + other.path);
+                return false;
+            }
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(RoomPath) == null)
+            {
+                Debug.LogError("場面 1 が無い: " + RoomPath);
+                return false;
+            }
+            var scene = EditorSceneManager.OpenScene(RoomPath, OpenSceneMode.Single);
+            if (!EditorSceneManager.SaveScene(scene, ScenePath))
+            {
+                Debug.LogError("Connect.unity として保存できなかった。場面 1 を守るためここで止める");
+                return false;
+            }
+            if (EditorSceneManager.GetActiveScene().path == ScenePath) return true;
+            Debug.LogError("名前が移っていない。まだ Room.unity を開いたままなので止める");
+            return false;
+        }
+
+        // ---- 場面 1 のものを落とす -------------------------------------------
+
+        /// <summary>
+        /// 場面 1 の頭の演出と、場面 1 の調べる対象を落とす。
+        /// 対象は入れ物の下だけでなく手首のジャックにも付いているので、
+        /// 名前ではなく付いているコンポーネントで拾う
+        /// </summary>
+        static void Strip()
+        {
+            var intro = Object.FindFirstObjectByType<RoomIntroDirector>(FindObjectsInactive.Include);
+            if (intro != null) Object.DestroyImmediate(intro);
+            foreach (var item in Object.FindObjectsByType<Interactable>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                Object.DestroyImmediate(item.gameObject);
+            Sold();
+        }
+
+        /// <summary>
+        /// 抜き差し台のメモリは場面 2 で売り切れている。チップと札を落とし、
+        /// 場面 1 で持ち出したときと同じところまで灯りを落とす。
+        /// 持ち出しの仕掛け（<see cref="Taken"/>）は id が場面 1 のものなので、
+        /// 置いておいても二度と動かない。落とす前に灯りの替えだけ写し取る
+        /// </summary>
+        static void Sold()
+        {
+            var hub = Look("Room/MemoryHub");
+            if (hub == null) return;
+            var taken = hub.GetComponent<Taken>();
+            if (taken != null)
+            {
+                var so = new SerializedObject(taken);
+                var lamp = so.FindProperty("lamp").objectReferenceValue as Material;
+                var relit = so.FindProperty("relit");
+                for (var i = 0; i < relit.arraySize; i++)
+                {
+                    var r = relit.GetArrayElementAtIndex(i).objectReferenceValue as Renderer;
+                    if (r == null || lamp == null) continue;
+                    r.sharedMaterial = lamp;
+                    EditorUtility.SetDirty(r);
+                }
+                Object.DestroyImmediate(taken);
+            }
+            for (var i = hub.childCount - 1; i >= 0; i--)
+            {
+                var c = hub.GetChild(i);
+                if (!c.name.StartsWith("Chip") && !c.name.StartsWith("Label")) continue;
+                Object.DestroyImmediate(c.gameObject);
+            }
+        }
+
+        // ---- 夕方の状態に置き直す ---------------------------------------------
+
+        /// <summary>
+        /// 場面 3 の SceneFlow。座って始まる仕度と、場面 1 の頭と終わりの段取りを外す。
+        /// SceneFlow そのものには手を入れない（場面 1・2・8 が同じものに乗っている）
+        /// </summary>
+        static void Flow()
+        {
+            var flow = Object.FindFirstObjectByType<SceneFlow>(FindObjectsInactive.Include);
+            if (flow == null) { Debug.LogError("SceneFlow が無い"); return; }
+            var so = new SerializedObject(flow);
+            // 空だと Awake が座位の仕度を丸ごと飛ばす。場面 3 は立って始まる
+            so.FindProperty("standAfter").stringValue = "";
+            // 場面 4 はまだ無い。「（仮）続く」で止める
+            so.FindProperty("nextScene").stringValue = "";
+            // 場面 2 の暗転から続くので見出しを挟まない
+            so.FindProperty("openingCard").stringValue = "";
+            so.FindProperty("cutToBlack").boolValue = false;
+            // 部屋を出ないので扉の音は鳴らない
+            so.FindProperty("exitSound").objectReferenceValue = null;
+            so.FindProperty("dazeUntil").stringValue = "";
+            // **眩暈は繋がない。** dazeUntil が空でも ReleaseDaze は最初の Update で
+            // Decay を呼ぶので、繋いだままだと場面の頭に 5 秒ぶんの眩暈が乗る。
+            // 眩暈は場面 1 の目覚めのもの
+            so.FindProperty("daze").objectReferenceValue = null;
+            // **空にする。** Awake は standAfter が空でも chairBlocker.SetActive(false) を
+            // 無条件に呼ぶ。歩き回る場面で椅子の当たりを切られると、椅子をすり抜ける。
+            // 座ったところで切るのは ConnectDirector の仕事
+            so.FindProperty("chairBlocker").objectReferenceValue = null;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(flow);
+        }
+
+        /// <summary>
+        /// 戸口の内側に立たせる。椅子の当たりは入れておく。
+        /// 座位の姿勢（<see cref="SeatedPose.Seated"/>）は直列化されないので、
+        /// 解くのは ConnectDirector が再生のたびにやる
+        /// </summary>
+        static void Stand()
+        {
+            var player = Object.FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
+            if (player == null) { Debug.LogError("PlayerController が無い"); return; }
+            player.transform.position = StartAt;
+            player.transform.rotation = Quaternion.identity;
+            EditorUtility.SetDirty(player);
+            var pose = Object.FindFirstObjectByType<SeatedPose>(FindObjectsInactive.Include);
+            if (pose != null) { pose.Seated = false; EditorUtility.SetDirty(pose); }
+            var blocker = Look("Room/Chair/Blocker");
+            if (blocker != null) blocker.gameObject.SetActive(true);
+            // 場面 1 の前腕は、下を向いたときだけジャックの対象を出し入れする。
+            // 場面 3 の jack は座り終えるまで伏せておくものなので、繋いだままだと
+            // 前腕が毎フレーム開け閉めして ConnectDirector と取り合う
+            var arm = Object.FindFirstObjectByType<Forearm>(FindObjectsInactive.Include);
+            if (arm == null) return;
+            var so = new SerializedObject(arm);
+            so.FindProperty("jackItem").objectReferenceValue = null;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(arm);
+        }
+
+        /// <summary>
+        /// ジャックは肘掛けに置いてある。場面 1 の終わりに置いたままの形。
+        /// 手首には受け口だけを残す。
+        ///
+        /// **受け口を空の GameObject で残すのは、手首の骨が 100 倍に伸びているため。**
+        /// JackPlug は挿さったところでジャックを受け口の原点へ等倍で置く。
+        /// 骨へ直に返すと 100 倍の大きさで生える。受け口が元の置き方と大きさを覚えていれば、
+        /// 挿した後の見え方は場面 1 の頭とそのまま同じになる
+        /// </summary>
+        static Transform Park()
+        {
+            var wrist = Look(WristPath);
+            var rest = Look("Room/Chair/JackRest");
+            if (wrist == null || rest == null) return null;
+            var jack = wrist.Find("Jack");
+            if (jack == null) { Debug.LogWarning("手首にジャックが無い"); return null; }
+            var socket = wrist.Find(SocketName);
+            if (socket == null)
+            {
+                var go = new GameObject(SocketName);
+                go.transform.SetParent(wrist, false);
+                socket = go.transform;
+            }
+            socket.localPosition = jack.localPosition;
+            socket.localRotation = jack.localRotation;
+            socket.localScale = jack.localScale;
+            jack.SetParent(rest, false);
+            jack.localPosition = Vector3.zero;
+            jack.localRotation = Quaternion.identity;
+            jack.localScale = Vector3.one;
+            return socket;
+        }
+
+        // ---- 調べる対象 ------------------------------------------------------
+
+        /// <summary>
+        /// 6 つとも必須。<c>jack</c> と <c>monitor</c> だけは伏せて始める。
+        /// after は「その id が済んだか」しか見ないので、座る演出と挿す演出の途中で
+        /// 次が拾えてしまう。演出の終わりで ConnectDirector が開けば、
+        /// 開く時刻が演出の終わりと一致する
+        /// </summary>
+        static Dictionary<string, GameObject> Items()
+        {
+            var made = new Dictionary<string, GameObject>();
+            var parent = Look("Interactables");
+            if (parent == null) return made;
+            var script = AssetDatabase.LoadAssetAtPath<RoomScript>(ScriptPath);
+            if (script == null)
+                Debug.LogWarning("場面 3 の文面が無い。先に HalfAware/Write the connect script を走らせる: " + ScriptPath);
+
+            made[ConnectIds.Note] = Put(parent, "Note", NoteAt, script, ConnectIds.Note, ItemRadius, null, true);
+            made[ConnectIds.Chair] = Put(parent, "Chair", ChairAt, script, ConnectIds.Chair, ItemRadius, ConnectIds.Note, true);
+            made[ConnectIds.Monitor] = Put(parent, "Monitor", ScreenAt, script, ConnectIds.Monitor, ItemRadius, null, false);
+            made[ConnectIds.List] = Put(parent, "List", ScreenAt, script, ConnectIds.List, ItemRadius, ConnectIds.Monitor, true);
+            made[ConnectIds.Dive] = Put(parent, "Dive", ScreenAt, script, ConnectIds.Dive, ItemRadius, ConnectIds.List, true);
+
+            // ジャックの対象はジャックに付いて回る。肘掛けに置いてある間はそこで拾い、
+            // 挿した後は手首に付いていく
+            var jack = Look("Room/Chair/JackRest/Jack");
+            if (jack != null)
+            {
+                var item = Put(jack, "Jack", jack.position, script, ConnectIds.Jack, JackRadius, null, false);
+                item.transform.localPosition = Vector3.zero;
+                made[ConnectIds.Jack] = item;
+            }
+            return made;
+        }
+
+        /// <summary>調べる対象をひとつ立てる。どれも一度調べたら終わり</summary>
+        static GameObject Put(Transform parent, string name, Vector3 at, RoomScript script,
+            string id, float radius, string after, bool live)
+        {
+            var go = new GameObject("Interactable_" + name);
+            go.transform.SetParent(parent, false);
+            go.transform.position = at;
+            // Interactable の OnValidate は AddComponent の中で走るので、
+            // ここで「id がない」と一度警告が出る。id はこの直後に入れている
+            var item = go.AddComponent<Interactable>();
+            var so = new SerializedObject(item);
+            so.FindProperty("id").stringValue = id;
+            so.FindProperty("script").objectReferenceValue = script;
+            so.FindProperty("radius").floatValue = radius;
+            so.FindProperty("required").boolValue = true;
+            so.FindProperty("once").boolValue = true;
+            var chain = so.FindProperty("after");
+            chain.arraySize = after == null ? 0 : 1;
+            if (after != null) chain.GetArrayElementAtIndex(0).stringValue = after;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            go.SetActive(live);
+            return go;
+        }
+
+        // ---- モニター --------------------------------------------------------
+
+        /// <summary>
+        /// 画面の面を場面 3 のマテリアルへ替える。
+        ///
+        /// **5 枚とも替える。** 机の 5 枚は場面 1 から同じマテリアルを共有していて、
+        /// 1 枚だけ替えて灯すと隣の 4 枚が消えたままになる。ひとつの作業机なので、
+        /// 点くときは 5 枚とも点く
+        /// </summary>
+        static Renderer[] Screens()
+        {
+            var faces = new List<Renderer>();
+            var monitors = Look("Room/Monitors");
+            if (monitors == null) return faces.ToArray();
+            var mat = Face();
+            foreach (Transform m in monitors)
+            {
+                var face = m.Find("Face");
+                var r = face != null ? face.GetComponent<Renderer>() : null;
+                if (r == null) continue;
+                if (mat != null) r.sharedMaterial = mat;
+                EditorUtility.SetDirty(r);
+                faces.Add(r);
+            }
+            if (faces.Count == 0) Debug.LogWarning("モニターの面が見つからない");
+            return faces.ToArray();
+        }
+
+        /// <summary>
+        /// 場面 3 の画面のマテリアル。場面 1 と共有したままだと、
+        /// こちらで灯した画面が向こうでも灯る
+        /// </summary>
+        static Material Face()
+        {
+            if (!AssetDatabase.IsValidFolder(Materials)) AssetDatabase.CreateFolder("Assets/Materials", "Connect");
+            var m = AssetDatabase.LoadAssetAtPath<Material>(FacePath);
+            if (m == null)
+            {
+                var source = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/Placeholder/Screen.mat");
+                if (source == null) { Debug.LogWarning("元の画面のマテリアルが無い"); return null; }
+                m = new Material(source);
+                m.name = "TerminalFace";
+                AssetDatabase.CreateAsset(m, FacePath);
+            }
+            var rows = AssetDatabase.LoadAssetAtPath<Texture2D>(RowsPath);
+            if (rows == null) Debug.LogWarning("帯の絵が無い: " + RowsPath);
+            // **帯は地と光る側の両方に貼る。** 地だけだと、灯ったときに一様な色の
+            // emission が上から塗り潰して帯が消え、画面が緑の板になる。
+            // URP の Lit は emission も _BaseMap_ST で畳んだ uv で引くので、
+            // 流すのは TerminalScreen に任せられる
+            m.SetTexture("_BaseMap", rows);
+            m.SetColor("_BaseColor", ScreenOff);
+            m.SetTexture("_EmissionMap", rows);
+            // **emission を切らない。** 切ってあると TerminalScreen が
+            // MaterialPropertyBlock から色を渡しても、シェーダーの側で捨てられる。
+            // 色そのものは消えているぶんを入れておく。エディタで開いたときの見え方も
+            // 組み立ての責任で、場面の頭では画面は消えている
+            m.SetColor("_EmissionColor", ScreenOff);
+            m.EnableKeyword("_EMISSION");
+            m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        // ---- 繋ぎ込み --------------------------------------------------------
+
+        /// <summary>
+        /// 場面 3 のものを足して繋ぐ。private な [SerializeField] なので
+        /// SerializedObject 越しに書く
+        /// </summary>
+        static void Wire(Transform socket, Renderer[] faces, Dictionary<string, GameObject> items)
+        {
+            var flow = Object.FindFirstObjectByType<SceneFlow>(FindObjectsInactive.Include);
+            var monitors = Look("Room/Monitors");
+            if (monitors != null)
+            {
+                var screen = monitors.GetComponent<TerminalScreen>();
+                if (screen == null) screen = monitors.gameObject.AddComponent<TerminalScreen>();
+                var so = new SerializedObject(screen);
+                var row = so.FindProperty("faces");
+                row.arraySize = faces.Length;
+                for (var i = 0; i < faces.Length; i++) row.GetArrayElementAtIndex(i).objectReferenceValue = faces[i];
+                so.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(screen);
+            }
+            Plug(flow, socket);
+        }
+
+        /// <summary>
+        /// 挿すしぐさ。曲げは手で写さない。
+        ///
+        /// **複製した時点で抜く側（<see cref="JackPull"/>）がまだ乗っているので、
+        /// 段を読み替えてそのまま複写する。** 手で数字を打ち直すより確実で、
+        /// 抜く側を詰め直したら組み直すだけで挿す側も付いてくる。
+        /// 写し終えたら抜く側は落とす。id が同じなので、残すと両方が動く
+        /// </summary>
+        static void Plug(SceneFlow flow, Transform socket)
+        {
+            var pro = Look("Player/Protagonist");
+            if (pro == null) return;
+            var pull = pro.GetComponent<JackPull>();
+            var plug = pro.GetComponent<JackPlug>();
+            if (plug == null) plug = pro.gameObject.AddComponent<JackPlug>();
+            var so = new SerializedObject(plug);
+            so.FindProperty("flow").objectReferenceValue = flow;
+            so.FindProperty("pose").objectReferenceValue = pro.GetComponent<SeatedPose>();
+            so.FindProperty("id").stringValue = ConnectIds.Jack;
+            so.FindProperty("jack").objectReferenceValue = Look("Room/Chair/JackRest/Jack");
+            so.FindProperty("grip").objectReferenceValue = Look(HoldPath);
+            so.FindProperty("socket").objectReferenceValue = socket;
+            var voice = Look("Player/Main Camera/Voice");
+            so.FindProperty("source").objectReferenceValue = voice != null ? voice.GetComponent<AudioSource>() : null;
+            var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(PlugPath);
+            if (clip == null) Debug.LogWarning("挿さる音が無い: " + PlugPath);
+            so.FindProperty("plug").objectReferenceValue = clip;
+            if (pull == null) Debug.LogWarning("JackPull が無い。曲げを写せないので挿すしぐさは棒立ちになる");
+            else
+            {
+                var from = new SerializedObject(pull);
+                Copy(from, "look", so, "look");
+                Copy(from, "reach", so, "reach");
+                // 抜く側の「前へ出す」が、挿す側では「手首の前へ運ぶ」にあたる
+                Copy(from, "show", so, "carry");
+                // 抜く側の「引き抜いて退ける」が、挿す側では「挿し込む」にあたる
+                Copy(from, "lift", so, "push");
+            }
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(plug);
+            if (pull != null) Object.DestroyImmediate(pull);
+        }
+
+        /// <summary>曲げの配列を写す。BoneTurn は struct なので、要素ごとに並べ直す</summary>
+        static void Copy(SerializedObject from, string source, SerializedObject to, string target)
+        {
+            var a = from.FindProperty(source);
+            var b = to.FindProperty(target);
+            b.arraySize = a.arraySize;
+            for (var i = 0; i < a.arraySize; i++)
+            {
+                var x = a.GetArrayElementAtIndex(i);
+                var y = b.GetArrayElementAtIndex(i);
+                y.FindPropertyRelative("bone").stringValue = x.FindPropertyRelative("bone").stringValue;
+                y.FindPropertyRelative("axis").enumValueIndex = x.FindPropertyRelative("axis").enumValueIndex;
+                y.FindPropertyRelative("degrees").floatValue = x.FindPropertyRelative("degrees").floatValue;
+            }
+        }
+
+        // ---- 見直し ----------------------------------------------------------
+
+        /// <summary>組み終えたら必ず見直す。目で気づくまで放っておかない</summary>
+        static void Check(Renderer[] faces, Dictionary<string, GameObject> items)
+        {
+            var script = AssetDatabase.LoadAssetAtPath<RoomScript>(ScriptPath);
+            var placed = Object.FindObjectsByType<Interactable>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            foreach (var id in ConnectIds.Order)
+            {
+                if (!items.ContainsKey(id)) Debug.LogWarning("シーンに対象が無い: " + id);
+                if (script != null && script.Find(id).id == null) Debug.LogWarning("文面に id が無い: " + id);
+            }
+            if (placed.Length != ConnectIds.Order.Length)
+                Debug.LogWarning(string.Format("対象の数が合わない。{0} 個あるが、場面 3 は {1} 個",
+                    placed.Length, ConnectIds.Order.Length));
+
+            Reach(ConnectIds.Note, NoteAt);
+            Reach(ConnectIds.Chair, ChairAt);
+
+            // 挿す前のジャックは肘掛けの上。判定点がそこから離れていると、
+            // 座っても拾えないか、座る前に部屋の向こうから拾える
+            var rest = Look("Room/Chair/JackRest");
+            GameObject jack;
+            if (rest != null && items.TryGetValue(ConnectIds.Jack, out jack))
+            {
+                var gap = Vector3.Distance(jack.transform.position, rest.position);
+                if (gap > 0.05f) Debug.LogWarning(string.Format("jack の判定点が肘掛けから {0:F3} m 離れている", gap));
+            }
+
+            // 画面のマテリアルが場面 1 と共有のままだと、こちらで灯した画面が向こうでも灯る
+            foreach (var face in faces)
+            {
+                if (face == null) continue;
+                var path = AssetDatabase.GetAssetPath(face.sharedMaterial);
+                if (path == FacePath) continue;
+                Debug.LogWarning("画面のマテリアルが場面 3 のものではない: " + face.name + " → " + path);
+            }
+        }
+
+        /// <summary>
+        /// 立って届く対象か。床に立った目の高さから、半径の中に入れる点があるかを測る。
+        /// 高さの差が半径より大きいと、どこに立っても届かない
+        /// </summary>
+        static void Reach(string id, Vector3 at)
+        {
+            var drop = at.y - (StartAt.y + PlayerController.StandingEyeHeight);
+            if (Mathf.Abs(drop) >= ItemRadius)
+            {
+                Debug.LogWarning(string.Format("{0} は立って届かない。高さの差 {1:F2} m が半径 {2:F2} m を超える",
+                    id, drop, ItemRadius));
+                return;
+            }
+            var room = Mathf.Sqrt(ItemRadius * ItemRadius - drop * drop);
+            Debug.Log(string.Format("{0} は床の上 {1:F2} m まで下がっても届く。手前 {2:F2} m から拾える", id, -drop, room));
+        }
+
+        /// <summary>頭から開いている対象の数</summary>
+        static int Open(Dictionary<string, GameObject> items)
+        {
+            var n = 0;
+            foreach (var pair in items) if (pair.Value != null && pair.Value.activeSelf) n++;
+            return n;
+        }
+
+        // ---- 道具 ------------------------------------------------------------
+
+        static Transform Look(string path)
+        {
+            var t = Find(path);
+            if (t == null) Debug.LogWarning("繋ぎ先が見つからない: " + path);
+            return t;
+        }
+
+        /// <summary>根から名前で辿る。切ってある物も辿れる（GameObject.Find は拾わない）</summary>
+        static Transform Find(string path)
+        {
+            var cut = path.IndexOf('/');
+            var head = cut < 0 ? path : path.Substring(0, cut);
+            foreach (var go in SceneManager.GetActiveScene().GetRootGameObjects())
+            {
+                if (go.name != head) continue;
+                return cut < 0 ? go.transform : go.transform.Find(path.Substring(cut + 1));
+            }
+            return null;
+        }
+    }
+}
