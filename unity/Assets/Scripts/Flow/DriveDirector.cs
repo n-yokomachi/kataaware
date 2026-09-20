@@ -218,6 +218,11 @@ namespace HalfAware
                 croftsDue = true;
             }
 
+            // **最後の景色の return より前に置く。** 小麦畑は最後の景色なので、
+            // 余韻に入ると下の分岐が return してしまい、ここから先は走らない。
+            // 下に置いていたあいだ、家は秒数をどれだけ延ばしても一度も出なかった
+            AdmitCrofts();
+
             // 速さと粗さは秒数と同じ扱いで、毎フレーム渡す。
             // Dress のときだけ渡すと、再生しながら Inspector で速さを触っても
             // 次の暗転まで効かない。今の帯は一生効かないことになる
@@ -249,9 +254,6 @@ namespace HalfAware
             // ここで clock.Reset を呼んではいけない。黒が 1 フレームで終わる
             if (clock.TakeSwap()) Dress(band + 1);
 
-            // 道の先まで下がった区切りに農家を載せる。独白を送り切るまでは何もしない
-            AdmitCrofts();
-
             // 黒と明けのあいだは操作を止める
             if (clock.Beat == DriveBeat.Black || clock.Beat == DriveBeat.FadingIn) flow.Freeze(0.25f);
 
@@ -274,6 +276,13 @@ namespace HalfAware
             // band を先に弾いておくのは、BandOf の「見つからない」も -1 で返るため。
             // 両方 -1 のまま比べると、どの対象を調べても通ってしまう
             if (route.BandOf(item.Id) != band) return;
+            // 窓は調べたその場で下ろす。文が出るのと同時に音が鳴り、こもりも取れる
+            if (item.Id == DriveIds.Window && sound != null)
+            {
+                sound.WindowDown();
+                sound.Open(true);
+            }
+
             // 煙草だけ、独白の前に一連の間が入る。**時計を進めるのはその後。**
             // ここで clock.Trigger を呼んでしまうと、段を積む前に Update が
             // 「話し終えた」と見なして（Talking かつ flow.Talking が false）、
@@ -508,6 +517,12 @@ namespace HalfAware
                 return;
             }
             shown = which;
+            // **速さと粗さをここで渡す。** Update は aboard が立つまで走らないので、
+            // 渡さないと黒のあいだも明けるあいだも速さが 0 のままで、
+            // フェードが明けたところから走り出すことになる。
+            // 景色は走っているところから始まらなければならない
+            world.Speed = At(which).speed;
+            world.Rough = At(which).rough;
             world.Dress(which);
             world.Rewind();
             ShowTrigger(which);

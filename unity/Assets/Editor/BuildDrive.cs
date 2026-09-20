@@ -820,13 +820,15 @@ namespace HalfAware.EditorTools
         // フェードではなく瞬間的な切り替えとする」とあるので fadeIn は 0。
         // 黒へ入るのは元から切り替えなので、出入りとも一瞬になる。
         //
-        // 最後の景色の余韻が 10 秒なのは、独白のあと家々が通り過ぎるところを
-        // 映してから暗転するため（設計書 7.2）
+        // 最後の景色の余韻が 30 秒なのは、独白のあと家々が通り過ぎるところを
+        // 映してから暗転するため（設計書 7.2）。**10 秒では足りなかった。**
+        // 家は道の先（110 m）から入ってくるので、現れてから目の前を過ぎるまでに
+        // それだけで 10 秒掛かる。30 秒で 330 m 進み、90 m 刻みの農家が三つ四つ通る
         static readonly DriveBand[] Route =
         {
             new DriveBand { name = "倫敦の市街", trigger = DriveIds.Chips, speed = 16f, rough = 1.0f, afterglow = 5f, black = 0.8f, fadeIn = 0f, sky = Night },
             new DriveBand { name = "夜の高速", trigger = DriveIds.Cigar, speed = 28f, rough = 1.0f, rain = true, afterglow = 5f, black = 0.8f, fadeIn = 0f, sky = Lit },
-            new DriveBand { name = "朝靄の未舗装路", trigger = DriveIds.Window, speed = 11f, rough = 4.5f, gravel = true, afterglow = 10f, black = 0.8f, fadeIn = 0f, sky = Morning },
+            new DriveBand { name = "朝靄の未舗装路", trigger = DriveIds.Window, speed = 11f, rough = 4.5f, gravel = true, afterglow = 30f, black = 0.8f, fadeIn = 0f, sky = Morning },
         };
 
         /// <summary>帯ごとのきっかけの対象。Items が立てて Wire が DriveDirector へ渡す</summary>
@@ -996,8 +998,10 @@ namespace HalfAware.EditorTools
             // 場面 1・2 と同じ箱を寝かせて置いてあるので、立てていたときより背が低い
             triggerItems[1] = Put(parent, "Cigar", new Vector3(0.722f, 1.311f, 0.560f), script, DriveIds.Cigar, ItemRadius, false);
             // 窓だけ必須。最後の景色に入るまで伏せてあるので、それまで場面は閉じない。
-            // ドアの内張りは x 0.82〜0.90。0.84 に置くと印が内張りの中に入る
-            triggerItems[2] = Put(parent, "Window", new Vector3(0.80f, 1.26f, 0.10f), script, DriveIds.Window, ItemRadius, true);
+            // ドアの内張りは x 0.82〜0.90。0.84 に置くと印が内張りの中に入る。
+            // **真横より少し前。** z 0.10 は目（z 0.22）より後ろで、印を見るのに
+            // 首を真横から更に後ろへ振ることになっていた
+            triggerItems[2] = Put(parent, "Window", new Vector3(0.80f, 1.26f, 0.42f), script, DriveIds.Window, ItemRadius, true);
             // きっかけはその帯に入るまで出さない。出し分けるのは DriveDirector.ShowTrigger
             for (var i = 0; i < triggerItems.Length; i++) triggerItems[i].SetActive(false);
 
