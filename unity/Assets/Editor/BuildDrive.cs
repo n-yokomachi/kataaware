@@ -230,6 +230,13 @@ namespace HalfAware.EditorTools
         /// <summary>目は顔にあるので体の前へ出す。PlayerController の eyeLead と同じ値</summary>
         public const float EyeLead = 0.22f;
 
+        // ---- ピン。場面 1 で焼いたものを読んで使い回す ------------------------
+
+        const string PinMesh = "Assets/Models/generated/Pin.asset";
+        const string PinHoleMesh = "Assets/Models/generated/PinHole.asset";
+        const string PinHeadMat = "Assets/Materials/Room/PinHead.mat";
+        const string PinHoleMat = "Assets/Materials/Room/PinHole.mat";
+
         /// <summary>
         /// 帯の値。<see cref="DriveIds.Triggers"/> と同じ並び。
         /// **秒数も速さもすべて仮置きで、オーナーが実画面を見てから決める。**
@@ -1295,6 +1302,7 @@ namespace HalfAware.EditorTools
             Drop("Player");
             Drop("Hud");
             Drop("SceneFlow");
+            Drop("Pins");
 
             var player = new GameObject("Player");
             var body = player.AddComponent<CharacterController>();
@@ -1330,7 +1338,52 @@ namespace HalfAware.EditorTools
             player.transform.rotation = Quaternion.Euler(0f, StandYaw, 0f);
             body.enabled = true;
 
-            Flow(walker, Screen());
+            Marks(Flow(walker, Screen()));
+        }
+
+        /// <summary>
+        /// 調べられる物に立てるピン。場面 1 と場面 2 は BuildProps.BuildPins が立てていて、
+        /// 場面 8 にだけ無かった。ピンが無いと、何を調べられるのかが画面のどこにも出ない。
+        ///
+        /// **BuildProps.BuildPins をそのまま呼ばない。** あちらは走るたびにマテリアルの色を
+        /// 書き戻すので、オーナーが赤に直した PinHead.mat が琥珀色へ戻り、
+        /// 場面 1 と場面 2 のピンまで一緒に変わる。ここでは同じ mesh と同じマテリアルを
+        /// 読んで組み立てるだけにする。色を決めるのはあくまでオーナーで、
+        /// 直せば三つの場面が揃って変わる。
+        ///
+        /// 場面の根に置く。BuildProps も根に置いているし、Player・Hud・SceneFlow も根にある。
+        /// Prune が落とすのは Drive の下の子だけなので、根のこれには届かない。
+        /// 組み直すたびに Rig の Drop("Pins") で作り直す
+        /// </summary>
+        static void Marks(SceneFlow flow)
+        {
+            var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(PinMesh);
+            var hole = AssetDatabase.LoadAssetAtPath<Mesh>(PinHoleMesh);
+            var head = AssetDatabase.LoadAssetAtPath<Material>(PinHeadMat);
+            var dark = AssetDatabase.LoadAssetAtPath<Material>(PinHoleMat);
+            if (mesh == null || hole == null || head == null || dark == null)
+            {
+                Debug.LogWarning("ピンの形かマテリアルが無い。先に HalfAware/Build the interaction pins を走らせる");
+                return;
+            }
+            var root = new GameObject("Pins");
+            var source = new GameObject("PinSource");
+            source.transform.SetParent(root.transform, false);
+            source.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var lit = source.AddComponent<MeshRenderer>();
+            lit.sharedMaterial = head;
+            // ピンは影を落とさない。暗い車内で自分の影が対象に掛かる
+            lit.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            var eye = Piece(source.transform, "Hole", hole, dark);
+            eye.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            // 複製のもと。切ったまま置いておく（PinMarkers.Start が複製する）
+            source.SetActive(false);
+
+            var markers = root.AddComponent<PinMarkers>();
+            var so = new SerializedObject(markers);
+            so.FindProperty("flow").objectReferenceValue = flow;
+            so.FindProperty("pin").objectReferenceValue = source;
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         /// <summary>同じ名前の根を落とす</summary>

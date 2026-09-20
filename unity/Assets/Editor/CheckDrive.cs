@@ -35,6 +35,42 @@ namespace HalfAware.EditorTools
         static readonly string[] Paving = { "Sheen", "Earth", "Ruts" };
 
         /// <summary>
+        /// 路面に重ねる面の隔たり。m。BuildDrive の「路面に重ねる面の高さ」の但し書きから取った。
+        /// 手前 0.1 / 奥 1000 の深度では 100 m あたり 6 mm ほどが限界なので、8 mm 取ってある
+        /// </summary>
+        const float RoadGap = 0.008f;
+
+        /// <summary>
+        /// ガレージの床に重ねる面の隔たり。m。こちらも BuildDrive の但し書きから。
+        /// 道の面ほど遠くを見ないので 4 mm で足りる
+        /// </summary>
+        const float BayGap = 0.004f;
+
+        /// <summary>
+        /// 路面に重なる面。下から上へ。BuildDrive の高さの表と同じ並び。
+        /// タイルと区切りは 0 番だけ見る。同じ mesh を全部で使い回しているので、
+        /// 1 枚見れば残りも同じ高さに乗っている
+        /// </summary>
+        static readonly string[] RoadStack =
+        {
+            "Road/Tile0",                        // 舗装。0.000
+            "Roadsides/Band0/Slice0/Sheen",      // 帯 0 の濡れた照り返し
+            "Road/Tile0/Line",                   // 白線。照り返しより上でないと帯 0 で消える
+            "Roadsides/Band4/Slice0/Earth",      // 帯 4 の土。白線を覆い隠す
+            "Roadsides/Band4/Slice0/Ruts",       // 帯 4 の轍
+        };
+
+        /// <summary>ガレージの床に重なる面。下から上へ。塗りの上に油、その上に排水口</summary>
+        static readonly string[] BayStack =
+        {
+            "Garage/Floor",
+            "Garage/BayPaint",
+            "Garage/OilStains",
+            "Garage/DrainPan",
+            "Garage/DrainGrate",
+        };
+
+        /// <summary>
         /// 歩く線から排水口までの許す隔たり。m。
         ///
         /// プレイヤーの当たりの半径が 0.3 なので、線から 0.4 の内側にあれば
@@ -70,6 +106,7 @@ namespace HalfAware.EditorTools
             bad += Fonts();
             bad += Drift();
             bad += Walk(root);
+            bad += Ladder(root);
             if (bad == 0) Debug.Log("見直し: 気になるところは無し");
             else Debug.LogWarning("見直し: 気になるところ " + bad + " 件。上を参照");
         }
@@ -746,6 +783,76 @@ namespace HalfAware.EditorTools
             if (len < 1e-6f) return Vector2.Distance(at, from);
             var t = Mathf.Clamp01(Vector2.Dot(at - from, span) / len);
             return Vector2.Distance(at, from + span * t);
+        }
+
+        // ---- 13. 重ねた面の梯子 -------------------------------------------------
+
+        /// <summary>
+        /// 同じ平面に重ねた面が、決めた順に、決めた隔たりだけ離れているか。
+        ///
+        /// 高さは BuildDrive の定数と但し書きだけで決まっていて、これまで誰も数えていなかった。
+        /// 一つ動かすと遠くでちらつくか、下の絵が消える。帯 0 の白線が照り返しに呑まれたのは
+        /// 実際に起きたことで、しかも遠くでしか出ないので目では必ず遅れて気づく。
+        ///
+        /// 定数どうしを比べても意味が無い。mesh が定数の言うところに乗っていなければ
+        /// 同じことなので、組み上がった mesh の頂点の高さから測る。
+        ///
+        /// 路肩（Verge）と牧草地（Pasture）はこの梯子に入れていない。路肩の mesh は
+        /// 地面・段・段の立ち上がりの三つの高さを一つに抱えていて、頂点からはどれがどれか
+        /// 分けられない。どちらも車道の外にあり、面として重なるのではなく縁で接している
+        /// </summary>
+        static int Ladder(Transform root)
+        {
+            return Rungs(root, RoadStack, RoadGap, "路面") + Rungs(root, BayStack, BayGap, "ガレージの床");
+        }
+
+        static int Rungs(Transform root, string[] stack, float gap, string what)
+        {
+            var bad = 0;
+            var lo = new float[stack.Length];
+            var hi = new float[stack.Length];
+            for (var i = 0; i < stack.Length; i++)
+            {
+                lo[i] = float.NaN;
+                var t = root.Find(stack[i]);
+                var mf = t == null ? null : t.GetComponent<MeshFilter>();
+                if (mf == null || mf.sharedMesh == null)
+                {
+                    Debug.LogWarning("見直し: " + what + "に重なる面が見つからない: " + stack[i]);
+                    bad++;
+                    continue;
+                }
+                var m = mf.transform.localToWorldMatrix;
+                var verts = mf.sharedMesh.vertices;
+                var low = float.PositiveInfinity;
+                var high = float.NegativeInfinity;
+                for (var v = 0; v < verts.Length; v++)
+                {
+                    var y = m.MultiplyPoint3x4(verts[v]).y;
+                    if (y < low) low = y;
+                    if (y > high) high = y;
+                }
+                lo[i] = low;
+                hi[i] = high;
+            }
+            for (var i = 0; i + 1 < stack.Length; i++)
+            {
+                if (float.IsNaN(lo[i]) || float.IsNaN(lo[i + 1])) continue;
+                // 下の面の一番上と、上の面の一番下を比べる。轍のように厚みのある面は、
+                // 板そのものの高さではなく下に張り出した縁の方が下の面と取り合う
+                var apart = lo[i + 1] - hi[i];
+                // 4 mm ちょうどの組（排水口の受けと格子）が小数の丸めで落ちないよう、
+                // 0.01 mm だけ見逃す
+                if (apart >= gap - 1e-5f) continue;
+                if (apart < 0f)
+                    Debug.LogWarning(string.Format("見直し: {0}に重なる面の順が入れ替わっている。{1} の上端 {2:F4} が {3} の下端 {4:F4} より上",
+                        what, stack[i], hi[i], stack[i + 1], lo[i + 1]));
+                else
+                    Debug.LogWarning(string.Format("見直し: {0}の {1} と {2} が {3:F4} m しか離れていない（{4:F3} m 要る）。遠くでちらつく",
+                        what, stack[i], stack[i + 1], apart, gap));
+                bad++;
+            }
+            return bad;
         }
 
         // ---- 道具 --------------------------------------------------------------
