@@ -952,8 +952,17 @@ namespace HalfAware
     /// 入れ物の中身を道と同じ環に乗せれば、継ぎ目は勝手に揃う。
     ///
     /// 対向車だけは同じ環に乗せない。すれ違う車は自分の速さと相手の速さの和で
-    /// 近づいてくるので、道と同じ速さで流すと隣を並んで走っているように見える
+    /// 近づいてくるので、道と同じ速さで流すと隣を並んで走っているように見える。
+    ///
+    /// 車体の揺れもここが出す。走った距離を持っているのがここだけで、
+    /// 揺れの位相はその距離から取るため。場面 8 では EyeSway を付けないので、
+    /// PlayerController.EyeOffset を書くのはここひとつだけになる。
+    ///
+    /// 実行順を -20 に置くのは、PlayerController（-10）がそのフレームの EyeOffset を
+    /// 読む前に書き終えるため。既定の 0 のままだと揺れが 1 フレーム遅れる。
+    /// EyeSway と同じ順で、DriveDirector（-5）より先に走る
     /// </summary>
+    [DefaultExecutionOrder(-20)]
     public sealed class DriveWorld : MonoBehaviour
     {
         [Tooltip("道のタイル。環にして流す。i 番目が環の i 番目の枠に入るので、並べ替えると道の出方が変わる")]
@@ -970,6 +979,14 @@ namespace HalfAware
             "走った距離に掛けるので、対向車の速さはこちらの速さに連れて変わる。" +
             "対向車を出すのが速さの変わらない帯 1 だけのうちは構わないが、ほかの帯にも出すなら見直す")]
         [SerializeField] float oncomingRate = 2.2f;
+
+        [Header("揺れ")]
+        [Tooltip("揺れの幅。m。舗装はごく小さく、未舗装は粗く")]
+        [SerializeField] float shake = 0.004f;
+        [Tooltip("揺れの速さ。走った距離に掛ける")]
+        [SerializeField] float shakeRate = 0.35f;
+        [Tooltip("ずれを渡す先")]
+        [SerializeField] PlayerController player;
 
         /// <summary>走る速さ。m/s。0 で止まる</summary>
         public float Speed { get; set; }
@@ -989,11 +1006,37 @@ namespace HalfAware
         /// <summary>今出している対向車。道より速い環に乗せる</summary>
         Transform rushing;
 
+        readonly RoadShake bump = new RoadShake();
+
+        void Awake()
+        {
+            if (player == null) Debug.LogError("DriveWorld: player が未接続。揺れを渡せない", this);
+        }
+
         void Update()
         {
-            if (!Rolling) return;
-            Travelled += Speed * Time.deltaTime;
-            Place();
+            if (Rolling)
+            {
+                Travelled += Speed * Time.deltaTime;
+                Place();
+            }
+            Shake();
+        }
+
+        /// <summary>
+        /// 目の位置のずれを渡す。自分で eye.localPosition を書かないのは、
+        /// PlayerController が毎フレームそこを書き直しているため。直に触ると
+        /// 上書きされるか、こちらが勝った場合は EyeHeight を初回の値で固めてしまう
+        /// （<see cref="EyeSway"/> の説明文と同じ理由）。
+        ///
+        /// 走っていない間は粗さ 0 で渡す。ガレージを歩いているあいだ、
+        /// 止まっている車の揺れを目に足さない
+        /// </summary>
+        void Shake()
+        {
+            if (player == null) return;
+            bump.Tick(Travelled, Rolling ? Rough : 0f, shake, shakeRate);
+            player.EyeOffset = bump.Offset;
         }
 
         /// <summary>今の走行距離で、道と沿道と対向車を並べ直す</summary>
@@ -1435,6 +1478,17 @@ namespace HalfAware
         [SerializeField] GameObject garage;
         [Tooltip("運転席。乗り込んだらここへ立たせる")]
         [SerializeField] Transform seat;
+        [Tooltip("車内の、帯を問わず置く対象。乗り込むまで伏せる。" +
+            "ガレージから届いてしまうと once: true のせいで走行中は二度と出ない")]
+        [SerializeField] GameObject cabin;
+
+        [Header("腕")]
+        [Tooltip("腕組みの腕。手動運転の帯だけ伏せる")]
+        [SerializeField] GameObject folded;
+        [Tooltip("ハンドルに乗せた手。手動運転の帯だけ出す")]
+        [SerializeField] GameObject onWheel;
+        [Tooltip("手動で運転する帯。0 から数える")]
+        [SerializeField] int drivenBand = 4;
 
         [Header("帯")]
         [Tooltip("景色の帯。DriveIds.Triggers と同じ並びにする")]
@@ -1478,6 +1532,9 @@ namespace HalfAware
             world.Rolling = false;
             world.Dress(-1);
             ShowTrigger(-1);
+            Arms(-1);
+            // 車内の対象はガレージからでも距離が届いてしまう。乗り込むまで伏せておく
+            if (cabin != null) cabin.SetActive(false);
             band = -1;
             shown = -1;
             flow.Examined += Examined;
@@ -1585,6 +1642,7 @@ namespace HalfAware
             }
             player.CanMove = false;
             world.Rolling = true;
+            if (cabin != null) cabin.SetActive(true);
             Dress(0);
             band = 0;
             // 組み直すのは場面の頭でだけ。帯を跨ぐときには呼ばない
@@ -1610,6 +1668,7 @@ namespace HalfAware
             world.Dress(which);
             world.Rewind();
             ShowTrigger(which);
+            Arms(which);
         }
 
         /// <summary>which 番目の帯のきっかけだけ出す。-1 でどれも出さない</summary>
@@ -1617,6 +1676,20 @@ namespace HalfAware
         {
             for (var i = 0; i < triggers.Length; i++)
                 if (triggers[i] != null) triggers[i].SetActive(i == which);
+        }
+
+        /// <summary>
+        /// which 番目の帯の腕を出す。-1 でどちらも伏せる。
+        ///
+        /// 最後の帯だけは原作どおり手動運転なので、ハンドルに手を乗せる。
+        /// ただし見た目だけで、入力は受け付けない。帯と一緒に黒のあいだに入れ替わる。
+        /// 乗り込む前に伏せるのは、ガレージを歩いているあいだ運転席に腕だけが浮いて見えるため
+        /// </summary>
+        void Arms(int which)
+        {
+            var driving = which == drivenBand;
+            if (folded != null) folded.SetActive(which >= 0 && !driving);
+            if (onWheel != null) onWheel.SetActive(which >= 0 && driving);
         }
     }
 }
@@ -1952,8 +2025,8 @@ return report;
 
 `unity/Assets/Scripts/Player/Forearm.cs` と `ForearmView.cs` を読む。場面 1 でどう置いているかを `BuildProps.cs` か `BuildAlley.cs` で調べ、同じ作りで運転席に置く。
 
-- 帯 0〜3: 腕組み。原作「自動運転に任せて私は腕組みをしながら考える」。胸の前、`(0, 1.02, 0.28)` あたり
-- 帯 4: ハンドルに手を乗せる。`(-0.38, 1.00, 0.46)` あたり、ハンドルの輪に沿わせる
+- 帯 0〜3: 腕組み。原作「自動運転に任せて私は腕組みをしながら考える」。`(**0.38**, 1.02, **0.15**)` あたり。x 0 は車の中心であって運転席ではない。z を 0.28 まで出すと、68 度に寝かせたハンドルのリム（z 0.222 まで手前へ来る）を前腕が貫く
+- 帯 4: ハンドルに手を乗せる。**`WheelRing` の位置から出す**（`(0.38, 1.02, 0.39)` 中心、握りは ± 内径 0.1625）。数値を別に書くとハンドルを動かしたときにずれる
 
 どちらも描画だけで、操作には繋がらない。`DriveDirector` に足す。
 
