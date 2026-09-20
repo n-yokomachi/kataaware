@@ -30,7 +30,8 @@ Material:
     m_Ints: []
     m_Floats:
     - _Canopy: 0.35
-    - _Glow: 0.7
+    - _Cutoff: 0
+    - _Glow: 0.6
     - _GroundHigh: 0.75
     - _GustAcross: 0.11
     - _GustAlong: 0.31415927
@@ -49,7 +50,7 @@ Material:
     - _SwaySide: 0.4
     - _Wrap: 0.52
     m_Colors:
-    - _BaseColor: {r: 0.5, g: 0.35, b: 0.12, a: 1}
-    - _TipColor: {r: 0.8, g: 0.64, b: 0.28, a: 1}
+    - _BaseColor: {r: 0.44, g: 0.365, b: 0.2, a: 1}
+    - _TipColor: {r: 0.7, g: 0.615, b: 0.39, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

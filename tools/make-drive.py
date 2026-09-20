@@ -147,6 +147,74 @@ def aim(im, target):
     return im
 
 
+def hblur(im, radius):
+    """横だけ畳んでぼかす。縦へ繰り返さない絵（麦の札）に使う"""
+    w, h = im.size
+    big = Image.new(im.mode, (w * 3, h))
+    for i in range(3):
+        big.paste(im, (w * i, 0))
+    return big.filter(ImageFilter.GaussianBlur(radius)).crop((w, 0, w * 2, h))
+
+
+class Pen(object):
+    """
+    明暗と α へ同時に描く。横だけ畳むので、左右は繋がり上下は繋がらない。
+
+    麦の札のように、下端が根で上端が穂先と決まっている絵に使う。
+    上下へ畳むと、穂が絵の下から生えてくる
+    """
+
+    def __init__(self, col, mask):
+        self.c = ImageDraw.Draw(col)
+        self.a = ImageDraw.Draw(mask)
+        self.w = col.size[0]
+
+    @staticmethod
+    def _tone(v):
+        return max(0, min(255, int(v)))
+
+    def line(self, xy, tone, width=1):
+        v = self._tone(tone)
+        for dx in (-self.w, 0, self.w):
+            pts = [(x + dx, y) for (x, y) in xy]
+            self.c.line(pts, fill=(v, v, v), width=width)
+            self.a.line(pts, fill=255, width=width)
+
+    def poly(self, xy, tone):
+        v = self._tone(tone)
+        for dx in (-self.w, 0, self.w):
+            pts = [(x + dx, y) for (x, y) in xy]
+            self.c.polygon(pts, fill=(v, v, v))
+            self.a.polygon(pts, fill=255)
+
+
+def level(im, mask, target):
+    """
+    α の残っているところだけを見て、その平均をこの明るさへ寄せる。
+
+    aim と違って α のある絵に使う。透けたところまで平均に数えると、
+    抜いたぶん暗い方へ引かれて、絵ぜんたいが持ち上がってしまう
+    """
+    px = im.load()
+    mx = mask.load()
+    w, h = im.size
+    tot = 0.0
+    n = 0
+    for y in range(h):
+        for x in range(w):
+            if mx[x, y] > 0:
+                tot += px[x, y][0]
+                n += 1
+    if n == 0:
+        return im
+    gain = target / max(1.0, tot / n)
+    for y in range(h):
+        for x in range(w):
+            c = px[x, y]
+            px[x, y] = tuple(min(255, int(c[k] * gain + 0.5)) for k in range(3))
+    return im
+
+
 def save(im, name):
     path = os.path.join(OUT, 'Drive' + name + '.png')
     im.save(path)
@@ -356,70 +424,115 @@ def dials():
 
 def wheat():
     """
-    麦の株の面。下端が根、上端が穂先。横へだけ繰り返す。
+    麦の札の絵。**α が形そのもの。**
 
-    シェーダーは縦を「根からの高さの割合」で引くので、株の背に関わらず
-    絵の下端が根、上端が穂先に来る。天面は割合 1 のところを引くので、
-    上から見たときは穂先の行だけが並ぶ。
+    箱に麦の絵を貼っても、輪郭は箱のままになる。天面が平らに切れて、株のあいだが
+    覗けない。麦が麦に見えるのは面の絵柄ではなく輪郭で、穂先の凸凹と株の隙間が
+    それを作っている。そこで形を α に持たせ、交差させた札（BuildDrive.Furrows）へ
+    貼って、シェーダーが閾値で抜く。三角も箱の 12 枚から 2 枚へ減る。
+
+    横は繰り返す。札ごとに u をずらすので、同じ並びが隣へ続かない。
+    縦は繰り返さない。下端が根、上端が穂の芒で、上へ行くほど疎になる。
+    この疎になり方がそのまま畑の稜線の毛羽立ちになる。
 
     **色はここが持たない。** 黄金色は WheatMat の根元色と穂先色が持っていて、
-    この絵は明暗だけを預かる。平均を中庸（128）に寄せてあり、シェーダーが
-    2 倍して albedo に掛ける。色まで焼き込むと、色を詰めるつまみが二箇所に割れる
+    この絵は明暗と α だけを預かる。明暗の平均は α の残っているところで中庸（128）に
+    寄せてあり、シェーダーが 2 倍して albedo に掛ける。透けたところの rgb も
+    同じ 128 で埋める。黒のまま残すと、mip で縁に暗い輪が出る
     """
     size = (SIZE, SIZE)
     rng = random.Random(3307)
-    # 地。根元ほど暗い。株の隙間には日が届かないので、下へ行くほど落とす
-    im = Image.new('RGB', size)
-    px = im.load()
-    base = clouds(size, 4411, 4, 1.2).load()
-    for y in range(SIZE):
-        v = 1.0 - y / float(SIZE - 1)          # 1 が上（穂先）
-        deep = 0.30 + 0.46 * v * v
-        for x in range(SIZE):
-            k = deep * (0.82 + base[x, y] / 255.0 * 0.36)
-            c = int(min(255, max(0, k * 255)))
-            px[x, y] = (c, c, c)
-    w = Wrap(im)
-    # 茎。少しずつ傾けて、縦に真っ直ぐ並ばないようにする
-    stalks = 34
-    ear = int(SIZE * 0.36)                     # ここから上が穂
-    for i in range(stalks):
-        x0 = (i + rng.uniform(-0.35, 0.35)) * SIZE / float(stalks)
-        lean = rng.uniform(-6.0, 6.0)
-        tone = rng.uniform(0.55, 1.0)
-        top = ear - rng.randint(0, int(SIZE * 0.10))
+    col = Image.new('RGB', size, (128, 128, 128))
+    mask = Image.new('L', size, 0)
+    pen = Pen(col, mask)
+
+    def py(u):
+        """下端を 0、上端を 1 とした高さを画素の y に直す"""
+        return (SIZE - 1) * (1.0 - u)
+
+    # 根元の刈り残し。株の付け根を塞ぐ。ここが抜けていると、
+    # 近くの札の下から畑の地がそのまま覗いて、麦が宙に浮いて見える
+    for _ in range(130):
+        x = rng.uniform(0, SIZE)
+        tone = rng.randint(48, 104)
+        pen.line([(x, py(-0.02)), (x + rng.uniform(-4.5, 4.5), py(rng.uniform(0.07, 0.30)))],
+                 tone, width=rng.randint(1, 3))
+
+    # 株。奥から手前へ描く。手前ほど明るく太くして、1 枚の札の中にも前後を出す
+    stalks = 13
+    order = list(range(stalks))
+    rng.shuffle(order)
+    for rank, i in enumerate(order):
+        deep = rank / float(stalks - 1)
+        x0 = (i + 0.5 + rng.uniform(-0.38, 0.38)) * SIZE / float(stalks)
+        lean = rng.uniform(-13.0, 13.0)
+        base = rng.uniform(0.40, 0.60)          # 穂の付け根の高さ
+        ear = rng.uniform(0.16, 0.26)           # 穂の丈
+        stem = int(56 + 64 * deep + rng.uniform(-10, 14))
+        thick = 3 if deep > 0.55 else 2
         pts = []
-        for k in range(9):
-            t = k / 8.0
-            pts.append((x0 + lean * t * t, SIZE - (SIZE - top) * t))
-        col = int(120 + 110 * tone)
-        w.line(pts, fill=(col, col, col), width=2 if tone > 0.8 else 1)
-        # 穂。茎の先に少し太い塊を置き、その上に芒を数本立てる
-        tx, ty = pts[-1]
-        eh = rng.randint(int(SIZE * 0.16), int(SIZE * 0.30))
-        bright = int(150 + 105 * rng.uniform(0.6, 1.0))
-        for k in range(7):
-            t = k / 6.0
-            yy = ty - eh * t
-            half = (1.6 + 2.6 * math.sin(math.pi * (0.15 + 0.85 * t))) * (1.0 - 0.25 * t)
-            tail = int(bright * (0.72 + 0.28 * t))
-            w.line([(tx - half, yy), (tx + half, yy)], fill=(tail, tail, tail), width=2)
-        for k in range(3):
-            aw = rng.uniform(-5.0, 5.0)
-            w.line([(tx, ty - eh), (tx + aw, ty - eh - rng.randint(8, 20))],
-                   fill=(bright, bright, bright), width=1)
-    # **一番上の数行に横のむらを入れる。** 箱の天面はここ一行だけを引くので、
-    # 一様だと蓋が平らな板に見える。穂を上から覗いた粗さをここへ焼いておく
-    w = Wrap(im)
-    for _ in range(260):
-        x = rng.randrange(SIZE)
-        y = rng.randint(0, int(SIZE * 0.09))
-        v = rng.randint(96, 255)
-        w.line([(x, y), (x + rng.uniform(-1.5, 1.5), y + rng.randint(3, 10))],
-               fill=(v, v, v), width=rng.randint(1, 3))
-    # 低い解像度で潰れないよう、ぼかしは軽く
-    im = Image.blend(im, tile_blur(im, 0.8), 0.45)
-    return aim(im, (128, 128, 128))
+        for k in range(10):
+            t = k / 9.0
+            pts.append((x0 + lean * t * t, py(base * t)))
+        pen.line(pts, stem, width=thick)
+        # 葉。茎だけだと針金を並べたように見える。中ほどの嵩はこれが持つ
+        for _ in range(rng.randint(0, 2)):
+            lu = rng.uniform(0.10, 0.40)
+            lx = x0 + lean * (lu / base) ** 2
+            out = (1 if rng.random() < 0.5 else -1) * rng.uniform(7.0, 17.0)
+            tip = lu + rng.uniform(0.10, 0.22)
+            pen.poly([(lx - 1.0, py(lu)),
+                      (lx + out * 0.70, py(lu + (tip - lu) * 0.50)),
+                      (lx + out, py(tip)),
+                      (lx + out * 0.42, py(lu + (tip - lu) * 0.44)),
+                      (lx + 1.5, py(lu))], int(stem * 1.12))
+        # 穂。**ここが麦と草を分ける。** 穂軸に沿って小穂を左右へ振り分け、
+        # それぞれを斜め上へ向けると、麦の穂の矢筈が出る
+        bx = x0 + lean
+        tipx = bx + lean * rng.uniform(0.25, 0.70)
+        wide = rng.uniform(4.4, 7.0)
+        grain = int(148 + 78 * deep + rng.uniform(-16, 22))
+        pen.line([(bx, py(base)), (tipx, py(base + ear))], int(grain * 0.66), width=2)
+        rows = rng.randint(7, 10)
+        for k in range(rows):
+            t = k / float(rows - 1)
+            cx = bx + (tipx - bx) * t
+            cu = base + ear * t
+            half = wide * (0.55 + 0.45 * math.sin(math.pi * min(1.0, 0.22 + 0.78 * t))) * (1.0 - 0.45 * t)
+            for s in (-1, 1):
+                pen.line([(cx + s * half * 0.18, py(cu)),
+                          (cx + s * half, py(cu + ear * 0.15))],
+                         grain + rng.randint(-14, 14) + int(20 * t),
+                         width=3 if deep > 0.45 else 2)
+        # 芒。穂の先から跳ねる細い毛。**上端をぎざぎざにしているのはこれ。**
+        # 1 画素の線なので遠くでは消えるが、消えたぶんは mip の α が拾う
+        for _ in range(rng.randint(3, 6)):
+            pen.line([(tipx + rng.uniform(-2.0, 2.0), py(base + ear * rng.uniform(0.55, 1.0))),
+                      (tipx + rng.uniform(-6.5, 6.5), py(base + ear + rng.uniform(0.02, 0.10)))],
+                     int(grain * 0.92), width=1)
+
+    # ぼかしは明暗だけ。α をぼかすと、閾値で抜いた縁が距離で太ったり痩せたりする
+    col = Image.blend(col, hblur(col, 0.7), 0.35)
+    col = level(col, mask, 128)
+    # **明暗の幅を狭める。** 描いたままだと穂が 255 近くまで行き、シェーダーが 2 倍して
+    # 穂先の色（0.935）に掛けた先が振り切れて白く飛ぶ。描画解像度が 1/3 なので、
+    # 飛んだ画素は隣と混ざらずそのまま残り、畑が金銀の砂を撒いたようにちらつく。
+    # 株を株として見せているのは明暗ではなく α の抜けなので、幅は詰めてよい
+    cp = col.load()
+    for y in range(SIZE):
+        for x in range(SIZE):
+            v = int(128 + (cp[x, y][0] - 128) * 0.65)
+            cp[x, y] = (v, v, v)
+    # 透けたところは平均色で塗り直す。mip が縁の外の色を混ぜても明るさが動かない
+    cp = col.load()
+    mp = mask.load()
+    for y in range(SIZE):
+        for x in range(SIZE):
+            if mp[x, y] == 0:
+                cp[x, y] = (128, 128, 128)
+    im = col.convert('RGBA')
+    im.putalpha(mask)
+    return im
 
 
 def field():

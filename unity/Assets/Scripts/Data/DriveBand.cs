@@ -24,8 +24,17 @@ namespace HalfAware
         /// ところに横一線の継ぎ目が出る。狙って地平を描くときだけ離す
         /// </summary>
         public Color haze;
-        /// <summary>霧の濃さ。ExponentialSquared。0.02 でおよそ 100 m 先が溶ける</summary>
+        /// <summary>霧の濃さ。0.02 の ExponentialSquared でおよそ 100 m 先が溶ける</summary>
         public float density;
+        /// <summary>
+        /// 靄として掛けるか。true なら Exponential、false なら ExponentialSquared。
+        ///
+        /// 二乗は近くをほとんど素通しにして、ある距離から一気に溶かす。夜の帯のように
+        /// 「向こうが見えない」だけが要るときはこれでよい。朝靄は違って、近くの株にも
+        /// 薄く白が掛かり、遠いものほど濃くなる。一乗はその掛かり方をする。
+        /// 既定（false）は二乗。帯 4 だけがこれを立てている
+        /// </summary>
+        public bool mist;
         /// <summary>日射しの色</summary>
         public Color sun;
         /// <summary>日射しの強さ</summary>
@@ -63,7 +72,7 @@ namespace HalfAware
                 RenderSettings.sun = sunLight;
             }
             RenderSettings.fog = true;
-            RenderSettings.fogMode = FogMode.ExponentialSquared;
+            RenderSettings.fogMode = mist ? FogMode.Exponential : FogMode.ExponentialSquared;
             RenderSettings.fogColor = haze;
             RenderSettings.fogDensity = density;
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;

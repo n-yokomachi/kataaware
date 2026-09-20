@@ -14,6 +14,7 @@ namespace HalfAware.EditorTools
         readonly List<Vector3> verts = new List<Vector3>();
         readonly List<Vector2> uvs = new List<Vector2>();
         readonly List<Vector2> roots = new List<Vector2>();
+        readonly List<Vector3> norms = new List<Vector3>();
         readonly List<int> tris = new List<int>();
 
         /// <summary>1 メートルあたり絵を何回繰り返すか</summary>
@@ -32,6 +33,15 @@ namespace HalfAware.EditorTools
         public float RootY;
         /// <summary>その物の背。割合を出すのに使う。0 以下なら割合は 0</summary>
         public float RootHigh = 1f;
+
+        /// <summary>
+        /// 札の法線を上へ倒す割合。麦だけが使う。
+        ///
+        /// 札は面が立っているので、そのままの法線では上を向く成分が無い。
+        /// 低い朝日は立った穂の横面にも天にも当たるので、真横を向いた法線で塗ると
+        /// 畑が板を並べたように平らに沈む。1.0 なら上と横が半々になる
+        /// </summary>
+        public float CardLift = 1f;
 
         public int Count { get { return tris.Count / 3; } }
 
@@ -67,6 +77,41 @@ namespace HalfAware.EditorTools
             var i = verts.Count;
             verts.Add(a); verts.Add(b); verts.Add(c); verts.Add(d);
             uvs.Add(ua); uvs.Add(ub); uvs.Add(uc); uvs.Add(ud);
+            Root(a); Root(b); Root(c); Root(d);
+            tris.Add(i); tris.Add(i + 1); tris.Add(i + 2);
+            tris.Add(i); tris.Add(i + 2); tris.Add(i + 3);
+        }
+
+        /// <summary>
+        /// 立てた札 1 枚。α で形を抜く絵を貼って、麦のように透けて見える株にする。
+        ///
+        /// **箱では麦にならない。** 絵をどれだけ描き込んでも輪郭は箱のままで、
+        /// 天面が平らに切れ、株のあいだが覗けない。形を絵の α に持たせれば、
+        /// 穂先の凸凹も株の隙間も絵の側が持つ。三角も箱の 12 枚から 2 枚へ減る。
+        ///
+        /// root は札の下辺の中、across は下辺の半分、up は札の丈。
+        /// 横の uv は実寸から Texel で繰り返し、uOffset だけずらす。ずらさないと、
+        /// 並べた札がどれも同じ株の並びになって、畑が反復模様に見える。
+        /// 縦の uv は必ず 0→1。絵が根から穂先までを 1 枚に収めているので、
+        /// 札の丈が違っても根が下端、穂先が上端に来る
+        /// </summary>
+        public void Card(Vector3 root, Vector3 across, Vector3 up, float uOffset)
+        {
+            var a = root - across;
+            var b = root + across;
+            var c = b + up;
+            var d = a + up;
+            var wide = across.magnitude * 2f * Texel;
+            var face = Vector3.Cross(across, up);
+            if (face.sqrMagnitude < 1e-12f) return;
+            var n = (face.normalized + Vector3.up * CardLift).normalized;
+            var i = verts.Count;
+            verts.Add(a); verts.Add(b); verts.Add(c); verts.Add(d);
+            uvs.Add(new Vector2(uOffset, 0f));
+            uvs.Add(new Vector2(uOffset + wide, 0f));
+            uvs.Add(new Vector2(uOffset + wide, 1f));
+            uvs.Add(new Vector2(uOffset, 1f));
+            norms.Add(n); norms.Add(n); norms.Add(n); norms.Add(n);
             Root(a); Root(b); Root(c); Root(d);
             tris.Add(i); tris.Add(i + 1); tris.Add(i + 2);
             tris.Add(i); tris.Add(i + 2); tris.Add(i + 3);
@@ -268,7 +313,10 @@ namespace HalfAware.EditorTools
             mesh.SetUVs(0, uvs);
             if (roots.Count == verts.Count) mesh.SetUVs(1, roots);
             mesh.SetTriangles(tris, 0);
-            mesh.RecalculateNormals();
+            // 札は面の向きどおりの法線では平らに沈むので、置く側が法線を決めている。
+            // 札を 1 枚でも混ぜたら数が合わなくなるので、全部が札のときだけ使う
+            if (norms.Count == verts.Count) mesh.SetNormals(norms);
+            else mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             var path = assetDir + name.Replace('.', '_') + ".asset";
             ProcMesh.Save(mesh, path);

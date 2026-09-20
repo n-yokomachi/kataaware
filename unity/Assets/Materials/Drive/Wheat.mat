@@ -105,7 +105,7 @@ Material:
     - _ClearCoatMask: 0
     - _ClearCoatSmoothness: 0
     - _Cull: 2
-    - _Cutoff: 0.5
+    - _Cutoff: 0.34
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
     - _DstBlend: 0
@@ -114,7 +114,7 @@ Material:
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
-    - _Glow: 0.7
+    - _Glow: 0.6
     - _GroundHigh: 0.75
     - _GustAcross: 0.11
     - _GustAlong: 0.31415927
@@ -148,10 +148,10 @@ Material:
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 0.6, g: 0.425, b: 0.14, a: 1}
+    - _BaseColor: {r: 0.5, g: 0.4, b: 0.21, a: 1}
     - _Color: {r: 0.21499997, g: 0.17999998, b: 0.09499996, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
-    - _TipColor: {r: 0.96, g: 0.79, b: 0.35, a: 1}
+    - _TipColor: {r: 0.845, g: 0.735, b: 0.44, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
