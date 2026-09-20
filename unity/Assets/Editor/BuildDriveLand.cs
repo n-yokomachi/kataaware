@@ -317,12 +317,24 @@ namespace HalfAware.EditorTools
             return all;
         }
 
-        /// <summary>帯 0。倫敦の外れ。高架の脚とネオン、濡れた路面</summary>
+        /// <summary>
+        /// 帯 0。倫敦の市街。道の両側にビルが並ぶ夜の街と、濡れた路面のネオン。
+        ///
+        /// **ここはまだ都市部。** 以前は高架の脚とネオンの板が疎らに並ぶだけで、
+        /// 市街ではなく郊外の空き地に見えていた。道の両側をビルで塞いで初めて、
+        /// 倫敦を出て行くところになる。ビルの中身は <see cref="City"/>
+        /// </summary>
         static void Outskirts(Transform[] slices)
         {
             var pier = Shape("Pier", 0.45f, b => b.Box(new Vector3(0f, 3.0f, 0f), new Vector3(1.10f, 6.0f, 1.10f)));
             var board = Shape("NeonBoard", 0.5f, b => b.Box(Vector3.zero, new Vector3(0.12f, 1.10f, 2.60f)));
+            // 袖看板。壁から道へ突き出すので、板の面は近づいてくる側を向く。
+            // 正面を向いた板（NeonBoard）は真横を通り過ぎる瞬間しか面にならないので、
+            // 道の先に続いて見えるネオンはこちらが出す。
+            // 突き出しは 0.8 m。高架の脚の外の面（±7.05）の手前で止める
+            var blade = Shape("NeonBlade", 0.5f, b => b.Box(Vector3.zero, new Vector3(0.80f, 0.90f, 0.10f)));
             var sheen = Shape("Sheen", 0.25f, b => b.FaceY(SheenY, Lane(-RoadHalf), Lane(RoadHalf), 0f, TileLength, 1));
+            var walk = WalkMesh();
             var hues = new[]
             {
                 new Color(1f, 0.30f, 0.34f), new Color(0.36f, 0.72f, 1f), new Color(0.44f, 1f, 0.62f),
@@ -336,26 +348,488 @@ namespace HalfAware.EditorTools
                 smears[h] = GlowMat("NeonSmear" + h, "Smear", hues[h], 1.05f, SmearWide, SmearDeep);
 
             for (var i = 0; i < slices.Length; i++)
+            {
                 Piece(slices[i], "Sheen", sheen, Mat("Sheen"));
+                Piece(slices[i], "Walk", walk, Mat("Concrete"));
+            }
+            City(slices);
             Along(slices, 45f, (slice, z, k) => Sides("Pier" + k, 6.5f, (at, side, name) =>
                 Piece(slice, name, pier, Mat("Concrete")).localPosition = new Vector3(at, 0f, z)));
-            Along(slices, 30f, (slice, z, k) => Sides("Neon" + k, 5.4f, (at, side, name) =>
+            // 看板は建物の壁へ移した。±5.4 に立っていた頃は歩道の真ん中に板が浮いており、
+            // 背後に何も無いので看板ではなく道標に見えていた。壁の面（CityFace）から
+            // 0.12 だけ手前へ出すと、壁に付いた看板になる。
+            // 一軒目の間口は CityLead で必ず看板を跨ぐように割り付けてある
+            Along(slices, 30f, (slice, z, k) => Sides("Neon" + k, CityFace - 0.12f, (at, side, name) =>
                 // 街灯の頭と同じ理由で 2.4 から落とす。ネオンは色が命で、
                 // 白く飛んだ看板は蛍光灯にしか見えない
                 Piece(slice, name, board, Glow(hues[(k + side) % hues.Length], 1.25f))
                     .localPosition = new Vector3(at, 3.2f, z)));
-            // 映り込みは看板の足元から手前へ伸びる。看板は道の外（±5.4）に立っているので、
+            // 袖看板は正面の板の中ほどへ差し込む。刻みは同じ 30 m なので環を割り切るままで、
+            // 15 m ごとに何かしらの灯りが流れる。色も正面の板と一つずらす
+            Along(slices, 30f, (slice, z, k) => Sides("Blade" + k, CityFace - 0.40f, (at, side, name) =>
+                Piece(slice, name, blade, Glow(hues[(k + side + 1) % hues.Length], 1.25f))
+                    .localPosition = new Vector3(at, 4.4f, z + 15f)));
+            // 映り込みは看板の足元から手前へ伸びる。看板は道の外（±7.9）に立っているので、
             // 舗装の縁（±3.5）へ寄せて落とす。艶（Sheen）の上に乗るのが正しい順で、
-            // 板の高さ（GlowY 0.028）は白線より上に取ってある
+            // 板の高さ（GlowY 0.028）は白線より上に取ってある。
+            // 袖看板の下にも同じ色で落とす。灯りが 15 m ごとに来るなら、照り返しも 15 m ごとに来る
             Along(slices, 30f, (slice, z, k) => Sides("Smear", 3.0f, (at, side, name) =>
                 Piece(slice, name, smear, smears[(k + side) % hues.Length])
                     .localPosition = new Vector3(at, 0f, z)));
+            Along(slices, 30f, (slice, z, k) => Sides("Smear", 3.0f, (at, side, name) =>
+                Piece(slice, name, smear, smears[(k + side + 1) % hues.Length])
+                    .localPosition = new Vector3(at, 0f, z + 15f)));
         }
 
         /// <summary>ネオンの映り込みの板の幅。濡れた舗装の映り込みは看板より広がる</summary>
         const float SmearWide = 3.2f;
-        /// <summary>ネオンの映り込みの板の長さ。看板の間隔（30）より短くする</summary>
-        const float SmearDeep = 20f;
+        /// <summary>ネオンの映り込みの板の長さ。看板の間隔（15）より短くする。繋がると流れが消える</summary>
+        const float SmearDeep = 13f;
+
+        // ---- 帯 0 の市街 --------------------------------------------------
+
+        /// <summary>
+        /// 手前の列の壁の面。道の中心から測る。
+        ///
+        /// 路肩の段（RoadHalf + Shoulder ＝ 4.7）と高架の脚（±6.5、半幅 0.55 なので
+        /// 外の面が 7.05）のどちらより外に取る。ここを詰めると脚が壁にめり込む。
+        ///
+        /// **手前の列だけは道からの距離を振らない。** 一軒ごとに前後へ振ると、道沿いの線が
+        /// 消えて、建物が各々に立っている空き地に見える。市街の道は壁の線が揃っていること
+        /// そのものが絵になるので、ばらつきは背・間口・奥行き・路地の方で出す
+        /// </summary>
+        const float CityFace = 8.0f;
+
+        /// <summary>歩道の内側の縁。路肩の段のすぐ外</summary>
+        const float WalkFrom = RoadHalf + Shoulder;
+
+        /// <summary>歩道の高さ。縁石のぶんだけ舗装より上げる</summary>
+        const float WalkY = 0.13f;
+
+        /// <summary>
+        /// 手前の街区ひとつの長さ。m。**180 を割り切ること。**
+        /// 割り切らないと、環が一周したところで街区が一つだけ詰まる
+        /// </summary>
+        const float CityBlock = 30f;
+
+        /// <summary>二列目の街区の長さ。m。180 を割り切ること</summary>
+        const float CitySecond = 20f;
+
+        /// <summary>三列目の街区の長さ。m。180 を割り切ること</summary>
+        const float CityThird = 30f;
+
+        /// <summary>
+        /// 街区の頭を看板より手前へ出す量。m。
+        ///
+        /// 看板は 30 m 刻みで並び、手前の街区も同じ 30 m 刻みで始まる。街区の頭だけ
+        /// これだけ手前へずらすと、看板は必ず一軒目の壁の上に来る。
+        /// 0 にすると看板がちょうど建物の継ぎ目に跨がり、路地に当たれば宙に浮く
+        /// </summary>
+        const float CityLead = 4f;
+
+        /// <summary>一軒の最小の間口。m。看板（長さ 2.6）が乗り切る幅を下回らせない</summary>
+        const float CityNarrow = 7f;
+
+        /// <summary>窓と店先を壁から浮かせる量。m。壁と同じ面に置くと深度で削り合う</summary>
+        const float CityProud = 0.05f;
+
+        /// <summary>軒（パラペット）の厚み。m。壁よりせり出させて、棟と棟の境に線を引かせる</summary>
+        const float CityCap = 0.55f;
+
+        /// <summary>点いた窓のうち寒色（蛍光灯）の割合。残りは暖色の白熱灯</summary>
+        const float CityCool = 0.30f;
+
+        /// <summary>建物の足元を地面より下へ下ろす量。m</summary>
+        const float CitySink = -0.6f;
+
+        /// <summary>市街の地の面の外縁。m。路肩の地面（±24）の外をこれで塞ぐ</summary>
+        const float CityGround = 95f;
+
+        /// <summary>市街の地の面の高さ。路肩の地面（VergeY）の下へ潜らせて面を重ねない</summary>
+        const float CityGroundY = VergeY - 0.02f;
+
+        /// <summary>
+        /// 市街のビルを焼く先。素材ごとに 1 つ持ち、区切り 1 つぶんをまとめて 1 枚の mesh にする
+        /// </summary>
+        sealed class CityBanks
+        {
+            /// <summary>
+            /// 手前の列の壁。**二色あるのは隣り合う建物を見分けるため。**
+            ///
+            /// この帯には影が出ず、道を向いた面も手前（-z）の面も環境光しか受けない。
+            /// 一色で塗ると隣り合う壁が一分の違いも無く揃い、軒を連ねた一列が
+            /// 一枚の塀に見える。境は色で引くほかない
+            /// </summary>
+            public readonly Bank WallA = new Bank { Texel = 0.3f };
+            public readonly Bank WallB = new Bank { Texel = 0.3f };
+            /// <summary>奥の列の壁と地の面。手前より暗く冷たい色にして、空気の厚みを出す</summary>
+            public readonly Bank Deep = new Bank { Texel = 0.3f };
+            /// <summary>消えている窓</summary>
+            public readonly Bank Dark = new Bank { Texel = 0.5f };
+            /// <summary>点いている窓。暖色（白熱灯）と寒色（蛍光灯）</summary>
+            public readonly Bank Warm = new Bank { Texel = 0.5f };
+            public readonly Bank Cool = new Bank { Texel = 0.5f };
+        }
+
+        /// <summary>
+        /// 市街のビル。三列に分けて並べ、区切りごとに 1 枚の mesh へ焼く。
+        ///
+        /// **一軒ずつ物を置いてはいけない。** 三列で 70 軒を越えるので、素材ごとに分けて
+        /// 置けばレンダラーが四百になる。区切り 1 つに素材 6 枚（壁二色・消えた窓・
+        /// 点いた窓二色）へ焼けば、帯ぜんたいで 54 枚に収まる。
+        ///
+        /// 並べるのは環の上の位置で、<see cref="Along"/> は使わない。軒の間口は一軒ごとに
+        /// 違うので、一定の刻みでは並べられない。代わりに街区（CityBlock / CitySecond /
+        /// CityThird）の長さだけが 180 を割り切ればよい。街区の中では幅を伸ばし縮めして
+        /// ちょうど埋めるので、環が一周しても継ぎ目が飛ばない
+        /// </summary>
+        static void City(Transform[] slices)
+        {
+            var banks = new CityBanks[slices.Length];
+            for (var i = 0; i < banks.Length; i++) banks[i] = new CityBanks();
+            // 種を決め打ちにして、組み直しても同じ街並みになるようにする
+            var rnd = new System.Random(20260921);
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                // 手前の列。街区の頭を看板より CityLead だけ手前へ出す
+                for (var k = 0; k < Mathf.RoundToInt(Span / CityBlock); k++)
+                    Terrace(banks, rnd, side, k * CityBlock - CityLead, CityBlock, 0);
+                // 二列目と三列目。**左右で位相を半刻みずらす。**
+                // 揃えると道を挟んで建物が対で並び、正面に遠近法の消点だけが残る
+                for (var k = 0; k < Mathf.RoundToInt(Span / CitySecond); k++)
+                    Terrace(banks, rnd, side, k * CitySecond + (s == 0 ? 0f : CitySecond * 0.5f), CitySecond, 1);
+                for (var k = 0; k < Mathf.RoundToInt(Span / CityThird); k++)
+                    Terrace(banks, rnd, side, k * CityThird + (s == 0 ? CityThird * 0.5f : 0f), CityThird, 2);
+            }
+
+            // 壁の色。**この帯のほかの素材（舗装 0.115 / 路肩 0.078）と揃えてはいけない。**
+            //
+            // それらは上を向いた面で、環境光の空側（lift 0.250）を丸ごと受ける。
+            // 壁は立っているので水平の環境光しか来ず、日射しは右手の壁の道向きの面に
+            // しか当たらない。実測したところ、色 0.112 で塗った壁は画面で luma 3〜12 しか
+            // 無く、空（24）より暗い真っ黒な影絵になっていた。窓だけが宙に浮いて、
+            // ビルが並んでいるという絵にならない。
+            //
+            // 上げても夜が壊れないのは、壁の受ける光が舗装の 1/5 しか無いからで、
+            // 色を 0.5 まで上げても陰の側の面は luma 14 にしかならない。
+            // 倫敦の建物はポートランド石と塗った塑塢で、実物もこの辺りに明るい。
+            // 手前を温かく明るく、奥を冷たく暗くして、色の側からも遠近を読ませる
+            var brick = CityMat("CityBrick", new Color(0.560f, 0.492f, 0.424f), 0.10f);
+            var stucco = CityMat("CityStucco", new Color(0.390f, 0.396f, 0.424f), 0.08f);
+            var deep = CityMat("CityDeep", new Color(0.250f, 0.262f, 0.310f), 0.06f);
+            // 消えている窓。壁より暗く、艶だけ高くする。映り込みは切ってあるので
+            // 何も映らないが、暗い面が格子に並ぶだけで壁の絵柄になる
+            var glass = CityMat("CityPane", new Color(0.055f, 0.060f, 0.082f), 0.70f);
+            // 点いている窓。灯りを何百も置けないので、ネオンや街灯の頭と同じく
+            // 明るい Unlit で済ませる。利得を上げ過ぎると白へ抜けて窓が穴になる
+            var warm = Glow(new Color(1f, 0.80f, 0.55f), 0.42f);
+            var cool = Glow(new Color(0.78f, 0.86f, 1f), 0.34f);
+
+            for (var i = 0; i < slices.Length; i++)
+            {
+                // 路肩の地面（GroundMesh の ±24）の外を塞ぐ。二列目から先はその外に建つので、
+                // 塞がないと建物の足元に空の色が抜けて、地平の手前に暗い帯が一本入る
+                for (var s = 0; s < 2; s++)
+                {
+                    var side = s == 0 ? -1f : 1f;
+                    var a = Lane(WalkFrom * side);
+                    var b = Lane(CityGround * side);
+                    banks[i].Deep.FaceY(CityGroundY, Mathf.Min(a, b), Mathf.Max(a, b), 0f, TileLength, 1);
+                }
+                banks[i].WallA.Emit(slices[i], "CityBrick" + i, brick, false, Generated);
+                banks[i].WallB.Emit(slices[i], "CityStucco" + i, stucco, false, Generated);
+                banks[i].Deep.Emit(slices[i], "CityDeep" + i, deep, false, Generated);
+                banks[i].Dark.Emit(slices[i], "CityPane" + i, glass, false, Generated);
+                banks[i].Warm.Emit(slices[i], "CityWarm" + i, warm, false, Generated);
+                banks[i].Cool.Emit(slices[i], "CityCool" + i, cool, false, Generated);
+            }
+        }
+
+        /// <summary>
+        /// 街区ひとつ。room メートルを軒と路地でちょうど埋める。
+        ///
+        /// 幅を先に重みで引いてから room へ伸ばし縮めするのは、余りを最後の一軒に
+        /// 押し付けると街区の尻だけが必ず同じ間口になるため。一周すれば 6 回来る
+        /// </summary>
+        static void Terrace(CityBanks[] banks, System.Random rnd, float side, float at, float room, int row)
+        {
+            // 一区画に何軒建てるか。手前ほど小割りにする
+            var n = row == 0 ? 2 + rnd.Next(2) : 1 + rnd.Next(2);
+            // 建物のあいだの隔たり。**ほとんどは 0（軒を連ねる）。**
+            // たまに路地を空けると、そこから奥の列が覗いて街に厚みが出る。
+            // さらにたまに横町ほどの幅を空けるのは、三列目まで見通せる穴を作るため
+            var gaps = new float[n];
+            var spare = 0f;
+            for (var i = 0; i < n; i++)
+            {
+                var roll = rnd.NextDouble();
+                gaps[i] = roll < 0.55 ? 0f
+                    : roll < 0.88 ? 2.0f + (float)rnd.NextDouble() * 2.2f
+                    : 5.5f + (float)rnd.NextDouble() * 3.5f;
+                spare += gaps[i];
+            }
+            var built = room - spare;
+            // 隔たりを取りすぎて軒が瘦せたら、隔たりの方を捨てる
+            if (built < n * CityNarrow)
+            {
+                built = room;
+                for (var i = 0; i < n; i++) gaps[i] = 0f;
+            }
+            var wide = new float[n];
+            var sum = 0f;
+            for (var i = 0; i < n; i++) { wide[i] = 0.7f + (float)rnd.NextDouble(); sum += wide[i]; }
+            for (var i = 0; i < n; i++) wide[i] = wide[i] / sum * built;
+            // 一軒目は看板を乗せるので、一番広い間口をそこへ持ってくる
+            for (var i = 1; i < n; i++)
+                if (wide[i] > wide[0]) { var swap = wide[0]; wide[0] = wide[i]; wide[i] = swap; }
+            var z = at;
+            for (var i = 0; i < n; i++)
+            {
+                Shell(banks, rnd, side, z, wide[i], row);
+                z += wide[i] + gaps[i];
+            }
+        }
+
+        /// <summary>
+        /// 建物 1 棟の寸法を引いて、環の上の位置から区切りへ振る。
+        ///
+        /// 描く中身には別の <see cref="System.Random"/> を渡す。区切りを索く順番に
+        /// 描くことになるので、一つの乱数を使い回すと並べ方を一つ直しただけで
+        /// 街並みが丸ごと変わる
+        /// </summary>
+        static void Shell(CityBanks[] banks, System.Random rnd, float side, float ring, float wide, int row)
+        {
+            float from, deep, high;
+            if (row == 0)
+            {
+                from = CityFace;
+                deep = 6f + (float)rnd.NextDouble() * 5f;
+                // 背は二乗寄りで引く。一様に引くと軒の線が真ん中に集まって、
+                // 屋上の線が波打っているだけの一枚の帯に見える
+                high = 10f + Mathf.Pow((float)rnd.NextDouble(), 1.4f) * 19f;
+            }
+            else if (row == 1)
+            {
+                from = 19f + (float)rnd.NextDouble() * 8f;
+                deep = 8f + (float)rnd.NextDouble() * 5f;
+                high = 16f + Mathf.Pow((float)rnd.NextDouble(), 1.2f) * 22f;
+            }
+            else
+            {
+                from = 40f + (float)rnd.NextDouble() * 16f;
+                deep = 12f + (float)rnd.NextDouble() * 9f;
+                high = 24f + Mathf.Pow((float)rnd.NextDouble(), 1.1f) * 24f;
+            }
+            var pick = rnd.Next(2);
+            // 点いている窓の割合。**棟ごとに振る。** 全部を同じ割合で散らすと、
+            // どの建物も同じ密度の点描になって、建物の境が窓の側から読めなくなる
+            var lit = 0.26f + (float)rnd.NextDouble() * 0.34f;
+            var shop = row == 0 && rnd.NextDouble() < 0.55;
+            var seed = rnd.Next();
+            Put(banks, ring, (c, z) =>
+                Raise(c, new System.Random(seed), side, z, wide, from, deep, high, row, pick, lit, shop));
+        }
+
+        /// <summary>
+        /// ビル 1 棟。壁と軒を積み、道を向いた面と手前（-z）の面に窓を並べる。
+        ///
+        /// **面は 6 つとも張るが、窓は 2 面にしか並べない。** 車は原点で +z を向いたまま
+        /// 動かないので、建物の向こう側（+z）の面と道と反対を向いた面は一度も画面に入らない。
+        /// 描画解像度 427 × 240 では窓一つが数画素しか無いので、見えない面にまで並べる
+        /// 余裕は無い。壁の方を削らないのは、路地の口から裏が覗くため
+        /// </summary>
+        static void Raise(CityBanks c, System.Random rnd, float side, float z0, float wide,
+            float from, float deep, float high, int row, int pick, float lit, bool shop)
+        {
+            var z1 = z0 + wide;
+            var xIn = Lane(from * side);
+            var xOut = Lane((from + deep) * side);
+            var x0 = Mathf.Min(xIn, xOut);
+            var x1 = Mathf.Max(xIn, xOut);
+            // 奥の列は一色で塗る。遠いほど霧に喰われるので、色を割っても見分けが付かない
+            var wall = row > 0 ? c.Deep : pick == 0 ? c.WallA : c.WallB;
+            // 軒は壁と違う色で塗る。同じ色だと、せり出しただけの軒はこの帯では一切読めない
+            var cap = row > 0 ? c.Deep : pick == 0 ? c.WallB : c.WallA;
+            var cx = (x0 + x1) * 0.5f;
+            var cz = (z0 + z1) * 0.5f;
+            wall.Box(new Vector3(cx, (high + CitySink) * 0.5f, cz), new Vector3(x1 - x0, high - CitySink, wide));
+            cap.Box(new Vector3(cx, high + CityCap * 0.5f, cz),
+                new Vector3(x1 - x0 + 0.44f, CityCap, wide + 0.44f));
+
+            // 窓の格子。奥の列ほど粗く取る。実寸で同じ刻みにすると、
+            // 60 m 先では窓一つが 3 画素を割ってちらつくだけになる
+            var pitch = row == 0 ? 2.70f : row == 1 ? 3.00f : 4.20f;
+            var floor = row == 0 ? 3.30f : row == 1 ? 3.60f : 4.40f;
+            // 一階ぶんを空ける。手前の列はそこが店先になる
+            var foot = row == 0 ? 3.45f : 5.0f;
+            var face = xIn - side * CityProud;
+            var look = side < 0f ? 1 : -1;
+            Panes(c, rnd, true, face, look, z0, z1, foot, high, pitch, floor, lit);
+            Panes(c, rnd, false, z0 - CityProud, -1, x0, x1, foot, high, pitch, floor, lit);
+
+            if (row == 0)
+            {
+                // 一階の店先。**ここが点くと建物の足元が読める。**
+                // 上の窓と同じ大きさで刻むと店に見えないので、間口いっぱいの硝子を
+                // 方立てで三枚に割る。消えている店は同じ形の暗い面になる
+                var sill = WalkY + 0.85f;
+                var head = 2.75f;
+                var run = (wide - 1.6f - 0.8f) / 3f;
+                var pane = shop ? (rnd.NextDouble() < CityCool ? c.Cool : c.Warm) : c.Dark;
+                for (var p = 0; p < 3 && run > 0.4f; p++)
+                {
+                    var b0 = z0 + 0.8f + p * (run + 0.40f);
+                    pane.FaceX(face, b0, b0 + run, sill, head, look);
+                }
+                // 看板の地。**点いた硝子の帯をここで切る。**
+                // 店先を一階ぶんそのまま立ち上げると、隣り合う二軒が点いただけで
+                // 幅 20 m の光る板になり、店ではなく行燈に見える。
+                // 横に暗い線が一本入るだけで、上の窓と下の店が別の階に読める
+                c.Dark.FaceX(face, z0 + 0.35f, z1 - 0.35f, head + 0.10f, head + 0.68f, look);
+            }
+
+            // 屋上。**ここを平らなままにすると、街が箱を並べたように見える。**
+            // 背の高い棟は上を一段引き、低い棟には塔屋と煙突を乗せる
+            var top = high + CityCap;
+            if (high > 17f && rnd.NextDouble() < 0.55)
+            {
+                var lift = 4f + (float)rnd.NextDouble() * 8f;
+                var inset = 1.3f + (float)rnd.NextDouble() * 2.2f;
+                var sz0 = z0 + inset;
+                var sz1 = z1 - inset;
+                // 引くのは道の側。背の面はそのまま残す
+                var sIn = xIn + side * inset;
+                var sx0 = Mathf.Min(sIn, xOut);
+                var sx1 = Mathf.Max(sIn, xOut);
+                if (sx1 - sx0 > 3f && sz1 - sz0 > 3f)
+                {
+                    wall.Box(new Vector3((sx0 + sx1) * 0.5f, top + lift * 0.5f, (sz0 + sz1) * 0.5f),
+                        new Vector3(sx1 - sx0, lift, sz1 - sz0));
+                    cap.Box(new Vector3((sx0 + sx1) * 0.5f, top + lift + CityCap * 0.4f, (sz0 + sz1) * 0.5f),
+                        new Vector3(sx1 - sx0 + 0.36f, CityCap * 0.8f, sz1 - sz0 + 0.36f));
+                    Panes(c, rnd, true, sIn - side * CityProud, look, sz0, sz1, top + 0.9f, top + lift, pitch, floor, lit);
+                    Panes(c, rnd, false, sz0 - CityProud, -1, sx0, sx1, top + 0.9f, top + lift, pitch, floor, lit);
+                    top += lift + CityCap * 0.8f;
+                }
+            }
+            if (rnd.NextDouble() < 0.5)
+            {
+                // 塔屋。階段室と水槽で、屋上には必ず何かしら立っている。
+                // 空との境を毛羽立たせるのが狙いなので、棟の真ん中ではなく寄せて置く
+                var hw = 0.9f + (float)rnd.NextDouble() * 1.6f;
+                var hd = 0.9f + (float)rnd.NextDouble() * 1.4f;
+                var hh = 1.6f + (float)rnd.NextDouble() * 2.2f;
+                if (x1 - x0 > hw * 2.6f && wide > hd * 2.6f)
+                    wall.Box(new Vector3(
+                            Mathf.Lerp(x0 + hw, x1 - hw, (float)rnd.NextDouble()),
+                            top + hh * 0.5f,
+                            Mathf.Lerp(z0 + hd, z1 - hd, (float)rnd.NextDouble())),
+                        new Vector3(hw * 2f, hh, hd * 2f));
+            }
+            if (row == 0 && high < 17f && wide > 5f)
+                // 煙突。倫敦の低い棟割長屋の屋根には必ず立っている。
+                // 道から引いたところへ置く。軒先に立てると看板の支柱に見える
+                wall.Box(new Vector3(Mathf.Lerp(x0, x1, side < 0f ? 0.34f : 0.66f), top + 0.85f, cz),
+                    new Vector3(0.9f, 1.7f, 1.5f));
+        }
+
+        /// <summary>
+        /// 壁ひと面ぶんの窓。点いている窓と消えている窓を混ぜて格子に並べる。
+        ///
+        /// **夜の街が街に見えるのはここだけ。** 窓の無い箱をいくら並べても倉庫にしかならず、
+        /// 逆に一様に点けると点描になる。**階ごと丸ごと暗い階を混ぜる。**
+        /// 縦にも横にも塊ができて初めて、人の入っている建物に見える。
+        ///
+        /// wallX が true なら x が一定の面（a0〜a1 は z の範囲）、
+        /// false なら z が一定の面（a0〜a1 は x の範囲）
+        /// </summary>
+        static void Panes(CityBanks c, System.Random rnd, bool wallX, float plane, int sign,
+            float a0, float a1, float low, float high, float pitch, float floor, float lit)
+        {
+            var cols = Mathf.FloorToInt((a1 - a0) / pitch);
+            var rows = Mathf.FloorToInt((high - low - CityCap) / floor);
+            if (cols < 1 || rows < 1) return;
+            var wide = pitch * 0.52f;
+            var tall = floor * 0.52f;
+            // 余りは両端へ振り分けて、格子を面の真ん中へ寄せる
+            var pad = ((a1 - a0) - cols * pitch) * 0.5f;
+            for (var r = 0; r < rows; r++)
+            {
+                var y0 = low + r * floor + (floor - tall) * 0.5f;
+                var dark = rnd.NextDouble() < 0.22;
+                for (var k = 0; k < cols; k++)
+                {
+                    var b0 = a0 + pad + k * pitch + (pitch - wide) * 0.5f;
+                    var bank = c.Dark;
+                    if (!dark && rnd.NextDouble() < lit)
+                        bank = rnd.NextDouble() < CityCool ? c.Cool : c.Warm;
+                    if (wallX) bank.FaceX(plane, b0, b0 + wide, y0, y0 + tall, sign);
+                    else bank.FaceZ(plane, b0, b0 + wide, y0, y0 + tall, sign);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 環の上の位置を、区切りの番号と区切りの中の z に割る。<see cref="Drop"/> の mesh 版
+        /// </summary>
+        static void Put(CityBanks[] banks, float ring, System.Action<CityBanks, float> draw)
+        {
+            var p = ring % Span;
+            if (p < 0f) p += Span;
+            var i = Mathf.Clamp((int)(p / TileLength), 0, banks.Length - 1);
+            draw(banks[i], p - i * TileLength);
+        }
+
+        /// <summary>
+        /// 歩道。区切り 1 つぶんで、左右に 1 本ずつ。
+        ///
+        /// ビルが路肩からじかに生えていると、建物が道に置いてあるように見える。
+        /// 縁石で一段上げた歩道を挟むと、道と建物のあいだに街の床が入る。
+        /// 縁石の立ち上がりは道の側だけ張ればよい。外は壁が塞ぐ
+        /// </summary>
+        static Mesh WalkMesh()
+        {
+            return Shape("CityWalk", 0.3f, b =>
+            {
+                for (var s = 0; s < 2; s++)
+                {
+                    var side = s == 0 ? -1f : 1f;
+                    var inner = Lane(WalkFrom * side);
+                    var outer = Lane(CityFace * side);
+                    b.FaceY(WalkY, Mathf.Min(inner, outer), Mathf.Max(inner, outer), 0f, TileLength, 1);
+                    b.FaceX(inner, 0f, TileLength, VergeY, WalkY, s == 0 ? 1 : -1);
+                }
+            });
+        }
+
+        /// <summary>
+        /// 市街の壁と窓のマテリアル。<see cref="Mat"/> を通さない。
+        /// あちらは名前から色を引くので、色を足すには BuildDrive の表を触ることになる。
+        ///
+        /// **絵は貼らない。** 描画解像度 427 × 240 では、窓の格子より細かい絵柄は
+        /// 画素に届かず、繰り返しの継ぎ目だけが残る。壁の絵柄は窓が持つ
+        /// </summary>
+        static Material CityMat(string name, Color col, float smooth)
+        {
+            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            var path = Materials + name + ".mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                m = new Material(shader);
+                m.name = name;
+                AssetDatabase.CreateAsset(m, path);
+            }
+            // 組み直すたびに結び直す。手で触った値は残らない
+            m.shader = shader;
+            m.SetTexture("_BaseMap", null);
+            m.SetColor("_BaseColor", col);
+            if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", smooth);
+            if (m.HasProperty("_Metallic")) m.SetFloat("_Metallic", 0f);
+            EditorUtility.SetDirty(m);
+            return m;
+        }
 
         /// <summary>街灯の橙。頭も溜まりも同じ色から出す</summary>
         static readonly Color LampHue = new Color(1f, 0.72f, 0.36f);
