@@ -228,7 +228,7 @@ namespace HalfAware
 `run_tests`（EditMode）→ `get_test_job`。
 Expected: `failed: 0`。既存の 261 件に 6 件足して 267 件。
 
-- [ ] **Step 5: commit**
+- [ ] **Step 6: commit**
 
 ```bash
 git add unity/Assets/Scripts/Data/DriveBand.cs unity/Assets/Scripts/Data/DriveBand.cs.meta unity/Assets/Tests/EditMode/DriveRouteTests.cs unity/Assets/Tests/EditMode/DriveRouteTests.cs.meta
@@ -1572,6 +1572,13 @@ namespace HalfAware
             if (garage != null) garage.SetActive(false);
             if (seat != null)
             {
+                // seat は足元ではなく目の位置。PlayerController は毎フレーム
+                // eye を足元から EyeHeight だけ上へ置き直すので、ここで 0 にして
+                // seat をそのまま目の高さにする。立っていたときの 1.6 のままだと
+                // 目が屋根（1.52）の上へ突き抜け、車内のどの対象も判定の距離から外れて、
+                // 帯 0 のきっかけすら調べられなくなる。
+                // 車内は座ったまま歩かないので、足元の高さはもう誰も使わない
+                player.EyeHeight = 0f;
                 player.transform.position = seat.position;
                 player.Yaw = seat.eulerAngles.y;
                 player.Pitch = 0f;
@@ -1784,13 +1791,25 @@ git commit -m "feat: build the car and the road it runs on"
 **Files:**
 - Modify: `unity/Assets/Editor/BuildDrive.cs`
 
-- [ ] **Step 1: ガレージを組む**
+- [ ] **Step 1: プレイヤーと HUD を入れる**
+
+`Drive.unity` には Task 8 の時点で `Drive` と `Directional Light` しか無い。`Wire()` が `flow` / `hud` / `player` を指す先が無いので、まずこれを作る。
+
+- `Player` — CharacterController + `PlayerController` + 子の `Main Camera`（`MainCamera` タグ、Camera、AudioListener）
+- `Hud` — Canvas + `HudView`。層の値は `Alley.unity` のものをそのまま写す
+- `SceneFlow` — `SceneFlow` と `DriveDirector` を同じ GameObject に載せる
+
+Task 8 が置いた仮の `Main Camera` はここで消す。残すとタグ付きカメラと AudioListener が二重になる。
+
+**`Board()` は目の高さを 0 にする。** `player.transform.position = seat.position` はプレイヤーの**根**を動かすだけで、`PlayerController` はそのあと毎フレーム `eye.localPosition = (0, EyeHeight, eyeLead)` を書く。`EyeHeight` が既定の 1.6 のままだと目が天井を突き抜け、車内の対象が全部 1.5〜2.2 m 先になって判定半径 1.4 の外へ出る。`drive.chips` に触れず帯 0 が終わらず、必須の `drive.window` にも届かない。`DriveDirector.Board()` に `player.EyeHeight = 0f;` を足して、`seat` を足元ではなく目の位置として使う。
+
+- [ ] **Step 2: ガレージを組む**
 
 車は原点、ガレージはその周り。プレイヤーは隅に立ち、歩いて運転席のドアまで来る。
 
 | もの | 値 |
 |---|---|
-| 床 | (0, 0, -2.0)、14 × 16 |
+| 床 | (0, **0.040**, -2.0)、14 × 16。道の路面標示（y 0.020）より上に置く |
 | 天井 | 高さ 2.9 |
 | 柱 | 四隅と、長辺の中ほどに 1 本ずつ。0.35 角 |
 | シャッター | (0, 0〜2.6, 6.0)、幅 4.2 |
@@ -1801,9 +1820,13 @@ git commit -m "feat: build the car and the road it runs on"
 
 ガレージは `Garage` という一つの入れ物にまとめ、`DriveDirector.garage` へ繋ぐ。乗り込んだ時点で丸ごと伏せる。
 
+床も壁も天井も、面ではなく厚みのある箱で作る。面は片側にしか向かないので、部屋の内側からは裏面になり、当たり判定の線も素通りする。
+
+**床は道より上に置く。** 壁は道を「見えなく」するだけで、足元で重なっている面はそのままちらつく。
+
 **壁は必ず立てる。** 道のタイルは z -30 〜 +140 に y ≈ 0 で敷いてあり、`DriveWorld` には道を隠す手立てが無い（`Dress(-1)` が消すのは沿道だけ）。壁が無いと、ガレージに立っている間ずっと道が左右へ突き抜けて見え、z が -10 〜 6 のあたりでは床と道が重なって面がちらつく。壁を立てたくない画にするなら、代わりに道そのものを入れ物に入れて乗り込むまで伏せる手を採る。どちらかは要る。
 
-- [ ] **Step 2: 調べる対象を立てる**
+- [ ] **Step 3: 調べる対象を立てる**
 
 `Items` の下に `Interactable` を置く。判定点は物の少し手前。
 
@@ -1835,7 +1858,7 @@ git commit -m "feat: build the car and the road it runs on"
 
 **シーンの `SceneFlow` の `standAfter` は空のままにする。** 何か入れると `Stand()` が毎フレーム `player.CanMove` を書くので、`Board()` が false にしたものを歩ける側へ戻してしまう。車内は座ったままなので、立ち上がりの段取りはそもそも要らない。
 
-- [ ] **Step 3: 帯の値を入れる**
+- [ ] **Step 4: 帯の値を入れる**
 
 `DriveDirector.bands` に 5 つ。**すべて仮置き。オーナーが実画面を見てから決める。**
 
@@ -1849,7 +1872,7 @@ git commit -m "feat: build the car and the road it runs on"
 
 帯 2 の `black` と `fadeIn` が長いのが仮眠にあたる。
 
-- [ ] **Step 4: 組み立てて確かめる**
+- [ ] **Step 5: 組み立てて確かめる**
 
 `execute_menu_item`（`HalfAware/Build the drive`）。
 `read_console`（types: error, warning）。
@@ -1905,6 +1928,8 @@ return report;
 ```
 
 `Update` の末尾で `player.EyeOffset` にずれを入れる。`Rough` は Task 5 で済んでいるので、ここでやるのは揺れの部分だけ。
+
+**ガレージの飾り付け**: 今は床・壁・天井・柱・シャッターだけの箱で、8 m 歩くあいだ見るものが何も無い。効く順に、① 歩く線の上の床（油染み、排水口、駐車枠の塗り）— 歩いているあいだ画面の下半分を埋めるのは床、② この場所が「共用」ガレージだと分かるもの（空いた隣の区画、別の車の覆い、区画番号）、③ シャッターの桟（歩く線の正面にあるのに、今はただの平らな面）。
 
 **あわせて直す小物**: 帯 3 の野の門が石垣と同軸（x -3.45）で、笠石より上の 0.34 m しか出ていない。周期的な動きとしては効いているが、門というより壁の上の金具に見える。`Lane(-6.0)` あたりへ出して牧草地に立たせる。
 
