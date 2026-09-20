@@ -21,8 +21,10 @@ namespace HalfAware
         [SerializeField] Color off = new Color(0.035f, 0.040f, 0.045f);
         [Tooltip("点いているときの色")]
         [SerializeField] Color glow = new Color(0.32f, 0.80f, 0.46f);
-        [Tooltip("文字を流す速さ。UV/秒")]
-        [SerializeField] float scrollSpeed = 0.22f;
+        [Tooltip("文字を流す速さ。UV/秒。行の高さは UV で 0.04 なので、0.06 なら 1 秒に 1.5 行進む")]
+        [SerializeField] float scrollSpeed = 0.06f;
+        [Tooltip("帯のテクスチャの、面に映す割り当て。**小さいほど字が大きく映る**")]
+        [SerializeField] Vector2 tiling = new Vector2(1.0f, 0.5f);
 
         static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
         static readonly int Emission = Shader.PropertyToID("_EmissionColor");
@@ -71,8 +73,13 @@ namespace HalfAware
                 face.GetPropertyBlock(block);
                 block.SetColor(BaseColor, lit);
                 block.SetColor(Emission, lit * level);
+                // **テクスチャを丸ごと映さない。** 描画は 427×240 に renderScale 0.333 が
+                // 掛かるので、画面 1 枚は実寸で 30×22 px ほどしかない。256 px の帯を
+                // 25 行とも詰めると 1 行が 1 px を切り、行が潰れてただの緑の板になる。
+                // 半分だけ切り出すと 1 行に 2 px 残り、文字の並びに見える。
+                // **横は 1 を超えない。** 超えると横に繋がって、継ぎ目が縦の筋に出る。
                 // 流すのは縦だけ。横へずらすと行が切れて読めない絵になる
-                block.SetVector(BaseMapST, new Vector4(1f, 1f, 0f, -offset));
+                block.SetVector(BaseMapST, new Vector4(tiling.x, tiling.y, 0f, -offset));
                 face.SetPropertyBlock(block);
             }
         }

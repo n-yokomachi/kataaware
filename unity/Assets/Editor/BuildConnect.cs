@@ -380,6 +380,14 @@ namespace HalfAware.EditorTools
             // 組み立ての責任で、場面の頭では画面は消えている
             m.SetColor("_EmissionColor", ScreenOff);
             m.EnableKeyword("_EMISSION");
+            // **艶を落とす。** 元の Screen.mat は smoothness 0.85 で、机の並びが
+            // 画面に映り込む。灯る前は縁がぎざぎざに光り、灯った後は帯の上に
+            // 部屋が重なって行が読めなくなる。画面は自分で光るものなので反射は要らない
+            m.SetFloat("_Smoothness", 0.02f);
+            m.SetFloat("_SpecularHighlights", 0f);
+            m.SetFloat("_EnvironmentReflections", 0f);
+            m.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
+            m.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
             m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
             EditorUtility.SetDirty(m);
             return m;
