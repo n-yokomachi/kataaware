@@ -146,11 +146,45 @@ namespace HalfAware.EditorTools
         static void Traffic(Transform parent)
         {
             Clear(parent);
-            var dots = Shape("Oncoming", 0.5f, b =>
+            var shell = Shape("OncomingShell", 0.4f, Hull);
+            var pane = Shape("OncomingPane", 0.5f, Glazing);
+            var beam = Shape("OncomingBeam", 0.5f, b =>
             {
-                b.Box(new Vector3(-0.76f, 0.72f, 0f), new Vector3(0.26f, 0.16f, 0.10f));
-                b.Box(new Vector3(0.76f, 0.72f, 0f), new Vector3(0.26f, 0.16f, 0.10f));
+                b.Box(new Vector3(-OncomingLampX, OncomingLampY, -OncomingNose - 0.05f), new Vector3(0.30f, 0.18f, 0.12f));
+                b.Box(new Vector3(OncomingLampX, OncomingLampY, -OncomingNose - 0.05f), new Vector3(0.30f, 0.18f, 0.12f));
             });
+            var tail = Shape("OncomingTail", 0.5f, b =>
+            {
+                b.Box(new Vector3(-OncomingTailX, OncomingTailY, OncomingBack + 0.04f), new Vector3(0.22f, 0.15f, 0.10f));
+                b.Box(new Vector3(OncomingTailX, OncomingTailY, OncomingBack + 0.04f), new Vector3(0.22f, 0.15f, 0.10f));
+            });
+            // 前照灯の暈。**この帯は雨が降っている**（Route の rain）ので、灯りは滲む。
+            // 札は十字に立てる。1 枚だと真横を過ぎる瞬間に面が消えて、暈が瞬く
+            var mist = Shape("OncomingMist", 1f, b =>
+            {
+                for (var s = 0; s < 2; s++)
+                {
+                    var at = new Vector3((s == 0 ? -1f : 1f) * OncomingLampX, OncomingLampY, -OncomingNose - 0.06f);
+                    Blot(b, at, new Vector3(OncomingHalo * 0.5f, 0f, 0f), new Vector3(0f, OncomingHalo * 0.5f, 0f));
+                    Blot(b, at, new Vector3(0f, 0f, OncomingHalo * 0.5f), new Vector3(0f, OncomingHalo * 0.5f, 0f));
+                }
+            });
+            // 外板。**すれ違うのは一瞬なので、読ませたいのは「灯りの後ろに塊がある」ことだけ。**
+            // 車種でも色でもない。
+            //
+            // それでも真っ黒にはしない。日射しはこの帯では向こう側（+z 向きの面）へ回るので、
+            // こちらを向いた鼻先には環境光の水平ぶんしか来ない。0.138 で撮ったら画面で 6 しかなく、
+            // 街灯の溜まりを跨ぐ一瞬にも屋根が返らなかった。0.235 なら屋根が 20、鼻先が 10 になり、
+            // 二つの灯りのあいだが「道を塞いでいる暗い塊」として読める
+            var body = CityMat("OncomingShell", new Color(0.235f, 0.240f, 0.258f), 0.44f);
+            // 風防と窓の暗がり。外板より暗く、艶だけ高くする。
+            // 夜の対向車で車体の形を読ませているのは、この「屋根の下の黒い帯」
+            var glass = CityMat("OncomingPane", new Color(0.042f, 0.046f, 0.058f), 0.76f);
+            var lamps = Glow(new Color(0.92f, 0.94f, 1f), 3.4f);
+            // 尾灯。**前照灯ほど強くしない。** 同じ利得にすると、通り過ぎたあとの赤が
+            // 近づいてくる白と見分けが付かず、対向車線が両向きに流れているように見える
+            var reds = Glow(new Color(1f, 0.20f, 0.13f), 1.5f);
+            var halo = HaloMat("OncomingHalo", new Color(0.86f, 0.90f, 1f), 0.24f);
             for (var b = 0; b < Bands; b++)
             {
                 var band = Child(parent, "Band" + b);
@@ -158,10 +192,97 @@ namespace HalfAware.EditorTools
                 // 60 は 180 を割り切る。割り切らないと一周に一度だけ続けざまにすれ違う
                 if (b == 1)
                     Along(slices, 60f, (slice, z, k) =>
-                        Piece(slice, "Oncoming" + k, dots, Glow(new Color(0.92f, 0.94f, 1f), 3.4f))
-                            .localPosition = new Vector3(OncomingX, 0f, z));
+                    {
+                        var car = Child(slice, "Oncoming" + k);
+                        // **道より速い環に乗っているのは入れ物の方（区切り）。**
+                        // ここで置く z は区切りの中の位置で、oncomingRate には触らない
+                        car.localPosition = new Vector3(OncomingX, 0f, z);
+                        // 形は 1 つを使い回して、大きさだけ振る。60 m ごとに同じ車が
+                        // 来るのを隠すのに、mesh を車種のぶんだけ焼く必要は無い
+                        car.localScale = OncomingSize[k % OncomingSize.Length];
+                        Piece(car, "Shell", shell, body);
+                        Piece(car, "Pane", pane, glass);
+                        Piece(car, "Beam", beam, lamps);
+                        Piece(car, "Tail", tail, reds);
+                        Piece(car, "Mist", mist, halo);
+                    });
                 band.gameObject.SetActive(b == 0);
             }
+        }
+
+        /// <summary>対向車の鼻先の z。局所。手前（-z）がこちらを向いている側</summary>
+        const float OncomingNose = 2.05f;
+        /// <summary>対向車の尻の z。局所</summary>
+        const float OncomingBack = 2.05f;
+        /// <summary>車体の幅</summary>
+        const float OncomingWide = 1.80f;
+        /// <summary>前照灯の、車体の中心からの張り出しと高さ</summary>
+        const float OncomingLampX = 0.68f;
+        const float OncomingLampY = 0.74f;
+        /// <summary>尾灯の、車体の中心からの張り出しと高さ。前照灯より外へ、少し上へ</summary>
+        const float OncomingTailX = 0.74f;
+        const float OncomingTailY = 0.92f;
+        /// <summary>客室の前端と後端の z。局所</summary>
+        const float OncomingCabFrom = -0.78f;
+        const float OncomingCabTo = 1.22f;
+        /// <summary>客室の床と天。窓の抜きはこの内側に取る</summary>
+        const float OncomingCabLow = 1.16f;
+        const float OncomingCabHigh = 1.62f;
+        /// <summary>
+        /// 前照灯の暈の差し渡し。m。
+        ///
+        /// **2.6 では近づいたときに車を呑んだ。** 世界に置いた札なので、暈の見かけの
+        /// 大きさは距離に反比例する。2.6 m だと 40 m 先では 3.7 度で程よいが、
+        /// すれ違う 10 m 手前では 15 度に膨らんで、左右の暈が繋がった一枚の白い塊になり、
+        /// せっかく作った車体がその中に消えた。1.7 なら 10 m でも 10 度で、
+        /// 車体（幅 1.8 m で 10 度）と同じ大きさに収まる
+        /// </summary>
+        const float OncomingHalo = 1.7f;
+
+        /// <summary>
+        /// 対向車の大きさの振り。環に 3 台しか乗らないので、同じ車が 2.9 秒ごとに来る。
+        /// mesh を増やさずに背丈と幅だけ振ると、それだけで別の車に見える
+        /// </summary>
+        static readonly Vector3[] OncomingSize =
+        {
+            new Vector3(1.00f, 1.00f, 1.00f),
+            new Vector3(1.06f, 1.24f, 1.14f),
+            new Vector3(0.95f, 0.93f, 0.96f),
+        };
+
+        /// <summary>
+        /// 対向車の外板。**手前（-z）が鼻先。** すれ違う車はこちらを向いて近づいてくる。
+        ///
+        /// 腰から下・胴・客室の三段に分ける。一つの箱では、街灯の溜まりを跨いだ一瞬に
+        /// 屋根と肩の折れが出ず、光る面がただの四角に見える。
+        /// 車輪のところは別に暗い塊を置く。床下が抜けていると、遠くで車体が宙に浮く
+        /// </summary>
+        static void Hull(Bank b)
+        {
+            var len = OncomingNose + OncomingBack;
+            var mid = (OncomingBack - OncomingNose) * 0.5f;
+            b.Box(new Vector3(0f, 0.62f, mid), new Vector3(OncomingWide, 0.60f, len));
+            b.Box(new Vector3(0f, 1.00f, mid + 0.06f), new Vector3(OncomingWide - 0.07f, 0.36f, len - 0.34f));
+            b.Box(new Vector3(0f, (OncomingCabLow + OncomingCabHigh) * 0.5f, (OncomingCabFrom + OncomingCabTo) * 0.5f),
+                new Vector3(OncomingWide - 0.26f, OncomingCabHigh - OncomingCabLow, OncomingCabTo - OncomingCabFrom));
+            // 車輪まわり。形は要らない。床下を塞いで、遠くで車体を地面に着けるためのもの
+            b.Box(new Vector3(0f, 0.26f, -OncomingNose * 0.62f), new Vector3(OncomingWide + 0.04f, 0.52f, 0.66f));
+            b.Box(new Vector3(0f, 0.26f, OncomingBack * 0.62f), new Vector3(OncomingWide + 0.04f, 0.52f, 0.66f));
+        }
+
+        /// <summary>
+        /// 風防と窓。客室の面から 2 cm だけ浮かせる。同じ面に置くと深度で削り合う。
+        /// 側面まで抜くのは、真横を過ぎる一瞬に屋根が板に見えないようにするため
+        /// </summary>
+        static void Glazing(Bank b)
+        {
+            var half = (OncomingWide - 0.26f) * 0.5f + 0.02f;
+            var low = OncomingCabLow + 0.06f;
+            var high = OncomingCabHigh - 0.05f;
+            b.FaceZ(OncomingCabFrom - 0.02f, -half + 0.10f, half - 0.10f, low, high, -1);
+            b.FaceZ(OncomingCabTo + 0.02f, -half + 0.10f, half - 0.10f, low, high, 1);
+            b.FaceX(-half, OncomingCabFrom + 0.14f, OncomingCabTo - 0.14f, low, high, -1);
+            b.FaceX(half, OncomingCabFrom + 0.14f, OncomingCabTo - 0.14f, low, high, 1);
         }
 
         // ---- 空に浮かべる雲 ---------------------------------------------------
@@ -247,9 +368,197 @@ namespace HalfAware.EditorTools
                         new Color(0.94f, 0.96f, 1f, 0.55f), 0.232f, 0.58f, new Vector2(0.0008f, 0.0003f));
                     LoneTree(band);
                 }
+                // 三日月。**夜の高速だけに出す。**
+                //
+                // 帯 0（倫敦の市街）には出せない。原作でこの都市を覆っているのは
+                // 「クラッカーたちが撒き散らすクラック用のナノマシンの黒雲」で、
+                // その黒雲は上（Nano）に敷いてある。塞いだ空に月が煌々と出ていれば、
+                // 塞いだこと自体が嘘になる。
+                //
+                // 最後の帯（朝靄の未舗装路）にも出せない。塗り潰しが靄の白（0.820）なので、
+                // 白い月を置いても空との差が残らない。あの帯で目を留める先は
+                // 遠景の一本木（<see cref="LoneTree"/>）が持っている。
+                //
+                // 残るのがここで、しかもここが一番合う。帯 1 は「倫敦の雲から抜けた」ところで、
+                // 空の物が何も無い唯一の帯でもある（この帯の Sky はこれまで空だった）。
+                // 低い三日月が一つ出れば、雲を抜けたことがそのまま絵になる。
+                // 雨は降っているが通り雨で、雲の切れ間に月が見えるのは雨の夜そのもの
+                if (b == 1 && b != Bands - 1) Moon(band);
                 // 出し分けるのは DriveDirector。組んだ直後は頭の帯だけ見せる
                 band.gameObject.SetActive(b == 0);
             }
+        }
+
+        // ---- 遠景の三日月 --------------------------------------------------
+
+        /// <summary>
+        /// 月までの距離。m。**カメラの奥（1000 m）の内側に収めること。**
+        /// 振った先の四隅までの距離がそこを越えると、月が切り落とされて直線が出る
+        /// </summary>
+        const float MoonAway = 560f;
+
+        /// <summary>
+        /// 月の仰角。度。運転席の目（<see cref="SeatAt"/> の 1.55）から測る。
+        ///
+        /// **上げてはいけない。** 風防の上の縁は目から見て仰角およそ 21 度にあり
+        /// （帯 4 の空の板の但し書きと同じ数）、そこを越えた月は屋根に切られて見えない。
+        /// かといって地平すれすれに置くと、門型（<see cref="Gantry"/>）や切り通しの
+        /// 稜線が次々に前を横切って、月が点滅する。11.5 度は、風防の上半分に収まったまま、
+        /// 沿道の物がめったに掛からない高さ
+        /// </summary>
+        const float MoonRise = 11.5f;
+
+        /// <summary>
+        /// 月の方位。度。正で左（-x）へ振る。
+        ///
+        /// **正面には置かない。** 道は消点へ向かってまっすぐ抜けるので、そこへ月を重ねると
+        /// 道の先の明かりと見分けが付かない。左へ振るのは、運転席が右（x 0.38）にあり、
+        /// 右へ振ると自分の側の窓の柱に隠れる時間が長くなるため
+        /// </summary>
+        const float MoonSwing = 9.0f;
+
+        /// <summary>
+        /// 月の見かけの差し渡し。度。
+        ///
+        /// **本物は 0.52 度だが、それでは出ない。** 描画解像度は 427 × 240 で、
+        /// 画角が縦 70 度なので 1 度がおよそ 3.4 画素。0.52 度では 2 画素に満たず、
+        /// 三日月どころか点になる。
+        ///
+        /// **3.2 度でも足りなかった。** 差し渡し 11 画素まで大きくしたが、撮って拡げてみると
+        /// 角（つの）の先が 1 画素を切って、三日月ではなく欠けた四角に見えた。
+        /// 5.4 度（差し渡し 18 画素）で初めて、欠け際の弧が弧として出る。
+        /// 本物の 10 倍だが、月を月として見せるのに要る大きさはこれ
+        /// </summary>
+        const float MoonWide = 5.4f;
+
+        /// <summary>欠け際を作る円の半径。月の半径に対する比</summary>
+        const float MoonBite = 0.82f;
+
+        /// <summary>
+        /// 欠け際の円をずらす量。月の半径に対する比。
+        /// 大きいほど細る。0.66 で、差し渡しのおよそ四分の一が残る三日月になる
+        /// </summary>
+        const float MoonShift = 0.66f;
+
+        /// <summary>弧を刻む数。11 画素の月なら、これだけあれば縁が角張らない</summary>
+        const int MoonSteps = 26;
+
+        /// <summary>月の傾き。度。角（つの）を斜め上へ向ける。真横だと舟に見える</summary>
+        const float MoonTilt = -34f;
+
+        /// <summary>
+        /// 月の色。**白にしない。** 月は青白いと思われがちだが、地平に近い月は
+        /// 大気を長く抜けてくるので黄ばむ。ここは仰角 11.5 度なので、わずかに暖めておく
+        /// </summary>
+        static readonly Color MoonHue = new Color(0.840f, 0.845f, 0.780f, 1f);
+
+        /// <summary>
+        /// 遠景の三日月。帯 1 の空に一つ置く。
+        ///
+        /// **動かさない。** 沿道の一本木（<see cref="LoneTree"/>）は走った距離のごく一部だけ
+        /// 手前へ動かすが（<see cref="FarTree"/>）、あれは木が霧の届く 100〜200 m のところに
+        /// 立っていて、そこでは視差が実際に効くため。月は比べものにならないほど遠い。
+        /// 車は原点から動かず、世界の方が流れる作りなので、置いたまま何もしなければ
+        /// 画面の同じところに留まり続ける。**それが月の正しい動き方**で、
+        /// 沿道が流れていくあいだ月だけが動かないところが、そのまま遠さになる。
+        /// component を足す必要も無いので、足していない。
+        ///
+        /// 空の入れ物に入れておけば、帯の出し分け（DriveDirector.ShowSky）に連れて
+        /// 出入りする。区切りの数を数える沿道と違って、いくつ入れても環は狂わない
+        /// </summary>
+        static void Moon(Transform band)
+        {
+            var radius = MoonAway * Mathf.Tan(MoonWide * 0.5f * Mathf.Deg2Rad);
+            var mesh = Shape("Moon", 1f, b => Crescent(b, radius));
+            var rise = MoonRise * Mathf.Deg2Rad;
+            var swing = MoonSwing * Mathf.Deg2Rad;
+            var dir = new Vector3(
+                -Mathf.Sin(swing) * Mathf.Cos(rise), Mathf.Sin(rise), Mathf.Cos(swing) * Mathf.Cos(rise));
+            var moon = Piece(band, "Moon", mesh, MoonMat());
+            // 仰角は運転席の目から測る。地の面から測ると 1.55 m ぶん低いところに出る
+            moon.localPosition = SeatAt + dir * MoonAway;
+            // 絵は xy の面に描いてあるので、局所の +z を目から離れる向きへ向ければ正面を向く。
+            // そのうえで面の中で傾けて、角を斜め上へ回す
+            moon.localRotation = Quaternion.LookRotation(dir, Vector3.up) * Quaternion.Euler(0f, 0f, MoonTilt);
+            // **暈は付けられない。** 雨の夜なので月の縁は滲むはずで、街灯と同じ加算の札を
+            // 一枚重ねてみたが、<c>HalfAware/RoadGlow</c> は距離で灯りを減らす作りなので
+            // （霧の色を帯びさせないための仕掛け）、560 m 先の月では通る光が 0 になり、
+            // 何も出なかった。距離を見ないのは雲の <c>HalfAware/SkyCloud</c> の方だが、
+            // あちらは α で混ぜるので、滲みの絵の α が要る。絵を足してまで付けるほどの
+            // ものではないと見て、三日月ひとつだけにしてある
+        }
+
+        /// <summary>
+        /// 三日月ひとつ。半径 1 の円から、<see cref="MoonShift"/> だけずらした
+        /// 半径 <see cref="MoonBite"/> の円を抜いた形を、二本の弧のあいだの帯として張る。
+        ///
+        /// **満月を描いて欠けを塗り潰す作りにはしない。** 欠けたところは空が透けるので、
+        /// 暗い色で塗った面を重ねると、そこだけ空と違う暗い円が浮く。
+        /// 明るいところだけを面にすれば、欠けたところには何も無い
+        /// </summary>
+        static void Crescent(Bank bank, float radius)
+        {
+            var d = MoonShift;
+            var r = MoonBite;
+            // 二つの円が交わるところ＝角（つの）。x は根の公式、y はそこから
+            var xh = (1f - r * r + d * d) / (2f * d);
+            var yh = Mathf.Sqrt(Mathf.Max(0f, 1f - xh * xh));
+            var outer = Mathf.Atan2(yh, xh);
+            var inner = Mathf.Atan2(yh, xh - d);
+            for (var i = 0; i < MoonSteps; i++)
+            {
+                var t0 = (float)i / MoonSteps;
+                var t1 = (float)(i + 1) / MoonSteps;
+                bank.Quad(
+                    Arc(outer, t0, 1f, 0f, radius), Arc(outer, t1, 1f, 0f, radius),
+                    Arc(inner, t1, r, d, radius), Arc(inner, t0, r, d, radius));
+            }
+        }
+
+        /// <summary>
+        /// 弧の上の一点。from（角の角度）から 2π - from まで、左回りに t で辿る。
+        /// 外の弧と欠け際の弧はどちらも同じ二点（角）から始まって同じ二点で終わるので、
+        /// 同じ t どうしを結べば帯になる
+        /// </summary>
+        static Vector3 Arc(float from, float t, float rad, float offset, float scale)
+        {
+            var ang = from + t * (2f * Mathf.PI - 2f * from);
+            return new Vector3((offset + rad * Mathf.Cos(ang)) * scale, rad * Mathf.Sin(ang) * scale, 0f);
+        }
+
+        /// <summary>
+        /// 月のマテリアル。**霧を掛けない。**
+        ///
+        /// 帯 1 の霧は二乗の 0.0085 なので、URP の Unlit で塗ると 560 m 先の月は
+        /// 丸ごと霧の色に呑まれて、空との差が一つも残らない。月は霧の向こう側にある物なので、
+        /// 雲の板と同じ <c>HalfAware/SkyCloud</c> で塗る。あちらは距離を見ない。
+        ///
+        /// 絵は貼らない。貼らなければシェーダーは白を返すので、色は <see cref="MoonHue"/> が持つ。
+        /// 仰角の薄れは月よりずっと下で終わらせて、月のところでは濃さのまま出す
+        /// </summary>
+        static Material MoonMat()
+        {
+            var shader = Shader.Find("HalfAware/SkyCloud");
+            if (shader == null) Debug.LogWarning("HalfAware/SkyCloud が見つからない。月が出ない");
+            var path = Materials + "Moon.mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                m = new Material(shader);
+                m.name = "Moon";
+                AssetDatabase.CreateAsset(m, path);
+            }
+            // 組み直すたびに結び直す。手で触った値は残らない
+            m.shader = shader;
+            m.SetTexture("_BaseMap", null);
+            m.SetColor("_BaseColor", MoonHue);
+            m.SetFloat("_FadeAt", 0.010f);
+            m.SetFloat("_FullAt", 0.040f);
+            // 透ける面どうしの並び。この帯に空の板はほかに無いが、
+            // 雲を足したときに月が沈まないよう、雲（2950）より繰り上げておく
+            m.renderQueue = 2940;
+            EditorUtility.SetDirty(m);
+            return m;
         }
 
         // ---- 遠景の一本木 --------------------------------------------------
@@ -456,7 +765,11 @@ namespace HalfAware.EditorTools
         ///
         /// **ここはまだ都市部。** 以前は高架の脚とネオンの板が疎らに並ぶだけで、
         /// 市街ではなく郊外の空き地に見えていた。道の両側をビルで塞いで初めて、
-        /// 倫敦を出て行くところになる。ビルの中身は <see cref="City"/>
+        /// 倫敦を出て行くところになる。ビルの中身は <see cref="City"/>。
+        ///
+        /// **ビルを建てても道そのものは空のままだった。** 夜の高速（<see cref="Wayside"/>）には
+        /// 縁石も柵も反射板も標識もあるのに、こちらは舗装と白線の両脇がいきなり歩道で、
+        /// 路面まわりに何も無かった。街路の中身は <see cref="Street"/> が持つ
         /// </summary>
         static void Outskirts(Transform[] slices)
         {
@@ -481,10 +794,15 @@ namespace HalfAware.EditorTools
             for (var h = 0; h < hues.Length; h++)
                 smears[h] = GlowMat("NeonSmear" + h, "Smear", hues[h], 1.05f, SmearWide, SmearDeep);
 
+            // 歩道は <see cref="Mat"/> の Concrete（0.150）から自前の色へ移した。
+            // あちらは高架の脚と共用で、脚を明るくすると夜の谷から影絵が消える。
+            // 歩道だけを 0.20 まで上げると画面で 17 になり、そこに立つ柱も
+            // 停めてある車の横腹（13）も、歩道を背にした影絵として形が読める
+            var paving = CityMat("CityPave", new Color(0.200f, 0.202f, 0.208f), 0.10f);
             for (var i = 0; i < slices.Length; i++)
             {
                 Piece(slices[i], "Sheen", sheen, Mat("Sheen"));
-                Piece(slices[i], "Walk", walk, Mat("Concrete"));
+                Piece(slices[i], "Walk", walk, paving);
             }
             City(slices);
             Along(slices, 45f, (slice, z, k) => Sides("Pier" + k, 6.5f, (at, side, name) =>
@@ -513,6 +831,19 @@ namespace HalfAware.EditorTools
             Along(slices, 30f, (slice, z, k) => Sides("Smear", 3.0f, (at, side, name) =>
                 Piece(slice, name, smear, smears[(k + side + 1) % hues.Length])
                     .localPosition = new Vector3(at, 0f, z + 15f)));
+
+            Street(slices);
+            // 街灯が路面に落とす溜まり。**ここだけは素材へ焼かずに物で置く。**
+            // 路面に貼る面は CheckDrive.Paving に名前で載っているものしか道へ出せない。
+            // 帯 1 の溜まりと同じ名前にしておけば、そちらの並びにそのまま乗る
+            var pool = Card("CityPool", CityPoolWide, CityPoolDeep);
+            var poolMat = GlowMat("CityPool", "Pool", CityLampHue, 0.38f, CityPoolWide, CityPoolDeep);
+            Along(slices, CityLampStep, (slice, z, k) =>
+            {
+                var side = LampSide(k);
+                Piece(slice, side < 0f ? "PoolL" : "PoolR", pool, poolMat)
+                    .localPosition = new Vector3(Lane((CityLampAt - CityLampReach) * side), 0f, z);
+            });
         }
 
         /// <summary>ネオンの映り込みの板の幅。濡れた舗装の映り込みは看板より広がる</summary>
@@ -534,7 +865,13 @@ namespace HalfAware.EditorTools
         /// </summary>
         const float CityFace = 8.0f;
 
-        /// <summary>歩道の内側の縁。路肩の段のすぐ外</summary>
+        /// <summary>
+        /// 市街の地の面の内側の縁。路肩の段のすぐ外。
+        ///
+        /// 歩道の縁だった頃の名前のまま。歩道は路上駐車の帯を空けるために
+        /// <see cref="CityKerbBack"/> まで外へ退いたので、今ここが受け持っているのは
+        /// 路肩の地面（±24）の外を塞ぐ面（<see cref="City"/> の Deep）の内縁だけ
+        /// </summary>
         const float WalkFrom = RoadHalf + Shoulder;
 
         /// <summary>歩道の高さ。縁石のぶんだけ舗装より上げる</summary>
@@ -921,7 +1258,11 @@ namespace HalfAware.EditorTools
         ///
         /// ビルが路肩からじかに生えていると、建物が道に置いてあるように見える。
         /// 縁石で一段上げた歩道を挟むと、道と建物のあいだに街の床が入る。
-        /// 縁石の立ち上がりは道の側だけ張ればよい。外は壁が塞ぐ
+        ///
+        /// **縁石の立ち上がりはここが張らない。** <see cref="Street"/> の縁石
+        /// （<see cref="CityKerbAt"/>〜<see cref="CityKerbBack"/>）が、歩道の内側の縁より
+        /// 手前で道を縁取る。ここでも張ると同じ面が二枚重なってちらつく。
+        /// 歩道の縁は縁石の天端（<see cref="CityKerbY"/>）が歩道より高いので隠れる
         /// </summary>
         static Mesh WalkMesh()
         {
@@ -930,10 +1271,9 @@ namespace HalfAware.EditorTools
                 for (var s = 0; s < 2; s++)
                 {
                     var side = s == 0 ? -1f : 1f;
-                    var inner = Lane(WalkFrom * side);
+                    var inner = Lane(CityKerbBack * side);
                     var outer = Lane(CityFace * side);
                     b.FaceY(WalkY, Mathf.Min(inner, outer), Mathf.Max(inner, outer), 0f, TileLength, 1);
-                    b.FaceX(inner, 0f, TileLength, VergeY, WalkY, s == 0 ? 1 : -1);
                 }
             });
         }
@@ -964,6 +1304,414 @@ namespace HalfAware.EditorTools
             if (m.HasProperty("_Metallic")) m.SetFloat("_Metallic", 0f);
             EditorUtility.SetDirty(m);
             return m;
+        }
+
+        // ---- 帯 0 の街路 ----------------------------------------------------
+        //
+        // ビル（<see cref="City"/>）が道の両側を塞いだあとも、路面まわりは白線だけで、
+        // 舗装の縁からいきなり歩道が始まっていた。夜の高速には縁石・ガードレール・
+        // 反射板・門型・標識・法面まであるのに、市街の道はそれより空だったことになる。
+        //
+        // ここで足すのは、倫敦の裏通りが幹線へ出たあたりの街路：
+        // 縁石、路上駐車の帯と側溝、雨水枡、街灯（高速のものとは形が違う）、
+        // 街路樹、路上駐車の車、標識。
+        //
+        // **刻みはどれも環一周（<see cref="Span"/> 180 m）を割り切る。**
+        // 区切りに続けて張るもの（路上駐車の帯・縁石・雨水枡）は区切りの長さ（20）が
+        // そのまま刻みになるので必ず割り切る。環の上へ置くもの（街灯 30・街路樹 45・
+        // 標識 45・路上駐車 30）は <see cref="Sow"/> が割り切るかどうかを見て、
+        // 割り切らない刻みは並べずに飛ばす。
+        //
+        // **物で置かずに素材へ焼く。** 街灯と街路樹と標識と停めてある車を一つずつ置けば、
+        // それだけでレンダラーが百を越える。区切りごとに素材へまとめれば、
+        // 中身の無い素材は <c>Bank.Emit</c> が何も置かないので、
+        // 車の停まっていない区切りにはレンダラーが増えない
+
+        /// <summary>
+        /// 縁石の道側の面。道の中心から。
+        ///
+        /// **舗装の縁（<see cref="RoadHalf"/> 3.5）から 2.1 m 外へ取る。**
+        /// ここと舗装の縁のあいだが路上駐車の帯になる。詰めると停めた車が道へ出て、
+        /// CheckDrive.OnRoad が知らせる。歩道だった 4.7 のままでは 1.2 m しか無く、
+        /// 車 1 台（幅 1.80）が入らない
+        /// </summary>
+        const float CityKerbAt = 5.60f;
+
+        /// <summary>縁石の歩道側の面。見付けは 0.30 m。歩道（<see cref="WalkMesh"/>）はここから外</summary>
+        const float CityKerbBack = 5.90f;
+
+        /// <summary>
+        /// 縁石の天端。**歩道（<see cref="WalkY"/> 0.13）より高く取る。**
+        /// 同じ高さにすると二枚の面が地続きになって、縁石が歩道の一部に見える。
+        /// 1.5 cm 出しておけば、縁石が歩道の縁を隠したまま、そこに石が据わって見える
+        /// </summary>
+        const float CityKerbY = 0.145f;
+
+        /// <summary>
+        /// 路上駐車の帯と側溝の面。路肩の段（-<see cref="ShoulderDrop"/> ＝ -0.05）の
+        /// 8 mm 上に乗せる。同じ高さに置くと遠くでちらつく
+        /// </summary>
+        const float CityGutterY = -0.042f;
+
+        /// <summary>
+        /// 路上駐車の帯の、道側の縁。**舗装の縁ちょうどには置かない。**
+        /// 丸めで 1e-7 だけ内側に落ちると、CheckDrive.OnRoad が食い込みとして知らせる
+        /// </summary>
+        const float CityGutterAt = RoadHalf + 0.02f;
+
+        /// <summary>雨水枡の口の、道の中心からの距離。側溝の中、縁石の見付けの手前</summary>
+        const float CityGullyAt = 3.70f;
+
+        /// <summary>雨水枡の口の幅</summary>
+        const float CityGullyWide = 0.46f;
+
+        /// <summary>雨水枡の、区切りの中の z。区切りごとに 1 つずつなので 20 m 刻みになる</summary>
+        const float CityGullyZ = 6.5f;
+
+        /// <summary>
+        /// 街灯の間隔。m。180 を割り切ること。**左右を交互に立てる**ので、
+        /// 片側では 60 m ごと。16 m/s なので 1.9 秒に 1 本くぐる
+        /// </summary>
+        const float CityLampStep = 30f;
+
+        /// <summary>
+        /// 街灯の柱の、道の中心からの距離。縁石（5.60〜5.90）の上。
+        /// 高架の脚（±6.5、半幅 0.55 なので内の面が 5.95）に当てないところに取る
+        /// </summary>
+        const float CityLampAt = 5.75f;
+
+        /// <summary>
+        /// 柱から灯りまでの、道の上への差し出し。
+        ///
+        /// **1.05 では道が照らせなかった。** 溜まりの板は灯りの真下を中心に敷くので、
+        /// 灯りが縁石の真上に留まると、板のいちばん明るいところが側溝に落ちて、
+        /// 舗装には裾しか掛からない。実際に撮って、路面に橙がまったく乗っていなかった。
+        /// 高速の街灯（<see cref="LampAt"/> 4.6 − <see cref="LampArm"/> 1.18 ＝ 3.42）と
+        /// 同じところまで差し出す。舗装の縁（3.5）は越えない
+        /// </summary>
+        const float CityLampReach = 2.15f;
+
+        /// <summary>街灯の柱の高さ</summary>
+        const float CityLampHigh = 5.40f;
+
+        /// <summary>
+        /// 市街の街灯の色。**高速の街灯（<see cref="LampHue"/>）より白に寄せてある。**
+        /// 同じ橙にすると、帯 0 から帯 1 へ移ったときに景色が変わったことが読めない。
+        /// 倫敦の街路は高速のナトリウム灯より新しい灯りが混ざっている
+        /// </summary>
+        static readonly Color CityLampHue = new Color(1f, 0.80f, 0.50f);
+
+        /// <summary>街灯が路面に落とす溜まりの幅</summary>
+        const float CityPoolWide = 12f;
+        /// <summary>
+        /// 街灯が路面に落とす溜まりの長さ。**片側の間隔（60）より十分短くする。**
+        /// 溜まりが繋がると、灯りの下をくぐっていく刻みが消える
+        /// </summary>
+        const float CityPoolDeep = 20f;
+
+        /// <summary>街路樹の間隔。m。180 を割り切る。左右を交互に</summary>
+        const float CityTreeStep = 45f;
+        /// <summary>
+        /// 街路樹の幹の、道の中心からの距離。歩道の上。
+        /// 高架の脚（±6.5）と同じ幅の帯に立つが、脚は 45 m 刻みで木は半刻みずれるので当たらない
+        /// </summary>
+        const float CityTreeAt = 6.10f;
+
+        /// <summary>標識の間隔。m。180 を割り切る</summary>
+        const float CitySignStep = 45f;
+        /// <summary>標識の柱の、道の中心からの距離。歩道の上</summary>
+        const float CitySignAt = 6.15f;
+
+        /// <summary>路上駐車の割り付けの刻み。m。180 を割り切る。一区画に 0〜3 台停める</summary>
+        const float CityParkStep = 30f;
+        /// <summary>停めた車どうしの間合い。m。車の長さ（4.1〜4.8）より少しだけ広く</summary>
+        const float CityParkGap = 5.3f;
+        /// <summary>
+        /// 停めた車の中心の、道の中心からの距離。
+        /// 車幅 1.80 の半分を引いて 3.72。舗装の縁（3.5）まで 0.22 m 残る
+        /// </summary>
+        const float CityParkAt = 4.62f;
+
+        /// <summary>街灯と街路樹と標識の左右。k が偶数なら左、奇数なら右</summary>
+        static float LampSide(int k)
+        {
+            return (k % 2) == 0 ? -1f : 1f;
+        }
+
+        /// <summary>
+        /// 帯 0 の街路を焼く先。素材ごとに 1 つ持ち、区切り 1 つぶんをまとめて 1 枚の mesh にする
+        /// </summary>
+        sealed class StreetBanks
+        {
+            /// <summary>縁石と雨水枡の枠。夜の街で道幅をまっすぐ引くのはこれ</summary>
+            public readonly Bank Kerb = new Bank { Texel = 0.5f };
+            /// <summary>路上駐車の帯と側溝。舗装より暗くして、走る幅と停める幅を分ける</summary>
+            public readonly Bank Tar = new Bank { Texel = 0.3f };
+            /// <summary>街路の鉄。街灯の柱・幹・標識の柱・雨水枡の格子・停めた車のガラス</summary>
+            public readonly Bank Iron = new Bank { Texel = 0.5f };
+            /// <summary>街路樹の葉</summary>
+            public readonly Bank Leaf = new Bank { Texel = 0.3f };
+            /// <summary>停めてある車の外板</summary>
+            public readonly Bank Shell = new Bank { Texel = 0.4f };
+            /// <summary>街灯の灯り</summary>
+            public readonly Bank Lamp = new Bank { Texel = 0.5f };
+            /// <summary>標識の札</summary>
+            public readonly Bank Face = new Bank { Texel = 0.5f };
+            /// <summary>街灯の暈。uv は 0〜1 を直に振る（<see cref="Blot"/>）</summary>
+            public readonly Bank Haze = new Bank { Texel = 1f };
+        }
+
+        /// <summary>街灯の暈の差し渡し。m。高速の暈（5.4 × 4.4）より小さい。灯りが低いぶん暈も小さい</summary>
+        const float CityHalo = 3.8f;
+
+        /// <summary>帯 0 の街路ぜんたい</summary>
+        static void Street(Transform[] slices)
+        {
+            var banks = new StreetBanks[slices.Length];
+            for (var i = 0; i < banks.Length; i++) banks[i] = new StreetBanks();
+
+            // 区切りに続けて張るもの。刻みは区切りの長さそのもの
+            for (var i = 0; i < banks.Length; i++) Paveway(banks[i]);
+
+            // 種を決め打ちにして、組み直しても同じ街路になるようにする
+            var rnd = new System.Random(20260925);
+            // 街灯。溜まり（Outskirts の CityPool）と同じ刻みと同じ左右に立てる
+            Sow(CityLampStep, 0f, 0f, rnd, (ring, k) => Put(banks, ring, (c, z) => Streetlamp(c, z, k)));
+            // 街路樹。街灯とも高架の脚（45 m 刻み）とも重ならないよう、半刻みずらす
+            Sow(CityTreeStep, 0f, CityTreeStep * 0.5f, rnd, (ring, k) =>
+            {
+                var seed = rnd.Next();
+                Put(banks, ring, (c, z) => Streettree(c, new System.Random(seed), z, k));
+            });
+            // 標識。街灯とも街路樹ともずらす
+            Sow(CitySignStep, 0f, CitySignStep * 0.25f, rnd, (ring, k) => Put(banks, ring, (c, z) => Signplate(c, z, k)));
+            Parking(banks, rnd);
+
+            // **色は画面で測って決めた。** 帯 0 の環境光は空側 0.250 で、これは
+            // ガンマの値なので線形では 0.048 しかない。上を向いた面ですら受ける光は
+            // その程度なので、素の色をそのまま画面の明るさとして読んではいけない。
+            // 撮って測ると、舗装（0.115）は画面で 6、壁（0.39〜0.56）でも 24 だった。
+            // 一段（8.2）以上の差が付かない色は、置いても何も足していないのと同じになる。
+            //
+            // 縁石。**この帯で路面まわりのいちばん明るいもの。**
+            //
+            // 夜の市街で道の縁を引いていたのは白線だけで、白線は道の中ほどにあるから、
+            // 道がどこで終わって街が始まるかは読めなかった。0.290 で試したときは
+            // 画面で 16、舗装（6）との差が 10 しかなく、遠くでは消えた。
+            // 0.40 まで上げると 22 になり、道の両側に 180 m の線が二本通る
+            var kerb = CityMat("CityKerb", new Color(0.400f, 0.392f, 0.366f), 0.12f);
+            // 路上駐車の帯と側溝。**舗装よりわずかに明るくする。**
+            //
+            // 最初は暗く落として「走る幅」と「停める幅」を分けるつもりだったが、
+            // 0.088 で測ると画面 5、舗装 6 で見分けが付かなかった。どちらも黒なので、
+            // 広げた道幅がそのまま闇になる。少し明るい側へ回して、側溝の石畳に寄せる。
+            // 走る幅と停める幅を分けるのは縁石と白線の役目にする。
+            // 艶は舗装（Sheen 0.86）寄りに上げる。この帯の路面は濡れている
+            var tar = CityMat("CityTar", new Color(0.168f, 0.172f, 0.184f), 0.62f);
+            // 街路の鉄。**立った細い物なので、明るくしても画面には出ない。**
+            // 柱が読めるのは色ではなく、明るい歩道と壁を背にした影絵としてなので、
+            // ここは暗いままでよい
+            var iron = CityMat("CityIron", new Color(0.074f, 0.076f, 0.084f), 0.22f);
+            // 街路樹の葉。鉄より明るく、緑を残す。街灯の橙をわずかに返す面として置く
+            var leaf = CityMat("CityLeaf", new Color(0.130f, 0.148f, 0.104f), 0.06f);
+            // 停めてある車の外板。**天板だけが明るい。**
+            //
+            // 0.196 で測ると天板が画面 16 で、歩道（12〜17）と見分けが付かなかった。
+            // 濡れた夜の街路で停めてある車がそこにあると分かるのは、屋根とボンネットが
+            // 空と灯りを映して、路面より明るい面として並ぶからで、横腹は暗いままでよい。
+            // 0.30 なら天板が 26、横腹は立った面なので 13 に落ちる
+            var shell = CityMat("CityShell", new Color(0.300f, 0.306f, 0.322f), 0.52f);
+            // 街灯の灯り。高速の頭（1.05）より落とす。市街にはネオンが並んでいるので、
+            // 街灯まで同じ明るさにすると灯りの数だけが増えて、どれも目立たなくなる
+            var lamp = Glow(CityLampHue, 0.92f);
+            // 標識の札。前照灯を返す面なので、灯りを置かずに明るい Unlit で済ませる
+            var face = Glow(new Color(0.86f, 0.88f, 0.94f), 0.46f);
+            var haze = HaloMat("CityHalo", CityLampHue, 0.26f);
+
+            for (var i = 0; i < slices.Length; i++)
+            {
+                banks[i].Tar.Emit(slices[i], "CityTar" + i, tar, false, Generated);
+                banks[i].Kerb.Emit(slices[i], "CityKerb" + i, kerb, false, Generated);
+                banks[i].Iron.Emit(slices[i], "CityIron" + i, iron, false, Generated);
+                banks[i].Leaf.Emit(slices[i], "CityLeaf" + i, leaf, false, Generated);
+                banks[i].Shell.Emit(slices[i], "CityShell" + i, shell, false, Generated);
+                banks[i].Lamp.Emit(slices[i], "CityLamp" + i, lamp, false, Generated);
+                banks[i].Face.Emit(slices[i], "CitySign" + i, face, false, Generated);
+                banks[i].Haze.Emit(slices[i], "CityHaze" + i, haze, false, Generated);
+            }
+        }
+
+        /// <summary>
+        /// 区切り 1 つぶんの路面まわり。路上駐車の帯・側溝・縁石・雨水枡。
+        ///
+        /// 高さは下から、路肩の段（-0.05）＞ 路上駐車の帯（-0.042）＞ 枡の枠（-0.038）
+        /// ＞ 格子（-0.034）＞ 歩道（0.13）＞ 縁石の天端（0.145）。
+        /// どれも 4 mm 以上あけてある。梯子（CheckDrive.Ladder）が見ているのは
+        /// 車道に重なる面だけなので、ここは入っていないが、離し方の考えは同じ
+        /// </summary>
+        static void Paveway(StreetBanks c)
+        {
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                var g0 = Lane(CityGutterAt * side);
+                var g1 = Lane(CityKerbAt * side);
+                c.Tar.FaceY(CityGutterY, Mathf.Min(g0, g1), Mathf.Max(g0, g1), 0f, TileLength, 1);
+                var k1 = Lane(CityKerbBack * side);
+                c.Kerb.FaceY(CityKerbY, Mathf.Min(g1, k1), Mathf.Max(g1, k1), 0f, TileLength, 1);
+                // 道へ向いた見付け。縁石が縁石に見えるのはこの立ち上がりがあるから
+                c.Kerb.FaceX(g1, 0f, TileLength, CityGutterY, CityKerbY, s == 0 ? 1 : -1);
+                // 歩道へ返す小さな段。天端と歩道の 1.5 cm を塞ぐ
+                c.Kerb.FaceX(k1, 0f, TileLength, WalkY, CityKerbY, s == 0 ? -1 : 1);
+                // 雨水枡。側溝に 20 m にひとつ。街の道には必ずあるもので、
+                // 側溝が一様な帯にならないよう刻みを入れる役もする
+                var a = Lane(CityGullyAt * side);
+                var b = Lane((CityGullyAt + CityGullyWide) * side);
+                c.Kerb.FaceY(CityGutterY + 0.004f, Mathf.Min(a, b) - 0.06f, Mathf.Max(a, b) + 0.06f,
+                    CityGullyZ - 0.40f, CityGullyZ + 0.40f, 1);
+                c.Iron.FaceY(CityGutterY + 0.008f, Mathf.Min(a, b), Mathf.Max(a, b),
+                    CityGullyZ - 0.34f, CityGullyZ + 0.34f, 1);
+            }
+        }
+
+        /// <summary>
+        /// 市街の街灯。**高速の街灯（<see cref="Motorway"/>）とは形が違う。**
+        ///
+        /// あちらは太い柱から長い腕を道の真ん中へ差し出し、伏せた板で路面を照らす。
+        /// こちらは細い柱に短い首を付けて、笠を被せた灯りを歩道の際に吊る。
+        /// 倫敦の街路灯は建物と歩く人のためのもので、道を照らすのは副産物にすぎない
+        /// </summary>
+        static void Streetlamp(StreetBanks c, float z, int k)
+        {
+            var side = LampSide(k);
+            var at = Lane(CityLampAt * side);
+            var arm = Lane((CityLampAt - CityLampReach) * side);
+            // 台座。柱がじかに地面から生えていると、鉄の棒が刺さっているように見える
+            c.Iron.Box(new Vector3(at, 0.20f, z), new Vector3(0.28f, 0.40f, 0.28f));
+            c.Iron.Box(new Vector3(at, (CityLampHigh + 0.30f) * 0.5f, z),
+                new Vector3(0.15f, CityLampHigh - 0.30f, 0.15f));
+            // 首。柱の天から道の側へ短く差し出す
+            Strut(c.Iron, new Vector3(at, CityLampHigh - 0.08f, z),
+                new Vector3(arm, CityLampHigh + 0.24f, z), 0.11f);
+            // 笠。灯りの上に伏せる。真上へ抜ける光を止めるのが本来の役だが、
+            // ここでは灯りの塊の天に暗い線を一本入れて、球ではなく吊り下げた灯りに見せる
+            c.Iron.Box(new Vector3(arm, CityLampHigh + 0.46f, z), new Vector3(0.62f, 0.09f, 0.62f));
+            // 灯り。**笠の下に二段。** 一つの箱だと遠くで四角い点になる。
+            // 下へ向かって窄めておくと、通り過ぎるときに吊り下がった形が読める。
+            //
+            // **0.34 では小さすぎた。** 30 m 先で 0.65 度、描画解像度 427 × 240 では
+            // 2 画素にしかならず、街灯の列ではなく点が明滅するだけになる。
+            // 高速の頭を 0.62 から 0.78 へ太らせたのと同じ話で、
+            // 遠くで見えるようにできるのは明るさではなく大きさの方
+            c.Lamp.Box(new Vector3(arm, CityLampHigh + 0.22f, z), new Vector3(0.52f, 0.44f, 0.52f));
+            c.Lamp.Box(new Vector3(arm, CityLampHigh - 0.04f, z), new Vector3(0.28f, 0.16f, 0.28f));
+            // 灯りの暈。**濡れた夜の街路では、灯りは必ず滲む。**
+            // 空気の中に立てる札なので、素材へ焼いても道へ出したことにはならない
+            // （CheckDrive.OnRoad が見るのは高さ 2.10 までで、ここは 5.6 m にある）。
+            // 札を十字に立てるのは、真横を過ぎる瞬間に面が消えて暈が瞬かないようにするため
+            var halo = new Vector3(arm, CityLampHigh + 0.20f, z);
+            Blot(c.Haze, halo, new Vector3(CityHalo * 0.5f, 0f, 0f), new Vector3(0f, CityHalo * 0.5f, 0f));
+            Blot(c.Haze, halo, new Vector3(0f, 0f, CityHalo * 0.5f), new Vector3(0f, CityHalo * 0.5f, 0f));
+        }
+
+        /// <summary>
+        /// 街路樹。幹と、四つの塊を重ねた樹冠。
+        ///
+        /// **樹冠は道の上へ張り出してよい。** 枝は <see cref="CheckDrive"/> の見る高さ
+        /// （2.10 m）より上にあるので、道に掛かっても知らせは出ない。
+        /// 実際の街路樹も車道の上へ出ている。幹だけは縁石の線から動かさない
+        /// </summary>
+        static void Streettree(StreetBanks c, System.Random rnd, float z, int k)
+        {
+            var side = LampSide(k);
+            var at = Lane(CityTreeAt * side);
+            var tall = 3.4f + (float)rnd.NextDouble() * 0.8f;
+            c.Iron.Box(new Vector3(at, WalkY + tall * 0.5f, z), new Vector3(0.26f, tall, 0.26f));
+            // 樹冠。**四つで足りる。** 夜の街路樹は灯りの上に乗る暗い塊で、
+            // 遠景の一本木（<see cref="LoneTree"/>）のように形を読ませるものではない。
+            //
+            // **広げすぎない。** 半幅と振れを足した 1.70 m が、壁のネオン（CityFace - 0.12
+            // ＝ 7.88、高さ 2.65〜3.75）へ届かない限界。越えると樹冠が看板を呑み込んで、
+            // 30 m ごとに流れるはずの灯りが一つ抜ける
+            var foot = WalkY + tall;
+            for (var i = 0; i < 4; i++)
+            {
+                var wide = 1.9f + (float)rnd.NextDouble() * 0.8f;
+                var dx = ((float)rnd.NextDouble() - 0.5f) * 0.7f;
+                var dz = ((float)rnd.NextDouble() - 0.5f) * 1.2f;
+                var up = foot + 0.35f + i * 0.52f + (float)rnd.NextDouble() * 0.3f;
+                c.Leaf.Box(new Vector3(at + dx, up, z + dz), new Vector3(wide, wide * 0.62f, wide * 0.84f),
+                    Quaternion.Euler(0f, (float)rnd.NextDouble() * 90f, 0f));
+            }
+        }
+
+        /// <summary>
+        /// 標識。柱と札。**札は手前（-z）を向ける。**
+        /// 標識は近づいてくる側へ向いているもので、真横を向いた札は通り過ぎる瞬間しか見えない
+        /// </summary>
+        static void Signplate(StreetBanks c, float z, int k)
+        {
+            // 街灯とも街路樹とも逆の側に出す。同じ側に集めると片側だけが混む
+            var side = -LampSide(k);
+            var at = Lane(CitySignAt * side);
+            c.Iron.Box(new Vector3(at, WalkY + 1.20f, z), new Vector3(0.09f, 2.40f, 0.09f));
+            // 二通り。横長は行き先や通りの名、縦長は規制の札にあたる
+            if ((k % 2) == 0) c.Face.Box(new Vector3(at, WalkY + 2.16f, z), new Vector3(0.74f, 0.34f, 0.05f));
+            else c.Face.Box(new Vector3(at, WalkY + 2.06f, z), new Vector3(0.46f, 0.58f, 0.05f));
+        }
+
+        /// <summary>
+        /// 路上駐車の割り付け。**まばらに置く。**
+        /// 隙間なく埋めると駐車場になり、一台も無ければ深夜の郊外になる。
+        /// 一区画に 0〜3 台、たまに丸ごと空ける
+        /// </summary>
+        static void Parking(StreetBanks[] banks, System.Random rnd)
+        {
+            Sow(CityParkStep, 0f, 0f, rnd, (ring, k) =>
+            {
+                // たいていは走っている側（左）の路肩。三つに一つは向こう側にも停まっている
+                var side = (k % 3) == 2 ? 1f : -1f;
+                var n = (k % 4) == 1 ? 0 : 1 + rnd.Next(3);
+                var head = (float)rnd.NextDouble() * 3.4f;
+                for (var i = 0; i < n; i++)
+                {
+                    var seed = rnd.Next();
+                    Put(banks, ring + head + i * CityParkGap,
+                        (c, z) => Motorcar(c, new System.Random(seed), side, z));
+                }
+            });
+        }
+
+        /// <summary>
+        /// 停めてある車 1 台。
+        ///
+        /// **道からの距離は道の側へしか振らない。** 外へ振ると縁石に乗り上げ、
+        /// 内へ振りすぎると舗装へ出て CheckDrive.OnRoad が知らせる。
+        /// <see cref="CityParkAt"/> から 0.10 m だけ道へ寄せる幅に留めてある
+        /// </summary>
+        static void Motorcar(StreetBanks c, System.Random rnd, float side, float z)
+        {
+            var away = CityParkAt - (float)rnd.NextDouble() * 0.10f;
+            var at = Lane(away * side);
+            var len = 4.10f + (float)rnd.NextDouble() * 0.70f;
+            var high = 1.32f + (float)rnd.NextDouble() * 0.28f;
+            const float wide = 1.80f;
+            c.Shell.Box(new Vector3(at, 0.60f, z), new Vector3(wide, 0.58f, len));
+            c.Shell.Box(new Vector3(at, 0.98f, z + 0.06f), new Vector3(wide - 0.07f, 0.34f, len - 0.34f));
+            var cab = len * 0.50f;
+            var cabZ = z + 0.18f;
+            c.Shell.Box(new Vector3(at, high - 0.20f, cabZ), new Vector3(wide - 0.26f, 0.44f, cab));
+            // 車輪まわり。形は要らない。床下を塞いで、車を地面に着けるためのもの
+            c.Iron.Box(new Vector3(at, 0.25f, z - len * 0.30f), new Vector3(wide + 0.04f, 0.50f, 0.64f));
+            c.Iron.Box(new Vector3(at, 0.25f, z + len * 0.30f), new Vector3(wide + 0.04f, 0.50f, 0.64f));
+            // 窓。客室の面から 2 cm 浮かせる。同じ面に置くと深度で削り合う
+            var half = (wide - 0.26f) * 0.5f + 0.02f;
+            var low = high - 0.36f;
+            var top = high - 0.02f;
+            c.Iron.FaceX(at - half, cabZ - cab * 0.5f + 0.12f, cabZ + cab * 0.5f - 0.12f, low, top, -1);
+            c.Iron.FaceX(at + half, cabZ - cab * 0.5f + 0.12f, cabZ + cab * 0.5f - 0.12f, low, top, 1);
+            c.Iron.FaceZ(cabZ - cab * 0.5f - 0.02f, at - half + 0.10f, at + half - 0.10f, low, top, -1);
+            c.Iron.FaceZ(cabZ + cab * 0.5f + 0.02f, at - half + 0.10f, at + half - 0.10f, low, top, 1);
         }
 
         /// <summary>街灯の橙。頭も溜まりも同じ色から出す</summary>
@@ -1795,14 +2543,23 @@ namespace HalfAware.EditorTools
         /// </summary>
         static Material HaloMat()
         {
+            return HaloMat("MotorHalo", LampHue, HaloGain);
+        }
+
+        /// <summary>
+        /// 暈 1 色。街灯のほかに対向車の前照灯も滲むので、色と利得だけ差し替えられるようにしてある。
+        /// 名前ごとに 1 枚ずつ作る。使い回すと、色を変えたつもりが両方とも変わる
+        /// </summary>
+        static Material HaloMat(string name, Color col, float gain)
+        {
             var shader = Shader.Find("HalfAware/RoadGlow");
             if (shader == null) Debug.LogWarning("HalfAware/RoadGlow が見つからない。灯りの暈が出ない");
-            var path = Materials + "MotorHalo.mat";
+            var path = Materials + name + ".mat";
             var m = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (m == null)
             {
                 m = new Material(shader);
-                m.name = "MotorHalo";
+                m.name = name;
                 AssetDatabase.CreateAsset(m, path);
             }
             // 組み直すたびに結び直す。手で触った値は残らない
@@ -1810,8 +2567,7 @@ namespace HalfAware.EditorTools
             var tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/DrivePool.png");
             if (tex == null) Debug.LogWarning("灯りの絵が無い: Assets/Textures/DrivePool.png");
             m.SetTexture("_BaseMap", tex);
-            m.SetColor("_BaseColor",
-                new Color(LampHue.r * HaloGain, LampHue.g * HaloGain, LampHue.b * HaloGain, 1f));
+            m.SetColor("_BaseColor", new Color(col.r * gain, col.g * gain, col.b * gain, 1f));
             m.SetTextureScale("_BaseMap", Vector2.one);
             m.SetTextureOffset("_BaseMap", Vector2.zero);
             EditorUtility.SetDirty(m);
