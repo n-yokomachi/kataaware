@@ -32,6 +32,17 @@ namespace HalfAware
         [SerializeField] GameObject garage;
         [Tooltip("運転席。乗り込んだらここへ立たせる")]
         [SerializeField] Transform seat;
+        [Tooltip("車内の、帯を問わず置く対象。乗り込むまで伏せる。" +
+            "ガレージから届いてしまうと once: true のせいで走行中は二度と出ない")]
+        [SerializeField] GameObject cabin;
+
+        [Header("腕")]
+        [Tooltip("腕組みの腕。手動運転の帯だけ伏せる")]
+        [SerializeField] GameObject folded;
+        [Tooltip("ハンドルに乗せた手。手動運転の帯だけ出す")]
+        [SerializeField] GameObject onWheel;
+        [Tooltip("手動で運転する帯。0 から数える")]
+        [SerializeField] int drivenBand = 4;
 
         [Header("帯")]
         [Tooltip("景色の帯。DriveIds.Triggers と同じ並びにする")]
@@ -75,6 +86,9 @@ namespace HalfAware
             world.Rolling = false;
             world.Dress(-1);
             ShowTrigger(-1);
+            Arms(-1);
+            // 車内の対象はガレージからでも距離が届いてしまう。乗り込むまで伏せておく
+            if (cabin != null) cabin.SetActive(false);
             band = -1;
             shown = -1;
             flow.Examined += Examined;
@@ -182,6 +196,7 @@ namespace HalfAware
             }
             player.CanMove = false;
             world.Rolling = true;
+            if (cabin != null) cabin.SetActive(true);
             Dress(0);
             band = 0;
             // 組み直すのは場面の頭でだけ。帯を跨ぐときには呼ばない
@@ -207,6 +222,7 @@ namespace HalfAware
             world.Dress(which);
             world.Rewind();
             ShowTrigger(which);
+            Arms(which);
         }
 
         /// <summary>which 番目の帯のきっかけだけ出す。-1 でどれも出さない</summary>
@@ -214,6 +230,20 @@ namespace HalfAware
         {
             for (var i = 0; i < triggers.Length; i++)
                 if (triggers[i] != null) triggers[i].SetActive(i == which);
+        }
+
+        /// <summary>
+        /// which 番目の帯の腕を出す。-1 でどちらも伏せる。
+        ///
+        /// 最後の帯だけは原作どおり手動運転なので、ハンドルに手を乗せる。
+        /// ただし見た目だけで、入力は受け付けない。帯と一緒に黒のあいだに入れ替わる。
+        /// 乗り込む前に伏せるのは、ガレージを歩いているあいだ運転席に腕だけが浮いて見えるため
+        /// </summary>
+        void Arms(int which)
+        {
+            var driving = which == drivenBand;
+            if (folded != null) folded.SetActive(which >= 0 && !driving);
+            if (onWheel != null) onWheel.SetActive(which >= 0 && driving);
         }
     }
 }

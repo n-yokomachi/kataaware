@@ -12,8 +12,17 @@ namespace HalfAware
     /// 入れ物の中身を道と同じ環に乗せれば、継ぎ目は勝手に揃う。
     ///
     /// 対向車だけは同じ環に乗せない。すれ違う車は自分の速さと相手の速さの和で
-    /// 近づいてくるので、道と同じ速さで流すと隣を並んで走っているように見える
+    /// 近づいてくるので、道と同じ速さで流すと隣を並んで走っているように見える。
+    ///
+    /// 車体の揺れもここが出す。走った距離を持っているのがここだけで、
+    /// 揺れの位相はその距離から取るため。場面 8 では EyeSway を付けないので、
+    /// PlayerController.EyeOffset を書くのはここひとつだけになる。
+    ///
+    /// 実行順を -20 に置くのは、PlayerController（-10）がそのフレームの EyeOffset を
+    /// 読む前に書き終えるため。既定の 0 のままだと揺れが 1 フレーム遅れる。
+    /// EyeSway と同じ順で、DriveDirector（-5）より先に走る
     /// </summary>
+    [DefaultExecutionOrder(-20)]
     public sealed class DriveWorld : MonoBehaviour
     {
         [Tooltip("道のタイル。環にして流す。i 番目が環の i 番目の枠に入るので、並べ替えると道の出方が変わる")]
@@ -30,6 +39,14 @@ namespace HalfAware
             "走った距離に掛けるので、対向車の速さはこちらの速さに連れて変わる。" +
             "対向車を出すのが速さの変わらない帯 1 だけのうちは構わないが、ほかの帯にも出すなら見直す")]
         [SerializeField] float oncomingRate = 2.2f;
+
+        [Header("揺れ")]
+        [Tooltip("揺れの幅。m。舗装はごく小さく、未舗装は粗く")]
+        [SerializeField] float shake = 0.004f;
+        [Tooltip("揺れの速さ。走った距離に掛ける")]
+        [SerializeField] float shakeRate = 0.35f;
+        [Tooltip("ずれを渡す先")]
+        [SerializeField] PlayerController player;
 
         /// <summary>走る速さ。m/s。0 で止まる</summary>
         public float Speed { get; set; }
@@ -49,11 +66,37 @@ namespace HalfAware
         /// <summary>今出している対向車。道より速い環に乗せる</summary>
         Transform rushing;
 
+        readonly RoadShake bump = new RoadShake();
+
+        void Awake()
+        {
+            if (player == null) Debug.LogError("DriveWorld: player が未接続。揺れを渡せない", this);
+        }
+
         void Update()
         {
-            if (!Rolling) return;
-            Travelled += Speed * Time.deltaTime;
-            Place();
+            if (Rolling)
+            {
+                Travelled += Speed * Time.deltaTime;
+                Place();
+            }
+            Shake();
+        }
+
+        /// <summary>
+        /// 目の位置のずれを渡す。自分で eye.localPosition を書かないのは、
+        /// PlayerController が毎フレームそこを書き直しているため。直に触ると
+        /// 上書きされるか、こちらが勝った場合は EyeHeight を初回の値で固めてしまう
+        /// （<see cref="EyeSway"/> の説明文と同じ理由）。
+        ///
+        /// 走っていない間は粗さ 0 で渡す。ガレージを歩いているあいだ、
+        /// 止まっている車の揺れを目に足さない
+        /// </summary>
+        void Shake()
+        {
+            if (player == null) return;
+            bump.Tick(Travelled, Rolling ? Rough : 0f, shake, shakeRate);
+            player.EyeOffset = bump.Offset;
         }
 
         /// <summary>今の走行距離で、道と沿道と対向車を並べ直す</summary>

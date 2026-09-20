@@ -78,6 +78,8 @@ namespace HalfAware.EditorTools
         public const float EarthY = 0.036f;
         /// <summary>帯 4 の轍。土の上</summary>
         public const float RutY = 0.050f;
+        /// <summary>帯 3 の牧草地。路肩より下げる。同じ高さだと面が重なってちらつく</summary>
+        public const float PastureY = -0.06f;
 
         /// <summary>空と霧の色。カメラの背景と揃える</summary>
         public static readonly Color Sky = new Color(0.055f, 0.060f, 0.082f);
@@ -116,6 +118,18 @@ namespace HalfAware.EditorTools
         /// <summary>天井の灯りの色</summary>
         public static readonly Color GarageLamp = new Color(0.62f, 0.66f, 0.72f);
 
+        /// <summary>
+        /// 車体を塞ぐ箱の外形。世界の座標で、x は ±<see cref="BlockHalfX"/>。
+        ///
+        /// 車（<see cref="Car"/>）は運転席から見える面しか無く、当たりも持たない。
+        /// 塞がないとガレージで車体をすり抜けられ、目線 1.64 が屋根の板（1.49〜1.55）を貫く。
+        /// 下端をガレージの床の面に合わせるのは、隙間に足先を差し込ませないため
+        /// </summary>
+        public const float BlockHalfX = 0.90f;
+        public const float BlockTop = 1.55f;
+        public const float BlockBack = -0.70f;
+        public const float BlockFront = 0.93f;
+
         /// <summary>立ち位置。運転席のドア側から近づく。ここから車まで約 8 m</summary>
         public static readonly Vector3 StandAt = new Vector3(4.2f, 0f, -7f);
         /// <summary>立ち位置の向き。度</summary>
@@ -126,11 +140,41 @@ namespace HalfAware.EditorTools
         /// </summary>
         public static readonly Vector3 SeatAt = new Vector3(0.38f, 1.18f, 0f);
 
+        /// <summary>ハンドルの中心。右ハンドルなので運転席と同じ x に来る</summary>
+        public static readonly Vector3 WheelAt = new Vector3(0.38f, 1.02f, 0.39f);
+        /// <summary>輪の外径</summary>
+        public const float WheelOuter = 0.36f;
+        /// <summary>輪の太さ</summary>
+        public const float WheelThick = 0.035f;
+        /// <summary>輪を x 軸まわりに倒す角。度。オフロード車なのでバスに近いところまで寝ている</summary>
+        public const float WheelLean = 68f;
+        /// <summary>輪の芯までの半径。手を乗せる位置はここから出す</summary>
+        public static float WheelRing { get { return WheelOuter * 0.5f - WheelThick * 0.5f; } }
+
+        /// <summary>
+        /// 腕組みの前腕の中心。胸の前。
+        ///
+        /// 計画は z 0.28 と置いていたが、その位置だと前腕が輪の下端（y 0.959 / z 0.239）を
+        /// 貫く。輪は 68 度寝ていて下端がこちらへ張り出しているので、胸に引き寄せて
+        /// 輪の手前へ収める。腕組みは元より胸に付く姿勢なので、寄せても不自然にはならない
+        /// </summary>
+        public static readonly Vector3 FoldedAt = new Vector3(0.38f, 1.02f, 0.15f);
+        /// <summary>肩。腕の付け根。上半身は作っていないので、視界の外の後ろへ逃がす</summary>
+        public const float ShoulderY = 1.14f;
+        public const float ShoulderZ = -0.06f;
+        /// <summary>肩の左右の開き。体の中心から</summary>
+        public const float ShoulderHalf = 0.19f;
+
         // ---- 調べる対象と繋ぎ先 ----------------------------------------------
 
         public const string ScriptPath = "Assets/Data/DriveScript.asset";
         const string ActionsPath = "Assets/InputSystem_Actions.inputactions";
         const string FontPath = "Assets/Fonts/NotoSansJP-Regular SDF.asset";
+        /// <summary>
+        /// 暗転中に出る字だけ明朝。台詞はゴシック、という取り決めで、
+        /// Alley.unity も Room.unity も Center 層だけこちらを使っている
+        /// </summary>
+        const string MinchoPath = "Assets/Fonts/ShipporiMincho-Regular SDF.asset";
 
         /// <summary>車内の対象を拾える距離。座ったまま手の届く範囲</summary>
         const float ItemRadius = 1.4f;
@@ -236,33 +280,27 @@ namespace HalfAware.EditorTools
         // ---- シーンの地 ----------------------------------------------------
 
         /// <summary>
-        /// カメラ・日射し・霧。組み直すたびに結び直すので、手で触った値は残らない。
+        /// 日射し・霧と、カメラのレンダリングの設定。組み直すたびに結び直すので、手で触った値は残らない。
+        /// カメラそのものは作らない。Rig が Player の下に必ず 1 つ作るので、ここで見るのは
+        /// そのレンダリングの設定だけ。必ず Rig の後に呼ぶ。
         /// 道は z 160 で終わる。霧が無いと世界の端がそのまま見える
         /// </summary>
         static void Stage()
         {
-            // カメラは本来 Player の持ち物（BuildAlley.Place と同じ構え）。場面 8 の rig は Task 9 で入る。
-            // それまでの間に合わせとしてシーンに直に 1 つ置き、rig が来たらそちらへ譲る。
-            // 両方に札と AudioListener を持たせると、耳が二つになって警告が出続ける
-            var rig = GameObject.Find("Player/Main Camera");
-            var cam = rig != null ? rig : Loose("Main Camera");
-            if (rig == null)
+            var cam = GameObject.Find("Player/Main Camera");
+            var c = cam != null ? cam.GetComponent<Camera>() : null;
+            if (c == null) Debug.LogWarning("Player/Main Camera が無い。Stage は Rig の後に呼ぶ");
+            else
             {
-                cam.tag = "MainCamera";
-                cam.transform.position = new Vector3(0f, 1.18f, 0f);
-                cam.transform.rotation = Quaternion.identity;
-                if (cam.GetComponent<AudioListener>() == null) cam.AddComponent<AudioListener>();
+                c.clearFlags = CameraClearFlags.SolidColor;
+                c.backgroundColor = Sky;
+                // 車内で一番近いのは天井の板の 0.31 m。手前を 0.1 まで引くと、
+                // 路面に重ねた面の深度の余裕がそのぶん増える
+                c.nearClipPlane = 0.1f;
+                c.farClipPlane = 1000f;
+                c.fieldOfView = 70f;
+                EditorUtility.SetDirty(c);
             }
-            var c = cam.GetComponent<Camera>();
-            if (c == null) c = cam.AddComponent<Camera>();
-            c.clearFlags = CameraClearFlags.SolidColor;
-            c.backgroundColor = Sky;
-            // 車内で一番近いのは天井の板の 0.31 m。手前を 0.1 まで引くと、
-            // 路面に重ねた面の深度の余裕がそのぶん増える
-            c.nearClipPlane = 0.1f;
-            c.farClipPlane = 1000f;
-            c.fieldOfView = 70f;
-            EditorUtility.SetDirty(c);
 
             var sun = Loose("Directional Light");
             sun.transform.position = new Vector3(0f, 8f, 0f);
@@ -305,7 +343,7 @@ namespace HalfAware.EditorTools
             // 英国なので右ハンドル。運転席が道の中心線側に来る（LaneOffset と対）
             glass.Box(new Vector3(0.38f, 1.02f, 0.60f), new Vector3(0.34f, 0.14f, 0.03f));
             // メーターより 0.05 手前へ引く。前後を揃えると輪の向こう端が計器の面と擦れる
-            Wheel(trim, new Vector3(0.38f, 1.02f, 0.39f), 0.36f, 0.035f, 68f);
+            Wheel(trim, WheelAt, WheelOuter, WheelThick, WheelLean);
             // 上を後ろへ倒す。屋根が前へ被さる向きにすると、外が見えなくなる。
             // 上の縁は天井の板の中へ差し込む。背を縮めずに下げると、下の縁が計器盤から離れて隙間が開く
             glass.Box(new Vector3(0f, 1.279f, 0.884f), new Vector3(1.66f, 0.49f, 0.02f), Quaternion.Euler(-22f, 0f, 0f));
@@ -326,6 +364,90 @@ namespace HalfAware.EditorTools
             var eye = Child(parent, "Seat");
             eye.localPosition = SeatAt;
             eye.localRotation = Quaternion.identity;
+
+            Arms(parent);
+        }
+
+        /// <summary>
+        /// 運転席の前腕。帯 0〜3 は腕組み、帯 4 だけハンドルに手を乗せる。
+        /// 原作「自動運転に任せて私は腕組みをしながら考える」で、手動で運転するのは最後だけ。
+        /// どちらも見た目だけで、操作には繋がらない。出し分けるのは <see cref="DriveDirector"/>。
+        ///
+        /// **カメラの子にはしない。** 座ったまま首だけ振るので、カメラに付けると
+        /// 見回すたびに腕が画面に貼り付いたまま一緒に回る。車の持ち物として車内に置けば、
+        /// 首を振っても腕は据わったまま残る。場面 1 の前腕（<see cref="Forearm"/>）が
+        /// カメラの子なのは、あちらが下を向いたときだけ出す作りだから
+        /// </summary>
+        static void Arms(Transform parent)
+        {
+            Folded(Child(parent, "ArmsFolded"));
+            var grip = Child(parent, "ArmsOnWheel");
+            OnWheel(grip);
+            // 組み立てた直後はエディタで腕組みの当たり具合を見られるよう、そちらだけ出しておく。
+            // 再生すれば DriveDirector.Awake がどちらも伏せ、乗り込んでから帯に合わせて出す
+            grip.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// 腕組み。胸の前で前腕を上下に重ね、手は反対側の肘の下へ入れる。
+        /// 二の腕は肩へ向けて後ろへ抜けさせる。上半身は作っていないので、
+        /// 目（z 0.22）より後ろまで下がったところで視界から外れる
+        /// </summary>
+        static void Folded(Transform parent)
+        {
+            Clear(parent);
+            var sleeve = new Bank { Texel = 1.6f };
+            var skin = new Bank { Texel = 2.0f };
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                var shoulder = new Vector3(FoldedAt.x + side * ShoulderHalf, ShoulderY, ShoulderZ);
+                var elbow = new Vector3(FoldedAt.x + side * 0.21f, FoldedAt.y, FoldedAt.z - 0.02f);
+                Limb(sleeve, shoulder, elbow, 0.095f);
+                // 右腕を上、左腕を下に重ねる。前後にも少しずらして、二本が同じ面に潰れないようにする
+                var y = FoldedAt.y + side * 0.034f;
+                var z = FoldedAt.z + side * 0.012f;
+                var wrist = new Vector3(FoldedAt.x - side * 0.15f, y, z);
+                Limb(sleeve, new Vector3(elbow.x, y, z), wrist, 0.085f);
+                // 手は反対側の肘の下。腕組みの形はここで決まる
+                skin.Box(wrist - new Vector3(side * 0.055f, 0f, 0f), new Vector3(0.10f, 0.075f, 0.09f));
+            }
+            sleeve.Emit(parent, "FoldedSleeves", Mat("Sleeve"), false, Generated);
+            skin.Emit(parent, "FoldedHands", Mat("Skin"), false, Generated);
+        }
+
+        /// <summary>
+        /// ハンドルに乗せた手。輪の左右（三時と九時）を握る。
+        /// 握りの位置は <see cref="WheelRing"/> から出すので、輪の寸法を変えても手が離れない
+        /// </summary>
+        static void OnWheel(Transform parent)
+        {
+            Clear(parent);
+            var sleeve = new Bank { Texel = 1.6f };
+            var skin = new Bank { Texel = 2.0f };
+            var tilt = Quaternion.Euler(WheelLean, 0f, 0f);
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                var grip = WheelAt + new Vector3(side * WheelRing, 0f, 0f);
+                var elbow = new Vector3(WheelAt.x + side * 0.21f, 0.88f, 0.10f);
+                var shoulder = new Vector3(WheelAt.x + side * ShoulderHalf, ShoulderY, ShoulderZ);
+                Limb(sleeve, shoulder, elbow, 0.095f);
+                Limb(sleeve, elbow, grip, 0.085f);
+                // 手は輪に沿わせて倒す。長い辺が輪の接線に乗る
+                skin.Box(grip, new Vector3(0.055f, 0.125f, 0.085f), tilt);
+            }
+            sleeve.Emit(parent, "WheelSleeves", Mat("Sleeve"), false, Generated);
+            skin.Emit(parent, "WheelHands", Mat("Skin"), false, Generated);
+        }
+
+        /// <summary>a から c へ伸びる 1 本。thick は断面の一辺</summary>
+        static void Limb(Bank bank, Vector3 a, Vector3 c, float thick)
+        {
+            var span = c - a;
+            var len = span.magnitude;
+            if (len < 1e-4f) return;
+            bank.Box((a + c) * 0.5f, new Vector3(thick, thick, len), Quaternion.LookRotation(span, Vector3.up));
         }
 
         /// <summary>
@@ -621,8 +743,8 @@ namespace HalfAware.EditorTools
             // 牧草地は路肩より下げる。同じ高さだと面が重なってちらつく
             var field = Shape("Pasture", 0.12f, b =>
             {
-                b.FaceY(-0.06f, Lane(-46f), Lane(-(RoadHalf + Shoulder)), 0f, TileLength, 1);
-                b.FaceY(-0.06f, Lane(RoadHalf + Shoulder), Lane(46f), 0f, TileLength, 1);
+                b.FaceY(PastureY, Lane(-46f), Lane(-(RoadHalf + Shoulder)), 0f, TileLength, 1);
+                b.FaceY(PastureY, Lane(RoadHalf + Shoulder), Lane(46f), 0f, TileLength, 1);
             });
             // 石垣は 20 m ずつの一様な押し出しなので、それだけでは何も流れて見えない。
             // 区切りに 1 つ門を入れると、区切りの長さがそのまま間隔になって必ず 180 を割り切る
@@ -637,9 +759,13 @@ namespace HalfAware.EditorTools
             {
                 Piece(slices[i], "Pasture", field, Mat("Grass"));
                 Piece(slices[i], "Wall", wall, Mat("Stone"));
-                // 運転席が右なので、近いのは左の石垣。門もそちら側に置く
+                // 運転席が右なので、近いのは左の石垣。門もそちら側に置く。
+                // 石垣と同軸（-5.2）に置くと笠石より上の 0.34 m しか出ず、
+                // 門ではなく壁に付いた金具に見える。牧草地の側へ出して独りで立たせる。
+                // 柱の足は牧草地の面まで下ろす。石垣に隠れていたときは気づかないが、
+                // 独りで立つと 6 cm 浮いているのがそのまま見える
                 Piece(slices[i], "Gate", gate, Mat("Metal"))
-                    .localPosition = new Vector3(Lane(-5.2f), 0f, 8.5f);
+                    .localPosition = new Vector3(Lane(-6.0f), PastureY, 8.5f);
             }
         }
 
@@ -828,7 +954,25 @@ namespace HalfAware.EditorTools
             posts.Emit(parent, "Pillars", Mat("Concrete"), true, Generated);
             door.Emit(parent, "Shutter", Mat("Shutter"), true, Generated);
 
+            Blocker(parent);
             Lamps(parent);
+        }
+
+        /// <summary>
+        /// 車体を塞ぐ箱。見えないので絵は持たせない。
+        ///
+        /// 車ではなくガレージの下に置く。<see cref="DriveDirector"/> は乗り込んだ瞬間に
+        /// Garage を丸ごと伏せるので、この当たりもそこで消える。車の下に置くと、
+        /// 座ったあとの CharacterController が生きた当たりの中に座ることになる。
+        /// 場面 1 の SceneFlow.chairBlocker と同じ考え方
+        /// </summary>
+        static void Blocker(Transform parent)
+        {
+            var go = new GameObject("Blocker");
+            go.transform.SetParent(parent, false);
+            var box = go.AddComponent<BoxCollider>();
+            box.center = new Vector3(0f, (GarageFloorY + BlockTop) * 0.5f, (BlockBack + BlockFront) * 0.5f);
+            box.size = new Vector3(BlockHalfX * 2f, BlockTop - GarageFloorY, BlockFront - BlockBack);
         }
 
         /// <summary>
@@ -894,10 +1038,16 @@ namespace HalfAware.EditorTools
             // きっかけはその帯に入るまで出さない。出し分けるのは DriveDirector.ShowTrigger
             for (var i = 0; i < triggerItems.Length; i++) triggerItems[i].SetActive(false);
 
-            // 帯を問わず置く、読んでも帯が進まない対象
-            Put(parent, "Radio", new Vector3(-0.02f, 0.96f, 0.70f), script, DriveIds.Radio, ItemRadius, false);
-            Put(parent, "Pocket", new Vector3(-0.10f, 0.70f, -0.30f), script, DriveIds.Pocket, ItemRadius, false);
-            Put(parent, "Fuel", new Vector3(0.46f, 1.02f, 0.58f), script, DriveIds.Fuel, ItemRadius, false);
+            // 帯を問わず置く、読んでも帯が進まない対象。
+            // ひとつの入れ物にまとめて、乗り込むまで DriveDirector に伏せさせる。
+            // 塞ぐ箱があってもガレージの立てる位置から 1.1〜1.3 m しか離れず、
+            // 拾える距離 1.4 の内側に入ってしまう。once: true なので、ここで読まれると
+            // 走行中に二度と出ない
+            var cabin = Child(parent, "Cabin");
+            Put(cabin, "Radio", new Vector3(-0.02f, 0.96f, 0.70f), script, DriveIds.Radio, ItemRadius, false);
+            Put(cabin, "Pocket", new Vector3(-0.10f, 0.70f, -0.30f), script, DriveIds.Pocket, ItemRadius, false);
+            Put(cabin, "Fuel", new Vector3(0.46f, 1.02f, 0.58f), script, DriveIds.Fuel, ItemRadius, false);
+            cabin.gameObject.SetActive(false);
         }
 
         /// <summary>
@@ -1003,6 +1153,8 @@ namespace HalfAware.EditorTools
 
             var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
             if (font == null) Debug.LogWarning("字の形が無い: " + FontPath);
+            var mincho = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(MinchoPath);
+            if (mincho == null) Debug.LogWarning("字の形が無い: " + MinchoPath);
 
             var band = Layer(go.transform, "SubtitleBand", new Color(0f, 0f, 0f, 0.75f), true);
             Frame(band, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f),
@@ -1033,7 +1185,8 @@ namespace HalfAware.EditorTools
             Frame(curtain, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
             curtain.gameObject.SetActive(false);
 
-            var centre = Line(go.transform, "Center", font, 40f, Color.white, TextAlignmentOptions.Center);
+            // 「続く」もここに出る。暗転中の字だけ明朝にするので、この層だけ font を渡さない
+            var centre = Line(go.transform, "Center", mincho, 40f, Color.white, TextAlignmentOptions.Center);
             Frame(centre.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
                 Vector2.zero, new Vector2(1000f, 80f));
 
@@ -1140,6 +1293,9 @@ namespace HalfAware.EditorTools
             so.FindProperty("tileLength").floatValue = TileLength;
             so.FindProperty("behind").floatValue = Behind;
             so.FindProperty("oncomingRate").floatValue = OncomingRate;
+            // 揺れは DriveWorld が PlayerController.EyeOffset へ渡す。
+            // 場面 8 では EyeSway を付けないので、そこを書くのはここひとつだけ
+            so.FindProperty("player").objectReferenceValue = Object.FindFirstObjectByType<PlayerController>();
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(world);
 
@@ -1157,6 +1313,15 @@ namespace HalfAware.EditorTools
             var garage = Look(root, "Garage");
             dso.FindProperty("garage").objectReferenceValue = garage != null ? garage.gameObject : null;
             dso.FindProperty("seat").objectReferenceValue = Look(root, "Car/Seat");
+            // 車内の対象は乗り込むまで伏せる。ガレージからでも拾える距離に入ってしまう
+            var cabin = Look(root, "Items/Cabin");
+            dso.FindProperty("cabin").objectReferenceValue = cabin != null ? cabin.gameObject : null;
+            var folded = Look(root, "Car/ArmsFolded");
+            var onWheel = Look(root, "Car/ArmsOnWheel");
+            dso.FindProperty("folded").objectReferenceValue = folded != null ? folded.gameObject : null;
+            dso.FindProperty("onWheel").objectReferenceValue = onWheel != null ? onWheel.gameObject : null;
+            // 手動で運転するのは最後の帯だけ
+            dso.FindProperty("drivenBand").intValue = Bands - 1;
             FillBands(dso.FindProperty("bands"));
             var picked = dso.FindProperty("triggers");
             picked.arraySize = triggerItems.Length;
@@ -1357,6 +1522,10 @@ namespace HalfAware.EditorTools
                 case "CarTrim": col = new Color(0.085f, 0.082f, 0.090f); smooth = 0.18f; break;
                 case "CarSeat": col = new Color(0.115f, 0.098f, 0.090f); smooth = 0.10f; break;
                 case "CarGlass": col = new Color(0.55f, 0.60f, 0.66f, 0.12f); smooth = 0.85f; break;
+                // 前腕。革のライダースの袖。BuildProtagonist の上着と同じ色にしてある
+                case "Sleeve": col = new Color(0.055f, 0.053f, 0.062f); smooth = 0.22f; break;
+                // 手。夜の車内なので、肌も袖よりわずかに明るい程度に留める
+                case "Skin": col = new Color(0.235f, 0.190f, 0.165f); smooth = 0.12f; break;
                 case "Asphalt": col = new Color(0.115f, 0.118f, 0.132f); smooth = 0.16f; break;
                 // 塗り直されていない白線。真っ白だと夜の道で浮く
                 case "RoadLine": col = new Color(0.520f, 0.510f, 0.470f); smooth = 0.10f; break;
