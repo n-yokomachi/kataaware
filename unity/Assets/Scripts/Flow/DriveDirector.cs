@@ -93,12 +93,15 @@ namespace HalfAware
         [SerializeField] float faceFront = 0.7f;
         [Tooltip("前を向いてからイグニッションまで。秒")]
         [SerializeField] float shutHold = 0.5f;
-        [Tooltip("板を開けるあいだ立つ場所。運転席から見た座。高さは今の目のまま使う。" +
-            "**板は目の高さを薙いで開く。** 丈は 1.65 m あり、調べる点（x 0.92）の" +
-            "そばに立ったまま開けると、開き 11 度のところで面が目を通る")]
-        [SerializeField] Vector3 doorStand = new Vector3(1.97f, 0f, -1.55f);
+        [Tooltip("板の面から空ける隙間。m。**板は目の高さを薙いで開く。** " +
+            "迫ってきた面がこの隙間より近づくぶんだけ、蝶番から遠ざかる向きに退く")]
+        [SerializeField] float doorClear = 0.25f;
+        [Tooltip("板のいちばん外へ出る点までの、蝶番からの距離。m。面から測った値")]
+        [SerializeField] float doorReach = 1.65f;
         [Tooltip("戸口の通り道。座席から運転席側へ出す距離。m。回り込む曲線の制御点になる")]
         [SerializeField] float doorGate = 0.75f;
+        [Tooltip("戸口の後ろと前の縁。車から見た z。通り道はこの間に収める")]
+        [SerializeField] Vector2 doorMouth = new Vector2(-0.50f, 0.75f);
         [Tooltip("目を向けるドアの取っ手。蝶番から見た座。板と一緒に動く")]
         [SerializeField] Vector3 doorMark = new Vector3(-0.05f, 1.13f, -0.84f);
         [Tooltip("目を向ける車内。運転席から見た座。計器盤の助手席寄り")]
@@ -430,27 +433,72 @@ namespace HalfAware
             var sit = seat != null ? seat.position : eye;
             float yaw, pitch;
 
-            // ---- 一。ドアの方を向き、板の退く先から外れる ------------------------
-            //
-            // 板の届く外まで退く。ドアを引くために一歩下がる動きに見える
-            var clear = StandClear(player.transform.position.y);
-            Aim(clear, DoorAt(), out yaw, out pitch);
-            yield return Slew(player.transform.position, clear,
-                player.Yaw, yaw, player.Pitch, pitch, doorFace);
+            // 蝶番から見た目の向き。閉じた板が 0 度、開ききった板が CarDoor.Swing 度。
+            // 開くにつれ carDoor は回るので、向きの基は閉じているうちに控えておく
+            var stood = player.transform.position;
+            var hinge = carDoor != null ? carDoor.transform.position : stood;
+            var along = carDoor != null ? -carDoor.transform.forward : Vector3.back;
+            var outward = carDoor != null ? carDoor.transform.right : Vector3.right;
+            var flat = stood - hinge;
+            flat.y = 0f;
+            var stoodFar = Mathf.Max(flat.magnitude, 1e-3f);
+            var high = stood.y;
+            var bearing = Mathf.Atan2(Vector3.Dot(flat, outward), Vector3.Dot(flat, along)) * Mathf.Rad2Deg;
 
-            // ---- 二。板が開く。目は据えたまま、開くところを見ている ---------------
+            // ---- 一。立ったところでドアの方を向く ---------------------------------
+            //
+            // **足は動かさない。** ただし開ききった板より前（<see cref="CarDoor.Swing"/> 度
+            // より大きい角）に立っていたときだけは、車体沿いに後ろへ滑らせる。
+            // そこは開いた板の向こう側で、開いてしまうと板が目と戸口の間に立つ。
+            // 板が閉じているうちなら邪魔は無いので、滑るのはこの段のあいだ。
+            // 動くのは蝶番を中心にした弧の上だけで、車から離れはしない
+            var kept = Mathf.Min(bearing, CarDoor.Swing);
+            var stand = Reckon(hinge, along, outward, kept, stoodFar, high);
+            Aim(stand, DoorAt(), out yaw, out pitch);
+            yield return Slew(stood, stand, player.Yaw, yaw, player.Pitch, pitch, doorFace);
+            bearing = kept;
+            var way = (stand - hinge); way.y = 0f; way = way.normalized;
+
+            // ---- 二。板が開く。迫ってきたぶんだけ譲る ----------------------------
+            //
+            // **退いてから開けるのではなく、立った場所から開ける。**
+            // 決め打ちの場所へ先に退かせると、ドアのすぐ脇にいたときに
+            // 2 m 以上も離れてから開くことになり、ドアから離れて見える。
+            //
+            // 板は目の高さを薙いで開くので、面が来たぶんだけは譲らざるを得ない。
+            // 譲るのは蝶番から遠ざかる向きだけで、譲り終わるのは面が目の脇を
+            // 通り過ぎるその瞬間。調べられる立ち位置 566 通りで測ると、
+            // 退く距離は平均 0.44 m に収まる
+
+            // 譲り終えた先と、面が目の脇を通り過ぎる頃合い
+            var far = stoodFar;
+            var pass = 1f;
+            for (var s = 0f; s <= 1.0001f; s += 0.005f)
+            {
+                var turn = Ease(s) * CarDoor.Swing;
+                far = Mathf.Max(far, Yield(bearing, turn));
+                if (pass >= 1f && turn >= bearing) pass = s;
+            }
+
             if (sound != null) sound.DoorOpen();
             for (var t = 0f; t < doorSwing; t += Time.deltaTime)
             {
-                if (carDoor != null) carDoor.Set(Ease(doorSwing <= 0f ? 1f : t / doorSwing));
+                var k = doorSwing <= 0f ? 1f : t / doorSwing;
+                if (carDoor != null) carDoor.Set(Ease(k));
+                var gave = Mathf.Lerp(stoodFar, far, Ease(pass <= 0f ? 1f : k / pass));
+                var at = hinge + way * gave;
+                player.transform.position = new Vector3(at.x, high, at.z);
                 // 板が開くにつれ取っ手も外へ出る。目はそれを追う
-                Aim(clear, DoorAt(), out yaw, out pitch);
+                Aim(player.transform.position, DoorAt(), out yaw, out pitch);
                 player.Yaw = yaw;
                 player.Pitch = pitch;
                 flow.Freeze(FreezeStep);
                 yield return null;
             }
             if (carDoor != null) carDoor.Set(1f);
+            var stop = hinge + way * far;
+            var clear = new Vector3(stop.x, high, stop.z);
+            player.transform.position = clear;
             Aim(clear, DoorAt(), out yaw, out pitch);
             player.Yaw = yaw;
             player.Pitch = pitch;
@@ -461,7 +509,7 @@ namespace HalfAware
             // **直線で滑らせない。** 退いた場所から座席へ真っ直ぐ引くと、開いた板の
             // 外を掠めて斜めに吸い込まれる。戸口を制御点にした二次曲線で回り込ませ、
             // 向きはドアから車内（<see cref="cabinMark"/>）へ振る
-            var gate = Gate(sit);
+            var gate = Gate(sit, clear);
             float inYaw, inPitch;
             Aim(sit, CabinAt(sit), out inYaw, out inPitch);
             var fromYaw = player.Yaw;
@@ -621,28 +669,42 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// 板を開けるあいだ立つ場所。高さだけは今の目のまま置く。
+        /// 板が turn 度のとき、その面から <see cref="doorClear"/> だけ空けるのに
+        /// 要る、蝶番からの水平の距離。m。
         ///
-        /// **扇から角度で外すのではなく、決め打ちの場所へ退く。** 蝶番から見た角度で
-        /// 判じると、蝶番の真横（車体のすぐ脇）に立たれたときに板との隙間が
-        /// 5 cm しか残らない。角度の余裕は蝶番に近いほど狭い距離にしかならない。
-        /// ここは蝶番（0.97, 0.94）から水平に 2.85 m あり、板の届く先 1.65 m の
-        /// 1.2 m 外に出る。運転席側の隣の区画は空いているので、退く先に物は無い
+        /// 面までの垂線は「蝶番からの距離 × 角の差の正弦」なので、隙間を保つ距離は
+        /// その逆数で出る。角の差が閉じるほど遠くへ要求されるが、板の先
+        /// （<see cref="doorReach"/>）を越えればもう面は無いので、そこで頭打ちにする
         /// </summary>
-        Vector3 StandClear(float high)
+        float Yield(float bearing, float turn)
         {
-            if (seat == null) return player.transform.position;
-            var at = seat.TransformPoint(doorStand);
-            return new Vector3(at.x, high, at.z);
+            var off = Mathf.Abs(bearing - turn) * Mathf.Deg2Rad;
+            var sin = Mathf.Sin(off);
+            if (sin < 1e-3f) return doorReach + doorClear;
+            return Mathf.Min(doorReach + doorClear, doorClear / sin);
         }
 
-        /// <summary>戸口の通り道。座席から運転席側へ <see cref="doorGate"/> だけ出したところ</summary>
-        Vector3 Gate(Vector3 sit)
+        /// <summary>
+        /// 戸口の通り道。座席から運転席側へ <see cref="doorGate"/> だけ出したところ。
+        ///
+        /// 前後は目のいる位置に合わせ、戸口の縁（<see cref="doorMouth"/>）で止める。
+        /// 座席の真横で決め打ちにすると、戸口の前寄りに立っていたときに
+        /// いったん後ろへ振ってから入ることになり、開いた板を掠める
+        /// </summary>
+        Vector3 Gate(Vector3 sit, Vector3 from)
         {
-            var side = carDoor != null ? carDoor.transform.right : Vector3.right;
-            side.y = 0f;
-            side = side.sqrMagnitude > 1e-6f ? side.normalized : Vector3.right;
-            return sit + side * doorGate;
+            if (seat == null) return sit;
+            var near = seat.InverseTransformPoint(from);
+            return seat.TransformPoint(new Vector3(doorGate, 0f,
+                Mathf.Clamp(near.z, doorMouth.x, doorMouth.y)));
+        }
+
+        /// <summary>蝶番から見て turn 度・far m のところ。高さは high</summary>
+        static Vector3 Reckon(Vector3 hinge, Vector3 along, Vector3 outward, float turn, float far, float high)
+        {
+            var rad = turn * Mathf.Deg2Rad;
+            var at = hinge + (along * Mathf.Cos(rad) + outward * Mathf.Sin(rad)) * far;
+            return new Vector3(at.x, high, at.z);
         }
 
         /// <summary>三点の二次曲線。a から c へ、b の側へ膨らませて</summary>
