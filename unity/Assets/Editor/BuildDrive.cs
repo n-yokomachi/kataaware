@@ -216,19 +216,19 @@ namespace HalfAware.EditorTools
 
         public const string ScriptPath = "Assets/Data/DriveScript.asset";
         const string ActionsPath = "Assets/InputSystem_Actions.inputactions";
-        const string FontPath = "Assets/Fonts/NotoSansJP-Regular SDF.asset";
+        public const string FontPath = "Assets/Fonts/NotoSansJP-Regular SDF.asset";
         /// <summary>
         /// 暗転中に出る字だけ明朝。台詞はゴシック、という取り決めで、
         /// Alley.unity も Room.unity も Center 層だけこちらを使っている
         /// </summary>
-        const string MinchoPath = "Assets/Fonts/ShipporiMincho-Regular SDF.asset";
+        public const string MinchoPath = "Assets/Fonts/ShipporiMincho-Regular SDF.asset";
 
         /// <summary>車内の対象を拾える距離。座ったまま手の届く範囲</summary>
         const float ItemRadius = 1.4f;
         /// <summary>ガレージのドア。歩いて近づくので、車内の対象より少し遠くから拾える</summary>
         const float DoorRadius = 1.6f;
         /// <summary>目は顔にあるので体の前へ出す。PlayerController の eyeLead と同じ値</summary>
-        const float EyeLead = 0.22f;
+        public const float EyeLead = 0.22f;
 
         /// <summary>
         /// 帯の値。<see cref="DriveIds.Triggers"/> と同じ並び。
@@ -286,7 +286,8 @@ namespace HalfAware.EditorTools
             Garage(root);
             Items(root);
             Wire(root);
-            // 見直し（CheckDrive.Run）は Task 11 で足す
+            // 組み終えたら必ず見直す。目で気づくまで放っておかない
+            CheckDrive.Run(root);
 
             Selection.activeGameObject = root.gameObject;
             Mark(root.gameObject);
@@ -1230,11 +1231,14 @@ namespace HalfAware.EditorTools
 
             triggerItems = new GameObject[Bands];
             triggerItems[0] = Put(parent, "Chips", new Vector3(-0.42f, 0.78f, -0.02f), script, DriveIds.Chips, ItemRadius, false);
-            triggerItems[1] = Put(parent, "Log", new Vector3(-0.42f, 0.80f, 0.24f), script, DriveIds.Log, ItemRadius, false);
+            // 背もたれの前面は z 0.17。0.24 に置くと判定点も印も背もたれの中に入って、
+            // 印が座席に食われる（CheckDrive の見直し 4 が拾う）。座面の上へ出す
+            triggerItems[1] = Put(parent, "Log", new Vector3(-0.42f, 0.80f, 0.14f), script, DriveIds.Log, ItemRadius, false);
             triggerItems[2] = Put(parent, "Mirror", new Vector3(0f, 1.42f, 0.72f), script, DriveIds.Mirror, ItemRadius, false);
             triggerItems[3] = Put(parent, "Photo", new Vector3(0.16f, 1.00f, 0.62f), script, DriveIds.Photo, ItemRadius, false);
-            // 窓だけ必須。帯 4 に入るまで伏せてあるので、それまで場面は閉じない
-            triggerItems[4] = Put(parent, "Window", new Vector3(0.84f, 1.00f, 0.10f), script, DriveIds.Window, ItemRadius, true);
+            // 窓だけ必須。帯 4 に入るまで伏せてあるので、それまで場面は閉じない。
+            // ドアの内張りは x 0.82〜0.90。0.84 に置くと印が内張りの中に入る
+            triggerItems[4] = Put(parent, "Window", new Vector3(0.80f, 1.00f, 0.10f), script, DriveIds.Window, ItemRadius, true);
             // きっかけはその帯に入るまで出さない。出し分けるのは DriveDirector.ShowTrigger
             for (var i = 0; i < triggerItems.Length; i++) triggerItems[i].SetActive(false);
 

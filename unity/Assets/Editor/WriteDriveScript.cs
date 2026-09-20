@@ -69,13 +69,14 @@ namespace HalfAware.EditorTools
             "窓を開ける",
         };
 
-        [MenuItem("HalfAware/Write the drive script", false, 220)]
-        public static void Write()
+        /// <summary>
+        /// 書き出す項目をそのまま組んで返す。Write はこれをアセットへ流し込むだけにしてある。
+        /// 分けてあるのは、見直し（CheckDrive）が「いま書き出すもの」と
+        /// アセットの中身を突き合わせられるようにするため。
+        /// ここの文を直したままアセットを書き出し忘れると、組み立てのたびに知らせが出る
+        /// </summary>
+        public static List<ScriptEntry> Entries()
         {
-            var asset = AssetDatabase.LoadAssetAtPath<RoomScript>(Path);
-            var made = asset == null;
-            if (made) asset = ScriptableObject.CreateInstance<RoomScript>();
-
             var entries = new List<ScriptEntry>();
 
             // ガレージ。運転席のドアを調べると乗り込む。乗り込めばガレージには戻れないので、
@@ -134,6 +135,18 @@ namespace HalfAware.EditorTools
                 lines = new[] { "半分を切っている。町に着くまでは保つ" },
                 hints = new ScriptHint[0],
             });
+
+            return entries;
+        }
+
+        [MenuItem("HalfAware/Write the drive script", false, 220)]
+        public static void Write()
+        {
+            var asset = AssetDatabase.LoadAssetAtPath<RoomScript>(Path);
+            var made = asset == null;
+            if (made) asset = ScriptableObject.CreateInstance<RoomScript>();
+
+            var entries = Entries();
 
             var so = new SerializedObject(asset);
             var list = so.FindProperty("entries");
