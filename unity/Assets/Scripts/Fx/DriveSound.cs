@@ -100,6 +100,20 @@ namespace HalfAware
             want = open ? openCut : shutCut;
         }
 
+        /// <summary>
+        /// 窓の開け閉めを、寄せずにその場で決める。景色が変わるときに使う。
+        ///
+        /// **景色の頭で寄せてはいけない。** 前の景色で窓を開けていると、
+        /// 次の景色に入っても 1.6 秒かけて閉まっていく途中の音から始まる。
+        /// 暗転を無くしたので、その 1.6 秒がそのまま聞こえる
+        /// </summary>
+        public void Shut()
+        {
+            want = shutCut;
+            cut = shutCut;
+            Apply(shutCut);
+        }
+
         void Awake()
         {
             roadMuffle = Muffle(road);

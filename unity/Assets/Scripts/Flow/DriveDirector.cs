@@ -102,9 +102,10 @@ namespace HalfAware
         // **秒数はここの既定が正。** 組み立て（BuildDrive.Wire）は DriveDirector を
         // 作り直すので、シーンで触った値は次の組み直しで既定へ戻る。変えるならここを変える
 
-        [Tooltip("黒のまま置く秒数。**黒へ落ちるのはイグニッションを鳴らし終えるこの秒数前。** " +
-            "黒が明けるのと鍵の音が鳴り終わるのが同じ瞬間になり、そこから走行音が始まる")]
-        [SerializeField] float pullHold = 4.6f;
+        [Tooltip("黒のまま置く秒数。**0 なら暗転を挟まず、鍵の音が鳴り終わったその場で走り出す。** " +
+            "0 より大きいときは、黒へ落ちるのは鳴らし終えるこの秒数前になり、" +
+            "黒が明けるのと鍵の音が鳴り終わるのが同じ瞬間になる")]
+        [SerializeField] float pullHold = 0f;
         [Tooltip("黒から一つ目の景色へ浮かび上がる秒数。**0 なら一瞬で切り替わる。** " +
             "景色どうしの切り替えがフェード無しなので、場面の頭もそれに揃えてある")]
         [SerializeField] float pullFade = 0f;
@@ -282,10 +283,10 @@ namespace HalfAware
             // 両方 -1 のまま比べると、どの対象を調べても通ってしまう
             if (route.BandOf(item.Id) != band) return;
             // 窓は調べたその場で下ろす。文が出るのと同時に音が鳴り、こもりも取れる
-            if (item.Id == DriveIds.Window && sound != null)
+            if (item.Id == DriveIds.Window)
             {
-                sound.WindowDown();
-                sound.Open(true);
+                if (sound != null) { sound.WindowDown(); sound.Open(true); }
+                Drift(true);
             }
 
             // 煙草だけ、独白の前に一連の間が入る。**時計を進めるのはその後。**
@@ -330,6 +331,7 @@ namespace HalfAware
             if (smoke != null) smoke.Begin(SmokeSeconds);
 
             if (sound != null) { sound.WindowDown(); sound.Open(true); }
+            Drift(true);
             yield return Wait((sound != null ? sound.WindowSeconds : 0f) + beforeExhale);
 
             // 窓が下りきってから吐く。煙のひと吹きも合わせる
@@ -380,6 +382,9 @@ namespace HalfAware
         System.Collections.IEnumerator Boarding()
         {
             flow.Held = true;
+            // 窓も煙も、始まりは閉め切った車内の扱い
+            if (sound != null) sound.Shut();
+            Drift(false);
             if (garageOnly != null) garageOnly.SetActive(false);
             // **足音は自分で止める。** Footsteps は CharacterController の velocity を見ていて、
             // PlayerController は CanMove が false のあいだ Move を一度も呼ばない。
@@ -464,8 +469,8 @@ namespace HalfAware
                 yield return Wait(ignitionHold);
             }
 
-            // 黒へは切り替えで入る。場面 1 のドアを閉める暗転と同じ扱い
-            hud.SetFade(1f);
+            // 黒を置くときだけ幕を下ろす。0 なら幕そのものを出さず、絵が切り替わるだけ
+            if (pullHold > 0f) hud.SetFade(1f);
             if (garage != null) garage.SetActive(false);
             world.Rolling = true;
             // 走り出したら揺れは路面が持つ。残すと二重に揺れる
@@ -549,12 +554,38 @@ namespace HalfAware
             if (aboard && sound != null) sound.Weather(At(which).rain);
             // 煙は景色を跨がない。黒のあいだに畳む
             if (smoke != null) smoke.Cancel();
-            // 窓も景色を跨がない。開けたのは前の景色の中の話
-            if (sound != null) sound.Open(false);
+            // 窓も景色を跨がない。開けたのは前の景色の中の話。
+            // **寄せずにその場で戻す。** 寄せると、次の景色が窓の開いた音から始まって
+            // 1.6 秒かけて閉まっていく
+            if (sound != null) sound.Shut();
+            // 煙の流れも戻す。窓を開けるまでは真っ直ぐ立ちのぼる
+            Drift(false);
             // 家は独白を送り切ってから出す。景色に入った時点では小麦だけ
             croftsDue = false;
             ShowCrofts(false);
         }
+
+        /// <summary>
+        /// 煙を窓の方へ流すか。**窓を開けるまでは流さない。**
+        /// 閉め切った車内で煙が横へ持っていかれる理由が無い。
+        /// 開けた瞬間から、開いた窓（運転席側＝右）の方へ抜けていく
+        /// </summary>
+        void Drift(bool open)
+        {
+            if (smoke == null) return;
+            var ps = smoke.GetComponent<ParticleSystem>();
+            if (ps == null) return;
+            var vel = ps.velocityOverLifetime;
+            vel.x = open
+                ? new ParticleSystem.MinMaxCurve(SmokeDriftLow, SmokeDriftHigh)
+                : new ParticleSystem.MinMaxCurve(-SmokeStill, SmokeStill);
+        }
+
+        /// <summary>窓を開けたあと煙が横へ流れる速さ。m/s</summary>
+        const float SmokeDriftLow = 0.10f;
+        const float SmokeDriftHigh = 0.26f;
+        /// <summary>閉め切った車内での漂い。m/s。BuildProps.BuildSmoke の既定と同じ</summary>
+        const float SmokeStill = 0.018f;
 
         /// <summary>小麦畑の農家を出す／伏せる。区切りごとに 1 つあるのでまとめて切る</summary>
         void ShowCrofts(bool on)

@@ -1153,11 +1153,10 @@ namespace HalfAware.EditorTools
         {
             var made = BuildProps.BuildSmoke(eye);
             var puffs = made.GetComponent<SmokePuffs>();
-            // **煙は右へ流す。** 運転席は右側で、窓も右にある。
-            // BuildProps は左右へ漂う程度（±0.018）に置いているが、
-            // 窓を開けて走っている車の中では、煙は開いた窓の方へ持っていかれる
-            var vel = made.GetComponent<ParticleSystem>().velocityOverLifetime;
-            vel.x = new ParticleSystem.MinMaxCurve(0.10f, 0.26f);
+            // **横へ流すのは組み立てでは決めない。** 窓を開けた瞬間から
+            // 開いた窓（運転席側＝右）の方へ抜けていく、という話なので、
+            // 流す・流さないは DriveDirector.Drift が走りながら切り替える。
+            // ここは BuildProps の既定（±0.018 の漂い）のまま
 
             var go = new GameObject("Cigarette");
             go.transform.SetParent(player, false);

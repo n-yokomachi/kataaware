@@ -35,7 +35,7 @@ https://pixabay.com/service/license-summary/
 | `CarDoorShut.wav` | Pixabay `freesound_community-car-door-close-6929` | Pixabay Content License | モノラル 44.1kHz へ、頭の無音を落とした。0.55 秒 |
 | `Ignition.wav` | Pixabay `freesound_community-keys-in-the-ignition-101951` | Pixabay Content License | モノラル 44.1kHz へ、頭の無音を落として 6.72 秒。そこへ**末尾 0.55 秒から金属音を落としたもの**を 0.05 秒ずつ被せて 8 回繋ぎ、4.05 秒足して 10.52 秒。金属音を落とすのは 1.8kHz の二段の低域通過と、目立っていた 5.2k / 7.6k の山を Q 12 で −18dB。3kHz 以上の実効値が −54.1 → −64.2dB、エンジンの胴（800Hz 以下）は −26.19 → −26.21dB でほぼ無傷。本体から繰り返しへは 0.25 秒かけて渡すので、金属ありから無しへの移り目は段にならない |
 | `DriveSealed.wav` | Pixabay `freesound_community-car-driving-interior-perspective-51388`（オーナーが 22.3〜286.7 秒で切り出したもの） | Pixabay Content License | 60 秒地点から 21 秒。**6900Hz の音を抜いてある**（周りより 18dB 突き出ていた。Q 28 で −30dB、Q 60 で −24dB の二段）。+7dB、ステレオ 44.1kHz へ。頭 1.0 秒を尻へ被せて輪にした。20.00 秒 |
-| `DriveGravel.wav` | Pixabay `freesound_community-driving-a-truck-in-gravel-58271` | Pixabay Content License | 20 秒地点から 12 秒。閾値 −26dB / 比 2.5 / 持ち上げ 3dB で圧縮し、0.80 で頭打ち。ステレオ 44.1kHz へ。頭 0.75 秒を尻へ被せて輪にした。11.25 秒 |
+| `DriveGravel.wav` | Pixabay `freesound_community-driving-a-truck-in-gravel-58271` | Pixabay Content License | **20 秒地点から最後まで**（97.27 秒）。閾値 −26dB / 比 2.5 / 持ち上げ 3dB で圧縮し、0.80 で頭打ち。ステレオ 44.1kHz へ。頭 1.0 秒を尻へ被せて輪にした。11.25 秒では「短すぎる」と差し戻されたので、素材にあるぶんを全部使っている |
 | `RainWipers.wav` | Pixabay `tommylynn-interior-car-in-rain-with-wipers-369260` | Pixabay Content License | 6 秒地点から 13.879 秒、+12dB。ステレオ 44.1kHz へ。頭 0.6 秒を尻へ被せて輪にした。**長さはワイパーの周期で決めてある**（包絡線の自己相関で 0.9485 秒。その 14 倍の 13.279 秒）。秒数で切ると払う拍が輪の継ぎ目で飛ぶ |
 | `Idle.wav` | Pixabay `freesound_community-car-keys-in-ignition-starting-stopping-engine-31102` | Pixabay Content License | 28 秒地点から 8.6 秒。モノラル 44.1kHz へ。頭 0.6 秒を尻へ被せて輪にした。8.00 秒。イグニッションのあと走り出すまでの間を埋める |
 | `WindowDown.wav` | Pixabay `freesound_community-car-window-down-103833` | Pixabay Content License | 1.85 秒地点から 4.45 秒、+20dB。モノラル 44.1kHz へ。素材は 8.94 秒あるが、窓が動いているのは 2〜6 秒だけ。素のままだと実効 −41.9dB で、持ち上げた走行の輪（−19dB）に埋もれて聞こえなかった |
@@ -69,6 +69,9 @@ https://pixabay.com/service/license-summary/
 1.00 の上限に張り付いて余地が無くなったため、素材の側を持ち上げた。実効値で舗装 −19.0dB、
 未舗装 −18.4dB、雨 −20.5dB、頂点はどれも −1.5dB 前後。ここだけ「素材の頂点は動かさない」の
 例外にあたる。ほかの単発は素のまま置いてある。
+
+**長い輪は Vorbis で持つ。** 未舗装の輪は 97 秒あり、生のままだと 17MB。
+WebGL 書き出しなので、走行の輪と雨とエンジンは取り込みを CompressedInMemory / Vorbis（品質 0.55）にしてある。
 
 輪の継ぎ目は頭を尻へ被せて消してある。頭と尻 0.25 秒の実効値の差は舗装で 1.4dB、
 未舗装で 2.4dB なので、そのまま `loop` に掛けて段は出ない。
