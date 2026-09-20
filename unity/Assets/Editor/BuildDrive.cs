@@ -1807,7 +1807,7 @@ namespace HalfAware.EditorTools
                 case "CarSeat": col = new Color(0.140f, 0.121f, 0.106f); smooth = 0.10f; break;
                 // 塗った鉄。輻・取っ手・摘み・止めねじ。**車内で唯一明るい素材。**
                 // 内装の 2.3 倍あるので、夜の帯でも輪郭が残る
-                case "CarSteel": col = new Color(0.288f, 0.262f, 0.208f); smooth = 0.28f; break;
+                case "CarSteel": col = new Color(0.216f, 0.223f, 0.238f); smooth = 0.28f; break;
                 // 継ぎ目と窪み。絵を持たず、ただ暗い。板と板の境をこれで引く
                 case "CarGap": col = new Color(0.020f, 0.019f, 0.021f); smooth = 0.05f; break;
                 case "CarGlass": col = new Color(0.55f, 0.60f, 0.66f, 0.12f); smooth = 0.85f; break;
@@ -1821,7 +1821,7 @@ namespace HalfAware.EditorTools
                 // 塗った面ではなく下地のままの鉄板に見えた。明るさを落とせば夜が潰れるので、
                 // 落とす代わりに緑へ寄せてある。絵（DriveCarBody.png）が持つ斑と剥げも同じ理由で、
                 // 平均を下げずに「平らな一枚板」から離すためにある
-                case "CarBody": col = new Color(0.352f, 0.440f, 0.262f); smooth = 0.18f; break;
+                case "CarBody": col = new Color(0.279f, 0.305f, 0.275f); smooth = 0.18f; break;
                 // 車輪のゴム。絵（DriveCarTyre.png）が持つので、ここは絵が無いときの控え。
                 // 実物のゴムの反射率は 0.03〜0.05 で、真っ黒に塗ると灯りの下でも穴に見える
                 case "CarTyre": col = new Color(0.030f, 0.030f, 0.032f); smooth = 0.12f; break;
