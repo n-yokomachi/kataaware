@@ -992,8 +992,9 @@ namespace HalfAware.EditorTools
             // 一度は計器盤の中ほど（0.06, 1.30, 0.50）に置いていて、「見づらい」と差し戻された。
             // 燃料計の隣へ移したが、そこも狭い。目（SeatAt + EyeLead）は計器盤の塊の上端より
             // 0.14 高いだけなので、塊の右脇の天板は塊の壁に隠れて運転席から見えない。
-            // 手前の玉縁まで戻して初めて箱が丸ごと出る。ここがその位置
-            triggerItems[1] = Put(parent, "Cigar", new Vector3(0.722f, 1.344f, 0.565f), script, DriveIds.Cigar, ItemRadius, false);
+            // 手前の玉縁まで戻して初めて箱が丸ごと出る。ここがその位置。
+            // 場面 1・2 と同じ箱を寝かせて置いてあるので、立てていたときより背が低い
+            triggerItems[1] = Put(parent, "Cigar", new Vector3(0.722f, 1.311f, 0.560f), script, DriveIds.Cigar, ItemRadius, false);
             // 窓だけ必須。最後の景色に入るまで伏せてあるので、それまで場面は閉じない。
             // ドアの内張りは x 0.82〜0.90。0.84 に置くと印が内張りの中に入る
             triggerItems[2] = Put(parent, "Window", new Vector3(0.80f, 1.26f, 0.10f), script, DriveIds.Window, ItemRadius, true);
@@ -1564,6 +1565,7 @@ namespace HalfAware.EditorTools
             dso.FindProperty("sound").objectReferenceValue = Object.FindFirstObjectByType<DriveSound>(FindObjectsInactive.Include);
             dso.FindProperty("cigarette").objectReferenceValue = Object.FindFirstObjectByType<Cigarette>(FindObjectsInactive.Include);
             dso.FindProperty("smoke").objectReferenceValue = Object.FindFirstObjectByType<SmokePuffs>(FindObjectsInactive.Include);
+            dso.FindProperty("carDoor").objectReferenceValue = Object.FindFirstObjectByType<CarDoor>(FindObjectsInactive.Include);
 
             // 小麦畑の農家。**区切りごとに 1 つある。** 帯の直下にまとめられない。
             // DriveWorld が帯の子の数を環の枠の数に使うので、区切り以外を 1 つ混ぜると

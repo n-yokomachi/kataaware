@@ -73,8 +73,18 @@ namespace HalfAware
         [Header("乗り込み")]
         [Tooltip("ドア・イグニッション・動き出しと走行音")]
         [SerializeField] DriveSound sound;
+        [Tooltip("運転席のドアの板。乗り込みで開いて閉める")]
+        [SerializeField] CarDoor carDoor;
         [Tooltip("ドアを開けてから目が動き出すまで。秒")]
         [SerializeField] float doorHold = 0.45f;
+        [Tooltip("目が動き出してから板が開き始めるまで。秒。" +
+            "**0 にするな。** 板の丈は 1.64 m あり、開き 11 度のところで面が" +
+            "立っている人の目（x 1.14）を通る。目が座席へ寄り始めてから開かせる")]
+        [SerializeField] float doorLag = 0.25f;
+        [Tooltip("板が開ききるまで。秒。doorLag と足して seatMove より短くすること")]
+        [SerializeField] float doorSwing = 0.9f;
+        [Tooltip("板が閉まりきるまで。秒。閉まったところで音が鳴る")]
+        [SerializeField] float doorShut = 0.45f;
         [Tooltip("立ち位置から運転席まで目を滑らせる秒数")]
         [SerializeField] float seatMove = 1.6f;
         [Tooltip("運転席に着いてからドアを閉めるまで。秒")]
@@ -365,6 +375,8 @@ namespace HalfAware
             if (feet != null) feet.enabled = false;
             player.CanMove = false;
 
+            // 板は閉じた姿から始める
+            if (carDoor != null) carDoor.Set(0f);
             if (sound != null) sound.DoorOpen();
             yield return Wait(doorHold);
 
@@ -392,18 +404,30 @@ namespace HalfAware
                 player.transform.position = Vector3.Lerp(from, to, k);
                 player.Yaw = Mathf.LerpAngle(yawFrom, yawTo, k);
                 player.Pitch = Mathf.Lerp(pitchFrom, 0f, k);
+                // 板は目が寄り始めてから開く。先に開けると面が目を通る
+                if (carDoor != null)
+                    carDoor.Set(Ease(doorSwing <= 0f ? 1f : (t - doorLag) / doorSwing));
                 flow.Freeze(FreezeStep);
                 yield return null;
             }
             player.transform.position = to;
             player.Yaw = yawTo;
             player.Pitch = 0f;
+            if (carDoor != null) carDoor.Set(1f);
             // **首の制限は体の向きを決めたあとで掛ける。** PlayerController.Yaw は
             // 首が制限されていると体ではなく首を回すので、先に掛けると
             // 運転席の正面ではなく立っていたときの向きが体の正面のまま残る
             player.HeadYawLimit = seatedYawLimit;
             yield return Wait(sitHold);
 
+            // 板を閉める。閉まりきったところで音が鳴る
+            for (var t = 0f; t < doorShut; t += Time.deltaTime)
+            {
+                if (carDoor != null) carDoor.Set(1f - Ease(doorShut <= 0f ? 1f : t / doorShut));
+                flow.Freeze(FreezeStep);
+                yield return null;
+            }
+            if (carDoor != null) carDoor.Set(0f);
             if (sound != null) sound.DoorShut();
             yield return Wait(shutHold);
             if (sound != null) sound.Ignition();
