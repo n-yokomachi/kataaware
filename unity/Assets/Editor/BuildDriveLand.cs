@@ -896,6 +896,806 @@ namespace HalfAware.EditorTools
             // 名前は帯を通して同じにする。CheckDrive の Paving（路面に貼る面）で引くため
             Along(slices, LampStep, (slice, z, k) => Sides("Pool", LampAt - LampArm, (at, side, name) =>
                 Piece(slice, name, pool, poolMat).localPosition = new Vector3(at, 0f, z)));
+
+            // 濡れた舗装。**この帯だけ雨が降っている**（Route の rain）。
+            // 市街（Outskirts）と同じ艶の面を敷く。艶は 0.86 あるので、素の舗装（0.16）では
+            // 出なかった照り返しが乗り、街灯の溜まりの外の路面も濡れて見える。
+            // 名前は市街と同じにする。CheckDrive の Paving で引くため
+            var sheen = Shape("Sheen", 0.25f,
+                b => b.FaceY(SheenY, Lane(-RoadHalf), Lane(RoadHalf), 0f, TileLength, 1));
+            for (var i = 0; i < slices.Length; i++) Piece(slices[i], "Sheen", sheen, Mat("Sheen"));
+
+            Wayside(slices);
+        }
+
+
+        // ---- 帯 1 の沿道 ----------------------------------------------------
+
+        /// <summary>
+        /// 路肩の縁石の内側の面。路肩の段（<see cref="RoadHalf"/> ＋ <see cref="Shoulder"/>）に
+        /// そのまま立てる。ここを詰めると縁石が道へ出て、CheckDrive.OnRoad が知らせる
+        /// </summary>
+        const float KerbFrom = RoadHalf + Shoulder;
+
+        /// <summary>縁石の外側の面</summary>
+        const float KerbTo = KerbFrom + 0.28f;
+
+        /// <summary>縁石の天端。路肩の段（-ShoulderDrop）から立ち上がる</summary>
+        const float KerbY = 0.12f;
+
+        /// <summary>
+        /// ガードレールの、道の中心からの距離。
+        /// **街灯の柱（<see cref="LampAt"/> 4.6、半幅 0.09）より外に取る。**
+        /// 内へ入れると、柱がレールを突き抜けて生えることになる
+        /// </summary>
+        const float RailAt = 5.30f;
+
+        /// <summary>
+        /// ガードレールの帯の中心の高さ。**目線（1.55）よりずっと低く抑える。**
+        /// 近いので、ここを上げると土手も遠景もまとめてこれ一本で塞がる
+        /// </summary>
+        const float RailY = 0.64f;
+
+        /// <summary>ガードレールの支柱の間隔。m。区切り（20）と環一周（180）のどちらも割り切る</summary>
+        const float RailStep = 5f;
+
+        /// <summary>
+        /// 反射板の間隔。m。区切りと環一周のどちらも割り切る。
+        /// 28 m/s なら 1 秒に 2.8 枚。街灯（36 m ＝ 0.78 本／秒）より細かい刻みにしてあり、
+        /// 走っている速さを読ませているのはこちらの方
+        /// </summary>
+        const float StudStep = 10f;
+
+        /// <summary>境の柵の、道の中心からの距離</summary>
+        const float FenceAt = 7.0f;
+
+        /// <summary>柵の胴の高さ</summary>
+        const float FenceY = 1.02f;
+
+        /// <summary>植え込みの内側と外側の縁</summary>
+        const float HedgeFrom = 7.35f;
+        const float HedgeTo = 9.35f;
+
+        /// <summary>法面の裾。切り通しの壁はここから立ち上がる。植え込み（HedgeTo）の外に取る</summary>
+        const float BundToe = 9.6f;
+
+        /// <summary>法面の中ほど。裾と天のあいだに 1 本入れて、斜面を S 字に丸める</summary>
+        const float BundMid = 13.5f;
+
+        /// <summary>法面の天。ここまでで壁を登り切る</summary>
+        const float BundTop = 17f;
+
+        /// <summary>土手の天端の中ほど。天と肩のあいだに 1 本入れて、稜線の折れを丸める</summary>
+        const float BundCrown = 24f;
+
+        /// <summary>土手の肩。ここから先は野へ均していく</summary>
+        const float BundBrow = 31f;
+
+        /// <summary>野の始まり。m。路肩の地面（±24）より外なので、ここから下は負に落としてよい</summary>
+        const float MoorFrom = 70f;
+
+        /// <summary>
+        /// 地の面の外縁。m。
+        ///
+        /// **ここを閉じないと地平が抜ける。** 路肩の地面（<see cref="GroundMesh"/>）は
+        /// ±24 までしか敷いておらず、その外は霧の色がそのまま出る。帯 1 の霧は
+        /// density 0.0085 の二乗掛かりで、24 m ではまだ 96% 抜けるので、
+        /// 道の左右に空の色の帯が地平まで届いて残った。市街が ±95（<see cref="CityGround"/>）で
+        /// 塞いでいるのと同じことを、こちらは霧の薄いぶん遠くまで敷いてやる。
+        /// 150 m なら 8 割が畳まれて空へ溶ける
+        /// </summary>
+        const float MoorEdge = 150f;
+
+        /// <summary>
+        /// 地の面を路肩の地面（<see cref="VergeY"/>）の上へ浮かせる量。m。
+        /// 路面に重ねる面の作法（CheckDrive.RoadGap）と同じ
+        /// </summary>
+        const float TurfLift = 0.010f;
+
+        /// <summary>
+        /// 法面を z 方向に刻む数。区切り 1 つぶん。地形の一番短い波は 60 m なので、
+        /// 4 m 刻みなら 1 波に 15 点が乗る。4 では稜線に折れが見えた
+        /// </summary>
+        const int BundSteps = 5;
+
+        /// <summary>植え込みを z 方向に刻む数。区切り 1 つぶん</summary>
+        const int HedgeSteps = 5;
+
+        /// <summary>
+        /// 地の面を横に割る境。道の中心からの距離。
+        ///
+        /// **裾と天のあいだ、天と肩のあいだにも 1 本ずつ入れてある。** 4 本で割ったときは
+        /// 切り通しの稜線が折れ線になって、土手ではなく折った紙に見えた。
+        /// 6 本なら区切り 1 つあたり 120 枚で、帯ぜんたいでも千枚ほどに収まる
+        /// </summary>
+        static readonly float[] TurfRows =
+        {
+            BundToe, BundMid, BundTop, BundCrown, BundBrow, MoorFrom, MoorEdge,
+        };
+
+        /// <summary>門型の間隔。m。180 を割り切る。28 m/s なら 3.2 秒に 1 基くぐる</summary>
+        const float GantryStep = 90f;
+
+        /// <summary>門型の脚の、道の中心からの距離。ガードレール（<see cref="RailAt"/>）の外</summary>
+        const float GantryAt = 6.4f;
+
+        /// <summary>
+        /// 門型の桁の下端。m。
+        /// **CheckDrive の Clearance（2.10）より高く取ること。** 見直しは高さ 2.10 より
+        /// 上の頂点を見ないので、そこを越えていれば道を跨いでも咎められない。
+        /// 逆に下回ると、道の上に物が出ていると知らせが出る
+        /// </summary>
+        const float GantryClear = 5.4f;
+
+        /// <summary>行き先の看板の間隔。m。180 を割り切る。門型と半刻みずらすので 45 m ごとに何かが来る</summary>
+        const float BoardStep = 90f;
+
+        /// <summary>行き先の看板の内側の縁の、道の中心からの距離</summary>
+        const float BoardAt = 6.2f;
+
+        /// <summary>小さな標識の間隔。m。180 を割り切る</summary>
+        const float PlateStep = 45f;
+
+        /// <summary>送電塔の間隔。m。180 を割り切る</summary>
+        const float PylonStep = 60f;
+
+        /// <summary>工場と倉庫の間隔。m。180 を割り切る</summary>
+        const float WorksStep = 45f;
+
+        /// <summary>
+        /// 路肩の灌木の茂みの間隔。m。180 を割り切る。
+        /// 45 では環に 4 群しか無く、土手の稜線の大半が裸のままだった
+        /// </summary>
+        const float CopseStep = 30f;
+
+        /// <summary>雨に滲む灯りの札の大きさ。m</summary>
+        const float HaloWide = 5.4f;
+        const float HaloHigh = 4.4f;
+
+        /// <summary>
+        /// 滲みの強さ。加算で重ねるので、上げ過ぎると灯りの形が消えて白い塊になる。
+        /// 溜まり（0.34）より少し上げてあるのは、空気の中に立てる札で、
+        /// 路面に寝かせた板より正面から見る面積が小さいため
+        /// </summary>
+        const float HaloGain = 0.40f;
+
+        /// <summary>路肩の水たまりの真ん中。道の中心からの距離。舗装の縁（RoadHalf 3.5）に掛けない</summary>
+        const float PuddleAt = 4.7f;
+        const float PuddleWide = 2.0f;
+        const float PuddleDeep = 7.0f;
+
+        /// <summary>
+        /// 帯 1 の沿道を焼く先。素材ごとに 1 つ持ち、区切り 1 つぶんをまとめて 1 枚の mesh にする
+        /// </summary>
+        sealed class MotorBanks
+        {
+            /// <summary>切り通しの壁と土手と、その先の野。地平を塞いでいるのはこれ</summary>
+            public readonly Bank Turf = new Bank { Texel = 0.12f };
+            /// <summary>縁石。夜の道で唯一、道の縁をまっすぐ引くもの</summary>
+            public readonly Bank Kerb = new Bank { Texel = 0.5f };
+            /// <summary>ガードレール・柵・門型・標識の柱。濡れた鉄は前照灯を返すので、この帯で一番明るい素材</summary>
+            public readonly Bank Steel = new Bank { Texel = 0.5f };
+            /// <summary>植え込みと灌木。地の面より暗くして、土手の前に黒い縁を引かせる</summary>
+            public readonly Bank Scrub = new Bank { Texel = 0.3f };
+            /// <summary>遠景。送電塔と工場と倉庫。空より暗い影絵にする</summary>
+            public readonly Bank Far = new Bank { Texel = 0.2f };
+            /// <summary>標識の地</summary>
+            public readonly Bank Face = new Bank { Texel = 0.5f };
+            /// <summary>標識の白い縁と文字、工場の点いた窓</summary>
+            public readonly Bank Mark = new Bank { Texel = 0.5f };
+            /// <summary>反射板と、遠くの街の灯り</summary>
+            public readonly Bank Spark = new Bank { Texel = 0.5f };
+            /// <summary>雨の夜の滲み。街灯の暈と路肩の水たまり。uv は 0〜1 を直に振る</summary>
+            public readonly Bank Haze = new Bank { Texel = 1f };
+        }
+
+        /// <summary>
+        /// 帯 1 の沿道ぜんたい。
+        ///
+        /// **一つずつ物を置いてはいけない。** 区切り 1 つに 20 m ぶんの縁石と支柱と柵と
+        /// 植え込みが乗り、環ぜんたいには門型も標識も送電塔も工場も並ぶ。物で置けば
+        /// レンダラーが三百を越える。市街（<see cref="City"/>）と同じ構えで、
+        /// 区切りごとに素材へ焼く。焼く先は <see cref="MotorBanks"/> の 9 枚で、
+        /// 中身の無い素材は <c>Bank.Emit</c> が何も置かないので、
+        /// 門型の乗らない区切りにはレンダラーが増えない。
+        ///
+        /// **刻みはどれも環一周（<see cref="Span"/> 180 m）を割り切る。**
+        /// 区切りに続けて張るもの（地の面・縁石・レール・柵・植え込み）は区切りの長さ（20）が
+        /// そのまま刻みになるので必ず割り切る。環の上へ置くもの（門型 90・行き先の看板 90・
+        /// 小さな標識 45・送電塔 60・工場 45・灌木 45・街灯の暈 36）は <see cref="Sow"/> が
+        /// 割り切るかどうかを見て、割り切らない刻みは並べずに飛ばす。
+        ///
+        /// 地形の波長も同じ理由で 180 / 90 / 60 / 45 / 20 しか使わない。
+        /// 割り切らない波長を混ぜると、環が一周したところで土手が段になる
+        /// </summary>
+        static void Wayside(Transform[] slices)
+        {
+            var banks = new MotorBanks[slices.Length];
+            for (var i = 0; i < banks.Length; i++) banks[i] = new MotorBanks();
+
+            // 区切りに続けて張るもの。環の上の位置は区切りの番号から出す
+            for (var i = 0; i < banks.Length; i++)
+            {
+                var ring = i * TileLength;
+                Slopes(banks[i], ring);
+                Railing(banks[i]);
+                Hedgerow(banks[i], ring);
+                Farside(banks[i], i, ring);
+            }
+
+            // 種を決め打ちにして、組み直しても同じ沿道になるようにする
+            var rnd = new System.Random(20260923);
+            // 門型。道をまたぐ枠に看板を吊る。夜はここが一番よく光る
+            Sow(GantryStep, 0f, 0f, rnd, (ring, k) => Put(banks, ring, (c, z) => Gantry(c, z, k)));
+            // 行き先の看板。門型と半刻みずらして、45 m ごとにどちらかが来るようにする
+            Sow(BoardStep, 0f, BoardStep * 0.5f, rnd, (ring, k) => Put(banks, ring, (c, z) => Signpost(c, z, k)));
+            // 小さな標識。左右を振り分ける
+            Sow(PlateStep, 0f, PlateStep * 0.5f, rnd, (ring, k) => Put(banks, ring, (c, z) => Plate(c, z, k)));
+            // 送電塔。倫敦を出たばかりの郊外なので、野を跨いで送電線が続いている
+            Sow(PylonStep, 9f, 0f, rnd, (ring, k) =>
+            {
+                var seed = rnd.Next();
+                Put(banks, ring, (c, z) => Pylon(c, new System.Random(seed), ring, z, k));
+            });
+            // 工場と倉庫
+            Sow(WorksStep, 11f, WorksStep * 0.5f, rnd, (ring, k) =>
+            {
+                var seed = rnd.Next();
+                Put(banks, ring, (c, z) => Works(c, new System.Random(seed), ring, z, k));
+            });
+            // 路肩の灌木の茂み。土手の縁を毛羽立たせる
+            Sow(CopseStep, 10f, CopseStep * 0.25f, rnd, (ring, k) =>
+            {
+                var seed = rnd.Next();
+                Put(banks, ring, (c, z) => Copse(c, new System.Random(seed), ring, z, k));
+            });
+            // 雨の夜の滲み。街灯と同じ刻みに乗せる
+            Sow(LampStep, 0f, 0f, rnd, (ring, k) => Put(banks, ring, (c, z) => Halos(c, z)));
+
+            // 切り通しと土手の草。**路肩の地面（Verge 0.078）より明るくする。**
+            //
+            // 路肩と同じ色で塗ったときは、左右の土手が形の読めない一枚の黒い塊になり、
+            // その手前に立つ植え込みとも遠景の工場とも見分けが付かなかった。
+            // 立った斜面は水平の環境光しか受けないので、0.078 では画面で 20 に届かない。
+            // 0.150 まで上げても、空（塗り潰しがそのまま出るので画面 94）との差は
+            // 十分に残って影絵のままになる
+            var turf = CityMat("MotorTurf", new Color(0.150f, 0.156f, 0.130f), 0.05f);
+            // 縁石。**舗装（0.115）より明るくする。** 同じ明るさで塗ると、
+            // 夜の道で道幅を読ませるものが白線だけになる
+            var kerb = CityMat("MotorKerb", new Color(0.196f, 0.192f, 0.180f), 0.14f);
+            // 亜鉛引きの鉄。**この帯で一番明るい素材。**
+            //
+            // 街灯の柱（Metal 0.085）と同じ色で塗っていては、ガードレールは夜に消える。
+            // レールは道と平行に延々と続く唯一の物で、道の縁と走っている速さを
+            // 同時に見せられるのはこれしかない。
+            //
+            // **艶は上げない。** 濡れた鉄のつもりで 0.55 まで上げたときは、
+            // 脇を過ぎる支柱が日射しの反射で真っ白に飛び、レールの列に白い札が
+            // 一枚だけ混ざったように見えた。夜の帯には点の灯りが無く、艶を上げても
+            // 返るものが日射し（power 0.42）しか無い。濡れて見せるのは
+            // 路面の艶（Sheen）と灯りの暈（<see cref="HaloMat"/>）の側に任せる
+            var steel = CityMat("MotorSteel", new Color(0.250f, 0.258f, 0.268f), 0.24f);
+            // 植え込みと灌木。地の面より暗くして、土手の前に黒い縁を引かせる
+            var scrub = CityMat("MotorScrub", new Color(0.062f, 0.074f, 0.054f), 0.06f);
+            // 遠景。空（0.115）より暗く冷たくして影絵にする。**真っ黒にはしない。**
+            // 霧が 4 割から 6 割を畳むので、素の色が黒だと畳まれた先が霧の色そのものになり、
+            // 工場の塊が空に溶けて輪郭だけの穴になる
+            var far = CityMat("MotorFar", new Color(0.068f, 0.072f, 0.086f), 0.05f);
+            // 標識の地。英国の高速の案内は青地に白。前照灯を返す面なので、
+            // 灯りを置かずに明るい Unlit で済ませる。上げ過ぎると青が白へ抜ける
+            var face = Glow(new Color(0.20f, 0.38f, 0.66f), 0.58f);
+            // 白い縁と文字。工場の点いた窓もこれで済ませる
+            var mark = Glow(new Color(0.90f, 0.93f, 1f), 0.62f);
+            // 反射板と遠くの街の灯り。街灯（LampHue）と同じ橙から出す。
+            // 街灯の頭（1.05）より落とす。同じ明るさにすると、脇を過ぎる反射板が
+            // 灯りそのものに見えて、街灯の列の刻みが読めなくなる
+            var spark = Glow(LampHue, 0.78f);
+            var haze = HaloMat();
+
+            for (var i = 0; i < slices.Length; i++)
+            {
+                banks[i].Turf.Emit(slices[i], "MotorTurf" + i, turf, false, Generated);
+                banks[i].Kerb.Emit(slices[i], "MotorKerb" + i, kerb, false, Generated);
+                banks[i].Steel.Emit(slices[i], "MotorSteel" + i, steel, false, Generated);
+                banks[i].Scrub.Emit(slices[i], "MotorScrub" + i, scrub, false, Generated);
+                banks[i].Far.Emit(slices[i], "MotorFar" + i, far, false, Generated);
+                banks[i].Face.Emit(slices[i], "MotorSign" + i, face, false, Generated);
+                banks[i].Mark.Emit(slices[i], "MotorMark" + i, mark, false, Generated);
+                banks[i].Spark.Emit(slices[i], "MotorSpark" + i, spark, false, Generated);
+                banks[i].Haze.Emit(slices[i], "MotorHaze" + i, haze, false, Generated);
+            }
+        }
+
+        // ---- 地形 ----------------------------------------------------------
+
+        /// <summary>
+        /// 切り通しの壁の高さ。環の上の位置から引く。
+        ///
+        /// **波長は 180 / 90 / 60 しか使わない。** どれも環一周を割り切るので、
+        /// 一周したところで地形が段にならない。0 で切ってあるので、
+        /// 壁の立たない素通しの区間もできる。高速は切り通しと素通しを繰り返して走る
+        /// </summary>
+        static float Cutting(float side, float ring)
+        {
+            var p = ring * (2f * Mathf.PI / Span);
+            var o = side < 0f ? 0f : 1.9f;
+            return Mathf.Max(0f, 2.2f
+                + 2.1f * Mathf.Sin(p + o)
+                + 1.3f * Mathf.Sin(2f * p + o * 1.7f)
+                + 0.7f * Mathf.Sin(3f * p + o * 0.6f));
+        }
+
+        /// <summary>
+        /// 土手の外の野の高さ。**こちらは負にも落ちる**（道が盛り土の上を走っているところ）。
+        /// 負へ落としてよいのは路肩の地面（±24）より外だけなので、
+        /// <see cref="Rise"/> は <see cref="BundBrow"/> より内側でこれを使わない
+        /// </summary>
+        static float Moor(float side, float ring)
+        {
+            var p = ring * (2f * Mathf.PI / Span);
+            var o = side < 0f ? 0.8f : 2.6f;
+            return -1.0f + 1.9f * Mathf.Sin(p + o) + 0.9f * Mathf.Sin(2f * p + o * 1.4f);
+        }
+
+        /// <summary>
+        /// 沿道の地の高さ。道の中心からの距離と環の上の位置で引く。
+        ///
+        /// 裾（<see cref="BundToe"/>）では必ず路肩の地面と同じ高さになる。ここを動かすと、
+        /// 敷いてある路肩の地面との境に段が出る
+        /// </summary>
+        static float Rise(float side, float ring, float from)
+        {
+            var wall = Cutting(side, ring);
+            float up;
+            if (from <= BundToe) up = 0f;
+            else if (from <= BundTop)
+                // 裾と天で傾きが 0 になる S 字。直線の斜面は、稜線の折れがそのまま影の縁になる
+                up = wall * Mathf.SmoothStep(0f, 1f, (from - BundToe) / (BundTop - BundToe));
+            else if (from <= BundBrow)
+                up = Mathf.Lerp(wall, wall * 0.55f,
+                    Mathf.SmoothStep(0f, 1f, (from - BundTop) / (BundBrow - BundTop)));
+            else if (from <= MoorFrom)
+                up = Mathf.Lerp(wall * 0.55f, Moor(side, ring), (from - BundBrow) / (MoorFrom - BundBrow));
+            else up = Moor(side, ring);
+            return VergeY + TurfLift + up;
+        }
+
+        /// <summary>
+        /// 切り通しと土手と野。区切り 1 つぶんを升目に割って張る。
+        ///
+        /// 升の高さは環の上の位置から引くので、隣の区切りと継ぎ目で必ず揃う。
+        /// uv は升の座標からじかに振る（<see cref="Bank.Patch"/>）。
+        /// 隅どうしの距離から振ると、斜面のぶんだけ伸びて隣の升とずれる
+        /// </summary>
+        static void Slopes(MotorBanks c, float ring0)
+        {
+            var dz = TileLength / BundSteps;
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                for (var k = 0; k < BundSteps; k++)
+                {
+                    var z0 = k * dz;
+                    var z1 = z0 + dz;
+                    var r0 = ring0 + z0;
+                    var r1 = ring0 + z1;
+                    for (var n = 0; n + 1 < TurfRows.Length; n++)
+                    {
+                        // 面を上へ向けるには x の小さい側から回す。
+                        // 左側は道から遠いほど x が小さくなるので、そこで入れ替わる
+                        var dA = TurfRows[n];
+                        var dB = TurfRows[n + 1];
+                        if (side < 0f) { var swap = dA; dA = dB; dB = swap; }
+                        var xA = Lane(dA * side);
+                        var xB = Lane(dB * side);
+                        c.Turf.Patch(
+                            new Vector3(xA, Rise(side, r1, dA), z1),
+                            new Vector3(xB, Rise(side, r1, dB), z1),
+                            new Vector3(xB, Rise(side, r0, dB), z0),
+                            new Vector3(xA, Rise(side, r0, dA), z0),
+                            new Vector2(xA * 0.12f, -z1 * 0.12f),
+                            new Vector2(xB * 0.12f, -z1 * 0.12f),
+                            new Vector2(xB * 0.12f, -z0 * 0.12f),
+                            new Vector2(xA * 0.12f, -z0 * 0.12f));
+                    }
+                }
+            }
+        }
+
+        // ---- 道の構え ------------------------------------------------------
+
+        /// <summary>
+        /// 縁石・ガードレール・反射板・境の柵。区切り 1 つぶんを左右に張る。
+        ///
+        /// **支柱と反射板は札 1 枚で足りる。** 車は原点で +z を向いたまま動かないので、
+        /// 沿道の物の裏側は一度も画面に入らない。描画解像度 427 × 240 では支柱 1 本が
+        /// 数画素しか無く、箱にして 12 枚使う謂れが無い。
+        /// レールと柵の胴だけは環の継ぎ目で断面が覗くので箱にしてある
+        /// </summary>
+        static void Railing(MotorBanks c)
+        {
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                // 道を向く向き。左側の物は +x、右側の物は -x に法線を向ける
+                var look = side < 0f ? 1 : -1;
+                var inner = Lane(KerbFrom * side);
+                var outer = Lane(KerbTo * side);
+                // 縁石。天端と、道を向いた立ち上がり
+                c.Kerb.FaceY(KerbY, Mathf.Min(inner, outer), Mathf.Max(inner, outer), 0f, TileLength, 1);
+                c.Kerb.FaceX(inner, 0f, TileLength, -ShoulderDrop, KerbY, look);
+                // ガードレールの帯
+                c.Steel.Box(new Vector3(Lane(RailAt * side), RailY, TileLength * 0.5f),
+                    new Vector3(0.09f, 0.34f, TileLength));
+                // 境の柵の胴
+                c.Steel.Box(new Vector3(Lane(FenceAt * side), FenceY, TileLength * 0.5f),
+                    new Vector3(0.05f, 0.05f, TileLength));
+                // 支柱
+                for (var z = RailStep * 0.5f; z < TileLength - 0.001f; z += RailStep)
+                {
+                    c.Steel.FaceX(Lane((RailAt - 0.05f) * side), z - 0.09f, z + 0.09f, VergeY, RailY + 0.10f, look);
+                    c.Steel.FaceX(Lane((FenceAt - 0.03f) * side), z - 0.055f, z + 0.055f, VergeY, FenceY + 0.04f, look);
+                }
+                // 反射板。**道ではなく手前（-z）を向ける。**
+                // 道を向けた札は真横を過ぎる瞬間しか面にならず、遠くで列にならない。
+                // レールの内側の面のすぐ手前へ浮かせて、レールの箱に埋めない
+                var a = Lane((RailAt - 0.05f) * side);
+                var b = Lane((RailAt - 0.23f) * side);
+                for (var z = StudStep * 0.5f; z < TileLength - 0.001f; z += StudStep)
+                    c.Spark.FaceZ(z, Mathf.Min(a, b), Mathf.Max(a, b), RailY - 0.055f, RailY + 0.055f, -1);
+            }
+        }
+
+        /// <summary>
+        /// 道に沿って続く植え込み。区切り 1 つぶんを z に刻んで、道を向いた面と天を張る。
+        ///
+        /// **背は目線（1.55）より低く抑える。** 越えると、土手も遠景も送電塔も
+        /// これ一枚で塞がれて、沿道が黒い塀の続く道になる。
+        /// 外を向いた面は張らない。道の側からしか見ないので、要るのは内と天だけ
+        /// </summary>
+        static void Hedgerow(MotorBanks c, float ring0)
+        {
+            var dz = TileLength / HedgeSteps;
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                var xi = Lane(HedgeFrom * side);
+                var xo = Lane(HedgeTo * side);
+                var x0 = Mathf.Min(xi, xo);
+                var x1 = Mathf.Max(xi, xo);
+                var low = VergeY;
+                for (var k = 0; k < HedgeSteps; k++)
+                {
+                    var z0 = k * dz;
+                    var z1 = z0 + dz;
+                    var h0 = Bush(side, ring0 + z0);
+                    var h1 = Bush(side, ring0 + z1);
+                    // 道を向いた面。FaceX と同じ回し方で、高さだけ z ごとに振る
+                    if (side < 0f)
+                        c.Scrub.Patch(
+                            new Vector3(xi, low, z1), new Vector3(xi, low, z0),
+                            new Vector3(xi, h0, z0), new Vector3(xi, h1, z1),
+                            new Vector2(z1 * 0.3f, low * 0.3f), new Vector2(z0 * 0.3f, low * 0.3f),
+                            new Vector2(z0 * 0.3f, h0 * 0.3f), new Vector2(z1 * 0.3f, h1 * 0.3f));
+                    else
+                        c.Scrub.Patch(
+                            new Vector3(xi, low, z0), new Vector3(xi, low, z1),
+                            new Vector3(xi, h1, z1), new Vector3(xi, h0, z0),
+                            new Vector2(z0 * 0.3f, low * 0.3f), new Vector2(z1 * 0.3f, low * 0.3f),
+                            new Vector2(z1 * 0.3f, h1 * 0.3f), new Vector2(z0 * 0.3f, h0 * 0.3f));
+                    // 天
+                    c.Scrub.Patch(
+                        new Vector3(x0, h1, z1), new Vector3(x1, h1, z1),
+                        new Vector3(x1, h0, z0), new Vector3(x0, h0, z0),
+                        new Vector2(x0 * 0.3f, -z1 * 0.3f), new Vector2(x1 * 0.3f, -z1 * 0.3f),
+                        new Vector2(x1 * 0.3f, -z0 * 0.3f), new Vector2(x0 * 0.3f, -z0 * 0.3f));
+                }
+            }
+        }
+
+        /// <summary>
+        /// 植え込みの背。波長は 45 と 20 で、どちらも環一周を割り切る。
+        /// 天端は 0.20〜1.28 m（路肩の地面から）で、目線には届かない
+        /// </summary>
+        static float Bush(float side, float ring)
+        {
+            var p = ring * (2f * Mathf.PI / Span);
+            var o = side < 0f ? 0.4f : 2.2f;
+            return VergeY + 0.80f + 0.28f * Mathf.Sin(4f * p + o) + 0.20f * Mathf.Sin(9f * p + o * 2f);
+        }
+
+        // ---- 標識と門型 ----------------------------------------------------
+
+        /// <summary>
+        /// 道をまたぐ門型。脚を左右に立て、桁を渡し、車線ごとに看板を吊る。
+        ///
+        /// **桁と看板は必ず 2.10 m より上に置く。** CheckDrive.OnRoad は高さ 2.10 を
+        /// 越える頂点を見ないので、そこより上なら道を跨いでよい。
+        /// 脚の方は下まで通っているので、道の中心から 3.5 m より外に立てる
+        /// </summary>
+        static void Gantry(MotorBanks c, float z, int k)
+        {
+            var xL = Lane(-GantryAt);
+            var xR = Lane(GantryAt);
+            var top = GantryClear + 1.6f;
+            var mid = (xL + xR) * 0.5f;
+            var span = xR - xL + 0.34f;
+            // 脚
+            c.Steel.Box(new Vector3(xL, (top + VergeY) * 0.5f, z), new Vector3(0.34f, top - VergeY, 0.34f));
+            c.Steel.Box(new Vector3(xR, (top + VergeY) * 0.5f, z), new Vector3(0.34f, top - VergeY, 0.34f));
+            // 桁。上弦と下弦の二本に割ると、一本の梁より桁組みに見える
+            c.Steel.Box(new Vector3(mid, top - 0.24f, z), new Vector3(span, 0.48f, 0.42f));
+            c.Steel.Box(new Vector3(mid, GantryClear - 0.13f, z), new Vector3(span, 0.26f, 0.32f));
+            // 看板。車線ごとに 1 枚ずつ吊る
+            for (var p = 0; p < 2; p++)
+            {
+                var at = Lane(p == 0 ? -RoadHalf * 0.5f : RoadHalf * 0.5f);
+                Board(c, at, z - 0.24f, 3.1f, GantryClear - 0.32f, 1.72f, k * 2 + p);
+            }
+        }
+
+        /// <summary>
+        /// 路肩に立つ行き先の看板。左右を一つおきに振り分ける。
+        /// 揃えると、環を一周するあいだ片側にだけ看板が並ぶ
+        /// </summary>
+        static void Signpost(MotorBanks c, float z, int k)
+        {
+            var side = k % 2 == 0 ? -1f : 1f;
+            const float wide = 4.8f;
+            const float tall = 2.7f;
+            const float top = 4.7f;
+            var inner = Lane(BoardAt * side);
+            var outer = Lane((BoardAt + wide) * side);
+            // 柱。板の左右から 1 本ずつ下ろす
+            for (var p = 0; p < 2; p++)
+            {
+                var x = Lane((BoardAt + 0.9f + p * (wide - 1.8f)) * side);
+                c.Steel.Box(new Vector3(x, (top - tall + VergeY) * 0.5f, z + 0.14f),
+                    new Vector3(0.22f, top - tall - VergeY, 0.22f));
+            }
+            Board(c, (inner + outer) * 0.5f, z, wide, top, tall, k + 31);
+        }
+
+        /// <summary>小さな標識。速さの札や注意の札にあたる</summary>
+        static void Plate(MotorBanks c, float z, int k)
+        {
+            var side = k % 2 == 0 ? 1f : -1f;
+            var x = Lane(6.2f * side);
+            c.Steel.Box(new Vector3(x, (2.95f + VergeY) * 0.5f, z + 0.11f),
+                new Vector3(0.14f, 2.95f - VergeY, 0.14f));
+            c.Face.FaceZ(z, x - 0.55f, x + 0.55f, 1.85f, 2.95f, -1);
+            c.Mark.FaceZ(z - 0.012f, x - 0.40f, x + 0.40f, 2.24f, 2.50f, -1);
+        }
+
+        /// <summary>
+        /// 標識の板 1 枚。青い地を 1 枚張って、白い帯を何本か重ねて文字に見せる。
+        ///
+        /// **絵は貼らない。** 描画解像度 427 × 240 では文字が画素に届かず、
+        /// 読めない絵柄の繰り返しだけが残る。夜の高速で効いているのは、
+        /// 前照灯を受けて浮かぶ青い面と、そこに並ぶ白い帯の並びの方。
+        /// 裏は張らない。くぐったあとを振り返ることはない
+        /// </summary>
+        static void Board(MotorBanks c, float at, float z, float wide, float top, float tall, int seed)
+        {
+            var x0 = at - wide * 0.5f;
+            var x1 = at + wide * 0.5f;
+            var y0 = top - tall;
+            c.Face.FaceZ(z, x0, x1, y0, top, -1);
+            var rnd = new System.Random(seed * 7919 + 13);
+            // 白い縁。板の上端に一本通す
+            c.Mark.FaceZ(z - 0.012f, x0 + 0.10f, x1 - 0.10f, top - 0.17f, top - 0.09f, -1);
+            // 文字の帯。長さを振ると行に見える
+            var rows = 2 + rnd.Next(2);
+            var step = (tall - 0.48f) / rows;
+            for (var r = 0; r < rows; r++)
+            {
+                var y = y0 + 0.16f + r * step;
+                var run = (wide - 0.6f) * (0.34f + (float)rnd.NextDouble() * 0.52f);
+                c.Mark.FaceZ(z - 0.012f, x0 + 0.28f, x0 + 0.28f + run, y, y + step * 0.44f, -1);
+            }
+        }
+
+        // ---- 遠景 ----------------------------------------------------------
+
+        /// <summary>
+        /// 送電塔。倫敦を出たばかりの郊外なので、野を跨いで送電線が続いている。
+        ///
+        /// **腕は z の向きへ伸ばす。** 道の脇に立つものを道から見るので、
+        /// x へ伸ばした腕は奥行きの向きに潰れて、ただの柱にしか見えない。
+        /// 送電線そのものは張らない。4 cm の線は 60 m 先で画素に届かない
+        /// </summary>
+        static void Pylon(MotorBanks c, System.Random rnd, float ring, float z, int k)
+        {
+            var side = k % 2 == 0 ? -1f : 1f;
+            var from = 46f + (float)rnd.NextDouble() * 30f;
+            var foot = Rise(side, ring, from);
+            var high = 23f + (float)rnd.NextDouble() * 8f;
+            var x = Lane(from * side);
+            var waist = high * 0.52f;
+            var spread = high * 0.19f;
+            // 脚。四隅から腰へすぼめる
+            for (var q = 0; q < 4; q++)
+            {
+                var sx = (q & 1) == 0 ? -1f : 1f;
+                var sz = (q & 2) == 0 ? -1f : 1f;
+                Strut(c.Far,
+                    new Vector3(x + sx * spread, foot, z + sz * spread),
+                    new Vector3(x + sx * 0.85f, foot + waist, z + sz * 0.85f), 0.38f);
+            }
+            // 胴
+            c.Far.Box(new Vector3(x, foot + (waist + high) * 0.5f, z), new Vector3(1.7f, high - waist, 1.7f));
+            // 腕。上へ行くほど短く
+            for (var r = 0; r < 3; r++)
+            {
+                var y = foot + waist + (high - waist) * (0.20f + r * 0.32f);
+                c.Far.Box(new Vector3(x, y, z), new Vector3(0.9f, 0.5f, 11f - r * 2.6f));
+            }
+            // 頂
+            c.Far.Box(new Vector3(x, foot + high + 0.9f, z), new Vector3(0.55f, 1.8f, 0.55f));
+        }
+
+        /// <summary>
+        /// 工場と倉庫。夜勤の窓が点いていて、煙突の天辺に赤い灯りが灯る。
+        /// 道からは影絵にしか見えないので、形は長く低い塊と煙突だけでよい
+        /// </summary>
+        static void Works(MotorBanks c, System.Random rnd, float ring, float z, int k)
+        {
+            var side = k % 2 == 0 ? 1f : -1f;
+            var from = 44f + (float)rnd.NextDouble() * 32f;
+            var deep = 14f + (float)rnd.NextDouble() * 16f;
+            var run = 22f + (float)rnd.NextDouble() * 26f;
+            var high = 7f + (float)rnd.NextDouble() * 6f;
+            var foot = Rise(side, ring, from);
+            var xi = Lane(from * side);
+            var xo = Lane((from + deep) * side);
+            var x0 = Mathf.Min(xi, xo);
+            var x1 = Mathf.Max(xi, xo);
+            c.Far.Box(new Vector3((x0 + x1) * 0.5f, foot + high * 0.5f, z + run * 0.5f),
+                new Vector3(x1 - x0, high, run));
+            // 屋上の小屋。空との境を毛羽立たせる
+            c.Far.Box(new Vector3((x0 + x1) * 0.5f, foot + high + 1.1f, z + run * 0.3f),
+                new Vector3((x1 - x0) * 0.45f, 2.2f, run * 0.22f));
+            if (rnd.NextDouble() < 0.6)
+            {
+                // 煙突。天辺の赤い灯りは航空障害灯
+                var tall = high + 12f + (float)rnd.NextDouble() * 15f;
+                var cx = Lane((from + deep * 0.7f) * side);
+                var cz = z + run * 0.24f;
+                c.Far.Box(new Vector3(cx, foot + tall * 0.5f, cz), new Vector3(2.2f, tall, 2.2f));
+                c.Spark.FaceZ(cz - 1.2f, cx - 0.75f, cx + 0.75f, foot + tall - 1.4f, foot + tall - 0.5f, -1);
+            }
+            // 点いた窓。手前（-z）の面だけに並べる。向こう側は一度も画面に入らない
+            var rows = 1 + rnd.Next(2);
+            for (var r = 0; r < rows; r++)
+            {
+                var y = foot + high * (0.34f + r * 0.30f);
+                for (var p = 0; p < 4; p++)
+                {
+                    var b0 = x0 + 1.2f + p * (x1 - x0 - 2.4f) / 4f;
+                    if (rnd.NextDouble() < 0.35) continue;
+                    c.Mark.FaceZ(z - 0.06f, b0, b0 + (x1 - x0 - 2.4f) / 6f, y, y + high * 0.13f, -1);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 遠くの街の灯り。野の上に橙の点が帯になって散る。
+        ///
+        /// **地平を灯りだけで見せる。** 92〜144 m の野は霧が 6 割から 8 割を畳むので、
+        /// 建物を置いても形にならない。灯りは加算ではなく明るい面なので、
+        /// 霧に混ぜられてなお空より明るく残る
+        /// </summary>
+        static void Farside(MotorBanks c, int slice, float ring0)
+        {
+            var rnd = new System.Random(slice * 131 + 17);
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                for (var n = 0; n < 6; n++)
+                {
+                    var from = 92f + (float)rnd.NextDouble() * 52f;
+                    var z = (float)rnd.NextDouble() * TileLength;
+                    var x = Lane(from * side);
+                    var y = Rise(side, ring0 + z, from) + 0.5f + (float)rnd.NextDouble() * 3.6f;
+                    var wide = 0.9f + (float)rnd.NextDouble() * 1.9f;
+                    c.Spark.FaceZ(z, x - wide * 0.5f, x + wide * 0.5f, y, y + 0.55f, -1);
+                }
+            }
+        }
+
+        /// <summary>路肩の灌木の茂み。土手の縁を毛羽立たせて、法面が板に見えないようにする</summary>
+        static void Copse(MotorBanks c, System.Random rnd, float ring, float z, int k)
+        {
+            var side = k % 2 == 0 ? -1f : 1f;
+            var n = 2 + rnd.Next(3);
+            for (var i = 0; i < n; i++)
+            {
+                var from = 12f + (float)rnd.NextDouble() * 9f;
+                var at = z + i * 3.4f;
+                var foot = Rise(side, ring + i * 3.4f, from);
+                var high = 2.2f + (float)rnd.NextDouble() * 2.6f;
+                var wide = 1.8f + (float)rnd.NextDouble() * 2.2f;
+                c.Scrub.Box(new Vector3(Lane(from * side), foot + high * 0.5f, at),
+                    new Vector3(wide, high, wide * 1.2f));
+            }
+        }
+
+        // ---- 雨の夜の滲み --------------------------------------------------
+
+        /// <summary>
+        /// 街灯の暈と、路肩の水たまり。**雨の夜はどの灯りにも暈が付く。**
+        ///
+        /// 灯りの頭のところへ加算の札を十字に立てる。1 枚だと真横を過ぎる瞬間に
+        /// 面が消えて、暈が瞬いたように見える。
+        /// 札は高さ 4.85〜9.05 m にあるので、道の上へ広がっても
+        /// CheckDrive.OnRoad は見ない（2.10 より上の頂点は見ないため）。
+        ///
+        /// 水たまりは路肩の上。舗装の縁（RoadHalf 3.5）に掛からないところへ置く
+        /// </summary>
+        static void Halos(MotorBanks c, float z)
+        {
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                var at = new Vector3(Lane((LampAt - LampArm) * side), 6.95f, z);
+                Blot(c.Haze, at, new Vector3(HaloWide * 0.5f, 0f, 0f), new Vector3(0f, HaloHigh * 0.5f, 0f));
+                Blot(c.Haze, at, new Vector3(0f, 0f, HaloWide * 0.5f), new Vector3(0f, HaloHigh * 0.5f, 0f));
+                Blot(c.Haze,
+                    new Vector3(Lane(PuddleAt * side), -ShoulderDrop + 0.010f, z + 2.6f),
+                    new Vector3(PuddleWide * 0.5f, 0f, 0f), new Vector3(0f, 0f, PuddleDeep * 0.5f));
+            }
+        }
+
+        /// <summary>
+        /// 滲みの札 1 枚。uv を 0〜1 で直に振るので、絵は札ごとにちょうど 1 枚ぶん出る。
+        /// <see cref="Card"/> と <see cref="GlowMat"/> の組は寝かせた板しか作れず、
+        /// 空気の中に立てる札はこちらで作る。
+        /// 表裏は見ない。HalfAware/RoadGlow は Cull Off で両面とも塗る
+        /// </summary>
+        static void Blot(Bank b, Vector3 at, Vector3 across, Vector3 up)
+        {
+            b.Patch(at - across - up, at + across - up, at + across + up, at - across + up,
+                new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(0f, 1f));
+        }
+
+        /// <summary>
+        /// 雨に滲む灯りのマテリアル。加算なので、暗いところには何も足さない。
+        /// <see cref="GlowMat"/> と違って絵を 0〜1 へ畳み直さないのは、
+        /// 札の側が uv をすでに 0〜1 で持っているため
+        /// </summary>
+        static Material HaloMat()
+        {
+            var shader = Shader.Find("HalfAware/RoadGlow");
+            if (shader == null) Debug.LogWarning("HalfAware/RoadGlow が見つからない。灯りの暈が出ない");
+            var path = Materials + "MotorHalo.mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                m = new Material(shader);
+                m.name = "MotorHalo";
+                AssetDatabase.CreateAsset(m, path);
+            }
+            // 組み直すたびに結び直す。手で触った値は残らない
+            m.shader = shader;
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/DrivePool.png");
+            if (tex == null) Debug.LogWarning("灯りの絵が無い: Assets/Textures/DrivePool.png");
+            m.SetTexture("_BaseMap", tex);
+            m.SetColor("_BaseColor",
+                new Color(LampHue.r * HaloGain, LampHue.g * HaloGain, LampHue.b * HaloGain, 1f));
+            m.SetTextureScale("_BaseMap", Vector2.one);
+            m.SetTextureOffset("_BaseMap", Vector2.zero);
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// <summary>2 点を結ぶ細い柱。送電塔の脚のように傾いだものを置く</summary>
+        static void Strut(Bank b, Vector3 from, Vector3 to, float thick)
+        {
+            var dir = to - from;
+            var len = dir.magnitude;
+            if (len < 0.01f) return;
+            b.Box((from + to) * 0.5f, new Vector3(thick, len, thick),
+                Quaternion.FromToRotation(Vector3.up, dir / len));
         }
 
         /// <summary>帯 2。深夜の幹線。木立だけ</summary>
