@@ -1979,7 +1979,7 @@ git commit -m "feat: park the car in the garage and give me things to look at"
 **`Center` 層のフォントが違う。** 暗転に出る「続く」が Noto Sans になっている。`Alley.unity` も `Room.unity` も `Center` だけ `Assets/Fonts/ShipporiMincho-Regular SDF.asset` を使い、ほかの層は Noto Sans。台詞はゴシック、暗転中の字は明朝、という取り決めのとおりに直す。
 `FontPath` の隣に明朝の定数を足し、`Center` にだけ渡す。
 
-**`Stage()` の取り残し。** `Rig()` が必ず `Player/Main Camera` を作るようになったので、`Loose("Main Camera")` と `if (rig == null)` の分岐はもう通らない。落として、カメラはリグのもので描画の設定だけここで見る、と書き直す。
+**`Stage()` の取り残し。** `Rig()` が必ず `Player/Main Camera` を作るようになったので、`Loose("Main Camera")` と `if (rig == null)` の分岐はもう通らない。落として、カメラはリグのもので、見え方の設定だけここで見る、と書き直す。
 
 - [ ] **Step 2: 視線移動を繋ぐ**
 
@@ -2019,7 +2019,7 @@ return report;
 
 **あわせて直す小物**: 帯 3 の野の門が石垣と同軸（x -3.45）で、笠石より上の 0.34 m しか出ていない。周期的な動きとしては効いているが、門というより壁の上の金具に見える。`Lane(-6.0)` あたりへ出して牧草地に立たせる。
 
-**`DriveWorld` に `[DefaultExecutionOrder(-20)]` を付ける。** 既定の 0 のままだと `PlayerController`（-10）がそのフレームの `EyeOffset` を読んだ後に書くことになり、揺れが 1 フレーム遅れる。`EyeSway` と同じ -20 にすれば `DriveDirector`（-5）より先に走るので、帯を跨ぐフレームでは古い走行距離で進んだ後に `DriveDirector` が巻き戻して置き直す。描画はその後なので食い違わない。
+**`DriveWorld` に `[DefaultExecutionOrder(-20)]` を付ける。** 既定の 0 のままだと `PlayerController`（-10）がそのフレームの `EyeOffset` を読んだ後に書くことになり、揺れが 1 フレーム遅れる。`EyeSway` と同じ -20 にすれば `DriveDirector`（-5）より先に走るので、帯を跨ぐフレームでは古い走行距離で進んだ後に `DriveDirector` が巻き戻して置き直す。絵が出るのはその後なので食い違わない。
 
 - [ ] **Step 4: 前腕を出す**
 
