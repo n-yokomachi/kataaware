@@ -99,9 +99,12 @@ namespace HalfAware
         [SerializeField] float idleRough = 0.55f;
         [Tooltip("座ってから左右に振れる角度。度。片側の値。90 で前方 180 度")]
         [SerializeField] float seatedYawLimit = 90f;
+        // **秒数はここの既定が正。** 組み立て（BuildDrive.Wire）は DriveDirector を
+        // 作り直すので、シーンで触った値は次の組み直しで既定へ戻る。変えるならここを変える
+
         [Tooltip("黒のまま置く秒数。**黒へ落ちるのはイグニッションを鳴らし終えるこの秒数前。** " +
             "黒が明けるのと鍵の音が鳴り終わるのが同じ瞬間になり、そこから走行音が始まる")]
-        [SerializeField] float pullHold = 2f;
+        [SerializeField] float pullHold = 4.6f;
         [Tooltip("黒から一つ目の景色へ浮かび上がる秒数。**0 なら一瞬で切り替わる。** " +
             "景色どうしの切り替えがフェード無しなので、場面の頭もそれに揃えてある")]
         [SerializeField] float pullFade = 0f;
