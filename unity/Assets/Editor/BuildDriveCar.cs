@@ -87,6 +87,9 @@ namespace HalfAware.EditorTools
             // 足すのは客室の後ろ（CabBack）から後ろと、床と、座面だけで、
             // 運転席まわりの寸法には一指も触れない
             Hold(trim, seat, steel, gap, body, lens);
+            // 調べられる物。判定点のところに、それと分かる形を置く。
+            // 入れ物を分けて足すので、ここより上の寸法には一指も触れない
+            Fittings(parent, trim, steel, gap, lens, tail);
 
             trim.Emit(parent, "CarTrim", Mat("CarTrim"), false, Generated);
             seat.Emit(parent, "CarSeat", Mat("CarSeat"), false, Generated);
@@ -678,6 +681,506 @@ namespace HalfAware.EditorTools
             // 前端。運転席からは見えないが、ガレージで外から見たときに前が抜けていると板が浮く。
             // 幅もフェンダーと揃えて外板まで広げる
             body.Box(new Vector3(0f, 1.085f, 2.450f), new Vector3(BodyHalf * 2f, 0.27f, 0.06f));
+        }
+
+        // ---- 調べられる物 ----------------------------------------------------
+
+        /// <summary>
+        /// 調べる対象そのものの形。<see cref="BuildDrive.Items"/> が立てているのは
+        /// 判定点と印だけで、そこに肝心の物が無かった。画面から何を調べているのかが
+        /// 読めるよう、判定点の位置に物を置く。
+        ///
+        /// **判定点は動かさない。** どれも文面と帯の並びに結び付いていて、高さも
+        /// 「判定点は物の少し手前に置く」取り決めで決まっている。合わせるのは物の側。
+        ///
+        /// **印を食わないこと。** 印は判定点の 0.17 m 上に立つ。物をそこへ被せると
+        /// 印が埋まる（見直し 4）。物はどれも印の下か、印から横へ外したところに収めてある。
+        ///
+        /// **灯りは足さない。** 帯 0〜2 の車内にあるのは計器の裏の一つだけで、
+        /// 形は明暗の段で見せる。暗い内装（0.125）の上に紙（0.33）・塗った鉄（0.216）・
+        /// 端子（0.42）を段違いに置けば、灯りを増やさずに輪郭が残る。燃料計の針と目盛りだけは
+        /// メーターの絵（<see cref="DialMat"/>）と同じ Unlit で、夜も自分で光る。
+        ///
+        /// **細かい造作は画素に届かない。** 描画は 427 × 240、画角は縦 70 度なので
+        /// 1 ラジアンが 171 画素にしかならない。目から 0.9 m の助手席では 1 mm が 0.19 画素で、
+        /// 5 mm を切る造作は明暗が混ざって消える。ここの寸法はどれもその物差しで決めてある
+        /// </summary>
+        static void Fittings(Transform parent, Bank trim, Bank steel, Bank gap, Bank lens, Bank tail)
+        {
+            // 基板と端子と紙と布。どれも車体の素材の表（Tone）に無いので、ここで色を結ぶ
+            var board = new Bank { Texel = 2.6f };
+            var gold = new Bank { Texel = 2.0f };
+            var paper = new Bank { Texel = 1.6f };
+            var cloth = new Bank { Texel = 1.8f };
+            // 鍍金。窓の回し把手とポケットの口の縁
+            var plate = new Bank { Texel = 2.4f };
+            // 燃料計の目盛りと針。Unlit なので入れ物を分ける
+            var scale = new Bank { Texel = 1f };
+            var pointer = new Bank { Texel = 1f };
+
+            ChipBundle(board, gold, steel);
+            LogCopy(paper, gap);
+            CoatOnSeat(cloth, gap, plate, paper);
+            RearMirror(trim, steel, gap, lens);
+            PhotoStand(trim, steel, paper, gap);
+            RadioSet(steel, gap, paper, tail);
+            FuelDial(trim, gap, scale, pointer);
+            WindowCrank(plate, steel, gap);
+
+            // 基板。暗い緑。内装（0.125）より暗く落として、助手席の座面（0.140）から切る
+            board.Emit(parent, "CarBoard", ItemMat("CarBoard", new Color(0.088f, 0.108f, 0.086f), 0.34f),
+                false, Generated);
+            // 端子。**車内でいちばん明るい面。**
+            //
+            // 助手席まで届く灯りが一つも無いので、実際に撮って測ると、
+            // 内装（0.125）がそこでは 255 段階の 7 にしかならない。0.42 で置いた端子は 24 で、
+            // 段は付くが「暗いところに暗い物がある」ところから出られなかった。
+            // 塗った鉄（0.216）の 3.6 倍まで上げると 44 になり、夜の助手席で最初に目へ入る
+            gold.Emit(parent, "CarGold", ItemMat("CarGold", new Color(0.780f, 0.600f, 0.250f), 0.55f),
+                false, Generated);
+            // 紙。褪せた写真とラジオの目盛りと煙草の箱も同じ素材で貼る。
+            // 端子と同じ事情で 0.335 から上げた。実際の紙の反射率（0.7 前後）の内なので、
+            // 朝の帯（実測 107 × 反射率）でも 66 までしか行かず、白く飛ばない
+            paper.Emit(parent, "CarPaper", ItemMat("CarPaper", new Color(0.620f, 0.596f, 0.530f), 0.05f),
+                false, Generated);
+            // 上着。主人公の革の上着だが、袖（Sleeve 0.055）のままでは暗すぎて、
+            // 撮ってみると畳みもポケットも一切見えない黒い塊になった。
+            // 座面（0.140）より暗いところは変えずに、畳みが読める 0.078 まで持ち上げてある
+            cloth.Emit(parent, "CarCloth", ItemMat("CarCloth", new Color(0.078f, 0.072f, 0.076f), 0.16f),
+                false, Generated);
+            // 鍍金。**塗った鉄（0.216）では足りない所にだけ使う。**
+            // 運転席のドアには計器の裏の灯りが 0.62 m 先から斜めに届くだけで、
+            // 実際に撮って測ると内張りが 0、塗った鉄の把手が 14 にしかならない。
+            // 段は付いているが、夜の画面で 14 は「そこに何かある」までしか言えない。
+            // この年式の車の回し把手は鍍金なので、0.46 で置き直すと 29 になる
+            plate.Emit(parent, "CarChrome", ItemMat("CarChrome", new Color(0.455f, 0.460f, 0.470f), 0.62f),
+                false, Generated);
+            scale.Emit(parent, "CarGaugeMark", ItemLamp("CarGaugeMark", new Color(0.520f, 0.470f, 0.338f)),
+                false, Generated);
+            pointer.Emit(parent, "CarGaugeNeedle", ItemLamp("CarGaugeNeedle", new Color(0.593f, 0.215f, 0.024f)),
+                false, Generated);
+        }
+
+        /// <summary>
+        /// 調べる対象だけが使う素材。<see cref="Mat"/> を通さないのは、
+        /// あちらが色の表（<see cref="Tone"/>）と絵の名前を BuildDrive 本体に持っているため。
+        /// 絵は持たず、色と艶だけを結ぶ
+        /// </summary>
+        static Material ItemMat(string name, Color col, float smooth)
+        {
+            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            var path = Materials + name + ".mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                m = new Material(shader);
+                m.name = name;
+                AssetDatabase.CreateAsset(m, path);
+            }
+            m.shader = shader;
+            m.SetTexture("_BaseMap", null);
+            m.SetColor("_BaseColor", col);
+            if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", smooth);
+            if (m.HasProperty("_Metallic")) m.SetFloat("_Metallic", 0f);
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// <summary>
+        /// 燃料計の目盛りと針の素材。メーターの絵（<see cref="DialMat"/>）と同じく Unlit で貼る。
+        ///
+        /// **灯りを増やさずに「夜に自分で光るもの」を置けるのはこの手だけ。** 色がそのまま
+        /// 画面に出るので、絵の中の目盛り（sRGB 238,228,198）と針（252,160,56）に
+        /// <see cref="DialGain"/> を掛けた値を線形で置いてある。立体の燃料計だけ明るさが
+        /// 揃わないと、計器盤の中でそこだけ浮く
+        /// </summary>
+        static Material ItemLamp(string name, Color col)
+        {
+            var shader = Shader.Find("Universal Render Pipeline/Unlit");
+            var path = Materials + name + ".mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                m = new Material(shader);
+                m.name = name;
+                AssetDatabase.CreateAsset(m, path);
+            }
+            m.shader = shader;
+            m.SetTexture("_BaseMap", null);
+            m.SetColor("_BaseColor", col);
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// <summary>
+        /// 助手席のメモリーチップの束。判定点 (-0.42, 1.15, -0.02)。
+        ///
+        /// 文面は「売れ残りのメモリーチップの束が転がっている」なので、揃えて置かず、
+        /// 座面の上へ斜めに投げ出す。座面の天板は 1.05 で、束はそこへ沈めてある。
+        ///
+        /// 束は板 3 枚。**4 枚 × 厚み 7 mm で組んだときは層が混ざって一つの塊に戻った。**
+        /// 目から 0.93 m だと 1 mm が 0.19 画素で、7 mm の板は 1.3 画素にしかならない。
+        /// 10 mm へ厚くして枚数を減らすと、1 枚が 2 画素になって層として残る。
+        /// **それでも読ませているのは層ではなく、暗い板を横切る明るい帯と端子の列の方。**
+        /// 帯（塗った鉄）は幅 20 mm で 3.7 画素、端子は 18 mm ごとで 3.4 画素ある
+        /// </summary>
+        static void ChipBundle(Bank board, Bank gold, Bank steel)
+        {
+            var at = new Vector3(-0.42f, 1.080f, -0.02f);
+            var toss = Quaternion.Euler(0f, 18f, -8f);
+            for (var i = 0; i < 3; i++)
+                board.Box(at + toss * new Vector3(0f, (i - 1) * 0.0170f, 0f),
+                    new Vector3(0.112f, 0.0100f, 0.068f), toss);
+            // 金の端子。いちばん上の板の手前の縁に並べる。**この列が無いと板の束にしか見えない**
+            for (var k = 0; k < 4; k++)
+                gold.Box(at + toss * new Vector3(-0.045f + k * 0.030f, 0.0230f, -0.0245f),
+                    new Vector3(0.018f, 0.0030f, 0.017f), toss);
+            // 束を留めた帯。暗い板の上を明るい帯が一本横切る。
+            // 真ん中ではなく奥へ 12 mm 寄せる。揃えて留めたのではなく、留めたまま転がっている
+            steel.Box(at + toss * new Vector3(0f, 0.0225f, 0.012f), new Vector3(0.115f, 0.0035f, 0.020f), toss);
+            steel.Box(at + toss * new Vector3(0f, -0.0225f, 0.012f), new Vector3(0.115f, 0.0035f, 0.020f), toss);
+            for (var i = 0; i < 2; i++)
+                steel.Box(at + toss * new Vector3(i == 0 ? -0.0580f : 0.0580f, 0f, 0.012f),
+                    new Vector3(0.0035f, 0.048f, 0.020f), toss);
+        }
+
+        /// <summary>
+        /// アクセスログの写し。判定点 (-0.42, 1.17, 0.14)。チップの束の 0.16 奥、同じ座面の上。
+        ///
+        /// **折り目で紙に見せる。** 平らな板を一枚置いても座面の染みと区別が付かない。
+        /// 半分を 17 度起こすと、上を向いた面と起きた面に明暗の段が付いて、そこで紙になる。
+        ///
+        /// 字は一行ずつ引かない。目から 0.89 m では 1 行（3 mm）が 0.6 画素にしかならず、
+        /// 引いても紙が灰色に濁るだけで終わる。太さ 8 mm・間 10 mm の細い帯を並べて、
+        /// 一本を「町の名」として短く太くしてある
+        /// </summary>
+        static void LogCopy(Bank paper, Bank gap)
+        {
+            var at = new Vector3(-0.42f, 1.0525f, 0.14f);
+            var lay = Quaternion.Euler(0f, -14f, 0f);
+            var tilt = lay * Quaternion.Euler(17f, 0f, 0f);
+            var top = at + lay * new Vector3(0f, 0.0082f, -0.0268f);
+            // 下に重なったもう一枚。縁がずれて覗くだけで、束ねた写しに見える
+            paper.Box(at + lay * new Vector3(0.010f, -0.0020f, 0.004f),
+                new Vector3(0.146f, 0.0020f, 0.108f), lay * Quaternion.Euler(0f, 5f, 0f));
+            // 手前の半分は座面に伏せたまま、奥の半分を折り目から起こす
+            paper.Box(at + lay * new Vector3(0f, 0f, 0.028f), new Vector3(0.150f, 0.0025f, 0.056f), lay);
+            paper.Box(top, new Vector3(0.150f, 0.0025f, 0.056f), tilt);
+            // 伏せた側の文字。細い帯を三本
+            for (var k = 0; k < 3; k++)
+                gap.Box(at + lay * new Vector3(-0.004f, 0.0024f, 0.012f + k * 0.018f),
+                    new Vector3(0.108f, 0.0010f, 0.008f), lay);
+            // 起こした側。いちばん上だけ短く太い。ここが「エディンバラから少し離れた田舎町の名」
+            gap.Box(top + tilt * new Vector3(-0.030f, 0.0024f, -0.019f),
+                new Vector3(0.062f, 0.0010f, 0.012f), tilt);
+            for (var k = 0; k < 2; k++)
+                gap.Box(top + tilt * new Vector3(-0.004f, 0.0024f, 0.002f + k * 0.018f),
+                    new Vector3(0.108f, 0.0010f, 0.008f), tilt);
+        }
+
+        /// <summary>
+        /// 座席に置いた上着とそのポケット。判定点 (-0.10, 1.07, -0.30)。
+        ///
+        /// **判定点の真上には物を置けない。** 運転席の目から判定点へ線を引くと、
+        /// 腕組みした左の二の腕（<see cref="Folded"/>）に当たる。実際に撮っても、
+        /// 画面の真ん中は袖の黒い塊で埋まっていた。線が通るのを一点ずつ測ると、
+        /// 抜けるのは x -0.35 から -0.21、z -0.17 から 0.05 の範囲で、
+        /// そこは助手席の座面の右半分にあたる。上着の身頃とポケットはそこへ置き、
+        /// 袖だけを判定点の方へ垂らして、上着が判定点まで届いていることにしてある。
+        ///
+        /// **チップと写しを食わない。** どちらも同じ座面の x -0.50 から -0.36 に置いてあるので、
+        /// 上着は x -0.35 より右だけを使う。**背もたれにも入らない。** 背もたれの前の面は
+        /// z -0.175 で、身頃はそれより手前に収める。
+        ///
+        /// 布は座面（0.140）より暗いので、明るい座面の上に暗い塊として抜ける。
+        /// ポケットの口は、暗いままだと布に沈んで消えるので、口の縁に塗った鉄の線を
+        /// 一本入れて段を作る。**煙草の箱は文面のもの**で、紙の面（0.62）が
+        /// 8 画素ぶん覗くと、そこがポケットだと一目で読める
+        /// </summary>
+        static void CoatOnSeat(Bank cloth, Bank gap, Bank plate, Bank paper)
+        {
+            // 身頃。座面の右半分に丸めて置く。左の縁はチップの束（x -0.355 まで）に触れさせない
+            cloth.Box(new Vector3(-0.225f, 1.088f, -0.055f), new Vector3(0.195f, 0.086f, 0.200f),
+                Quaternion.Euler(0f, -12f, 4f));
+            // 畳まれて盛り上がった襟のあたり。写し（x -0.342 まで）の右
+            cloth.Box(new Vector3(-0.232f, 1.116f, 0.085f), new Vector3(0.140f, 0.060f, 0.135f),
+                Quaternion.Euler(0f, 14f, -6f));
+            // 袖。座面の右の縁から判定点の方へ垂らす。下端は変速機の覆いの天板（0.935）に着く
+            cloth.Box(new Vector3(-0.115f, 1.020f, -0.215f), new Vector3(0.090f, 0.155f, 0.095f),
+                Quaternion.Euler(22f, 0f, 26f));
+            cloth.Box(new Vector3(-0.085f, 0.965f, -0.285f), new Vector3(0.085f, 0.075f, 0.105f),
+                Quaternion.Euler(12f, -8f, 14f));
+
+            // ポケット。身頃の上を向いた面に付ける。ここだけは線の通るところに置く
+            var lean = Quaternion.Euler(-16f, -12f, 4f);
+            var pocket = new Vector3(-0.243f, 1.100f, -0.130f);
+            cloth.Box(pocket, new Vector3(0.150f, 0.055f, 0.120f), lean);
+            // 口。暗い窪みを一本
+            gap.Box(pocket + lean * new Vector3(0f, 0.031f, 0.006f),
+                new Vector3(0.108f, 0.008f, 0.028f), lean);
+            // 口の縁。ここだけ明るくして、布のどこがポケットなのかを出す
+            plate.Box(pocket + lean * new Vector3(0f, 0.035f, 0.022f),
+                new Vector3(0.104f, 0.006f, 0.008f), lean);
+            // 蓋。口の向こうへ寝かせる
+            cloth.Box(pocket + lean * new Vector3(0f, 0.031f, -0.026f),
+                new Vector3(0.116f, 0.012f, 0.044f), lean);
+            // 煙草の箱。口から覗かせる
+            paper.Box(pocket + lean * new Vector3(-0.024f, 0.042f, 0.002f),
+                new Vector3(0.046f, 0.026f, 0.030f), lean * Quaternion.Euler(-18f, 0f, 0f));
+        }
+
+        /// <summary>
+        /// ルームミラー。判定点 (0, 1.66, 0.66)。
+        ///
+        /// 既にあるのは淡いガラスの板 1 枚（y 1.79〜1.87 / z 0.73〜0.75）だけで、
+        /// 透けるので向こうの天井が見えていた。板は作り直さず、それを丸ごと包む筐で覆う。
+        ///
+        /// **鏡面は反射させない。** 映り込みを返す面をここに置くと、WebGL で映すものを
+        /// 増やすことになるうえ、夜は映す物が無いので黒い穴が開く。暗い面（0.020）に
+        /// 淡い筋（0.43）を二本入れて、「暗い鏡に何かが映っている」ところまでで止める。
+        ///
+        /// 面を 16 度下へ向けてある。文面の「角度が悪くて、自分の顔は映らない」がそれで、
+        /// 目（1.55）より高い 1.82 にある鏡が下を向いていれば、映るのは座面だけになる。
+        ///
+        /// **印（0, 1.83, 0.66）を食わない。** 筐の手前の端は z 0.706 で、印の 0.046 奥にある。
+        /// 高さは <see cref="CheckDrive"/> の SightLid（1.70）より上なので、道は削らない
+        /// </summary>
+        static void RearMirror(Bank trim, Bank steel, Bank gap, Bank lens)
+        {
+            var lean = Quaternion.Euler(-16f, 0f, 0f);
+            var at = new Vector3(0f, 1.828f, 0.745f);
+            // 筐。既にあるガラスの板をそのまま呑み込む大きさにする
+            trim.Box(at, new Vector3(0.320f, 0.105f, 0.045f), lean);
+            // 鏡面。筐より一回り小さく、縁が枠として残る
+            var face = at + lean * new Vector3(0f, 0f, -0.0255f);
+            gap.Box(face, new Vector3(0.286f, 0.082f, 0.008f), lean);
+            // 映っているもの。細い筋を二本。長さを変えて並べると、模様ではなく映り込みに見える
+            lens.Box(face + lean * new Vector3(-0.022f, 0.014f, -0.005f),
+                new Vector3(0.170f, 0.009f, 0.004f), lean * Quaternion.Euler(0f, 0f, -3f));
+            lens.Box(face + lean * new Vector3(0.062f, -0.019f, -0.005f),
+                new Vector3(0.062f, 0.006f, 0.004f), lean * Quaternion.Euler(0f, 0f, -3f));
+            // 天井からの腕。風防の上端（y 1.900 / z 0.850）へ向けて後ろ上がりに渡す
+            Limb(steel, new Vector3(0f, 1.866f, 0.774f), new Vector3(0f, 1.884f, 0.846f), 0.022f);
+            // 風防に留めた座
+            trim.Box(new Vector3(0f, 1.886f, 0.856f), new Vector3(0.052f, 0.030f, 0.042f),
+                Quaternion.Euler(-10f, 0f, 0f));
+        }
+
+        /// <summary>
+        /// メーターの脇の古い写真立て。判定点 (0.16, 1.23, 0.62)。
+        ///
+        /// **計器盤の天板には置けない。** 判定点そのものはメーターの塊
+        /// （x 0.10〜0.66 / y 1.247〜1.391）の中で、その前の天板は運転席の目から見ると
+        /// 塊と庇に丸ごと隠れる。**庇が効く。** 庇の奥の下の縁（y 1.4304 / z 0.4439）を
+        /// 掠める線が天板と交わるのが z 0.725 で、塊の前の面（z 0.71）とのあいだに
+        /// 15 mm しか残らない。天板に何を立てても運転席からは見えない。
+        ///
+        /// 見えるのは塊より下と手前で、そこにあるのが中央の操作盤の天板（y 1.26）になる。
+        /// 塊の左の下の角と操作盤の天板のあいだへ、文面どおり「挟んで」立てる。
+        /// 判定点からは 0.16 m、印を向いたときの画面では中心から 17 度のところに来る。
+        ///
+        /// 面はメーターの板と同じ 14 度で起こし、左へ 28 度ひねって運転席へ向ける。
+        /// **揃えると計器盤の部品に見える。** 斜めなのが、後から挟んだものの印になる。
+        /// ひねりが 9 度だったときは、面が計器の裏の灯り（x 0.38）に対してほとんど
+        /// 横を向いていて、夜の帯で写真が黒い窪みにしか見えなかった。28 度まで回すと
+        /// 灯りとの向きの積が 0.16 から 0.46 になり、暗い車内で写真だけが浮く。
+        ///
+        /// 右の端（x 0.1415）は絵の中の速度計の左の縁（x 0.1606）の手前で止める。
+        /// 中身は人の形が二つ。目から 0.48 m なので、顔が 12 mm で 4 画素、
+        /// 肩幅 22 mm で 8 画素になる。**顔を描き込む余地は無い。** 淡い紙の上に
+        /// 暗い塊を四つ置いて、人が二人写っているというところまでで止める
+        /// </summary>
+        static void PhotoStand(Bank trim, Bank steel, Bank paper, Bank gap)
+        {
+            var lean = Quaternion.Euler(14f, -28f, 3f);
+            var at = new Vector3(0.096f, 1.312f, 0.500f);
+            var front = lean * Vector3.back;
+            var right = lean * Vector3.right;
+            var up = lean * Vector3.up;
+            // 台紙。下端が中央の操作盤の天板（1.26）に着く
+            trim.Box(at, new Vector3(0.088f, 0.100f, 0.013f), lean);
+            // 褪せた写真の面
+            var print = at + front * 0.0085f;
+            paper.Box(print, new Vector3(0.068f, 0.074f, 0.004f), lean);
+            // 中の人影。滲んだ塊として置く。左が大きく、右が半歩下がる
+            var skin = print + front * 0.003f;
+            gap.Box(skin - right * 0.013f - up * 0.012f, new Vector3(0.022f, 0.034f, 0.003f), lean);
+            gap.Box(skin - right * 0.013f + up * 0.013f, new Vector3(0.012f, 0.012f, 0.003f), lean);
+            gap.Box(skin + right * 0.014f - up * 0.015f, new Vector3(0.019f, 0.028f, 0.003f), lean);
+            gap.Box(skin + right * 0.014f + up * 0.008f, new Vector3(0.011f, 0.011f, 0.003f), lean);
+            // 枠。塗った鉄で四辺を回す。**暗い車内で写真立てだと読めるのはこの四本の線による**
+            for (var i = 0; i < 2; i++)
+            {
+                var d = i == 0 ? -1f : 1f;
+                steel.Box(print + up * (d * 0.042f), new Vector3(0.088f, 0.011f, 0.007f), lean);
+                steel.Box(print + right * (d * 0.039f), new Vector3(0.010f, 0.095f, 0.007f), lean);
+            }
+        }
+
+        /// <summary>
+        /// ラジオ。判定点 (-0.02, 1.19, 0.70)。
+        ///
+        /// 中央の操作盤（<see cref="Dash"/>）に、暗い面と摘み二つと押しボタンの列は既にある。
+        /// 足りないのは目盛りで、それが無いあいだは無地の窪みにしか見えなかった。
+        ///
+        /// 目から 0.72 m なので、目盛りの帯は 206 mm で 49 画素、刻みは 30 mm ごとに 10 画素、
+        /// 針は 5 mm で 1.7 画素になる。**刻みをこれ以上細かくすると帯が一色に潰れる。**
+        /// 針だけ尾灯と同じ赤にしてあるのは、暗い車内で淡い帯の上の一点を切るため
+        /// </summary>
+        static void RadioSet(Bank steel, Bank gap, Bank paper, Bank tail)
+        {
+            const float x = -0.01f;
+            const float y = 1.196f;
+            // 枠。既にある暗い面（0.250 × 0.075）を囲う
+            for (var i = 0; i < 2; i++)
+            {
+                var d = i == 0 ? -1f : 1f;
+                steel.Box(new Vector3(x, y + d * 0.0425f, DashFace - 0.0515f),
+                    new Vector3(0.266f, 0.010f, 0.014f));
+                steel.Box(new Vector3(x + d * 0.130f, y, DashFace - 0.0515f),
+                    new Vector3(0.010f, 0.095f, 0.014f));
+            }
+            // 目盛りの帯。紙の面（0.62）を面の上半分へ。
+            // 運転席から見ると操作盤の面は 66 度の浅い角度で、帯が縦に潰れて見える。
+            // そのぶん明るさで持たせる
+            paper.Box(new Vector3(x, y + 0.016f, DashFace - 0.0545f), new Vector3(0.206f, 0.024f, 0.008f));
+            // 刻み。端から端まで七つ。真ん中だけ長くして、帯に中心を与える
+            for (var k = 0; k < 7; k++)
+                gap.Box(new Vector3(x + (k - 3) * 0.030f, y + 0.016f, DashFace - 0.0585f),
+                    new Vector3(0.0035f, k == 3 ? 0.020f : 0.013f, 0.004f));
+            // 針。「雑音しか拾わない」ので、局と局のあいだに止めてある
+            tail.Box(new Vector3(x + 0.052f, y + 0.016f, DashFace - 0.0605f),
+                new Vector3(0.0050f, 0.028f, 0.005f));
+            // 目盛りの下の格子。摘みと押しボタンのあいだの空きを埋める
+            for (var k = 0; k < 5; k++)
+                gap.Box(new Vector3(x + (k - 2) * 0.014f, y - 0.026f, DashFace - 0.0505f),
+                    new Vector3(0.006f, 0.026f, 0.004f));
+        }
+
+        /// <summary>
+        /// 燃料計。判定点 (0.46, 1.25, 0.58)。
+        ///
+        /// メーターの面は絵 1 枚（DriveCarDials.png 512 × 128）で、速度計・回転計と
+        /// 小さい計器が二つ描いてある。そのうち右の小さい方（絵の px 366）を燃料計として
+        /// 立体で作り直す。絵の上に地の面を被せてから、枠・目盛り・字・針を置き直す。
+        ///
+        /// **ここだけ立体にすると、計器盤の中で燃料計だけ段が付く。** ほかの計器は絵なので
+        /// 平らなまま、これだけ枠が 10 mm 手前へ出て影を落とす。調べる対象がどれなのかが
+        /// それで読める。
+        ///
+        /// 数字ではなく E と F の字を置くのが燃料計の印で、速度計・回転計と読み違えない。
+        /// 目から 0.48 m なので字は 16 mm で 5.8 画素にしかならないが、読ませているのは
+        /// 字そのものではなく「端に数字ではないものがある」ことの方。
+        /// 針は文面どおり「半分を切っている」ところ（0.44）へ倒してある。
+        ///
+        /// **印（0.46, 1.42, 0.58）を食わない。** 枠の上端は 1.393 で、印の 27 mm 下に収まる
+        /// </summary>
+        static void FuelDial(Bank trim, Bank gap, Bank scale, Bank pointer)
+        {
+            var lean = Quaternion.Euler(14f, 0f, 0f);
+            var pod = new Vector3(WheelAt.x, 1.320f, 0.615f);
+            var right = lean * Vector3.right;
+            var up = lean * Vector3.up;
+            var outward = lean * Vector3.back;
+            // 絵の中の計器の中心。左端（x 0.14）から px 366 ÷ 512 だけ右
+            var at = pod + lean * new Vector3(0f, 0f, -0.0825f)
+                + right * (0.14f + 366f / 512f * DialWide - WheelAt.x);
+            // 絵の中の計器と同じ半径（px 34）
+            const float r = 0.0319f;
+
+            // 地の面。絵に描いてある目盛りと針を消す
+            Disc(gap, at + outward * 0.004f, outward, r - 0.001f, 8);
+            // 枠の輪。隣の計器（絵の縁は x 0.4458 まで）へ 0.6 mm しか掛からない太さに収める
+            Hoop(trim, at + outward * 0.007f, outward, r + 0.002f, 0.014f, 0.008f, 10, 0f, 360f);
+
+            // 目盛り。E から F までの 270 度を四つに割る。
+            // 両端は字が兼ねるので引かない。重ねて置いたら字が潰れた
+            for (var i = 1; i <= 3; i++)
+            {
+                var way = DialWay(right, up, i / 4f);
+                scale.Box(at + outward * 0.006f + way * 0.0235f,
+                    new Vector3(0.0042f, 0.0042f, i == 2 ? 0.0085f : 0.0060f),
+                    Quaternion.LookRotation(way, outward));
+            }
+            DialLetter(scale, at, right, up, outward, 0f, true);
+            DialLetter(scale, at, right, up, outward, 1f, false);
+
+            // 針。0.44 は真ん中よりわずかに E の側
+            var swing = DialWay(right, up, 0.44f);
+            pointer.Box(at + outward * 0.009f + swing * 0.0135f, new Vector3(0.0050f, 0.0050f, 0.0245f),
+                Quaternion.LookRotation(swing, outward));
+            // 針の軸
+            Disc(scale, at + outward * 0.011f, outward, 0.0055f, 6);
+        }
+
+        /// <summary>
+        /// 計器の盤の上の向き。part は 0 が E、1 が F。
+        /// 絵（tools/make-drive.py の face）と同じく、左下の 135 度から右回りに 270 度を振る
+        /// </summary>
+        static Vector3 DialWay(Vector3 right, Vector3 up, float part)
+        {
+            var a = (135f + 270f * part) * Mathf.Deg2Rad;
+            return right * Mathf.Cos(a) - up * Mathf.Sin(a);
+        }
+
+        /// <summary>
+        /// 盤の上の E と F。縦の棒に横棒を三本（E）か二本（F）。
+        /// 字の形を作れる大きさではないので、太さは画素に載る 3 mm で通す。
+        /// **盤の縁へ寄せる。** 半径 14.5 mm に置いたときは二字が真ん中で寄り合って、
+        /// 一つの塊に見えた。19 mm まで出すと左下と右下に分かれて、端の印として読める
+        /// </summary>
+        static void DialLetter(Bank bank, Vector3 at, Vector3 right, Vector3 up, Vector3 outward,
+            float part, bool full)
+        {
+            var centre = at + outward * 0.006f + DialWay(right, up, part) * 0.0190f;
+            var rot = Quaternion.LookRotation(outward, up);
+            bank.Box(centre - right * 0.0028f, new Vector3(0.0028f, 0.0130f, 0.0040f), rot);
+            bank.Box(centre + up * 0.0051f, new Vector3(0.0080f, 0.0028f, 0.0040f), rot);
+            bank.Box(centre, new Vector3(0.0080f, 0.0028f, 0.0040f), rot);
+            if (full) bank.Box(centre - up * 0.0051f, new Vector3(0.0080f, 0.0028f, 0.0040f), rot);
+        }
+
+        /// <summary>
+        /// 運転席の窓と回し把手。判定点 (0.80, 1.26, 0.10)。
+        ///
+        /// <see cref="DoorCard"/> の回し手は前寄り（z 0.52）に付いていて、判定点からは 0.42 m 離れる。
+        /// 印を向いた運転席の目からだと画面の中心から 42 度、つまり端に映るだけになるので、
+        /// 判定点の指している方をここに作る。**運転席の側だけ。** 助手席の扉は調べる対象にならない。
+        ///
+        /// 併せて窓の下枠を通す。既にある内張りの上端（y 1.30〜1.35）の上へ、暗い溝と
+        /// 明るい笠を重ねる。判定点の高さ（1.26）に「窓の開くところ」が無いと、
+        /// 調べているのが把手なのか内張りなのか画面から決まらない。
+        ///
+        /// **窓のガラスは足さない。** 側面のガラスは外を向いた面 1 枚で張ってあり
+        /// （<see cref="Shell"/>）、内向きの面を入れると走行中に見えている沿道の画が変わる。
+        ///
+        /// **把手の後ろに暗い座を敷く。** 把手だけを内張りの上へ置いたときは、
+        /// 塗った鉄（0.216）と内装（0.125）の差が 1.7 倍しかなく、撮ってみると
+        /// のっぺりした面の上の淡い染みにしか見えなかった。一回り大きい暗い板
+        /// （<see cref="Mat"/> の CarGap 0.020）を後ろへ敷くと、明るい把手が
+        /// 暗い輪に囲まれて、形が段として立つ
+        /// </summary>
+        static void WindowCrank(Bank plate, Bank steel, Bank gap)
+        {
+            // 窓の下枠。左右とも通す。溝は暗く、笠は明るく
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                gap.Box(new Vector3(side * 0.862f, 1.3555f, 0.115f), new Vector3(0.062f, 0.013f, 1.362f));
+                steel.Box(new Vector3(side * 0.858f, 1.3475f, 0.115f), new Vector3(0.098f, 0.013f, 1.372f));
+            }
+
+            // 暗い座。把手のぜんたいを後ろから囲う
+            gap.Box(new Vector3(0.8175f, 1.140f, 0.110f), new Vector3(0.013f, 0.180f, 0.130f));
+            // 回し把手の台座。内張りの室内側の面（x 0.82）から手前へ出す
+            plate.Box(new Vector3(0.8090f, 1.162f, 0.100f), new Vector3(0.017f, 0.090f, 0.090f));
+            // 軸
+            plate.Box(new Vector3(0.7955f, 1.162f, 0.100f), new Vector3(0.028f, 0.030f, 0.030f));
+            // 柄。下前がりに倒す
+            plate.Box(new Vector3(0.7890f, 1.1260f, 0.1190f), new Vector3(0.018f, 0.0814f, 0.024f),
+                Quaternion.Euler(-27.8f, 0f, 0f));
+            // 握り。柄の先から室内へ出す
+            plate.Box(new Vector3(0.7790f, 1.0880f, 0.1400f), new Vector3(0.036f, 0.030f, 0.030f));
         }
 
         // ---- 車の外装 --------------------------------------------------------
