@@ -51,12 +51,16 @@ namespace HalfAware
         [SerializeField] SmokePuffs smoke;
         [Tooltip("何服吸うか")]
         [SerializeField] int drags = 1;
+        [Tooltip("窓が下りきってから吐き始めるまで。秒")]
+        [SerializeField] float beforeExhale = 0.35f;
         [Tooltip("吐き終わってから独白が出るまで。秒")]
         [SerializeField] float afterSmoke = 0.8f;
 
         [Header("家")]
-        [Tooltip("小麦畑の農家。独白を送り切るまで伏せておく")]
-        [SerializeField] GameObject crofts;
+        [Tooltip("小麦畑の農家。独白を送り切るまで伏せておく。" +
+            "環の区切りごとに 1 つあるので配列になる。帯の直下にまとめられない" +
+            "（DriveWorld が帯の子の数を環の枠の数に使うため、区切り以外を混ぜると環がずれる）")]
+        [SerializeField] GameObject[] crofts = new GameObject[0];
         [Tooltip("ガレージの床を歩く足音。乗り込んだら止める")]
         [SerializeField] Footsteps feet;
 
@@ -194,7 +198,7 @@ namespace HalfAware
                 clock.Spoken();
                 // ここで家が現れる。小麦だけの畑を走ってきて、
                 // 独白を読み終えたところで人の住むところに差し掛かる
-                if (crofts != null) crofts.SetActive(true);
+                ShowCrofts(true);
             }
 
             // 速さと粗さは秒数と同じ扱いで、毎フレーム渡す。
@@ -272,33 +276,33 @@ namespace HalfAware
         System.Collections.IEnumerator Smoking()
         {
             while (flow.Talking) yield return null;
-            cigarette.Light(drags);
 
-            // **窓は吸ってから吐くまでの間に開ける。** 火を点ける → 吸う →
-            // 窓が下りる → 吐く、の順。SmokeBeats の時刻表から、一服目を吸い終わる
-            // ところを割り出して鳴らす。Cigarette 自身は窓を知らないので、
-            // 掛け合わせはここで持つ
+            // 火を点けて吸うところまでは Cigarette の時刻表どおり。
+            // **吐くところまで任せない。** あちらは吸い終わって 0.55 秒で吐き始めるが、
+            // 窓を下ろす音は 4.45 秒あるので、任せると窓の途中で吐いてしまう。
+            // 順は「火を点ける → 吸う → 窓が下りる → 吐く」でなければならない
+            cigarette.Light(drags);
             var lit = Time.time;
-            var openAt = SmokeBeats.DragAt(0, drags) + SmokeBeats.DragSeconds;
-            var opened = false;
-            while (cigarette.Smoking)
+            var drawn = SmokeBeats.DragAt(0, drags) + SmokeBeats.DragSeconds;
+            while (cigarette.Smoking && Time.time - lit < drawn)
             {
-                if (!opened && Time.time - lit >= openAt)
-                {
-                    opened = true;
-                    if (sound != null) sound.WindowDown();
-                }
                 flow.Freeze(FreezeStep);
                 yield return null;
             }
-            // 吸い終わりが早すぎて窓を鳴らしそびれたときの保険
-            if (!opened && sound != null) sound.WindowDown();
 
-            // **煙は消さない。** 一服ぶんで切ると、独白のあいだ煙が無い車内になる。
-            // 暗転までは吸っている扱いにして、そこで Dress が畳む
+            // 吸い終わったところで Cigarette を降ろす。ここから先はこちらで組む。
+            // Stop は煙も消すので、消えたぶんはすぐ焚き直す
+            cigarette.Stop();
             if (smoke != null) smoke.Begin(SmokeSeconds);
 
-            yield return Wait(afterSmoke);
+            if (sound != null) sound.WindowDown();
+            yield return Wait((sound != null ? sound.WindowSeconds : 0f) + beforeExhale);
+
+            // 窓が下りきってから吐く。煙のひと吹きも合わせる
+            if (sound != null) sound.Exhale();
+            if (smoke != null) smoke.Blow();
+            yield return Wait((sound != null ? sound.ExhaleSeconds : 0f) + afterSmoke);
+
             clock.Trigger();
             Speak();
         }
@@ -487,7 +491,14 @@ namespace HalfAware
             // 煙は景色を跨がない。黒のあいだに畳む
             if (smoke != null) smoke.Cancel();
             // 家は独白を送り切ってから出す。景色に入った時点では小麦だけ
-            if (crofts != null) crofts.SetActive(false);
+            ShowCrofts(false);
+        }
+
+        /// <summary>小麦畑の農家を出す／伏せる。区切りごとに 1 つあるのでまとめて切る</summary>
+        void ShowCrofts(bool on)
+        {
+            for (var i = 0; i < crofts.Length; i++)
+                if (crofts[i] != null && crofts[i].activeSelf != on) crofts[i].SetActive(on);
         }
 
         /// <summary>which 番目の帯の空の物だけ出す。-1 でどれも出さない</summary>

@@ -34,6 +34,10 @@ namespace HalfAware
         [SerializeField] AudioClip pullAway;
         [Tooltip("運転席の窓を下ろす音")]
         [SerializeField] AudioClip windowDown;
+        [Tooltip("煙を吐く息。**Cigarette が持つのと同じ素材。**" +
+            "あちらは時刻表どおりに吸ってすぐ吐くが、ここでは窓を下ろし終えてから吐かせたいので、" +
+            "吐く息だけこちらから鳴らす")]
+        [SerializeField] AudioClip exhale;
 
         [Header("走行音")]
         [Tooltip("舗装された道")]
@@ -57,6 +61,8 @@ namespace HalfAware
         [SerializeField] float rainVolume = 0.55f;
         [Tooltip("エンジンだけ掛かっている音")]
         [SerializeField] float idleVolume = 0.60f;
+        [Tooltip("吐く息。口元なので単発より控えめに。場面 1 の Cigarette は 0.40")]
+        [SerializeField] float breathVolume = 0.40f;
 
         /// <summary>暗転の黒のあいだに流す音の長さ。秒。黒を何秒置くか決めるのに使う</summary>
         public float PullAwaySeconds { get { return pullAway != null ? pullAway.length : 0f; } }
@@ -72,6 +78,16 @@ namespace HalfAware
         public void Ignition() { Shot(ignition); }
         public void PullAway() { Shot(pullAway); }
         public void WindowDown() { Shot(windowDown); }
+
+        /// <summary>煙を吐く息。窓を下ろし終えてから鳴らす</summary>
+        public void Exhale()
+        {
+            if (oneShot == null || exhale == null) return;
+            oneShot.PlayOneShot(exhale, breathVolume);
+        }
+
+        /// <summary>吐く息の長さ。秒</summary>
+        public float ExhaleSeconds { get { return exhale != null ? exhale.length : 0f; } }
 
         /// <summary>
         /// エンジンだけ掛かっている音。イグニッションのあと、走り出すまでの間を埋める。

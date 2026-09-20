@@ -987,9 +987,13 @@ namespace HalfAware.EditorTools
 
             triggerItems = new GameObject[Bands];
             triggerItems[0] = Put(parent, "Chips", new Vector3(-0.42f, 1.15f, -0.02f), script, DriveIds.Chips, ItemRadius, false);
-            // 煙草はダッシュボードの天板の上。計器の絵（y 1.28〜1.40 / z 0.52〜0.55）の
-            // 手前に置く。印は 0.17 上に出るので、計器盤の庇へ入らない高さにしてある
-            triggerItems[1] = Put(parent, "Cigar", new Vector3(0.06f, 1.30f, 0.50f), script, DriveIds.Cigar, ItemRadius, false);
+            // 煙草の箱の上。**位置は箱に合わせてある。**
+            //
+            // 一度は計器盤の中ほど（0.06, 1.30, 0.50）に置いていて、「見づらい」と差し戻された。
+            // 燃料計の隣へ移したが、そこも狭い。目（SeatAt + EyeLead）は計器盤の塊の上端より
+            // 0.14 高いだけなので、塊の右脇の天板は塊の壁に隠れて運転席から見えない。
+            // 手前の玉縁まで戻して初めて箱が丸ごと出る。ここがその位置
+            triggerItems[1] = Put(parent, "Cigar", new Vector3(0.722f, 1.344f, 0.565f), script, DriveIds.Cigar, ItemRadius, false);
             // 窓だけ必須。最後の景色に入るまで伏せてあるので、それまで場面は閉じない。
             // ドアの内張りは x 0.82〜0.90。0.84 に置くと印が内張りの中に入る
             triggerItems[2] = Put(parent, "Window", new Vector3(0.80f, 1.26f, 0.10f), script, DriveIds.Window, ItemRadius, true);
@@ -1262,6 +1266,7 @@ namespace HalfAware.EditorTools
             "rain", "Assets/Audio/RainWipers.wav",
             "idle", "Assets/Audio/Idle.wav",
             "windowDown", "Assets/Audio/WindowDown.wav",
+            "exhale", "Assets/Audio/Blow.wav",
         };
 
         static AudioClip Sound(string path)
@@ -1559,6 +1564,22 @@ namespace HalfAware.EditorTools
             dso.FindProperty("sound").objectReferenceValue = Object.FindFirstObjectByType<DriveSound>(FindObjectsInactive.Include);
             dso.FindProperty("cigarette").objectReferenceValue = Object.FindFirstObjectByType<Cigarette>(FindObjectsInactive.Include);
             dso.FindProperty("smoke").objectReferenceValue = Object.FindFirstObjectByType<SmokePuffs>(FindObjectsInactive.Include);
+
+            // 小麦畑の農家。**区切りごとに 1 つある。** 帯の直下にまとめられない。
+            // DriveWorld が帯の子の数を環の枠の数に使うので、区切り以外を 1 つ混ぜると
+            // 環が 10 枠になって道と沿道の継ぎ目が丸ごとずれる
+            var wheat = Look(root, "Roadsides/Band" + (Bands - 1));
+            var holders = dso.FindProperty("crofts");
+            holders.arraySize = 0;
+            if (wheat != null)
+                foreach (Transform slice in wheat)
+                {
+                    var held = slice.Find(BuildDrive.CroftHolder);
+                    if (held == null) continue;
+                    holders.arraySize = holders.arraySize + 1;
+                    holders.GetArrayElementAtIndex(holders.arraySize - 1).objectReferenceValue = held.gameObject;
+                }
+            if (holders.arraySize == 0) Debug.LogWarning("小麦畑の農家の入れ物が見つからない");
             // 風防の水とワイパー。BuildDriveCar が Drive/Car/Rain として組む。
             // **無くても知らせない。** まだ作っていない段では毎回組むたびに知らせが出る。
             // DriveDirector は null を見て何もしないので、無いまま走っても止まらない
