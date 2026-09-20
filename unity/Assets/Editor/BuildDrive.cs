@@ -493,7 +493,11 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>帯の数</summary>
-        public const int Bands = 5;
+        /// <summary>
+        /// 景色の数。<see cref="Route"/> と必ず同じにする。
+        /// 設計書の改訂で 5 から 3 になった（2026-09-16-scenario-design.md 7 節）
+        /// </summary>
+        public const int Bands = 3;
 
         // ---- ガレージ。メートル ---------------------------------------------
 
@@ -808,13 +812,21 @@ namespace HalfAware.EditorTools
         /// **秒数も速さもすべて仮置きで、オーナーが実画面を見てから決める。**
         /// 帯 2 の黒と明けだけ長いのが仮眠にあたる
         /// </summary>
+        // **景色は 3 つ。** 設計書（2026-09-16-scenario-design.md 7 節）の改訂で、
+        // 深夜の幹線と明け方の丘陵が落ちた。Deep と Dawn の空はもう誰も使わないが、
+        // 戻すときのために残してある。
+        //
+        // **明けるのはフェードではなく切り替え。** 設計書に「各シーンの切り替えは
+        // フェードではなく瞬間的な切り替えとする」とあるので fadeIn は 0。
+        // 黒へ入るのは元から切り替えなので、出入りとも一瞬になる。
+        //
+        // 最後の景色の余韻が 10 秒なのは、独白のあと家々が通り過ぎるところを
+        // 映してから暗転するため（設計書 7.2）
         static readonly DriveBand[] Route =
         {
-            new DriveBand { name = "倫敦の市街", trigger = DriveIds.Chips, speed = 16f, rough = 1.0f, afterglow = 5f, black = 0.8f, fadeIn = 1.4f, sky = Night },
-            new DriveBand { name = "夜の高速", trigger = DriveIds.Log, speed = 28f, rough = 1.0f, afterglow = 5f, black = 0.8f, fadeIn = 1.4f, sky = Lit },
-            new DriveBand { name = "深夜の幹線", trigger = DriveIds.Mirror, speed = 24f, rough = 1.0f, afterglow = 5f, black = 3.5f, fadeIn = 2.6f, sky = Deep },
-            new DriveBand { name = "明け方の丘陵", trigger = DriveIds.Photo, speed = 20f, rough = 1.6f, afterglow = 5f, black = 0.8f, fadeIn = 1.6f, sky = Dawn },
-            new DriveBand { name = "朝靄の未舗装路", trigger = DriveIds.Window, speed = 11f, rough = 4.5f, gravel = true, afterglow = 5f, black = 0.8f, fadeIn = 1.4f, sky = Morning },
+            new DriveBand { name = "倫敦の市街", trigger = DriveIds.Chips, speed = 16f, rough = 1.0f, afterglow = 5f, black = 0.8f, fadeIn = 0f, sky = Night },
+            new DriveBand { name = "夜の高速", trigger = DriveIds.Cigar, speed = 28f, rough = 1.0f, rain = true, afterglow = 5f, black = 0.8f, fadeIn = 0f, sky = Lit },
+            new DriveBand { name = "朝靄の未舗装路", trigger = DriveIds.Window, speed = 11f, rough = 4.5f, gravel = true, afterglow = 10f, black = 0.8f, fadeIn = 0f, sky = Morning },
         };
 
         /// <summary>帯ごとのきっかけの対象。Items が立てて Wire が DriveDirector へ渡す</summary>
@@ -975,16 +987,12 @@ namespace HalfAware.EditorTools
 
             triggerItems = new GameObject[Bands];
             triggerItems[0] = Put(parent, "Chips", new Vector3(-0.42f, 1.15f, -0.02f), script, DriveIds.Chips, ItemRadius, false);
-            // 背もたれの前面は z 0.17。0.24 に置くと判定点も印も背もたれの中に入って、
-            // 印が座席に食われる（CheckDrive の見直し 4 が拾う）。座面の上へ出す
-            triggerItems[1] = Put(parent, "Log", new Vector3(-0.42f, 1.17f, 0.14f), script, DriveIds.Log, ItemRadius, false);
-            // 鏡そのものは y 1.79〜1.87 / z 0.73〜0.75。印は 0.17 上に出るので、
-            // 鏡に合わせて置くと天井の板（1.88〜1.94）に食われる。手前と下へ外してある
-            triggerItems[2] = Put(parent, "Mirror", new Vector3(0f, 1.66f, 0.66f), script, DriveIds.Mirror, ItemRadius, false);
-            triggerItems[3] = Put(parent, "Photo", new Vector3(0.16f, 1.23f, 0.62f), script, DriveIds.Photo, ItemRadius, false);
-            // 窓だけ必須。帯 4 に入るまで伏せてあるので、それまで場面は閉じない。
+            // 煙草はダッシュボードの天板の上。計器の絵（y 1.28〜1.40 / z 0.52〜0.55）の
+            // 手前に置く。印は 0.17 上に出るので、計器盤の庇へ入らない高さにしてある
+            triggerItems[1] = Put(parent, "Cigar", new Vector3(0.06f, 1.30f, 0.50f), script, DriveIds.Cigar, ItemRadius, false);
+            // 窓だけ必須。最後の景色に入るまで伏せてあるので、それまで場面は閉じない。
             // ドアの内張りは x 0.82〜0.90。0.84 に置くと印が内張りの中に入る
-            triggerItems[4] = Put(parent, "Window", new Vector3(0.80f, 1.26f, 0.10f), script, DriveIds.Window, ItemRadius, true);
+            triggerItems[2] = Put(parent, "Window", new Vector3(0.80f, 1.26f, 0.10f), script, DriveIds.Window, ItemRadius, true);
             // きっかけはその帯に入るまで出さない。出し分けるのは DriveDirector.ShowTrigger
             for (var i = 0; i < triggerItems.Length; i++) triggerItems[i].SetActive(false);
 
@@ -1001,7 +1009,6 @@ namespace HalfAware.EditorTools
 
             var cabin = Child(parent, "Cabin");
             Put(cabin, "Radio", new Vector3(-0.02f, 1.19f, 0.70f), script, DriveIds.Radio, ItemRadius, false);
-            Put(cabin, "Pocket", new Vector3(-0.10f, 1.07f, -0.30f), script, DriveIds.Pocket, ItemRadius, false);
             Put(cabin, "Fuel", new Vector3(0.46f, 1.25f, 0.58f), script, DriveIds.Fuel, ItemRadius, false);
             cabin.gameObject.SetActive(false);
         }
@@ -1079,6 +1086,7 @@ namespace HalfAware.EditorTools
 
             Feet(player.transform, body);
             CarSound(player.transform);
+            Smoke(player.transform, eye.transform);
 
             // 当たりを入れたまま動かすと床や壁に押し出されて狙った場所に立たない（BuildAlley.Place と同じ）
             body.enabled = false;
@@ -1159,6 +1167,46 @@ namespace HalfAware.EditorTools
         /// ここは端から端までひと続きの箱で、響きの変わる場所が無い
         /// </summary>
         /// <summary>
+        /// 火を点けて一服する一連。**場面 1 の仕組みをそのまま使い回す。**
+        ///
+        /// <see cref="Cigarette"/> が <see cref="SmokeBeats"/> の時刻表どおりに
+        /// 蓋を開ける金属音・火・吸う息・吐く息を並べ、<see cref="SmokePuffs"/> が煙を出す。
+        /// 素材も場面 1 と同じものを読む。
+        ///
+        /// 煙はカメラの子に置く。口元から立つものなので、視線を振れば一緒に動く
+        /// </summary>
+        static void Smoke(Transform player, Transform eye)
+        {
+            var puffs = BuildProps.BuildSmoke(eye).GetComponent<SmokePuffs>();
+
+            var go = new GameObject("Cigarette");
+            go.transform.SetParent(player, false);
+            var voice = go.AddComponent<AudioSource>();
+            voice.playOnAwake = false;
+            voice.loop = false;
+            // 口元。耳と同じ体に付いているので距離で減らさない
+            voice.spatialBlend = 0f;
+            voice.volume = 0.40f;
+
+            var smoke = go.AddComponent<Cigarette>();
+            var so = new SerializedObject(smoke);
+            so.FindProperty("puffs").objectReferenceValue = puffs;
+            so.FindProperty("voice").objectReferenceValue = voice;
+            for (var i = 0; i < SmokeClips.Length; i += 2)
+                so.FindProperty(SmokeClips[i]).objectReferenceValue = Sound(SmokeClips[i + 1]);
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>一服の素材。場面 1 と同じものを読む。出どころは Assets/Audio/LICENSES.md</summary>
+        static readonly string[] SmokeClips =
+        {
+            "lighterClick", "Assets/Audio/LighterClick.wav",
+            "lighterFlame", "Assets/Audio/LighterFlame.wav",
+            "drag", "Assets/Audio/Drag.wav",
+            "blow", "Assets/Audio/Blow.wav",
+        };
+
+        /// <summary>
         /// 乗り込みと走行の音。**足音とは別の入れ物に置く。**
         ///
         /// 足音の入れ物には <see cref="AudioReverbFilter"/> が付いていて、
@@ -1184,10 +1232,19 @@ namespace HalfAware.EditorTools
             road.loop = true;
             road.spatialBlend = 0f;
 
+            // 雨は走行音に重ねるので、別の入れ物で同時に鳴らす
+            var sky = new GameObject("Weather");
+            sky.transform.SetParent(go.transform, false);
+            var weather = sky.AddComponent<AudioSource>();
+            weather.playOnAwake = false;
+            weather.loop = true;
+            weather.spatialBlend = 0f;
+
             var sound = go.AddComponent<DriveSound>();
             var so = new SerializedObject(sound);
             so.FindProperty("oneShot").objectReferenceValue = shots;
             so.FindProperty("road").objectReferenceValue = road;
+            so.FindProperty("weather").objectReferenceValue = weather;
             for (var i = 0; i < DriveClips.Length; i += 2)
                 so.FindProperty(DriveClips[i]).objectReferenceValue = Sound(DriveClips[i + 1]);
             so.ApplyModifiedPropertiesWithoutUndo();
@@ -1208,6 +1265,8 @@ namespace HalfAware.EditorTools
             "pullAway", "Assets/Audio/PullAway.wav",
             "paved", "Assets/Audio/DriveSealed.wav",
             "gravel", "Assets/Audio/DriveGravel.wav",
+            "rain", "Assets/Audio/RainWipers.wav",
+            "windowDown", "Assets/Audio/WindowDown.wav",
         };
 
         static AudioClip Sound(string path)
@@ -1510,6 +1569,12 @@ namespace HalfAware.EditorTools
             // 足音。乗り込んだら止める。Player の下にあるのでガレージと一緒には消えない
             dso.FindProperty("feet").objectReferenceValue = Object.FindFirstObjectByType<Footsteps>(FindObjectsInactive.Include);
             dso.FindProperty("sound").objectReferenceValue = Object.FindFirstObjectByType<DriveSound>(FindObjectsInactive.Include);
+            dso.FindProperty("cigarette").objectReferenceValue = Object.FindFirstObjectByType<Cigarette>(FindObjectsInactive.Include);
+            // 風防の水とワイパー。BuildDriveCar が Drive/Car/Rain として組む。
+            // **無くても知らせない。** まだ作っていない段では毎回組むたびに知らせが出る。
+            // DriveDirector は null を見て何もしないので、無いまま走っても止まらない
+            var rain = root.Find("Car/Rain");
+            dso.FindProperty("rainRig").objectReferenceValue = rain != null ? rain.gameObject : null;
             var folded = Look(root, "Car/ArmsFolded");
             var onWheel = Look(root, "Car/ArmsOnWheel");
             dso.FindProperty("folded").objectReferenceValue = folded != null ? folded.gameObject : null;
@@ -1558,6 +1623,7 @@ namespace HalfAware.EditorTools
                 e.FindPropertyRelative("speed").floatValue = Route[i].speed;
                 e.FindPropertyRelative("rough").floatValue = Route[i].rough;
                 e.FindPropertyRelative("gravel").boolValue = Route[i].gravel;
+                e.FindPropertyRelative("rain").boolValue = Route[i].rain;
                 e.FindPropertyRelative("afterglow").floatValue = Route[i].afterglow;
                 e.FindPropertyRelative("black").floatValue = Route[i].black;
                 e.FindPropertyRelative("fadeIn").floatValue = Route[i].fadeIn;

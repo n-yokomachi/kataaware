@@ -19,7 +19,7 @@ namespace HalfAware.Tests
             Assert.IsFalse(DriveIds.IsPage(null));
             foreach (var id in DriveIds.Triggers)
                 Assert.IsFalse(DriveIds.IsPage(id), "きっかけの対象が段に見えている: " + id);
-            foreach (var id in new[] { DriveIds.Door, DriveIds.Radio, DriveIds.Pocket, DriveIds.Fuel })
+            foreach (var id in new[] { DriveIds.Door, DriveIds.Button, DriveIds.Radio, DriveIds.Fuel })
                 Assert.IsFalse(DriveIds.IsPage(id), "対象が段に見えている: " + id);
         }
 
@@ -27,9 +27,10 @@ namespace HalfAware.Tests
         public void TheTriggersAreAllDifferent()
         {
             var all = DriveIds.Triggers;
-            Assert.AreEqual(5, all.Count, "帯は 5 つ");
+            // 設計書の改訂で 5 つから 3 つになった（2026-09-16-scenario-design.md 7 節）
+            Assert.AreEqual(3, all.Count, "景色は 3 つ");
             CollectionAssert.AllItemsAreUnique(all);
-            Assert.AreEqual(DriveIds.Window, all[4], "最後の帯のきっかけは窓");
+            Assert.AreEqual(DriveIds.Window, all[all.Count - 1], "最後の景色のきっかけは窓");
         }
     }
 }

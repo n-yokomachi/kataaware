@@ -84,7 +84,6 @@ namespace HalfAware.Tests
                 want.Add(DriveIds.Page(i));
             }
             want.Add(DriveIds.Radio);
-            want.Add(DriveIds.Pocket);
             want.Add(DriveIds.Fuel);
             Assert.That(Load().Ids(), Is.EquivalentTo(want));
         }

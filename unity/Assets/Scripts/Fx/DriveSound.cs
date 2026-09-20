@@ -21,6 +21,8 @@ namespace HalfAware
         [SerializeField] AudioSource oneShot;
         [Tooltip("走行音。輪で鳴らし続ける")]
         [SerializeField] AudioSource road;
+        [Tooltip("雨とワイパー。走行音に重ねる輪")]
+        [SerializeField] AudioSource weather;
 
         [Header("単発")]
         [SerializeField] AudioClip doorOpen;
@@ -28,18 +30,24 @@ namespace HalfAware
         [SerializeField] AudioClip ignition;
         [Tooltip("暗転の黒のあいだに流す、車が動き出す音")]
         [SerializeField] AudioClip pullAway;
+        [Tooltip("運転席の窓を下ろす音")]
+        [SerializeField] AudioClip windowDown;
 
         [Header("走行音")]
         [Tooltip("舗装された道")]
         [SerializeField] AudioClip paved;
         [Tooltip("土と轍の道")]
         [SerializeField] AudioClip gravel;
+        [Tooltip("雨とワイパー。ワイパーの周期 0.9485 秒の 14 倍で輪にしてある")]
+        [SerializeField] AudioClip rain;
 
         [Header("大きさ")]
         [SerializeField] float shotVolume = 0.85f;
         [Tooltip("舗装の輪。素材が 10dB 小さいぶんここで持ち上げる")]
         [SerializeField] float pavedVolume = 0.75f;
         [SerializeField] float gravelVolume = 0.30f;
+        [Tooltip("雨とワイパー。走行音に重ねるので控えめに")]
+        [SerializeField] float rainVolume = 0.45f;
 
         /// <summary>暗転の黒のあいだに流す音の長さ。秒。黒を何秒置くか決めるのに使う</summary>
         public float PullAwaySeconds { get { return pullAway != null ? pullAway.length : 0f; } }
@@ -47,10 +55,31 @@ namespace HalfAware
         /// <summary>イグニッションの長さ。秒。鳴らし終えてから震え出すのに使う</summary>
         public float IgnitionSeconds { get { return ignition != null ? ignition.length : 0f; } }
 
+        /// <summary>窓を下ろす音の長さ。秒。下ろし終えてから独白を出すのに使う</summary>
+        public float WindowSeconds { get { return windowDown != null ? windowDown.length : 0f; } }
+
         public void DoorOpen() { Shot(doorOpen); }
         public void DoorShut() { Shot(doorShut); }
         public void Ignition() { Shot(ignition); }
         public void PullAway() { Shot(pullAway); }
+        public void WindowDown() { Shot(windowDown); }
+
+        /// <summary>雨の輪。走行音に重ねる。降っていない景色では止める</summary>
+        public void Weather(bool wet)
+        {
+            if (weather == null) return;
+            if (!wet)
+            {
+                if (weather.isPlaying) weather.Stop();
+                return;
+            }
+            if (rain == null) return;
+            weather.volume = rainVolume;
+            if (weather.clip == rain && weather.isPlaying) return;
+            weather.clip = rain;
+            weather.loop = true;
+            weather.Play();
+        }
 
         /// <summary>走行音を鳴らし始める。同じ道が続くなら鳴らし直さない</summary>
         public void Road(bool rough)
@@ -71,6 +100,7 @@ namespace HalfAware
         public void Hush()
         {
             if (road != null && road.isPlaying) road.Stop();
+            if (weather != null && weather.isPlaying) weather.Stop();
         }
 
         void Shot(AudioClip clip)

@@ -42,6 +42,20 @@ namespace HalfAware
         [Tooltip("ガレージでだけ調べられる対象。乗り込んだら伏せる。" +
             "伏せないと走っている車の後ろにピンが浮いたまま残る")]
         [SerializeField] GameObject garageOnly;
+
+        [Header("雨")]
+        [Tooltip("風防に付く水とワイパー。雨の景色でだけ出す")]
+        [SerializeField] GameObject rainRig;
+
+        [Header("煙草")]
+        [Tooltip("火を点けて一服する一連。場面 1 と同じ仕組みを使い回す")]
+        [SerializeField] Cigarette cigarette;
+        [Tooltip("何服吸うか")]
+        [SerializeField] int drags = 1;
+        [Tooltip("吸い終わってから窓を下ろすまで。秒")]
+        [SerializeField] float afterSmoke = 0.6f;
+        [Tooltip("窓を下ろし終えてから独白が出るまで。秒")]
+        [SerializeField] float afterWindow = 0.8f;
         [Tooltip("ガレージの床を歩く足音。乗り込んだら止める")]
         [SerializeField] Footsteps feet;
 
@@ -142,6 +156,8 @@ namespace HalfAware
             garageSky.Apply(sun, eye, beams);
             // 車内の対象はガレージからでも距離が届いてしまう。乗り込むまで伏せておく
             if (cabin != null) cabin.SetActive(false);
+            // ガレージは屋内。雨は降っていない
+            if (rainRig != null) rainRig.SetActive(false);
             band = -1;
             shown = -1;
             flow.Examined += Examined;
@@ -228,7 +244,44 @@ namespace HalfAware
             // band を先に弾いておくのは、BandOf の「見つからない」も -1 で返るため。
             // 両方 -1 のまま比べると、どの対象を調べても通ってしまう
             if (route.BandOf(item.Id) != band) return;
+            // 煙草だけ、独白の前に一連の間が入る。**時計を進めるのはその後。**
+            // ここで clock.Trigger を呼んでしまうと、段を積む前に Update が
+            // 「話し終えた」と見なして（Talking かつ flow.Talking が false）、
+            // 独白を出さないまま余韻へ移る
+            if (item.Id == DriveIds.Cigar && cigarette != null)
+            {
+                StartCoroutine(Smoking());
+                return;
+            }
             clock.Trigger();
+            Speak();
+        }
+
+        /// <summary>
+        /// 煙草に火を点け、一服して、窓を下ろしてから独白を出す。
+        ///
+        /// 対象そのものの文（「煙草に火をつけ、窓を開ける」）は SceneFlow が先に出すので、
+        /// それを送り切るまで待つ。待たずに始めると、字幕の裏で火が点いて煙が立つ
+        /// </summary>
+        System.Collections.IEnumerator Smoking()
+        {
+            while (flow.Talking) yield return null;
+            cigarette.Light(drags);
+            while (cigarette.Smoking)
+            {
+                flow.Freeze(FreezeStep);
+                yield return null;
+            }
+            yield return Wait(afterSmoke);
+            if (sound != null) sound.WindowDown();
+            yield return Wait((sound != null ? sound.WindowSeconds : 0f) + afterWindow);
+            clock.Trigger();
+            Speak();
+        }
+
+        /// <summary>今の景色の独白を積む</summary>
+        void Speak()
+        {
             if (script == null) { Debug.LogWarning("DriveDirector: 文面が未接続", this); return; }
             var page = script.Find(DriveIds.Page(band));
             if (page.id == null) { Debug.LogWarning("DriveDirector: 段が文面に無い: " + DriveIds.Page(band), this); return; }
@@ -329,8 +382,8 @@ namespace HalfAware
             clock.Reset();
             yield return Wait(pullHold);
 
-            // 明けるのはフェードイン。走行音はここから
-            if (sound != null) sound.Road(At(0).gravel);
+            // 明けるのはフェードイン。走行音と雨はここから
+            if (sound != null) { sound.Road(At(0).gravel); sound.Weather(At(0).rain); }
             for (var t = 0f; t < pullFade; t += Time.deltaTime)
             {
                 hud.SetFade(pullFade <= 0f ? 0f : 1f - t / pullFade);
@@ -386,9 +439,12 @@ namespace HalfAware
             // 走っている最中に時間帯が変わると、夜から朝へ切り替わるその一瞬が見える
             ShowSky(which);
             At(which).sky.Apply(sun, eye, beams);
-            // 走行音も黒のあいだに入れ替える。舗装のまま続く帯では鳴らし直さない。
+            // 走行音も黒のあいだに入れ替える。舗装のまま続く景色では鳴らし直さない。
             // 乗り込みのときだけ Boarding が明けてから鳴らすので、ここでは出さない
             if (aboard && sound != null) sound.Road(At(which).gravel);
+            // 雨は景色が持つ。風防の水とワイパーも音も、降っている景色でだけ出す
+            if (rainRig != null) rainRig.SetActive(At(which).rain);
+            if (aboard && sound != null) sound.Weather(At(which).rain);
         }
 
         /// <summary>which 番目の帯の空の物だけ出す。-1 でどれも出さない</summary>

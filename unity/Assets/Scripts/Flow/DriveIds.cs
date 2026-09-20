@@ -16,18 +16,17 @@ namespace HalfAware
         /// <summary>ガレージ。シャッターの開閉ボタン。読むだけで、何も動かない</summary>
         public const string Button = "garage.button";
 
-        /// <summary>帯 0 のきっかけ。助手席のメモリーチップの束</summary>
+        /// <summary>倫敦の市街のきっかけ。助手席のメモリーチップの束</summary>
         public const string Chips = "drive.chips";
-        /// <summary>帯 1 のきっかけ。アクセスログの写し</summary>
-        public const string Log = "drive.log";
-        /// <summary>帯 2 のきっかけ。ルームミラー</summary>
-        public const string Mirror = "drive.mirror";
-        /// <summary>帯 3 のきっかけ。メーターの脇の写真立て</summary>
-        public const string Photo = "drive.photo";
-        /// <summary>帯 4 のきっかけ。窓を開けると場面 9 へ</summary>
+        /// <summary>
+        /// 夜の高速のきっかけ。ダッシュボードの上の煙草。
+        /// 調べると火を点けて一服し、窓を開けてから独白が出る
+        /// </summary>
+        public const string Cigar = "drive.cigar";
+        /// <summary>朝靄の未舗装路のきっかけ。窓を開けると場面 9 へ</summary>
         public const string Window = "drive.window";
 
-        static readonly string[] triggers = { Chips, Log, Mirror, Photo, Window };
+        static readonly string[] triggers = { Chips, Cigar, Window };
 
         /// <summary>
         /// 帯の順に並べたきっかけの id。BuildDrive と WriteDriveScript が同じ並びを使う。
@@ -37,8 +36,6 @@ namespace HalfAware
 
         /// <summary>ラジオ。帯を問わず置く、読んでも帯が進まない対象</summary>
         public const string Radio = "drive.radio";
-        /// <summary>上着のポケット。同じく帯は進まない</summary>
-        public const string Pocket = "drive.pocket";
         /// <summary>燃料計。同じく帯は進まない</summary>
         public const string Fuel = "drive.fuel";
 

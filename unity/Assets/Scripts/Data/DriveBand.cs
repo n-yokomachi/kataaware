@@ -149,6 +149,11 @@ namespace HalfAware
         /// 道そのものは舗装されている
         /// </summary>
         public bool gravel;
+        /// <summary>
+        /// 雨が降っているか。風防の水とワイパーを出し、雨の音を重ねる。
+        /// 路面が濡れているかどうかとは別で、こちらは「いま降っている」こと
+        /// </summary>
+        public bool rain;
         /// <summary>独白を送り切ってから黒へ切り替わるまでの秒数。黙って走る</summary>
         public float afterglow;
         /// <summary>黒のまま置く秒数。仮眠にあたる切れ目だけ長く取る</summary>

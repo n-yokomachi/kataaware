@@ -62,12 +62,19 @@ namespace HalfAware.EditorTools
         static readonly string[] RoadStack =
         {
             "Road/Tile0",                        // 舗装。0.000
-            "Roadsides/Band0/Slice0/Sheen",      // 帯 0 の濡れた照り返し
-            "Road/Tile0/Line",                   // 白線。照り返しより上でないと帯 0 で消える
+            "Roadsides/Band0/Slice0/Sheen",      // 倫敦の市街の濡れた照り返し
+            "Road/Tile0/Line",                   // 白線。照り返しより上でないと倫敦の市街で消える
             "Roadsides/Band1/Slice0/PoolL",      // 路面に落ちる灯り。白線より上でないと深度で弾かれる
-            "Roadsides/Band4/Slice0/Earth",      // 帯 4 の土。白線を覆い隠す
-            "Roadsides/Band4/Slice0/Ruts",       // 帯 4 の轍
+            Unpaved + "/Slice0/Earth",            // 未舗装の土。白線を覆い隠す
+            Unpaved + "/Slice0/Ruts",             // 未舗装の轍
         };
+
+        /// <summary>
+        /// 未舗装の景色の入れ物。**番号を直に書かない。**
+        /// 設計書の改訂で景色が 5 つから 3 つになったとき、Band4 と書いてあった 2 行が
+        /// どこも指さなくなった。未舗装はいつも最後の景色なので、数から組み立てる
+        /// </summary>
+        static string Unpaved { get { return "Roadsides/Band" + (BuildDrive.Bands - 1); } }
 
         /// <summary>ガレージの床に重なる面。下から上へ。塗りの上に油、その上に排水口</summary>
         static readonly string[] BayStack =

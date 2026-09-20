@@ -37,6 +37,8 @@ https://pixabay.com/service/license-summary/
 | `PullAway.wav` | Pixabay `freesound_community-car-driving-interior-perspective-51388` | Pixabay Content License | 冒頭 6 秒。ステレオ 44.1kHz へ、頭 0.15 秒で立ち上げ、末尾 0.6 秒で落として次の走行音へ渡す |
 | `DriveSealed.wav` | Pixabay `freesound_community-car-driving-ambience-6365` | Pixabay Content License | ステレオ 44.1kHz へ。頭 0.5 秒を尻へ被せて輪にした。13.23 秒 |
 | `DriveGravel.wav` | Pixabay `freesound_community-driving-a-truck-in-gravel-58271` | Pixabay Content License | 20 秒地点から 12 秒。ステレオ 44.1kHz へ。頭 0.75 秒を尻へ被せて輪にした。11.25 秒 |
+| `RainWipers.wav` | Pixabay `tommylynn-interior-car-in-rain-with-wipers-369260` | Pixabay Content License | 6 秒地点から 13.879 秒。ステレオ 44.1kHz へ。頭 0.6 秒を尻へ被せて輪にした。**長さはワイパーの周期で決めてある**（包絡線の自己相関で 0.9485 秒。その 14 倍の 13.279 秒）。秒数で切ると払う拍が輪の継ぎ目で飛ぶ |
+| `WindowDown.wav` | Pixabay `freesound_community-car-window-down-103833` | Pixabay Content License | 1.85 秒地点から 4.45 秒。モノラル 44.1kHz へ。素材は 8.94 秒あるが、窓が動いているのは 2〜6 秒だけ |
 
 切り出しの手順は ffmpeg で、`docs/` ではなくここに残す。素材そのものは repo に置かず、加工後の物だけを置いている。
 
@@ -67,7 +69,9 @@ https://pixabay.com/service/license-summary/
 輪の継ぎ目は頭を尻へ被せて消してある。頭と尻 0.25 秒の実効値の差は舗装で 1.4dB、
 未舗装で 2.4dB なので、そのまま `loop` に掛けて段は出ない。
 
-**どの帯で未舗装を鳴らすかは `DriveBand.gravel` が決める。** `rough`（揺れ幅）から
+雨とワイパーは走行音に重ねる。別の AudioSource を持っていて、降っている景色でだけ鳴らす。
+
+**どの景色で未舗装を鳴らすかは `DriveBand.gravel`、雨は `DriveBand.rain` が決める。** `rough`（揺れ幅）から
 割り出さない。明け方の丘陵は所々荒れていて `rough` が 1.6 あるが、道そのものは舗装されている。
 - 雨は `RainLoop`。プレイヤーの頭上で輪にして流し、`RainCover` が屋根の下で音量を 35% まで絞る
 - インプラントジャックを抜く音は `JackPull`。`PullTimeline` の引き抜く段の頭で 1 度だけ鳴らす。チップを抜く音と同じパックから採ったが、低く伸ばして生々しさを足してある
