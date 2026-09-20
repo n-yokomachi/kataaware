@@ -99,7 +99,8 @@ namespace HalfAware
         [SerializeField] float idleRough = 0.55f;
         [Tooltip("座ってから左右に振れる角度。度。片側の値。90 で前方 180 度")]
         [SerializeField] float seatedYawLimit = 90f;
-        [Tooltip("黒のまま置く秒数。ここで走行音が鳴り始める")]
+        [Tooltip("黒のまま置く秒数。**黒へ落ちるのはイグニッションを鳴らし終えるこの秒数前。** " +
+            "黒が明けるのと鍵の音が鳴り終わるのが同じ瞬間になり、そこから走行音が始まる")]
         [SerializeField] float pullHold = 4.6f;
         [Tooltip("黒から一つ目の景色へ浮かび上がる秒数")]
         [SerializeField] float pullFade = 1.8f;
@@ -440,10 +441,16 @@ namespace HalfAware
             if (sound != null) sound.DoorShut();
             yield return Wait(shutHold);
             if (sound != null) sound.Ignition();
-            // 鳴らし終えるまで待ってから震え出す。掛かった音の途中で震えると、
-            // まだ掛かっていないエンジンで車が揺れることになる
-            yield return Wait(sound != null ? sound.IgnitionSeconds : 0f);
-            // 鳴らし終えてから黒へ落ちるまでに間があるときだけ、その間を埋める。
+
+            // **黒へ落ちるのは、イグニッションを鳴らし終える pullHold 秒前。**
+            // 黒のまま置く長さが pullHold なので、こうすると黒が明けるのと
+            // 鍵の音が鳴り終わるのが同じ瞬間になる。走行音はそこから始まるので、
+            // 明けた絵と走り出しの音がぴったり揃う。
+            // 音より黒の方が長いときは、鳴らし始めたその場で黒へ落とす
+            var lit = sound != null ? sound.IgnitionSeconds : 0f;
+            yield return Wait(Mathf.Max(0f, lit - pullHold));
+
+            // 鳴らし終えてから黒へ落ちるまでに間を置きたいときだけ、その間を埋める。
             // **間が 0 なら何も出さない。** 1 フレームだけ震えて鳴って消えるのは、
             // 演出ではなく不具合に見える
             if (ignitionHold > 0f)
@@ -455,24 +462,20 @@ namespace HalfAware
 
             // 黒へは切り替えで入る。場面 1 のドアを閉める暗転と同じ扱い
             hud.SetFade(1f);
-            // **黒のあいだに走り出す音を流す。** 以前は動き出しの一発（PullAway）を
-            // 置いていたが、舗装の走行音と同じ録音から切ったもので、オーナーに外された。
-            // 代わりに走行音の輪そのものをここから鳴らす。明けたときには
-            // すでに走っている音が続いているので、絵と音の辻褄も合う
-            if (sound != null) { sound.Road(At(0).gravel); sound.Weather(At(0).rain); }
             if (garage != null) garage.SetActive(false);
             world.Rolling = true;
             // 走り出したら揺れは路面が持つ。残すと二重に揺れる
             world.Idling = 0f;
-            // 動き出しの音に渡す。止まっているエンジンの輪はここまで
             if (sound != null) sound.Idle(false);
             Dress(0);
             band = 0;
             // 組み直すのは場面の頭でだけ。帯を跨ぐときには呼ばない
             clock.Reset();
+            // **ここでは走行音を鳴らさない。** 黒のあいだはイグニッションの残りが鳴っている
             yield return Wait(pullHold);
 
-            // 明けるのはフェードイン。走行音は黒のあいだから続いている
+            // 明ける。走行音はこの瞬間から。鍵の音が鳴り終わるのもここ
+            if (sound != null) { sound.Road(At(0).gravel); sound.Weather(At(0).rain); }
             for (var t = 0f; t < pullFade; t += Time.deltaTime)
             {
                 hud.SetFade(pullFade <= 0f ? 0f : 1f - t / pullFade);
