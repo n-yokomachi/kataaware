@@ -56,8 +56,13 @@ namespace HalfAware
         [SerializeField] float sitHold = 0.5f;
         [Tooltip("ドアを閉めてからイグニッションまで。秒")]
         [SerializeField] float shutHold = 0.8f;
-        [Tooltip("イグニッションから黒へ切り替わるまで。秒")]
-        [SerializeField] float ignitionHold = 3.2f;
+        [Tooltip("イグニッションを鳴らし終えてから黒へ切り替わるまで。秒。" +
+            "この間だけエンジンの震えが入る")]
+        [SerializeField] float ignitionHold = 3f;
+        [Tooltip("エンジンだけ掛かっているときの震え。走行中の粗さ 1.0 に対する割合")]
+        [SerializeField] float idleRough = 0.55f;
+        [Tooltip("座ってから左右に振れる角度。度。片側の値。90 で前方 180 度")]
+        [SerializeField] float seatedYawLimit = 90f;
         [Tooltip("黒のまま置く秒数。ここで車の動き出す音が流れる")]
         [SerializeField] float pullHold = 4.6f;
         [Tooltip("黒から一つ目の景色へ浮かび上がる秒数")]
@@ -295,11 +300,19 @@ namespace HalfAware
             player.transform.position = to;
             player.Yaw = yawTo;
             player.Pitch = 0f;
+            // **首の制限は体の向きを決めたあとで掛ける。** PlayerController.Yaw は
+            // 首が制限されていると体ではなく首を回すので、先に掛けると
+            // 運転席の正面ではなく立っていたときの向きが体の正面のまま残る
+            player.HeadYawLimit = seatedYawLimit;
             yield return Wait(sitHold);
 
             if (sound != null) sound.DoorShut();
             yield return Wait(shutHold);
             if (sound != null) sound.Ignition();
+            // 鳴らし終えるまで待ってから震え出す。掛かった音の途中で震えると、
+            // まだ掛かっていないエンジンで車が揺れることになる
+            yield return Wait(sound != null ? sound.IgnitionSeconds : 0f);
+            world.Idling = idleRough;
             yield return Wait(ignitionHold);
 
             // 黒へは切り替えで入る。場面 1 のドアを閉める暗転と同じ扱い
@@ -308,6 +321,8 @@ namespace HalfAware
             if (garage != null) garage.SetActive(false);
             if (cabin != null) cabin.SetActive(true);
             world.Rolling = true;
+            // 走り出したら揺れは路面が持つ。残すと二重に揺れる
+            world.Idling = 0f;
             Dress(0);
             band = 0;
             // 組み直すのは場面の頭でだけ。帯を跨ぐときには呼ばない

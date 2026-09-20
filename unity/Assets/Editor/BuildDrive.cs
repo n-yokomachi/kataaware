@@ -84,6 +84,16 @@ namespace HalfAware.EditorTools
         /// </summary>
         public const float ShakeRate = 1.0f;
 
+        /// <summary>
+        /// 止まったままエンジンだけ掛かっているときに、揺れの位相を進める速さ。m/s 相当。
+        ///
+        /// 揺れの位相は本来なら走った距離から取る（<see cref="RoadShake"/>）。
+        /// 止まっているあいだは距離が進まないので、そのままでは震えが凍りつく。
+        /// ここで時間から位相を作る。7 なら ShakeRate 1.0 で基本の波長が
+        /// およそ 1.1 Hz。エンジンの回転そのものではなく、車体が揺すられる周期にあたる
+        /// </summary>
+        public const float IdleRate = 7f;
+
         // ---- 路面に重ねる面の高さ ------------------------------------------
         //
         // 同じ平面に何枚も重ねるので、上下の順と間隔をここで一箇所に決める。
@@ -1054,19 +1064,46 @@ namespace HalfAware.EditorTools
             Marks(Flow(walker, Screen()));
         }
 
-        // 響きの強さ。**一度弱いと差し戻されている。** 下の値は二度目で、
-        // 括弧内が一度目。もう一段強めるなら EchoDecay と EchoLevel から上げる
+        // 響きの値。**「もっと空間に響いている感じ」と差し戻されている。**
+        //
+        // 強さだけ上げても広さは出ない。広い場所だと分かるのは、音が返ってくるまでの
+        // 間と、高音が尾のあいだどれだけ残るかで、そこを触るのが要る。
+        //
+        //   - 返ってくるまでの間（EchoEarlyDelay / EchoLateDelay）。壁までの距離がこれで伝わる。
+        //     14 × 21 の車庫なら、いちばん近い壁でも 5 m ほど離れている
+        //   - 高音の残り（EchoDecayHF）。既定の 0.5 では高音が先に消えて、
+        //     尾が籠もった唸りになる。裸のコンクリートは高音を返すので 1 に近づける
+        //   - 尾の長さ（EchoDecay）。空の車庫は実際 2 秒を超えて鳴る
+        //
+        // 強すぎると言われたら EchoLevel と EchoDecay から下げる
 
-        /// <summary>ガレージの響きの広さ。ミリベル。場面 2 の小道は -700（一度目 -520）</summary>
-        const float EchoRoom = -360f;
-        /// <summary>高音の残り。コンクリートは高音を返すので小道の -600 より上げる（一度目 -320）</summary>
-        const float EchoBright = -220f;
-        /// <summary>尾を引く長さ。秒。小道は 0.75（一度目 1.15）</summary>
-        const float EchoDecay = 1.70f;
-        /// <summary>初期反射の強さ。ミリベル。小道は -900（一度目 -680）</summary>
-        const float EchoReflect = -500f;
-        /// <summary>残響そのものの強さ。ミリベル。小道は 60（一度目 105）</summary>
-        const float EchoLevel = 180f;
+        /// <summary>響きの広さ。ミリベル。場面 2 の小道は -700</summary>
+        const float EchoRoom = -220f;
+        /// <summary>高音の残り。コンクリートは高音を返すので小道の -600 より上げる</summary>
+        const float EchoBright = -120f;
+        /// <summary>尾を引く長さ。秒。小道は 0.75</summary>
+        const float EchoDecay = 2.60f;
+        /// <summary>
+        /// 尾のあいだ高音がどれだけ残るか。低音の尾に対する割合。
+        /// 既定の 0.5 では高音が先に落ちて、響きが壁の向こうの唸りに聞こえる
+        /// </summary>
+        const float EchoDecayHF = 0.92f;
+        /// <summary>初期反射の強さ。ミリベル。小道は -900</summary>
+        const float EchoReflect = -420f;
+        /// <summary>
+        /// 最初の反射が返ってくるまで。秒。壁までの距離がここに出る。
+        /// 音は 1 秒で 340 m 進むので、0.020 秒は往復 6.8 m にあたる
+        /// </summary>
+        const float EchoEarlyDelay = 0.020f;
+        /// <summary>残響そのものの強さ。ミリベル。小道は 60</summary>
+        const float EchoLevel = 520f;
+        /// <summary>初期反射のあと、尾が立ち上がるまで。秒。長いほど広い場所に聞こえる</summary>
+        const float EchoLateDelay = 0.038f;
+        /// <summary>
+        /// 直の音の残し方。ミリベル。0 が素のまま。
+        /// 少しだけ落として、響きの側を前に出す
+        /// </summary>
+        const float EchoDry = -140f;
 
         /// <summary>
         /// 場面 8 の足音の素材。**場面 1・2 の Step1〜5 とは別物。**
@@ -1181,12 +1218,15 @@ namespace HalfAware.EditorTools
             // 強すぎると言われたら decay と reverbLevel から下げる
             var echo = feet.AddComponent<AudioReverbFilter>();
             echo.reverbPreset = AudioReverbPreset.User;
+            echo.dryLevel = EchoDry;
             echo.room = EchoRoom;
             echo.roomHF = EchoBright;
             echo.decayTime = EchoDecay;
+            echo.decayHFRatio = EchoDecayHF;
             echo.reflectionsLevel = EchoReflect;
+            echo.reflectionsDelay = EchoEarlyDelay;
             echo.reverbLevel = EchoLevel;
-            echo.reverbDelay = 0.022f;
+            echo.reverbDelay = EchoLateDelay;
             echo.diffusion = 100f;
             echo.density = 100f;
 
@@ -1419,6 +1459,7 @@ namespace HalfAware.EditorTools
             so.FindProperty("player").objectReferenceValue = Object.FindFirstObjectByType<PlayerController>();
             so.FindProperty("shake").floatValue = Shake;
             so.FindProperty("shakeRate").floatValue = ShakeRate;
+            so.FindProperty("idleRate").floatValue = IdleRate;
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(world);
 

@@ -46,6 +46,10 @@ namespace HalfAware
         [Tooltip("揺れの速さ。走った距離に掛ける。1.0 で基本の波長がおよそ 6.3 m。" +
             "組み直すと BuildDrive.ShakeRate に戻る")]
         [SerializeField] float shakeRate = 1.0f;
+        [Tooltip("止まったままの震えが位相を進める速さ。m/s 相当。" +
+            "揺れの位相は本来なら走った距離から取るが、止まっているあいだは距離が進まない。" +
+            "組み直すと BuildDrive.IdleRate に戻る")]
+        [SerializeField] float idleRate = 7f;
         [Tooltip("ずれを渡す先")]
         [SerializeField] PlayerController player;
 
@@ -58,6 +62,14 @@ namespace HalfAware
         /// <summary>走り出したか。乗り込むまでは動かさない</summary>
         public bool Rolling { get; set; }
 
+        /// <summary>
+        /// 止まったままエンジンだけ掛かっている震え。<see cref="Rough"/> と同じ扱いで、0 で震えない。
+        ///
+        /// 走り出したら見ない。走っているあいだの揺れは路面が決めるもので、
+        /// そこへエンジンの震えを足すと二重に揺れる
+        /// </summary>
+        public float Idling { get; set; }
+
         /// <summary>今の帯に入ってから走った距離。帯を跨ぐと 0 に戻る。揺れがこれを位相に使う</summary>
         public float Travelled { get; private set; }
 
@@ -68,6 +80,9 @@ namespace HalfAware
         Transform rushing;
 
         readonly RoadShake bump = new RoadShake();
+
+        /// <summary>止まったままの震えの位相。時間で進める。走っているあいだは触らない</summary>
+        float idlePhase;
 
         void Awake()
         {
@@ -80,6 +95,12 @@ namespace HalfAware
             {
                 Travelled += Speed * Time.deltaTime;
                 Place();
+            }
+            else if (Idling > 0f)
+            {
+                // **位相を時間で進める。** RoadShake は走った距離を位相に使うが、
+                // 止まっているあいだ距離は進まない。そのまま渡すと震えが凍りつく
+                idlePhase += idleRate * Time.deltaTime;
             }
             Shake();
         }
@@ -96,7 +117,8 @@ namespace HalfAware
         void Shake()
         {
             if (player == null) return;
-            bump.Tick(Travelled, Rolling ? Rough : 0f, shake, shakeRate);
+            if (Rolling) bump.Tick(Travelled, Rough, shake, shakeRate);
+            else bump.Tick(idlePhase, Idling, shake, shakeRate);
             player.EyeOffset = bump.Offset;
         }
 

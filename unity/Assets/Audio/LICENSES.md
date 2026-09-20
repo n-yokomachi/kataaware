@@ -22,7 +22,7 @@ https://pixabay.com/service/license-summary/
 | ファイル | 出典 | 許諾 | 加工 |
 |---|---|---|---|
 | `Step1`〜`Step5.wav` | Kenney RPG Audio（https://kenney.nl/assets/rpg-audio）の `footstep00/02/04/06/08.ogg` | CC0 1.0 | モノラル 44.1kHz へ、末尾を落として頂点を −6dB に揃えた |
-| `Concrete1`〜`Concrete4.wav` | 同上（`Step2` / `Step5` / `Step1` / `Step3` から作り直し） | CC0 1.0 | `tools/make-steps.py`。190Hz より下を落とし、1.2kHz より上を 1.9 倍に持ち上げ、素のまま 0.62 倍を混ぜ、時定数 62ms で尾を詰めて 0.200 秒へ切り、頂点 −6dB |
+| `Concrete1`〜`Concrete4.wav` | 同上（`Step2` / `Step5` / `Step1` / `Step3` から作り直し）＋合成した低い打ち | CC0 1.0 | `tools/make-steps.py`。190Hz より下を落とし、1.2kHz より上を 1.5 倍に持ち上げ、素のまま 0.80 倍を混ぜ、時定数 62ms で尾を詰めて 0.200 秒へ切る。そこへ 92Hz の正弦を 48ms で減衰させた低い打ちを頂点の 0.50 倍で重ね、頂点 −6dB。300Hz 以下の実効値が重ねる前の +13〜16dB |
 | `LighterClick.wav` | OpenGameArt「Zippo click sound」（https://opengameart.org/content/zippo-click-sound）作者 dawith | CC0 1.0 | 金属音の当たりだけを 0.060〜0.320 秒で切り出し、頂点 −3dB |
 | `Drag.wav` | Pixabay の `crackle`。作品名と作者は未記入 | Pixabay Content License | 前後の無音を落として頂点 −8dB |
 | `Blow.wav` | Pixabay の `blow`。作品名と作者は未記入 | Pixabay Content License | 同上 |
@@ -80,6 +80,12 @@ https://pixabay.com/service/license-summary/
 Kenney の足音はどれも柔らかい地面のもので、2.5kHz 以上が 700Hz 以下より
 10.9〜15.5dB 弱い。裸のコンクリートは逆に高い打ちつけが勝つ。
 `tools/make-steps.py` で唸りを抜いて打音を持ち上げ、偏りを +2.5 / −0.3 / −3.0 / −7.7dB へ寄せた。
+
+**低い打ちは合成して足している。** 二度「軽い」と差し戻されて分かったのは、
+素材に低い成分がそもそも無いということ。Kenney の足音は柔らかい地面のもので、
+低い帯域が録れていない。残す・削るをどう振っても無いものは出てこないので、
+92Hz の正弦を減衰させた打ちを合成して重ねてある。重さを増減するのは
+`tools/make-steps.py` の `THUMP_GAIN`（0.30 で低い側が素の +12dB、0.50 で +16dB、0.62 で +18dB）。
 
 **5 つ全部は使っていない。** `Step4` は元から高域がいちばん少なく、持ち上げても
 素材に無いものは出てこないので落とした。4 つ目（`Step3` 由来）だけ鈍いのはわざとで、

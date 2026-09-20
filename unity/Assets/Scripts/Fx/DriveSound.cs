@@ -44,6 +44,9 @@ namespace HalfAware
         /// <summary>暗転の黒のあいだに流す音の長さ。秒。黒を何秒置くか決めるのに使う</summary>
         public float PullAwaySeconds { get { return pullAway != null ? pullAway.length : 0f; } }
 
+        /// <summary>イグニッションの長さ。秒。鳴らし終えてから震え出すのに使う</summary>
+        public float IgnitionSeconds { get { return ignition != null ? ignition.length : 0f; } }
+
         public void DoorOpen() { Shot(doorOpen); }
         public void DoorShut() { Shot(doorShut); }
         public void Ignition() { Shot(ignition); }
