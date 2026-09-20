@@ -1766,15 +1766,20 @@ namespace HalfAware.EditorTools
         static void CigarettePack(Transform parent)
         {
             var pack = Child(parent, "CigarettePack");
-            // **写真立てのあったところ。** 中央の操作盤の天板（1.26）へ寝かせ、
-            // 箱の厚みの半分だけ持ち上げる。
+            // **写真立てのあったところ。** 中央の操作盤の縁の上。
             //
             // 計器盤の天板には置けない。判定点そのものはメーターの塊
             // （x 0.10〜0.66 / y 1.247〜1.391）の中で、その前の天板は運転席の目から見ると
             // 塊と庇に丸ごと隠れる。庇の奥の下の縁（y 1.4304 / z 0.4439）を掠める線が
             // 天板と交わるのが z 0.725 で、塊の前の面（z 0.71）とのあいだに 15 mm しか残らない。
-            // 見えるのは塊より下と手前、つまりここになる
-            pack.localPosition = new Vector3(0.140f, 1.271f, 0.545f);
+            // 見えるのは塊より下と手前、つまりここになる。
+            //
+            // **ただし操作盤の縁は奥行き 44 mm（z 0.466〜0.510）しかない。**
+            // 箱は 86 mm あるので載り切らない。ここにあった写真立ては台紙が
+            // 13 mm と薄く、立てていたから収まっていた。寝かせるなら受ける面が要るので、
+            // 縁から手前へ小さな棚を出す。棚の天面が箱の座になる
+            Tray(parent);
+
             // 少し振り、手前を持ち上げて傾ける。
             //
             // **平らに寝かせると読めない。** 天板と同じ向きの面は同じだけ灯りを受けるので、
@@ -1782,16 +1787,61 @@ namespace HalfAware.EditorTools
             // ここにあった写真立てが読めていたのは、面を計器の裏の灯り（x 0.38 / y 1.36）へ
             // 向けていたからで、同じ手を当てる。手前を 16 度起こすと上の面が灯りを正面から
             // 受け、箱の縁にも影の線が出る
-            pack.localRotation = Quaternion.Euler(-16f, -22f, 4f);
-            // 起こしたぶん、奥の角が天板へ潜らないように持ち上げる
-            pack.localPosition += new Vector3(0f, 0.008f, 0f);
+            var lean = Quaternion.Euler(-16f, -22f, 4f);
+            pack.localRotation = lean;
+
+            var size = new Vector3(0.056f, 0.022f, 0.086f);
+            // **持ち上げる量は傾きから出す。** 勘で足していたときは、いちばん低い隅が
+            // 天面より 5.3 mm 下へ潜って「埋まってる」と差し戻された。
+            // 回した箱がどれだけ下へ張り出すかは、三辺それぞれの向きの縦成分で決まる
+            var drop = Sink(lean, size);
+            pack.localPosition = new Vector3(PackAt.x, TrayTop + drop + 0.0005f, PackAt.z);
+
             var box = GameObject.CreatePrimitive(PrimitiveType.Cube);
             box.name = "Box";
             box.transform.SetParent(pack, false);
-            box.transform.localScale = new Vector3(0.056f, 0.022f, 0.086f);
+            box.transform.localScale = size;
             box.GetComponent<MeshRenderer>().sharedMaterial = PackMat();
             // 調べるのは判定点の側の仕事。箱そのものに当たりは要らない
             Object.DestroyImmediate(box.GetComponent<Collider>());
+        }
+
+        /// <summary>箱の置き場。x と z だけ使う。y は棚の天面から出す</summary>
+        static readonly Vector3 PackAt = new Vector3(0.140f, 0f, 0.545f);
+
+        /// <summary>棚の天面。中央の操作盤の縁（1.260）に板の厚みを足した高さ</summary>
+        const float TrayTop = 1.272f;
+
+        /// <summary>
+        /// 回した箱が中心からどれだけ下へ張り出すか。m。
+        /// 三辺の向きを世界へ移し、その縦成分に半分の長さを掛けて足す
+        /// </summary>
+        static float Sink(Quaternion turn, Vector3 size)
+        {
+            return Mathf.Abs((turn * Vector3.right).y) * size.x * 0.5f
+                + Mathf.Abs((turn * Vector3.up).y) * size.y * 0.5f
+                + Mathf.Abs((turn * Vector3.forward).y) * size.z * 0.5f;
+        }
+
+        /// <summary>
+        /// 箱を受ける棚。中央の操作盤の縁から手前へ出す。
+        ///
+        /// 道の見える縁（<see cref="SightY"/>）は z 0.57 で 1.498。棚の天面 1.272 は
+        /// その 226 mm 下なので、前は塞がない。ハンドル（軸 x 0.38、外径の半分 0.19）へも
+        /// 届かない。棚の右端 x 0.20 は軸から 0.18 離れていて、輪がそこまで来ない高さにある
+        /// </summary>
+        static void Tray(Transform parent)
+        {
+            var trim = new Bank { Texel = 1.2f };
+            var steel = new Bank { Texel = 1.2f };
+            var top = TrayTop;
+            // 板。操作盤の面（z 0.510）から手前 0.585 まで
+            trim.Box(new Vector3(PackAt.x, top - 0.006f, 0.5475f), new Vector3(0.132f, 0.012f, 0.150f));
+            // 縁の立ち上がり。載せたものが転がり落ちない見た目にする
+            steel.Box(new Vector3(PackAt.x, top + 0.004f, 0.6175f), new Vector3(0.132f, 0.020f, 0.010f));
+            steel.Box(new Vector3(PackAt.x - 0.061f, top + 0.004f, 0.5475f), new Vector3(0.010f, 0.020f, 0.150f));
+            trim.Emit(parent, "TrayTrim", Mat("CarTrim"), false, Generated);
+            steel.Emit(parent, "TraySteel", Mat("CarSteel"), false, Generated);
         }
 
         /// <summary>
