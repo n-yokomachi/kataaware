@@ -6,7 +6,7 @@ Mesh:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: CarDials
+  m_Name: CarSideWater
   serializedVersion: 12
   m_SubMeshes:
   - serializedVersion: 2
@@ -17,8 +17,8 @@ Mesh:
     firstVertex: 0
     vertexCount: 4
     localAABB:
-      m_Center: {x: 0.38, y: 1.3399587, z: 0.5949506}
-      m_Extent: {x: 0.24000001, y: 0.058217764, z: 0.01451534}
+      m_Center: {x: 0, y: 0, z: 0}
+      m_Extent: {x: 0, y: 0.20999998, z: 0.73}
   m_Shapes:
     vertices: []
     shapes: []
@@ -97,7 +97,7 @@ Mesh:
       format: 0
       dimension: 0
     m_DataSize: 128
-    _typelessdata: 52b81e3f1610a43f6897143f0000000076ba773e4c6578bf0000000000000000295c0f3e1610a43f6897143f0000000076ba773e4c6578bf90c2f53e00000000295c0f3e72f7b23ff6051c3f0000000076ba773e4c6578bf90c2f53e96c2f53d52b81e3f72f7b23ff6051c3f0000000076ba773e4c6578bf0000000096c2f53d
+    _typelessdata: 000000003c0a57be48e13abf000080bf000000000000000089d9d33ca158423f000000003c0a57be48e13a3f000080bf00000000000000007bc1d9bee61e21bf000000003c0a573e48e13a3f000080bf000000000000000089d9d3bca15842bf000000003c0a573e48e13abf000080bf00000000000000007bc1d93ee61e213f
   m_CompressedMesh:
     m_Vertices:
       m_NumItems: 0
@@ -151,8 +151,8 @@ Mesh:
       m_BitSize: 0
     m_UVInfo: 0
   m_LocalAABB:
-    m_Center: {x: 0.38, y: 1.3399587, z: 0.5949506}
-    m_Extent: {x: 0.24000001, y: 0.058217764, z: 0.01451534}
+    m_Center: {x: 0, y: 0, z: 0}
+    m_Extent: {x: 0, y: 0.20999998, z: 0.73}
   m_MeshUsageFlags: 0
   m_CookingOptions: 30
   m_BakedConvexCollisionMesh: 

@@ -6,7 +6,7 @@ Mesh:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: CarDials
+  m_Name: DoorGlass
   serializedVersion: 12
   m_SubMeshes:
   - serializedVersion: 2
@@ -17,8 +17,8 @@ Mesh:
     firstVertex: 0
     vertexCount: 4
     localAABB:
-      m_Center: {x: 0.38, y: 1.3399587, z: 0.5949506}
-      m_Extent: {x: 0.24000001, y: 0.058217764, z: 0.01451534}
+      m_Center: {x: 0.958, y: 1.5899999, z: 0.13}
+      m_Extent: {x: 0, y: 0.20999998, z: 0.73}
   m_Shapes:
     vertices: []
     shapes: []
@@ -97,7 +97,7 @@ Mesh:
       format: 0
       dimension: 0
     m_DataSize: 128
-    _typelessdata: 52b81e3f1610a43f6897143f0000000076ba773e4c6578bf0000000000000000295c0f3e1610a43f6897143f0000000076ba773e4c6578bf90c2f53e00000000295c0f3e72f7b23ff6051c3f0000000076ba773e4c6578bf90c2f53e96c2f53d52b81e3f72f7b23ff6051c3f0000000076ba773e4c6578bf0000000096c2f53d
+    _typelessdata: 7d3f753fd7a3b03ff6285c3f0000803f0000000000000000c520303fdf4f8d3f7d3f753fd7a3b03f9a9919bf0000803f00000000000000006a91ed3fdf4f8d3f7d3f753f6666e63f9a9919bf0000803f00000000000000006a91ed3feb51b83f7d3f753f6666e63ff6285c3f0000803f0000000000000000c520303feb51b83f
   m_CompressedMesh:
     m_Vertices:
       m_NumItems: 0
@@ -151,8 +151,8 @@ Mesh:
       m_BitSize: 0
     m_UVInfo: 0
   m_LocalAABB:
-    m_Center: {x: 0.38, y: 1.3399587, z: 0.5949506}
-    m_Extent: {x: 0.24000001, y: 0.058217764, z: 0.01451534}
+    m_Center: {x: 0.958, y: 1.5899999, z: 0.13}
+    m_Extent: {x: 0, y: 0.20999998, z: 0.73}
   m_MeshUsageFlags: 0
   m_CookingOptions: 30
   m_BakedConvexCollisionMesh: 

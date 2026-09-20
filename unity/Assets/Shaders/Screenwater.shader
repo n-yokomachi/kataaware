@@ -65,6 +65,8 @@ Shader "HalfAware/Screenwater"
         _Rill ("筋の濃さ", Range(0, 1)) = 0.85
         _Spray ("ちぎれて飛ぶ水の濃さ", Range(0, 1)) = 0.34
         _Smear ("後ろの灯りをにじませる量。掛け算で効く", Range(0, 3)) = 1.6
+        [Toggle] _Wiped ("羽根に拭われる面か。脇の窓には羽根が無い", Float) = 1
+        _Fall ("落ちる筋の量。uv の縦が真上でない面では減らす", Range(0, 1)) = 1
         _Grit ("1 m あたりの砂目の刻み", Float) = 150
         _Creep ("砂目が上へ流れる速さ。m/s", Float) = 0.38
         _Fan ("走行風が水を外へ開く量。上端での広がり", Float) = 0.22
@@ -88,6 +90,8 @@ Shader "HalfAware/Screenwater"
             half _Rill;
             half _Spray;
             half _Smear;
+            half _Wiped;
+            half _Fall;
             float _Grit;
             float _Creep;
             float _Fan;
@@ -312,8 +316,16 @@ Shader "HalfAware/Screenwater"
         void Water(float2 uv, out float cover, out float lit)
         {
             float t = _WipeWash;
-            float wet = Dried(uv, _WipePivot.xy);
-            if (_WipeSpan.w > 1.5) wet = min(wet, Dried(uv, _WipePivot.zw));
+            // **拭われる面かどうかは素材が決める。** 羽根の角も軸も Shader.SetGlobal で
+            // 場面ぜんたいに置かれるので、風防と脇の窓が同じ値を読む。脇の窓には
+            // 羽根が無いのに、そのまま読ませると風防の扇がそっくり脇の窓にも出る。
+            // 拭われない面は溜まりきったまま（1）にして、水を減らさない
+            float wet = 1.0;
+            if (_Wiped > 0.5)
+            {
+                wet = Dried(uv, _WipePivot.xy);
+                if (_WipeSpan.w > 1.5) wet = min(wet, Dried(uv, _WipePivot.zw));
+            }
 
             // 拭い跡は羽根の軸から測るのでガラスの実寸で、
             // 水そのものは走行風に歪められた側の座標で起こす
@@ -324,7 +336,9 @@ Shader "HalfAware/Screenwater"
             m += _Sand * blot * Sand(p, _Grit, t, wet);
 
             float2 up = Rill(p, t, _Up, 1.0, wet, 0.0);
-            float2 down = Rill(p, t, _Down, -1.0, wet, 23.7);
+            // 落ちる筋は uv の縦を下へ流れる。脇の窓は縦を後ろへ寝かせて張ってあるので、
+            // そのまま出すと水が前上がりに走る。面の側で減らせるようにしておく
+            float2 down = Rill(p, t, _Down, -1.0, wet, 23.7) * _Fall;
             m += _Rill * max(up.x, down.x);
             m += _Spray * Dart(p, t, _Dart, wet);
 

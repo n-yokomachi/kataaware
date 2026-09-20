@@ -7,13 +7,12 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: CarWater
+  m_Name: CarSideWater
   m_Shader: {fileID: 4800000, guid: 03de232c2eb8d724684b0b1223e68c54, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
-  m_InvalidKeywords:
-  - _WIPED_ON
+  m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -26,25 +25,21 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _Bead: 0.42
-    - _Creep: 0.52
-    - _Fall: 1
-    - _Fan: 0.3
-    - _Flow: 0.9
-    - _Grain: 12
+    - _Creep: 0.7
+    - _Fall: 0.18
+    - _Fan: 0.14
     - _Grit: 150
-    - _Rill: 0.9
-    - _Runs: 7
-    - _Sand: 0.36
+    - _Rill: 0.92
+    - _Sand: 0.44
     - _Smear: 1.6
-    - _Spray: 0.46
-    - _Veil: 0.13
-    - _Wiped: 1
+    - _Spray: 0.5
+    - _Veil: 0.19
+    - _Wiped: 0
     m_Colors:
     - _BaseColor: {r: 0.186, g: 0.183, b: 0.176, a: 1}
-    - _Dart: {r: 0.046, g: 0.125, b: 3.1, a: 0.0046}
-    - _Down: {r: 0.212, g: 0.46, b: 0.56, a: 0.0084}
+    - _Dart: {r: 0.042, g: 0.15, b: 4.2, a: 0.0048}
+    - _Down: {r: 0.212, g: 0.46, b: 0.4, a: 0.007}
     - _Glint: {r: 0.285, g: 0.275, b: 0.255, a: 1}
-    - _Up: {r: 0.124, g: 0.5, b: 2.45, a: 0.0062}
+    - _Up: {r: 0.106, g: 0.78, b: 3.2, a: 0.0064}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

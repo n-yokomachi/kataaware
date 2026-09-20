@@ -27,6 +27,82 @@ namespace HalfAware.EditorTools
         /// <summary>風防の傾き。上を後ろへ 10 度倒す</summary>
         public static readonly Quaternion GlassLean = Quaternion.Euler(-10f, 0f, 0f);
 
+        // ---- 開くドア --------------------------------------------------------
+        //
+        // 運転席のドアだけは、車体に焼き込まずに別の入れ物へ分けて出す。
+        // 乗り込むところでドアが開くので、板が蝶番を軸にして振れなければならない。
+        // 助手席の側は最後まで閉じたままなので、これまでどおり車体に焼く
+
+        /// <summary>開くドアの側。右ハンドルなので運転席は +x</summary>
+        const float LeafSide = 1f;
+        /// <summary>蝶番の軸。ドアの前の縁（継ぎ目 z 0.94）の、外板の面（x 0.97）</summary>
+        static readonly Vector3 LeafPivot = new Vector3(LeafSide * BodyHalf, 0f, 0.94f);
+        /// <summary>ドアの後ろの縁。客室の後ろの柱と継ぐところ</summary>
+        const float LeafBack = CabBack;
+
+        /// <summary>
+        /// 開くドアが持って行く面の入れ物。素材ごとに 1 つずつ。
+        ///
+        /// 車体の入れ物（trim / body / …）と同じ Texel で持つ。同じ素材の面が
+        /// 二つの mesh に分かれるので、絵の目の粗さが揃っていないと継ぎ目で段が出る。
+        ///
+        /// **閉じた姿勢では車体の座標そのままで組む。** 蝶番の入れ物の下に
+        /// 「車の原点へ戻す」子を一枚挟んであるので（<see cref="DoorLeaf"/>）、
+        /// ここへ置く面の座標は車体側と一切変わらない。閉じているあいだは
+        /// 焼き込んでいたときと同じところに同じ面が出る
+        /// </summary>
+        sealed class Leaf
+        {
+            public readonly Bank Body = new Bank { Texel = 0.9f };
+            public readonly Bank Steel = new Bank { Texel = 2.2f };
+            public readonly Bank Gap = new Bank { Texel = 1.0f };
+            public readonly Bank Glass = new Bank { Texel = 0.8f };
+            public readonly Bank Trim = new Bank { Texel = 1.2f };
+            public readonly Bank Plate = new Bank { Texel = 2.4f };
+
+            /// <summary>その側の面をドアへ載せるか。開かない側は車体に焼く</summary>
+            public static bool Mine(float side) { return side * LeafSide > 0f; }
+        }
+
+        /// <summary>
+        /// 開くドアを吐く。蝶番の入れ物を車の下へ立て、その子に板の面を置く。
+        ///
+        /// **入れ物を二段にする。** 上（DriverDoor）は蝶番の軸のところに据えて、
+        /// これを y 回りに回すとドアが前の縁を軸に振れる。下（Leaf）は軸のぶんを
+        /// 打ち消して車の原点へ戻すので、面の座標は車体に焼いていたときのままでよい。
+        /// 一段にすると、面を組むたびに軸からの差へ書き直すことになり、
+        /// 車体側の寸法と突き合わせられなくなる。
+        ///
+        /// 回すのは <see cref="CarDoor"/>。段取り（DriveDirector）が開き具合を渡す
+        /// </summary>
+        static void DoorLeaf(Transform parent, Leaf leaf)
+        {
+            var hinge = Child(parent, "DriverDoor");
+            hinge.localPosition = LeafPivot;
+            hinge.localRotation = Quaternion.identity;
+            var slab = Child(hinge, "Leaf");
+            slab.localPosition = -LeafPivot;
+            slab.localRotation = Quaternion.identity;
+
+            leaf.Body.Emit(slab, "DoorBody", Mat("CarBody"), false, Generated);
+            leaf.Steel.Emit(slab, "DoorSteel", Mat("CarSteel"), false, Generated);
+            leaf.Gap.Emit(slab, "DoorGap", Mat("CarGap"), false, Generated);
+            leaf.Glass.Emit(slab, "DoorGlass", Mat("CarGlass"), false, Generated);
+            leaf.Trim.Emit(slab, "DoorTrim", Mat("CarTrim"), false, Generated);
+            leaf.Plate.Emit(slab, "DoorChrome",
+                ItemMat("CarChrome", new Color(0.455f, 0.460f, 0.470f), 0.62f), false, Generated);
+
+            var hung = hinge.GetComponent<CarDoor>();
+            if (hung == null) hung = hinge.gameObject.AddComponent<CarDoor>();
+            var so = new SerializedObject(hung);
+            so.FindProperty("swing").floatValue = CarDoor.Swing;
+            so.FindProperty("side").floatValue = LeafSide;
+            so.FindProperty("open").floatValue = 0f;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            // 組み上がった場面はまだガレージの中で、誰も乗り込んでいない。閉じて置く
+            hung.Set(0f);
+        }
+
         // ---- 車内 ----------------------------------------------------------
 
         /// <summary>
@@ -62,6 +138,8 @@ namespace HalfAware.EditorTools
             // メーターの板。**Texel は 1 から動かさない。** DialMat が _BaseMap_ST で
             // uv を畳み直すときに、実寸がそのまま uv になっていることを当てにしている
             var dials = new Bank { Texel = 1f };
+            // 運転席のドア。開くので車体には焼かず、蝶番の子へ分けて出す
+            var leaf = new Leaf();
 
             // 計器盤。天板は 1.28 で、目線より 0.27 下。この差がそのままボンネットの見える量になる。
             // 上げればボンネットが隠れ、下げれば計器盤が薄くなって乗用車に戻る
@@ -77,7 +155,7 @@ namespace HalfAware.EditorTools
             // 上の縁は天井の板の中へ差し込む。背を縮めずに下げると、下の縁が計器盤から離れて隙間が開く
             glass.Box(GlassAt, GlassSize, GlassLean);
             // ドアの内張り。上端 1.30 を計器盤の天板と揃える。腰の線が左右と前で一本に通ると箱に見える
-            for (var s = 0; s < 2; s++) DoorCard(trim, steel, gap, s == 0 ? -1f : 1f);
+            for (var s = 0; s < 2; s++) DoorCard(trim, steel, gap, s == 0 ? -1f : 1f, leaf);
             Pillars(trim);
             PassengerSeat(seat, steel);
             // 天井。目線との間を 0.33 取る。乗用車だったときの 0.31 より広い
@@ -95,14 +173,14 @@ namespace HalfAware.EditorTools
             var rubber = new Bank { Texel = 3.0f };
             var lens = new Bank { Texel = 1.0f };
             var tail = new Bank { Texel = 1.0f };
-            Shell(body, steel, gap, glass, rubber, lens, tail);
+            Shell(body, steel, gap, glass, rubber, lens, tail, leaf);
             // 車内の後ろ半分。外装の後に呼ぶのは、消えたままの室内灯に lens の入れ物が要るため。
             // 足すのは客室の後ろ（CabBack）から後ろと、床と、座面だけで、
             // 運転席まわりの寸法には一指も触れない
             Hold(trim, seat, steel, gap, body, lens);
             // 調べられる物。判定点のところに、それと分かる形を置く。
             // 入れ物を分けて足すので、ここより上の寸法には一指も触れない
-            Fittings(parent, trim, steel, gap, lens, tail);
+            Fittings(parent, trim, steel, gap, lens, tail, leaf);
 
             trim.Emit(parent, "CarTrim", Mat("CarTrim"), false, Generated);
             seat.Emit(parent, "CarSeat", Mat("CarSeat"), false, Generated);
@@ -114,6 +192,8 @@ namespace HalfAware.EditorTools
             lens.Emit(parent, "CarLamp", Mat("CarLamp"), false, Generated);
             tail.Emit(parent, "CarTail", Mat("CarTail"), false, Generated);
             dials.Emit(parent, "CarDials", DialMat(), false, Generated);
+            // 開くドア。車体を吐いた後に、蝶番の入れ物ごと立てる
+            DoorLeaf(parent, leaf);
 
             // 計器の裏の明かり。**この場面で車内に足す灯りはこれ一つだけ。**
             //
@@ -174,6 +254,22 @@ namespace HalfAware.EditorTools
         const float BladeOut = 0.018f;
         const float FilmOut = 0.034f;
 
+        // ---- 脇の窓の雨 ------------------------------------------------------
+
+        /// <summary>脇の窓の水の板を張る x。側面のガラス（0.958）の 6 mm 外</summary>
+        const float SideFilmX = 0.964f;
+        /// <summary>脇の窓の間口。ドアのガラス（<c>Flanks</c> が張る面）と同じ</summary>
+        const float SideFilmFront = 0.86f;
+        const float SideFilmBack = -0.60f;
+        /// <summary>
+        /// 脇の窓の水が流れる向き。度。0 なら真後ろ、大きいほど後ろ下がりに寝る。
+        ///
+        /// 風防の水は上（＝走行風の下流）へ引かれるが、脇の窓では下流が真後ろになる。
+        /// 板の uv の縦をそちらへ倒して張るので、同じシェーダーのまま筋が後ろへ走る。
+        /// 実際の窓の筋も真横ではなく、重さのぶんだけ後ろ下がりに流れる
+        /// </summary>
+        const float SideFilmRake = 18f;
+
         /// <summary>
         /// 風防に付いた雨と、それを拭うワイパー。**帯 1（夜の高速）でだけ出す。**
         ///
@@ -215,6 +311,28 @@ namespace HalfAware.EditorTools
             // 内へ入れると羽根が水に霞んで、ガラスの内側を拭いているように見える
             var film = Piece(rain, "Film", Pane("CarWater", GlassSize.x, GlassSize.y), WaterMat());
             film.localPosition = new Vector3(0f, 0f, FilmOut);
+
+            // 脇の窓の水。**風防だけでは雨が降っていることが伝わらない。**
+            //
+            // 走行中に脇を向くと、そこにあるのは乾いたガラス一枚と流れる沿道だけで、
+            // 前を向いたときだけ雨が降っていることになっていた。実際の車は
+            // 脇の窓にも水が付くし、羽根が無いぶん拭われないまま溜まり続ける。
+            //
+            // 入れ物を一枚挟んで、風防の傾きを打ち消しておく。Rain は風防の面に
+            // 合わせて据えてあるので、その子に置くと脇の窓まで 10 度傾く
+            var sides = Child(rain, "Sides");
+            sides.localRotation = Quaternion.Inverse(GlassLean);
+            sides.localPosition = Quaternion.Inverse(GlassLean) * -GlassAt;
+            var sideFilm = SideFilm("CarSideWater",
+                SideFilmFront - SideFilmBack, PaneHigh - PaneLow, SideFilmRake);
+            var sideMat = SideWaterMat();
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                var pane = Piece(sides, "SideFilm" + s, sideFilm, sideMat);
+                pane.localPosition = new Vector3(side * SideFilmX,
+                    (PaneLow + PaneHigh) * 0.5f, (SideFilmFront + SideFilmBack) * 0.5f);
+            }
 
             var run = rain.GetComponent<Wipers>();
             if (run == null) run = rain.gameObject.AddComponent<Wipers>();
@@ -264,6 +382,38 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
+        /// 脇の窓に張る水の板 1 枚。x = 0 の面に立てる。置く側が左右へずらす。
+        ///
+        /// **uv は板の形とは別に振る。** シェーダーは uv の縦を「走行風の下流」として
+        /// 水を流すので、真上へ振ると脇の窓でも水が上へ昇ってしまう。縦を後ろへ
+        /// rake 度倒した向き（<see cref="SideFilmRake"/>）に取ると、同じシェーダーのまま
+        /// 筋が後ろ下がりに走る。縦横とも長さ 1 の向きなので、uv の目盛りは
+        /// 風防と同じくメートルのままになる。
+        ///
+        /// 四隅だけで張る。<see cref="Pane"/> と同じ理由で、中を割る必要が無い
+        /// </summary>
+        static Mesh SideFilm(string name, float deep, float high, float rake)
+        {
+            var hz = deep * 0.5f;
+            var hy = high * 0.5f;
+            var a = rake * Mathf.Deg2Rad;
+            // uv の縦。後ろ（-z）へ、少し下（-y）へ
+            var up = new Vector3(0f, -Mathf.Sin(a), -Mathf.Cos(a));
+            // uv の横。縦と直交するもう一本
+            var across = new Vector3(0f, Mathf.Cos(a), -Mathf.Sin(a));
+            var corner = new[]
+            {
+                new Vector3(0f, -hy, -hz), new Vector3(0f, -hy, hz),
+                new Vector3(0f, hy, hz), new Vector3(0f, hy, -hz)
+            };
+            var uv = new Vector2[4];
+            for (var i = 0; i < 4; i++)
+                uv[i] = new Vector2(Vector3.Dot(corner[i], across), Vector3.Dot(corner[i], up));
+            return Shape(name, 1f, b => b.Patch(
+                corner[0], corner[1], corner[2], corner[3], uv[0], uv[1], uv[2], uv[3]));
+        }
+
+        /// <summary>
         /// 風防に乗った水のマテリアル。
         ///
         /// 色は線形で置く（<see cref="Paint"/> と同じ）。
@@ -282,38 +432,102 @@ namespace HalfAware.EditorTools
         ///
         /// 粒は筋に譲る。1 画素が 4.7 mm ぶんある解像度では、実物どおりの
         /// 2〜5 mm の水滴は円として描けないので、砂目（_Sand）として敷き、
-        /// 読める太さを持てる筋（_Up / _Down）とちぎれて飛ぶ水（_Dart）を主役にする
+        /// 読める太さを持てる筋（_Up / _Down）とちぎれて飛ぶ水（_Dart）を主役にする。
+        ///
+        /// ---- 三度目の詰め -----------------------------------------------------
+        ///
+        /// **足りなかったのは筋の太さだった。** 半幅 3.0 mm で置いていた頃、筋は
+        /// いちばん太いところでも 4.2 mm しかなく、画素（3.8 mm）とほとんど同じ幅で、
+        /// どの画素に載るかで出たり消えたりしていた。**動いてはいたが、動いているものが
+        /// 画素の網を渡り歩くたびに明滅していたので、流れではなく雑音に見えていた。**
+        /// 速さや量をいくら足しても、一本が画素に載り切らない限りここは変わらない。
+        ///
+        /// 半幅を倍に取ると、いちばん細い筋でも 8.7 mm ＝ 2.3 画素になり、
+        /// 一本が隣の画素へ渡っていくところが追える。列の間隔も詰めて本数を増やし、
+        /// 速さを 1.70 から 2.30 m/s（1 フレームで 20 画素）へ上げてある
         /// </summary>
         static Material WaterMat()
         {
+            var m = WetGlass("CarWater");
+            m.SetColor("_BaseColor", new Color(0.186f, 0.183f, 0.176f, 1f));
+            m.SetColor("_Glint", new Color(0.285f, 0.275f, 0.255f, 1f));
+            m.SetFloat("_Veil", 0.13f);
+            m.SetFloat("_Sand", 0.36f);
+            m.SetFloat("_Rill", 0.90f);
+            m.SetFloat("_Spray", 0.46f);
+            m.SetFloat("_Smear", 1.60f);
+            m.SetFloat("_Grit", 150f);
+            m.SetFloat("_Creep", 0.52f);
+            // **走行風で外へ開く量を 0.22 から 0.30 へ。** 太らせた筋を真っ直ぐ上へ
+            // 走らせると、間口を縦に抜ける平行線になってガラスの水ではなく
+            // 外を落ちる雨に見える。上へ行くほど外へ逃がすと、筋が扇に開いて
+            // 「風に引かれてガラスを伝っている」向きが出る
+            m.SetFloat("_Fan", 0.30f);
+            m.SetFloat("_Wiped", 1f);
+            m.SetFloat("_Fall", 1f);
+            // 列の間隔 / 一本の長さ / 流れる速さ / 半幅。どれもメートル。
+            // 後ろへ引かれる筋は細く長く速く、落ちる筋は太く短く遅い。
+            // ちぎれて飛ぶ水はいちばん細く、いちばん速い（間口を 0.20 秒で抜ける）。
+            // **半幅はどれも 1 画素（3.8 mm）を超えるところまで太らせてある。**
+            // 細いほど本物らしいが、載らない太さの筋は明滅にしかならない
+            m.SetVector("_Up", new Vector4(0.124f, 0.50f, 2.45f, 0.0062f));
+            m.SetVector("_Down", new Vector4(0.212f, 0.46f, 0.56f, 0.0084f));
+            m.SetVector("_Dart", new Vector4(0.046f, 0.125f, 3.10f, 0.0046f));
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// <summary>
+        /// 脇の窓に乗った水のマテリアル。**風防とは三つのことが違う。**
+        ///
+        ///   - 拭われない（_Wiped 0）。脇の窓に羽根は無い。羽根の角は
+        ///     Shader.SetGlobal で場面ぜんたいに置かれるので、切っておかないと
+        ///     風防の扇がそのまま脇の窓にも出る
+        ///   - 落ちる筋をほとんど出さない（_Fall）。板の uv の縦は後ろへ寝かせてあるので、
+        ///     落ちる筋は前上がりに走ることになる。重さで垂れるぶんは砂目が受け持つ
+        ///   - 溜まりきったまま拭われないので、風防より水が厚い。薄膜と砂目を増やし、
+        ///     後ろへ引かれる筋（_Up）を長く速くする。走行風に持って行かれた水が
+        ///     窓の後ろの端まで一本で抜けていくのが、脇の窓でいちばん目に入る
+        ///
+        /// 地の色は風防と揃える。同じ雨がどちらのガラスにも当たっている
+        /// </summary>
+        static Material SideWaterMat()
+        {
+            var m = WetGlass("CarSideWater");
+            m.SetColor("_BaseColor", new Color(0.186f, 0.183f, 0.176f, 1f));
+            m.SetColor("_Glint", new Color(0.285f, 0.275f, 0.255f, 1f));
+            m.SetFloat("_Veil", 0.19f);
+            m.SetFloat("_Sand", 0.44f);
+            m.SetFloat("_Rill", 0.92f);
+            m.SetFloat("_Spray", 0.50f);
+            m.SetFloat("_Smear", 1.60f);
+            m.SetFloat("_Grit", 150f);
+            // 砂目も後ろへ引かれる。板の uv の縦がそちらを向いている
+            m.SetFloat("_Creep", 0.70f);
+            m.SetFloat("_Fan", 0.14f);
+            m.SetFloat("_Wiped", 0f);
+            m.SetFloat("_Fall", 0.18f);
+            m.SetVector("_Up", new Vector4(0.106f, 0.78f, 3.20f, 0.0064f));
+            m.SetVector("_Down", new Vector4(0.212f, 0.46f, 0.40f, 0.0070f));
+            m.SetVector("_Dart", new Vector4(0.042f, 0.150f, 4.20f, 0.0048f));
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// <summary>水の乗ったガラス 1 枚ぶんのマテリアルの器。値は呼ぶ側が入れる</summary>
+        static Material WetGlass(string name)
+        {
             var shader = Shader.Find("HalfAware/Screenwater");
-            if (shader == null) Debug.LogWarning("HalfAware/Screenwater が見つからない。風防に水が乗らない");
-            var path = Materials + "CarWater.mat";
+            if (shader == null) Debug.LogWarning("HalfAware/Screenwater が見つからない。ガラスに水が乗らない");
+            var path = Materials + name + ".mat";
             var m = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (m == null)
             {
                 m = new Material(shader);
-                m.name = "CarWater";
+                m.name = name;
                 AssetDatabase.CreateAsset(m, path);
             }
             m.shader = shader;
-            m.SetColor("_BaseColor", new Color(0.186f, 0.183f, 0.176f, 1f));
-            m.SetColor("_Glint", new Color(0.285f, 0.275f, 0.255f, 1f));
-            m.SetFloat("_Veil", 0.13f);
-            m.SetFloat("_Sand", 0.32f);
-            m.SetFloat("_Rill", 0.85f);
-            m.SetFloat("_Spray", 0.34f);
-            m.SetFloat("_Smear", 1.60f);
-            m.SetFloat("_Grit", 150f);
-            m.SetFloat("_Creep", 0.38f);
-            m.SetFloat("_Fan", 0.22f);
-            // 列の間隔 / 一本の長さ / 流れる速さ / 半幅。どれもメートル。
-            // 後ろへ引かれる筋は細く長く速く、落ちる筋は太く短く遅い。
-            // ちぎれて飛ぶ水はいちばん細く、いちばん速い（間口を 0.26 秒で抜ける）
-            m.SetVector("_Up", new Vector4(0.165f, 0.60f, 1.70f, 0.0030f));
-            m.SetVector("_Down", new Vector4(0.270f, 0.44f, 0.38f, 0.0052f));
-            m.SetVector("_Dart", new Vector4(0.058f, 0.115f, 2.40f, 0.0026f));
-            EditorUtility.SetDirty(m);
             return m;
         }
 
@@ -429,12 +643,33 @@ namespace HalfAware.EditorTools
         /// </summary>
         static void Binnacle(Bank trim, Bank dials)
         {
-            var lean = Quaternion.Euler(14f, 0f, 0f);
-            var pod = new Vector3(WheelAt.x, 1.320f, 0.615f);
-            trim.Box(pod, new Vector3(0.560f, 0.140f, 0.160f), lean);
-            trim.Box(new Vector3(pod.x, 1.4585f, 0.5195f), new Vector3(0.600f, 0.018f, 0.160f), lean);
-            Panel(dials, pod + lean * new Vector3(0f, 0f, -0.0825f), DialWide, DialHigh, lean);
+            trim.Box(PodAt, new Vector3(0.560f, 0.140f, 0.160f), PodLean);
+            trim.Box(PodAt + new Vector3(0f, 0.1385f, -0.0955f),
+                new Vector3(0.600f, 0.018f, 0.160f), PodLean);
+            Panel(dials, PodFace, DialWide, DialHigh, PodLean);
         }
+
+        /// <summary>
+        /// メーターの塊の中心と傾き。**ここと <see cref="FuelDial"/> の二箇所で使うので
+        /// 数を二重に持たない。** 片方だけ動かすと、立体の燃料計が絵の中の燃料計から外れる。
+        ///
+        /// **z 0.615 から 0.675 へ引いた。** 手前に置いていた頃は、ハンドルの輪の上側
+        /// （68 度寝ているので上の縁がいちばん前へ出る。y 1.301 / z 0.564）が
+        /// 計器の面（同じ高さで z 0.525）を 39 mm 貫いていて、輪の角が盤の絵の中から
+        /// 生えていた。塊を 60 mm 奥へ引くと輪の上側との隙間が 22 mm 開く。
+        ///
+        /// **引けるのはここまで。** 庇の上端（1.4866）と道の見える縁
+        /// （<see cref="SightY"/>）の隙間が、奥へ引くほど詰まる（縁は 1 m につき 0.15 下がる）。
+        /// 0.675 で残りは 21 mm。見直し 14 が組むたびに測る。
+        ///
+        /// 読みやすさはむしろ良くなる。目から輪の上の縁を掠めた線が盤と交わる高さが
+        /// 1.343（盤の真ん中、二つの計器の只中）から 1.310（計器の丸の下端）へ下がり、
+        /// 輪が計器を横切らなくなる
+        /// </summary>
+        static readonly Vector3 PodAt = new Vector3(WheelAt.x, 1.320f, 0.675f);
+        static readonly Quaternion PodLean = Quaternion.Euler(14f, 0f, 0f);
+        /// <summary>計器の絵を貼る面の中心。塊の運転席を向いた側</summary>
+        static Vector3 PodFace { get { return PodAt + PodLean * new Vector3(0f, 0f, -0.0825f); } }
 
         /// <summary>
         /// 絵を一度だけ貼る板。<see cref="Bank.Quad"/> をじかに呼ぶのは、Box にすると
@@ -457,10 +692,14 @@ namespace HalfAware.EditorTools
         /// **窓の下枠が要。** 板一枚だけだと脇が抜けたままで、車に乗っているのではなく
         /// 屋根の付いた台に座っているように見える。枠を回して初めて「窓」になる。
         /// 外へ出す量は塞ぐ箱（<see cref="BlockHalfX"/> 0.92）の内に収め、
-        /// ガレージのドアの印（x 0.92）を食わない
+        /// ガレージのドアの印（x 0.92）を食わない。
+        ///
+        /// **運転席の側は開くドアへ載せる。** 内張りは外板と一緒に振れるもので、
+        /// 車体に残すと、開いたドアの跡に内張りだけが宙に立つ
         /// </summary>
-        static void DoorCard(Bank trim, Bank steel, Bank gap, float side)
+        static void DoorCard(Bank trim, Bank steel, Bank gap, float side, Leaf leaf)
         {
+            if (Leaf.Mine(side)) { trim = leaf.Trim; steel = leaf.Steel; gap = leaf.Gap; }
             trim.Box(new Vector3(side * 0.86f, 1.02f, 0.10f), new Vector3(0.08f, 0.56f, 1.30f));
             trim.Box(new Vector3(side * 0.858f, 1.325f, 0.115f), new Vector3(0.094f, 0.050f, 1.37f));
             // 内張りの継ぎ目。上下二枚に割る
@@ -873,7 +1112,7 @@ namespace HalfAware.EditorTools
         /// 1 ラジアンが 171 画素にしかならない。目から 0.9 m の助手席では 1 mm が 0.19 画素で、
         /// 5 mm を切る造作は明暗が混ざって消える。ここの寸法はどれもその物差しで決めてある
         /// </summary>
-        static void Fittings(Transform parent, Bank trim, Bank steel, Bank gap, Bank lens, Bank tail)
+        static void Fittings(Transform parent, Bank trim, Bank steel, Bank gap, Bank lens, Bank tail, Leaf leaf)
         {
             // 基板と端子と紙と布。どれも車体の素材の表（Tone）に無いので、ここで色を結ぶ
             var board = new Bank { Texel = 2.6f };
@@ -893,8 +1132,8 @@ namespace HalfAware.EditorTools
             PhotoStand(trim, steel, paper, gap);
             RadioSet(steel, gap, paper, tail);
             FuelDial(trim, gap, scale, pointer);
-            CigarettePack(paper, gap, gold);
-            WindowCrank(plate, steel, gap);
+            CigarettePack(parent);
+            WindowCrank(plate, steel, gap, leaf);
 
             // 基板。暗い緑。内装（0.125）より暗く落として、助手席の座面（0.140）から切る
             board.Emit(parent, "CarBoard", ItemMat("CarBoard", new Color(0.088f, 0.108f, 0.086f), 0.34f),
@@ -1246,14 +1485,12 @@ namespace HalfAware.EditorTools
         /// </summary>
         static void FuelDial(Bank trim, Bank gap, Bank scale, Bank pointer)
         {
-            var lean = Quaternion.Euler(14f, 0f, 0f);
-            var pod = new Vector3(WheelAt.x, 1.320f, 0.615f);
+            var lean = PodLean;
             var right = lean * Vector3.right;
             var up = lean * Vector3.up;
             var outward = lean * Vector3.back;
             // 絵の中の計器の中心。左端（x 0.14）から px 366 ÷ 512 だけ右
-            var at = pod + lean * new Vector3(0f, 0f, -0.0825f)
-                + right * (0.14f + 366f / 512f * DialWide - WheelAt.x);
+            var at = PodFace + right * (0.14f + 366f / 512f * DialWide - WheelAt.x);
             // 絵の中の計器と同じ半径（px 34）
             const float r = 0.0319f;
 
@@ -1283,40 +1520,53 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 煙草の箱。燃料計のすぐ外側、計器盤の天板の玉縁（<see cref="Dash"/>）の上。
+        /// 煙草の箱。判定点は燃料計の隣の天板の上。
         ///
-        /// **もとは上着のポケットから覗かせていただけだった**（<see cref="CoatOnSeat"/>）。
-        /// 助手席の座面は運転席から遠くて暗く、そこへ 8 画素ぶん覗かせた紙の面では
-        /// 何を調べているのか読めない。箱そのものを、明るいところへ一つ出す。
+        /// **場面 1・2 に出てくる箱をそのまま使う。** 自室の卓にも小道の卓にも同じ箱が
+        /// 置いてあり（<c>BuildAlleyItems.Pack</c>）、寸法も絵も
+        /// <c>Assets/Materials/Room/CigarettePack.mat</c> の一枚で通っている。
+        /// ここだけ別に紙の箱を組むと、同じ物が場面をまたいで別の形になる。
+        /// 面の集まり（<see cref="Bank"/>）ではなく立方体ひとつで置くのは、
+        /// 巻いてある絵が立方体の uv を当てにしているため。
         ///
-        /// **置ける場所は見た目より狭い。** 目（0.38, 1.55, 0.22）は計器盤の塊
-        /// （<see cref="Binnacle"/>。x 0.10〜0.66・上端 1.41）より 0.14 高いだけなので、
-        /// 塊の右脇の天板（1.28）は塊の右の壁にほとんど隠れる。目から一点ずつ線を引いて
-        /// 測ると、天板の高さで隠れずに残るのは x 0.79 より外――つまり内張り（0.82）の
-        /// 中だけだった。前へ出すほど塊の陰は右へ伸びるので、前へ逃げる手も無い。
-        /// 手前の玉縁（z 0.51〜0.61・上端 1.30）の上まで戻すと陰は x 0.685 で止まり、
-        /// そこでようやく箱が丸ごと出る。ここが燃料計にいちばん近い置き場になる。
+        /// **立てずに寝かせる。** 立てた 88 mm の箱は、目（0.38, 1.55, 0.22）から
+        /// 0.52 m しか離れていない天板の上でほとんど計器盤の高さまで伸びていて、
+        /// 卓に置いた箱ではなく天板に立てた柱に見えた。寝かせれば背が 22 mm になり、
+        /// 天板の上に転がしたものとして読める。
         ///
-        /// **庇の下には入れられない。** 計器盤の庇（y 1.44〜1.48）は塊の天面を丸ごと覆うので、
-        /// 塊の上に立てた箱は庇の後ろの縁で帯状に切り取られる。
-        ///
-        /// 高さは 88 mm で実物どおり。目から 0.52 m なので画面では 28 画素になり、
-        /// 立った紙の箱として一目で読める。道の見える縁（z 0.58 で 1.496）へは 0.10 m 余る
+        /// **置ける場所は見た目より狭い。** 目は計器盤の塊（<see cref="PodAt"/>）より
+        /// 0.14 高いだけなので、塊の右脇の天板は塊の右の壁の陰に入る。手前の玉縁
+        /// （z 0.51〜0.61・上端 1.30）の上まで戻したところが、箱が丸ごと出る
+        /// いちばん燃料計に近い置き場になる。塊を 60 mm 奥へ引いたぶん陰も退いたので、
+        /// 立てていた頃と同じ x 0.722 のままで、箱の内側の角（x 0.680）まで見えている
         /// </summary>
-        static void CigarettePack(Bank paper, Bank gap, Bank gold)
+        static void CigarettePack(Transform parent)
         {
-            // 少し運転席の方へ振る。天板と平行に置くと、箱の正面が運転席から見えない
-            var lean = Quaternion.Euler(0f, 22f, 0f);
-            var at = new Vector3(0.722f, 1.344f, 0.565f);
-            // 箱。玉縁の天面（1.30）に立てる
-            paper.Box(at, new Vector3(0.056f, 0.088f, 0.023f), lean);
-            // 蓋の継ぎ目。一本入れないと、この解像度では白い角柱にしか見えない
-            gap.Box(at + lean * new Vector3(0f, 0.016f, 0f),
-                new Vector3(0.0585f, 0.010f, 0.0255f), lean);
-            // 開けた口から覗く銀紙。車内でいちばん明るい素材（端子と同じ）を 10 mm だけ使う。
-            // 暗い天板の上で最初に目へ入るのがここになる
-            gold.Box(at + lean * new Vector3(0f, 0.047f, -0.002f),
-                new Vector3(0.044f, 0.010f, 0.016f), lean);
+            var pack = Child(parent, "CigarettePack");
+            // 玉縁の天面（1.30）へ寝かせる。箱の厚みの半分だけ持ち上げる
+            pack.localPosition = new Vector3(0.722f, 1.311f, 0.560f);
+            // 少し振る。天板と平行に置くと、置いたのではなく嵌めたものに見える
+            pack.localRotation = Quaternion.Euler(0f, 16f, 0f);
+            var box = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            box.name = "Box";
+            box.transform.SetParent(pack, false);
+            box.transform.localScale = new Vector3(0.056f, 0.022f, 0.086f);
+            box.GetComponent<MeshRenderer>().sharedMaterial = PackMat();
+            // 調べるのは判定点の側の仕事。箱そのものに当たりは要らない
+            Object.DestroyImmediate(box.GetComponent<Collider>());
+        }
+
+        /// <summary>
+        /// 煙草の箱の素材。自室のものをそのまま借りる。
+        /// 借り物が見つからないときだけ、同じ色の無地を車内の素材として作る
+        /// </summary>
+        static Material PackMat()
+        {
+            const string shared = "Assets/Materials/Room/CigarettePack.mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(shared);
+            if (m != null) return m;
+            Debug.LogWarning("自室の煙草のマテリアルが無い: " + shared + "。無地で置く");
+            return ItemMat("CarPack", new Color(0.320f, 0.180f, 0.155f), 0.24f);
         }
 
         /// <summary>
@@ -1366,15 +1616,22 @@ namespace HalfAware.EditorTools
         /// （<see cref="Mat"/> の CarGap 0.020）を後ろへ敷くと、明るい把手が
         /// 暗い輪に囲まれて、形が段として立つ
         /// </summary>
-        static void WindowCrank(Bank plate, Bank steel, Bank gap)
+        static void WindowCrank(Bank plate, Bank steel, Bank gap, Leaf leaf)
         {
-            // 窓の下枠。左右とも通す。溝は暗く、笠は明るく
+            // 窓の下枠。左右とも通す。溝は暗く、笠は明るく。
+            // 運転席の側は窓ごとドアに付いているので、開くドアへ載せる
             for (var s = 0; s < 2; s++)
             {
                 var side = s == 0 ? -1f : 1f;
-                gap.Box(new Vector3(side * 0.862f, 1.3555f, 0.115f), new Vector3(0.062f, 0.013f, 1.362f));
-                steel.Box(new Vector3(side * 0.858f, 1.3475f, 0.115f), new Vector3(0.098f, 0.013f, 1.372f));
+                var dark = Leaf.Mine(side) ? leaf.Gap : gap;
+                var lit = Leaf.Mine(side) ? leaf.Steel : steel;
+                dark.Box(new Vector3(side * 0.862f, 1.3555f, 0.115f), new Vector3(0.062f, 0.013f, 1.362f));
+                lit.Box(new Vector3(side * 0.858f, 1.3475f, 0.115f), new Vector3(0.098f, 0.013f, 1.372f));
             }
+
+            // 把手も運転席のドアに付いている。ここから先は開くドアの側へ置く
+            plate = leaf.Plate;
+            gap = leaf.Gap;
 
             // 暗い座。把手のぜんたいを後ろから囲う
             gap.Box(new Vector3(0.8175f, 1.140f, 0.110f), new Vector3(0.013f, 0.180f, 0.130f));
@@ -1406,9 +1663,10 @@ namespace HalfAware.EditorTools
         /// 併せて、見直し 4 の巻き数の判定は開いた面を「中」と数えないので、
         /// 窓の判定点（x 0.80）がガラスに埋まったことにもならない
         /// </summary>
-        static void Shell(Bank body, Bank steel, Bank gap, Bank glass, Bank tyre, Bank lens, Bank tail)
+        static void Shell(Bank body, Bank steel, Bank gap, Bank glass, Bank tyre, Bank lens, Bank tail,
+            Leaf leaf)
         {
-            Flanks(body, steel, gap, glass);
+            Flanks(body, steel, gap, glass, leaf);
             Boot(body, steel, gap, glass, tyre, tail, lens);
             Face(body, steel, gap, lens);
             Running(body, steel, gap, tyre);
@@ -1420,7 +1678,7 @@ namespace HalfAware.EditorTools
         /// **雨樋が要。** 屋根と側面のあいだに樋を一本回すだけで、
         /// 塗った板を貼り合わせた車に見える。この年式の四輪駆動車の顔付きそのもの
         /// </summary>
-        static void Flanks(Bank body, Bank steel, Bank gap, Bank glass)
+        static void Flanks(Bank body, Bank steel, Bank gap, Bank glass, Leaf leaf)
         {
             var mid = (SkinIn + BodyHalf) * 0.5f;
             var skin = BodyHalf - SkinIn;
@@ -1436,21 +1694,32 @@ namespace HalfAware.EditorTools
             {
                 var side = s == 0 ? -1f : 1f;
                 var x = side * mid;
+                // 開くドアが持って行く面。開かない側では車体の入れ物をそのまま指す
+                var mine = Leaf.Mine(side);
+                var dBody = mine ? leaf.Body : body;
+                var dSteel = mine ? leaf.Steel : steel;
+                var dGap = mine ? leaf.Gap : gap;
+                var dGlass = mine ? leaf.Glass : glass;
 
                 // 前の翼板。抜きの前後は腰まで、抜きの上は頂きから腰まで
                 Slab(body, x, skin, 0.94f, frontIn, SillY, 1.28f);
                 Slab(body, x, skin, frontOut, 2.42f, SillY, 1.28f);
                 Slab(body, x, skin, frontIn, frontOut, crown, 1.28f);
                 // ドア。腰の線まで。継ぎ目で前後を切る
-                Slab(body, x, skin, CabBack, 0.94f, SillY, BeltY);
+                Slab(dBody, x, skin, LeafBack, 0.94f, SillY, BeltY);
                 // 後ろの荷室の側面。抜きを避けて三つに割る
                 Slab(body, x, skin, rearIn, CabBack, SillY, BeltY);
                 Slab(body, x, skin, TailZ, rearOut, SillY, BeltY);
                 Slab(body, x, skin, rearOut, rearIn, crown, BeltY);
 
-                // 窓の枠。下枠・上枠・柱で、間を抜いてガラスを張る
-                Slab(body, x, skin, TailZ, 0.94f, BeltY, PaneLow);
-                Slab(body, x, skin, TailZ, 0.94f, PaneHigh, 1.94f);
+                // 窓の枠。下枠・上枠・柱で、間を抜いてガラスを張る。
+                // **ドアの間口ぶんはドアへ回す。** この車のドアは枠ごと一枚で、
+                // 開けば下枠も上枠も一緒に振れる。車体に残すと、開いたドアの跡に
+                // 枠だけが四角く残って窓が浮く
+                Slab(body, x, skin, TailZ, LeafBack, BeltY, PaneLow);
+                Slab(body, x, skin, TailZ, LeafBack, PaneHigh, 1.94f);
+                Slab(dBody, x, skin, LeafBack, 0.94f, BeltY, PaneLow);
+                Slab(dBody, x, skin, LeafBack, 0.94f, PaneHigh, 1.94f);
                 // 中柱（客室の後ろ）と後ろの隅の柱
                 Slab(body, x, skin, CabBack, CabBack + 0.12f, PaneLow, PaneHigh);
                 Slab(body, x, skin, TailZ, TailZ + 0.17f, PaneLow, PaneHigh);
@@ -1467,30 +1736,35 @@ namespace HalfAware.EditorTools
                 steel.Box(new Vector3(side * (BodyHalf + 0.012f), 1.885f, -0.655f),
                     new Vector3(0.040f, 0.048f, 3.19f));
 
-                // ドアの継ぎ目。前後の縁を暗く落とす
-                foreach (var seam in new[] { CabBack, 0.94f })
-                    gap.Box(new Vector3(x, (SillY + BeltY) * 0.5f, seam),
+                // ドアの継ぎ目。前後の縁を暗く落とす。ドアの側の縁なので板と一緒に振れる
+                foreach (var seam in new[] { LeafBack, 0.94f })
+                    dGap.Box(new Vector3(x, (SillY + BeltY) * 0.5f, seam),
                         new Vector3(skin + 0.004f, BeltY - SillY, 0.018f));
                 // 露わな蝶番。二枚。この車は継ぎ目を隠さない
                 foreach (var y in new[] { 0.80f, 1.20f })
-                    steel.Box(new Vector3(side * (BodyHalf + 0.010f), y, 0.900f),
+                    dSteel.Box(new Vector3(side * (BodyHalf + 0.010f), y, 0.900f),
                         new Vector3(0.030f, 0.085f, 0.110f));
                 // 取っ手。押しボタン式の座と、引く爪
-                steel.Box(new Vector3(side * (BodyHalf + 0.012f), 1.170f, 0.420f),
+                dSteel.Box(new Vector3(side * (BodyHalf + 0.012f), 1.170f, 0.420f),
                     new Vector3(0.028f, 0.070f, 0.200f));
-                steel.Box(new Vector3(side * (BodyHalf + 0.026f), 1.170f, 0.480f),
+                dSteel.Box(new Vector3(side * (BodyHalf + 0.026f), 1.170f, 0.480f),
                     new Vector3(0.022f, 0.040f, 0.060f));
                 // 鍵穴
-                steel.Box(new Vector3(side * (BodyHalf + 0.008f), 1.090f, 0.420f),
+                dSteel.Box(new Vector3(side * (BodyHalf + 0.008f), 1.090f, 0.420f),
                     new Vector3(0.018f, 0.032f, 0.032f));
-                // 止めねじ。腰の線に沿って。露わなままなのがこの車の作り
+                // 止めねじ。腰の線に沿って。露わなままなのがこの車の作り。
+                // ドアの間口に落ちるものはドアの板へ打つ
                 for (var k = 0; k < 6; k++)
-                    steel.Box(new Vector3(side * (BodyHalf + 0.006f), BeltY - 0.030f, -2.05f + k * 0.52f),
+                {
+                    var z = -2.05f + k * 0.52f;
+                    (z > LeafBack ? dSteel : steel).Box(
+                        new Vector3(side * (BodyHalf + 0.006f), BeltY - 0.030f, z),
                         new Vector3(0.014f, 0.020f, 0.020f));
+                }
 
                 // 側面のガラス。外を向いた面 1 枚ずつ。ドアと荷室で 2 枚
                 var pane = side * (BodyHalf - 0.012f);
-                glass.FaceX(pane, -0.60f, 0.86f, PaneLow, PaneHigh, s == 0 ? -1 : 1);
+                dGlass.FaceX(pane, -0.60f, 0.86f, PaneLow, PaneHigh, s == 0 ? -1 : 1);
                 glass.FaceX(pane, TailZ + 0.17f, CabBack, PaneLow, PaneHigh, s == 0 ? -1 : 1);
 
                 // 鏡。腕木と鏡面。**外へ出す量は塞ぐ箱（1.06）の内に収める。**
