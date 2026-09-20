@@ -981,9 +981,10 @@ namespace HalfAware
         [SerializeField] float oncomingRate = 2.2f;
 
         [Header("揺れ")]
-        [Tooltip("揺れの幅。m。舗装はごく小さく、未舗装は粗く")]
+        [Tooltip("揺れの幅。m。舗装はごく小さく、未舗装は粗く。組み直すと BuildDrive.Shake に戻る")]
         [SerializeField] float shake = 0.004f;
-        [Tooltip("揺れの速さ。走った距離に掛ける。1.0 で基本の波長がおよそ 6.3 m")]
+        [Tooltip("揺れの速さ。走った距離に掛ける。1.0 で基本の波長がおよそ 6.3 m。" +
+            "組み直すと BuildDrive.ShakeRate に戻る")]
         [SerializeField] float shakeRate = 1.0f;
         [Tooltip("ずれを渡す先")]
         [SerializeField] PlayerController player;
