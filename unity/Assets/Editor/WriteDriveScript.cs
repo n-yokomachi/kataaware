@@ -111,22 +111,6 @@ namespace HalfAware.EditorTools
                 });
             }
 
-            // 帯を問わず置く、読んでも帯が進まない対象
-            entries.Add(new ScriptEntry
-            {
-                id = DriveIds.Radio,
-                label = "ラジオをつける",
-                lines = new[] { "雑音しか拾わない。この辺りはもう中継塔の外だ" },
-                hints = new ScriptHint[0],
-            });
-            entries.Add(new ScriptEntry
-            {
-                id = DriveIds.Fuel,
-                label = "燃料計を見る",
-                lines = new[] { "半分を切っている。町に着くまでは保つ" },
-                hints = new ScriptHint[0],
-            });
-
             return entries;
         }
 

@@ -82,19 +82,3 @@ MonoBehaviour:
     choice:
       question: 
       afterYes: []
-  - id: drive.radio
-    label: "\u30E9\u30B8\u30AA\u3092\u3064\u3051\u308B"
-    lines:
-    - "\u96D1\u97F3\u3057\u304B\u62FE\u308F\u306A\u3044\u3002\u3053\u306E\u8FBA\u308A\u306F\u3082\u3046\u4E2D\u7D99\u5854\u306E\u5916\u3060"
-    hints: []
-    choice:
-      question: 
-      afterYes: []
-  - id: drive.fuel
-    label: "\u71C3\u6599\u8A08\u3092\u898B\u308B"
-    lines:
-    - "\u534A\u5206\u3092\u5207\u3063\u3066\u3044\u308B\u3002\u753A\u306B\u7740\u304F\u307E\u3067\u306F\u4FDD\u3064"
-    hints: []
-    choice:
-      question: 
-      afterYes: []

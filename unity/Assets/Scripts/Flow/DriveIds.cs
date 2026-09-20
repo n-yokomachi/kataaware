@@ -34,10 +34,9 @@ namespace HalfAware
         /// </summary>
         public static IReadOnlyList<string> Triggers { get { return triggers; } }
 
-        /// <summary>ラジオ。帯を問わず置く、読んでも帯が進まない対象</summary>
-        public const string Radio = "drive.radio";
-        /// <summary>燃料計。同じく帯は進まない</summary>
-        public const string Fuel = "drive.fuel";
+        // **車内に任意の対象は置かない。** ラジオも燃料計も上着のポケットも、
+        // 物としては車内に残っているが調べられない。走っているあいだ調べられるのは
+        // その景色のきっかけひとつだけで、任意の対象はガレージの garage.button だけになる
 
         /// <summary>i 番目の帯で出す独白の段</summary>
         public static string Page(int i)

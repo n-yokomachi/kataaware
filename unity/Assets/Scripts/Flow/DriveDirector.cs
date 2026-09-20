@@ -36,9 +36,6 @@ namespace HalfAware
         [SerializeField] GameObject garage;
         [Tooltip("運転席。乗り込んだらここへ立たせる")]
         [SerializeField] Transform seat;
-        [Tooltip("車内の、帯を問わず置く対象。乗り込むまで伏せる。" +
-            "ガレージから届いてしまうと once: true のせいで走行中は二度と出ない")]
-        [SerializeField] GameObject cabin;
         [Tooltip("ガレージでだけ調べられる対象。乗り込んだら伏せる。" +
             "伏せないと走っている車の後ろにピンが浮いたまま残る")]
         [SerializeField] GameObject garageOnly;
@@ -154,8 +151,6 @@ namespace HalfAware
             // 室内に朝日が差して壁も床も白く飛ぶ。空の物も出さない
             ShowSky(-1);
             garageSky.Apply(sun, eye, beams);
-            // 車内の対象はガレージからでも距離が届いてしまう。乗り込むまで伏せておく
-            if (cabin != null) cabin.SetActive(false);
             // ガレージは屋内。雨は降っていない
             if (rainRig != null) rainRig.SetActive(false);
             band = -1;
@@ -372,7 +367,6 @@ namespace HalfAware
             hud.SetFade(1f);
             if (sound != null) sound.PullAway();
             if (garage != null) garage.SetActive(false);
-            if (cabin != null) cabin.SetActive(true);
             world.Rolling = true;
             // 走り出したら揺れは路面が持つ。残すと二重に揺れる
             world.Idling = 0f;

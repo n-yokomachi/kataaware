@@ -996,21 +996,16 @@ namespace HalfAware.EditorTools
             // きっかけはその帯に入るまで出さない。出し分けるのは DriveDirector.ShowTrigger
             for (var i = 0; i < triggerItems.Length; i++) triggerItems[i].SetActive(false);
 
-            // 帯を問わず置く、読んでも帯が進まない対象。
-            // ひとつの入れ物にまとめて、乗り込むまで DriveDirector に伏せさせる。
-            // 塞ぐ箱があってもガレージの立てる位置から 1.1〜1.3 m しか離れず、
-            // 拾える距離 1.4 の内側に入ってしまう。once: true なので、ここで読まれると
-            // 走行中に二度と出ない
             // ガレージでだけ調べられる対象。乗り込んだら DriveDirector が伏せる。
             // 伏せないと、走っている車の後ろ 5.9 m にピンが浮いたまま残る
             // （PinMarkers は Interactable.Active しか見ない）
             var garageOnly = Child(parent, "GarageOnly");
             Put(garageOnly, "Button", new Vector3(2.55f, 1.12f, 5.60f), script, DriveIds.Button, ItemRadius, false);
 
-            var cabin = Child(parent, "Cabin");
-            Put(cabin, "Radio", new Vector3(-0.02f, 1.19f, 0.70f), script, DriveIds.Radio, ItemRadius, false);
-            Put(cabin, "Fuel", new Vector3(0.46f, 1.25f, 0.58f), script, DriveIds.Fuel, ItemRadius, false);
-            cabin.gameObject.SetActive(false);
+            // **車内に任意の対象は置かない。** ラジオ・燃料計・上着のポケット・
+            // アクセスログ・ルームミラー・写真立ては、物としては車内にあるが
+            // 調べる対象からは外してある。走っているあいだ調べられるのは、
+            // その景色のきっかけひとつだけ。任意の対象はガレージのボタンだけになる
         }
 
         /// <summary>
@@ -1562,8 +1557,6 @@ namespace HalfAware.EditorTools
             dso.FindProperty("garage").objectReferenceValue = garage != null ? garage.gameObject : null;
             dso.FindProperty("seat").objectReferenceValue = Look(root, "Car/Seat");
             // 車内の対象は乗り込むまで伏せる。ガレージからでも拾える距離に入ってしまう
-            var cabin = Look(root, "Items/Cabin");
-            dso.FindProperty("cabin").objectReferenceValue = cabin != null ? cabin.gameObject : null;
             var garageOnly = Look(root, "Items/GarageOnly");
             dso.FindProperty("garageOnly").objectReferenceValue = garageOnly != null ? garageOnly.gameObject : null;
             // 足音。乗り込んだら止める。Player の下にあるのでガレージと一緒には消えない

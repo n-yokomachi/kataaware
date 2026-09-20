@@ -19,7 +19,7 @@ namespace HalfAware.Tests
             Assert.IsFalse(DriveIds.IsPage(null));
             foreach (var id in DriveIds.Triggers)
                 Assert.IsFalse(DriveIds.IsPage(id), "きっかけの対象が段に見えている: " + id);
-            foreach (var id in new[] { DriveIds.Door, DriveIds.Button, DriveIds.Radio, DriveIds.Fuel })
+            foreach (var id in new[] { DriveIds.Door, DriveIds.Button })
                 Assert.IsFalse(DriveIds.IsPage(id), "対象が段に見えている: " + id);
         }
 
