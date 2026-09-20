@@ -33,9 +33,14 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 路面にじかに貼る面。道に乗っているのが正しいので、道へのはみ出しは見ない。
-        /// 帯 0 の濡れた照り返しと、帯 4 の土と轍がこれにあたる
+        /// 帯 0 の濡れた照り返しとネオンの映り込み、帯 1 の街灯の溜まり、
+        /// 帯 4 の土と轍がこれにあたる。灯りの板は道を照らすために置いてあるので、
+        /// 道に掛かっていないほうが不具合になる
         /// </summary>
-        static readonly string[] Paving = { "Sheen", "Earth", "Ruts" };
+        static readonly string[] Paving =
+        {
+            "Sheen", "Earth", "Ruts", "PoolL", "PoolR", "SmearL", "SmearR",
+        };
 
         /// <summary>
         /// 路面に重ねる面の隔たり。m。BuildDrive の「路面に重ねる面の高さ」の但し書きから取った。
@@ -59,6 +64,7 @@ namespace HalfAware.EditorTools
             "Road/Tile0",                        // 舗装。0.000
             "Roadsides/Band0/Slice0/Sheen",      // 帯 0 の濡れた照り返し
             "Road/Tile0/Line",                   // 白線。照り返しより上でないと帯 0 で消える
+            "Roadsides/Band1/Slice0/PoolL",      // 路面に落ちる灯り。白線より上でないと深度で弾かれる
             "Roadsides/Band4/Slice0/Earth",      // 帯 4 の土。白線を覆い隠す
             "Roadsides/Band4/Slice0/Ruts",       // 帯 4 の轍
         };

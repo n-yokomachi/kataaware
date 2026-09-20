@@ -45,6 +45,15 @@ namespace HalfAware
         public Color lift;
         /// <summary>環境光の下（地面側）</summary>
         public Color ground;
+        /// <summary>
+        /// 前照灯が路面を照らす強さ。0 で消える。
+        ///
+        /// WebGL なので本物の灯りは置かず、照らした跡を板（HalfAware/RoadGlow）で
+        /// 路面へ加算する。**強さだけは帯が持つ。** 夜の帯では道を読ませる唯一の
+        /// 手掛かりだが、朝の帯でそのまま点けたままにすると、土の轍に白が乗って
+        /// 黄金色の畑のあいだを灰色の道が抜けることになる
+        /// </summary>
+        public float beam;
 
         /// <summary>
         /// 環境光の水平。上と下の中ほどを取る。
@@ -54,11 +63,31 @@ namespace HalfAware
         public Color Equator { get { return Color.Lerp(lift, ground, 0.5f); } }
 
         /// <summary>
-        /// この帯の空と灯りに差し替える。暗転の裏で呼ぶ。
-        /// 明るいところで呼ぶと、時間帯が切り替わるのがそのまま見える
+        /// 前照灯の板へ強さを渡す入れ物。帯を跨ぐたびに作り直さないよう、ここへ置く。
+        /// マテリアルそのものは 5 帯で 1 枚を使い回すので、色を書くとほかの帯まで連れて動く
         /// </summary>
-        public void Apply(Light sunLight, Camera eye)
+        static MaterialPropertyBlock paint;
+
+        /// <summary>
+        /// この帯の空と灯りに差し替える。暗転の裏で呼ぶ。
+        /// 明るいところで呼ぶと、時間帯が切り替わるのがそのまま見える。
+        ///
+        /// beams は前照灯の照り返しの板。繋がっていなければ黙って飛ばす。
+        /// 組み立ての途中や、絵を撮るために外から呼ぶときに無いことがある
+        /// </summary>
+        public void Apply(Light sunLight, Camera eye, Renderer beams = null)
         {
+            if (beams != null)
+            {
+                beams.enabled = beam > 0f;
+                if (beam > 0f)
+                {
+                    if (paint == null) paint = new MaterialPropertyBlock();
+                    beams.GetPropertyBlock(paint);
+                    paint.SetColor("_BaseColor", new Color(beam, beam, beam, 1f));
+                    beams.SetPropertyBlock(paint);
+                }
+            }
             if (eye != null)
             {
                 eye.clearFlags = CameraClearFlags.SolidColor;
@@ -82,6 +111,13 @@ namespace HalfAware
             // 空の球は使わない。濡れた面の映り込みが要る路地裏と違い、
             // ここは平らな色で塗る。階調の少ない絵に合う
             RenderSettings.skybox = null;
+            // **映り込みも切る。** 空の球が無いと、既定の映り込みは Unity の組み込みの
+            // 灰色の立方体のままになる。夜の空とは何の関係も無い明るさで、艶のある面が
+            // 片端からそれを映す。実際に測ると、濡れた舗装（艶 0.86）が 15〜40 m のところで
+            // (127,146,165) の平らな明るい楔になってネオンの映り込みを呑み、
+            // フロントガラス（艶 0.85）は外の景色ぜんたいに +14 の被りを掛けていた。
+            // 夜の帯が「暗いのに平ら」だったのはこの二つで、空や霧の値ではなかった
+            RenderSettings.reflectionIntensity = 0f;
             // 環境光の球面調和はここで焼き直す。**書き換えただけでは次のフレームまで効かない。**
             // 帯を跨ぐのは黒のあいだなので 1 フレームの遅れは見えないが、
             // エディタで絵を撮ると 1 枚前の帯の灯りで撮れてしまい、

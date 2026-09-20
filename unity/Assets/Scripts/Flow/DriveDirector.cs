@@ -57,6 +57,9 @@ namespace HalfAware
         [SerializeField] DriveSky garageSky;
         [Tooltip("帯ごとの空の物。雲など。帯と同じ並び。中身の無い帯は空の入れ物")]
         [SerializeField] Transform[] skies = new Transform[0];
+        [Tooltip("前照灯が路面を照らした跡の板。車の子で、環には乗らない。" +
+            "強さは帯が持つ（DriveBand.sky.beam）ので、ここへ渡すのは差し替える先だけ")]
+        [SerializeField] Renderer beams;
 
         [Header("帯")]
         [Tooltip("景色の帯。DriveIds.Triggers と同じ並びにする")]
@@ -104,7 +107,7 @@ namespace HalfAware
             // 走り出す前はガレージの中。ここへ帯の空を入れると、天井の灯りが二つある
             // 室内に朝日が差して壁も床も白く飛ぶ。空の物も出さない
             ShowSky(-1);
-            garageSky.Apply(sun, eye);
+            garageSky.Apply(sun, eye, beams);
             // 車内の対象はガレージからでも距離が届いてしまう。乗り込むまで伏せておく
             if (cabin != null) cabin.SetActive(false);
             band = -1;
@@ -244,7 +247,7 @@ namespace HalfAware
             // 空と灯りもここで差し替える。**黒のあいだに呼ばれるのが要る。**
             // 走っている最中に時間帯が変わると、夜から朝へ切り替わるその一瞬が見える
             ShowSky(which);
-            At(which).sky.Apply(sun, eye);
+            At(which).sky.Apply(sun, eye, beams);
         }
 
         /// <summary>which 番目の帯の空の物だけ出す。-1 でどれも出さない</summary>

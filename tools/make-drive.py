@@ -806,6 +806,168 @@ def skyhigh():
     return im
 
 
+# ---- 路面に落ちる灯り ---------------------------------------------------
+#
+# どれも HalfAware/RoadGlow で路面へ加算する板の絵。板の縦（v）は 0 が奥、
+# 1 が手前で、Bank が振る uv をマテリアルの _BaseMap_ST で 0〜1 へ畳んだもの。
+# 明るさの絶対値はマテリアルの色（_BaseColor）が決めるので、ここでは形だけ描く。
+# 縁はどれも黒で閉じる。繰り返しの設定のまま貼るので、端が滲むと隣が出る
+
+
+def smoothstep(a, b, x):
+    """
+    a から b へ、両端を寝かせて 0→1。
+
+    **a > b でも通す。** 落ちる側の裾を引くのに同じ式を逆向きで使うので、
+    そこで 0 を返す書き方にすると板ぜんたいが黙って消える（実際に消した）
+    """
+    if b == a:
+        return 0.0 if x < a else 1.0
+    t = max(0.0, min(1.0, (x - a) / (b - a)))
+    return t * t * (3.0 - 2.0 * t)
+
+
+def beam():
+    """
+    前照灯が路面を照らした跡。帯 0〜3 に敷く。
+
+    原作の帯 3 は「街灯が絶え、ヘッドライトだけ」で、その灯りが無いと道そのものが
+    見えない。左右の灯りが少し離れて重なるので、手前で二つの芯が並び、
+    遠くでひとつに溶ける。真下は照らさない。灯りは鼻先より前に付いていて、
+    そこから先へ投げるものなので、車のすぐ前には届かない。
+
+    板は幅 16 m・長さ 44 m で、車の鼻先の 2.6 m 先から敷く。
+    照らす幅は距離に連れて開き、11 m あたりで一番明るくなってから落ちる。
+
+    **一番明るいところを手前へ寄せすぎない。** 運転席から道が見え始めるのは
+    10.5 m 先（ボンネットの天板の前の角で切れる）で、それより手前は絵に出ない。
+    8 m に山を置いていたときは、山がボンネットの陰に隠れたまま、その先の落ちる側だけが
+    見えて、道を照らす光ではなく手前に置いた白い塊になった
+    """
+    wide, deep, near = 16.0, 44.0, 2.6
+    size = (128, 256)
+    im = Image.new('RGB', size, (0, 0, 0))
+    px = im.load()
+    grain = clouds(size, 4517, 3, 1.6)
+    gp = grain.load()
+    for j in range(size[1]):
+        # v は 0 が奥。絵は上の行が v 1（手前）に来る
+        v = 1.0 - (j + 0.5) / size[1]
+        d = near + deep * (1.0 - v)
+        half = 1.90 + 0.145 * d
+        # 距離の profile。鼻先の前で立ち上がり、11 m で満ちてから落ちる
+        rise = smoothstep(near, near + 4.5, d)
+        fall = 1.0 / (1.0 + ((max(0.0, d - 11.0)) / 17.0) ** 2)
+        # 板の端に届く前に消し切る。残すと遠くの縁が横一線になる
+        cut = smoothstep(near + deep, near + deep - 14.0, d)
+        run = rise * fall * cut
+        if run <= 0.002:
+            continue
+        for i in range(size[0]):
+            x = ((i + 0.5) / size[0] - 0.5) * wide
+            t = abs(x) / half
+            if t >= 1.0:
+                continue
+            # 縁の落ち。端で 0 になる
+            edge = math.cos(t * math.pi * 0.5) ** 2
+            # 左右の芯。灯りが二つ離れて付いているぶん、手前ほど割れて見える
+            split = 0.46 * half * smoothstep(30.0, 8.0, d)
+            core = 0.0
+            for c in (-split, split):
+                core += math.exp(-((x - c) / (0.62 * half)) ** 2)
+            core = min(1.35, core)
+            k = run * edge * (0.55 + 0.45 * core)
+            # 濡れた路面でも照らしは一様ではない。粒を薄く掛ける
+            k *= 0.86 + gp[i, j] / 255.0 * 0.28
+            px[i, j] = _warm(k, (1.00, 0.965, 0.885))
+    return im
+
+
+def pool():
+    """
+    街灯が一本ぶん路面へ落とす橙の溜まり。帯 1 に敷く。
+
+    設計書の帯 2（実装の帯 1）は「街灯の橙が一定の間隔で流れる」。街灯の頭が
+    光っているだけでは点が並ぶだけで、流れるのはこの溜まりの方。
+    板は幅 12 m・長さ 22 m で、灯りの腕の真下に置く。
+    縁を立てると道に橙の楕円が置いてあるように見えるので、外へ長く引く。
+
+    **絵は明暗だけ持つ。** 橙はマテリアル（BuildDrive.LampHue）が掛ける。
+    絵にも色を持たせていたときは橙が二度掛かり、溜まりが (1, 0.53, 0.15) の
+    彩度 85% になって、路面ではなく塗料の池に見えた
+    """
+    size = (128, 128)
+    im = Image.new('RGB', size, (0, 0, 0))
+    px = im.load()
+    grain = clouds(size, 8821, 3, 1.8)
+    gp = grain.load()
+    for j in range(size[1]):
+        b = ((j + 0.5) / size[1] - 0.5) * 2.0
+        for i in range(size[0]):
+            a = ((i + 0.5) / size[0] - 0.5) * 2.0
+            # uv では円。板が道に沿って長いので、路面では楕円になる。
+            # ここで縦を詰めると縁で消え切らず、板の前後の端が横一線に出る
+            r = math.sqrt(a * a + b * b)
+            if r >= 1.0:
+                continue
+            k = math.cos(r * math.pi * 0.5) ** 2
+            # 芯を足す。真下だけは白へ寄る
+            k = min(1.0, k * 0.72 + math.exp(-(r / 0.34) ** 2) * 0.46)
+            k *= 0.88 + gp[i, j] / 255.0 * 0.24
+            px[i, j] = _warm(k, (1.0, 1.0, 1.0))
+    return im
+
+
+def smear():
+    """
+    濡れた舗装に落ちるネオンの映り込み。帯 0 に敷く。
+
+    設計書の帯 1（実装の帯 0）は「濡れた舗装。まだ雨」で「ネオンの照り返し」。
+    看板が自分で光っているだけでは、路面が濡れている理由がどこにも出ない。
+    映り込みは看板の足元から手前へ長く伸び、途中で波に千切れる。
+    板は幅 2.2 m・長さ 20 m。色はマテリアルが看板ごとに持つ
+    """
+    size = (64, 256)
+    im = Image.new('RGB', size, (0, 0, 0))
+    px = im.load()
+    rng = random.Random(3391)
+    # 波の刻み。手前ほど大きく崩れる
+    ripple = [rng.uniform(0.0, math.pi * 2.0) for _ in range(7)]
+    for j in range(size[1]):
+        v = 1.0 - (j + 0.5) / size[1]
+        # 看板の足元は板の真ん中。そこから両側へ伸びるが、手前側を長く残す
+        along = v - 0.5
+        run = math.exp(-((along * (3.4 if along > 0 else 2.0)) ** 2))
+        if run <= 0.003:
+            continue
+        # 波で千切れる。足元から離れるほど深く切れる
+        broken = 1.0
+        for k, ph in enumerate(ripple):
+            broken *= 1.0 - 0.30 * abs(along) * 2.0 * max(0.0, math.sin(v * (9.0 + k * 5.0) * math.pi + ph))
+        broken = max(0.0, broken)
+        # 看板の足元がいちばん太く、離れるほど細って千切れる
+        half = 0.86 - 0.46 * abs(along) * 2.0
+        for i in range(size[0]):
+            a = ((i + 0.5) / size[0] - 0.5) * 2.0
+            t = abs(a) / half
+            if t >= 1.0:
+                continue
+            k = math.cos(t * math.pi * 0.5) ** 2 * run * (0.35 + 0.65 * broken)
+            px[i, j] = _warm(k, (1.0, 1.0, 1.0))
+    return im
+
+
+def _warm(k, hue):
+    """0〜1 の強さを色に直す。芯は白へ寄せる。板は加算なので α は使わない"""
+    k = max(0.0, min(1.0, k))
+    out = []
+    for c in hue:
+        # 強いところほど色が抜ける。灯りの芯はどの色でも白い
+        mix = c + (1.0 - c) * k * k * 0.55
+        out.append(int(max(0.0, min(255.0, 255.0 * k * mix)) + 0.5))
+    return tuple(out)
+
+
 def save_plain(im, name):
     """Drive を冠さない名前で保存する。雲の絵は帯をまたいで名前が決まっている"""
     path = os.path.join(OUT, name + '.png')
@@ -825,6 +987,9 @@ def main():
     save(field(), 'Field')
     save(dirt(), 'Dirt')
     save(rut(), 'Rut')
+    save(beam(), 'Beam')
+    save(pool(), 'Pool')
+    save(smear(), 'Smear')
     save_plain(torn(), 'CloudTorn')
     save_plain(skyhigh(), 'SkyHigh')
 

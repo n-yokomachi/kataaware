@@ -92,6 +92,14 @@ namespace HalfAware.EditorTools
         public const float SheenY = 0.008f;
         /// <summary>白線。照り返しより上でないと、帯 0 だけ線が消える</summary>
         public const float PaintY = 0.020f;
+        /// <summary>
+        /// 路面に落ちる灯りの板。街灯の溜まり・前照灯の照らし・ネオンの映り込み。
+        /// 白線より上でないと、加算の板が深度で弾かれて何も乗らない。
+        /// 帯 4 の土（0.036）とは帯が違うので画面で重なることは無いが、
+        /// 梯子（<see cref="CheckDrive"/> 13）は 5 帯ぶんを一列に並べて見るので、
+        /// 上下どちらへも 8 mm 空けたここに置く
+        /// </summary>
+        public const float GlowY = 0.028f;
         /// <summary>帯 4 の土。白線を覆い隠す高さが要る</summary>
         public const float EarthY = 0.036f;
         /// <summary>帯 4 の轍。土の上</summary>
@@ -249,28 +257,48 @@ namespace HalfAware.EditorTools
         /// <summary>帯 0。倫敦の外れ。ナノマシンの黒雲とネオンの照り返し</summary>
         static readonly DriveSky Night = new DriveSky
         {
-            sky = new Color(0.055f, 0.060f, 0.082f),
-            haze = new Color(0.055f, 0.060f, 0.082f),
+            // **0.055 から上げた。** 空の色はガンマのまま画面に出るので、0.055 は 14/255。
+            // 高架の脚もネオンの看板も、その手前で霧に溶ける地平も、そこより明るくなって
+            // 影絵にならない。倫敦の外れの空はネオンと街の照り返しで低いところが明るい。
+            // 黒雲（Sky/Band0 の Nano）が上を塞いでいるので、上げても天頂は黒いまま
+            sky = new Color(0.100f, 0.105f, 0.130f),
+            haze = new Color(0.100f, 0.105f, 0.130f),
             density = 0.014f,
             sun = new Color(0.60f, 0.68f, 0.92f),
             power = 0.55f,
             aim = new Vector3(24f, 152f, 0f),
-            lift = new Color(0.070f, 0.078f, 0.105f),
-            ground = new Color(0.035f, 0.036f, 0.045f),
+            // **環境光はここまで大きい数になる。** 舗装の地の色は 0.115 しかないので、
+            // 掛かる光が 0.08 ほど無いと路面が画面に出ない。0.070 で足りて見えていたのは、
+            // 既定の映り込み（組み込みの灰色の立方体）がどの面にも平らな艶を足していたため。
+            // それを切った以上、明るさは帯の値として持つほかない
+            lift = new Color(0.250f, 0.262f, 0.320f),
+            ground = new Color(0.105f, 0.104f, 0.120f),
+            // 前照灯。ネオンと濡れた舗装が明るいので、控えめに足すだけでよい
+            beam = 0.26f,
         };
 
         /// <summary>帯 1。夜の高速。街灯の橙が一定の間隔で流れる。倫敦の雲から抜けたので、霧は薄い</summary>
         static readonly DriveSky Lit = new DriveSky
         {
-            sky = new Color(0.044f, 0.046f, 0.062f),
-            haze = new Color(0.044f, 0.046f, 0.062f),
-            density = 0.012f,
+            // 街灯の橙が低い雲へ照り返す。夜の高速の空は真上より地平が明るい。
+            // 帯 0 より暖かく、わずかに明るい
+            sky = new Color(0.115f, 0.104f, 0.108f),
+            haze = new Color(0.115f, 0.104f, 0.108f),
+            // **0.012 から下げた。** 表が謳うのは「街灯の列」で、0.012 では 36 m 先の
+            // 一対しか残らず、その先は霧に呑まれて列にならない。0.0085 なら 140 m 先
+            // （道の敷いてある端）でも 24% 抜けるので、四対が奥へ並ぶ
+            density = 0.0085f,
             sun = new Color(0.54f, 0.60f, 0.86f),
             power = 0.42f,
             aim = new Vector3(28f, 168f, 0f),
-            // 街灯の橙が回り込む。上を少し暖色へ寄せる
-            lift = new Color(0.064f, 0.060f, 0.072f),
-            ground = new Color(0.030f, 0.028f, 0.030f),
+            // 街灯の橙が回り込む。上を少し暖色へ寄せる。
+            // 帯 0 より高いのは、片側 5 本ずつの街灯が空気ごと照らしているため。
+            // 溜まりの外の路面が読めるのはこの環境光の側で、溜まりはその上に乗る
+            lift = new Color(0.278f, 0.258f, 0.262f),
+            ground = new Color(0.116f, 0.106f, 0.102f),
+            // 前照灯。街灯の溜まりのあいだを埋める。溜まりと同じだけ明るくすると
+            // 一定の間隔で流れるはずの橙が、点きっぱなしの照らしに呑まれる
+            beam = 0.24f,
         };
 
         /// <summary>
@@ -279,32 +307,62 @@ namespace HalfAware.EditorTools
         /// </summary>
         static readonly DriveSky Deep = new DriveSky
         {
-            sky = new Color(0.026f, 0.028f, 0.040f),
-            haze = new Color(0.026f, 0.028f, 0.040f),
+            // **0.026 から上げた。** 木立は空より暗いつもりで置いてあったが、実際に測ると
+            // 木 (26,27,29) に対して地平の空が (23,22,22) で、木の方がわずかに明るかった。
+            // 差は 1 段（8.2）に届かないので、影絵どころか木立がそこにあることが読めない。
+            //
+            // **空の色はガンマのまま画面に出る。** 0.026 は 14/255 ではなく 7/255 で、
+            // そこへガラスの被り（+14）が乗って 23 になっていた。つまり空の側は
+            // ほとんど何も決めておらず、動かしても絵が変わらない。0.125（32/255）まで
+            // 上げて初めて、木（26 前後）との間に段（8.2）以上の差が付く。
+            // 環境光は据え置く。上げると木まで一緒に明るくなって差が戻らない
+            sky = new Color(0.125f, 0.130f, 0.160f),
+            haze = new Color(0.125f, 0.130f, 0.160f),
             density = 0.020f,
             sun = new Color(0.34f, 0.38f, 0.58f),
             power = 0.22f,
             aim = new Vector3(34f, 186f, 0f),
-            lift = new Color(0.034f, 0.036f, 0.050f),
-            ground = new Color(0.016f, 0.016f, 0.020f),
+            // この帯だけは環境光も落とす。街灯が絶えた幹線を照らすものは無い
+            lift = new Color(0.215f, 0.222f, 0.268f),
+            ground = new Color(0.082f, 0.082f, 0.098f),
+            // **この帯で道を見せているのはこれだけ。** 街灯が絶えるので、
+            // ほかの帯より強く投げる。木立が前照灯の縁を掠めて流れていく
+            beam = 0.46f,
         };
 
         /// <summary>
         /// 帯 3。明け方の丘陵。薄明と霧。低い位置からの光。
-        /// 空が開き始めたところで、まだ朝ではない。霧はこの帯が一番濃い
+        /// 空が開き始めたところで、まだ朝ではない。霧はこの帯が一番濃い。
+        ///
+        /// **塗り潰しは地平の色にする。** 帯 4 と同じ理由で、上の暗い側を板
+        /// （<see cref="Clouds"/> の Deep）に乗せてある。薄明は空の色が一色なのではなく、
+        /// 地平が明るく天頂が暗いという傾きそのものなので、一色で塗ると
+        /// どこも同じ灰色になって「まだ夜の続き」に見える。実際そうなっていて、
+        /// 空も道も石垣も 45〜50 に並んでいた
         /// </summary>
         static readonly DriveSky Dawn = new DriveSky
         {
-            sky = new Color(0.150f, 0.152f, 0.185f),
-            haze = new Color(0.150f, 0.152f, 0.185f),
-            density = 0.026f,
-            sun = new Color(0.80f, 0.56f, 0.44f),
-            power = 0.62f,
+            // 地平の薄明。天頂の青は板が乗せる
+            sky = new Color(0.232f, 0.218f, 0.228f),
+            haze = new Color(0.232f, 0.218f, 0.228f),
+            density = 0.022f,
+            // **一乗で掛ける。** 表が謳っているのは「薄明と霧」で、二乗の掛かりは
+            // 近くを素通しにして遠くだけ一気に溶かす。それは向こうが見えない夜の掛かり方で、
+            // 霧ではない。一乗なら近くの石垣にも薄く白が乗り、遠いほど濃くなる。
+            // 帯 4 の朝靄と同じ掛け方で、濃さだけが違う
+            mist = true,
+            // 夜明けの色。**彩度は抑える。** (0.86, 0.58, 0.44) では、低い日射しが
+            // 直に当たる柱と天井の内張りが木目に見えるほど赤茶けた
+            sun = new Color(0.88f, 0.66f, 0.52f),
+            power = 0.86f,
             // 5 度。地平すれすれから薙ぐ。石垣の側面だけが赤く当たる。
             // 向きは帯 4 と揃える。日の昇る場所が帯を跨いで飛ぶと、夜明けが繋がらない
             aim = new Vector3(5f, 294f, 0f),
-            lift = new Color(0.145f, 0.150f, 0.180f),
-            ground = new Color(0.052f, 0.048f, 0.046f),
+            lift = new Color(0.340f, 0.346f, 0.390f),
+            ground = new Color(0.132f, 0.124f, 0.118f),
+            // 薄明が上がってきているので、前照灯はもう路面を支配しない。
+            // 消してしまうと夜からの続きが切れるので、点けたまま落とす
+            beam = 0.16f,
         };
 
         /// <summary>
@@ -349,8 +407,11 @@ namespace HalfAware.EditorTools
             // **1.15 では足りなかった。** 日射しが 14 度から入るので、上を向いた面が
             // 直に受けるのは 0.24 ぶんしかない。残りは青い環境光が埋めることになり、
             // 実際に測ると未舗装路が (0.28, 0.26, 0.26) の無彩色、つまり灰色の舗装に見えた。
-            // 1.40 まで上げて初めて土の色が青い環境光に勝つ
-            power = 1.40f,
+            // 1.40 まで上げて初めて土の色が青い環境光に勝つ。
+            // 1.46 は、既定の映り込み（<see cref="DriveSky.Apply"/> で切った）が
+            // 艶のある面へ足していたぶんの埋め合わせ。ボンネット (108,115,96) と
+            // 轍 (136,106,85) を切る前の値へ戻すための 4% で、畑の側は動かない
+            power = 1.46f,
             // 14 度。低いまま畑を薙ぐ。ここを 30 度に上げると株の天面しか当たらず、
             // 畑が真上から照らした平らな板になる。逆に 11 度まで下げると、
             // 水平な面（道と畑の地）に届く光が足りず、地面から色が抜ける。
@@ -362,6 +423,9 @@ namespace HalfAware.EditorTools
             aim = new Vector3(14f, 298f, 0f),
             lift = new Color(0.38f, 0.42f, 0.50f),
             ground = new Color(0.32f, 0.29f, 0.24f),
+            // 朝。前照灯は消す。点けたままにすると轍に白が乗り、
+            // 土の暖色（139,107,82）が灰へ転ぶ
+            beam = 0f,
         };
 
         /// <summary>
@@ -373,9 +437,20 @@ namespace HalfAware.EditorTools
         /// **帯 0 と同じ値にしてある。** 乗り込むところには暗転が無く、ドアを調べた
         /// その場でガレージが伏せて走り出す。ここで色が変われば、切り替わる瞬間が
         /// そのまま見える。帯を跨ぐときの差し替えが黒のあいだに隠れるのとは事情が違う。
-        /// 帯 0 と別に名前を付けてあるのは、帯 0 を触ってもガレージが連れて動かないため
+        /// 帯 0 と別に名前を付けてあるのは、帯 0 を触ってもガレージが連れて動かないため。
+        ///
+        /// **前照灯だけは帯 0 と違う。** 停めてある車の灯りは消えている。
+        /// ドアを調べて乗り込んだところで点くので、切り替わる瞬間が見えても構わない。
+        /// むしろそこは「エンジンを掛けた」ところにあたる
         /// </summary>
-        public static readonly DriveSky GarageSky = Night;
+        public static readonly DriveSky GarageSky = Parked(Night);
+
+        /// <summary>前照灯だけ消した写し。DriveSky は struct なので、受けた時点で控えになる</summary>
+        static DriveSky Parked(DriveSky from)
+        {
+            from.beam = 0f;
+            return from;
+        }
 
         /// <summary>帯の数</summary>
         public const int Bands = 5;
@@ -523,6 +598,21 @@ namespace HalfAware.EditorTools
         {
             return SeatAt.y - 0.15f * (z - EyeLead);
         }
+
+        // ---- 前照灯の照らし。メートル ----------------------------------------
+        //
+        // 板の寸法。絵（tools/make-drive.py の beam）はこの寸法を前提に描いてある。
+        // ここを動かすなら絵の方の wide / deep / near も揃えること
+
+        /// <summary>照らしの板の幅。遠くで開くぶんまで含む</summary>
+        public const float BeamWide = 16f;
+        /// <summary>照らしの板の長さ</summary>
+        public const float BeamDeep = 44f;
+        /// <summary>
+        /// 照らしの板の手前の端。z。ボンネットの鼻先（2.48）のすぐ先。
+        /// ここより手前は前照灯より後ろなので、そもそも照らされない
+        /// </summary>
+        public const float BeamFrom = 2.6f;
 
         /// <summary>メーターの絵を貼る板の大きさ。テクスチャの縦横比（512 × 128）と揃える</summary>
         public const float DialWide = 0.48f;
@@ -794,6 +884,20 @@ namespace HalfAware.EditorTools
             lit.intensity = 0.0025f;
             lit.range = 1.10f;
             lit.shadows = LightShadows.None;
+
+            // 前照灯が路面を照らした跡。**灯りではなく、照らされた跡の方を置く。**
+            // 本物の spot を前に据えると、路面を薙ぐ角度が浅すぎて（10 m 先で 6 度）
+            // 面の向きとの積がほとんど残らない。道を明るくできるだけ強くすると、
+            // 今度はすぐ脇の木や標識が真っ白に飛ぶ。板なら道だけを狙って照らせる。
+            //
+            // 車の子にする。沿道と違って環には乗らないので、走っても車の前に据わったまま。
+            // 実際そう見える。前照灯の照らしは車と一緒に動くもので、流れて行くものではない。
+            // 流れるのは帯 1 の街灯の溜まりの方（<see cref="Motorway"/>）。
+            //
+            // 強さは帯が持つ（<see cref="DriveSky.beam"/>）。ここで置くのは帯 0 のぶん
+            var thrown = Piece(parent, "Beam", Card("Beam", BeamWide, BeamDeep),
+                GlowMat("Beam", "Beam", Color.white, 0.26f, BeamWide, BeamDeep));
+            thrown.localPosition = new Vector3(0f, 0f, BeamFrom + BeamDeep * 0.5f);
 
             // 視点の置き場。DriveDirector.seat へ繋ぐ。
             // ハンドルの真後ろに寄せてあるので、座ると輪が正面に来る
@@ -1360,6 +1464,17 @@ namespace HalfAware.EditorTools
                 if (b == 0 && nano != null)
                     Deck(band, "Nano", nano, 30f, 420f, 0.010f,
                         new Color(0.030f, 0.026f, 0.042f, 0.94f), 0.078f, 0.30f, new Vector2(0.0034f, 0.0012f));
+                // 帯 3 の薄明。**暗い側を板にする。** 帯 4 の「高い空」（High）と同じ構えで、
+                // 塗り潰しに地平の明るい色を置き、そこへ上ほど濃い暗い板を重ねる。
+                // 逆を取ると、板の縁の外の仰角（26 / 680√2 ＝ 1.6 度）に地平の色が帯で残る。
+                //
+                // 絵は帯 4 と同じ SkyHigh を使い回す。要るのは一様な地と薄い斑だけで、
+                // 色は板の側（_BaseColor）が持つ。夜明け前の天頂は青紫で、日の出の側から
+                // 遠いほど暗い。ここは一枚の板なので向きは持てないが、
+                // 傾き（地平が明るく天頂が暗い）が出れば薄明には見える
+                else if (b == 3 && high != null)
+                    Deck(band, "Deep", high, 26f, 680f, 0.0008f,
+                        new Color(0.075f, 0.080f, 0.130f, 0.92f), 0.085f, 0.34f, Vector2.zero, 2940);
                 else if (b == Bands - 1 && torn != null)
                 {
                     // 高い空。**青のほうを板にする。**
@@ -1485,16 +1600,58 @@ namespace HalfAware.EditorTools
                 new Color(1f, 0.30f, 0.34f), new Color(0.36f, 0.72f, 1f), new Color(0.44f, 1f, 0.62f),
             };
 
+            // 濡れた舗装に落ちるネオンの映り込み。**看板と同じ色を、同じ割り付けで引く。**
+            // 板そのものは色を持たず、マテリアルが看板ごとに 1 枚ずつ要る
+            var smear = Card("NeonSmear", SmearWide, SmearDeep);
+            var smears = new Material[hues.Length];
+            for (var h = 0; h < hues.Length; h++)
+                smears[h] = GlowMat("NeonSmear" + h, "Smear", hues[h], 1.05f, SmearWide, SmearDeep);
+
             for (var i = 0; i < slices.Length; i++)
                 Piece(slices[i], "Sheen", sheen, Mat("Sheen"));
             Along(slices, 45f, (slice, z, k) => Sides("Pier" + k, 6.5f, (at, side, name) =>
                 Piece(slice, name, pier, Mat("Concrete")).localPosition = new Vector3(at, 0f, z)));
             Along(slices, 30f, (slice, z, k) => Sides("Neon" + k, 5.4f, (at, side, name) =>
-                Piece(slice, name, board, Glow(hues[(k + side) % hues.Length], 2.4f))
+                // 街灯の頭と同じ理由で 2.4 から落とす。ネオンは色が命で、
+                // 白く飛んだ看板は蛍光灯にしか見えない
+                Piece(slice, name, board, Glow(hues[(k + side) % hues.Length], 1.25f))
                     .localPosition = new Vector3(at, 3.2f, z)));
+            // 映り込みは看板の足元から手前へ伸びる。看板は道の外（±5.4）に立っているので、
+            // 舗装の縁（±3.5）へ寄せて落とす。艶（Sheen）の上に乗るのが正しい順で、
+            // 板の高さ（GlowY 0.028）は白線より上に取ってある
+            Along(slices, 30f, (slice, z, k) => Sides("Smear", 3.0f, (at, side, name) =>
+                Piece(slice, name, smear, smears[(k + side) % hues.Length])
+                    .localPosition = new Vector3(at, 0f, z)));
         }
 
-        /// <summary>帯 1。夜の高速。街灯だけ。対向車は別の環に乗るので Traffic が持つ</summary>
+        /// <summary>ネオンの映り込みの板の幅。濡れた舗装の映り込みは看板より広がる</summary>
+        const float SmearWide = 3.2f;
+        /// <summary>ネオンの映り込みの板の長さ。看板の間隔（30）より短くする</summary>
+        const float SmearDeep = 20f;
+
+        /// <summary>街灯の橙。頭も溜まりも同じ色から出す</summary>
+        static readonly Color LampHue = new Color(1f, 0.72f, 0.36f);
+        /// <summary>街灯の間隔。m。180 を割り切ること。28 m/s で 1.3 秒ごとに 1 本すれ違う</summary>
+        const float LampStep = 36f;
+        /// <summary>街灯の柱の、道の中心からの距離</summary>
+        const float LampAt = 4.6f;
+        /// <summary>柱から灯りの頭までの、道の上への差し出し</summary>
+        const float LampArm = 1.18f;
+        /// <summary>街灯が路面に落とす溜まりの幅</summary>
+        const float PoolWide = 12f;
+        /// <summary>街灯が路面に落とす溜まりの長さ。間隔（36）より短くする。溜まりが繋がると流れが消える</summary>
+        const float PoolDeep = 22f;
+
+        /// <summary>
+        /// 帯 1。夜の高速。街灯と、街灯が路面に落とす橙の溜まり。
+        /// 対向車は別の環に乗るので Traffic が持つ。
+        ///
+        /// 設計書の「街灯の橙が一定の間隔で流れる」を出しているのは溜まりの方で、
+        /// 頭ではない。**頭だけ光らせていた頃は、遠くに橙の点が一つ見えるだけだった。**
+        /// 頭は 0.62 × 0.12 m しかなく、36 m 先では低い描画解像度で 4 × 1 画素に届かない。
+        /// そのうえ光る面は自分が光るだけで路面には何も落とさないので、
+        /// 夜の高速で一番効くはずの「灯りの下を一定の間隔でくぐる」が丸ごと無かった
+        /// </summary>
         static void Motorway(Transform[] slices)
         {
             var post = Shape("LampPost", 0.4f, b =>
@@ -1504,17 +1661,34 @@ namespace HalfAware.EditorTools
                 // 道の上へ差し出す腕。真上にしか光らない街灯は道を照らさない
                 b.Box(new Vector3(0.62f, 7.14f, 0f), new Vector3(1.30f, 0.12f, 0.12f));
             });
-            var head = Shape("LampHead", 0.5f, b => b.Box(new Vector3(1.18f, 7.02f, 0f), new Vector3(0.62f, 0.12f, 0.26f)));
+            // 灯りの頭。**0.62 × 0.12 × 0.26 から太らせた。** 遠くで画素に届かないと
+            // 列にならず、点が一つ二つ瞬くだけになる。笠の下に伏せた面も足して、
+            // 道側から見たときに橙の板として残るようにしてある
+            var head = Shape("LampHead", 0.5f, b =>
+            {
+                b.Box(new Vector3(LampArm, 7.00f, 0f), new Vector3(0.78f, 0.20f, 0.42f));
+                b.Box(new Vector3(LampArm, 6.86f, 0f), new Vector3(0.54f, 0.10f, 0.30f));
+            });
+            var pool = Card("LampPool", PoolWide, PoolDeep);
+            var poolMat = GlowMat("LampPool", "Pool", LampHue, 0.34f, PoolWide, PoolDeep);
 
-            Along(slices, 36f, (slice, z, k) => Sides("Lamp" + k, 4.6f, (at, side, name) =>
+            Along(slices, LampStep, (slice, z, k) => Sides("Lamp" + k, LampAt, (at, side, name) =>
             {
                 var lamp = Child(slice, name);
                 lamp.localPosition = new Vector3(at, 0f, z);
                 // 腕は mesh の +x へ伸ばしてあるので、右側は向きを返して道へ差し出す
                 lamp.localRotation = Quaternion.Euler(0f, side == 0 ? 0f : 180f, 0f);
                 Piece(lamp, "Post", post, Mat("Metal"));
-                Piece(lamp, "Head", head, Glow(new Color(1f, 0.72f, 0.36f), 3.0f));
+                // **4.2 では白い点になる。** 加算ではなく自分の色で塗る面なので、
+                // 利得を上げると赤も緑も青も 1 を越えて、橙が白へ抜ける。
+                // 実際に測って (247,247,247) だった。明るさはここで頭打ちなので、
+                // 遠くで見えるようにするのは大きさの方（頭を太らせてある）
+                Piece(lamp, "Head", head, Glow(LampHue, 1.05f));
             }));
+            // 溜まりは灯りの頭の真下。柱ではなく腕の先から下ろす。
+            // 名前は帯を通して同じにする。CheckDrive の Paving（路面に貼る面）で引くため
+            Along(slices, LampStep, (slice, z, k) => Sides("Pool", LampAt - LampArm, (at, side, name) =>
+                Piece(slice, name, pool, poolMat).localPosition = new Vector3(at, 0f, z)));
         }
 
         /// <summary>帯 2。深夜の幹線。木立だけ</summary>
@@ -2171,7 +2345,13 @@ namespace HalfAware.EditorTools
                 var l = bulb.AddComponent<Light>();
                 l.type = LightType.Point;
                 l.color = GarageLamp;
-                l.intensity = 2.6f;
+                // **2.6 から上げた。** ガレージの明るさは天井の灯りではなく、
+                // 既定の映り込み（組み込みの灰色の立方体）が持っていた。
+                // それを切った（<see cref="DriveSky.Apply"/>）ので、床も壁も
+                // ほとんど真っ暗になり、歩く先が読めなくなった。
+                // 灯りの真下で床が 52、隅で 24 になるところまで上げてある。
+                // 天井から床まで 2.8 m あり、距離の二乗で効く
+                l.intensity = 8.0f;
                 l.range = 16f;
                 l.shadows = LightShadows.None;
             }
@@ -2569,6 +2749,14 @@ namespace HalfAware.EditorTools
             FillSky(dso.FindProperty("garageSky"), GarageSky);
             var overhead = Look(root, "Sky");
             Fill(dso.FindProperty("skies"), overhead != null ? Kids(overhead) : new Transform[0]);
+            // 前照灯の照り返し。強さは帯が持ち、差し替える先をここで渡す
+            var thrown = Look(root, "Car/Beam");
+            var lamps = thrown != null ? thrown.GetComponent<Renderer>() : null;
+            dso.FindProperty("beams").objectReferenceValue = lamps;
+            // 組み上がった場面はまだガレージの中。前照灯は消えている。
+            // 再生すれば DriveDirector が帯ごとに点け直すが、エディタで開いたときの
+            // 見え方も組み立ての責任なので、ここで揃えておく
+            if (lamps != null) lamps.enabled = GarageSky.beam > 0f;
             FillBands(dso.FindProperty("bands"));
             var picked = dso.FindProperty("triggers");
             picked.arraySize = triggerItems.Length;
@@ -2619,6 +2807,7 @@ namespace HalfAware.EditorTools
             at.FindPropertyRelative("aim").vector3Value = from.aim;
             at.FindPropertyRelative("lift").colorValue = from.lift;
             at.FindPropertyRelative("ground").colorValue = from.ground;
+            at.FindPropertyRelative("beam").floatValue = from.beam;
         }
 
         /// <summary>繋ぎ先を引く。黙って null を渡すと、再生して初めて気づくことになる</summary>
@@ -3031,6 +3220,48 @@ namespace HalfAware.EditorTools
                 case "Rut": col = new Color(0.434f, 0.175f, 0.027f); smooth = 0.10f; break;
                 default: col = new Color(0.12f, 0.12f, 0.13f); smooth = 0.30f; break;
             }
+        }
+
+        /// <summary>
+        /// 路面に落ちる灯りの板 1 枚の形。原点を中心に、x へ wide、z へ deep。
+        ///
+        /// Texel は 1 のまま。Bank は実寸に Texel を掛けた uv を振るので、
+        /// uv がそのまま長さ（m）になり、<see cref="GlowMat"/> が _BaseMap_ST で
+        /// 0〜1 へ畳み直せる（<see cref="DialMat"/> と同じ手）。
+        /// v は 0 が奥（+z）、1 が手前（-z）に来る
+        /// </summary>
+        static Mesh Card(string name, float wide, float deep)
+        {
+            return Shape(name, 1f, b => b.FaceY(GlowY, -wide * 0.5f, wide * 0.5f, -deep * 0.5f, deep * 0.5f, 1));
+        }
+
+        /// <summary>
+        /// 路面に落ちる灯りのマテリアル。加算で重ねるので、暗いところは何もしない。
+        ///
+        /// URP の Unlit ではなく <c>HalfAware/RoadGlow</c> を使う。あちらは霧を色として
+        /// 混ぜるので、加算の板では霧の色が板の形のまま路面に乗る
+        /// </summary>
+        static Material GlowMat(string name, string picture, Color col, float gain, float wide, float deep)
+        {
+            var shader = Shader.Find("HalfAware/RoadGlow");
+            if (shader == null) Debug.LogWarning("HalfAware/RoadGlow が見つからない。路面の灯りが出ない");
+            var path = Materials + name + ".mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                m = new Material(shader);
+                m.name = name;
+                AssetDatabase.CreateAsset(m, path);
+            }
+            m.shader = shader;
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/Drive" + picture + ".png");
+            if (tex == null) Debug.LogWarning("灯りの絵が無い: Assets/Textures/Drive" + picture + ".png");
+            m.SetTexture("_BaseMap", tex);
+            m.SetColor("_BaseColor", new Color(col.r * gain, col.g * gain, col.b * gain, 1f));
+            m.SetTextureScale("_BaseMap", new Vector2(1f / wide, 1f / deep));
+            m.SetTextureOffset("_BaseMap", new Vector2(0.5f, -0.5f));
+            EditorUtility.SetDirty(m);
+            return m;
         }
 
         /// <summary>
