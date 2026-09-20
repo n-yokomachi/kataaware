@@ -29,6 +29,7 @@ https://pixabay.com/service/license-summary/
 | `LighterFlame.wav` | Pixabay の `flint`。作品名と作者は未記入 | Pixabay Content License | 前後の無音を落として頂点 −5dB |
 | `ChipPull.wav` | OpenGameArt「Sound Effects Pack」（https://opengameart.org/content/sound-effects-pack）作者 OwlishMedia の `Technology/plugpull.wav` | CC0 1.0 | 0.02〜0.40 秒、頂点 −6dB |
 | `JackPull.wav` | 同上パックの `Technology/plugpull2.wav` | CC0 1.0 | 3.33 秒から 0.50 秒を切り出し、再生速度 0.85 倍で低く伸ばし、前後の無音を落として頂点 −6dB |
+| `JackPlug.wav` | Pixabay `freesound_community-headphones-jack-plugged-in-97328` | Pixabay Content License | 0.58〜1.10 秒を切り出し、再生速度 0.85 倍で低く伸ばし（`JackPull` と同じ扱いにして、抜くのと挿すので音の質を揃えた）、前後の無音を落として頂点 −6dB。モノラル 44.1kHz、0.22 秒 |
 | `RainLoop.wav` | Pixabay `dragon-studio-copyright-free-rain-sounds-331497` | Pixabay Content License | 60 秒地点から 24 秒を切り出し、モノラル 22.05kHz へ。末尾 1.5 秒を頭に重ねて輪にし、実効値を −22dBFS に揃えた |
 | `DoorShut.wav` | Pixabay `dragon-studio-open-and-close-door-405453` | Pixabay Content License | モノラル 44.1kHz へ、頭から 2.15 秒を切り出して末尾 0.1 秒を落とし、頂点を −3dB に揃えた。開けると閉めるが 1 つに入っている（開ける 〜0.5 秒、間 〜1.0 秒、閉まる 1.45〜1.65 秒） |
 | `CarDoorOpen.wav` | Pixabay `dragon-studio-open-car-door-372469` | Pixabay Content License | モノラル 44.1kHz へ、頭の無音を落として末尾 60ms を落とした。0.92 秒 |
