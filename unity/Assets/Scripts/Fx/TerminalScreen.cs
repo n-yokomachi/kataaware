@@ -3,7 +3,13 @@ using UnityEngine;
 namespace HalfAware
 {
     /// <summary>
-    /// モニターの画面。消灯から起動して、文字に見える帯を流す。
+    /// モニターの画面。消灯から起動して、中に開いた窓ごとに文字を流す。
+    ///
+    /// **地と文字を別の面に分ける。** 画面の面そのものに帯のテクスチャを貼ると、
+    /// 消えている間も灰色の文字が見えてしまう。地の色に帯が掛かるので、
+    /// 暗いなりに行が読めてしまうため。地は帯を貼らない一枚板にして、
+    /// 文字は手前へ浮かせた小さな面（<see cref="Pane"/>）に持たせ、
+    /// 消えている間はその面ごと伏せる。
     ///
     /// **面のマテリアルはこの場面のために複製したものを当てる。**
     /// 場面 1 と共有すると、こちらで灯した画面が向こうでも灯る。
@@ -15,16 +21,32 @@ namespace HalfAware
     /// </summary>
     public sealed class TerminalScreen : MonoBehaviour
     {
-        [Tooltip("画面の面。ここのマテリアルを触る。机に並んだぶんを全部渡す")]
-        [SerializeField] Renderer[] faces = new Renderer[0];
-        [Tooltip("消えているときの色")]
+        /// <summary>画面の中に開いた窓ひとつ。窓ごとに字の大きさも流れる速さも違う</summary>
+        [System.Serializable]
+        public struct Pane
+        {
+            [Tooltip("窓の面")]
+            public Renderer face;
+            [Tooltip("帯のテクスチャの割り当て。**小さいほど字が大きく映る**")]
+            public Vector2 tiling;
+            [Tooltip("流れる速さの倍率。窓ごとに変えて、揃って動かないようにする")]
+            public float speed;
+            [Tooltip("初めのずれ。窓ごとに変えて、同じ行が並ばないようにする")]
+            public float phase;
+        }
+
+        [Tooltip("画面の地。机に並んだぶんを全部渡す")]
+        [SerializeField] Renderer[] backs = new Renderer[0];
+        [Tooltip("画面の中の窓")]
+        [SerializeField] Pane[] panes = new Pane[0];
+        [Tooltip("消えているときの地の色")]
         [SerializeField] Color off = new Color(0.035f, 0.040f, 0.045f);
-        [Tooltip("点いているときの色")]
+        [Tooltip("点いているときの地の色。窓の外に出る")]
+        [SerializeField] Color back = new Color(0.026f, 0.070f, 0.040f);
+        [Tooltip("文字の色")]
         [SerializeField] Color glow = new Color(0.32f, 0.80f, 0.46f);
         [Tooltip("文字を流す速さ。UV/秒。行の高さは UV で 0.04 なので、0.06 なら 1 秒に 1.5 行進む")]
         [SerializeField] float scrollSpeed = 0.06f;
-        [Tooltip("帯のテクスチャの、面に映す割り当て。**小さいほど字が大きく映る**")]
-        [SerializeField] Vector2 tiling = new Vector2(1.0f, 0.5f);
 
         static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
         static readonly int Emission = Shader.PropertyToID("_EmissionColor");
@@ -64,23 +86,53 @@ namespace HalfAware
 
         void Paint(float level)
         {
-            if (faces == null) return;
-            var lit = Color.Lerp(off, glow, level);
-            for (var i = 0; i < faces.Length; i++)
+            if (block == null) block = new MaterialPropertyBlock();
+            var lit = level > 0.001f;
+            Ground(lit ? Color.Lerp(off, back, level) : off);
+            Windows(level, lit);
+        }
+
+        /// <summary>画面の地。帯を貼っていないので、色を渡すだけで一様に染まる</summary>
+        void Ground(Color tone)
+        {
+            if (backs == null) return;
+            for (var i = 0; i < backs.Length; i++)
             {
-                var face = faces[i];
+                var face = backs[i];
                 if (face == null) continue;
                 face.GetPropertyBlock(block);
-                block.SetColor(BaseColor, lit);
-                block.SetColor(Emission, lit * level);
-                // **テクスチャを丸ごと映さない。** 描画は 427×240 に renderScale 0.333 が
-                // 掛かるので、画面 1 枚は実寸で 30×22 px ほどしかない。256 px の帯を
-                // 25 行とも詰めると 1 行が 1 px を切り、行が潰れてただの緑の板になる。
-                // 半分だけ切り出すと 1 行に 2 px 残り、文字の並びに見える。
-                // **横は 1 を超えない。** 超えると横に繋がって、継ぎ目が縦の筋に出る。
-                // 流すのは縦だけ。横へずらすと行が切れて読めない絵になる
-                block.SetVector(BaseMapST, new Vector4(tiling.x, tiling.y, 0f, -offset));
+                block.SetColor(BaseColor, tone);
+                block.SetColor(Emission, tone);
                 face.SetPropertyBlock(block);
+            }
+        }
+
+        /// <summary>
+        /// 画面の中の窓。
+        ///
+        /// **消えている間はレンダラーごと伏せる。** 色を黒にするだけでは、
+        /// 地との僅かな差で窓の四角が浮き、消えているはずの画面に枠が見える。
+        ///
+        /// 流す向きは下。ST のずれを増やすと、いま見えている行より上にあった行を
+        /// 拾うようになるので、絵は下へ送られる。上へ送りたいなら符号を返す
+        /// </summary>
+        void Windows(float level, bool lit)
+        {
+            if (panes == null) return;
+            var tone = Color.Lerp(Color.black, glow, level);
+            for (var i = 0; i < panes.Length; i++)
+            {
+                var pane = panes[i];
+                if (pane.face == null) continue;
+                if (pane.face.enabled != lit) pane.face.enabled = lit;
+                if (!lit) continue;
+                pane.face.GetPropertyBlock(block);
+                block.SetColor(BaseColor, tone);
+                block.SetColor(Emission, tone);
+                // 流すのは縦だけ。横へずらすと行が切れて読めない絵になる
+                block.SetVector(BaseMapST,
+                    new Vector4(pane.tiling.x, pane.tiling.y, 0f, pane.phase + offset * pane.speed));
+                pane.face.SetPropertyBlock(block);
             }
         }
     }

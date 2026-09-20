@@ -25,6 +25,7 @@ namespace HalfAware.EditorTools
         public const string ScriptPath = "Assets/Data/ConnectScript.asset";
         public const string Materials = "Assets/Materials/Connect";
         public const string FacePath = Materials + "/TerminalFace.mat";
+        public const string PanePath = Materials + "/TerminalPane.mat";
         public const string RowsPath = "Assets/Textures/TerminalRows.png";
         public const string PlugPath = "Assets/Audio/JackPlug.wav";
 
@@ -74,18 +75,19 @@ namespace HalfAware.EditorTools
             Stand();
             var socket = Park();
             var items = Items();
-            var faces = Screens();
-            Wire(socket, faces, items);
+            var sheet = Screens();
+            Wire(socket, sheet, items);
 
             var scene = EditorSceneManager.GetActiveScene();
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             AssetDatabase.SaveAssets();
-            Check(faces, items);
-            Debug.Log(string.Format("夕方の部屋を組んだ。調べる対象 {0} 個（頭から開くのは {1} 個）、画面 {2} 枚。"
-                + "立ち位置 {3} から椅子 {4} まで約 {5:F1} m",
-                items.Count, Open(items), faces.Length, StartAt.ToString("F2"), SeatAt.ToString("F2"),
-                Vector3.Distance(new Vector3(StartAt.x, 0f, StartAt.z), new Vector3(SeatAt.x, 0f, SeatAt.z))));
+            Check(sheet.backs, items);
+            Debug.Log(string.Format("夕方の部屋を組んだ。調べる対象 {0} 個（頭から開くのは {1} 個）、"
+                + "画面 {2} 枚に窓 {6} 個。立ち位置 {3} から椅子 {4} まで約 {5:F1} m",
+                items.Count, Open(items), sheet.backs.Length, StartAt.ToString("F2"), SeatAt.ToString("F2"),
+                Vector3.Distance(new Vector3(StartAt.x, 0f, StartAt.z), new Vector3(SeatAt.x, 0f, SeatAt.z)),
+                sheet.panes.Length));
         }
 
         /// <summary>
@@ -323,73 +325,209 @@ namespace HalfAware.EditorTools
 
         // ---- モニター --------------------------------------------------------
 
+        /// <summary>組み上がった画面。地の面と、その中に開いた窓</summary>
+        public struct Sheet
+        {
+            public Renderer[] backs;
+            public TerminalScreen.Pane[] panes;
+        }
+
         /// <summary>
-        /// 画面の面を場面 3 のマテリアルへ替える。
+        /// 画面の中に開く窓の割り付け。面を 1 とした割合で、左下を原点に置く。
+        /// モニターごとに違う並びを当てて、5 枚が同じ絵にならないようにする
+        /// </summary>
+        static readonly Rect[][] Layouts =
+        {
+            new[] { new Rect(0f, 0f, 0.46f, 1f), new Rect(0.52f, 0.54f, 0.48f, 0.46f), new Rect(0.52f, 0f, 0.48f, 0.48f) },
+            new[] { new Rect(0f, 0.60f, 1f, 0.40f), new Rect(0f, 0f, 0.56f, 0.54f), new Rect(0.62f, 0f, 0.38f, 0.54f) },
+            new[] { new Rect(0f, 0.54f, 1f, 0.46f), new Rect(0f, 0f, 1f, 0.48f) },
+            new[] { new Rect(0f, 0f, 0.52f, 1f), new Rect(0.58f, 0f, 0.42f, 1f) },
+            new[] { new Rect(0f, 0f, 0.36f, 1f), new Rect(0.42f, 0.56f, 0.58f, 0.44f), new Rect(0.42f, 0f, 0.58f, 0.50f) },
+        };
+
+        /// <summary>窓ごとの字の大きさ。小さいほど大きく映る</summary>
+        static readonly float[] PaneScale = { 0.70f, 1.15f, 0.90f };
+        /// <summary>窓ごとの流れる速さの倍率</summary>
+        static readonly float[] PaneSpeed = { 1.00f, 0.65f, 1.35f };
+
+        /// <summary>画面の面の大きさ。メートル</summary>
+        const float FaceWide = 0.810f;
+        const float FaceHigh = 0.480f;
+        /// <summary>面の前へ窓を浮かせる量。メートル。**0 にすると面と喧嘩して縞が出る**</summary>
+        const float PaneLift = 0.002f;
+        /// <summary>画面の縁に残す余白。面を 1 とした割合</summary>
+        const float PaneEdge = 0.035f;
+        /// <summary>
+        /// 面を丸ごと映したときの割り当て。窓はこれに窓の大きさと
+        /// <see cref="PaneScale"/> を掛けたものになる
+        /// </summary>
+        static readonly Vector2 PaneFit = new Vector2(1.0f, 0.5f);
+
+        /// <summary>
+        /// 画面の面を場面 3 のマテリアルへ替え、その中に窓を開ける。
         ///
         /// **5 枚とも替える。** 机の 5 枚は場面 1 から同じマテリアルを共有していて、
         /// 1 枚だけ替えて灯すと隣の 4 枚が消えたままになる。ひとつの作業机なので、
-        /// 点くときは 5 枚とも点く
+        /// 点くときは 5 枚とも点く。
+        ///
+        /// **帯は面ではなく窓に貼る。** 面に貼ると、消えている間も地の色に帯が掛かり、
+        /// 灰色の文字が読めてしまう
         /// </summary>
-        static Renderer[] Screens()
+        static Sheet Screens()
         {
-            var faces = new List<Renderer>();
+            var backs = new List<Renderer>();
+            var panes = new List<TerminalScreen.Pane>();
             var monitors = Look("Room/Monitors");
-            if (monitors == null) return faces.ToArray();
-            var mat = Face();
+            if (monitors == null) return new Sheet { backs = backs.ToArray(), panes = panes.ToArray() };
+            var ground = Face();
+            var ink = PaneFace();
+            var which = 0;
             foreach (Transform m in monitors)
             {
                 var face = m.Find("Face");
                 var r = face != null ? face.GetComponent<Renderer>() : null;
                 if (r == null) continue;
-                if (mat != null) r.sharedMaterial = mat;
+                if (ground != null) r.sharedMaterial = ground;
                 EditorUtility.SetDirty(r);
-                faces.Add(r);
+                backs.Add(r);
+                panes.AddRange(Panes(m, face, ink, which));
+                which++;
             }
-            if (faces.Count == 0) Debug.LogWarning("モニターの面が見つからない");
-            return faces.ToArray();
+            if (backs.Count == 0) Debug.LogWarning("モニターの面が見つからない");
+            return new Sheet { backs = backs.ToArray(), panes = panes.ToArray() };
         }
 
         /// <summary>
-        /// 場面 3 の画面のマテリアル。場面 1 と共有したままだと、
-        /// こちらで灯した画面が向こうでも灯る
+        /// 1 枚ぶんの窓を開ける。
+        ///
+        /// **面の子にはしない。** 面は 0.810 × 0.480 × 0.012 に伸ばした立方体なので、
+        /// その子に置くと窓まで縦横で違う倍率に引き伸ばされる。モニターの子に置き、
+        /// 面の前の位置だけ自分で出す
+        /// </summary>
+        static TerminalScreen.Pane[] Panes(Transform monitor, Transform face, Material ink, int which)
+        {
+            var group = monitor.Find("Windows");
+            if (group != null) Object.DestroyImmediate(group.gameObject);
+            group = new GameObject("Windows").transform;
+            group.SetParent(monitor, false);
+            group.localPosition = Vector3.zero;
+            group.localRotation = Quaternion.identity;
+
+            // 面の手前の側。面の中心から厚みの半分だけ、モニターの -z へ出たところ
+            var front = face.localPosition.z - face.localScale.z * 0.5f - PaneLift;
+            var plan = Layouts[which % Layouts.Length];
+            var made = new TerminalScreen.Pane[plan.Length];
+            for (var i = 0; i < plan.Length; i++)
+            {
+                var cut = plan[i];
+                // 縁の余白は面の外周にだけ残す。窓と窓のあいだは割り付けが持っている
+                var x0 = Mathf.Lerp(PaneEdge, 1f - PaneEdge, cut.xMin);
+                var x1 = Mathf.Lerp(PaneEdge, 1f - PaneEdge, cut.xMax);
+                var y0 = Mathf.Lerp(PaneEdge, 1f - PaneEdge, cut.yMin);
+                var y1 = Mathf.Lerp(PaneEdge, 1f - PaneEdge, cut.yMax);
+                var wide = (x1 - x0) * FaceWide;
+                var high = (y1 - y0) * FaceHigh;
+
+                var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                quad.name = "Window" + i;
+                quad.transform.SetParent(group, false);
+                quad.transform.localPosition = new Vector3(
+                    ((x0 + x1) * 0.5f - 0.5f) * FaceWide, ((y0 + y1) * 0.5f - 0.5f) * FaceHigh, front);
+                // **回さない。** Unity の Quad は法線が -z を向いていて、
+                // そのままでモニターの表（運転席ではなく椅子の側）を向く。
+                // 180 度回すと裏返って、背面の削りで丸ごと消える
+                quad.transform.localRotation = Quaternion.identity;
+                quad.transform.localScale = new Vector3(wide, high, 1f);
+                Object.DestroyImmediate(quad.GetComponent<Collider>());
+                var r = quad.GetComponent<Renderer>();
+                r.sharedMaterial = ink;
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                r.receiveShadows = false;
+                // 灯るまで伏せておく。TerminalScreen が点けたところで起こす
+                r.enabled = false;
+
+                var scale = PaneScale[i % PaneScale.Length];
+                made[i] = new TerminalScreen.Pane
+                {
+                    face = r,
+                    tiling = new Vector2((x1 - x0) * PaneFit.x * scale, (y1 - y0) * PaneFit.y * scale),
+                    speed = PaneSpeed[i % PaneSpeed.Length],
+                    // 窓ごとに頭をずらす。揃えると 5 枚とも同じ行が並んで模様に見える
+                    phase = which * 0.41f + i * 0.137f,
+                };
+            }
+            return made;
+        }
+
+        /// <summary>
+        /// 画面の地のマテリアル。場面 1 と共有したままだと、
+        /// こちらで灯した画面が向こうでも灯る。
+        ///
+        /// **帯は貼らない。** 貼ると、消えている間も地の色に帯が掛かって
+        /// 灰色の文字が読めてしまう。文字は窓（<see cref="PaneFace"/>）が持つ
         /// </summary>
         static Material Face()
         {
-            if (!AssetDatabase.IsValidFolder(Materials)) AssetDatabase.CreateFolder("Assets/Materials", "Connect");
-            var m = AssetDatabase.LoadAssetAtPath<Material>(FacePath);
-            if (m == null)
-            {
-                var source = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/Placeholder/Screen.mat");
-                if (source == null) { Debug.LogWarning("元の画面のマテリアルが無い"); return null; }
-                m = new Material(source);
-                m.name = "TerminalFace";
-                AssetDatabase.CreateAsset(m, FacePath);
-            }
-            var rows = AssetDatabase.LoadAssetAtPath<Texture2D>(RowsPath);
-            if (rows == null) Debug.LogWarning("帯の絵が無い: " + RowsPath);
-            // **帯は地と光る側の両方に貼る。** 地だけだと、灯ったときに一様な色の
-            // emission が上から塗り潰して帯が消え、画面が緑の板になる。
-            // URP の Lit は emission も _BaseMap_ST で畳んだ uv で引くので、
-            // 流すのは TerminalScreen に任せられる
-            m.SetTexture("_BaseMap", rows);
+            var m = Clone(FacePath, "TerminalFace");
+            if (m == null) return null;
+            m.SetTexture("_BaseMap", null);
+            m.SetTexture("_EmissionMap", null);
             m.SetColor("_BaseColor", ScreenOff);
-            m.SetTexture("_EmissionMap", rows);
             // **emission を切らない。** 切ってあると TerminalScreen が
             // MaterialPropertyBlock から色を渡しても、シェーダーの側で捨てられる。
             // 色そのものは消えているぶんを入れておく。エディタで開いたときの見え方も
             // 組み立ての責任で、場面の頭では画面は消えている
             m.SetColor("_EmissionColor", ScreenOff);
             m.EnableKeyword("_EMISSION");
-            // **艶を落とす。** 元の Screen.mat は smoothness 0.85 で、机の並びが
-            // 画面に映り込む。灯る前は縁がぎざぎざに光り、灯った後は帯の上に
-            // 部屋が重なって行が読めなくなる。画面は自分で光るものなので反射は要らない
+            m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// <summary>窓のマテリアル。帯を地と光る側の両方に貼る</summary>
+        static Material PaneFace()
+        {
+            var m = Clone(PanePath, "TerminalPane");
+            if (m == null) return null;
+            var rows = AssetDatabase.LoadAssetAtPath<Texture2D>(RowsPath);
+            if (rows == null) Debug.LogWarning("帯の絵が無い: " + RowsPath);
+            // **帯は地と光る側の両方に貼る。** 地だけだと、灯ったときに一様な色の
+            // emission が上から塗り潰して帯が消え、窓が緑の板になる。
+            // URP の Lit は emission も _BaseMap_ST で畳んだ uv で引くので、
+            // 流すのは TerminalScreen に任せられる
+            m.SetTexture("_BaseMap", rows);
+            m.SetTexture("_EmissionMap", rows);
+            m.SetColor("_BaseColor", Color.black);
+            m.SetColor("_EmissionColor", Color.black);
+            m.EnableKeyword("_EMISSION");
+            m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// <summary>
+        /// 置き場のマテリアルを、無ければ元の画面から複製して返す。
+        /// 艶は落とす。元の Screen.mat は smoothness 0.85 で、机の並びが画面に映り込み、
+        /// 灯る前は縁がぎざぎざに光り、灯った後は帯の上に部屋が重なって行が読めなくなる。
+        /// 画面は自分で光るものなので反射は要らない
+        /// </summary>
+        static Material Clone(string path, string name)
+        {
+            if (!AssetDatabase.IsValidFolder(Materials)) AssetDatabase.CreateFolder("Assets/Materials", "Connect");
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                var source = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/Placeholder/Screen.mat");
+                if (source == null) { Debug.LogWarning("元の画面のマテリアルが無い"); return null; }
+                m = new Material(source);
+                m.name = name;
+                AssetDatabase.CreateAsset(m, path);
+            }
             m.SetFloat("_Smoothness", 0.02f);
             m.SetFloat("_SpecularHighlights", 0f);
             m.SetFloat("_EnvironmentReflections", 0f);
             m.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
             m.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
-            m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
-            EditorUtility.SetDirty(m);
             return m;
         }
 
@@ -399,7 +537,7 @@ namespace HalfAware.EditorTools
         /// 場面 3 のものを足して繋ぐ。private な [SerializeField] なので
         /// SerializedObject 越しに書く
         /// </summary>
-        static void Wire(Transform socket, Renderer[] faces, Dictionary<string, GameObject> items)
+        static void Wire(Transform socket, Sheet sheet, Dictionary<string, GameObject> items)
         {
             var flow = Object.FindFirstObjectByType<SceneFlow>(FindObjectsInactive.Include);
             TerminalScreen screen = null;
@@ -410,9 +548,20 @@ namespace HalfAware.EditorTools
                 screen = monitors.GetComponent<TerminalScreen>();
                 if (screen == null) screen = monitors.gameObject.AddComponent<TerminalScreen>();
                 var so = new SerializedObject(screen);
-                var row = so.FindProperty("faces");
-                row.arraySize = faces.Length;
-                for (var i = 0; i < faces.Length; i++) row.GetArrayElementAtIndex(i).objectReferenceValue = faces[i];
+                var row = so.FindProperty("backs");
+                row.arraySize = sheet.backs.Length;
+                for (var i = 0; i < sheet.backs.Length; i++)
+                    row.GetArrayElementAtIndex(i).objectReferenceValue = sheet.backs[i];
+                var win = so.FindProperty("panes");
+                win.arraySize = sheet.panes.Length;
+                for (var i = 0; i < sheet.panes.Length; i++)
+                {
+                    var e = win.GetArrayElementAtIndex(i);
+                    e.FindPropertyRelative("face").objectReferenceValue = sheet.panes[i].face;
+                    e.FindPropertyRelative("tiling").vector2Value = sheet.panes[i].tiling;
+                    e.FindPropertyRelative("speed").floatValue = sheet.panes[i].speed;
+                    e.FindPropertyRelative("phase").floatValue = sheet.panes[i].phase;
+                }
                 so.ApplyModifiedPropertiesWithoutUndo();
                 EditorUtility.SetDirty(screen);
             }
