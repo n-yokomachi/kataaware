@@ -169,13 +169,16 @@ namespace HalfAware.EditorTools
         /// 車体を塞ぐ箱の外形。世界の座標で、x は ±<see cref="BlockHalfX"/>。
         ///
         /// 車（<see cref="Car"/>）は運転席から見える面しか無く、当たりも持たない。
-        /// 塞がないとガレージで車体をすり抜けられ、目線 1.64 が屋根の板（1.49〜1.55）を貫く。
-        /// 下端をガレージの床の面に合わせるのは、隙間に足先を差し込ませないため
+        /// 塞がないとガレージで車体をすり抜けられる。車高を上げた今は屋根の板（1.88〜1.94）が
+        /// 立っている目線 1.60 より高いところにあるので、頭ごと車内へ入り込めてしまう。
+        /// 下端をガレージの床の面に合わせるのは、隙間に足先を差し込ませないため。
+        ///
+        /// 前端はボンネットの先（2.48）まで伸ばす。屋根の前端で切ると、ボンネットの上を歩ける
         /// </summary>
-        public const float BlockHalfX = 0.90f;
-        public const float BlockTop = 1.55f;
+        public const float BlockHalfX = 0.92f;
+        public const float BlockTop = 1.94f;
         public const float BlockBack = -0.70f;
-        public const float BlockFront = 0.93f;
+        public const float BlockFront = 2.50f;
 
         /// <summary>立ち位置。運転席のドア側から近づく。ここから車まで約 8 m</summary>
         public static readonly Vector3 StandAt = new Vector3(4.2f, 0f, -7f);
@@ -183,12 +186,24 @@ namespace HalfAware.EditorTools
         public const float StandYaw = -28f;
         /// <summary>
         /// 運転席。ハンドルの真後ろ。x 0 に座るとハンドルが横に 44 度ずれて見える。
-        /// 右ハンドルなので正の側で、<see cref="LaneOffset"/> と対になっている
+        /// 右ハンドルなので正の側で、<see cref="LaneOffset"/> と対になっている。
+        ///
+        /// 原作の「ボロのオフロード車」に合わせて、目は乗用車の 1.18 から 1.55 へ上げた。
+        /// 車体がばねの上に高く載っているぶんがこの差にあたる。
+        /// 車内の物はどれもこの目線から割り出してあるので、ここを動かすなら
+        /// 計器盤・天井・ハンドル・座席・調べる対象までまとめて動かすことになる
         /// </summary>
-        public static readonly Vector3 SeatAt = new Vector3(0.38f, 1.18f, 0f);
+        public static readonly Vector3 SeatAt = new Vector3(0.38f, 1.55f, 0f);
 
-        /// <summary>ハンドルの中心。右ハンドルなので運転席と同じ x に来る</summary>
-        public static readonly Vector3 WheelAt = new Vector3(0.38f, 1.02f, 0.39f);
+        /// <summary>
+        /// ハンドルの中心。右ハンドルなので運転席と同じ x に来る。
+        ///
+        /// 高さは目線ではなく計器盤の天板から決める。輪の下の縁が天板より 0.09 沈んでいると、
+        /// 輪が宙に浮かず柱から生えて見える。天板 1.28 に対してここは 1.25。
+        /// 目線（1.55）との差は 0.30 で、乗用車だったときの 0.16 より開いた。
+        /// 高い席から低い輪を見下ろす構えそのものが、オフロード車の座り方にあたる
+        /// </summary>
+        public static readonly Vector3 WheelAt = new Vector3(0.38f, 1.25f, 0.39f);
         /// <summary>輪の外径</summary>
         public const float WheelOuter = 0.36f;
         /// <summary>輪の太さ</summary>
@@ -201,13 +216,17 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// 腕組みの前腕の中心。胸の前。
         ///
-        /// 計画は z 0.28 と置いていたが、その位置だと前腕が輪の下端（y 0.959 / z 0.239）を
+        /// 計画は z 0.28 と置いていたが、その位置だと前腕が輪の下端（y 1.189 / z 0.239）を
         /// 貫く。輪は 68 度寝ていて下端がこちらへ張り出しているので、胸に引き寄せて
-        /// 輪の手前へ収める。腕組みは元より胸に付く姿勢なので、寄せても不自然にはならない
+        /// 輪の手前へ収める。腕組みは元より胸に付く姿勢なので、寄せても不自然にはならない。
+        ///
+        /// **高さは <see cref="WheelAt"/> と揃えて上げ下げする。** 車高を上げたときも
+        /// 輪と腕を一緒に 0.23 持ち上げたので、袖と輪の 34 mm の隙間はそのまま残っている。
+        /// 片方だけ動かすと、この隙間が黙って詰まる
         /// </summary>
-        public static readonly Vector3 FoldedAt = new Vector3(0.38f, 1.02f, 0.15f);
+        public static readonly Vector3 FoldedAt = new Vector3(0.38f, 1.25f, 0.15f);
         /// <summary>肩。腕の付け根。上半身は作っていないので、視界の外の後ろへ逃がす</summary>
-        public const float ShoulderY = 1.14f;
+        public const float ShoulderY = 1.37f;
         public const float ShoulderZ = -0.06f;
         /// <summary>肩の左右の開き。体の中心から</summary>
         public const float ShoulderHalf = 0.19f;
@@ -349,7 +368,7 @@ namespace HalfAware.EditorTools
             {
                 c.clearFlags = CameraClearFlags.SolidColor;
                 c.backgroundColor = Sky;
-                // 車内で一番近いのは天井の板の 0.31 m。手前を 0.1 まで引くと、
+                // 車内で一番近いのは天井の板の 0.33 m。手前を 0.1 まで引くと、
                 // 路面に重ねた面の深度の余裕がそのぶん増える
                 c.nearClipPlane = 0.1f;
                 c.farClipPlane = 1000f;
@@ -384,8 +403,12 @@ namespace HalfAware.EditorTools
         // ---- 車内 ----------------------------------------------------------
 
         /// <summary>
-        /// 運転席から見える範囲だけ組む。車の外形は要らない。原点は車の中心で、
-        /// 視点は seat の (0, 1.18, 0)。寸法はすべて仮置きで、オーナーが実画面を見てから詰める
+        /// 運転席から見える範囲だけ組む。原点は車の中心で、視点は seat の (0.38, 1.55, 0)。
+        /// 外形はボンネットだけ作る。運転席から見えるのはそこまでで、側面も車輪も画面に入らない。
+        ///
+        /// 車は原作どおり「ボロのオフロード車」で、乗用車ではない。目線 1.55・立てたガラス・
+        /// 計器盤の向こうに見えるボンネットの三つがその印で、どれか一つでも乗用車の値へ戻すと
+        /// たちまちセダンに見える。とくにボンネットは、他の二つを合わせたより効く
         /// </summary>
         static void Car(Transform parent)
         {
@@ -393,26 +416,35 @@ namespace HalfAware.EditorTools
             var trim = new Bank { Texel = 1.2f };
             var seat = new Bank { Texel = 1.2f };
             var glass = new Bank { Texel = 0.8f };
+            var body = new Bank { Texel = 0.9f };
 
-            trim.Box(new Vector3(0f, 0.92f, 0.72f), new Vector3(1.72f, 0.26f, 0.42f));
+            // 計器盤。天板は 1.28 で、目線より 0.27 下。この差がそのままボンネットの見える量になる。
+            // 上げればボンネットが隠れ、下げれば計器盤が薄くなって乗用車に戻る
+            trim.Box(new Vector3(0f, 1.13f, 0.74f), new Vector3(1.72f, 0.30f, 0.46f));
             // 英国なので右ハンドル。運転席が道の中心線側に来る（LaneOffset と対）
-            glass.Box(new Vector3(0.38f, 1.02f, 0.60f), new Vector3(0.34f, 0.14f, 0.03f));
+            glass.Box(new Vector3(0.38f, 1.25f, 0.60f), new Vector3(0.34f, 0.14f, 0.03f));
             // メーターより 0.05 手前へ引く。前後を揃えると輪の向こう端が計器の面と擦れる
             Wheel(trim, WheelAt, WheelOuter, WheelThick, WheelLean);
             // 上を後ろへ倒す。屋根が前へ被さる向きにすると、外が見えなくなる。
+            // 古いオフロード車のガラスはほとんど立っているので、乗用車の 22 度から 10 度へ起こした。
+            // 起こすと同じ間口でもガラスが縦に広がり、天井の縁が視界から退く。
             // 上の縁は天井の板の中へ差し込む。背を縮めずに下げると、下の縁が計器盤から離れて隙間が開く
-            glass.Box(new Vector3(0f, 1.279f, 0.884f), new Vector3(1.66f, 0.49f, 0.02f), Quaternion.Euler(-22f, 0f, 0f));
-            trim.Box(new Vector3(-0.86f, 0.86f, 0.10f), new Vector3(0.08f, 0.72f, 1.30f));
-            trim.Box(new Vector3(0.86f, 0.86f, 0.10f), new Vector3(0.08f, 0.72f, 1.30f));
+            glass.Box(new Vector3(0f, 1.590f, 0.905f), new Vector3(1.66f, 0.63f, 0.02f), Quaternion.Euler(-10f, 0f, 0f));
+            // ドアの内張り。上端 1.30 を計器盤の天板と揃える。腰の線が左右と前で一本に通ると箱に見える
+            trim.Box(new Vector3(-0.86f, 1.02f, 0.10f), new Vector3(0.08f, 0.56f, 1.30f));
+            trim.Box(new Vector3(0.86f, 1.02f, 0.10f), new Vector3(0.08f, 0.56f, 1.30f));
             // 助手席は運転席の反対、道の外側
-            seat.Box(new Vector3(-0.42f, 0.62f, -0.06f), new Vector3(0.52f, 0.10f, 0.52f));
-            seat.Box(new Vector3(-0.42f, 0.94f, 0.22f), new Vector3(0.52f, 0.54f, 0.10f));
-            trim.Box(new Vector3(0f, 1.52f, 0.10f), new Vector3(1.72f, 0.06f, 1.60f));
-            glass.Box(new Vector3(0f, 1.44f, 0.74f), new Vector3(0.28f, 0.08f, 0.02f));
+            seat.Box(new Vector3(-0.42f, 0.99f, -0.06f), new Vector3(0.52f, 0.10f, 0.52f));
+            seat.Box(new Vector3(-0.42f, 1.31f, 0.22f), new Vector3(0.52f, 0.54f, 0.10f));
+            // 天井。目線との間を 0.33 取る。乗用車だったときの 0.31 より広い
+            trim.Box(new Vector3(0f, 1.91f, 0.10f), new Vector3(1.72f, 0.06f, 1.60f));
+            glass.Box(new Vector3(0f, 1.83f, 0.74f), new Vector3(0.28f, 0.08f, 0.02f));
+            Bonnet(body);
 
             trim.Emit(parent, "CarTrim", Mat("CarTrim"), false, Generated);
             seat.Emit(parent, "CarSeat", Mat("CarSeat"), false, Generated);
             glass.Emit(parent, "CarGlass", Mat("CarGlass"), false, Generated);
+            body.Emit(parent, "CarBody", Mat("CarBody"), false, Generated);
 
             // 視点の置き場。DriveDirector.seat へ繋ぐ。
             // ハンドルの真後ろに寄せてあるので、座ると輪が正面に来る
@@ -421,6 +453,34 @@ namespace HalfAware.EditorTools
             eye.localRotation = Quaternion.identity;
 
             Arms(parent);
+        }
+
+        /// <summary>
+        /// ボンネットと前のフェンダー。車内から計器盤の向こうに見える、唯一の車体。
+        ///
+        /// **セダンとオフロード車を分けているのはこれ。** 目線を上げただけでは
+        /// 「背の高い乗用車」にしか見えず、計器盤の先に平らな鉄板が寝ていて初めて
+        /// 4x4 に座っていることが読める。
+        ///
+        /// 天板は 1.22。計器盤の天板（1.28）より 0.06 だけ低い。深く下げると計器盤の陰に
+        /// 完全に隠れ、上げると道が見えなくなる。目（1.55 / z 0.22）から計器盤の前の角
+        /// （1.28 / z 0.97）を掠める線が天板と交わるのが z 1.14 で、そこから先の 1.3 m が見えている。
+        /// フェンダーは天板より 0.06 高くして左右に立てる。この二本の筋が遠近を作るので、
+        /// 板一枚のときより前へ伸びて見える。
+        /// 「ボロの」車なので曲面も飾りも付けない。角の立った板だけで組む
+        /// </summary>
+        static void Bonnet(Bank body)
+        {
+            // 天板。計器盤の前端（0.97）から継いで前へ 1.45
+            body.Box(new Vector3(0f, 1.195f, 1.695f), new Vector3(1.52f, 0.05f, 1.45f));
+            // フェンダー。天板の左右に一段高く載せる
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                body.Box(new Vector3(side * 0.78f, 1.235f, 1.710f), new Vector3(0.26f, 0.09f, 1.42f));
+            }
+            // 前端。運転席からは見えないが、ガレージで外から見たときに前が抜けていると板が浮く
+            body.Box(new Vector3(0f, 1.085f, 2.450f), new Vector3(1.82f, 0.27f, 0.06f));
         }
 
         /// <summary>
@@ -485,7 +545,8 @@ namespace HalfAware.EditorTools
             {
                 var side = s == 0 ? -1f : 1f;
                 var grip = WheelAt + new Vector3(side * WheelRing, 0f, 0f);
-                var elbow = new Vector3(WheelAt.x + side * 0.21f, 0.88f, 0.10f);
+                // 肘は輪から引く。手で書いた高さのままだと、車高を上げたときに腕だけ床に取り残される
+                var elbow = new Vector3(WheelAt.x + side * 0.21f, WheelAt.y - 0.14f, 0.10f);
                 var shoulder = new Vector3(WheelAt.x + side * ShoulderHalf, ShoulderY, ShoulderZ);
                 Limb(sleeve, shoulder, elbow, 0.095f);
                 Limb(sleeve, elbow, grip, 0.085f);
@@ -1214,6 +1275,11 @@ namespace HalfAware.EditorTools
         /// 運転席のドアと窓は x の正の側、助手席と上着のポケットは負の側にある。
         /// <see cref="LaneOffset"/> を裏返して左ハンドルにするなら、ここの x もまとめて裏返す。
         ///
+        /// **高さは車内と一緒に上げ下げする。** どれも掴まっている物（座面・計器盤・内張り・鏡）から
+        /// 割り出した数で、車高を上げたときもその物との差を保ったまま持ち上げた。
+        /// 置き直したら、座った目（<see cref="SeatAt"/> + <see cref="EyeLead"/>）からの距離が
+        /// <see cref="ItemRadius"/> の内側に残っているか測り直すこと。
+        ///
         /// **必須にするのは garage.door と drive.window の 2 つだけ。** 最後の帯で窓の独白を
         /// 送り切ったところで SceneFlow が場面を閉じる前提になっている。ほかに必須を足すと、
         /// 閉じられないまま BandClock が一巡して戻り、古い入れ替えの知らせで
@@ -1233,19 +1299,23 @@ namespace HalfAware.EditorTools
             if (script == null)
                 Debug.LogWarning("場面 8 の文面が無い。先に HalfAware/Write the drive script を走らせる: " + ScriptPath);
 
-            // ガレージのドアだけは歩いて近づくので、ほかより遠くから拾える
-            Put(parent, "Door", new Vector3(0.92f, 1.05f, 0.10f), script, DriveIds.Door, DoorRadius, true);
+            // ガレージのドアだけは歩いて近づくので、ほかより遠くから拾える。
+            // 高さは内張りの真ん中。x と z は動かさない。見直し 12 が立ち位置からここまでを
+            // 「歩く線」として引いていて、排水口がその線に乗っているかを見ている
+            Put(parent, "Door", new Vector3(0.92f, 1.13f, 0.10f), script, DriveIds.Door, DoorRadius, true);
 
             triggerItems = new GameObject[Bands];
-            triggerItems[0] = Put(parent, "Chips", new Vector3(-0.42f, 0.78f, -0.02f), script, DriveIds.Chips, ItemRadius, false);
+            triggerItems[0] = Put(parent, "Chips", new Vector3(-0.42f, 1.15f, -0.02f), script, DriveIds.Chips, ItemRadius, false);
             // 背もたれの前面は z 0.17。0.24 に置くと判定点も印も背もたれの中に入って、
             // 印が座席に食われる（CheckDrive の見直し 4 が拾う）。座面の上へ出す
-            triggerItems[1] = Put(parent, "Log", new Vector3(-0.42f, 0.80f, 0.14f), script, DriveIds.Log, ItemRadius, false);
-            triggerItems[2] = Put(parent, "Mirror", new Vector3(0f, 1.42f, 0.72f), script, DriveIds.Mirror, ItemRadius, false);
-            triggerItems[3] = Put(parent, "Photo", new Vector3(0.16f, 1.00f, 0.62f), script, DriveIds.Photo, ItemRadius, false);
+            triggerItems[1] = Put(parent, "Log", new Vector3(-0.42f, 1.17f, 0.14f), script, DriveIds.Log, ItemRadius, false);
+            // 鏡そのものは y 1.79〜1.87 / z 0.73〜0.75。印は 0.17 上に出るので、
+            // 鏡に合わせて置くと天井の板（1.88〜1.94）に食われる。手前と下へ外してある
+            triggerItems[2] = Put(parent, "Mirror", new Vector3(0f, 1.66f, 0.66f), script, DriveIds.Mirror, ItemRadius, false);
+            triggerItems[3] = Put(parent, "Photo", new Vector3(0.16f, 1.23f, 0.62f), script, DriveIds.Photo, ItemRadius, false);
             // 窓だけ必須。帯 4 に入るまで伏せてあるので、それまで場面は閉じない。
             // ドアの内張りは x 0.82〜0.90。0.84 に置くと印が内張りの中に入る
-            triggerItems[4] = Put(parent, "Window", new Vector3(0.80f, 1.00f, 0.10f), script, DriveIds.Window, ItemRadius, true);
+            triggerItems[4] = Put(parent, "Window", new Vector3(0.80f, 1.26f, 0.10f), script, DriveIds.Window, ItemRadius, true);
             // きっかけはその帯に入るまで出さない。出し分けるのは DriveDirector.ShowTrigger
             for (var i = 0; i < triggerItems.Length; i++) triggerItems[i].SetActive(false);
 
@@ -1255,9 +1325,9 @@ namespace HalfAware.EditorTools
             // 拾える距離 1.4 の内側に入ってしまう。once: true なので、ここで読まれると
             // 走行中に二度と出ない
             var cabin = Child(parent, "Cabin");
-            Put(cabin, "Radio", new Vector3(-0.02f, 0.96f, 0.70f), script, DriveIds.Radio, ItemRadius, false);
-            Put(cabin, "Pocket", new Vector3(-0.10f, 0.70f, -0.30f), script, DriveIds.Pocket, ItemRadius, false);
-            Put(cabin, "Fuel", new Vector3(0.46f, 1.02f, 0.58f), script, DriveIds.Fuel, ItemRadius, false);
+            Put(cabin, "Radio", new Vector3(-0.02f, 1.19f, 0.70f), script, DriveIds.Radio, ItemRadius, false);
+            Put(cabin, "Pocket", new Vector3(-0.10f, 1.07f, -0.30f), script, DriveIds.Pocket, ItemRadius, false);
+            Put(cabin, "Fuel", new Vector3(0.46f, 1.25f, 0.58f), script, DriveIds.Fuel, ItemRadius, false);
             cabin.gameObject.SetActive(false);
         }
 
@@ -1781,6 +1851,13 @@ namespace HalfAware.EditorTools
                 case "CarTrim": col = new Color(0.085f, 0.082f, 0.090f); smooth = 0.18f; break;
                 case "CarSeat": col = new Color(0.115f, 0.098f, 0.090f); smooth = 0.10f; break;
                 case "CarGlass": col = new Color(0.55f, 0.60f, 0.66f, 0.12f); smooth = 0.85f; break;
+                // ボンネット。褪せて白茶けた塗りの鉄板。
+                // **ここだけ夜の場面の中で浮くほど明るい。** 車内の色（0.09）で塗ると、
+                // 実際に組んで測ったところ画面では路面と同じ 0.19 になり、ボンネットが丸ごと道に溶けた。
+                // この場面は空も道も内装も 0.1 前後に固まっていて、形を読ませる手掛かりが明暗しか無い。
+                // 0.47 まで上げて初めて路面の 0.19 に対して 0.22 へ離れ、前の縁が線として出る。
+                // 古いオフロード車は石灰色や砂色に褪せているものなので、色の選び方としても外れていない
+                case "CarBody": col = new Color(0.470f, 0.482f, 0.432f); smooth = 0.18f; break;
                 // 前腕。革のライダースの袖。BuildProtagonist の上着と同じ色にしてある
                 case "Sleeve": col = new Color(0.055f, 0.053f, 0.062f); smooth = 0.22f; break;
                 // 手。夜の車内なので、肌も袖よりわずかに明るい程度に留める
