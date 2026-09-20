@@ -51,18 +51,34 @@ namespace HalfAware
 
         [Header("大きさ")]
         [SerializeField] float shotVolume = 0.85f;
-        // **走行音は一度「もう少し大きめに」と差し戻されている。**
-        // 上げるときは二本の差を保つこと。素材の実効値が舗装 -35dB、未舗装 -25dB で
-        // 10dB 開いているので、同じ値を入れると未舗装だけ飛び出す
-        [Tooltip("舗装の輪。素材が 10dB 小さいぶんここで持ち上げる")]
+        // **どれも 1.00。** 二度「もう少し大きめに」と差し戻された末の指示がこれ。
+        // AudioSource.volume の上限が 1 なので、ここから先は上げられない。
+        // 窓を開けたときの「さらに大きく」は、音量ではなくこもりの取れ方で出す
+        // （<see cref="Open"/>）。素材の実効値が舗装 -35dB、未舗装 -25dB と
+        // 10dB 開いているので、同じ 1.00 でも未舗装の方がはっきり大きく鳴る
+        [Tooltip("舗装の輪")]
         [SerializeField] float pavedVolume = 1.00f;
-        [SerializeField] float gravelVolume = 0.42f;
-        [Tooltip("雨とワイパー。走行音に重ねるので控えめに")]
-        [SerializeField] float rainVolume = 0.55f;
+        [Tooltip("土と轍の輪")]
+        [SerializeField] float gravelVolume = 1.00f;
+        [Tooltip("雨とワイパー。走行音に重ねる")]
+        [SerializeField] float rainVolume = 1.00f;
         [Tooltip("エンジンだけ掛かっている音")]
         [SerializeField] float idleVolume = 0.60f;
         [Tooltip("吐く息。口元なので単発より控えめに。場面 1 の Cigarette は 0.40")]
         [SerializeField] float breathVolume = 0.40f;
+
+        [Header("窓")]
+        [Tooltip("窓を閉めているときに走行音と雨から上を削る高さ。Hz")]
+        [SerializeField] float shutCut = 1500f;
+        [Tooltip("窓を開けたときの高さ。Hz。22000 で実質こもりなし")]
+        [SerializeField] float openCut = 22000f;
+        [Tooltip("こもりが取れるまでの秒数。窓が下りる速さに合わせる")]
+        [SerializeField] float openSeconds = 1.6f;
+
+        AudioLowPassFilter roadMuffle;
+        AudioLowPassFilter weatherMuffle;
+        float cut = -1f;
+        float want;
 
         /// <summary>暗転の黒のあいだに流す音の長さ。秒。黒を何秒置くか決めるのに使う</summary>
         public float PullAwaySeconds { get { return pullAway != null ? pullAway.length : 0f; } }
@@ -72,6 +88,57 @@ namespace HalfAware
 
         /// <summary>窓を下ろす音の長さ。秒。下ろし終えてから独白を出すのに使う</summary>
         public float WindowSeconds { get { return windowDown != null ? windowDown.length : 0f; } }
+
+        /// <summary>
+        /// 窓を開けた／閉めた。**音量では上げない。**
+        ///
+        /// 走行音も雨も既に 1.00 で、AudioSource.volume の上限に張り付いている。
+        /// 窓を開けて大きく聞こえるのは、実際には音量より「こもりが取れる」こと
+        /// なので、そちらで出す。閉まっているあいだは 1.5kHz から上を削り、
+        /// 開けるとその蓋が外れる。路面の擦れも雨の粒も高い方に居るので、
+        /// 蓋が外れた瞬間にどちらもぐっと前へ出る
+        /// </summary>
+        public void Open(bool open)
+        {
+            want = open ? openCut : shutCut;
+        }
+
+        void Awake()
+        {
+            roadMuffle = Muffle(road);
+            weatherMuffle = Muffle(weather);
+            want = shutCut;
+            cut = shutCut;
+            Apply(shutCut);
+        }
+
+        void Update()
+        {
+            if (Mathf.Approximately(cut, want)) return;
+            // 対数で寄せる。Hz を線形で動かすと、聞こえ方は終わり際にしか変わらない
+            var from = Mathf.Log(Mathf.Max(20f, cut));
+            var to = Mathf.Log(Mathf.Max(20f, want));
+            var step = Mathf.Abs(Mathf.Log(Mathf.Max(20f, openCut)) - Mathf.Log(Mathf.Max(20f, shutCut)));
+            var rate = openSeconds > 0.0001f ? step / openSeconds : step;
+            cut = Mathf.Exp(Mathf.MoveTowards(from, to, rate * Time.deltaTime));
+            if (Mathf.Abs(cut - want) / Mathf.Max(1f, want) < 0.01f) cut = want;
+            Apply(cut);
+        }
+
+        void Apply(float hz)
+        {
+            if (roadMuffle != null) roadMuffle.cutoffFrequency = hz;
+            if (weatherMuffle != null) weatherMuffle.cutoffFrequency = hz;
+        }
+
+        static AudioLowPassFilter Muffle(AudioSource on)
+        {
+            if (on == null) return null;
+            var had = on.GetComponent<AudioLowPassFilter>();
+            if (had == null) had = on.gameObject.AddComponent<AudioLowPassFilter>();
+            had.lowpassResonanceQ = 1f;
+            return had;
+        }
 
         public void DoorOpen() { Shot(doorOpen); }
         public void DoorShut() { Shot(doorShut); }

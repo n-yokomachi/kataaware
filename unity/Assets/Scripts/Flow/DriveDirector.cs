@@ -61,6 +61,12 @@ namespace HalfAware
             "環の区切りごとに 1 つあるので配列になる。帯の直下にまとめられない" +
             "（DriveWorld が帯の子の数を環の枠の数に使うため、区切り以外を混ぜると環がずれる）")]
         [SerializeField] GameObject[] crofts = new GameObject[0];
+        [Tooltip("農家が現れてよい、いちばん手前の z。m。" +
+            "これより遠い区切りが回ってきたときだけ出す。道の先は 110 m")]
+        [SerializeField] float croftFrom = 88f;
+
+        /// <summary>農家を出してよいか。独白を送り切ったところで立つ</summary>
+        bool croftsDue;
         [Tooltip("ガレージの床を歩く足音。乗り込んだら止める")]
         [SerializeField] Footsteps feet;
 
@@ -196,9 +202,10 @@ namespace HalfAware
             if (clock.Beat == DriveBeat.Talking && !flow.Talking)
             {
                 clock.Spoken();
-                // ここで家が現れる。小麦だけの畑を走ってきて、
-                // 独白を読み終えたところで人の住むところに差し掛かる
-                ShowCrofts(true);
+                // ここから家が現れてよくなる。**その場では出さない。**
+                // 目の前に湧くのは見ていて分かるので、環が一周して
+                // 道の先から入ってくる区切りにだけ載せる
+                croftsDue = true;
             }
 
             // 速さと粗さは秒数と同じ扱いで、毎フレーム渡す。
@@ -231,6 +238,9 @@ namespace HalfAware
             // 黒へ入った一度だけ、景色を先に入れ替える。段取りはまだ終わる側のまま。
             // ここで clock.Reset を呼んではいけない。黒が 1 フレームで終わる
             if (clock.TakeSwap()) Dress(band + 1);
+
+            // 道の先まで下がった区切りに農家を載せる。独白を送り切るまでは何もしない
+            AdmitCrofts();
 
             // 黒と明けのあいだは操作を止める
             if (clock.Beat == DriveBeat.Black || clock.Beat == DriveBeat.FadingIn) flow.Freeze(0.25f);
@@ -295,7 +305,7 @@ namespace HalfAware
             cigarette.Stop();
             if (smoke != null) smoke.Begin(SmokeSeconds);
 
-            if (sound != null) sound.WindowDown();
+            if (sound != null) { sound.WindowDown(); sound.Open(true); }
             yield return Wait((sound != null ? sound.WindowSeconds : 0f) + beforeExhale);
 
             // 窓が下りきってから吐く。煙のひと吹きも合わせる
@@ -490,7 +500,10 @@ namespace HalfAware
             if (aboard && sound != null) sound.Weather(At(which).rain);
             // 煙は景色を跨がない。黒のあいだに畳む
             if (smoke != null) smoke.Cancel();
+            // 窓も景色を跨がない。開けたのは前の景色の中の話
+            if (sound != null) sound.Open(false);
             // 家は独白を送り切ってから出す。景色に入った時点では小麦だけ
+            croftsDue = false;
             ShowCrofts(false);
         }
 
@@ -499,6 +512,27 @@ namespace HalfAware
         {
             for (var i = 0; i < crofts.Length; i++)
                 if (crofts[i] != null && crofts[i].activeSelf != on) crofts[i].SetActive(on);
+        }
+
+        /// <summary>
+        /// 道の先から入ってくる区切りにだけ農家を載せる。
+        ///
+        /// **一度に全部出さない。** 独白を送り切った瞬間に出すと、すぐ横にも
+        /// 目の前にも家が湧いて見える。区切りは環を回って道の先（110 m）から
+        /// 入ってくるので、そこまで下がった区切りにだけ載せれば、
+        /// 家はいつも遠景から現れて近づいてくる
+        /// </summary>
+        void AdmitCrofts()
+        {
+            if (!croftsDue) return;
+            for (var i = 0; i < crofts.Length; i++)
+            {
+                var held = crofts[i];
+                if (held == null || held.activeSelf) continue;
+                var slice = held.transform.parent;
+                if (slice == null || slice.position.z < croftFrom) continue;
+                held.SetActive(true);
+            }
         }
 
         /// <summary>which 番目の帯の空の物だけ出す。-1 でどれも出さない</summary>
