@@ -919,8 +919,12 @@ namespace HalfAware.EditorTools
         static void Binnacle(Bank trim, Bank dials)
         {
             trim.Box(PodAt, new Vector3(0.560f, 0.140f, 0.160f), PodLean);
-            trim.Box(PodAt + new Vector3(0f, 0.1385f, -0.0955f),
-                new Vector3(0.600f, 0.018f, 0.160f), PodLean);
+            // 庇。**手前へ出し過ぎない。** 160 mm 取っていたときは near 側が z 0.4995 まで
+            // 来ていて、運転席から見ると計器の上に板が突き出しているのが分かる。
+            // 105 mm へ詰めて奥へ寄せ、near 側を 0.552 まで引いた。
+            // 計器の面（z 0.595）を覆う役目はそのまま果たす
+            trim.Box(PodAt + new Vector3(0f, 0.1385f, -0.0705f),
+                new Vector3(0.600f, 0.018f, 0.105f), PodLean);
             Panel(dials, PodFace, DialWide, DialHigh, PodLean);
         }
 
@@ -1766,36 +1770,29 @@ namespace HalfAware.EditorTools
         static void CigarettePack(Transform parent)
         {
             var pack = Child(parent, "CigarettePack");
-            // **写真立てのあったところ。** 中央の操作盤の縁の上。
+            // **計器盤の天板に置く。**
             //
-            // 計器盤の天板には置けない。判定点そのものはメーターの塊
-            // （x 0.10〜0.66 / y 1.247〜1.391）の中で、その前の天板は運転席の目から見ると
-            // 塊と庇に丸ごと隠れる。庇の奥の下の縁（y 1.4304 / z 0.4439）を掠める線が
-            // 天板と交わるのが z 0.725 で、塊の前の面（z 0.71）とのあいだに 15 mm しか残らない。
-            // 見えるのは塊より下と手前、つまりここになる。
+            // 前は中央の操作盤の縁（y 1.260）に置いて、わざわざ棚まで足していた。
+            // 見当違いで、その上には計器盤の天板（y 1.300、z 0.510〜0.610）が既にあり、
+            // 箱はその板の中に沈んでいた。棚は捨てて、あるものの上に載せる。
             //
-            // **ただし操作盤の縁は奥行き 44 mm（z 0.466〜0.510）しかない。**
-            // 箱は 86 mm あるので載り切らない。ここにあった写真立ては台紙が
-            // 13 mm と薄く、立てていたから収まっていた。寝かせるなら受ける面が要るので、
-            // 縁から手前へ小さな棚を出す。棚の天面が箱の座になる
-            Tray(parent);
-
-            // 少し振り、手前を持ち上げて傾ける。
-            //
-            // **平らに寝かせると読めない。** 天板と同じ向きの面は同じだけ灯りを受けるので、
-            // 実測で箱 13.9 に対して周りの天板 12.2 ── 1.7 しか違わなかった。
-            // ここにあった写真立てが読めていたのは、面を計器の裏の灯り（x 0.38 / y 1.36）へ
-            // 向けていたからで、同じ手を当てる。手前を 16 度起こすと上の面が灯りを正面から
-            // 受け、箱の縁にも影の線が出る
-            var lean = Quaternion.Euler(-16f, -22f, 4f);
+            // **長い辺は左右に向ける。** 天板の使える奥行きは、手前の縁
+            // （<see cref="ShelfNear"/> 0.510）から計器の塊の面（<see cref="PodNear"/> 0.595）
+            // までの 85 mm しかない。箱の長い辺は 86 mm あるので、前後に向けると入らない。
+            // 横へ向けたうえで 8 度だけ振る。真横に揃えると、置いたのではなく
+            // 嵌めたものに見える。
+            var lean = Quaternion.Euler(-14f, -98f, 4f);
             pack.localRotation = lean;
 
             var size = new Vector3(0.056f, 0.022f, 0.086f);
-            // **持ち上げる量は傾きから出す。** 勘で足していたときは、いちばん低い隅が
-            // 天面より 5.3 mm 下へ潜って「埋まってる」と差し戻された。
-            // 回した箱がどれだけ下へ張り出すかは、三辺それぞれの向きの縦成分で決まる
-            var drop = Sink(lean, size);
-            pack.localPosition = new Vector3(PackAt.x, TrayTop + drop + 0.0005f, PackAt.z);
+            // **置く場所は測って決める。勘で足さない。** 二度、沈ませて差し戻されている。
+            // 縦は回した箱の下への張り出しぶんだけ天板から浮かせ、
+            // 前後は塊の面から箱の奥行きの半分と隙間ぶんだけ手前へ引く
+            var reach = Reach(lean, size);
+            pack.localPosition = new Vector3(
+                PackX,
+                DashShelf + Sink(lean, size) + 0.0005f,
+                PodNear - reach * 0.5f - PackGap);
 
             var box = GameObject.CreatePrimitive(PrimitiveType.Cube);
             box.name = "Box";
@@ -1806,11 +1803,20 @@ namespace HalfAware.EditorTools
             Object.DestroyImmediate(box.GetComponent<Collider>());
         }
 
-        /// <summary>箱の置き場。x と z だけ使う。y は棚の天面から出す</summary>
-        static readonly Vector3 PackAt = new Vector3(0.140f, 0f, 0.545f);
+        /// <summary>箱の左右の位置。計器の絵（x 0.1606 が左の縁）より左へ外す</summary>
+        const float PackX = 0.118f;
 
-        /// <summary>棚の天面。中央の操作盤の縁（1.260）に板の厚みを足した高さ</summary>
-        const float TrayTop = 1.272f;
+        /// <summary>計器盤の天板の高さ。ここが箱の座になる</summary>
+        const float DashShelf = 1.300f;
+
+        /// <summary>計器の塊の、運転席を向いた面の z。箱はこれより手前に収める</summary>
+        const float PodNear = 0.595f;
+
+        /// <summary>箱と塊の面のあいだに残す隙間。m</summary>
+        const float PackGap = 0.008f;
+
+        /// <summary>計器盤の天板の手前の縁。箱をここから前へはみ出させない</summary>
+        const float ShelfNear = 0.510f;
 
         /// <summary>
         /// 回した箱が中心からどれだけ下へ張り出すか。m。
@@ -1823,31 +1829,14 @@ namespace HalfAware.EditorTools
                 + Mathf.Abs((turn * Vector3.forward).y) * size.z * 0.5f;
         }
 
-        /// <summary>
-        /// 箱を受ける棚。中央の操作盤の縁から手前へ出す。
-        ///
-        /// 道の見える縁（<see cref="SightY"/>）は z 0.57 で 1.498。棚の天面 1.272 は
-        /// その 226 mm 下なので、前は塞がない。ハンドル（軸 x 0.38、外径の半分 0.19）へも
-        /// 届かない。棚の右端 x 0.20 は軸から 0.18 離れていて、輪がそこまで来ない高さにある
-        /// </summary>
-        static void Tray(Transform parent)
+        /// <summary>回した箱が前後にどれだけ広がるか。m</summary>
+        static float Reach(Quaternion turn, Vector3 size)
         {
-            var trim = new Bank { Texel = 1.2f };
-            var steel = new Bank { Texel = 1.2f };
-            var top = TrayTop;
-            // 板。操作盤の面（z 0.510）から手前 0.585 まで
-            trim.Box(new Vector3(PackAt.x, top - 0.006f, 0.5475f), new Vector3(0.132f, 0.012f, 0.150f));
-            // 縁の立ち上がり。載せたものが転がり落ちない見た目にする
-            steel.Box(new Vector3(PackAt.x, top + 0.004f, 0.6175f), new Vector3(0.132f, 0.020f, 0.010f));
-            steel.Box(new Vector3(PackAt.x - 0.061f, top + 0.004f, 0.5475f), new Vector3(0.010f, 0.020f, 0.150f));
-            trim.Emit(parent, "TrayTrim", Mat("CarTrim"), false, Generated);
-            steel.Emit(parent, "TraySteel", Mat("CarSteel"), false, Generated);
+            return Mathf.Abs((turn * Vector3.right).z) * size.x
+                + Mathf.Abs((turn * Vector3.up).z) * size.y
+                + Mathf.Abs((turn * Vector3.forward).z) * size.z;
         }
 
-        /// <summary>
-        /// 煙草の箱の素材。自室のものをそのまま借りる。
-        /// 借り物が見つからないときだけ、同じ色の無地を車内の素材として作る
-        /// </summary>
         static Material PackMat()
         {
             const string shared = "Assets/Materials/Room/CigarettePack.mat";

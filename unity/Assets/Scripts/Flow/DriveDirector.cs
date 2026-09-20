@@ -75,22 +75,34 @@ namespace HalfAware
         [SerializeField] DriveSound sound;
         [Tooltip("運転席のドアの板。乗り込みで開いて閉める")]
         [SerializeField] CarDoor carDoor;
-        [Tooltip("ドアを開けてから目が動き出すまで。秒")]
-        [SerializeField] float doorHold = 0.45f;
-        [Tooltip("目が動き出してから板が開き始めるまで。秒。" +
-            "**0 にするな。** 板の丈は 1.64 m あり、開き 11 度のところで面が" +
-            "立っている人の目（x 1.14）を通る。目が座席へ寄り始めてから開かせる")]
-        [SerializeField] float doorLag = 0.25f;
-        [Tooltip("板が開ききるまで。秒。doorLag と足して seatMove より短くすること")]
+        [Tooltip("目をドアへ向け、板の退く先から外れるまで。秒")]
+        [SerializeField] float doorFace = 0.7f;
+        [Tooltip("板が開ききるまで。秒。この間、目は据えたまま開くところを見ている")]
         [SerializeField] float doorSwing = 0.9f;
+        [Tooltip("板が開ききってから目が動き出すまで。秒")]
+        [SerializeField] float doorHold = 0.45f;
+        [Tooltip("戸口をくぐって運転席まで目を運ぶ秒数")]
+        [SerializeField] float seatMove = 1.5f;
+        [Tooltip("車内を正面に置いたまま待つ秒数")]
+        [SerializeField] float sitHold = 0.6f;
+        [Tooltip("車内からドアへ向き直るまで。秒")]
+        [SerializeField] float doorLook = 0.55f;
         [Tooltip("板が閉まりきるまで。秒。閉まったところで音が鳴る")]
         [SerializeField] float doorShut = 0.45f;
-        [Tooltip("立ち位置から運転席まで目を滑らせる秒数")]
-        [SerializeField] float seatMove = 1.6f;
-        [Tooltip("運転席に着いてからドアを閉めるまで。秒")]
-        [SerializeField] float sitHold = 0.5f;
-        [Tooltip("ドアを閉めてからイグニッションまで。秒")]
-        [SerializeField] float shutHold = 0.8f;
+        [Tooltip("閉めてから前を向ききるまで。秒")]
+        [SerializeField] float faceFront = 0.7f;
+        [Tooltip("前を向いてからイグニッションまで。秒")]
+        [SerializeField] float shutHold = 0.5f;
+        [Tooltip("板を開けるあいだ立つ場所。運転席から見た座。高さは今の目のまま使う。" +
+            "**板は目の高さを薙いで開く。** 丈は 1.65 m あり、調べる点（x 0.92）の" +
+            "そばに立ったまま開けると、開き 11 度のところで面が目を通る")]
+        [SerializeField] Vector3 doorStand = new Vector3(1.97f, 0f, -1.55f);
+        [Tooltip("戸口の通り道。座席から運転席側へ出す距離。m。回り込む曲線の制御点になる")]
+        [SerializeField] float doorGate = 0.75f;
+        [Tooltip("目を向けるドアの取っ手。蝶番から見た座。板と一緒に動く")]
+        [SerializeField] Vector3 doorMark = new Vector3(-0.05f, 1.13f, -0.84f);
+        [Tooltip("目を向ける車内。運転席から見た座。計器盤の助手席寄り")]
+        [SerializeField] Vector3 cabinMark = new Vector3(-0.36f, -0.22f, 0.60f);
         [Tooltip("イグニッションを鳴らし終えてから黒へ切り替わるまで。秒。" +
             "0 なら鳴らし終えた時点で黒へ落ちる。この間だけエンジンの震えと" +
             "止まったままの音が入るので、0 のときはどちらも出さない")]
@@ -399,10 +411,8 @@ namespace HalfAware
 
             // 板は閉じた姿から始める
             if (carDoor != null) carDoor.Set(0f);
-            if (sound != null) sound.DoorOpen();
-            yield return Wait(doorHold);
 
-            // 目を運転席へ滑らせる。
+            // **目の高さを足元へ写してから、足元そのものを目にする。**
             //
             // seat は足元ではなく目の位置。PlayerController は毎フレーム eye を
             // 足元から EyeHeight だけ上へ置き直すので、EyeHeight を 0 にして
@@ -411,46 +421,89 @@ namespace HalfAware
             // 一つ目のきっかけすら調べられなくなる。車内は座ったまま歩かないので、
             // 足元の高さはもう誰も使わない。
             //
-            // **切り替える前に、今の目の高さを足元へ写す。** 写さずに EyeHeight だけ
-            // 0 にすると、その 1 フレームで目が 1.6 m 落ちてから滑り始める
-            var from = player.transform.position + Vector3.up * player.EyeHeight;
+            // 写さずに EyeHeight だけ 0 にすると、その 1 フレームで目が 1.6 m 落ちてしまう
+            var eye = player.transform.position + Vector3.up * player.EyeHeight;
             player.EyeHeight = 0f;
-            player.transform.position = from;
-            var to = seat != null ? seat.position : from;
-            var yawFrom = player.Yaw;
-            var yawTo = seat != null ? seat.eulerAngles.y : yawFrom;
-            var pitchFrom = player.Pitch;
-            for (var t = 0f; t < seatMove; t += Time.deltaTime)
+            player.transform.position = eye;
+
+            var seatYaw = seat != null ? seat.eulerAngles.y : player.Yaw;
+            var sit = seat != null ? seat.position : eye;
+            float yaw, pitch;
+
+            // ---- 一。ドアの方を向き、板の退く先から外れる ------------------------
+            //
+            // 板の届く外まで退く。ドアを引くために一歩下がる動きに見える
+            var clear = StandClear(player.transform.position.y);
+            Aim(clear, DoorAt(), out yaw, out pitch);
+            yield return Slew(player.transform.position, clear,
+                player.Yaw, yaw, player.Pitch, pitch, doorFace);
+
+            // ---- 二。板が開く。目は据えたまま、開くところを見ている ---------------
+            if (sound != null) sound.DoorOpen();
+            for (var t = 0f; t < doorSwing; t += Time.deltaTime)
             {
-                var k = Ease(seatMove <= 0f ? 1f : t / seatMove);
-                player.transform.position = Vector3.Lerp(from, to, k);
-                player.Yaw = Mathf.LerpAngle(yawFrom, yawTo, k);
-                player.Pitch = Mathf.Lerp(pitchFrom, 0f, k);
-                // 板は目が寄り始めてから開く。先に開けると面が目を通る
-                if (carDoor != null)
-                    carDoor.Set(Ease(doorSwing <= 0f ? 1f : (t - doorLag) / doorSwing));
+                if (carDoor != null) carDoor.Set(Ease(doorSwing <= 0f ? 1f : t / doorSwing));
+                // 板が開くにつれ取っ手も外へ出る。目はそれを追う
+                Aim(clear, DoorAt(), out yaw, out pitch);
+                player.Yaw = yaw;
+                player.Pitch = pitch;
                 flow.Freeze(FreezeStep);
                 yield return null;
             }
-            player.transform.position = to;
-            player.Yaw = yawTo;
-            player.Pitch = 0f;
             if (carDoor != null) carDoor.Set(1f);
-            // **首の制限は体の向きを決めたあとで掛ける。** PlayerController.Yaw は
-            // 首が制限されていると体ではなく首を回すので、先に掛けると
-            // 運転席の正面ではなく立っていたときの向きが体の正面のまま残る
-            player.HeadYawLimit = seatedYawLimit;
+            Aim(clear, DoorAt(), out yaw, out pitch);
+            player.Yaw = yaw;
+            player.Pitch = pitch;
+            yield return Wait(doorHold);
+
+            // ---- 三。戸口をくぐって運転席へ。車内が正面に来る ---------------------
+            //
+            // **直線で滑らせない。** 退いた場所から座席へ真っ直ぐ引くと、開いた板の
+            // 外を掠めて斜めに吸い込まれる。戸口を制御点にした二次曲線で回り込ませ、
+            // 向きはドアから車内（<see cref="cabinMark"/>）へ振る
+            var gate = Gate(sit);
+            float inYaw, inPitch;
+            Aim(sit, CabinAt(sit), out inYaw, out inPitch);
+            var fromYaw = player.Yaw;
+            var fromPitch = player.Pitch;
+            for (var t = 0f; t < seatMove; t += Time.deltaTime)
+            {
+                var k = Ease(seatMove <= 0f ? 1f : t / seatMove);
+                player.transform.position = Bend(clear, gate, sit, k);
+                player.Yaw = Mathf.LerpAngle(fromYaw, inYaw, k);
+                player.Pitch = Mathf.Lerp(fromPitch, inPitch, k);
+                flow.Freeze(FreezeStep);
+                yield return null;
+            }
+            player.transform.position = sit;
+            player.Yaw = inYaw;
+            player.Pitch = inPitch;
             yield return Wait(sitHold);
 
-            // 板を閉める。閉まりきったところで音が鳴る
+            // ---- 四。板の方へ向き直り、引いて閉める -------------------------------
+            Aim(sit, DoorAt(), out yaw, out pitch);
+            yield return Slew(sit, sit, inYaw, yaw, inPitch, pitch, doorLook);
             for (var t = 0f; t < doorShut; t += Time.deltaTime)
             {
                 if (carDoor != null) carDoor.Set(1f - Ease(doorShut <= 0f ? 1f : t / doorShut));
+                // 閉まっていく取っ手を目で追う。板より先に前を向くと、
+                // 誰も触っていない板が勝手に閉まったように見える
+                Aim(sit, DoorAt(), out yaw, out pitch);
+                player.Yaw = yaw;
+                player.Pitch = pitch;
                 flow.Freeze(FreezeStep);
                 yield return null;
             }
             if (carDoor != null) carDoor.Set(0f);
             if (sound != null) sound.DoorShut();
+            Aim(sit, DoorAt(), out yaw, out pitch);
+
+            // ---- 五。前を向く ----------------------------------------------------
+            yield return Slew(sit, sit, yaw, seatYaw, pitch, 0f, faceFront);
+            // **首の制限は体の向きを決めたあとで掛ける。** PlayerController.Yaw は
+            // 首が制限されていると体ではなく首を回すので、先に掛けると
+            // 運転席の正面ではなく振り向いた先が体の正面のまま残る
+            player.HeadYawLimit = seatedYawLimit;
             yield return Wait(shutHold);
             if (sound != null) sound.Ignition();
 
@@ -523,6 +576,80 @@ namespace HalfAware
         {
             k = Mathf.Clamp01(k);
             return k * k * (3f - 2f * k);
+        }
+
+        /// <summary>
+        /// 目を from から to へ、向きを yawFrom/pitchFrom から yawTo/pitchTo へ、
+        /// seconds 秒かけて移す。両端は緩める。待っているあいだ送りは止めておく
+        /// </summary>
+        System.Collections.IEnumerator Slew(Vector3 from, Vector3 to,
+            float yawFrom, float yawTo, float pitchFrom, float pitchTo, float seconds)
+        {
+            for (var t = 0f; t < seconds; t += Time.deltaTime)
+            {
+                var k = Ease(seconds <= 0f ? 1f : t / seconds);
+                player.transform.position = Vector3.Lerp(from, to, k);
+                player.Yaw = Mathf.LerpAngle(yawFrom, yawTo, k);
+                player.Pitch = Mathf.Lerp(pitchFrom, pitchTo, k);
+                flow.Freeze(FreezeStep);
+                yield return null;
+            }
+            player.transform.position = to;
+            player.Yaw = yawTo;
+            player.Pitch = pitchTo;
+        }
+
+        /// <summary>from から at を見るときの左右と上下の向き。度。上下は下向きが正</summary>
+        static void Aim(Vector3 from, Vector3 at, out float yaw, out float pitch)
+        {
+            var way = at - from;
+            var flat = new Vector2(way.x, way.z).magnitude;
+            yaw = Mathf.Atan2(way.x, way.z) * Mathf.Rad2Deg;
+            pitch = flat < 1e-4f ? 0f : -Mathf.Atan2(way.y, flat) * Mathf.Rad2Deg;
+        }
+
+        /// <summary>いまのドアの取っ手の座。板が開いていれば一緒に外へ出ている</summary>
+        Vector3 DoorAt()
+        {
+            return carDoor != null ? carDoor.transform.TransformPoint(doorMark) : Vector3.zero;
+        }
+
+        /// <summary>目を向ける車内の座</summary>
+        Vector3 CabinAt(Vector3 sit)
+        {
+            return seat != null ? seat.TransformPoint(cabinMark) : sit + Vector3.forward;
+        }
+
+        /// <summary>
+        /// 板を開けるあいだ立つ場所。高さだけは今の目のまま置く。
+        ///
+        /// **扇から角度で外すのではなく、決め打ちの場所へ退く。** 蝶番から見た角度で
+        /// 判じると、蝶番の真横（車体のすぐ脇）に立たれたときに板との隙間が
+        /// 5 cm しか残らない。角度の余裕は蝶番に近いほど狭い距離にしかならない。
+        /// ここは蝶番（0.97, 0.94）から水平に 2.85 m あり、板の届く先 1.65 m の
+        /// 1.2 m 外に出る。運転席側の隣の区画は空いているので、退く先に物は無い
+        /// </summary>
+        Vector3 StandClear(float high)
+        {
+            if (seat == null) return player.transform.position;
+            var at = seat.TransformPoint(doorStand);
+            return new Vector3(at.x, high, at.z);
+        }
+
+        /// <summary>戸口の通り道。座席から運転席側へ <see cref="doorGate"/> だけ出したところ</summary>
+        Vector3 Gate(Vector3 sit)
+        {
+            var side = carDoor != null ? carDoor.transform.right : Vector3.right;
+            side.y = 0f;
+            side = side.sqrMagnitude > 1e-6f ? side.normalized : Vector3.right;
+            return sit + side * doorGate;
+        }
+
+        /// <summary>三点の二次曲線。a から c へ、b の側へ膨らませて</summary>
+        static Vector3 Bend(Vector3 a, Vector3 b, Vector3 c, float k)
+        {
+            var one = 1f - k;
+            return one * one * a + 2f * one * k * b + k * k * c;
         }
 
         /// <summary>

@@ -982,7 +982,7 @@ namespace HalfAware.EditorTools
             // 玉縁まで戻して初めて丸ごと見える狭さだった。いまは写真立てのあった
             // 中央の操作盤の天板に寝かせてある。印の高さ（判定点 + 0.17）が
             // 庇の下へ入らないよう、箱の中心より 36 mm 下げて置いてある
-            triggerItems[1] = Put(parent, "Cigar", new Vector3(0.140f, 1.258f, 0.545f), script, DriveIds.Cigar, ItemRadius, false);
+            triggerItems[1] = Put(parent, "Cigar", new Vector3(0.140f, 1.258f, 0.534f), script, DriveIds.Cigar, ItemRadius, false);
             // 窓だけ必須。最後の景色に入るまで伏せてあるので、それまで場面は閉じない。
             // ドアの内張りは x 0.82〜0.90。0.84 に置くと印が内張りの中に入る。
             // **真横より少し前。** z 0.10 は目（z 0.22）より後ろで、印を見るのに
