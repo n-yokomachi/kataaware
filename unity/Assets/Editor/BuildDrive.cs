@@ -143,8 +143,18 @@ namespace HalfAware.EditorTools
         /// </summary>
         public const float FurrowSlant = 0.13f;
         /// <summary>
+        /// 畑の地の裾が道へ寄る距離。m。ここから外は畑の地、内側は踏み固められた土の肩。
+        ///
+        /// 一番内側の株（3.30、札の半幅 0.34、風の振れ 0.25）が 2.71 まで寄るので、
+        /// 裾はそれより内側に取る。轍（<see cref="DirtHalf"/> 2.3）との間に
+        /// 0.5 m の土が残る
+        /// </summary>
+        public const float HemFrom = 2.8f;
+
+        /// <summary>
         /// 畑の地を割る升目の、道からの距離。m。
-        /// 起伏を追わせるので 1 枚の面では張れない。近くは細かく、遠くは粗く割る
+        /// 起伏を追わせるので 1 枚の面では張れない。近くは細かく、遠くは粗く割る。
+        /// <see cref="HemFrom"/> からここの頭までは、起伏の無い裾が別に埋める
         /// </summary>
         public static readonly float[] FieldRows =
         {
@@ -194,6 +204,28 @@ namespace HalfAware.EditorTools
         /// そちらは mip を作るときに被覆を保つ基準で、ずれると遠くの畑だけ痩せる
         /// </summary>
         public const float WheatCut = 0.34f;
+        /// <summary>
+        /// 朝靄が溜まる層の高さ。m。ここより上には靄が掛からない。
+        ///
+        /// **距離の霧（<see cref="DriveSky.density"/>）とは別物。** あちらは距離しか見ないので、
+        /// どれだけ濃くしても空気が一様に霞むだけになる。原作の「朝靄の中で」はそうではなく、
+        /// 靄は地面に溜まっていて、穂先や丘の背はそこから抜けて立っている。
+        /// 株の背（0.72〜1.18）の三倍ほどに取ってあるので、手前の株は根元だけが
+        /// わずかに沈み、遠くの窪みは丸ごと白く畳まれる。主な背（<see cref="CrestHigh"/>、
+        /// 道から 78 m で 8.5 m）はこの層の上に出るので、稜線だけが靄から顔を出す
+        /// </summary>
+        public const float MistTop = 3.4f;
+        /// <summary>
+        /// 朝靄の溜まりの濃さ。1/m。**二乗で掛かる**（HalfAware/Wheat の Misting）。
+        ///
+        /// 地面すれすれで 20 m 先が 4%、30 m で 9%、手前のうねり（<see cref="FoldAt"/> の
+        /// 47 m）で 22%、稜線の足元（78 m）で 49%、畑の端（150 m）で 92% 白くなる。
+        /// 一乗で掛けていたときは 20 m でもう 20% 乗って、手前の畑から黄金色が抜けた。
+        /// 原作は「朝靄の中で」と「黄金色に」を同じ一文で書いているので、
+        /// 手前の株の色を靄に明け渡してはいけない
+        /// </summary>
+        public const float MistDeep = 0.0105f;
+
         /// <summary>
         /// 帯 4 の畑の広がり。道の中心から片側、m。
         /// 霧が畳む距離（帯 4 の density 0.017 でおよそ 100 m）より十分遠くまで敷く。
@@ -281,29 +313,35 @@ namespace HalfAware.EditorTools
         /// **霧の色は空と同じにしてある。** 離すと、畑が霧に溶け切ったところに
         /// 横一線の継ぎ目が出る。同じ色にしておけば、畑はそのまま空へ溶けて消える。
         /// 朝靄はその溶け方そのもので、別の色として描くものではない。
-        /// 高さは雲の層（<see cref="Clouds"/>）が遠近で見せる
+        /// 高い空の青と千切れ雲は、そのうえに敷く板（<see cref="Clouds"/>）が持つ
         /// </summary>
         static readonly DriveSky Morning = new DriveSky
         {
-            // **地平の色ではない。** 地平は靄の板（Clouds の Haze）が白く抜くので、
-            // ここは見上げたときの高い空の色。原作の「まだ薄青い高い空」にあたる
-            sky = new Color(0.400f, 0.520f, 0.800f),
-            // **ここだけ霧の色を空から離してある。** ふつうは揃えるもので、
-            // 揃えないと地面が霧に溶け切ったところに横一線の継ぎ目が出る。
-            // 畑が丘（<see cref="CrestHigh"/>）を持ってからは、溶け切る手前で必ず
-            // 稜線が視界を塞ぐので、その継ぎ目が絵に出ない。空いた自由を使って
-            // 靄を暖かい白へ寄せる。朝靄は青くなく、日の当たった水気の色をしている。
-            // 0.700/0.665/0.615 からさらに白へ上げた。色味の残る靄は煙に見える
-            haze = new Color(0.800f, 0.792f, 0.770f),
-            // **原作は「朝靄の中で」畑が広がる。** 掛かり方をここで二乗から一乗へ移した
-            // （<see cref="DriveSky.mist"/>）。二乗は近くをまったく素通しにして、ある距離から
-            // 一気に溶かす掛かり方で、0.008 では 20 m 先が 2.5% しか霞まなかった。
-            // 澄み切った朝であって、靄の中ではない。
+            // **地平の色。高い空の色ではない。** 高い空の青は板（Clouds の High）が
+            // 乗せるので、塗り潰しは畑が溶けていく先の色――朝靄の白を置く。
+            // 板には必ず縁があり、縁の外の仰角にはこの色がそのまま出る。
+            // ここへ青を置いていたときは、道の先のように稜線が視界を塞がない向きで、
+            // 地平の上に 1.6 度ぶんの青い帯が硬い縁を引いて残った
+            sky = new Color(0.820f, 0.800f, 0.752f),
+            // **空と同じ色。** 畑が溶け切ったところがそのまま塗り潰しに続くので、
+            // 地平に継ぎ目が出ない。朝靄は青くなく、日の当たった水気の色をしている。
+            // 0.700/0.665/0.615 からさらに白へ上げた。色味の残る靄は煙に見える。
+            // ほぼ無彩の 0.800/0.792/0.770 からわずかに暖めてある。畑が溶けていく先が
+            // 無彩だと、白く飛んだところが灰色に転んで、朝ではなく曇りの色になる
+            haze = new Color(0.820f, 0.800f, 0.752f),
+            // **ここは空気そのものの霞み。朝靄の溜まりではない。**
+            // 靄が地面に溜まって穂先だけが抜けて立つところは、畑のシェーダーが
+            // 別に持っている（<see cref="MistTop"/> / <see cref="MistDeep"/>）。
+            // RenderSettings の霧は距離しか見ないので、いくら濃くしても
+            // 空気が一様に霞むだけで、靄の層にはならない。
             //
-            // 一乗の 0.0095 なら 20 m で 17%、60 m で 43%、稜線（78 m）で 52%、
-            // 畑の端（150 m）で 76% 霞む。近くの株から向こうの丘まで、どこも薄く
-            // 白が掛かって見える。0.013 まで濃くすると手前の株からも黄金色が抜けた
-            density = 0.0095f,
+            // 掛かり方は一乗（<see cref="DriveSky.mist"/>）。二乗は近くをまったく
+            // 素通しにして、ある距離から一気に溶かす掛かり方で、夜の帯には合うが
+            // 靄の朝には合わない。0.0095 から 0.0080 へ下げたのは、溜まりのぶんが
+            // 別に乗るようになったため。20 m で 15%、稜線（78 m）で 47%、
+            // 畑の端（150 m）で 70% 霞む。稜線を空へ溶かしているのはこちらで、
+            // 稜線の天は靄の層（3.4 m）より高いところにある
+            density = 0.0080f,
             mist = true,
             // **橙から引き戻した。** (1.00, 0.86, 0.64) では畑の色を掛けた先が
             // 夕日になる。朝の日射しは白に近く、色を付けているのは水気の方
@@ -1296,7 +1334,7 @@ namespace HalfAware.EditorTools
             Clear(parent);
             var nano = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/CloudLayer.png");
             var torn = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/CloudTorn.png");
-            var mist = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/SkyHaze.png");
+            var high = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/SkyHigh.png");
             if (nano == null || torn == null) Debug.LogWarning("雲の絵が無い");
             for (var b = 0; b < Bands; b++)
             {
@@ -1307,21 +1345,34 @@ namespace HalfAware.EditorTools
                         new Color(0.030f, 0.026f, 0.042f, 0.94f), 0.078f, 0.30f, new Vector2(0.0034f, 0.0012f));
                 else if (b == Bands - 1 && torn != null)
                 {
-                    // 朝靄。地平の側だけを明るく抜く。
+                    // 高い空。**青のほうを板にする。**
                     //
-                    // 空はカメラの塗り潰しの一色なので、そのままでは地平も天頂も同じ青になる。
-                    // 原作の「まだ薄青い高い空」を出すには上を深く、地平を白くしたい。
-                    // 天頂を沈める板は置けない。板は水平なので、低い仰角には板の縁の外しか無く、
-                    // 高いところへ置くほど届く仰角が上がる。実際 300 m に置いた板は
-                    // 仰角 31 度から下が空になり、屋根に切られた窓（上は 21 度まで）には
-                    // 一度も映らなかった。そこで逆を取り、地平の側を靄で塗る。
+                    // 空はカメラの塗り潰しの一色なので、そのままでは地平も天頂も同じ色になる。
+                    // 原作の「まだ薄青い高い空」を出すには、上を深い青に、地平を朝靄の白にしたい。
+                    // 長らく逆を取って、青い塗り潰しの上へ地平の側を白く抜く板を敷いていた。
                     //
-                    // **薄れの上下を入れ替えて渡している。** 低い側（0.34 ＝ 20 度）で消え、
-                    // 高い側（0.045 ＝ 2.6 度）で濃さのまま。板の縁は 26/680 ＝ 2.2 度なので、
-                    // 濃さのままになる仰角はその外側にある
-                    if (mist != null)
-                        Deck(band, "Haze", mist, 26f, 680f, 0.0008f,
-                            new Color(0.820f, 0.800f, 0.760f, 0.72f), 0.34f, 0.045f, Vector2.zero);
+                    // **それでは地平に生の青が残る。** 板は水平な有限の面なので、
+                    // 届く仰角には必ず下限がある（26 / 680√2 ＝ 1.6 度）。その下は塗り潰しの
+                    // 色が出るので、道の先のように稜線が視界を塞がない向きでは、
+                    // 地平の上に 1.6 度ぶんの青い帯が硬い縁を引いて残った。
+                    // 塗り潰しを靄の白にして青を板へ移せば、板の縁の外はそのまま靄になる。
+                    // 薄れを 0 から始める仰角（0.085 ＝ 4.9 度）を板の縁より上に取ってあるので、
+                    // 縁のところで色が動かない。空のどこにも境目が無くなる。
+                    //
+                    // 0.045（2.6 度）から 0.085 へ上げた。稜線は仰角 5.1 度に出るので、
+                    // 2.6 度から青を混ぜ始めると稜線の真上にもう青が乗り、実際に測ると
+                    // 稜線 (182,182,188) に対して空が (155,164,195) と暗くなって、
+                    // 地平が空より明るいという逆さまの絵になっていた。靄がいちばん厚いのは
+                    // 視線が水平に近いところで、そこは空も畑も同じ白へ寄るのが正しい。
+                    //
+                    // 濃さのままになるのは 0.26（15 度）。屋根に切られた窓は上が 21 度なので、
+                    // 見上げた先には深い青が残り、稜線のあたりだけが靄で白く抜ける。
+                    //
+                    // **雲より先に塗る。** 並び順は距離で決まり、この板（26 m）は雲（88 / 155 m）
+                    // より手前になるので、放っておくと青が雲の上に乗って千切れ雲が沈む
+                    if (high != null)
+                        Deck(band, "High", high, 26f, 680f, 0.0008f,
+                            new Color(0.400f, 0.520f, 0.800f, 1f), 0.085f, 0.26f, Vector2.zero, 2940);
                     // 千切れ雲。二層に分けるのは、遠近だけでは高さが出ないため。
                     // 別々の速さで流れる二枚が重なって初めて「高い空」に見える。
                     // **絵の刻みは粗く取る。** 細かく繰り返すと、浅い角度で見たときに
@@ -1338,15 +1389,23 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 雲の層 1 枚。下から見上げるので面は下へ向ける。
-        /// low は絵が消え切る仰角の sin で、板の縁の仰角（high / 半幅）より上に取ること。
-        /// 下回ると、空を横切る板の縁がそのまま線になって出る
+        ///
+        /// fade は絵が消え切る仰角の sin、full は濃さのままになる仰角の sin。
+        /// **fade は板の縁の仰角（high / 半幅）より上に取ること。**
+        /// 下回ると、空を横切る板の縁がそのまま線になって出る。
+        ///
+        /// 上下を入れ替えて渡してもよい。下ほど濃い板は fade > full で渡す。
+        /// シェーダーはどちらの向きも受ける。
+        ///
+        /// queue は透ける面どうしの並び。既定（2950）では距離で決まるので、
+        /// 低く敷いた板ほど後から塗られる
         /// </summary>
         static void Deck(Transform parent, string name, Texture2D tex, float high, float half, float texel,
-            Color tint, float low, float full, Vector2 drift)
+            Color tint, float fade, float full, Vector2 drift, int queue = 2950)
         {
             var bank = new Bank { Texel = texel };
             bank.FaceY(high, -half, half, -half, half, -1);
-            var go = bank.Emit(parent, name, CloudMat(name, tex, tint, low, full), false, Generated);
+            var go = bank.Emit(parent, name, CloudMat(name, tex, tint, fade, full, queue), false, Generated);
             if (go == null) return;
             var drifter = go.AddComponent<CloudDrift>();
             var so = new SerializedObject(drifter);
@@ -1358,7 +1417,7 @@ namespace HalfAware.EditorTools
         /// 雲のマテリアル。層ごとに 1 枚ずつ作る。CloudDrift が層ごとに別の絵をずらすので、
         /// 共有すると全部の層が一緒に動く
         /// </summary>
-        static Material CloudMat(string name, Texture2D tex, Color tint, float low, float full)
+        static Material CloudMat(string name, Texture2D tex, Color tint, float fade, float full, int queue)
         {
             var path = Materials + "Cloud" + name + ".mat";
             var m = AssetDatabase.LoadAssetAtPath<Material>(path);
@@ -1372,8 +1431,11 @@ namespace HalfAware.EditorTools
             m.shader = Shader.Find("HalfAware/SkyCloud");
             m.SetTexture("_BaseMap", tex);
             m.SetColor("_BaseColor", tint);
-            m.SetFloat("_HazeLow", low);
-            m.SetFloat("_HazeHigh", full);
+            m.SetFloat("_FadeAt", fade);
+            m.SetFloat("_FullAt", full);
+            // 透ける面どうしの並びは、同じ待ち行列なら距離で決まる。低く敷いた板ほど
+            // 手前になるので、高い空の板は待ち行列のほうを繰り上げて雲の先に塗る
+            m.renderQueue = queue;
             EditorUtility.SetDirty(m);
             return m;
         }
@@ -1560,9 +1622,37 @@ namespace HalfAware.EditorTools
                 b.RootY = 0f;
                 b.RootHigh = 1f;
                 var dz = TileLength / FieldSteps;
+                // 轍のすぐ外まで畑の地を寄せる裾。
+                //
+                // **株の立つ足元が土だと、畑が土手に生えた雑草に見える。** 土の面（Earth）は
+                // 下の舗装を覆い隠すために ±4.9 まで敷いてあり、その上に一番内側の株が
+                // 立っていた。窓から見下ろすと、轍と麦のあいだに 1.5 m の裸地が延びて、
+                // そこだけが畑のどこよりも暗い。実際に測ると土 (96,76,57) に対して
+                // 株は (174,148,98) で、明るさが倍ほど違う。
+                //
+                // 裾は土の面より上に置く。下に潜らせると舗装が透ける。
+                // 隔たりは路面に重ねる面の作法（CheckDrive.RoadGap）と同じ 8 mm。
+                // 起伏は要らない。SwellFrom の内側なので Land はどこも 0 になる
+                var hemY = EarthY + 0.008f;
                 for (var s = 0; s < 2; s++)
                 {
                     var side = s == 0 ? -1f : 1f;
+                    var hA = side < 0f ? FieldRows[0] : HemFrom;
+                    var hB = side < 0f ? HemFrom : FieldRows[0];
+                    for (var k = 0; k < FieldSteps; k++)
+                    {
+                        var z0 = k * dz;
+                        var z1 = z0 + dz;
+                        var hx = Lane(hA * side);
+                        var hy = Lane(hB * side);
+                        b.Patch(
+                            new Vector3(hx, hemY, z1), new Vector3(hy, hemY, z1),
+                            new Vector3(hy, hemY, z0), new Vector3(hx, hemY, z0),
+                            new Vector2(hx * FieldTexel, -z1 * FieldTexel),
+                            new Vector2(hy * FieldTexel, -z1 * FieldTexel),
+                            new Vector2(hy * FieldTexel, -z0 * FieldTexel),
+                            new Vector2(hx * FieldTexel, -z0 * FieldTexel));
+                    }
                     for (var c = 0; c + 1 < FieldRows.Length; c++)
                     {
                         // 面を上へ向けるには x の小さい側から回す。
@@ -1625,7 +1715,7 @@ namespace HalfAware.EditorTools
                 // 風でさらに WheatWind.Reach だけ振れるぶんは見直しが見る
                 var at = new[]
                 {
-                    3.75f, 4.5f, 5.4f, 6.5f, 7.8f, 9.4f, 11.4f, 14.0f, 17.5f, 21.5f,
+                    3.30f, 3.95f, 4.75f, 5.70f, 7.8f, 9.4f, 11.4f, 14.0f, 17.5f, 21.5f,
                     26.0f, 31.5f, 38.0f, 46.0f, 56.0f, 68.0f, 83.0f, 101.0f, 122.0f,
                 };
                 var wide = new[]
@@ -2729,14 +2819,31 @@ namespace HalfAware.EditorTools
         /// </summary>
         static Material FieldMat()
         {
-            // 株より一段落とす。同じ明るさにすると畑が一枚の板になり、立っている感じが消える。
+            // **株の陰になる面として塗る。** 株より一段どころではなく、七掛けまで落とす。
+            //
+            // ここは上を向いた面なので、株と同じ灯りの式で塗ると回り込みも穂群の天も
+            // 満額で受けて、実際に測ると株 (177,145,75) より明るい (180,152,88) になった。
+            // 株の隙間から覗くところが畑でいちばん明るいと、隙間のひとつひとつが
+            // 光って見えて、畑が疎らに散った枯れ草になる。麦畑の地は株の下の日陰で、
+            // そこがどれだけ暗いかが「詰まっている」という見え方そのものを作る。
+            //
+            // 穂群の天（_Canopy）と穂の透かし（_Glow）も落とす。どちらも立った穂の
+            // ためにある値で、水平な地に満額で掛けるものではない。
+            //
+            // **落としすぎてもいけない。** 株の四割五分まで沈めたときは、隙間が
+            // 穴になって、低い描画解像度では畑が胡麻塩に見えた。六割弱に置いてある
+            //
             // 橙から引き戻す向きは株と揃える。片方だけ直すと、株の切れる先で色が変わる
             return Crop("FieldCrop", "DriveField", false,
-                new Color(0.440f, 0.365f, 0.200f), new Color(0.700f, 0.615f, 0.390f));
+                new Color(0.330f, 0.272f, 0.145f), new Color(0.520f, 0.446f, 0.264f),
+                0.10f, 0.26f);
         }
 
         /// <summary>
         /// 畑を塗るマテリアル。ほかの素材と違って URP の Lit を使わない。
+        ///
+        /// canopy と glow は立った穂のための値なので、水平な地（<see cref="FieldMat"/>）は
+        /// 落として呼ぶ。満額で掛けると地が株より明るくなる。
         ///
         /// 要るものが四つある。ひとつは頂点をずらして微風になびかせること。株は区切り 1 つに
         /// 600 を越える札を 1 枚の mesh へ焼いてあるので、Transform では動かせない。
@@ -2751,7 +2858,8 @@ namespace HalfAware.EditorTools
         /// 揺れの数は <see cref="WheatWind"/> から取る。見直しが同じ数を読んで、
         /// なびいた穂先が轍へ倒れ込まないかを測る
         /// </summary>
-        static Material Crop(string name, string picture, bool rooted, Color root, Color tip)
+        static Material Crop(string name, string picture, bool rooted, Color root, Color tip,
+            float canopy = 0.35f, float glow = 0.60f)
         {
             var shader = Shader.Find("HalfAware/Wheat");
             if (shader == null)
@@ -2782,8 +2890,8 @@ namespace HalfAware.EditorTools
             // 穂は薄く、朝の低い日射しを実際に透かすので、色の選び方としても外れていない。
             // 箱を札に替えてからは 0.70 だと日陰の面まで持ち上がりすぎたので 0.60 へ。
             // 箱と違って札は裏も表も同じ絵なので、透かしの効く面が倍に増えている
-            m.SetFloat("_Glow", 0.60f);
-            m.SetFloat("_Canopy", 0.35f);
+            m.SetFloat("_Glow", glow);
+            m.SetFloat("_Canopy", canopy);
             // 畑の地の絵は α を持たない。閾値を 0 にして素通しにする。
             // 株の絵は α で形を抜くので、こちらだけ切る
             m.SetFloat("_Cutoff", rooted ? WheatCut : 0f);
@@ -2802,6 +2910,11 @@ namespace HalfAware.EditorTools
             m.SetFloat("_GustAlong", WheatWind.GustAlong);
             m.SetFloat("_GustRate", WheatWind.GustRate);
             m.SetFloat("_ShadeDeep", WheatWind.Shade);
+            // 朝靄の溜まり。色は帯 4 の霧と同じものを渡す。
+            // 距離の霧（DriveSky.density）と別に持つのは、あちらが距離しか見ないため
+            m.SetColor("_MistColor", Morning.haze);
+            m.SetFloat("_MistDeep", MistDeep);
+            m.SetFloat("_MistTop", MistTop);
             // 時刻はずらさない。絵を撮るときだけ外から動かす
             m.SetFloat("_SwayShift", 0f);
             EditorUtility.SetDirty(m);

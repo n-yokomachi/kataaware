@@ -450,13 +450,40 @@ def wheat():
         """下端を 0、上端を 1 とした高さを画素の y に直す"""
         return (SIZE - 1) * (1.0 - u)
 
-    # 根元の刈り残し。株の付け根を塞ぐ。ここが抜けていると、
-    # 近くの札の下から畑の地がそのまま覗いて、麦が宙に浮いて見える
-    for _ in range(130):
+    # 根元の下草。株の付け根を塞ぐ。ここが抜けていると、
+    # 近くの札の下から畑の地がそのまま覗いて、麦が宙に浮いて見える。
+    #
+    # **本数と丈を増やした。** 130 本・丈 0.30 では、札を二枚交差させて重ねても
+    # 光の 4 割が素通りして、畑の地が株のあいだからそのまま見えていた。
+    # 麦畑を横から見たとき、地面が見えるのは足元の一列だけで、その先は
+    # 茎の重なりで詰まっている。密にするのはこの帯で、穂の側ではない
+    for _ in range(190):
         x = rng.uniform(0, SIZE)
         tone = rng.randint(48, 104)
-        pen.line([(x, py(-0.02)), (x + rng.uniform(-4.5, 4.5), py(rng.uniform(0.07, 0.30)))],
+        pen.line([(x, py(-0.02)), (x + rng.uniform(-5.5, 5.5), py(rng.uniform(0.10, 0.42)))],
                  tone, width=rng.randint(1, 3))
+
+    # 奥の株。細く暗い茎だけを疎らに立てて、手前の株のあいだを埋める。
+    # **手前の株を太らせて埋めてはいけない。** 太らせると穂の輪郭が鈍って、
+    # 低い描画解像度では麦ではなく穂綿の塊になる。奥へもう一列置けば、
+    # 覆いは増えるのに輪郭は変わらず、そのうえ札 1 枚の中に前後が出る
+    for i in range(9):
+        x0 = (i + 0.5 + rng.uniform(-0.45, 0.45)) * SIZE / 9.0
+        lean = rng.uniform(-11.0, 11.0)
+        top = rng.uniform(0.34, 0.62)
+        tone = rng.randint(40, 72)
+        pts = [(x0 + lean * (k / 9.0) ** 2, py(top * k / 9.0)) for k in range(10)]
+        pen.line(pts, tone, width=2)
+        for _ in range(rng.randint(1, 2)):
+            lu = rng.uniform(0.12, top * 0.8)
+            lx = x0 + lean * (lu / max(top, 1e-3)) ** 2
+            out = (1 if rng.random() < 0.5 else -1) * rng.uniform(6.0, 14.0)
+            tip = lu + rng.uniform(0.08, 0.18)
+            pen.poly([(lx - 1.0, py(lu)),
+                      (lx + out * 0.70, py(lu + (tip - lu) * 0.50)),
+                      (lx + out, py(tip)),
+                      (lx + out * 0.42, py(lu + (tip - lu) * 0.44)),
+                      (lx + 1.5, py(lu))], tone)
 
     # 株。奥から手前へ描く。手前ほど明るく太くして、1 枚の札の中にも前後を出す
     stalks = 13
@@ -475,12 +502,13 @@ def wheat():
             t = k / 9.0
             pts.append((x0 + lean * t * t, py(base * t)))
         pen.line(pts, stem, width=thick)
-        # 葉。茎だけだと針金を並べたように見える。中ほどの嵩はこれが持つ
-        for _ in range(rng.randint(0, 2)):
-            lu = rng.uniform(0.10, 0.40)
+        # 葉。茎だけだと針金を並べたように見える。**札の中ほどの嵩はこれが持つ。**
+        # 0〜2 枚では茎と茎のあいだが空いたままで、そこが畑の透け方をそのまま決めていた
+        for _ in range(rng.randint(2, 4)):
+            lu = rng.uniform(0.08, 0.44)
             lx = x0 + lean * (lu / base) ** 2
-            out = (1 if rng.random() < 0.5 else -1) * rng.uniform(7.0, 17.0)
-            tip = lu + rng.uniform(0.10, 0.22)
+            out = (1 if rng.random() < 0.5 else -1) * rng.uniform(8.0, 20.0)
+            tip = lu + rng.uniform(0.12, 0.26)
             pen.poly([(lx - 1.0, py(lu)),
                       (lx + out * 0.70, py(lu + (tip - lu) * 0.50)),
                       (lx + out, py(tip)),
@@ -560,10 +588,13 @@ def field():
         w.line([(x + 9, -4), (x + 9 + rng.uniform(-6, 6), SIZE + 4)], fill=(96, 96, 96), width=1)
     im = Image.blend(im, tile_blur(im, 2.0), 0.75)
     w = Wrap(im)
-    # 穂の粒。筋だけだと縞の板になるので、細かい点を撒いて面を荒らす
+    # 穂の粒。筋だけだと縞の板になるので、細かい点を撒いて面を荒らす。
+    # **明るさの幅は詰める。** 地は株の陰として暗く塗る（BuildDrive.FieldMat）ので、
+    # 235 の粒はシェーダーが二倍した先で 1.84 倍になり、暗い地の上に
+    # 白い粒が散って見える。畑の地ではなく砂利を撒いた面に見えた
     for _ in range(1100):
         x, y = rng.randrange(SIZE), rng.randrange(SIZE)
-        v = rng.randint(150, 235)
+        v = rng.randint(142, 190)
         w.line([(x, y), (x + rng.uniform(-1, 1), y - rng.randint(2, 5))], fill=(v, v, v), width=1)
     im = shade(im, blot(size, 7717, 14, 46, 46, 9.0), 0.34)
     return aim(im, (128, 128, 128))
@@ -702,15 +733,16 @@ def torn():
     return im
 
 
-def skyhaze():
+def skyhigh():
     """
-    地平に敷く朝靄の板。
+    高い空を青く沈める板。
 
-    帯 4 の空はカメラの塗り潰し（一色）なので、そのままでは天頂も地平も同じ青になる。
-    原作の「まだ薄青い高い空」を出すには上を深く、地平を白く抜きたい。
-    天頂を沈める板は置けない（板は水平なので、低い仰角には届かない）ので、
-    逆に地平の側を明るい靄で塗る。空の色そのものを深い青へ落としておけば、
-    見上げるほど青が深くなる。
+    帯 4 の空はカメラの塗り潰し（一色）で、そこには朝靄の白を置いてある。
+    地平まで塗り潰しが届くので、畑が靄に溶け切ったところに継ぎ目が出ない。
+    そのうえへこの板を敷き、仰角が上がるほど濃く青を乗せて、原作の
+    「まだ薄青い高い空」を出す。**靄の側ではなく青の側を板にするのが肝。**
+    板には必ず縁があり、縁の外の仰角は塗り潰しの色がそのまま出る。
+    青を塗り潰しに置くと、その縁の外に生の青が帯になって残る。
 
     絵は一様でよいが、まったくの平面だと帯が出るので薄い斑を入れる。
     α は抜かない。濃さは板の色（_BaseColor）と仰角の薄れが決める
@@ -742,7 +774,7 @@ def main():
     save(dirt(), 'Dirt')
     save(rut(), 'Rut')
     save_plain(torn(), 'CloudTorn')
-    save_plain(skyhaze(), 'SkyHaze')
+    save_plain(skyhigh(), 'SkyHigh')
 
 
 if __name__ == '__main__':

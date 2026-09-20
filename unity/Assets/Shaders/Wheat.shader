@@ -46,6 +46,13 @@ Shader "HalfAware/Wheat"
         // むらが明るさを動かす深さ。麦が倒れると日の当たる面の向きが変わり、
         // 畑の上を明暗の帯が渡る。頂点を動かすだけでは遠い畑に風が出ない
         _ShadeDeep ("むらが明るさを動かす深さ", Range(0, 0.5)) = 0.12
+        // 朝靄。**距離の霧とは別に要る。** RenderSettings の霧は距離だけを見るので、
+        // どれだけ濃くしても空気が一様に霞むだけになる。原作の「朝靄の中で」は
+        // そうではなく、靄が地面に溜まって、穂先だけがそこから抜けて立っている。
+        // 畑が窪みで白く沈み、丘の背が靄の上に出る。この層がそれを出す
+        _MistColor ("靄の色", Color) = (0.82, 0.80, 0.75, 1)
+        _MistDeep ("靄の溜まりの濃さ。1/m", Float) = 0.0105
+        _MistTop ("靄が消える高さ。m", Float) = 3.4
         // 時刻のずらし。秒。ふだんは 0。
         // 再生せずに別の瞬間の絵を撮るときだけ動かす。位相ではなく秒で持つのは、
         // 波と震えで進む速さが違い、ひとつの位相では両方を同じ瞬間へ運べないため
@@ -86,7 +93,28 @@ Shader "HalfAware/Wheat"
             float _GustAlong;
             float _GustRate;
             half _ShadeDeep;
+            half4 _MistColor;
+            float _MistDeep;
+            float _MistTop;
         CBUFFER_END
+
+        // 地面に溜まる朝靄。0〜1。世界の高さと目からの距離で決まる。
+        //
+        // 高さの落とし方を二乗ではなく両端を寝かせた形にしてあるのは、層の上端に
+        // 水平の切れ目を出さないため。畑は丘を持つので、切れ目が出ると
+        // 靄の面が丘を横切る一本の線になって、雲海に浮かぶ島に見える
+        float Misting(float3 world)
+        {
+            float lay = saturate(1.0 - world.y / max(_MistTop, 1e-3));
+            lay = lay * lay * (3.0 - 2.0 * lay);
+            // **距離は二乗で効かせる。** 一乗だと 20 m 先の株にもう 2 割の白が乗り、
+            // 手前の畑から黄金色が抜けて生成りの布になる。原作は靄と黄金色を
+            // 同時に書いているので、どちらも捨てられない。二乗にすると手前は
+            // ほとんど素通しのまま、40 m あたりから急に白が溜まりはじめる
+            float t = _MistDeep * distance(world, _WorldSpaceCameraPos);
+            float far = 1.0 - exp(-t * t);
+            return saturate(lay * far);
+        }
 
         // 根からの高さの重み。根は動かさない。
         // 二乗するのは、真っ直ぐ倒れるのではなく穂先ほど大きく撓ませるため
@@ -157,6 +185,7 @@ Shader "HalfAware/Wheat"
                 float fogCoord : TEXCOORD2;
                 float2 uv : TEXCOORD3;
                 float gust : TEXCOORD4;
+                float mist : TEXCOORD5;
             };
 
             Varyings Vert(Attributes v)
@@ -176,6 +205,9 @@ Shader "HalfAware/Wheat"
                 o.uv = v.uv;
                 o.gust = Gusting(v.positionOS.xyz);
                 o.fogCoord = ComputeFogFactor(o.positionCS.z);
+                // 靄は頂点で引く。札の下辺と上辺で値が違うので、そのまま補間すれば
+                // 1 枚の札の中で根元が白く沈んで穂先が抜けて立つ
+                o.mist = Misting(world);
                 return o;
             }
 
@@ -201,6 +233,10 @@ Shader "HalfAware/Wheat"
                 // 揺れない地（_Rooted 0）にもこれは掛ける。遠い畑に風を出しているのはこちら
                 col *= 1.0 + _ShadeDeep * i.gust;
                 col = MixFog(col, i.fogCoord);
+                // 距離の霧の上へ、地面に溜まったぶんを重ねる。
+                // 色は霧と同じにしてあるので（DriveSky.haze）、二つの掛かり方が
+                // 一つの空気として見える。離すと畑の途中に色の変わる線が出る
+                col = lerp(col, _MistColor.rgb, i.mist);
                 return half4(col, 1.0);
             }
             ENDHLSL

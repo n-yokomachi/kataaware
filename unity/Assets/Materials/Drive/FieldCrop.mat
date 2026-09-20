@@ -29,14 +29,16 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Canopy: 0.35
+    - _Canopy: 0.1
     - _Cutoff: 0
-    - _Glow: 0.6
+    - _Glow: 0.26
     - _GroundHigh: 0.75
     - _GustAcross: 0.11
     - _GustAlong: 0.31415927
     - _GustDeep: 0.35
     - _GustRate: 0.85
+    - _MistDeep: 0.0105
+    - _MistTop: 3.4
     - _Rooted: 0
     - _ShadeDeep: 0.12
     - _SwayAcross: 0.44
@@ -50,7 +52,8 @@ Material:
     - _SwaySide: 0.4
     - _Wrap: 0.52
     m_Colors:
-    - _BaseColor: {r: 0.44, g: 0.365, b: 0.2, a: 1}
-    - _TipColor: {r: 0.7, g: 0.615, b: 0.39, a: 1}
+    - _BaseColor: {r: 0.33, g: 0.272, b: 0.145, a: 1}
+    - _MistColor: {r: 0.82, g: 0.8, b: 0.752, a: 1}
+    - _TipColor: {r: 0.52, g: 0.446, b: 0.264, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: CloudHaze
+  m_Name: CloudHigh
   m_Shader: {fileID: 4800000, guid: 4a787044e6425bb44b018bd1e75ee652, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -16,7 +16,7 @@ Material:
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
+  m_CustomRenderQueue: 2940
   stringTagMap: {}
   disabledShaderPasses: []
   m_LockedProperties: 
@@ -24,14 +24,14 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: 2800000, guid: 21389284f44cdae40b5ade4ebfffe8d2, type: 3}
+        m_Texture: {fileID: 2800000, guid: 37af326605cd17e4b835f35f41f75583, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _HazeHigh: 0.045
-    - _HazeLow: 0.34
+    - _FadeAt: 0.085
+    - _FullAt: 0.26
     m_Colors:
-    - _BaseColor: {r: 0.82, g: 0.8, b: 0.76, a: 0.72}
+    - _BaseColor: {r: 0.4, g: 0.52, b: 0.8, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
