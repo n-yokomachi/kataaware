@@ -219,7 +219,7 @@ namespace HalfAware.EditorTools
             lit.range = 1.10f;
             lit.shadows = LightShadows.None;
 
-            // 前照灯が路面を照らした跡。**灯りではなく、照らされた跡の方を置く。**
+            // 前照灯の照らし。**灯りではなく、照らされたところの方を置く。**
             // 本物の spot を前に据えると、路面を薙ぐ角度が浅すぎて（10 m 先で 6 度）
             // 面の向きとの積がほとんど残らない。道を明るくできるだけ強くすると、
             // 今度はすぐ脇の木や標識が真っ白に飛ぶ。板なら道だけを狙って照らせる。
@@ -228,10 +228,12 @@ namespace HalfAware.EditorTools
             // 実際そう見える。前照灯の照らしは車と一緒に動くもので、流れて行くものではない。
             // 流れるのは帯 1 の街灯の溜まりの方（<see cref="Motorway"/>）。
             //
+            // **入れ物ごと車の原点に据える。** 板の物体座標がそのまま車の座標になるので、
+            // シェーダーへ渡すレンズの座（<see cref="LampX"/> ほか）を組み立てと同じ数で書ける。
+            //
             // 強さは帯が持つ（<see cref="DriveSky.beam"/>）。ここで置くのは帯 0 のぶん
-            var thrown = Piece(parent, "Beam", Card("Beam", BeamWide, BeamDeep),
-                GlowMat("Beam", "Beam", Color.white, 0.26f, BeamWide, BeamDeep));
-            thrown.localPosition = new Vector3(0f, 0f, BeamFrom + BeamDeep * 0.5f);
+            var thrown = Piece(parent, "Beam", Throw("Beam"), BeamMat());
+            thrown.localPosition = Vector3.zero;
 
             // 視点の置き場。DriveDirector.seat へ繋ぐ。
             // ハンドルの真後ろに寄せてあるので、座ると輪が正面に来る
@@ -241,6 +243,194 @@ namespace HalfAware.EditorTools
 
             Arms(parent);
             Rain(parent);
+        }
+
+        // ---- 前照灯の照らし。メートル ----------------------------------------
+        //
+        // **絵ではなく式で持つ。** 灯り一つを、レンズの座から前へ伸びる円錐として置き、
+        // 板の画素ごとにその円錐へ当てて明るさを出す（<c>HalfAware/Headlamp</c>）。
+        // 路面の板も空中の板も同じ式を引くので、路面の跡は「円錐が舗装を切ったところ」に
+        // なり、空中の帯と自動で辻褄が合う。
+        //
+        // 前は路面に寝かせた板一枚に絵を貼っていた。光そのものが空中に無いので、
+        // 夜の路面に橙色の染みが浮いているようにしか見えなかった。
+        //
+        // **BuildDrive の BeamWide / BeamDeep / BeamFrom はもう使わない。**
+        // あちらは絵（DriveBeam.png）の寸法と対になっている数で、絵をやめた以上
+        // ここの寸法と揃える相手がいない。板の寸法はこの節が持つ
+
+        /// <summary>
+        /// 前照灯のレンズの座。**<see cref="Face"/> が置く輪の中心と揃える。**
+        /// 片方だけ動かすと、灯りの無いところから光が出る
+        /// </summary>
+        const float LampX = 0.715f;
+        const float LampY = 1.085f;
+        /// <summary>レンズの面。鼻先（<c>NoseZ</c> 2.48）の 4 cm 前</summary>
+        const float LampZ = 2.52f;
+        /// <summary>
+        /// 光の軸を伏せる量。正接。0.050 で 2.9 度。
+        ///
+        /// 路面に落ちる跡がどこで終わるかは、これと <see cref="LampLid"/> の差で決まる。
+        /// 終わりは <c>LampY / (LampDrop - LampLid)</c> ＝ 30 m。
+        /// 運転席から道が見え始めるのは 10.5 m 先なので、見えている路面のほぼ全部が
+        /// 照らしの中に入り、その先ですっぱり切れる
+        /// </summary>
+        const float LampDrop = 0.050f;
+        /// <summary>
+        /// 上端の切れ。軸からの上向き。正接。
+        ///
+        /// **実際の下向きの前照灯は上端がすっぱり切れている。** 対向車を眩ませないための
+        /// 造りで、これが前照灯を前照灯に見せる。四角い板をぼかしただけでは出てこない
+        /// </summary>
+        const float LampLid = 0.014f;
+        /// <summary>
+        /// 切れ目のぼかし。**画素に載る太さまでは鈍らせる。**
+        /// 切れるところは画面の 5 画素ぶんしか無いので、ここを 0 にすると
+        /// 走るたびに階段が明滅する。0.015 で 4 画素かけて落ちる
+        /// </summary>
+        const float LampLidSoft = 0.015f;
+        /// <summary>横の開き。正接。0.115 で片側 6.6 度</summary>
+        const float LampSpread = 0.115f;
+        /// <summary>軸より下への開き。正接。ここを詰めると足元が暗くなる</summary>
+        const float LampDroop = 0.105f;
+        /// <summary>下ほど横へ張り出す量。実際の前照灯も足元がいちばん広い</summary>
+        const float LampFlare = 1.6f;
+        /// <summary>届く距離。m。これを過ぎると二乗で弱る</summary>
+        const float LampReach = 17f;
+        /// <summary>芯の増し。灯り一つぶんの明るい真ん中。左右に二つ並ぶ山の高さ</summary>
+        const float LampCore = 1.20f;
+        /// <summary>
+        /// 芯の広がり。正接。
+        ///
+        /// **横の開きに対する割合ではなく、角で持つ。** 割合で置いたときは、
+        /// 芯の差し渡しが距離に連れてほとんど変わらず、二つの山が最後まで
+        /// 溶けないか、でなければ最初から一つだった。角で持てば差し渡しは
+        /// 距離に比例して広がり、灯りの間隔（1.43 m）は変わらないので、
+        /// 13 m では二つの芯が並び、25 m を過ぎたあたりで一つに溶ける
+        /// </summary>
+        const float LampLobe = 0.040f;
+        /// <summary>
+        /// ぜんたいの強さ。**帯の <see cref="DriveSky.beam"/> に掛かる。**
+        /// 帯の値は絵を貼っていた頃の板に合わせて決めてあるので、
+        /// 式に移した明るさをここで元の桁へ戻す。
+        /// 画面で測って、いちばん明るいところが前の 1.7 倍（線形）になる値
+        /// </summary>
+        const float LampGain = 1.10f;
+
+        /// <summary>
+        /// 空中の帯が切れ目の上へ漏れる量。正接。
+        ///
+        /// 路面の跡だけでは「路面に橙の染みがある」に留まる。雨や靄の中を通る光は
+        /// 切れ目の上にも淡い暈を残すので、そこを漏らして初めて空中に光があると読める
+        /// </summary>
+        const float AirLeak = 0.045f;
+        /// <summary>空中の下への開きの増し。散るぶんだけ路面より広い</summary>
+        const float AirOpen = 1.7f;
+        /// <summary>
+        /// 空中の強さ。路面に対する割合。
+        ///
+        /// **境を潰さない量に留める。** 切れ目の上へ漏らすのは芯だけなので
+        /// （シェーダーの側でやる）、ここを上げても上下が繋がることはないが、
+        /// 上げすぎると空ぜんたいが白ちゃける
+        /// </summary>
+        const float AirGain = 0.30f;
+        /// <summary>板の向きの効き。1 に近いほど、斜めから見たときに早く消える</summary>
+        const float AirFace = 0.6f;
+
+        /// <summary>路面に敷く板。幅と、手前の z と先の z</summary>
+        const float ThrowWide = 17f;
+        const float ThrowFrom = 2.6f;
+        const float ThrowTo = 40f;
+        /// <summary>空中の板の下の縁。路面の板（<c>GlowY</c>）のすぐ上</summary>
+        const float AirFloor = 0.032f;
+        /// <summary>
+        /// 空中の板。(灯りからの距離 m, 重み)。
+        ///
+        /// **光の筋を横から切った面を、奥へ何枚か重ねる。** 運転席は光の軸のほぼ真上に
+        /// 座っているので、軸に沿って立てた板（十字の構え）はどれも紙のように
+        /// 横から見ることになって何も出ない。軸を横切る向きに寝かせれば、
+        /// どの板も正面から見ることになる。
+        ///
+        /// 重みは板と板の間隔。光の中を見通した量を数えているので、
+        /// 間隔の広い奥ほど一枚が受け持つぶんが多い。
+        ///
+        /// **枚数はこれで足りる。** 円錐の中の明るさは角で決まるので、どの板も
+        /// 画面ではほぼ同じところに同じ大きさで重なる。六枚で段は出ない。
+        /// 三角は路面と合わせて 14 枚
+        /// </summary>
+        static readonly Vector2[] AirCards =
+        {
+            new Vector2(4.5f, 0.60f), new Vector2(8f, 0.80f), new Vector2(12.5f, 1.00f),
+            new Vector2(18f, 1.15f), new Vector2(24f, 1.20f), new Vector2(30f, 1.20f)
+        };
+
+        /// <summary>
+        /// 前照灯の照らしの板。路面に寝かせた一枚と、空中に立てた六枚。
+        ///
+        /// **uv は絵の座標ではない。** x が板の種（0 が路面、1 が空中）、
+        /// y が板ごとの重み。シェーダーはこの二つで振る舞いを分ける
+        /// </summary>
+        static Mesh Throw(string name)
+        {
+            return Shape(name, 1f, b =>
+            {
+                var road = new Vector2(0f, 1f);
+                var hw = ThrowWide * 0.5f;
+                b.Patch(
+                    new Vector3(-hw, GlowY, ThrowFrom), new Vector3(hw, GlowY, ThrowFrom),
+                    new Vector3(hw, GlowY, ThrowTo), new Vector3(-hw, GlowY, ThrowTo),
+                    road, road, road, road);
+                foreach (var card in AirCards)
+                {
+                    var f = card.x;
+                    var z = LampZ + f;
+                    // 板は光の広がりより一回り大きく取る。切り詰めると縁で光が切れる
+                    var wide = LampX + 0.42f * f;
+                    var top = 1.10f + 0.10f * f;
+                    var tag = new Vector2(1f, card.y);
+                    b.Patch(
+                        new Vector3(-wide, AirFloor, z), new Vector3(wide, AirFloor, z),
+                        new Vector3(wide, top, z), new Vector3(-wide, top, z),
+                        tag, tag, tag, tag);
+                }
+            });
+        }
+
+        /// <summary>
+        /// 前照灯の照らしのマテリアル。加算で重ねるので、暗いところは何もしない。
+        ///
+        /// **色は Vector で渡す。** 線形のまま渡したいので、色として宣言して
+        /// SetColor の変換に晒さない（<see cref="Paint"/> と同じ扱い）。
+        ///
+        /// **橙に寄せない。** 実際の前照灯は白〜淡い黄で、橙に転ぶのは古い電球の車だけ。
+        /// 原作は「ボロのオフロード車」なので少し暖かくてよいが、赤と青の差は 13% に留める。
+        /// 芯はそこからさらに白へ抜ける（シェーダーの側でやる）。
+        ///
+        /// _BaseColor は景色ごとに DriveDirector が差し替える（<see cref="DriveSky.Apply"/>）。
+        /// ここで置くのは帯 0 のぶん
+        /// </summary>
+        static Material BeamMat()
+        {
+            var shader = Shader.Find("HalfAware/Headlamp");
+            if (shader == null) Debug.LogWarning("HalfAware/Headlamp が見つからない。前照灯が照らさない");
+            var path = Materials + "Beam.mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                m = new Material(shader);
+                m.name = "Beam";
+                AssetDatabase.CreateAsset(m, path);
+            }
+            m.shader = shader;
+            m.SetColor("_BaseColor", new Color(0.26f, 0.26f, 0.26f, 1f));
+            m.SetVector("_Warm", new Vector4(1f, 0.955f, 0.875f, 1f));
+            m.SetVector("_Lamp", new Vector4(LampX, LampY, LampZ, LampDrop));
+            m.SetVector("_Cut", new Vector4(LampLid, LampLidSoft, LampSpread, LampDroop));
+            m.SetVector("_Shape", new Vector4(LampFlare, LampReach, LampCore, LampLobe));
+            m.SetVector("_Air", new Vector4(AirLeak, AirOpen, AirGain, AirFace));
+            m.SetFloat("_Gain", LampGain);
+            EditorUtility.SetDirty(m);
+            return m;
         }
 
         // ---- 風防の雨 --------------------------------------------------------

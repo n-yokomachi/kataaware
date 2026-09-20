@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-6708307049868164233
+--- !u!114 &-8627473785806369691
 MonoBehaviour:
   m_ObjectHideFlags: 11
   m_CorrespondingSourceObject: {fileID: 0}
@@ -20,8 +20,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Wheat
-  m_Shader: {fileID: 4800000, guid: 4269db3a6fd0b19458d6927439521e3b, type: 3}
+  m_Name: LoneTree
+  m_Shader: {fileID: 4800000, guid: 933532a4fcc9baf4fa0491de14d08ed7, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -30,7 +30,8 @@ Material:
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
-  stringTagMap: {}
+  stringTagMap:
+    RenderType: Opaque
   disabledShaderPasses:
   - MOTIONVECTORS
   m_LockedProperties: 
@@ -38,7 +39,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: 2800000, guid: f6644da6d2b8f904a81877c6cf336bea, type: 3}
+        m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
@@ -101,71 +102,36 @@ Material:
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
     - _BumpScale: 1
-    - _Canopy: 0.35
     - _ClearCoatMask: 0
     - _ClearCoatSmoothness: 0
     - _Cull: 2
-    - _Cutoff: 0.34
+    - _Cutoff: 0.5
     - _DetailAlbedoMapScale: 1
-    - _DetailDeep: 0.38
-    - _DetailFade: 0.86
     - _DetailNormalMapScale: 1
     - _DstBlend: 0
     - _DstBlendAlpha: 0
     - _EnvironmentReflections: 1
-    - _FarCropGain: 0.92
-    - _FarFill: 0.22
-    - _FarFrom: 6
-    - _FarGroundGain: 2.15
-    - _FarTo: 45
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
-    - _Glow: 0.6
-    - _GroundHigh: 0.75
-    - _GustAcross: 0.11
-    - _GustAlong: 0.31415927
-    - _GustDeep: 0.45
-    - _GustRate: 0.85
-    - _GustRoll: 0.4
-    - _GustSlant: 0.6
     - _Metallic: 0
-    - _MistDeep: 0.0105
-    - _MistTop: 3.4
     - _OcclusionStrength: 1
     - _Parallax: 0.005
     - _QueueOffset: 0
     - _ReceiveShadows: 1
-    - _RollAcross: 0.8
-    - _RollRate: -0.45
-    - _Rooted: 1
-    - _ShadeDeep: 0.22
-    - _Smoothness: 0.1
+    - _Smoothness: 0.05
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
     - _Surface: 0
-    - _SwayAcross: 0.44
-    - _SwayAlong: 0.62831855
-    - _SwayAmp: 0.17
-    - _SwayFlutter: 0.32
-    - _SwayFlutterRate: 5.2
-    - _SwayHigh: 1.18
-    - _SwayPhase: 0
-    - _SwayRate: 2.2
-    - _SwayShift: 0
-    - _SwaySide: 0.4
     - _WorkflowMode: 1
-    - _Wrap: 0.52
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 0.5, g: 0.4, b: 0.21, a: 1}
-    - _Color: {r: 0.21499997, g: 0.17999998, b: 0.09499996, a: 1}
+    - _BaseColor: {r: 0.228, g: 0.218, b: 0.132, a: 1}
+    - _Color: {r: 0.22799996, g: 0.21799996, b: 0.13199997, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _MistColor: {r: 0.82, g: 0.8, b: 0.752, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
-    - _TipColor: {r: 0.845, g: 0.735, b: 0.44, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

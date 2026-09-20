@@ -31,16 +31,27 @@ Material:
     m_Floats:
     - _Canopy: 0.1
     - _Cutoff: 0
+    - _DetailDeep: 0.38
+    - _DetailFade: 0.86
+    - _FarCropGain: 0.92
+    - _FarFill: 0.22
+    - _FarFrom: 6
+    - _FarGroundGain: 2.15
+    - _FarTo: 45
     - _Glow: 0.26
     - _GroundHigh: 0.75
     - _GustAcross: 0.11
     - _GustAlong: 0.31415927
-    - _GustDeep: 0.35
+    - _GustDeep: 0.45
     - _GustRate: 0.85
+    - _GustRoll: 0.4
+    - _GustSlant: 0.6
     - _MistDeep: 0.0105
     - _MistTop: 3.4
+    - _RollAcross: 0.8
+    - _RollRate: -0.45
     - _Rooted: 0
-    - _ShadeDeep: 0.12
+    - _ShadeDeep: 0.22
     - _SwayAcross: 0.44
     - _SwayAlong: 0.62831855
     - _SwayAmp: 0

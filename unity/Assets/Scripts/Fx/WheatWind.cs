@@ -20,8 +20,12 @@ namespace HalfAware
     /// </summary>
     public static class WheatWind
     {
-        /// <summary>穂先の振れ幅。m。微風なので、1.18 m の株がおよそ 7 度傾くところに置く</summary>
-        public const float Amp = 0.14f;
+        /// <summary>
+        /// 穂先の振れ幅。m。微風なので、1.18 m の株がおよそ 8 度傾くところに置く。
+        /// 0.14 から上げた。低い描画解像度では 0.14 の傾きが 1 画素に届かず、
+        /// 手前の株まで立ったまま止まって見えていた
+        /// </summary>
+        public const float Amp = 0.17f;
         /// <summary>細かい震えの割合。Amp に対して</summary>
         public const float Flutter = 0.32f;
         /// <summary>x 方向の波数。rad/m。波長およそ 14.3 m。x は区切りを跨いでも続くので端数でよい</summary>
@@ -49,12 +53,23 @@ namespace HalfAware
         //
         // 上の波だけだと、畑ぜんたいが同じ強さで一様に揺れる。オーナーの言う
         // 「ある程度の塊で横になびかせる」には、もっと長い波で振れ幅そのものを
-        // 撫でてやる必要がある。塊の大きさは x に 57 m、z に 20 m。
-        // 振れ幅に (1 + Gust·sin) を掛けるので、Reach もそのぶん広がる
+        // 撫でてやる必要がある。振れ幅に (1 + Gust·Gusting) を掛けるので、
+        // Reach もそのぶん広がる。
+        //
+        // **むらは二つの波を足して作る。** 一つだけでは波長が 19 m までしか伸びない。
+        // z 方向の波長は区切りの長さ（20 m）を割り切る数でなければならず、
+        // いちばん長く取っても 20 m だからで、そこに x の波数が加わるともっと短くなる。
+        // 19 m の塊は、走っている車から 40 m 先を見たときに画面の 1/5 ほどしか無い。
+        // それだけだと畑が細かく波立つばかりで、風が渡っていくようには見えない。
+        //
+        // 二つめは z を持たない波（<see cref="RollAcross"/>）で、道と平行な帯が
+        // 畑を横切って外へ渡っていく。z を持たないので継ぎ目の心配が要らず、
+        // 波長をいくらでも長く取れる。**風が渡っているように見えるのはこちら。**
+        // 一つめの斜めの波が、その帯を崩して縞に見せない役をする
 
         /// <summary>風のむらの深さ。振れ幅に対する増減</summary>
-        public const float Gust = 0.35f;
-        /// <summary>むらの x 方向の波数。rad/m。波長およそ 57 m</summary>
+        public const float Gust = 0.45f;
+        /// <summary>むらの x 方向の波数。rad/m。z の波数と合わせて波長およそ 19 m</summary>
         public const float GustAcross = 0.11f;
         /// <summary>
         /// むらの z 方向の波数。rad/m。波長ちょうど 20 m。
@@ -63,20 +78,48 @@ namespace HalfAware
         public const float GustAlong = 0.31415927f;
         /// <summary>むらの進む速さ。rad/s。0.14 Hz。畑を撫でていくのが見える遅さ</summary>
         public const float GustRate = 0.85f;
+
+        /// <summary>斜めの短い波の取り分。<see cref="Roll"/> と足して 1 にすること</summary>
+        public const float Slant = 0.60f;
+        /// <summary>道と平行な長い波の取り分。<see cref="Slant"/> と足して 1 にすること</summary>
+        public const float Roll = 0.40f;
+        /// <summary>
+        /// 長い波の x 方向の波数。<see cref="GustAcross"/> に対する割合。
+        /// 0.11 × 0.80 ＝ 0.088 rad/m で、波長はおよそ 71 m。
+        /// 道の片側だけで帯が二本ほど見えるところに置いてある
+        /// </summary>
+        public const float RollAcross = 0.80f;
+        /// <summary>
+        /// 長い波の進む速さ。<see cref="GustRate"/> に対する割合。符号は外向き。
+        /// 0.85 × 0.45 ＝ 0.38 rad/s。波長 71 m と合わせて 4.3 m/s で、
+        /// 畑を渡っていくのが目で追える速さ
+        /// </summary>
+        public const float RollRate = -0.45f;
         /// <summary>
         /// むらが明るさを動かす深さ。
         ///
         /// **これは揺れではないので <see cref="Reach"/> には効かない。** 麦が風に倒れると
         /// 日の当たる面の向きが変わり、畑の上を明暗の帯が渡っていく。頂点を動かすだけでは
         /// その帯が出ず、遠い畑は風が吹いていないように見える。
-        /// 数をここに置いてあるのは、シェーダーと揃っていることを一箇所で読めるようにするため
+        /// 数をここに置いてあるのは、シェーダーと揃っていることを一箇所で読めるようにするため。
+        ///
+        /// 0.12 から上げた。**足りなかったのではなく、見えていなかった。**
+        /// 株の絵の明暗がそのまま 0.2 倍〜2.0 倍まで振れていた頃は、画面の隣り合う画素が
+        /// それより桁違いに大きく振れていて、風の帯は砂嵐に埋もれていた。
+        /// 絵の明暗を遠くで均した（Wheat.shader の _DetailFade）ので、
+        /// ここを上げたぶんがそのまま畑を渡る帯として出る
         /// </summary>
-        public const float Shade = 0.12f;
+        public const float Shade = 0.22f;
 
-        /// <summary>その点の風のむら。-1〜1</summary>
+        /// <summary>
+        /// その点の風のむら。-1〜1。
+        /// 斜めの短い波と、道と平行な長い波の足し合わせ。
+        /// 取り分を足して 1 にしてあるので、振れ幅は 1 を越えない（<see cref="Reach"/>）
+        /// </summary>
         public static float Gusting(float x, float z, float t)
         {
-            return Mathf.Sin(x * GustAcross + z * GustAlong + t * GustRate);
+            return Slant * Mathf.Sin(x * GustAcross + z * GustAlong + t * GustRate)
+                + Roll * Mathf.Sin(x * GustAcross * RollAcross + t * GustRate * RollRate);
         }
 
         /// <summary>
