@@ -118,6 +118,32 @@ namespace HalfAware.EditorTools
         /// <summary>天井の灯りの色</summary>
         public static readonly Color GarageLamp = new Color(0.62f, 0.66f, 0.72f);
 
+        // ---- ガレージの飾り -------------------------------------------------
+        //
+        // 床に貼る面は上下の順をここで決める。塗りの上に油、その上に排水口。
+        // 実際にその順で汚れていくので、重なりの順と物の順が揃う。
+        // 道の面ほど遠くを見ないので 4 mm ずつで足りる
+
+        /// <summary>区画の線と番号</summary>
+        public const float BayPaintY = GarageFloorY + 0.006f;
+        /// <summary>油染み。塗りの上に落ちる</summary>
+        public const float StainY = GarageFloorY + 0.010f;
+        /// <summary>排水口の受け</summary>
+        public const float DrainY = GarageFloorY + 0.014f;
+        /// <summary>排水口の格子</summary>
+        public const float GrateY = GarageFloorY + 0.020f;
+
+        /// <summary>区画 1 つの幅。車 1 台ぶん。14 m の床に 5 つ取れる</summary>
+        public const float BayWide = 2.9f;
+        /// <summary>区画の奥行き</summary>
+        public const float BayDeep = 5.2f;
+        /// <summary>区画の真ん中の z。車（原点）の入っている区画に合わせる</summary>
+        public const float BayZ = 0.1f;
+        /// <summary>塗りの線の幅</summary>
+        public const float BayLine = 0.10f;
+        /// <summary>覆いを掛けた隣の車を置く区画。車の左隣。歩く線には掛からない</summary>
+        public const float CoveredBayX = -BayWide;
+
         /// <summary>
         /// 車体を塞ぐ箱の外形。世界の座標で、x は ±<see cref="BlockHalfX"/>。
         ///
@@ -946,6 +972,7 @@ namespace HalfAware.EditorTools
             var door = new Bank { Texel = 0.5f };
             door.Box(new Vector3(GarageAt.x, (GarageFloorY + ShutterHigh) * 0.5f, front),
                 new Vector3(ShutterWide, ShutterHigh - GarageFloorY, GarageThick * 0.5f));
+            Slats(door, front - GarageThick * 0.25f);
 
             // 当たりは壁と床に要る。歩いて出られては困るし、床が無いと落ちる
             floor.Emit(parent, "Floor", Mat("GarageFloor"), true, Generated);
@@ -955,7 +982,159 @@ namespace HalfAware.EditorTools
             door.Emit(parent, "Shutter", Mat("Shutter"), true, Generated);
 
             Blocker(parent);
+            Bays(parent);
+            Covered(parent);
             Lamps(parent);
+        }
+
+        /// <summary>
+        /// シャッターの桟。歩く線の正面にあるのに、今までただの平らな面だった。
+        /// inner は壁の厚みの中にある内側の面の z。ここから部屋の側へ出す。
+        /// 巻き上げ式なので横桟だけ。真ん中に一本だけ太いのが持ち手にあたる
+        /// </summary>
+        static void Slats(Bank bank, float inner)
+        {
+            const float pitch = 0.235f;
+            const float depth = 0.035f;
+            var z = inner - depth * 0.5f;
+            for (var y = GarageFloorY + 0.14f; y < ShutterHigh - 0.05f; y += pitch)
+            {
+                var grip = Mathf.Abs(y - 1.15f) < pitch * 0.5f;
+                bank.Box(new Vector3(GarageAt.x, y, z),
+                    new Vector3(ShutterWide - 0.10f, grip ? 0.105f : 0.060f, depth));
+            }
+            // 下端のレール。床との境に影が落ちて、閉まっていることが読める
+            bank.Box(new Vector3(GarageAt.x, GarageFloorY + 0.045f, z),
+                new Vector3(ShutterWide - 0.04f, 0.090f, depth * 1.4f));
+        }
+
+        /// <summary>
+        /// 床の飾り。歩いているあいだ画面の下半分を埋めるのは床なので、
+        /// ここが空だと 8 m のあいだ見るものが何も無い。
+        /// 区画の線・番号・油染み・排水口の 4 つだけ置く。
+        ///
+        /// どれも当たりは持たせない。歩く線の真上を通るので、少しでも高さを持つと
+        /// 足が引っかかったように見える。区画が 5 つ並ぶこと自体が、
+        /// ここが自分ひとりの車庫ではなく共用だという説明になっている
+        /// </summary>
+        static void Bays(Transform parent)
+        {
+            var paint = new Bank { Texel = 0.5f };
+            // 区画の仕切り。内側の 4 本だけ引く。外側の 2 区画は壁が境になる
+            foreach (var k in new[] { -1.5f, -0.5f, 0.5f, 1.5f })
+                Stripe(paint, BayPaintY, k * BayWide, BayZ, BayLine, BayDeep);
+            // 突き当たりの止め線。ここまで入れて停める
+            Stripe(paint, BayPaintY, GarageAt.x, BayZ - BayDeep * 0.5f, GarageWide - 0.4f, BayLine);
+            // 区画の番号。入口の側に描く。奥から歩いてくる人の正面に来るので、
+            // 歩いているあいだずっと目に入る
+            for (var i = 0; i < 5; i++)
+                Numeral(paint, (i - 2) * BayWide, BayZ + BayDeep * 0.5f + 0.75f, i + 1, BayPaintY);
+            paint.Emit(parent, "BayPaint", Mat("BayPaint"), false, Generated);
+
+            // 油染み。自分の区画、歩く線の上、覆いを掛けた隣の区画に 1 つずつ
+            var oil = new Bank { Texel = 0.35f };
+            Stain(oil, 0.10f, BayZ - 0.45f, 0.64f, 7311);
+            Stain(oil, 3.05f, -4.30f, 0.34f, 4127);
+            // 覆いを掛けた車の下は見えないので、その手前の空いたところへ落とす
+            Stain(oil, CoveredBayX + 0.28f, BayZ + 2.70f, 0.42f, 9043);
+            oil.Emit(parent, "OilStains", Mat("OilStain"), false, Generated);
+
+            // 排水口。歩く線がちょうど踏む場所に置く。足の下を過ぎていくのが分かる
+            var pan = new Bank { Texel = 0.5f };
+            var grate = new Bank { Texel = 1.0f };
+            Drain(pan, grate, 3.45f, -5.20f);
+            pan.Emit(parent, "DrainPan", Mat("Drain"), false, Generated);
+            grate.Emit(parent, "DrainGrate", Mat("Metal"), false, Generated);
+        }
+
+        /// <summary>床に貼る帯。上を向いた面 1 枚だけ。裏は誰も見ないので作らない</summary>
+        static void Stripe(Bank bank, float y, float x, float z, float wide, float deep)
+        {
+            bank.FaceY(y, x - wide * 0.5f, x + wide * 0.5f, z - deep * 0.5f, z + deep * 0.5f, 1);
+        }
+
+        /// <summary>数字の 7 本の棒の組み合わせ。0 から 9 まで。上から順に a b c d e f g の位</summary>
+        static readonly int[] Segments = { 63, 6, 91, 79, 102, 109, 125, 7, 127, 111 };
+
+        /// <summary>
+        /// 床に描く区画の番号。字の形（フォント）を 3D に持ち込まずに済むよう、
+        /// 7 本の棒で組む。型で抜いた塗りなので、角の丸みが無くても嘘にならない。
+        /// 読む向きの上は +z。奥から入口へ歩く人がそのまま読める
+        /// </summary>
+        static void Numeral(Bank bank, float x, float z, int n, float y)
+        {
+            const float wide = 0.44f;
+            const float high = 0.72f;
+            const float thick = 0.085f;
+            var bits = Segments[Mathf.Clamp(n, 0, 9)];
+            if ((bits & 1) != 0) Stripe(bank, y, x, z + high * 0.5f, wide, thick);
+            if ((bits & 64) != 0) Stripe(bank, y, x, z, wide, thick);
+            if ((bits & 8) != 0) Stripe(bank, y, x, z - high * 0.5f, wide, thick);
+            if ((bits & 32) != 0) Stripe(bank, y, x - wide * 0.5f, z + high * 0.25f, thick, high * 0.5f);
+            if ((bits & 2) != 0) Stripe(bank, y, x + wide * 0.5f, z + high * 0.25f, thick, high * 0.5f);
+            if ((bits & 16) != 0) Stripe(bank, y, x - wide * 0.5f, z - high * 0.25f, thick, high * 0.5f);
+            if ((bits & 4) != 0) Stripe(bank, y, x + wide * 0.5f, z - high * 0.25f, thick, high * 0.5f);
+        }
+
+        /// <summary>
+        /// 油染み。四角い面を置くと床にただの黒い四角が乗って見えるので、
+        /// 輪郭を崩して扇に張る（BuildAlley の水たまりと同じ作り）
+        /// </summary>
+        static void Stain(Bank bank, float x, float z, float span, int seed)
+        {
+            const int n = 16;
+            var rnd = new System.Random(seed);
+            var rim = new Vector2[n];
+            for (var i = 0; i < n; i++)
+            {
+                var a = Mathf.PI * 2f * i / n;
+                var r = span * (0.55f + (float)rnd.NextDouble() * 0.70f);
+                rim[i] = new Vector2(x + Mathf.Cos(a) * r, z + Mathf.Sin(a) * r * 1.25f);
+            }
+            bank.FanY(new Vector3(x, StainY, z), rim);
+        }
+
+        /// <summary>
+        /// 排水口。床を抜く代わりに、暗い受けの上へ格子を並べて開いているように見せる。
+        /// 抜いてしまうと下に何も無いので、歩いて覗き込まれたときに床の裏が見える
+        /// </summary>
+        static void Drain(Bank pan, Bank grate, float x, float z)
+        {
+            const float side = 0.52f;
+            Stripe(pan, DrainY, x, z, side, side);
+            // 枠。受けの縁を隠す
+            for (var s = 0; s < 2; s++)
+            {
+                var away = s == 0 ? -1f : 1f;
+                grate.Box(new Vector3(x + away * side * 0.5f, GrateY, z), new Vector3(0.06f, 0.012f, side));
+                grate.Box(new Vector3(x, GrateY, z + away * side * 0.5f), new Vector3(side, 0.012f, 0.06f));
+            }
+            for (var i = -2; i <= 2; i++)
+                grate.Box(new Vector3(x, GrateY, z + i * 0.093f), new Vector3(side - 0.10f, 0.012f, 0.035f));
+        }
+
+        /// <summary>
+        /// 隣の区画の、覆いを掛けたままの車。共用のガレージだと一目で分かるものがこれ。
+        /// 形は覆いの下の塊だけで、車そのものは作らない。
+        /// 歩く線は x 1.3〜4.2 を通るので、左隣の区画に置けば道を塞がない
+        /// </summary>
+        static void Covered(Transform parent)
+        {
+            var tarp = new Bank { Texel = 0.8f };
+            var x = CoveredBayX;
+            var z = BayZ;
+            // 下から順に細くしていく。角の立った箱を重ねると、布を掛けた丸みに近づく
+            tarp.Box(new Vector3(x, 0.26f, z), new Vector3(1.80f, 0.44f, 4.10f));
+            tarp.Box(new Vector3(x, 0.60f, z - 0.05f), new Vector3(1.70f, 0.30f, 3.90f));
+            tarp.Box(new Vector3(x, 0.86f, z - 0.30f), new Vector3(1.48f, 0.26f, 2.30f));
+            tarp.Box(new Vector3(x, 1.02f, z - 0.35f), new Vector3(1.20f, 0.12f, 1.80f));
+            // 掛けた布の皺。上を横切る紐のあたりが盛り上がる
+            foreach (var at in new[] { -1.35f, 0.20f, 1.55f })
+                tarp.Box(new Vector3(x, 0.52f, z + at), new Vector3(1.86f, 0.52f, 0.09f),
+                    Quaternion.Euler(0f, 0f, 2.5f));
+            // 当たりを入れる。壁と同じで、すり抜けられては困る。
+            // Garage の下にあるので、乗り込んだ瞬間にこれも一緒に消える
+            tarp.Emit(parent, "CoveredCar", Mat("Tarp"), true, Generated);
         }
 
         /// <summary>
@@ -1536,6 +1715,14 @@ namespace HalfAware.EditorTools
                 case "GarageFloor": col = new Color(0.098f, 0.096f, 0.094f); smooth = 0.14f; break;
                 case "GarageWall": col = new Color(0.128f, 0.128f, 0.133f); smooth = 0.07f; break;
                 case "Shutter": col = new Color(0.155f, 0.150f, 0.140f); smooth = 0.24f; break;
+                // 区画の線と番号。塗り直されていない白なので、床よりわずかに明るい程度
+                case "BayPaint": col = new Color(0.310f, 0.300f, 0.262f); smooth = 0.08f; break;
+                // 油染み。地の色は床より暗く、艶だけが残る
+                case "OilStain": col = new Color(0.030f, 0.029f, 0.031f); smooth = 0.58f; break;
+                // 排水口の受け。中は見えないので、ただ暗い
+                case "Drain": col = new Color(0.040f, 0.039f, 0.038f); smooth = 0.14f; break;
+                // 隣の車に掛かった覆い。埃をかぶった帆布
+                case "Tarp": col = new Color(0.168f, 0.166f, 0.172f); smooth = 0.05f; break;
                 // 濡れた路面。艶だけの面は映る物が無いと穴に見えるので、地の明るさを持たせる
                 case "Sheen": col = new Color(0.100f, 0.108f, 0.128f); smooth = 0.86f; break;
                 case "Metal": col = new Color(0.085f, 0.088f, 0.095f); smooth = 0.26f; break;

@@ -10,7 +10,8 @@ namespace HalfAware.Tests
         /// <summary>未舗装の粗さ。帯 4 と同じ値</summary>
         const float Dirt = 4.5f;
         const float Shift = 0.004f;
-        const float Rate = 0.35f;
+        /// <summary>DriveWorld の shakeRate と同じ値。試す数と実際に走る数を離さない</summary>
+        const float Rate = 1.0f;
 
         static RoadShake At(float travelled, float rough)
         {
