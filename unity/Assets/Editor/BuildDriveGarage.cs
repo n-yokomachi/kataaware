@@ -103,9 +103,9 @@ namespace HalfAware.EditorTools
 
             Blocker(parent);
             Bays(parent);
-            Covered(parent);
             Neighbours(parent);
             Controls(parent);
+            SideDoor(parent);
             Racks(parent);
             Lamps(parent);
         }
@@ -166,7 +166,7 @@ namespace HalfAware.EditorTools
             Stain(oil, -2.55f, AisleFrom - 1.05f, 0.50f, 9043);
             // 空いている 10 番の区画
             Stain(oil, BayWide * 2f - 0.15f, BackBayZ - 0.20f, 0.56f, 5181);
-            // 覆いを掛けた車の手前。布の下からいまも垂れている
+            // 隣の 2 番の車の鼻先。古い車なので、停めた先から垂れている
             Stain(oil, CoveredBayX + 0.24f, BayZ + 2.55f, 0.38f, 2609);
             oil.Emit(parent, "OilStains", Mat("OilStain"), false, Generated);
 
@@ -352,30 +352,6 @@ namespace HalfAware.EditorTools
                 grate.Box(new Vector3(x, GrateY, z + i * 0.093f), new Vector3(side - 0.10f, 0.012f, 0.035f));
         }
 
-        /// <summary>
-        /// 隣の区画の、覆いを掛けたままの車。共用のガレージだと一目で分かるものがこれ。
-        /// 形は覆いの下の塊だけで、車そのものは作らない。
-        /// 歩く線は x 1.3〜4.2 を通るので、左隣の区画に置けば道を塞がない
-        /// </summary>
-        static void Covered(Transform parent)
-        {
-            var tarp = new Bank { Texel = 0.8f };
-            var x = CoveredBayX;
-            var z = BayZ;
-            // 下から順に細くしていく。角の立った箱を重ねると、布を掛けた丸みに近づく
-            tarp.Box(new Vector3(x, 0.26f, z), new Vector3(1.80f, 0.44f, 4.10f));
-            tarp.Box(new Vector3(x, 0.60f, z - 0.05f), new Vector3(1.70f, 0.30f, 3.90f));
-            tarp.Box(new Vector3(x, 0.86f, z - 0.30f), new Vector3(1.48f, 0.26f, 2.30f));
-            tarp.Box(new Vector3(x, 1.02f, z - 0.35f), new Vector3(1.20f, 0.12f, 1.80f));
-            // 掛けた布の皺。上を横切る紐のあたりが盛り上がる
-            foreach (var at in new[] { -1.35f, 0.20f, 1.55f })
-                tarp.Box(new Vector3(x, 0.52f, z + at), new Vector3(1.86f, 0.52f, 0.09f),
-                    Quaternion.Euler(0f, 0f, 2.5f));
-            // 当たりを入れる。壁と同じで、すり抜けられては困る。
-            // Garage の下にあるので、乗り込んだ瞬間にこれも一緒に消える
-            tarp.Emit(parent, "CoveredCar", Mat("Tarp"), true, Generated);
-        }
-
         // ---- 隣の車 ----------------------------------------------------------
 
         /// <summary>
@@ -396,20 +372,27 @@ namespace HalfAware.EditorTools
             public float axleF, axleR;      // 車軸
             public float tyre;              // 車輪の外径の半分
             public bool box;                // 尻が箱（ワゴン・バン）。false なら段（セダン）
+            public bool near;               // すぐ隣に停まっている。CloseUp が細部を足す
         }
 
         /// <summary>
         /// 共用のガレージに停まっている、自分以外の車。
         ///
-        /// 区画は 10 あって、3 番が自分の車、2 番が覆いを掛けた車。
-        /// ここで組むのは 1・5・6・8・9 の 5 台で、4・7・10 は空けておく。
+        /// 区画は 10 あって、3 番が自分の車。ここで組むのは 1・2・5・6・8・9 の 6 台で、
+        /// 4・7・10 は空けておく。
         /// **空の区画が要る。** 全部埋めると駐車場に見えて、共同住宅の車庫に見えない。
         /// 4 番は歩く線が横切るので、そもそも埋められない。
         ///
-        /// 形は 4 種。背の高い商用車、古い箱型のセダン、小さな二箱の車、荷台のある四輪駆動。
-        /// どれも <see cref="Park"/> が同じ作りで組み、寸法の違いだけで別の車に見せる。
-        /// 自分の車ほど作り込まない。隣の車は遠目にしか見ないので、
-        /// 車輪の止めねじも蝶番も取っ手も持たせていない
+        /// **2 番は前まで覆いを掛けた塊で済ませていた。** 布を掛けた車のつもりで
+        /// 箱を四段重ねたものだったが、自分の車のすぐ隣にあって、乗り込むまでのあいだ
+        /// ずっと横目に入る一台なので、ただの低い箱にしか見えなかった。
+        /// ほかの隣と同じ <see cref="Park"/> で、外装のある車として組み直してある。
+        ///
+        /// 形は 5 種。背の高い商用車、長いエステート、古い箱型のセダン、小さな二箱の車、
+        /// 荷台のある四輪駆動。どれも <see cref="Park"/> が同じ作りで組み、
+        /// 寸法の違いだけで別の車に見せる。
+        /// 遠くの一台は自分の車ほど作り込まない。近くに停まっている 2 番だけ
+        /// <see cref="Motor.near"/> を立てて、継ぎ目・取っ手・格子の桟までを足す
         /// </summary>
         static readonly Motor[] Stalls =
         {
@@ -418,6 +401,13 @@ namespace HalfAware.EditorTools
                 half = 0.90f, nose = 2.24f, tail = -2.24f, sill = 0.48f, belt = 1.34f, roof = 2.18f,
                 hood = 1.06f, cabBack = 0.30f, cabNose = 1.62f, axleF = 1.42f, axleR = -1.28f,
                 tyre = 0.33f, box = true },
+            // 2 番。自分の車の左隣。長いエステートで、客室が尻まで続く。
+            // **塗りは Cream。** 左は Tan（1 番）、右は自分の車の緑で、どちらとも続かない。
+            // 暗いガレージでいちばん明るい車体になるので、灯りの下で形がそのまま読める
+            new Motor { bayX = CoveredBayX, rowZ = BayZ, face = 1f, paint = 0,
+                half = 0.86f, nose = 2.16f, tail = -2.16f, sill = 0.36f, belt = 1.10f, roof = 1.54f,
+                hood = 1.06f, cabBack = -0.62f, cabNose = 0.78f, axleF = 1.32f, axleR = -1.30f,
+                tyre = 0.31f, box = true, near = true },
             // 5 番。古い箱型のセダン。歩く線の右手にあたる
             new Motor { bayX = BayWide * 2f, rowZ = BayZ, face = 1f, paint = 1,
                 half = 0.84f, nose = 2.20f, tail = -2.20f, sill = 0.34f, belt = 1.06f, roof = 1.46f,
@@ -580,12 +570,93 @@ namespace HalfAware.EditorTools
             // 車台の暗がり。無いと脇から車の下が見通せて、車体が浮く
             slot(dark, -outer + 0.20f, outer - 0.20f, m.sill - 0.22f, m.sill + 0.01f, m.tail + 0.30f, m.nose - 0.30f);
 
+            // すぐ隣の一台だけ、近くで見るぶんの細部を足す
+            if (m.near) CloseUp(slot, steel, dark, m, cz, hubY, outer);
+
             // 当たり。車体を包む箱ひとつ
             var stop = new GameObject("Block" + (which + 1));
             stop.transform.SetParent(group, false);
             var box2 = stop.AddComponent<BoxCollider>();
             box2.center = new Vector3(m.bayX, (GarageFloorY + m.roof) * 0.5f, cz + m.face * (m.tail + m.nose) * 0.5f);
             box2.size = new Vector3(m.half * 2f + 0.14f, m.roof - GarageFloorY, m.nose - m.tail + 0.26f);
+        }
+
+        /// <summary>
+        /// すぐ隣に停まっている一台の仕上げ。窓の向こうの暗がり・扉の継ぎ目・取っ手・
+        /// 窓の桟・車輪の止めねじ・格子・前照灯の縁・ワイパー・給油口・排気の先。
+        ///
+        /// **窓の暗がりがいちばん効く。** ガラスは外を向いた面 1 枚しか張っていないので、
+        /// 遠くの一台では気づかないが、近くに寄ると窓が向こう側まで素通しの穴に見える。
+        /// 客室の中へ暗い塊を一つ置けば、そこで初めてガラスとして読める。
+        ///
+        /// 置く場所はどれも <see cref="Motor"/> の寸法から出す。数を直に書かないのは、
+        /// 近くに停める車が別の寸法へ変わってもそのまま付いてくるようにするため
+        /// </summary>
+        static void CloseUp(System.Action<Bank, float, float, float, float, float, float> slot,
+            Bank steel, Bank dark, Motor m, float cz, float hubY, float outer)
+        {
+            var backTo = m.box ? m.tail : m.cabBack;
+
+            // 窓の向こうの暗がり。ガラス（|x| = half - 0.014）より内に収める
+            slot(dark, -outer + 0.07f, outer - 0.07f, m.belt - 0.04f, m.roof - 0.075f,
+                backTo + 0.10f, m.cabNose - 0.09f);
+
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                var inn = side * (m.half - 0.018f);
+                var lip = side * (m.half + 0.006f);
+
+                // 扉の継ぎ目。前の扉の前縁・扉と扉のあいだ・後ろの扉の後縁
+                foreach (var z in new[] { m.cabNose - 0.03f, 0.02f, m.tail + 0.62f })
+                    slot(dark, inn, lip, m.sill + 0.02f, m.belt + 0.05f, z - 0.014f, z + 0.014f);
+                // 取っ手。扉ごとに一つ
+                foreach (var z in new[] { 0.30f, -0.40f })
+                    slot(steel, inn, side * (m.half + 0.028f), m.belt - 0.16f, m.belt - 0.10f,
+                        z - 0.085f, z + 0.085f);
+                // 鍵穴。前の扉の取っ手の下
+                slot(steel, inn, side * (m.half + 0.014f), m.belt - 0.235f, m.belt - 0.195f, 0.335f, 0.375f);
+                // 窓の桟。腰の線と屋根の縁に明るい一本ずつ。古い英国の車の顔付きはこれで決まる
+                slot(steel, inn, lip, m.belt + 0.050f, m.belt + 0.068f, backTo + 0.04f, m.cabNose - 0.02f);
+                slot(steel, side * (m.half - 0.030f), lip, m.roof - 0.020f, m.roof + 0.008f,
+                    backTo, m.cabNose - 0.06f);
+
+                // 車輪の止めねじ。五本。輪が回る物だと読めるのはこれがあるから
+                foreach (var z in new[] { m.axleF, m.axleR })
+                {
+                    var at = new Vector3(m.bayX + side * (m.half - 0.022f), hubY, cz + m.face * z);
+                    for (var i = 0; i < 5; i++)
+                    {
+                        var a = (i / 5f) * Mathf.PI * 2f;
+                        steel.Box(at + new Vector3(0f, Mathf.Cos(a) * m.tyre * 0.34f,
+                            Mathf.Sin(a) * m.tyre * 0.34f), new Vector3(0.030f, 0.032f, 0.032f));
+                    }
+                }
+            }
+
+            // ワイパー。風防（z は cabNose）の前、ボンネットの天板の上に二本寝かせる
+            for (var s = 0; s < 2; s++)
+            {
+                var wx = (s == 0 ? -1f : 1f) * (outer - 0.30f);
+                slot(steel, wx - 0.24f, wx + 0.24f, m.hood + 0.005f, m.hood + 0.022f,
+                    m.cabNose + 0.020f, m.cabNose + 0.075f);
+            }
+            // 格子の桟。三本。前照灯のあいだにだけ渡す
+            for (var k = 0; k < 3; k++)
+                slot(steel, -0.44f, 0.44f, m.hood - 0.270f + k * 0.055f,
+                    m.hood - 0.245f + k * 0.055f, m.nose + 0.032f, m.nose + 0.048f);
+            // 前照灯の縁。淡い面の周りを金物で囲う。奥の暗がりより前、灯りの面より後ろ
+            for (var s = 0; s < 2; s++)
+            {
+                var lx = (s == 0 ? -1f : 1f) * (outer - 0.16f);
+                slot(steel, lx - 0.155f, lx + 0.155f, m.hood - 0.300f, m.hood - 0.090f,
+                    m.nose + 0.030f, m.nose + 0.044f);
+            }
+            // 給油口。左の後ろの翼板に一つだけ
+            slot(steel, -(m.half - 0.018f), -(m.half + 0.010f), m.sill + 0.40f, m.sill + 0.56f,
+                m.axleR - 0.58f, m.axleR - 0.40f);
+            // 排気の先。緩衝器（sill-0.10 から）の下をくぐらせる
+            slot(steel, -0.62f, -0.48f, m.sill - 0.22f, m.sill - 0.12f, m.tail - 0.16f, m.tail + 0.24f);
         }
 
         // ---- シャッターの操作盤と感知器 ----------------------------------------
@@ -725,6 +796,109 @@ namespace HalfAware.EditorTools
             dark.Emit(parent, "ShutterFace", Mat("CarGap"), false, Generated);
             shell.Emit(parent, "ShutterCases", Mat("CarSteel"), false, Generated);
             knob.Emit(parent, "ShutterButtons", Mat("CarSteel"), false, Generated);
+        }
+
+        // ---- 通用口 ----------------------------------------------------------
+
+        /// <summary>
+        /// 右の壁の、立ち位置のすぐ脇にある通用口。建物の中へ通じる扉。
+        ///
+        /// **調べられない。ただの見た目。** この場面で必須なのは garage.door と
+        /// drive.window の 2 つだけで、必須でない対象を足しても、乗り込む前に
+        /// 拾える物が増えるだけになる（<see cref="Controls"/> と同じ但し書き）。
+        ///
+        /// **立ち位置のすぐ脇に置く。** プレイヤーは <see cref="BuildDrive.StandAt"/>
+        /// (4.2, 0, -7) に立って始まる。右の壁（x 7）までは 2.8 m しかないので、
+        /// 振り向けば目の前に来る。前の壁（z 6）なら始まった向き
+        /// （<see cref="BuildDrive.StandYaw"/> -28 度）の画面に入るが、13 m 先で、
+        /// 「立ち位置の近くの壁」にはならない。
+        ///
+        /// **始まった向きの画面には入らない。** 右へ 90 度ほど向いたところに来る。
+        /// z -7 は通路の側で、前の列の止め線（-2.5）と後ろの列の口（-8.4）のあいだ。
+        /// 柱（z -8.4 と -2.5）にも、停めてある車にも掛からない。
+        ///
+        /// 枠・扉・框・取っ手・蝶番・敷居・扉の上の灯りまで作る。
+        /// **枠と扉と鏡板の素材を分ける。** 枠は塗った鉄（0.216）、扉はシャッターと同じ塗り
+        /// （0.155）、鏡板と開口の際は Metal（0.085）。壁（0.128）に対して明・中・暗の
+        /// 三段になるので、扉が付いていることが形として読める。
+        /// **鏡板を CarGap（0.020）で塗ると、近くで見たときに窪みではなく穴に見える。**
+        /// 半分の明るさで足りる
+        /// </summary>
+        static void SideDoor(Transform parent)
+        {
+            // 右の壁の内側の面。壁は厚み 0.25 の真ん中が halfX + skin に来る
+            var wall = GarageAt.x + GarageWide * 0.5f;
+            const float z = -7f;
+            const float wide = 0.98f;
+            const float high = 2.10f;
+
+            var cases = new Bank { Texel = 1.4f };
+            var leaf = new Bank { Texel = 0.5f };
+            var dark = new Bank { Texel = 1.0f };
+            var mid = GarageFloorY + high * 0.5f;
+
+            // 開口の暗がり。壁の面へ半分埋めて、縁が壁と並ばないようにする
+            dark.Box(new Vector3(wall - 0.008f, mid, z), new Vector3(0.030f, high, wide));
+
+            // 扉。開口より一回り小さく、継ぎ目のぶん内へ寄せる
+            leaf.Box(new Vector3(wall - 0.048f, mid, z), new Vector3(0.055f, high - 0.03f, wide - 0.06f));
+            // 框。竪框二本と、上・中・下の桟。板を継いだ扉に見せる
+            for (var s = 0; s < 2; s++)
+                leaf.Box(new Vector3(wall - 0.088f, mid, z + (s == 0 ? -0.375f : 0.375f)),
+                    new Vector3(0.020f, high - 0.07f, 0.170f));
+            leaf.Box(new Vector3(wall - 0.088f, GarageFloorY + 0.105f, z), new Vector3(0.020f, 0.185f, 0.920f));
+            leaf.Box(new Vector3(wall - 0.088f, GarageFloorY + 1.150f, z), new Vector3(0.020f, 0.140f, 0.920f));
+            leaf.Box(new Vector3(wall - 0.088f, GarageFloorY + 1.998f, z), new Vector3(0.020f, 0.165f, 0.920f));
+            // 鏡板。框の窪みを暗い面で出す
+            dark.Box(new Vector3(wall - 0.076f, GarageFloorY + 0.645f, z), new Vector3(0.012f, 0.860f, 0.600f));
+            dark.Box(new Vector3(wall - 0.076f, GarageFloorY + 1.570f, z), new Vector3(0.012f, 0.680f, 0.600f));
+
+            // 枠。前後の竪枠と上枠。壁から部屋の側へ 7 cm 出す
+            for (var s = 0; s < 2; s++)
+                cases.Box(new Vector3(wall - 0.035f, mid + 0.055f, z + (s == 0 ? -0.545f : 0.545f)),
+                    new Vector3(0.070f, high + 0.150f, 0.110f));
+            cases.Box(new Vector3(wall - 0.035f, GarageFloorY + high + 0.075f, z),
+                new Vector3(0.070f, 0.110f, wide + 0.330f));
+            // 敷居。床との境。ここで扉が止まっていることが読める
+            cases.Box(new Vector3(wall - 0.060f, GarageFloorY + 0.010f, z), new Vector3(0.120f, 0.020f, 1.020f));
+
+            // 取っ手。座と、握りの棒。蝶番と反対の側に付ける
+            cases.Box(new Vector3(wall - 0.098f, 1.050f, z - 0.375f), new Vector3(0.026f, 0.100f, 0.100f));
+            cases.Box(new Vector3(wall - 0.122f, 1.050f, z - 0.325f), new Vector3(0.035f, 0.035f, 0.165f));
+            // 蝶番。奥の側に二枚
+            foreach (var y in new[] { 0.44f, 1.78f })
+                cases.Box(new Vector3(wall - 0.090f, y, z + 0.445f), new Vector3(0.030f, 0.130f, 0.055f));
+
+            // 扉の上の灯り。防滴灯の笠と筐体。シャッターの脇のものと同じ作りで揃える
+            const float lampY = 2.42f;
+            cases.Box(new Vector3(wall - 0.115f, lampY + 0.085f, z), new Vector3(0.230f, 0.045f, 0.340f));
+            cases.Box(new Vector3(wall - 0.048f, lampY, z), new Vector3(0.095f, 0.200f, 0.260f));
+            // 電線の管。灯りから天井へ立ち上げる
+            cases.Box(new Vector3(wall - 0.035f, (lampY + 0.11f + GarageHigh) * 0.5f, z),
+                new Vector3(0.042f, GarageHigh - lampY - 0.11f, 0.042f));
+
+            cases.Emit(parent, "SideDoorCase", Mat("CarSteel"), false, Generated);
+            leaf.Emit(parent, "SideDoorLeaf", Mat("Shutter"), false, Generated);
+            dark.Emit(parent, "SideDoorFace", Mat("Metal"), false, Generated);
+
+            Piece(Child(parent, "SideDoorLamp"), "Pane",
+                Shape("SideDoorPane", 1f, b => b.Box(Vector3.zero, new Vector3(0.030f, 0.135f, 0.210f))),
+                Glow(GarageLamp, 1.6f)).position = new Vector3(wall - 0.100f, lampY, z);
+            // **壁から 0.38 離す。** 壁の際に置くと、壁を向いた面（枠の小口・扉の框）へ
+            // 光が斜めにしか当たらず、いちばん見せたい形が暗いまま残る。
+            // 影は落とさせない。WebGL で影を持つ灯りを増やすと重くなる
+            var bulb = new GameObject("Light");
+            bulb.transform.SetParent(Child(parent, "SideDoorLamp"), false);
+            bulb.transform.localPosition = new Vector3(wall - 0.38f, lampY - 0.18f, z);
+            var lit = bulb.AddComponent<Light>();
+            lit.type = LightType.Point;
+            lit.color = GarageLamp;
+            // **押しボタンの箱の灯り（1.7）より弱い。** あちらは 8 m 先から見つけさせる
+            // 灯りだが、こちらは立ち位置の 2.8 m 隣にある。同じ強さだと、
+            // 始まった瞬間に画面の端が明るくなって、暗い車庫の暗さが崩れる
+            lit.intensity = 0.9f;
+            lit.range = 4f;
+            lit.shadows = LightShadows.None;
         }
 
         // ---- 奥の壁際 --------------------------------------------------------

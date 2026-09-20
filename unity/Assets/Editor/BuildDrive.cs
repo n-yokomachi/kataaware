@@ -551,7 +551,12 @@ namespace HalfAware.EditorTools
         public static float AisleTo { get { return BayZ - BayDeep * 0.5f; } }
         /// <summary>塗りの線の幅</summary>
         public const float BayLine = 0.10f;
-        /// <summary>覆いを掛けた隣の車を置く区画。車の左隣。歩く線には掛からない</summary>
+        /// <summary>
+        /// 隣の 2 番の区画。自分の車の左隣。歩く線（x 1.3〜4.2）には掛からない。
+        ///
+        /// 前は覆いを掛けた塊を置いていたが、乗り込むまでずっと横目に入る一台なので、
+        /// 今はほかの隣と同じ外装のある車が停めてある（<see cref="Stalls"/>）
+        /// </summary>
         public const float CoveredBayX = -BayWide;
 
         /// <summary>
@@ -953,6 +958,12 @@ namespace HalfAware.EditorTools
             // 塞ぐ箱があってもガレージの立てる位置から 1.1〜1.3 m しか離れず、
             // 拾える距離 1.4 の内側に入ってしまう。once: true なので、ここで読まれると
             // 走行中に二度と出ない
+            // ガレージでだけ調べられる対象。乗り込んだら DriveDirector が伏せる。
+            // 伏せないと、走っている車の後ろ 5.9 m にピンが浮いたまま残る
+            // （PinMarkers は Interactable.Active しか見ない）
+            var garageOnly = Child(parent, "GarageOnly");
+            Put(garageOnly, "Button", new Vector3(2.55f, 1.12f, 5.60f), script, DriveIds.Button, ItemRadius, false);
+
             var cabin = Child(parent, "Cabin");
             Put(cabin, "Radio", new Vector3(-0.02f, 1.19f, 0.70f), script, DriveIds.Radio, ItemRadius, false);
             Put(cabin, "Pocket", new Vector3(-0.10f, 1.07f, -0.30f), script, DriveIds.Pocket, ItemRadius, false);
@@ -1051,6 +1062,17 @@ namespace HalfAware.EditorTools
         /// 尾を詰めたものが Concrete1〜4（`tools/make-steps.py`）。
         /// 出どころと加工は Assets/Audio/LICENSES.md に控えてある
         /// </summary>
+        /// <summary>ガレージの響きの広さ。ミリベル。場面 2 の小道は -700</summary>
+        const float EchoRoom = -520f;
+        /// <summary>高音の残り。コンクリートは高音を返すので、小道の -600 より上げる</summary>
+        const float EchoBright = -320f;
+        /// <summary>尾を引く長さ。秒。小道は 0.75</summary>
+        const float EchoDecay = 1.15f;
+        /// <summary>初期反射の強さ。ミリベル。小道は -900</summary>
+        const float EchoReflect = -680f;
+        /// <summary>残響そのものの強さ。ミリベル。小道は 60</summary>
+        const float EchoLevel = 105f;
+
         static readonly string[] ConcreteSteps =
         {
             "Assets/Audio/Concrete1.wav", "Assets/Audio/Concrete2.wav",
@@ -1085,8 +1107,24 @@ namespace HalfAware.EditorTools
             // ここは無音の車庫で、同じ音量だと足音だけが画面から浮く
             src.volume = 0.38f;
 
+            // **既製の ParkingLot を当てない。** あれは room も roomHF も -1000 で、
+            // 高音が丸ごと落ちるので、無音のガレージではほとんど何も聞こえない。
+            // 実際「反響が付いていない」と差し戻された。場面 2 と同じく User にして
+            // 一つずつ置く（RainCover が小道でやっているのと同じ構え）。
+            //
+            // 小道より強く取る。あちらは石壁の細い通りで room -700 / decay 0.75 だが、
+            // ここは 14 × 21 × 高さ 2.9 のコンクリートの箱で、実際よく響く。
+            // 強すぎると言われたら decay と reverbLevel から下げる
             var echo = feet.AddComponent<AudioReverbFilter>();
-            echo.reverbPreset = AudioReverbPreset.ParkingLot;
+            echo.reverbPreset = AudioReverbPreset.User;
+            echo.room = EchoRoom;
+            echo.roomHF = EchoBright;
+            echo.decayTime = EchoDecay;
+            echo.reflectionsLevel = EchoReflect;
+            echo.reverbLevel = EchoLevel;
+            echo.reverbDelay = 0.022f;
+            echo.diffusion = 100f;
+            echo.density = 100f;
 
             var steps = feet.AddComponent<Footsteps>();
             var so = new SerializedObject(steps);
@@ -1337,6 +1375,8 @@ namespace HalfAware.EditorTools
             // 車内の対象は乗り込むまで伏せる。ガレージからでも拾える距離に入ってしまう
             var cabin = Look(root, "Items/Cabin");
             dso.FindProperty("cabin").objectReferenceValue = cabin != null ? cabin.gameObject : null;
+            var garageOnly = Look(root, "Items/GarageOnly");
+            dso.FindProperty("garageOnly").objectReferenceValue = garageOnly != null ? garageOnly.gameObject : null;
             // 足音。乗り込んだら止める。Player の下にあるのでガレージと一緒には消えない
             dso.FindProperty("feet").objectReferenceValue = Object.FindFirstObjectByType<Footsteps>(FindObjectsInactive.Include);
             var folded = Look(root, "Car/ArmsFolded");
@@ -1863,8 +1903,6 @@ namespace HalfAware.EditorTools
                 case "OilStain": col = new Color(0.030f, 0.029f, 0.031f, 0.96f); smooth = 0.86f; break;
                 // 排水口の受け。中は見えないので、ただ暗い
                 case "Drain": col = new Color(0.040f, 0.039f, 0.038f); smooth = 0.14f; break;
-                // 隣の車に掛かった覆い。埃をかぶった帆布
-                case "Tarp": col = new Color(0.168f, 0.166f, 0.172f); smooth = 0.05f; break;
                 // 濡れた路面。艶だけの面は映る物が無いと穴に見えるので、地の明るさを持たせる
                 case "Sheen": col = new Color(0.100f, 0.108f, 0.128f); smooth = 0.86f; break;
                 case "Metal": col = new Color(0.085f, 0.088f, 0.095f); smooth = 0.26f; break;

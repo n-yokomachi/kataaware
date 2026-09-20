@@ -83,6 +83,10 @@ namespace HalfAware.EditorTools
             var lens = new Bank { Texel = 1.0f };
             var tail = new Bank { Texel = 1.0f };
             Shell(body, steel, gap, glass, rubber, lens, tail);
+            // 車内の後ろ半分。外装の後に呼ぶのは、消えたままの室内灯に lens の入れ物が要るため。
+            // 足すのは客室の後ろ（CabBack）から後ろと、床と、座面だけで、
+            // 運転席まわりの寸法には一指も触れない
+            Hold(trim, seat, steel, gap, body, lens);
 
             trim.Emit(parent, "CarTrim", Mat("CarTrim"), false, Generated);
             seat.Emit(parent, "CarSeat", Mat("CarSeat"), false, Generated);
@@ -351,6 +355,279 @@ namespace HalfAware.EditorTools
                     new Vector3(0.018f, 0.060f, 0.018f));
             // 床の滑り台に載った枠
             steel.Box(new Vector3(x, 0.905f, 0.06f), new Vector3(0.46f, 0.055f, 0.44f));
+        }
+
+        // ---- 車内の後ろ半分と荷室 --------------------------------------------
+
+        /// <summary>荷室の床板の上面。台枠の暗がりの天板（0.6225）の上に載る</summary>
+        const float HoldFloorY = 0.685f;
+
+        /// <summary>
+        /// 振り返ったときに見える車内ぜんたい。床・タイヤハウス・側面の内張り・
+        /// 後部座席・積んだ荷・天井・後ろの扉の内側。
+        ///
+        /// **運転席から後ろを向くと、そこには何も無かった。** 計器盤も内張りも助手席も
+        /// 前しか作っておらず、客室の後ろ（<see cref="CabBack"/>）から先は外板の内面が
+        /// 剥き出しで、床さえ張っていない。下を向けば車輪のあいだの地面が見えていた。
+        /// 原作の主人公は荷を積んで倫敦からエディンバラ近郊へ走るので、後ろが空では困る。
+        ///
+        /// **運転席の背もたれだけは作らない。** 目は座席の (0.38, 1.55, 0) にあって、
+        /// 後ろを向くと <see cref="EyeLead"/> のぶん z -0.22 へ下がる。背もたれは
+        /// z -0.24 に立つので、作れば振り返った目の 2 cm 前に板が立って画面を塞ぐ。
+        /// 座面と枠だけ置いて、背は座っている本人ということにしてある。
+        ///
+        /// 寸法はどれも既にある車体から割り出す。内張りの外面は外板の内面
+        /// （<see cref="SkinIn"/> 0.93）、天井は荷室の蓋の下面（1.88）、
+        /// 後ろは扉の内面（-2.19）、前は客室の後ろの柱（-0.55）。
+        /// 角の立った板と箱だけで組むのは外装と同じ
+        /// </summary>
+        static void Hold(Bank trim, Bank seat, Bank steel, Bank gap, Bank body, Bank lens)
+        {
+            FloorPan(trim, seat, steel, gap);
+            for (var s = 0; s < 2; s++) HoldSide(trim, seat, steel, body, s == 0 ? -1f : 1f);
+            Load(trim, seat, steel);
+            Lining(trim, steel, lens);
+            TailInside(trim, steel, gap);
+        }
+
+        /// <summary>
+        /// 床。**今まで一枚も無かった。** 客室の前から後ろの扉まで一枚の板で通す。
+        /// 下端は敷居（<see cref="SillY"/>）のすぐ下に収めて、外から車体の下を覗いても
+        /// 板の小口が出ないようにする。
+        ///
+        /// 真ん中の隆起は変速機の覆い。オフロード車の床はこれで左右に割れていて、
+        /// 変速と副変速の把手が二本そこから生えている。振り返ったとき、
+        /// 座席と座席のあいだに最初に目へ入るのがこれになる
+        /// </summary>
+        static void FloorPan(Bank trim, Bank seat, Bank steel, Bank gap)
+        {
+            // 床板。前は計器盤の下（0.95）、後ろは扉の内張りの中（-2.22）まで
+            trim.Box(new Vector3(0f, HoldFloorY - 0.035f, -0.635f), new Vector3(1.88f, 0.070f, 3.17f));
+            // 荷を滑らせないための当て木。塗った鉄で五本。荷室の床に前後の向きが出る
+            for (var k = -2; k <= 2; k++)
+                steel.Box(new Vector3(k * 0.26f, HoldFloorY + 0.007f, -1.42f),
+                    new Vector3(0.055f, 0.014f, 1.52f));
+            // 客室と荷室の境の継ぎ目
+            gap.Box(new Vector3(0f, HoldFloorY + 0.004f, -0.62f), new Vector3(1.80f, 0.010f, 0.030f));
+
+            // 変速機の覆い。天板は座面より少し低い
+            trim.Box(new Vector3(0f, 0.805f, 0.20f), new Vector3(0.34f, 0.26f, 1.50f));
+            steel.Box(new Vector3(0f, 0.940f, 0.20f), new Vector3(0.30f, 0.022f, 1.46f));
+            // 把手の根の蛇腹
+            gap.Box(new Vector3(0.02f, 0.952f, 0.16f), new Vector3(0.18f, 0.030f, 0.22f));
+            // 変速の把手。倒れる向きに少しひねって立てる
+            steel.Box(new Vector3(0.02f, 1.075f, 0.170f), new Vector3(0.034f, 0.280f, 0.034f),
+                Quaternion.Euler(-7f, 0f, -5f));
+            trim.Box(new Vector3(0.005f, 1.215f, 0.152f), new Vector3(0.080f, 0.080f, 0.080f));
+            // 副変速の把手。四輪駆動の車にはこれが二本目として付いている
+            steel.Box(new Vector3(-0.10f, 1.035f, 0.095f), new Vector3(0.030f, 0.200f, 0.030f),
+                Quaternion.Euler(-5f, 0f, 7f));
+            trim.Box(new Vector3(-0.118f, 1.140f, 0.088f), new Vector3(0.064f, 0.064f, 0.064f));
+            // 手制動。覆いの上を後ろへ寝かせる
+            steel.Box(new Vector3(0.055f, 1.010f, -0.10f), new Vector3(0.030f, 0.036f, 0.340f),
+                Quaternion.Euler(22f, 0f, 0f));
+            trim.Box(new Vector3(0.055f, 1.078f, -0.238f), new Vector3(0.048f, 0.048f, 0.110f),
+                Quaternion.Euler(22f, 0f, 0f));
+
+            // 運転席の座面。背もたれは作らない（<see cref="Hold"/> の但し書き）。
+            // 助手席と同じ作りで、下を向いたときに座っているものが見える
+            seat.Box(new Vector3(SeatAt.x, 0.985f, 0.06f), new Vector3(0.54f, 0.13f, 0.50f));
+            for (var i = 0; i < 2; i++)
+                seat.Box(new Vector3(SeatAt.x + (i == 0 ? -0.235f : 0.235f), 1.025f, 0.06f),
+                    new Vector3(0.07f, 0.11f, 0.46f));
+            steel.Box(new Vector3(SeatAt.x, 0.905f, 0.06f), new Vector3(0.46f, 0.055f, 0.44f));
+        }
+
+        /// <summary>
+        /// 荷室の側面。タイヤハウスの張り出し・腰の内張り・窓の内枠・後部座席。
+        ///
+        /// **タイヤハウスが要る。** 後ろの車輪（<see cref="AxleRearZ"/>）は泥除けの抜きから
+        /// 荷室の中へ入り込んでいて、箱で覆わないと床の上に車輪が生えて見える。
+        /// 実際の車も同じ形で、この箱の上が後部座席の台になっている。
+        ///
+        /// 座席は左右で出し分ける。運転席側は下ろして座れる形、助手席側は畳んで
+        /// 側面へ立ててある。荷を積むときに畳む席なので、畳んだままなのが
+        /// 「荷を積んで出てきた」ことの説明になる
+        /// </summary>
+        static void HoldSide(Bank trim, Bank seat, Bank steel, Bank body, float side)
+        {
+            // タイヤハウス。抜きの頂き（0.89）より上へ出して、車輪を覆い切る
+            body.Box(new Vector3(side * 0.775f, 0.805f, AxleRearZ), new Vector3(0.320f, 0.290f, 1.020f));
+            // 天板の縁。塗った鉄なので、暗い荷室でここだけ形が残る
+            steel.Box(new Vector3(side * 0.775f, 0.962f, AxleRearZ), new Vector3(0.345f, 0.030f, 1.050f));
+            // 前後の小口。箱をそのまま切るより、一段落とした方が据わって見える
+            for (var i = 0; i < 2; i++)
+                body.Box(new Vector3(side * 0.775f, 0.740f, AxleRearZ + (i == 0 ? -0.565f : 0.565f)),
+                    new Vector3(0.320f, 0.160f, 0.110f));
+
+            // 腰の内張り。タイヤハウスの上から窓の下枠まで
+            trim.Box(new Vector3(side * 0.8975f, 1.145f, -1.37f), new Vector3(0.085f, 0.390f, 1.46f));
+            // 縦の骨。押した筋の代わりに、内張りの上へ細い板を三本
+            foreach (var z in new[] { -0.80f, -1.37f, -1.94f })
+                body.Box(new Vector3(side * 0.842f, 1.145f, z), new Vector3(0.040f, 0.370f, 0.075f));
+            // 窓の下枠。暗い内張りと窓のあいだに明るい線が一本通る
+            steel.Box(new Vector3(side * 0.9025f, 1.355f, -1.37f), new Vector3(0.075f, 0.050f, 1.420f));
+            // 窓の内枠。上枠と前後の縦枠
+            trim.Box(new Vector3(side * 0.9025f, 1.825f, -1.37f), new Vector3(0.075f, 0.050f, 1.420f));
+            trim.Box(new Vector3(side * 0.9025f, 1.590f, -0.745f), new Vector3(0.075f, 0.420f, 0.090f));
+            trim.Box(new Vector3(side * 0.9025f, 1.590f, -2.035f), new Vector3(0.075f, 0.420f, 0.090f));
+
+            if (side > 0f)
+            {
+                // 運転席側。タイヤハウスの上に載る横向きの座席
+                seat.Box(new Vector3(0.665f, 1.035f, AxleRearZ), new Vector3(0.380f, 0.115f, 0.980f));
+                seat.Box(new Vector3(0.800f, 1.270f, AxleRearZ), new Vector3(0.110f, 0.360f, 0.960f));
+                // 前の縁の枠と、床へ下ろした脚。座面が宙に浮かない
+                steel.Box(new Vector3(0.490f, 0.985f, AxleRearZ), new Vector3(0.045f, 0.045f, 1.000f));
+                for (var i = 0; i < 2; i++)
+                    steel.Box(new Vector3(0.490f, 0.820f, AxleRearZ + (i == 0 ? -0.400f : 0.400f)),
+                        new Vector3(0.036f, 0.290f, 0.036f));
+            }
+            else
+            {
+                // 助手席側。畳んで側面へ立ててある。背と座面の二枚が前後に重なる
+                seat.Box(new Vector3(-0.800f, 1.330f, AxleRearZ), new Vector3(0.110f, 0.460f, 0.980f));
+                seat.Box(new Vector3(-0.715f, 1.310f, AxleRearZ), new Vector3(0.095f, 0.420f, 0.940f),
+                    Quaternion.Euler(0f, 0f, -4f));
+                // 蝶番の側の枠。タイヤハウスの天板（0.977）の上に載る
+                steel.Box(new Vector3(-0.760f, 1.000f, AxleRearZ), new Vector3(0.080f, 0.050f, 0.980f));
+                // 吊り紐。畳んだ席の上を跨いで、前へ垂らす
+                for (var i = 0; i < 2; i++)
+                {
+                    var z = AxleRearZ + (i == 0 ? -0.360f : 0.360f);
+                    trim.Box(new Vector3(-0.790f, 1.575f, z), new Vector3(0.190f, 0.028f, 0.050f));
+                    trim.Box(new Vector3(-0.655f, 1.455f, z), new Vector3(0.024f, 0.260f, 0.050f));
+                }
+            }
+        }
+
+        /// <summary>
+        /// 積んである荷。木箱・布を掛けた荷・鞄・油の缶と、それを留める帯と床の留め具。
+        ///
+        /// 置く場所は左右のタイヤハウス（|x| 0.615 から外）のあいだと、その後ろの
+        /// 一枚になった床。荷は床に直に置き、帯で床の留め具へ締める。
+        /// **一つだけ塗った鉄の物を混ぜる。** 暗い荷室で角がいちばん先に光るので、
+        /// 荷が積んであること自体がそこで読める
+        /// </summary>
+        static void Load(Bank trim, Bank seat, Bank steel)
+        {
+            var floor = HoldFloorY;
+            // 奥は扉の内張りの面（-2.11）まで。手前は客室との境（-0.62）まで。
+            // 左右はタイヤハウスの内の縁（|x| 0.615）まで
+
+            // 木箱。奥の左に二つ積む。下の箱には鉄の箍を二本
+            seat.Box(new Vector3(-0.32f, floor + 0.220f, -1.875f), new Vector3(0.620f, 0.440f, 0.450f));
+            for (var i = 0; i < 2; i++)
+                steel.Box(new Vector3(-0.32f + (i == 0 ? -0.180f : 0.180f), floor + 0.220f, -1.875f),
+                    new Vector3(0.030f, 0.455f, 0.465f));
+            trim.Box(new Vector3(-0.36f, floor + 0.545f, -1.900f), new Vector3(0.460f, 0.210f, 0.380f),
+                Quaternion.Euler(0f, 9f, 0f));
+
+            // 布を掛けた荷。中の塊の上へ、一回り大きい布を被せる
+            trim.Box(new Vector3(0.10f, floor + 0.190f, -1.30f), new Vector3(0.560f, 0.380f, 0.600f));
+            seat.Box(new Vector3(0.10f, floor + 0.205f, -1.30f), new Vector3(0.600f, 0.400f, 0.640f),
+                Quaternion.Euler(0f, 3f, 0f));
+            // 布の皺。垂れたところが二本
+            foreach (var at in new[] { -0.22f, 0.20f })
+                seat.Box(new Vector3(0.10f + at, floor + 0.190f, -1.30f), new Vector3(0.070f, 0.400f, 0.660f),
+                    Quaternion.Euler(0f, 0f, 3f));
+
+            // 荷締めの帯。荷の上を跨いで、床まで下ろす
+            trim.Box(new Vector3(0.10f, floor + 0.415f, -1.30f), new Vector3(0.640f, 0.022f, 0.090f));
+            for (var i = 0; i < 2; i++)
+            {
+                var x = 0.10f + (i == 0 ? -0.315f : 0.315f);
+                trim.Box(new Vector3(x, floor + 0.210f, -1.30f), new Vector3(0.022f, 0.430f, 0.090f));
+                steel.Box(new Vector3(x, floor + 0.030f, -1.30f), new Vector3(0.090f, 0.040f, 0.040f));
+            }
+            // 締め金。帯の上の一点だけ鉄
+            steel.Box(new Vector3(0.24f, floor + 0.428f, -1.30f), new Vector3(0.100f, 0.055f, 0.100f));
+
+            // 床の留め具。前は客室との境のそば、後ろは扉の手前
+            foreach (var ring in new[] { new Vector2(0.545f, -0.68f), new Vector2(0.780f, -2.05f) })
+                for (var s = 0; s < 2; s++)
+                {
+                    var x = (s == 0 ? -1f : 1f) * ring.x;
+                    steel.Box(new Vector3(x, floor + 0.012f, ring.y), new Vector3(0.115f, 0.024f, 0.060f));
+                    steel.Box(new Vector3(x, floor + 0.038f, ring.y), new Vector3(0.035f, 0.060f, 0.035f));
+                }
+
+            // 鞄。畳んだ席の下の床へ、タイヤハウスへ押し付けて寝かせる
+            trim.Box(new Vector3(-0.34f, floor + 0.095f, -0.80f), new Vector3(0.520f, 0.190f, 0.340f),
+                Quaternion.Euler(0f, -8f, 0f));
+            for (var i = 0; i < 2; i++)
+                steel.Box(new Vector3(-0.34f + (i == 0 ? -0.150f : 0.150f), floor + 0.128f, -0.655f),
+                    new Vector3(0.070f, 0.055f, 0.040f), Quaternion.Euler(0f, -8f, 0f));
+
+            // 油の缶。木箱の右。**塗った鉄はこの荷室でいちばん明るい素材で、
+            // 暗い帯ではここの角が最初に光る。** 荷が積んであること自体がそこで読める
+            steel.Box(new Vector3(0.40f, floor + 0.235f, -1.90f), new Vector3(0.190f, 0.470f, 0.360f));
+            steel.Box(new Vector3(0.40f, floor + 0.495f, -1.90f), new Vector3(0.080f, 0.060f, 0.140f));
+        }
+
+        /// <summary>
+        /// 天井と、そこに付く物。骨・手すり・消えたままの室内灯・助手席の背の裏の物入れ。
+        ///
+        /// 荷室の天井は内から蓋を一枚しただけで、上を向くと継ぎ目の無い板だった。
+        /// 骨を三本渡せば、そこが天井だと読めるようになる
+        /// </summary>
+        static void Lining(Bank trim, Bank steel, Bank lens)
+        {
+            // 天井の骨。荷室の蓋（下面 1.88）へ 5 mm 差し込んで、面が並ばないようにする
+            foreach (var z in new[] { -1.12f, -1.60f, -2.05f })
+                steel.Box(new Vector3(0f, 1.865f, z), new Vector3(1.78f, 0.040f, 0.070f));
+            // 手すり。後ろの柱の上。助手席の前のものと同じ作り
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                steel.Box(new Vector3(side * 0.845f, 1.812f, -0.86f), new Vector3(0.036f, 0.036f, 0.260f));
+                for (var i = 0; i < 2; i++)
+                    steel.Box(new Vector3(side * 0.872f, 1.846f, -0.86f + (i == 0 ? -0.130f : 0.130f)),
+                        new Vector3(0.050f, 0.070f, 0.045f));
+            }
+            // 室内灯。**点けない。** 車内に足す灯りは計器の裏の一つだけという取り決めで
+            // （<see cref="Car"/>）、ここに置くのは消えている灯りの笠だけ。
+            // 淡い面が天井に一つあると、暗い荷室の奥行きがそこで測れる
+            trim.Box(new Vector3(-0.56f, 1.862f, -1.30f), new Vector3(0.200f, 0.045f, 0.150f));
+            lens.Box(new Vector3(-0.56f, 1.834f, -1.30f), new Vector3(0.150f, 0.022f, 0.105f));
+
+            // 助手席の背もたれの裏の物入れ。振り返ると背の裏側が正面に来る
+            trim.Box(new Vector3(-0.42f, 1.225f, -0.322f), new Vector3(0.420f, 0.320f, 0.036f));
+            for (var i = 0; i < 2; i++)
+                steel.Box(new Vector3(-0.42f + (i == 0 ? -0.190f : 0.190f), 1.300f, -0.318f),
+                    new Vector3(0.028f, 0.520f, 0.024f));
+        }
+
+        /// <summary>
+        /// 後ろの扉の内側。内張り・窓の内枠・掛け金・扉に留めた工具。
+        ///
+        /// 扉は横開きで、蝶番は外から見て左（x -0.915）に付いている。
+        /// 掛け金は外の掛け金（x 0.860）と同じ側に置く。左右が食い違うと、
+        /// 外から見たときと内から見たときで開く向きが逆になる
+        /// </summary>
+        static void TailInside(Bank trim, Bank steel, Bank gap)
+        {
+            // 内張り。扉の板（-2.25〜-2.19）へ 2 mm 差し込む
+            const float panel = -2.155f;
+            var face = panel + 0.0375f;
+            trim.Box(new Vector3(0f, 0.980f, panel), new Vector3(1.780f, 0.700f, 0.075f));
+            // 板を二枚継いである継ぎ目
+            gap.Box(new Vector3(0f, 1.010f, face + 0.008f), new Vector3(1.700f, 0.018f, 0.020f));
+            // 窓の内枠。扉の枠（厚み 0.06）の内側に合わせる
+            trim.Box(new Vector3(0f, 1.355f, -2.160f), new Vector3(1.740f, 0.050f, 0.060f));
+            trim.Box(new Vector3(0f, 1.825f, -2.160f), new Vector3(1.740f, 0.050f, 0.060f));
+            for (var s = 0; s < 2; s++)
+                trim.Box(new Vector3((s == 0 ? -1f : 1f) * 0.885f, 1.590f, -2.160f),
+                    new Vector3(0.090f, 0.420f, 0.060f));
+            // 引き手と掛け金
+            steel.Box(new Vector3(0.700f, 1.120f, face + 0.030f), new Vector3(0.240f, 0.050f, 0.050f));
+            steel.Box(new Vector3(0.815f, 1.035f, face + 0.025f), new Vector3(0.070f, 0.170f, 0.040f));
+            // 蝶番の側の骨
+            steel.Box(new Vector3(-0.830f, 0.980f, face + 0.018f), new Vector3(0.070f, 0.640f, 0.030f));
+            // 車載の工具。帯で扉へ留めてある。x は積んだ木箱（-0.63 まで）と
+            // 蝶番の側の骨（-0.795 から）のあいだ
+            steel.Box(new Vector3(-0.700f, 1.060f, face + 0.050f), new Vector3(0.110f, 0.380f, 0.090f));
+            trim.Box(new Vector3(-0.700f, 1.180f, face + 0.062f), new Vector3(0.150f, 0.030f, 0.115f));
         }
 
         /// <summary>
