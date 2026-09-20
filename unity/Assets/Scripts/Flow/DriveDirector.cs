@@ -72,8 +72,9 @@ namespace HalfAware
         [Tooltip("ドアを閉めてからイグニッションまで。秒")]
         [SerializeField] float shutHold = 0.8f;
         [Tooltip("イグニッションを鳴らし終えてから黒へ切り替わるまで。秒。" +
-            "この間だけエンジンの震えが入る")]
-        [SerializeField] float ignitionHold = 3f;
+            "0 なら鳴らし終えた時点で黒へ落ちる。この間だけエンジンの震えと" +
+            "止まったままの音が入るので、0 のときはどちらも出さない")]
+        [SerializeField] float ignitionHold = 0f;
         [Tooltip("エンジンだけ掛かっているときの震え。走行中の粗さ 1.0 に対する割合")]
         [SerializeField] float idleRough = 0.55f;
         [Tooltip("座ってから左右に振れる角度。度。片側の値。90 で前方 180 度")]
@@ -395,11 +396,15 @@ namespace HalfAware
             // 鳴らし終えるまで待ってから震え出す。掛かった音の途中で震えると、
             // まだ掛かっていないエンジンで車が揺れることになる
             yield return Wait(sound != null ? sound.IgnitionSeconds : 0f);
-            world.Idling = idleRough;
-            // **エンジンを鳴らし続ける。** 鍵を回し終えたところで音が切れると、
-            // 止まったように聞こえる。走り出すまでの間をこれで埋める
-            if (sound != null) sound.Idle(true);
-            yield return Wait(ignitionHold);
+            // 鳴らし終えてから黒へ落ちるまでに間があるときだけ、その間を埋める。
+            // **間が 0 なら何も出さない。** 1 フレームだけ震えて鳴って消えるのは、
+            // 演出ではなく不具合に見える
+            if (ignitionHold > 0f)
+            {
+                world.Idling = idleRough;
+                if (sound != null) sound.Idle(true);
+                yield return Wait(ignitionHold);
+            }
 
             // 黒へは切り替えで入る。場面 1 のドアを閉める暗転と同じ扱い
             hud.SetFade(1f);
