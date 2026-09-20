@@ -968,6 +968,181 @@ def _warm(k, hue):
     return tuple(out)
 
 
+# ---- ガレージ。油染み・ゴム・隣の車の塗り -------------------------------
+
+def oilstain():
+    """
+    床の油染み。**唯一 α を持つ床の絵で、唯一の判じ物でもある。**
+
+    これまでは輪郭を崩した扇にほぼ真っ黒（0.030）を塗っていた。実画面では
+    床に開いた穴か、でなければ水たまりにしか見えない。オーナーの第一声が
+    「あの黒いのは水たまり？」だったのはそのとおりで、油だと読める手掛かりが
+    絵にも形にも一つも無かった。
+
+    油だと分かるのは次の 3 つが揃ったときで、どれも欠かせない。
+
+      - **薄膜の虹。** これが決め手。水たまりは虹を出さない。
+        コンクリートの上の油だけが、膜の厚みに応じて赤紫から青緑へ色を回す
+      - **縁がぼける。** 油は染み込むので、濃い芯のまわりに地の染みた輪が広がり、
+        外へ行くほど薄れて消える。四角く切れた縁や、はっきりした輪郭は水の方の印
+      - **芯は黒ではなく焦茶。** 真っ黒は穴に見える。溜まった油は褐色を帯びる
+
+    虹は **濃く描く。** 画面は 32 段に落として Bayer で撒くので、値は 8.2 刻みに
+    しか乗らない。実物ほどの淡さで描くと、posterise を通ったところで丸ごと
+    床と同じ段に落ちて消える。
+
+    α を持つので `Stain` は 0〜1 の uv を振って 1 枚ずつ貼る（`FanY` の
+    位置そのままの uv ではなく `Patch`）。染みの大きさが変わっても
+    芯と輪と虹の割合は変わらない
+    """
+    size = (SIZE, SIZE)
+    col = Image.new('RGB', size, (0, 0, 0))
+    mask = Image.new('L', size, 0)
+    cp = col.load()
+    mp = mask.load()
+    # 縁の崩れと膜の斑。虹が同心円に並ばないよう、位相をこの斑で散らす
+    edge = clouds(size, 6607, 4, 2.2).load()
+    # **spread を通す。** clouds は 116〜138 ほどの幅しか返さないので、
+    # そのまま位相に使うと色が回りきらず、虹が一色の靄になる（実際そうなった）
+    film = spread(clouds(size, 9103, 2, 6.0), 5.0).load()
+    thin = spread(clouds(size, 2207, 2, 5.0), 4.0).load()
+    grain = noise(size, 2411, 0, 255, 0.6).load()
+    mid = (SIZE - 1) * 0.5
+    for y in range(SIZE):
+        for x in range(SIZE):
+            dx = (x - mid) / mid
+            dy = (y - mid) / mid
+            r = math.sqrt(dx * dx + dy * dy)
+            # 縁を崩す。丸いままだと判子を押したように見える
+            r *= 1.0 + (edge[x, y] - 128) / 128.0 * 0.42
+            if r >= 1.0:
+                continue
+            # 芯はべったり、そのまわりに染みた輪。二つ足して 1 で止める。
+            # 一続きの傾きで落とすと、濃さの無い埃の跡になる
+            a = (1.0 - smoothstep(0.46, 0.74, r)) + (1.0 - smoothstep(0.55, 1.0, r)) * 0.55
+            a = min(1.0, a) * (0.88 + (grain[x, y] / 255.0) * 0.12)
+            if a <= 0.02:
+                continue
+            # 地の色。芯は溜まった油、外は染みたコンクリート。
+            # 外へ行くほど褐色へ寄せる。灰色のまま薄めると濡れた石に見える。
+            #
+            # **値は sRGB で置く。** 絵は sRGB として読まれるので、床の地の色
+            # （線形 0.098 ＝ sRGB 88）と同じ物差しでは比べられない。芯の 40 は
+            # 線形の 0.021 にあたり、床のおよそ 5 分の 1 になる
+            k = smoothstep(0.05, 0.88, r)
+            base = [40 + 46 * k, 34 + 36 * k, 29 + 26 * k]
+            # 薄膜の虹。**位相はほとんど斑が持つ。** 半径から回すと同心の輪になり、
+            # 油ではなく的に見えた。膜は流れて溜まるので、色は島のように散る
+            phase = r * 2.0 + (film[x, y] - 128) / 128.0 * 6.2
+            glow = smoothstep(0.18, 0.40, r) * (1.0 - smoothstep(0.62, 0.95, r))
+            # 斑そのものでも間引く。膜の薄いところにしか虹は出ない
+            glow *= 0.62 * max(0.0, min(1.0, (thin[x, y] - 96) / 78.0))
+            for i in range(3):
+                hue = 0.5 + 0.5 * math.sin(phase + i * 2.094)
+                base[i] = base[i] * (1.0 - glow) + (62 + 88 * hue) * glow
+            cp[x, y] = tuple(max(0, min(255, int(v + 0.5))) for v in base)
+            mp[x, y] = max(0, min(255, int(a * 255 + 0.5)))
+    # 撥ねと垂れ。大きな染みのまわりの小さな粒が、床にこぼしたものだと言う
+    rng = random.Random(5519)
+    d = ImageDraw.Draw(col)
+    a = ImageDraw.Draw(mask)
+    for _ in range(22):
+        ang = rng.uniform(0, math.pi * 2)
+        far = rng.uniform(0.78, 1.16) * mid
+        px_ = mid + math.cos(ang) * far
+        py_ = mid + math.sin(ang) * far * 1.05
+        rr = rng.uniform(1.6, 5.2)
+        d.ellipse([px_ - rr, py_ - rr, px_ + rr, py_ + rr], fill=(46, 39, 33))
+        a.ellipse([px_ - rr, py_ - rr, px_ + rr, py_ + rr], fill=rng.randint(150, 225))
+    col = col.filter(ImageFilter.GaussianBlur(1.0))
+    mask = mask.filter(ImageFilter.GaussianBlur(0.8))
+    col.putalpha(mask)
+    return col
+
+
+def tyre():
+    """
+    車輪のゴム。踏み面も側面もこの 1 枚で賄う。
+
+    ガレージの灯りの下で見るので、真っ黒に塗ると車輪が四つの穴になる。
+    **値は sRGB で置く。** 平均の 44 は線形の 0.026 にあたり、実物のゴムの反射率
+    （0.03〜0.05）に収まる。はじめ 13 で焼いたときは線形 0.004 まで落ちて、
+    灯りの下でも車輪が四つの黒い穴だった。
+    `Texel` 3.0 で貼るので 1 枚が 0.33 m。山の一つが 8 cm ほどに来る
+    """
+    size = (SIZE, SIZE)
+    base = clouds(size, 7717, 4, 1.2)
+    im = tint(size, spread(base, 1.6), (34, 34, 36), (62, 62, 66))
+    w = Wrap(im)
+    rng = random.Random(3307)
+    # 山と溝。泥濘地用の粗い山なので、縦の溝を斜めに割る
+    for k in range(4):
+        x = k * 64
+        w.rect([x - 7, -10, x + 7, SIZE + 10], fill=(17, 17, 18))
+    for j in range(0, SIZE, 32):
+        off = 16 if (j // 32) % 2 else 0
+        w.line([(0, j), (SIZE, j + 10)], fill=(20, 20, 21), width=5)
+        for k in range(4):
+            x = k * 64 + off + 20
+            w.rect([x, j + 4, x + 24, j + 22], fill=(74, 74, 78))
+    im = tile_blur(im, 0.9)
+    # 使い込んだ肌。細かい傷と、縁石で削れた明るい擦れ
+    w = Wrap(im)
+    for _ in range(90):
+        x, y = rng.randrange(SIZE), rng.randrange(SIZE)
+        ln = rng.randint(4, 16)
+        ang = rng.uniform(0, math.pi)
+        w.line([(x, y), (x + ln * math.cos(ang), y + ln * math.sin(ang))],
+               fill=(92, 92, 96) if rng.random() < 0.3 else (14, 14, 15), width=1)
+    im = tile_blur(im, 0.5)
+    im = shade(im, blot(size, 8813, 10, 34, 40, 10.0, -1), 0.35)
+    return aim(im, (44, 44, 46))
+
+
+def paint():
+    """
+    隣の車の塗り。**色は持たず、汚れと褪せだけを持つ。**
+
+    共用のガレージに 5 台を並べるので、車ごとに絵を焼くと絵だけで 5 枚増える。
+    平均をほぼ白に揃えた 1 枚を全部で使い回し、色はマテリアルの `_BaseColor` で
+    掛ける（`Paint`）。URP の Lit は絵に地の色を掛けるので、これで色だけ差し替わる。
+
+    自分の車（`CarBody`）はこれを使わない。あちらは褪せた緑そのものを絵が持っていて、
+    斑も剥げもその色に合わせて描いてある
+    """
+    size = (SIZE, SIZE)
+    base = spread(clouds(size, 4441, 5, 2.4), 1.7)
+    im = tint(size, base, (196, 194, 192), (255, 255, 255))
+    w = Wrap(im)
+    rng = random.Random(6661)
+    # 板の継ぎ目。縦に薄く。塗り分けではなく影の線として入れる
+    for x in (40, 128, 210):
+        w.line([(x, -10), (x + 6, SIZE + 10)], fill=(150, 148, 147), width=2)
+    # 洗っていない車の埃。上から下へ流れた筋
+    for _ in range(50):
+        x = rng.randrange(SIZE)
+        y = rng.randrange(SIZE)
+        ln = rng.randint(20, 90)
+        w.line([(x, y), (x + rng.randint(-4, 4), y + ln)],
+               fill=(176, 172, 168), width=rng.randint(1, 3))
+    im = tile_blur(im, 1.3)
+    # 擦り傷と、塗りの剥げた点。剥げは下地が出るので暗い
+    w = Wrap(im)
+    for _ in range(26):
+        x, y = rng.randrange(SIZE), rng.randrange(SIZE)
+        ln = rng.randint(6, 30)
+        ang = rng.uniform(-0.5, 0.5)
+        w.line([(x, y), (x + ln * math.cos(ang), y + ln * math.sin(ang))],
+               fill=(255, 255, 255), width=1)
+    for _ in range(14):
+        x, y = rng.randrange(SIZE), rng.randrange(SIZE)
+        r = rng.uniform(1.5, 4.5)
+        w.ellipse([x - r, y - r, x + r, y + r], fill=(128, 122, 116))
+    im = tile_blur(im, 0.5)
+    im = shade(im, blot(size, 1123, 12, 40, 44, 12.0, -1), 0.28)
+    return aim(im, (236, 234, 232))
+
+
 def save_plain(im, name):
     """Drive を冠さない名前で保存する。雲の絵は帯をまたいで名前が決まっている"""
     path = os.path.join(OUT, name + '.png')
@@ -990,6 +1165,9 @@ def main():
     save(beam(), 'Beam')
     save(pool(), 'Pool')
     save(smear(), 'Smear')
+    save(oilstain(), 'OilStain')
+    save(tyre(), 'CarTyre')
+    save(paint(), 'CarPaint')
     save_plain(torn(), 'CloudTorn')
     save_plain(skyhigh(), 'SkyHigh')
 

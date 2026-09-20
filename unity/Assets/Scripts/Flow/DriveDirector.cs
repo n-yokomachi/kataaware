@@ -39,6 +39,8 @@ namespace HalfAware
         [Tooltip("車内の、帯を問わず置く対象。乗り込むまで伏せる。" +
             "ガレージから届いてしまうと once: true のせいで走行中は二度と出ない")]
         [SerializeField] GameObject cabin;
+        [Tooltip("ガレージの床を歩く足音。乗り込んだら止める")]
+        [SerializeField] Footsteps feet;
 
         [Header("腕")]
         [Tooltip("腕組みの腕。手動運転の帯だけ伏せる")]
@@ -202,6 +204,12 @@ namespace HalfAware
             if (aboard) return;
             aboard = true;
             if (garage != null) garage.SetActive(false);
+            // **足音は自分で止める。** Footsteps は CharacterController の velocity を見ていて、
+            // PlayerController は CanMove が false のあいだ Move を一度も呼ばない。
+            // 呼ばれない限り velocity は最後の値を持ち越すので、座ったまま歩き続けたことになり、
+            // 走行中ずっとコンクリートの足音が鳴る。伏せる先がガレージではなく
+            // プレイヤーの下にあるので、garage.SetActive(false) では消えない
+            if (feet != null) feet.enabled = false;
             if (seat != null)
             {
                 // seat は足元ではなく目の位置。PlayerController は毎フレーム

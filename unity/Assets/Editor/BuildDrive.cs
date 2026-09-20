@@ -457,12 +457,25 @@ namespace HalfAware.EditorTools
 
         // ---- ガレージ。メートル ---------------------------------------------
 
-        /// <summary>床の中心。車は原点にいるので、後ろへ寄せて歩く間を取る</summary>
-        public static readonly Vector3 GarageAt = new Vector3(0f, 0f, -2f);
+        /// <summary>
+        /// 床の中心。車は原点にいるので、後ろへ寄せて歩く間を取る。
+        ///
+        /// **区画を 2 列にしたときに後ろへ 2.5 動かした。** 前の壁（シャッター）の z は
+        /// GarageAt.z + GarageDeep/2 + 厚みの半分で決まる。奥行きを 16 から 21 へ伸ばしても
+        /// 中心を -2 のままにすると、シャッターが z 8.6 まで前へ出て、車の鼻先からの間合いが
+        /// 倍に開く。中心を下げれば前の壁は 6.125 に据わったままで、伸びたぶんが
+        /// そっくり後ろの列と通路になる
+        /// </summary>
+        public static readonly Vector3 GarageAt = new Vector3(0f, 0f, -4.5f);
         /// <summary>床の広さ。x 方向</summary>
         public const float GarageWide = 14f;
-        /// <summary>床の広さ。z 方向。柱の割り付けでいう長辺はこちら</summary>
-        public const float GarageDeep = 16f;
+        /// <summary>
+        /// 床の広さ。z 方向。柱の割り付けでいう長辺はこちら。
+        ///
+        /// **16 では 2 列が入らない。** 区画の奥行きが 5.2 で、車が区画へ切り返せる通路に
+        /// 5.9 は要る。5.2 × 2 + 5.9 に、シャッターの前の 3.3 と後ろの壁際の 1.4 を足して 21
+        /// </summary>
+        public const float GarageDeep = 21f;
         /// <summary>天井の高さ</summary>
         public const float GarageHigh = 2.9f;
         /// <summary>壁・床・天井の厚み</summary>
@@ -508,8 +521,20 @@ namespace HalfAware.EditorTools
         public const float BayWide = 2.9f;
         /// <summary>区画の奥行き</summary>
         public const float BayDeep = 5.2f;
-        /// <summary>区画の真ん中の z。車（原点）の入っている区画に合わせる</summary>
+        /// <summary>前の列の真ん中の z。車（原点）の入っている区画に合わせる</summary>
         public const float BayZ = 0.1f;
+        /// <summary>
+        /// 後ろの列の真ん中の z。
+        ///
+        /// 二つの列は通路を挟んで向かい合う。どちらの列も通路から入るので、
+        /// 前の列は +z へ、後ろの列は -z へ鼻を向けて停める。突き当たりの止め線は
+        /// それぞれの奥（前の列は +z 側、後ろの列は -z 側）に引き、番号は
+        /// どちらも通路に面した口に描く。通路を歩く人の足元に番号が来る
+        /// </summary>
+        public const float BackBayZ = -11f;
+        /// <summary>通路。前の列の口から後ろの列の口まで</summary>
+        public static float AisleFrom { get { return BackBayZ + BayDeep * 0.5f; } }
+        public static float AisleTo { get { return BayZ - BayDeep * 0.5f; } }
         /// <summary>塗りの線の幅</summary>
         public const float BayLine = 0.10f;
         /// <summary>覆いを掛けた隣の車を置く区画。車の左隣。歩く線には掛からない</summary>
@@ -523,12 +548,21 @@ namespace HalfAware.EditorTools
         /// 立っている目線 1.60 より高いところにあるので、頭ごと車内へ入り込めてしまう。
         /// 下端をガレージの床の面に合わせるのは、隙間に足先を差し込ませないため。
         ///
-        /// 前端はボンネットの先（2.48）まで伸ばす。屋根の前端で切ると、ボンネットの上を歩ける
+        /// 前端はボンネットの先（2.48）まで伸ばす。屋根の前端で切ると、ボンネットの上を歩ける。
+        ///
+        /// **外装を作ってから車ぜんたいを包む形へ広げた。** それまでは運転席の周りしか
+        /// 無かったので、客室のぶんだけ塞げば足りていた。車輪も後ろの荷室も尻の予備輪も
+        /// 無かったからで、今それらを付けた以上、同じ箱では後ろ半分をすり抜けられる。
+        ///
+        /// x は車体の外板（0.97）でも泥除け（1.00）でもなく、いちばん外へ出る鏡（1.055）に
+        /// 合わせる。歩いていて頭が鏡を通り抜けるのは、車体をすり抜けるのと同じ見え方になる。
+        /// <see cref="InteractionPicker"/> は光線を引かないので、ドアの判定点（x 0.92）が
+        /// 箱の中に入っても拾えなくなりはしない
         /// </summary>
-        public const float BlockHalfX = 0.92f;
-        public const float BlockTop = 1.94f;
-        public const float BlockBack = -0.70f;
-        public const float BlockFront = 2.50f;
+        public const float BlockHalfX = 1.06f;
+        public const float BlockTop = 1.97f;
+        public const float BlockBack = -2.50f;
+        public const float BlockFront = 2.66f;
 
         /// <summary>立ち位置。運転席のドア側から近づく。ここから車まで約 8 m</summary>
         public static readonly Vector3 StandAt = new Vector3(4.2f, 0f, -7f);
@@ -583,6 +617,55 @@ namespace HalfAware.EditorTools
         public const float CardOut = 0.90f;
         /// <summary>天井の板の下端</summary>
         public const float RoofLow = 1.88f;
+
+        // ---- 車の外装。メートル ----------------------------------------------
+        //
+        // **場面 8 を組み始めてから今まで、外装は一枚も無かった。** 運転席からしか
+        // 車を見ない前提で、屋根の板・内張り 2 枚・ボンネット・ガラス・計器盤だけを
+        // 内側から組んである。ガレージに立って眺めると、宙に浮いた板が数枚あるだけで、
+        // 側面も車輪も尻も灯りも無い。
+        //
+        // ここの数はすべて、既にある車内の寸法から割り出す。勝手に置くと車内と噛み合わない。
+        //   - 外板の外面（0.97）は内張りの外面（<see cref="CardOut"/> 0.90）の外
+        //   - 外板の内面（0.93）はドアの判定点（x 0.92）の外。中へ入ると
+        //     見直し 4（ピンが形に埋まっていないか）が鳴る
+        //   - 窓の下枠（1.32）は内張りの上端（<see cref="WaistY"/> 1.30）に合わせる
+        //   - 屋根（1.94）と鼻先（2.48）は天井の板とボンネットの前パネルがもう決めている
+        //
+        // 原作の「ボロのオフロード車」は角の立った実用車で、丸みも飾りも持たない。
+        // 露わな蝶番と止めねじ、尻に背負った予備輪、平らな板だけで組む
+
+        /// <summary>外板の外面。x の絶対値。全幅 1.94 m</summary>
+        public const float BodyHalf = 0.97f;
+        /// <summary>外板の内面。x の絶対値。ドアの判定点（0.92）より外に置く</summary>
+        public const float SkinIn = 0.93f;
+        /// <summary>車体の下端。ここから下は足回りと影</summary>
+        public const float SillY = 0.62f;
+        /// <summary>窓の下枠。外から見た腰の線</summary>
+        public const float BeltY = 1.32f;
+        /// <summary>側面のガラスの下端と上端</summary>
+        public const float PaneLow = 1.38f;
+        public const float PaneHigh = 1.80f;
+        /// <summary>屋根の外板の上端。天井の板（1.94）の上へ 3 cm 載せる</summary>
+        public const float ShellTop = 1.97f;
+        /// <summary>尻。荷室の後端</summary>
+        public const float TailZ = -2.25f;
+        /// <summary>鼻先。前パネルの前面（既にある）</summary>
+        public const float NoseZ = 2.48f;
+        /// <summary>客室の後端。屋根の板と塞ぐ箱がここで切れていた</summary>
+        public const float CabBack = -0.70f;
+        /// <summary>車軸の z。軸間 2.82 m。110 型の車台にあたる</summary>
+        public const float AxleFrontZ = 1.62f;
+        public const float AxleRearZ = -1.20f;
+        /// <summary>車輪の外径の半分と幅。床の面に接する</summary>
+        public const float TyreR = 0.37f;
+        public const float TyreWide = 0.24f;
+        /// <summary>車輪の中心の x。輪距 1.69 m</summary>
+        public const float HubX = 0.845f;
+        /// <summary>泥除けの抜きの半径。車輪より 0.11 大きい</summary>
+        public const float ArchR = 0.48f;
+        /// <summary>車輪の中心の高さ。ガレージの床の面に接地させる</summary>
+        public static float HubY { get { return GarageFloorY + TyreR; } }
 
         /// <summary>
         /// 運転席から道が見え始める下の縁の高さ。z を渡すと、その位置での境目を返す。
@@ -803,8 +886,18 @@ namespace HalfAware.EditorTools
         // ---- 車内 ----------------------------------------------------------
 
         /// <summary>
-        /// 運転席から見える範囲だけ組む。原点は車の中心で、視点は seat の (0.38, 1.55, 0)。
-        /// 外形はボンネットだけ作る。運転席から見えるのはそこまでで、側面も車輪も画面に入らない。
+        /// 車。原点は車の中心で、視点は seat の (0.38, 1.55, 0)。
+        ///
+        /// **もとは運転席から見える範囲だけを内側から組んでいた。** ボンネットのほかに外形は
+        /// 無く、側面も車輪も尻も灯りも作っていない。走っているあいだはそれで足りるが、
+        /// 場面はガレージから始まり、プレイヤーは 8 m 歩くあいだずっと車を外から見ている。
+        /// そこに立っていたのは宙に浮いた板が数枚で、車には見えなかった。
+        /// 外装は <see cref="Shell"/> が足す。
+        ///
+        /// **外装を足しても車内は一切動かさない。** 走行中の画面はすべて車内で、
+        /// 目・計器盤・ハンドル・ガラス・ボンネットの寸法はどれも実画面で詰めた値になっている。
+        /// 外装は内張りの外面（<see cref="CardOut"/>）より外だけを使い、
+        /// 道の見える縁（<see cref="SightY"/>）へは一指も触れない。見直し 14 が毎回測る。
         ///
         /// 車は原作どおり「ボロのオフロード車」で、乗用車ではない。目線 1.55・立てたガラス・
         /// 計器盤の向こうに見えるボンネットの三つがその印で、どれか一つでも乗用車の値へ戻すと
@@ -852,6 +945,13 @@ namespace HalfAware.EditorTools
                 steel.Box(new Vector3(-0.83f, 1.846f, 0.30f + (i == 0 ? -0.13f : 0.13f)),
                     new Vector3(0.05f, 0.07f, 0.045f));
             Bonnet(body, gap);
+            // ゴムと灯りは外装にしか出てこないので、ここで初めて入れ物を作る。
+            // 緩衝器も牽引環も排気の先も steel に混ぜる。塗った鉄板の緩衝器は
+            // このころの実用車そのもので、入れ物を分けるとレンダラーが 1 つ増えるだけ
+            var rubber = new Bank { Texel = 3.0f };
+            var lens = new Bank { Texel = 1.0f };
+            var tail = new Bank { Texel = 1.0f };
+            Shell(body, steel, gap, glass, rubber, lens, tail);
 
             trim.Emit(parent, "CarTrim", Mat("CarTrim"), false, Generated);
             seat.Emit(parent, "CarSeat", Mat("CarSeat"), false, Generated);
@@ -859,6 +959,9 @@ namespace HalfAware.EditorTools
             body.Emit(parent, "CarBody", Mat("CarBody"), false, Generated);
             steel.Emit(parent, "CarSteel", Mat("CarSteel"), false, Generated);
             gap.Emit(parent, "CarGap", Mat("CarGap"), false, Generated);
+            rubber.Emit(parent, "CarTyre", Mat("CarTyre"), false, Generated);
+            lens.Emit(parent, "CarLamp", Mat("CarLamp"), false, Generated);
+            tail.Emit(parent, "CarTail", Mat("CarTail"), false, Generated);
             dials.Emit(parent, "CarDials", DialMat(), false, Generated);
 
             // 計器の裏の明かり。**この場面で車内に足す灯りはこれ一つだけ。**
@@ -1154,14 +1257,392 @@ namespace HalfAware.EditorTools
                 var side = s == 0 ? -1f : 1f;
                 gap.Box(new Vector3(side * 0.46f, 1.2225f, 1.700f), new Vector3(0.028f, 0.006f, 1.40f));
             }
-            // フェンダー。天板の左右に一段高く載せる
+            // フェンダー。天板の左右に一段高く載せる。
+            // **外の縁を車体の外板（0.97）まで広げてある。** 0.91 で切っていた頃は
+            // 車内から見るぶんには足りたが、外装を付けたら天板と側面のあいだに
+            // 幅 2 cm の隙が一本、鼻先まで通って開いた。内の縁（0.65）は動かさない。
+            // 運転席から見えるのはそちらで、見える量が変わってしまう
             for (var s = 0; s < 2; s++)
             {
                 var side = s == 0 ? -1f : 1f;
-                body.Box(new Vector3(side * 0.78f, 1.235f, 1.710f), new Vector3(0.26f, 0.09f, 1.42f));
+                body.Box(new Vector3(side * 0.81f, 1.235f, 1.710f), new Vector3(0.32f, 0.09f, 1.42f));
             }
-            // 前端。運転席からは見えないが、ガレージで外から見たときに前が抜けていると板が浮く
-            body.Box(new Vector3(0f, 1.085f, 2.450f), new Vector3(1.82f, 0.27f, 0.06f));
+            // 前端。運転席からは見えないが、ガレージで外から見たときに前が抜けていると板が浮く。
+            // 幅もフェンダーと揃えて外板まで広げる
+            body.Box(new Vector3(0f, 1.085f, 2.450f), new Vector3(BodyHalf * 2f, 0.27f, 0.06f));
+        }
+
+        // ---- 車の外装 --------------------------------------------------------
+
+        /// <summary>
+        /// 車の外装ぜんたい。側面・荷室・屋根・足回り・前後の顔。
+        ///
+        /// **車内へは一指も触れない。** 使うのは内張りの外面（<see cref="CardOut"/> 0.90）より
+        /// 外と、天井の板（1.94）より上と、客室の後ろ（<see cref="CabBack"/>）より後ろだけ。
+        /// 唯一の例外が風防の下の水切り板とワイパーで、そこは道の見える縁
+        /// （<see cref="SightY"/>(0.94) = 1.442）より 0.17 下に収めてある。
+        ///
+        /// 側面のガラスだけは**片面**で張る。両面の板を入れると、走行中の車内の見え方が
+        /// 変わる。この場面は走っている時間がほとんどで、脇の窓から見える沿道は
+        /// 5 つの帯ぶん詰めた画のうちに入っている。外から見たときだけガラスが要るので、
+        /// 外を向いた面 1 枚で足りる（床に貼る帯と同じ理屈で「裏は誰も見ない」）。
+        /// 併せて、見直し 4 の巻き数の判定は開いた面を「中」と数えないので、
+        /// 窓の判定点（x 0.80）がガラスに埋まったことにもならない
+        /// </summary>
+        static void Shell(Bank body, Bank steel, Bank gap, Bank glass, Bank tyre, Bank lens, Bank tail)
+        {
+            Flanks(body, steel, gap, glass);
+            Boot(body, steel, gap, glass, tyre, tail, lens);
+            Face(body, steel, gap, lens);
+            Running(body, steel, gap, tyre);
+        }
+
+        /// <summary>
+        /// 側面。外板・窓の枠・柱の外側・雨樋・ドアの継ぎ目と蝶番と取っ手。
+        ///
+        /// **雨樋が要。** 屋根と側面のあいだに樋を一本回すだけで、
+        /// 塗った板を貼り合わせた車に見える。この年式の四輪駆動車の顔付きそのもの
+        /// </summary>
+        static void Flanks(Bank body, Bank steel, Bank gap, Bank glass)
+        {
+            var mid = (SkinIn + BodyHalf) * 0.5f;
+            var skin = BodyHalf - SkinIn;
+            // 泥除けの抜き。前は車軸の前後 ArchR、後ろも同じ
+            var frontIn = AxleFrontZ - ArchR;
+            var frontOut = AxleFrontZ + ArchR;
+            var rearIn = AxleRearZ + ArchR;
+            var rearOut = AxleRearZ - ArchR;
+            // 抜きの頂き。ここから上が板で埋まる
+            var crown = HubY + ArchR;
+
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                var x = side * mid;
+
+                // 前の翼板。抜きの前後は腰まで、抜きの上は頂きから腰まで
+                Slab(body, x, skin, 0.94f, frontIn, SillY, 1.28f);
+                Slab(body, x, skin, frontOut, 2.42f, SillY, 1.28f);
+                Slab(body, x, skin, frontIn, frontOut, crown, 1.28f);
+                // ドア。腰の線まで。継ぎ目で前後を切る
+                Slab(body, x, skin, CabBack, 0.94f, SillY, BeltY);
+                // 後ろの荷室の側面。抜きを避けて三つに割る
+                Slab(body, x, skin, rearIn, CabBack, SillY, BeltY);
+                Slab(body, x, skin, TailZ, rearOut, SillY, BeltY);
+                Slab(body, x, skin, rearOut, rearIn, crown, BeltY);
+
+                // 窓の枠。下枠・上枠・柱で、間を抜いてガラスを張る
+                Slab(body, x, skin, TailZ, 0.94f, BeltY, PaneLow);
+                Slab(body, x, skin, TailZ, 0.94f, PaneHigh, 1.94f);
+                // 中柱（客室の後ろ）と後ろの隅の柱
+                Slab(body, x, skin, CabBack, CabBack + 0.12f, PaneLow, PaneHigh);
+                Slab(body, x, skin, TailZ, TailZ + 0.17f, PaneLow, PaneHigh);
+
+                // 前の柱と中柱の外側。車内の柱（x 0.8225〜0.9075）の続き
+                body.Box(new Vector3(x, 1.585f, 0.905f), new Vector3(skin, 0.640f, 0.085f),
+                    Quaternion.Euler(-10f, 0f, 0f));
+                body.Box(new Vector3(x, 1.590f, -0.615f), new Vector3(skin, 0.620f, 0.140f));
+
+                // 屋根の縁。天井の板（|x| 0.86 まで）と窓の上枠（0.93 から）の隙を埋める。
+                // 外の縁を 0.97 まで伸ばすと上枠と面がそろって、遠くでちらつく
+                body.Box(new Vector3(side * 0.895f, 1.910f, 0.10f), new Vector3(0.070f, 0.060f, 1.60f));
+                // 雨樋。屋根と側面の境を一本で通す
+                steel.Box(new Vector3(side * (BodyHalf + 0.012f), 1.885f, -0.655f),
+                    new Vector3(0.040f, 0.048f, 3.19f));
+
+                // ドアの継ぎ目。前後の縁を暗く落とす
+                foreach (var seam in new[] { CabBack, 0.94f })
+                    gap.Box(new Vector3(x, (SillY + BeltY) * 0.5f, seam),
+                        new Vector3(skin + 0.004f, BeltY - SillY, 0.018f));
+                // 露わな蝶番。二枚。この車は継ぎ目を隠さない
+                foreach (var y in new[] { 0.80f, 1.20f })
+                    steel.Box(new Vector3(side * (BodyHalf + 0.010f), y, 0.900f),
+                        new Vector3(0.030f, 0.085f, 0.110f));
+                // 取っ手。押しボタン式の座と、引く爪
+                steel.Box(new Vector3(side * (BodyHalf + 0.012f), 1.170f, 0.420f),
+                    new Vector3(0.028f, 0.070f, 0.200f));
+                steel.Box(new Vector3(side * (BodyHalf + 0.026f), 1.170f, 0.480f),
+                    new Vector3(0.022f, 0.040f, 0.060f));
+                // 鍵穴
+                steel.Box(new Vector3(side * (BodyHalf + 0.008f), 1.090f, 0.420f),
+                    new Vector3(0.018f, 0.032f, 0.032f));
+                // 止めねじ。腰の線に沿って。露わなままなのがこの車の作り
+                for (var k = 0; k < 6; k++)
+                    steel.Box(new Vector3(side * (BodyHalf + 0.006f), BeltY - 0.030f, -2.05f + k * 0.52f),
+                        new Vector3(0.014f, 0.020f, 0.020f));
+
+                // 側面のガラス。外を向いた面 1 枚ずつ。ドアと荷室で 2 枚
+                var pane = side * (BodyHalf - 0.012f);
+                glass.FaceX(pane, -0.60f, 0.86f, PaneLow, PaneHigh, s == 0 ? -1 : 1);
+                glass.FaceX(pane, TailZ + 0.17f, CabBack, PaneLow, PaneHigh, s == 0 ? -1 : 1);
+
+                // 鏡。腕木と鏡面。**外へ出す量は塞ぐ箱（1.06）の内に収める。**
+                // 歩いていて頭が鏡を通り抜けると、車体をすり抜けたのと同じに見える
+                steel.Box(new Vector3(side * 1.005f, 1.470f, 0.880f), new Vector3(0.090f, 0.030f, 0.030f));
+                body.Box(new Vector3(side * 1.040f, 1.490f, 0.860f), new Vector3(0.036f, 0.150f, 0.115f));
+                glass.FaceZ(0.800f, side * 1.040f - 0.030f, side * 1.040f + 0.030f, 1.430f, 1.548f, -1);
+            }
+
+            // 屋根の外板。天井の板（1.94）の上へ薄く載せる。荷室の上まで一枚で通す。
+            // **車内の天井の板には重ねない。** 1.88 まで下ろすと、板の下面（1.88）と
+            // 外板の下面が同じ高さで向かい合い、車内の天井が走行中ずっとちらつく
+            body.Box(new Vector3(0f, (1.94f + ShellTop) * 0.5f, (TailZ + 0.94f) * 0.5f),
+                new Vector3(BodyHalf * 2f, ShellTop - 1.94f, 0.94f - TailZ));
+            // 荷室の天井。客室の後ろは天井の板が無いので、ここだけ内から蓋をする。
+            // 幅を窓の上枠の内面（0.93）へ 5 mm 差し込んで、面が並ばないようにする
+            body.Box(new Vector3(0f, 1.910f, (TailZ + CabBack) * 0.5f),
+                new Vector3(1.870f, 0.060f, CabBack - TailZ));
+            // 屋根の骨。三本。板一枚のままだと、上から見たときに平らな蓋になる
+            foreach (var z in new[] { -1.70f, -0.90f, -0.10f })
+                steel.Box(new Vector3(0f, ShellTop + 0.010f, z), new Vector3(BodyHalf * 2f - 0.10f, 0.022f, 0.050f));
+
+            // 風防の下の水切り板。ボンネットの後ろ端（0.97）と風防の下端をつなぐ。
+            // 天板 1.30 は道の見える縁 1.442 の下。ここを上げると走行中の道が削れる
+            body.Box(new Vector3(0f, 1.265f, 0.955f), new Vector3(1.80f, 0.070f, 0.070f));
+            // ワイパー。二本を左下がりに寝かせる。水切り板の上に乗るだけの高さに留める
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                steel.Box(new Vector3(side * 0.34f, 1.302f, 0.940f), new Vector3(0.560f, 0.016f, 0.016f),
+                    Quaternion.Euler(0f, 0f, side * 7f));
+                steel.Box(new Vector3(side * 0.62f, 1.300f, 0.950f), new Vector3(0.055f, 0.030f, 0.050f));
+            }
+            // ボンネットの蝶番。後ろ端に二つ。開く向きが読める
+            for (var s = 0; s < 2; s++)
+                steel.Box(new Vector3((s == 0 ? -1f : 1f) * 0.52f, 1.235f, 0.995f),
+                    new Vector3(0.110f, 0.040f, 0.075f));
+        }
+
+        /// <summary>x が一定の板 1 枚。厚みを持たせた箱として置く</summary>
+        static void Slab(Bank bank, float x, float thick, float z0, float z1, float y0, float y1)
+        {
+            if (z1 <= z0 || y1 <= y0) return;
+            bank.Box(new Vector3(x, (y0 + y1) * 0.5f, (z0 + z1) * 0.5f),
+                new Vector3(thick, y1 - y0, z1 - z0));
+        }
+
+        /// <summary>
+        /// 尻。後ろの扉・後ろのガラス・背負った予備輪・尾灯・番号板・緩衝器。
+        ///
+        /// **予備輪が決め手。** 尻に輪を一つ背負わせるだけで、乗用車の後ろ姿から離れる。
+        /// 実際そこに積む物なので、飾りではなく道具として付いている
+        /// </summary>
+        static void Boot(Bank body, Bank steel, Bank gap, Bank glass, Bank tyre, Bank tail, Bank lens)
+        {
+            var back = TailZ + 0.03f;
+            // 後ろの扉。腰の線まで一枚。横開きなので蝶番は片側だけ
+            body.Box(new Vector3(0f, (SillY + BeltY) * 0.5f, back), new Vector3(BodyHalf * 2f, BeltY - SillY, 0.06f));
+            // ガラスの枠。上枠と左右の柱
+            body.Box(new Vector3(0f, (PaneHigh + 1.94f) * 0.5f, back), new Vector3(BodyHalf * 2f, 1.94f - PaneHigh, 0.06f));
+            for (var s = 0; s < 2; s++)
+                body.Box(new Vector3((s == 0 ? -1f : 1f) * 0.915f, (PaneLow + PaneHigh) * 0.5f, back),
+                    new Vector3(0.110f, PaneHigh - PaneLow, 0.06f));
+            // 後ろのガラス。外を向いた面 1 枚
+            glass.FaceZ(TailZ - 0.005f, -0.86f, 0.86f, PaneLow, PaneHigh, -1);
+            // 扉の継ぎ目と蝶番と掛け金
+            gap.Box(new Vector3(0f, BeltY - 0.004f, TailZ - 0.004f), new Vector3(BodyHalf * 2f - 0.06f, 0.016f, 0.055f));
+            for (var i = 0; i < 2; i++)
+                steel.Box(new Vector3(-0.915f, 0.78f + i * 0.40f, TailZ - 0.030f), new Vector3(0.090f, 0.075f, 0.030f));
+            steel.Box(new Vector3(0.860f, 0.98f, TailZ - 0.034f), new Vector3(0.070f, 0.170f, 0.030f));
+
+            // 背負った予備輪。運転席の側へ寄せる。真ん中に据えると番号板が隠れる。
+            // 緩衝器（y 0.63〜0.77）より上へ持ち上げて取り合わないようにする
+            var spare = new Vector3(0.26f, 1.06f, TailZ - 0.175f);
+            Hoop(tyre, spare, Vector3.forward, TyreR - 0.055f, TyreWide, 0.110f, 14, 0f, 360f);
+            Wheel4(null, steel, gap, spare, Vector3.back, true);
+            // 受けの腕。扉から生やす
+            steel.Box(new Vector3(spare.x, spare.y, TailZ - 0.075f), new Vector3(0.080f, 0.080f, 0.150f));
+            steel.Box(new Vector3(spare.x, spare.y - 0.24f, TailZ - 0.040f), new Vector3(0.060f, 0.300f, 0.055f));
+
+            // 尾灯。丸を二つ。赤いのは外装で唯一の彩り
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                steel.Box(new Vector3(side * 0.78f, 0.95f, TailZ - 0.020f), new Vector3(0.190f, 0.190f, 0.045f));
+                Disc(tail, new Vector3(side * 0.78f, 0.95f, TailZ - 0.046f), Vector3.back, 0.072f, 10);
+            }
+            // 番号板。字は持たせない。淡い板が一枚あるだけで後ろ姿が締まる
+            lens.Box(new Vector3(-0.30f, 0.76f, TailZ - 0.028f), new Vector3(0.430f, 0.125f, 0.020f));
+
+            // 緩衝器。塗った鉄の角材。牽引環と排気の先を添える
+            steel.Box(new Vector3(0f, 0.700f, TailZ - 0.115f), new Vector3(BodyHalf * 2f + 0.02f, 0.135f, 0.155f));
+            steel.Box(new Vector3(0f, 0.610f, TailZ - 0.160f), new Vector3(0.110f, 0.100f, 0.090f));
+            steel.Box(new Vector3(-0.66f, 0.540f, TailZ - 0.060f), new Vector3(0.065f, 0.065f, 0.200f));
+        }
+
+        /// <summary>
+        /// 顔。格子・前照灯・小灯・下の覆い・緩衝器。
+        ///
+        /// 前照灯は丸。この年式の実用車の顔はここで決まるので、四角い板では代わりにならない
+        /// </summary>
+        static void Face(Bank body, Bank steel, Bank gap, Bank lens)
+        {
+            // 格子。暗い奥を前へ出して、横桟を渡す
+            gap.Box(new Vector3(0f, 1.085f, 2.495f), new Vector3(1.08f, 0.210f, 0.035f));
+            for (var k = 0; k < 4; k++)
+                steel.Box(new Vector3(0f, 1.000f + k * 0.057f, 2.512f), new Vector3(1.06f, 0.022f, 0.018f));
+            for (var s = 0; s < 2; s++)
+                steel.Box(new Vector3((s == 0 ? -1f : 1f) * 0.525f, 1.085f, 2.505f),
+                    new Vector3(0.030f, 0.215f, 0.030f));
+
+            // 前照灯。輪を金物で囲って、奥に淡い面を置く
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                var at = new Vector3(side * 0.715f, 1.085f, NoseZ);
+                Hoop(steel, at + new Vector3(0f, 0f, 0.020f), Vector3.forward, 0.108f, 0.036f, 0.030f, 10, 0f, 360f);
+                Disc(lens, at + new Vector3(0f, 0f, 0.018f), Vector3.forward, 0.098f, 10);
+                // 灯りの座。輪の裏の暗がり
+                gap.Box(at + new Vector3(0f, 0f, -0.010f), new Vector3(0.210f, 0.210f, 0.030f));
+            }
+            // 小灯。翼板の前の角。丸ではなく角にして、前照灯と役を分ける
+            for (var s = 0; s < 2; s++)
+                lens.Box(new Vector3((s == 0 ? -1f : 1f) * 0.885f, 1.095f, NoseZ + 0.016f),
+                    new Vector3(0.090f, 0.075f, 0.030f));
+
+            // 下の覆い。前パネル（0.95）から下を塞ぐ。無いと鼻の下が抜けて板に見える
+            body.Box(new Vector3(0f, 0.840f, 2.450f), new Vector3(1.74f, 0.230f, 0.055f));
+            // 緩衝器。後ろと同じ角材。牽引環を二つ
+            steel.Box(new Vector3(0f, 0.700f, NoseZ + 0.085f), new Vector3(BodyHalf * 2f + 0.02f, 0.140f, 0.160f));
+            for (var s = 0; s < 2; s++)
+                steel.Box(new Vector3((s == 0 ? -1f : 1f) * 0.42f, 0.700f, NoseZ + 0.180f),
+                    new Vector3(0.075f, 0.105f, 0.045f));
+            // ボンネットの留め金。二つとも外から掛ける。開けるたびに手で外す作り
+            for (var s = 0; s < 2; s++)
+                steel.Box(new Vector3((s == 0 ? -1f : 1f) * 0.50f, 1.215f, 2.455f),
+                    new Vector3(0.090f, 0.060f, 0.060f));
+        }
+
+        /// <summary>
+        /// 足回り。車輪 4 本・泥除けの庇・車軸・車台・敷居。
+        ///
+        /// **車台の暗がりが要る。** 敷居（0.62）から床までが抜けていると、
+        /// 脇から見たときに車の下を向こうの区画まで見通せて、車体が浮いて見える
+        /// </summary>
+        static void Running(Bank body, Bank steel, Bank gap, Bank tyre)
+        {
+            foreach (var z in new[] { AxleFrontZ, AxleRearZ })
+            {
+                for (var s = 0; s < 2; s++)
+                {
+                    var side = s == 0 ? -1f : 1f;
+                    var at = new Vector3(side * HubX, HubY, z);
+                    Hoop(tyre, at, Vector3.right, TyreR - 0.055f, TyreWide, 0.110f, 16, 0f, 360f);
+                    Wheel4(tyre, steel, gap, at, Vector3.right * side, false);
+                    // 泥除けの庇。抜きの上半分に沿わせて、外板より 3 cm 外へ出す。
+                    // 貼り付けの庇はこの手の車に必ず付いていて、輪郭を太く見せる。
+                    // 角は真上を 0 として前後へ振るので、上半分は -82〜82 度
+                    Hoop(body, new Vector3(side * (BodyHalf + 0.002f), HubY, z), Vector3.right,
+                        ArchR + 0.030f, 0.060f, 0.055f, 7, -82f, 164f);
+                    // 抜きの内側。庇の下の暗がり。無いと車輪が板に貼り付いて見える
+                    Hoop(gap, new Vector3(side * (BodyHalf - 0.075f), HubY, z), Vector3.right,
+                        ArchR - 0.015f, 0.150f, 0.045f, 7, -82f, 164f);
+                }
+                // 車軸。剛性軸なので左右が一本で繋がっている。脇から必ず見える
+                steel.Box(new Vector3(0f, HubY, z), new Vector3(HubX * 2f - 0.10f, 0.105f, 0.120f));
+                gap.Box(new Vector3(0f, HubY, z), new Vector3(0.34f, 0.230f, 0.230f));
+            }
+            // 車台。敷居より下の暗がり。前後の車軸のあいだを埋める
+            gap.Box(new Vector3(0f, 0.500f, 0.10f), new Vector3(1.34f, 0.245f, 4.40f));
+            // 敷居。踏み板の受けと、乗り降りの段
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                body.Box(new Vector3(side * 0.945f, 0.590f, -0.28f), new Vector3(0.075f, 0.075f, 3.10f));
+                steel.Box(new Vector3(side * 1.000f, 0.470f, 0.170f), new Vector3(0.130f, 0.045f, 0.740f));
+                for (var i = 0; i < 2; i++)
+                    steel.Box(new Vector3(side * 0.975f, 0.530f, 0.170f + (i == 0 ? -0.30f : 0.30f)),
+                        new Vector3(0.040f, 0.130f, 0.040f));
+            }
+        }
+
+        /// <summary>
+        /// 車輪の面。外側の皿・中心の窪み・止めねじ・内側の蓋。
+        /// axis が向く側が外。tyre が null なら予備輪で、内側の蓋は要らない
+        /// </summary>
+        static void Wheel4(Bank tyre, Bank steel, Bank gap, Vector3 at, Vector3 axis, bool spare)
+        {
+            var n = axis.normalized;
+            var face = at + n * (spare ? 0.030f : TyreWide * 0.5f - 0.035f);
+            Disc(steel, face, n, 0.235f, 10);
+            Disc(gap, face + n * 0.004f, n, 0.082f, 8);
+            Disc(steel, face + n * 0.008f, n, 0.046f, 8);
+            // 止めねじ。五本。輪が回る物だと読めるのはこれがあるから
+            var u = Mathf.Abs(n.x) > 0.5f ? Vector3.up : Vector3.right;
+            var v = Vector3.Cross(n, u);
+            for (var i = 0; i < 5; i++)
+            {
+                var a = (i / 5f) * Mathf.PI * 2f;
+                steel.Box(face + n * 0.006f + (u * Mathf.Cos(a) + v * Mathf.Sin(a)) * 0.135f,
+                    new Vector3(0.036f, 0.036f, 0.036f));
+            }
+            if (spare || tyre == null) return;
+            // 内側。抜けたままだと反対側から車の中が見通せる
+            Disc(gap, at - n * (TyreWide * 0.5f - 0.020f), -n, 0.255f, 10);
+        }
+
+        /// <summary>
+        /// 円板 1 枚。axis の向く側から見て表になる。
+        ///
+        /// <see cref="Bank"/> に丸い面は <see cref="Bank.FanY"/>（水平だけ）しか無いので、
+        /// <see cref="Bank.Patch"/> を 2 枚ずつ使って扇に張る。Patch は a→b→c と a→c→d の
+        /// 二つを出すので、(中心, 縁 i, 縁 i+1, 縁 i+2) と渡せば degenerate な三角を作らずに
+        /// 扇が組める。seg は偶数でなければならない。
+        ///
+        /// uv は面の中の実寸に Texel を掛けて振る。ほかの面と同じ物差しなので、
+        /// ゴムでも鉄でも絵の目の粗さが揃う
+        /// </summary>
+        static void Disc(Bank bank, Vector3 centre, Vector3 axis, float radius, int seg)
+        {
+            if (seg < 4) return;
+            if (seg % 2 != 0) seg++;
+            var n = axis.normalized;
+            var u = Mathf.Abs(n.y) > 0.9f ? Vector3.right : Vector3.up;
+            u = (u - n * Vector3.Dot(u, n)).normalized;
+            // u × v が axis になる組にする。FanY と同じ向きの決め方
+            var v = Vector3.Cross(n, u);
+            var rim = new Vector3[seg];
+            var uv = new Vector2[seg];
+            for (var i = 0; i < seg; i++)
+            {
+                var a = (float)i / seg * Mathf.PI * 2f;
+                var c = Mathf.Cos(a) * radius;
+                var d = Mathf.Sin(a) * radius;
+                rim[i] = centre + u * c + v * d;
+                uv[i] = new Vector2(c * bank.Texel, d * bank.Texel);
+            }
+            var mid = Vector2.zero;
+            for (var i = 0; i < seg; i += 2)
+                bank.Patch(centre, rim[i], rim[(i + 1) % seg], rim[(i + 2) % seg],
+                    mid, uv[i], uv[(i + 1) % seg], uv[(i + 2) % seg]);
+        }
+
+        /// <summary>
+        /// 輪。短い箱を円周に並べる（ハンドルの <see cref="Wheel"/> と同じ手）。
+        /// axis が輪の軸、radius は箱の中心までの半径、wide が軸の向きの幅、thick が厚み。
+        /// from と span は度。360 なら閉じた輪、それ未満なら泥除けの庇のような弧になる。
+        /// 角度は axis から見て、軸に直交する最初の基準（上または右）から左回りに測る
+        /// </summary>
+        static void Hoop(Bank bank, Vector3 centre, Vector3 axis, float radius,
+            float wide, float thick, int seg, float from, float span)
+        {
+            if (seg < 3 || radius <= 0f) return;
+            var n = axis.normalized;
+            var u = Mathf.Abs(n.y) > 0.9f ? Vector3.forward : Vector3.up;
+            u = (u - n * Vector3.Dot(u, n)).normalized;
+            var v = Vector3.Cross(n, u);
+            var step = span / seg * Mathf.Deg2Rad;
+            // 継ぎ目を少し重ねる。ぴったりだと角と角のあいだに隙間が見える
+            var chord = radius * step * 1.10f;
+            if (span >= 359.9f) chord = 2f * Mathf.PI * radius / seg * 1.10f;
+            for (var i = 0; i < seg; i++)
+            {
+                var a = (from + (i + 0.5f) * span / seg) * Mathf.Deg2Rad;
+                var radial = u * Mathf.Cos(a) + v * Mathf.Sin(a);
+                var along = -u * Mathf.Sin(a) + v * Mathf.Cos(a);
+                bank.Box(centre + radial * radius, new Vector3(wide, thick, chord),
+                    Quaternion.LookRotation(along, radial));
+            }
         }
 
         /// <summary>
@@ -2129,10 +2610,15 @@ namespace HalfAware.EditorTools
             roof.Box(new Vector3(GarageAt.x, GarageHigh + skin, GarageAt.z),
                 new Vector3(GarageWide, GarageThick, GarageDeep));
 
-            // 柱は四隅と長辺の中ほど。壁から部屋の側へ出して、面の中に埋もれないようにする
+            // 柱は四隅と、区画の列の境目。壁から部屋の側へ出して、面の中に埋もれないようにする。
+            // 通路の両端に立てると、二つの列の切れ目が柱で読めるようになる
             var posts = new Bank { Texel = 0.5f };
             var inset = halfX - PillarSide * 0.5f;
-            var rows = new[] { GarageAt.z - halfZ + PillarSide * 0.5f, GarageAt.z, GarageAt.z + halfZ - PillarSide * 0.5f };
+            var rows = new[]
+            {
+                GarageAt.z - halfZ + PillarSide * 0.5f, AisleFrom, AisleTo,
+                GarageAt.z + halfZ - PillarSide * 0.5f,
+            };
             for (var s = 0; s < 2; s++)
             {
                 var side = s == 0 ? -1f : 1f;
@@ -2157,6 +2643,9 @@ namespace HalfAware.EditorTools
             Blocker(parent);
             Bays(parent);
             Covered(parent);
+            Neighbours(parent);
+            Controls(parent);
+            Racks(parent);
             Lamps(parent);
         }
 
@@ -2193,23 +2682,30 @@ namespace HalfAware.EditorTools
         static void Bays(Transform parent)
         {
             var paint = new Bank { Texel = 0.5f };
-            // 区画の仕切り。内側の 4 本だけ引く。外側の 2 区画は壁が境になる
-            foreach (var k in new[] { -1.5f, -0.5f, 0.5f, 1.5f })
-                Stripe(paint, BayPaintY, k * BayWide, BayZ, BayLine, BayDeep);
-            // 突き当たりの止め線。ここまで入れて停める
-            Stripe(paint, BayPaintY, GarageAt.x, BayZ - BayDeep * 0.5f, GarageWide - 0.4f, BayLine);
-            // 区画の番号。入口の側に描く。奥から歩いてくる人の正面に来るので、
-            // 歩いているあいだずっと目に入る
-            for (var i = 0; i < 5; i++)
-                Numeral(paint, (i - 2) * BayWide, BayZ + BayDeep * 0.5f + 0.75f, i + 1, BayPaintY);
+            // 前の列（1〜5）と後ろの列（6〜10）。どちらも通路から入るので、
+            // 止め線は奥（前の列は +z、後ろの列は -z）、番号は通路に面した口に描く
+            Row(paint, BayZ, 1, 1f);
+            Row(paint, BackBayZ, 6, -1f);
             paint.Emit(parent, "BayPaint", Mat("BayPaint"), false, Generated);
 
-            // 油染み。自分の区画、歩く線の上、覆いを掛けた隣の区画に 1 つずつ
-            var oil = new Bank { Texel = 0.35f };
-            Stain(oil, 0.10f, BayZ - 0.45f, 0.64f, 7311);
-            Stain(oil, 3.05f, -4.30f, 0.34f, 4127);
-            // 覆いを掛けた車の下は見えないので、その手前の空いたところへ落とす
-            Stain(oil, CoveredBayX + 0.28f, BayZ + 2.70f, 0.42f, 9043);
+            // 油染み。**「水たまりに見える」と言われた所。**
+            //
+            // 落とす場所を「床が空いているところ」から「車から油が落ちるところ」へ
+            // 変えてある。停まっている車の機関の下、空いた区画の真ん中、通路で
+            // 何度も切り返す所。油は車の下に落ちるものなので、そこにしか無い。
+            // 絵と形は Stain が持つ
+            var oil = new Bank { Texel = 1f };
+            // 空いている 4 番の区画の真ん中。**歩く線が横切る。**
+            // 車の居ない区画に油だけが残っているのが、共用の車庫のいちばんの説明になる
+            Stain(oil, BayWide, BayZ + 0.35f, 0.62f, 7311);
+            // 自分の車の右前輪の脇。ドアへ寄る途中で足元に来る
+            Stain(oil, 1.38f, AxleFrontZ + 0.10f, 0.34f, 4127);
+            // 通路。後ろの列の車が切り返す所
+            Stain(oil, -2.55f, AisleFrom - 1.05f, 0.50f, 9043);
+            // 空いている 10 番の区画
+            Stain(oil, BayWide * 2f - 0.15f, BackBayZ - 0.20f, 0.56f, 5181);
+            // 覆いを掛けた車の手前。布の下からいまも垂れている
+            Stain(oil, CoveredBayX + 0.24f, BayZ + 2.55f, 0.38f, 2609);
             oil.Emit(parent, "OilStains", Mat("OilStain"), false, Generated);
 
             // 排水口。歩く線がちょうど踏む場所に置く。足の下を過ぎていくのが分かる
@@ -2218,6 +2714,22 @@ namespace HalfAware.EditorTools
             Drain(pan, grate, 3.45f, -5.20f);
             pan.Emit(parent, "DrainPan", Mat("Drain"), false, Generated);
             grate.Emit(parent, "DrainGrate", Mat("Metal"), false, Generated);
+        }
+
+        /// <summary>
+        /// 区画の列 1 つ。仕切りの線・突き当たりの止め線・口に描いた番号。
+        /// deep が +1 なら鼻を +z へ向けて停める列で、止め線は +z 側、番号は -z 側に来る
+        /// </summary>
+        static void Row(Bank paint, float z, int first, float deep)
+        {
+            // 仕切り。内側の 4 本だけ引く。外側の 2 区画は壁が境になる
+            foreach (var k in new[] { -1.5f, -0.5f, 0.5f, 1.5f })
+                Stripe(paint, BayPaintY, k * BayWide, z, BayLine, BayDeep);
+            // 突き当たりの止め線。ここまで入れて停める
+            Stripe(paint, BayPaintY, GarageAt.x, z + deep * BayDeep * 0.5f, GarageWide - 0.4f, BayLine);
+            // 番号。通路に面した口に、通路から読める向きで描く
+            for (var i = 0; i < 5; i++)
+                Number(paint, (i - 2) * BayWide, z - deep * (BayDeep * 0.5f + 0.75f), first + i, BayPaintY, deep);
         }
 
         /// <summary>床に貼る帯。上を向いた面 1 枚だけ。裏は誰も見ないので作らない</summary>
@@ -2230,41 +2742,96 @@ namespace HalfAware.EditorTools
         static readonly int[] Segments = { 63, 6, 91, 79, 102, 109, 125, 7, 127, 111 };
 
         /// <summary>
-        /// 床に描く区画の番号。字の形（フォント）を 3D に持ち込まずに済むよう、
-        /// 7 本の棒で組む。型で抜いた塗りなので、角の丸みが無くても嘘にならない。
-        /// 読む向きの上は +z。奥から入口へ歩く人がそのまま読める
+        /// 区画の番号。二桁（10 番）まで。桁を横に並べる。
+        /// up が +1 なら字の上が +z を向き、-1 なら裏返る。
+        /// 通路の両側で読む向きが逆になるので、列ごとに渡し分ける
         /// </summary>
-        static void Numeral(Bank bank, float x, float z, int n, float y)
+        static void Number(Bank bank, float x, float z, int n, float y, float up)
+        {
+            if (n < 10) { Numeral(bank, x, z, n, y, up); return; }
+            const float pitch = 0.30f;
+            // 左右は字の向きに合わせて入れ替わる。裏返したまま並べると 10 が 01 になる
+            Numeral(bank, x - up * pitch, z, n / 10, y, up);
+            Numeral(bank, x + up * pitch, z, n % 10, y, up);
+        }
+
+        /// <summary>
+        /// 床に描く区画の番号 1 桁。字の形（フォント）を 3D に持ち込まずに済むよう、
+        /// 7 本の棒で組む。型で抜いた塗りなので、角の丸みが無くても嘘にならない。
+        /// up が +1 なら読む向きの上は +z
+        /// </summary>
+        static void Numeral(Bank bank, float x, float z, int n, float y, float up)
         {
             const float wide = 0.44f;
             const float high = 0.72f;
             const float thick = 0.085f;
             var bits = Segments[Mathf.Clamp(n, 0, 9)];
-            if ((bits & 1) != 0) Stripe(bank, y, x, z + high * 0.5f, wide, thick);
+            if ((bits & 1) != 0) Stripe(bank, y, x, z + up * high * 0.5f, wide, thick);
             if ((bits & 64) != 0) Stripe(bank, y, x, z, wide, thick);
-            if ((bits & 8) != 0) Stripe(bank, y, x, z - high * 0.5f, wide, thick);
-            if ((bits & 32) != 0) Stripe(bank, y, x - wide * 0.5f, z + high * 0.25f, thick, high * 0.5f);
-            if ((bits & 2) != 0) Stripe(bank, y, x + wide * 0.5f, z + high * 0.25f, thick, high * 0.5f);
-            if ((bits & 16) != 0) Stripe(bank, y, x - wide * 0.5f, z - high * 0.25f, thick, high * 0.5f);
-            if ((bits & 4) != 0) Stripe(bank, y, x + wide * 0.5f, z - high * 0.25f, thick, high * 0.5f);
+            if ((bits & 8) != 0) Stripe(bank, y, x, z - up * high * 0.5f, wide, thick);
+            if ((bits & 32) != 0) Stripe(bank, y, x - up * wide * 0.5f, z + up * high * 0.25f, thick, high * 0.5f);
+            if ((bits & 2) != 0) Stripe(bank, y, x + up * wide * 0.5f, z + up * high * 0.25f, thick, high * 0.5f);
+            if ((bits & 16) != 0) Stripe(bank, y, x - up * wide * 0.5f, z - up * high * 0.25f, thick, high * 0.5f);
+            if ((bits & 4) != 0) Stripe(bank, y, x + up * wide * 0.5f, z - up * high * 0.25f, thick, high * 0.5f);
         }
 
         /// <summary>
-        /// 油染み。四角い面を置くと床にただの黒い四角が乗って見えるので、
-        /// 輪郭を崩して扇に張る（BuildAlley の水たまりと同じ作り）
+        /// 油染み 1 つ。
+        ///
+        /// **これまでは輪郭を崩した扇に、ほぼ真っ黒（0.030）を一様に塗っていた。**
+        /// 実画面では床に開いた穴か、でなければ水たまりにしか見えない。
+        /// オーナーの第一声が「あの黒いのは水たまり？」で、そのとおりだった。
+        /// 濃さが均一で、縁が切り立っていて、色が無い。水の見え方そのものになっている。
+        ///
+        /// 直したのは絵の方（`tools/make-drive.py` の `oilstain`）で、薄膜の虹・
+        /// 染みてぼけた縁・焦茶の芯の三つを持たせてある。ここで変えたのは uv の振り方。
+        ///
+        /// <see cref="Bank.FanY"/> は uv を世界の位置から振るので、絵を貼ると
+        /// 染みごとに絵のどこが出るか分からず、芯も縁も揃わない。
+        /// <see cref="Bank.Patch"/> で 0〜1 の uv をじかに渡し、絵 1 枚をそのまま 1 つの
+        /// 染みに写す。大きさを変えても芯と輪と虹の割合は変わらない。
+        ///
+        /// 判子を押したように揃わないよう、種ごとに uv を 90 度ずつ回して裏返す。
+        /// 縁の崩れも同じ種から引くので、形と絵の崩れがそろって動く
         /// </summary>
         static void Stain(Bank bank, float x, float z, float span, int seed)
         {
             const int n = 16;
             var rnd = new System.Random(seed);
+            // 縁の最大の伸び。uv を畳む物差しになるので、実際に使う伸びより少し広く取る
+            const float reach = 1.32f;
             var rim = new Vector2[n];
             for (var i = 0; i < n; i++)
             {
                 var a = Mathf.PI * 2f * i / n;
-                var r = span * (0.55f + (float)rnd.NextDouble() * 0.70f);
-                rim[i] = new Vector2(x + Mathf.Cos(a) * r, z + Mathf.Sin(a) * r * 1.25f);
+                var r = span * (0.72f + (float)rnd.NextDouble() * 0.52f);
+                rim[i] = new Vector2(x + Mathf.Cos(a) * r, z + Mathf.Sin(a) * r * 1.18f);
             }
-            bank.FanY(new Vector3(x, StainY, z), rim);
+            var turn = rnd.Next(4) * 90f * Mathf.Deg2Rad;
+            var flip = rnd.Next(2) == 0 ? 1f : -1f;
+            System.Func<Vector2, Vector2> fold = at =>
+            {
+                var dx = (at.x - x) / (span * reach);
+                var dz = (at.y - z) / (span * reach * 1.18f);
+                var c = Mathf.Cos(turn);
+                var s = Mathf.Sin(turn);
+                return new Vector2(0.5f + (dx * c - dz * s) * 0.5f * flip,
+                    0.5f + (dx * s + dz * c) * 0.5f);
+            };
+            var mid = new Vector3(x, StainY, z);
+            var uc = new Vector2(0.5f, 0.5f);
+            // 扇に張る。Patch は a→b→c と a→c→d を出すので、縁を 2 つずつ渡せば
+            // 面積の無い三角を作らずに扇になる（<see cref="Disc"/> と同じ手）。
+            // **縁は逆回りに渡す。** FanY が (中心, 縁 i+1, 縁 i) の順で上を向かせているので、
+            // 素直に i → i+2 の順で渡すと面が下を向いて、床から何も見えなくなる
+            for (var i = 0; i < n; i += 2)
+            {
+                var b = rim[i];
+                var c = rim[(i + 1) % n];
+                var d = rim[(i + 2) % n];
+                bank.Patch(mid, new Vector3(d.x, StainY, d.y), new Vector3(c.x, StainY, c.y),
+                    new Vector3(b.x, StainY, b.y), uc, fold(d), fold(c), fold(b));
+            }
         }
 
         /// <summary>
@@ -2310,6 +2877,363 @@ namespace HalfAware.EditorTools
             tarp.Emit(parent, "CoveredCar", Mat("Tarp"), true, Generated);
         }
 
+        // ---- 隣の車 ----------------------------------------------------------
+
+        /// <summary>
+        /// 隣に停めてある車 1 台の寸法。長さはすべて車の中心から測る。
+        /// 高さだけは床からの絶対値で、区画をまたいでも地面の高さは変わらない
+        /// </summary>
+        struct Motor
+        {
+            public float bayX;              // 区画の中心の x
+            public float rowZ;              // 列の中心の z
+            public float face;              // +1 なら鼻が +z。前の列が +1、後ろの列が -1
+            public int paint;               // 塗りの番号
+            public float half;              // 全幅の半分
+            public float nose, tail;        // 鼻先と尻
+            public float sill, belt, roof;  // 車体の下端・腰の線・屋根
+            public float hood;              // ボンネットの天板
+            public float cabBack, cabNose;  // 客室の後ろと前
+            public float axleF, axleR;      // 車軸
+            public float tyre;              // 車輪の外径の半分
+            public bool box;                // 尻が箱（ワゴン・バン）。false なら段（セダン）
+        }
+
+        /// <summary>
+        /// 共用のガレージに停まっている、自分以外の車。
+        ///
+        /// 区画は 10 あって、3 番が自分の車、2 番が覆いを掛けた車。
+        /// ここで組むのは 1・5・6・8・9 の 5 台で、4・7・10 は空けておく。
+        /// **空の区画が要る。** 全部埋めると駐車場に見えて、共同住宅の車庫に見えない。
+        /// 4 番は歩く線が横切るので、そもそも埋められない。
+        ///
+        /// 形は 4 種。背の高い商用車、古い箱型のセダン、小さな二箱の車、荷台のある四輪駆動。
+        /// どれも <see cref="Park"/> が同じ作りで組み、寸法の違いだけで別の車に見せる。
+        /// 自分の車ほど作り込まない。隣の車は遠目にしか見ないので、
+        /// 車輪の止めねじも蝶番も取っ手も持たせていない
+        /// </summary>
+        static readonly Motor[] Stalls =
+        {
+            // 1 番。背の高い商用車。屋根が高いので、いちばん左が壁のように立つ
+            new Motor { bayX = -BayWide * 2f, rowZ = BayZ, face = 1f, paint = 3,
+                half = 0.90f, nose = 2.24f, tail = -2.24f, sill = 0.48f, belt = 1.34f, roof = 2.18f,
+                hood = 1.06f, cabBack = 0.30f, cabNose = 1.62f, axleF = 1.42f, axleR = -1.28f,
+                tyre = 0.33f, box = true },
+            // 5 番。古い箱型のセダン。歩く線の右手にあたる
+            new Motor { bayX = BayWide * 2f, rowZ = BayZ, face = 1f, paint = 1,
+                half = 0.84f, nose = 2.20f, tail = -2.20f, sill = 0.34f, belt = 1.06f, roof = 1.46f,
+                hood = 1.02f, cabBack = -0.44f, cabNose = 0.72f, axleF = 1.34f, axleR = -1.30f,
+                tyre = 0.30f, box = false },
+            // 6 番。小さな二箱の車。後ろの列のいちばん左
+            new Motor { bayX = -BayWide * 2f, rowZ = BackBayZ, face = -1f, paint = 0,
+                half = 0.79f, nose = 1.86f, tail = -1.86f, sill = 0.32f, belt = 1.02f, roof = 1.48f,
+                hood = 0.96f, cabBack = -1.12f, cabNose = 0.50f, axleF = 1.18f, axleR = -1.14f,
+                tyre = 0.28f, box = true },
+            // 8 番。もう一台のセダン。真後ろに来るので、立ち位置から真っ先に目に入る
+            new Motor { bayX = 0f, rowZ = BackBayZ, face = -1f, paint = 2,
+                half = 0.86f, nose = 2.26f, tail = -2.26f, sill = 0.36f, belt = 1.08f, roof = 1.50f,
+                hood = 1.04f, cabBack = -0.52f, cabNose = 0.76f, axleF = 1.38f, axleR = -1.34f,
+                tyre = 0.31f, box = false },
+            // 9 番。荷台のある四輪駆動。自分の車と同じ背丈なので、並べて比べられる
+            new Motor { bayX = BayWide, rowZ = BackBayZ, face = -1f, paint = 1,
+                half = 0.92f, nose = 2.30f, tail = -2.30f, sill = 0.58f, belt = 1.30f, roof = 1.88f,
+                hood = 1.22f, cabBack = -0.30f, cabNose = 0.88f, axleF = 1.50f, axleR = -1.12f,
+                tyre = 0.36f, box = false },
+        };
+
+        static void Neighbours(Transform parent)
+        {
+            var group = Child(parent, "Neighbours");
+            var paints = new Bank[PaintNames.Length];
+            for (var i = 0; i < paints.Length; i++) paints[i] = new Bank { Texel = 1.1f };
+            var steel = new Bank { Texel = 2.2f };
+            var dark = new Bank { Texel = 1.0f };
+            var glass = new Bank { Texel = 0.8f };
+            var tyre = new Bank { Texel = 3.0f };
+            var lens = new Bank { Texel = 1.0f };
+            var tail = new Bank { Texel = 1.0f };
+
+            for (var i = 0; i < Stalls.Length; i++)
+                Park(group, paints, steel, dark, glass, tyre, lens, tail, Stalls[i], i);
+
+            // 塗りは 1 枚の絵を色で塗り分ける。車ごとに絵を焼くと絵だけで 5 枚増える
+            for (var i = 0; i < paints.Length; i++)
+                paints[i].Emit(group, "Paint" + PaintNames[i], Paint(i), false, Generated);
+            steel.Emit(group, "NeighbourSteel", Mat("CarSteel"), false, Generated);
+            dark.Emit(group, "NeighbourGap", Mat("CarGap"), false, Generated);
+            glass.Emit(group, "NeighbourGlass", Mat("CarGlass"), false, Generated);
+            tyre.Emit(group, "NeighbourTyre", Mat("CarTyre"), false, Generated);
+            lens.Emit(group, "NeighbourLamp", Mat("CarLamp"), false, Generated);
+            tail.Emit(group, "NeighbourTail", Mat("CarTail"), false, Generated);
+        }
+
+        /// <summary>
+        /// 車 1 台。自分の車と同じ語彙で組む。平らな板と角の立った箱だけで、曲面は使わない。
+        ///
+        /// **当たりは mesh ではなく箱で持たせる。** 塗りの入れ物は何台ぶんも一つの mesh に
+        /// まとまっているので、MeshCollider を貼ると台ごとに切れない。車体を包む箱を
+        /// 1 台に 1 つ置けば足りるし、非凸の MeshCollider より軽い。
+        /// 箱は Garage の下にあるので、乗り込んだ瞬間に当たりごと消える
+        /// </summary>
+        static void Park(Transform group, Bank[] paints, Bank steel, Bank dark, Bank glass,
+            Bank tyre, Bank lens, Bank tail, Motor m, int which)
+        {
+            var body = paints[m.paint];
+            const float skin = 0.045f;
+            // 鼻先を止め線の 0.2 手前に置く。区画の奥行きは車より長いので、尻に余りが出る
+            var cz = m.rowZ + m.face * (BayDeep * 0.5f - 0.20f) - m.face * m.nose;
+            var hubY = GarageFloorY + m.tyre;
+            var arch = m.tyre + 0.10f;
+            var outer = m.half - skin * 0.5f;
+
+            // 局所の座標を世界へ。z は鼻の向きで裏返る
+            System.Action<Bank, float, float, float, float, float, float> slot =
+                (bank, ax, bx, y0, y1, z0, z1) =>
+                {
+                    if (y1 <= y0) return;
+                    bank.Box(new Vector3(m.bayX + (ax + bx) * 0.5f, (y0 + y1) * 0.5f,
+                            cz + m.face * (z0 + z1) * 0.5f),
+                        new Vector3(Mathf.Abs(bx - ax), y1 - y0, Mathf.Abs(z1 - z0)));
+                };
+
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                var a = side * (outer - skin * 0.5f);
+                var b = side * (outer + skin * 0.5f);
+                // 側面。泥除けの抜きを避けて三つに割り、抜きの上だけ低く始める
+                slot(body, a, b, m.sill, m.belt, m.tail, m.axleR - arch);
+                slot(body, a, b, m.sill, m.belt, m.axleR + arch, m.axleF - arch);
+                slot(body, a, b, m.sill, m.belt, m.axleF + arch, m.nose);
+                slot(body, a, b, hubY + arch, m.belt, m.axleR - arch, m.axleR + arch);
+                slot(body, a, b, hubY + arch, m.belt, m.axleF - arch, m.axleF + arch);
+                // 窓の枠。下枠と屋根の縁、前後の柱。あいだを抜いてガラスを張る
+                var backTo = m.box ? m.tail : m.cabBack;
+                slot(body, a, b, m.belt, m.belt + 0.055f, backTo, m.cabNose);
+                slot(body, a, b, m.roof - 0.065f, m.roof, backTo, m.cabNose);
+                slot(body, a, b, m.belt, m.roof, m.cabNose - 0.085f, m.cabNose);
+                slot(body, a, b, m.belt, m.roof, backTo, backTo + 0.085f);
+                if (m.box) slot(body, a, b, m.belt, m.roof, m.cabBack, m.cabBack + 0.070f);
+                // ガラス。外を向いた面 1 枚ずつ。車内は誰も見ない
+                glass.FaceX(m.bayX + side * (m.half - 0.014f),
+                    Mathf.Min(cz + m.face * (backTo + 0.085f), cz + m.face * (m.cabNose - 0.085f)),
+                    Mathf.Max(cz + m.face * (backTo + 0.085f), cz + m.face * (m.cabNose - 0.085f)),
+                    m.belt + 0.055f, m.roof - 0.065f, s == 0 ? -1 : 1);
+                // 鏡
+                body.Box(new Vector3(m.bayX + side * (m.half + 0.055f), m.belt + 0.10f,
+                        cz + m.face * (m.cabNose - 0.10f)),
+                    new Vector3(0.090f, 0.110f, 0.040f));
+
+                // 車輪。止めねじは省く。遠目にしか見ないので、皿と窪みだけで足りる
+                foreach (var z in new[] { m.axleF, m.axleR })
+                {
+                    var at = new Vector3(m.bayX + side * (m.half - 0.10f), hubY, cz + m.face * z);
+                    Hoop(tyre, at, Vector3.right, m.tyre - 0.050f, 0.215f, 0.100f, 10, 0f, 360f);
+                    var out4 = at + new Vector3(side * 0.070f, 0f, 0f);
+                    Disc(steel, out4, Vector3.right * side, m.tyre * 0.62f, 8);
+                    Disc(dark, out4 + new Vector3(side * 0.004f, 0f, 0f), Vector3.right * side, m.tyre * 0.22f, 6);
+                    // 抜きの奥の暗がり
+                    Hoop(dark, at - new Vector3(side * 0.030f, 0f, 0f), Vector3.right,
+                        arch - 0.02f, 0.130f, 0.040f, 6, -82f, 164f);
+                }
+            }
+
+            // 屋根と、ボンネットと、尻
+            var roofBack = m.box ? m.tail : m.cabBack;
+            slot(body, -outer, outer, m.roof - 0.055f, m.roof, roofBack, m.cabNose);
+            slot(body, -outer, outer, m.hood - 0.055f, m.hood, m.cabNose, m.nose);
+            if (m.box)
+            {
+                // 尻は立てた一枚。荷室の窓と扉
+                slot(body, -outer, outer, m.sill, m.belt, m.tail, m.tail + 0.055f);
+                slot(body, -outer, outer, m.roof - 0.065f, m.roof, m.tail, m.tail + 0.055f);
+                glass.FaceZ(cz + m.face * (m.tail - 0.008f), m.bayX - outer + 0.09f, m.bayX + outer - 0.09f,
+                    m.belt + 0.055f, m.roof - 0.065f, m.face > 0f ? -1 : 1);
+            }
+            else
+            {
+                // 段。荷室の蓋と、立てた尻の板
+                slot(body, -outer, outer, m.hood - 0.055f, m.hood, m.tail, m.cabBack);
+                slot(body, -outer, outer, m.sill, m.hood, m.tail, m.tail + 0.055f);
+                // 後ろのガラス。客室の後ろを寝かせて塞ぐ
+                glass.FaceZ(cz + m.face * (m.cabBack + 0.012f), m.bayX - outer + 0.10f, m.bayX + outer - 0.10f,
+                    m.belt + 0.055f, m.roof - 0.065f, m.face > 0f ? -1 : 1);
+            }
+            // 風防
+            glass.FaceZ(cz + m.face * (m.cabNose - 0.012f), m.bayX - outer + 0.09f, m.bayX + outer - 0.09f,
+                m.belt + 0.055f, m.roof - 0.065f, m.face > 0f ? 1 : -1);
+            // 前の顔。格子と灯り
+            slot(dark, -outer + 0.14f, outer - 0.14f, m.hood - 0.30f, m.hood - 0.09f, m.nose, m.nose + 0.030f);
+            slot(body, -outer, outer, m.sill, m.hood - 0.30f, m.nose, m.nose + 0.040f);
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                var lx = side * (outer - 0.16f);
+                slot(lens, lx - 0.13f, lx + 0.13f, m.hood - 0.28f, m.hood - 0.11f, m.nose + 0.020f, m.nose + 0.050f);
+                slot(tail, lx - 0.12f, lx + 0.12f, m.sill + 0.24f, m.sill + 0.44f, m.tail - 0.030f, m.tail);
+            }
+            // 番号板。前後に一枚ずつ
+            slot(lens, -0.20f, 0.20f, m.sill + 0.10f, m.sill + 0.21f, m.nose + 0.030f, m.nose + 0.050f);
+            slot(lens, -0.20f, 0.20f, m.sill + 0.08f, m.sill + 0.19f, m.tail - 0.050f, m.tail - 0.030f);
+            // 緩衝器。前後
+            slot(steel, -m.half, m.half, m.sill - 0.10f, m.sill + 0.04f, m.nose + 0.020f, m.nose + 0.130f);
+            slot(steel, -m.half, m.half, m.sill - 0.10f, m.sill + 0.04f, m.tail - 0.130f, m.tail - 0.020f);
+            // 車台の暗がり。無いと脇から車の下が見通せて、車体が浮く
+            slot(dark, -outer + 0.20f, outer - 0.20f, m.sill - 0.22f, m.sill + 0.01f, m.tail + 0.30f, m.nose - 0.30f);
+
+            // 当たり。車体を包む箱ひとつ
+            var stop = new GameObject("Block" + (which + 1));
+            stop.transform.SetParent(group, false);
+            var box2 = stop.AddComponent<BoxCollider>();
+            box2.center = new Vector3(m.bayX, (GarageFloorY + m.roof) * 0.5f, cz + m.face * (m.tail + m.nose) * 0.5f);
+            box2.size = new Vector3(m.half * 2f + 0.14f, m.roof - GarageFloorY, m.nose - m.tail + 0.26f);
+        }
+
+        // ---- シャッターの操作盤と感知器 ----------------------------------------
+
+        /// <summary>
+        /// シャッターの押しボタンと感知器。
+        ///
+        /// **どちらも調べる対象にはしない。** この場面で必須なのは garage.door と
+        /// drive.window の 2 つだけで、必須をもう 1 つ足すと最後の帯で場面が閉じられない
+        /// （<see cref="Items"/> の但し書き）。必須でない対象を足しても、乗り込む前に
+        /// 拾える物が増えて、ドアを調べる前に別の物へ手が伸びる。
+        /// ここで置くのは、共用の車庫にあるべき物として立っているだけの造作。
+        ///
+        /// 三つで一組にする。押しボタンの箱・上げ下げの巻き取り機・足元の光電管。
+        /// どれか一つだけだと壁に付いた謎の箱にしか見えないが、
+        /// 三つが電線で繋がっていると「シャッターの仕掛け」として読める
+        /// </summary>
+        static void Controls(Transform parent)
+        {
+            var metal = new Bank { Texel = 1.4f };
+            var dark = new Bank { Texel = 1.0f };
+            var knob = new Bank { Texel = 2.2f };
+            // 前の壁の内側の面。壁は厚み 0.25 の真ん中が front に来る
+            var wall = GarageAt.z + GarageDeep * 0.5f;
+            var jamb = ShutterWide * 0.5f;
+
+            // 押しボタンの箱。シャッターの右の柱側。立って手の届く高さ
+            var boxX = jamb + 0.45f;
+            metal.Box(new Vector3(boxX, 1.24f, wall - 0.055f), new Vector3(0.20f, 0.30f, 0.110f));
+            dark.Box(new Vector3(boxX, 1.24f, wall - 0.113f), new Vector3(0.155f, 0.245f, 0.010f));
+            // 上げる・止める・下げるの三つ。押しボタンなので座から少し出る
+            for (var i = 0; i < 3; i++)
+                knob.Box(new Vector3(boxX, 1.325f - i * 0.085f, wall - 0.126f),
+                    new Vector3(0.062f, 0.050f, 0.028f));
+            // 通電を示す小さな灯り。**ガレージで唯一、自分で光っている物。**
+            // 天井の灯りが届かないシャッターの際に、一点だけ緑が点いている
+            var pilot = Piece(Child(parent, "ShutterPilot"), "Lamp",
+                Shape("PilotLamp", 1f, b => b.Box(Vector3.zero, new Vector3(0.030f, 0.030f, 0.014f))),
+                Glow(new Color(0.42f, 0.95f, 0.50f), 1.9f));
+            pilot.position = new Vector3(boxX, 1.398f, wall - 0.122f);
+            // 電線の管。箱から天井へ立ち上げ、シャッターの上を横へ渡す
+            metal.Box(new Vector3(boxX, (1.39f + GarageHigh) * 0.5f, wall - 0.035f),
+                new Vector3(0.045f, GarageHigh - 1.39f, 0.045f));
+            metal.Box(new Vector3((boxX + 0f) * 0.5f, GarageHigh - 0.075f, wall - 0.035f),
+                new Vector3(boxX + 0.045f, 0.045f, 0.045f));
+
+            // 巻き取り機。シャッターの上のまぐさに渡す。これが無いと、
+            // 板が勝手に上がる仕掛けになる
+            metal.Box(new Vector3(0f, GarageHigh - 0.28f, wall - 0.175f),
+                new Vector3(ShutterWide - 0.30f, 0.240f, 0.240f));
+            metal.Box(new Vector3(-ShutterWide * 0.5f + 0.42f, GarageHigh - 0.28f, wall - 0.255f),
+                new Vector3(0.300f, 0.300f, 0.180f));
+            for (var s = 0; s < 2; s++)
+                metal.Box(new Vector3((s == 0 ? -1f : 1f) * (ShutterWide * 0.5f - 0.06f), GarageHigh - 0.28f, wall - 0.175f),
+                    new Vector3(0.100f, 0.320f, 0.320f));
+
+            // 足元の光電管。シャッターの両脇に向かい合わせで一対。
+            // 一つでは「箱」だが、向かい合って二つあると光の線を渡しているのが読める
+            for (var s = 0; s < 2; s++)
+            {
+                var side = s == 0 ? -1f : 1f;
+                var x = side * (jamb - 0.10f);
+                metal.Box(new Vector3(x, 0.30f, wall - 0.110f), new Vector3(0.090f, 0.170f, 0.100f));
+                metal.Box(new Vector3(x, 0.14f, wall - 0.110f), new Vector3(0.055f, 0.160f, 0.055f));
+                // 目。向かい合う側を向く。赤い小さな面
+                dark.Box(new Vector3(x - side * 0.048f, 0.30f, wall - 0.110f),
+                    new Vector3(0.010f, 0.100f, 0.060f));
+                var eye = Piece(Child(parent, "ShutterEye" + s), "Lens",
+                    Shape("EyeLens", 1f, b => b.Box(Vector3.zero, new Vector3(0.010f, 0.048f, 0.030f))),
+                    Glow(new Color(0.95f, 0.30f, 0.26f), 1.4f));
+                eye.position = new Vector3(x - side * 0.055f, 0.30f, wall - 0.110f);
+                // 管。柱に沿って上へ逃がす
+                metal.Box(new Vector3(x, 1.00f, wall - 0.035f), new Vector3(0.040f, 1.24f, 0.040f));
+            }
+
+            metal.Emit(parent, "ShutterGear", Mat("Metal"), false, Generated);
+            dark.Emit(parent, "ShutterFace", Mat("CarGap"), false, Generated);
+            knob.Emit(parent, "ShutterButtons", Mat("CarSteel"), false, Generated);
+        }
+
+        // ---- 奥の壁際 --------------------------------------------------------
+
+        /// <summary>
+        /// 後ろの列の先、奥の壁までの 1.4 m。
+        ///
+        /// 区画を 2 列にして奥行きを 21 m へ伸ばしたぶん、奥の壁がまるごと空いた。
+        /// 何も置かないと、灯りの届かない奥にただの灰色の板が立っているだけになる。
+        /// 共用の車庫の奥に置いてある物を並べる。棚と、油の缶と、積んだ古い車輪
+        /// </summary>
+        static void Racks(Transform parent)
+        {
+            var metal = new Bank { Texel = 1.4f };
+            var dark = new Bank { Texel = 1.0f };
+            var tyre = new Bank { Texel = 3.0f };
+            var wall = GarageAt.z - GarageDeep * 0.5f;
+
+            // 棚。支柱 4 本と棚板 3 枚
+            var from = -4.6f;
+            var to = -0.9f;
+            for (var i = 0; i < 4; i++)
+            {
+                var x = Mathf.Lerp(from, to, i / 3f);
+                metal.Box(new Vector3(x, 1.02f, wall + 0.28f), new Vector3(0.055f, 1.96f, 0.055f));
+                metal.Box(new Vector3(x, 1.02f, wall + 0.74f), new Vector3(0.055f, 1.96f, 0.055f));
+            }
+            foreach (var y in new[] { 0.42f, 1.06f, 1.70f })
+                metal.Box(new Vector3((from + to) * 0.5f, y, wall + 0.51f),
+                    new Vector3(to - from + 0.10f, 0.035f, 0.500f));
+            // 棚に載っている物。箱を無造作に。大きさをばらけさせるだけで散らかって見える
+            var rnd = new System.Random(4421);
+            for (var i = 0; i < 11; i++)
+            {
+                var x = Mathf.Lerp(from + 0.2f, to - 0.2f, (float)rnd.NextDouble());
+                var shelf = new[] { 0.42f, 1.06f, 1.70f }[rnd.Next(3)];
+                var w = 0.18f + (float)rnd.NextDouble() * 0.22f;
+                var h = 0.14f + (float)rnd.NextDouble() * 0.20f;
+                dark.Box(new Vector3(x, shelf + 0.018f + h * 0.5f, wall + 0.51f + (float)(rnd.NextDouble() - 0.5) * 0.12f),
+                    new Vector3(w, h, 0.26f + (float)rnd.NextDouble() * 0.12f),
+                    Quaternion.Euler(0f, (float)(rnd.NextDouble() - 0.5) * 22f, 0f));
+            }
+
+            // 油の缶。二つ並べて立てる
+            for (var i = 0; i < 2; i++)
+            {
+                var at = new Vector3(2.9f + i * 0.72f, 0.0f, wall + 0.44f + i * 0.10f);
+                Hoop(metal, at + new Vector3(0f, GarageFloorY + 0.44f, 0f), Vector3.up,
+                    0.285f, 0.880f, 0.040f, 10, 0f, 360f);
+                Disc(metal, at + new Vector3(0f, GarageFloorY + 0.880f, 0f), Vector3.up, 0.300f, 10);
+                // 蓋の縁。二本の輪が缶らしさを作る
+                foreach (var y in new[] { 0.26f, 0.62f })
+                    Hoop(metal, at + new Vector3(0f, GarageFloorY + y, 0f), Vector3.up,
+                        0.300f, 0.050f, 0.030f, 10, 0f, 360f);
+            }
+
+            // 積んだ古い車輪。四つ重ねる
+            for (var i = 0; i < 4; i++)
+            {
+                var at = new Vector3(5.3f, GarageFloorY + 0.10f + i * 0.20f, wall + 0.62f);
+                Hoop(tyre, at, Vector3.up, 0.305f, 0.195f, 0.115f, 10, i * 9f, 360f);
+                if (i == 3) Disc(dark, at + new Vector3(0f, 0.098f, 0f), Vector3.up, 0.245f, 8);
+            }
+
+            metal.Emit(parent, "Racks", Mat("Metal"), true, Generated);
+            dark.Emit(parent, "RackBoxes", Mat("CarGap"), true, Generated);
+            tyre.Emit(parent, "SpareTyres", Mat("CarTyre"), true, Generated);
+        }
+
         /// <summary>
         /// 車体を塞ぐ箱。見えないので絵は持たせない。
         ///
@@ -2328,33 +3252,48 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 天井の灯り。2 本。強さと届く範囲は仮置きで、オーナーが実画面を見てから決める。
+        /// 天井の灯り。**区画の列に合わせて 2 列。**
+        ///
+        /// 1 列のときは (±3.0, 2.80, -2.00) に 2 本だけで、奥行き 16 m のうち
+        /// 真ん中しか照らしていなかった。21 m に伸ばして列を 2 つにした以上、
+        /// 灯りも 2 列に増やさないと後ろの列が丸ごと闇に沈む。
+        ///
+        /// **列の z は区画の真ん中ではなく、通路の両端に置く。** 区画の真ん中に吊ると、
+        /// 灯りの真下に車の屋根が来て、光がそこで止まる。通路の縁に吊れば、
+        /// 同じ灯りが車の前半分と通路の両方を照らす。実際の車庫もそう吊ってある。
+        ///
+        /// 管は x の向きに寝かせる。列が横一線に並んで、二つの列だと一目で分かる。
         /// 影を落とさせないのは、WebGL で影を持つ灯りを増やすと重くなるため
         /// </summary>
         static void Lamps(Transform parent)
         {
-            var tube = Shape("GarageTube", 0.5f, b => b.Box(Vector3.zero, new Vector3(0.18f, 0.08f, 2.40f)));
+            var tube = Shape("GarageTube", 0.5f, b => b.Box(Vector3.zero, new Vector3(2.40f, 0.08f, 0.18f)));
             var lit = Glow(GarageLamp, 1.6f);
-            for (var s = 0; s < 2; s++)
-            {
-                var lamp = Child(parent, "Lamp" + s);
-                lamp.localPosition = new Vector3(s == 0 ? -3.0f : 3.0f, 2.8f, -2.0f);
-                Piece(lamp, "Tube", tube, lit);
-                var bulb = new GameObject("Light");
-                bulb.transform.SetParent(lamp, false);
-                var l = bulb.AddComponent<Light>();
-                l.type = LightType.Point;
-                l.color = GarageLamp;
-                // **2.6 から上げた。** ガレージの明るさは天井の灯りではなく、
-                // 既定の映り込み（組み込みの灰色の立方体）が持っていた。
-                // それを切った（<see cref="DriveSky.Apply"/>）ので、床も壁も
-                // ほとんど真っ暗になり、歩く先が読めなくなった。
-                // 灯りの真下で床が 52、隅で 24 になるところまで上げてある。
-                // 天井から床まで 2.8 m あり、距離の二乗で効く
-                l.intensity = 8.0f;
-                l.range = 16f;
-                l.shadows = LightShadows.None;
-            }
+            var rows = new[] { AisleTo + 1.30f, AisleFrom - 1.30f };
+            var across = new[] { -4.6f, 0f, 4.6f };
+            for (var r = 0; r < rows.Length; r++)
+                for (var k = 0; k < across.Length; k++)
+                {
+                    var lamp = Child(parent, "Lamp" + r + k);
+                    lamp.localPosition = new Vector3(across[k], 2.8f, rows[r]);
+                    Piece(lamp, "Tube", tube, lit);
+                    // 吊り具。天井から 10 cm 下げてあるので、繋がっていないと浮いて見える
+                    for (var i = 0; i < 2; i++)
+                        Piece(lamp, "Hanger" + i,
+                            Shape("GarageHanger", 0.5f, b => b.Box(Vector3.zero, new Vector3(0.05f, 0.14f, 0.05f))),
+                            Mat("Metal")).localPosition = new Vector3(i == 0 ? -0.9f : 0.9f, 0.10f, 0f);
+                    var bulb = new GameObject("Light");
+                    bulb.transform.SetParent(lamp, false);
+                    var l = bulb.AddComponent<Light>();
+                    l.type = LightType.Point;
+                    l.color = GarageLamp;
+                    // **8.0 から下げた。** 2 本が 6 本になったので、同じ強さのままだと
+                    // 重なったところで床が飛ぶ。灯りの真下で床が 52 前後に来るところは
+                    // 変えずに、本数のぶんだけ 1 本を弱める
+                    l.intensity = 4.6f;
+                    l.range = 13f;
+                    l.shadows = LightShadows.None;
+                }
         }
 
         // ---- 調べる対象 ------------------------------------------------------
@@ -2491,6 +3430,8 @@ namespace HalfAware.EditorTools
             pso.FindProperty("eyeLead").floatValue = EyeLead;
             pso.ApplyModifiedPropertiesWithoutUndo();
 
+            Feet(player.transform, body);
+
             // 当たりを入れたまま動かすと床や壁に押し出されて狙った場所に立たない（BuildAlley.Place と同じ）
             body.enabled = false;
             player.transform.position = new Vector3(StandAt.x, GarageFloorY + 0.06f, StandAt.z);
@@ -2498,6 +3439,67 @@ namespace HalfAware.EditorTools
             body.enabled = true;
 
             Marks(Flow(walker, Screen()));
+        }
+
+        /// <summary>
+        /// 場面 8 の足音の素材。**場面 1・2 の Step1〜5 とは別物。**
+        ///
+        /// あちらは Kenney の柔らかい足音で、濡れた石畳と土のためにある。測ると
+        /// 2.5kHz 以上が 700Hz 以下より 11〜15dB 弱く、裸のコンクリートの上で鳴らすと
+        /// 床が土に聞こえる。同じ素材（CC0）から唸りを抜いて打音を持ち上げ、
+        /// 尾を詰めたものが Concrete1〜4（`tools/make-steps.py`）。
+        /// 出どころと加工は Assets/Audio/LICENSES.md に控えてある
+        /// </summary>
+        static readonly string[] ConcreteSteps =
+        {
+            "Assets/Audio/Concrete1.wav", "Assets/Audio/Concrete2.wav",
+            "Assets/Audio/Concrete3.wav", "Assets/Audio/Concrete4.wav",
+        };
+
+        /// <summary>
+        /// 足音。**場面 8 には今まで無かった。**
+        ///
+        /// プレイヤーはコンクリートの床を 8 m 歩いて車まで来る。そのあいだ無音で、
+        /// 歩いているという手応えがどこにも無かった。場面 2 は Alley.unity に
+        /// 手で置いた Feet が持っているが、場面 8 は空のシーンから組み上げるので、
+        /// ここで作らないと誰も作らない。
+        ///
+        /// 反響は素材ではなく `AudioReverbFilter` に持たせる。
+        /// コンクリートの箱の中なので、組み込みの `ParkingLot` がそのまま当たる。
+        /// 場面 2 の `RainCover` のように屋根の下で切り替える必要は無い。
+        /// ここは端から端までひと続きの箱で、響きの変わる場所が無い
+        /// </summary>
+        static void Feet(Transform player, CharacterController body)
+        {
+            var feet = new GameObject("Feet");
+            feet.transform.SetParent(player, false);
+            feet.transform.localPosition = new Vector3(0f, 0.02f, 0f);
+
+            var src = feet.AddComponent<AudioSource>();
+            src.playOnAwake = false;
+            src.loop = false;
+            // 耳と同じ体に付いているので、距離で減らさない
+            src.spatialBlend = 0f;
+            // 場面 2 の 0.55 より下げる。あちらは雨の音の上で鳴らすので大きく要るが、
+            // ここは無音の車庫で、同じ音量だと足音だけが画面から浮く
+            src.volume = 0.38f;
+
+            var echo = feet.AddComponent<AudioReverbFilter>();
+            echo.reverbPreset = AudioReverbPreset.ParkingLot;
+
+            var steps = feet.AddComponent<Footsteps>();
+            var so = new SerializedObject(steps);
+            so.FindProperty("body").objectReferenceValue = body;
+            so.FindProperty("source").objectReferenceValue = src;
+            var clips = so.FindProperty("clips");
+            clips.arraySize = ConcreteSteps.Length;
+            for (var i = 0; i < ConcreteSteps.Length; i++)
+            {
+                var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(ConcreteSteps[i]);
+                if (clip == null) Debug.LogWarning("足音の素材が無い: " + ConcreteSteps[i]);
+                clips.GetArrayElementAtIndex(i).objectReferenceValue = clip;
+            }
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         /// <summary>
@@ -2734,6 +3736,8 @@ namespace HalfAware.EditorTools
             // 車内の対象は乗り込むまで伏せる。ガレージからでも拾える距離に入ってしまう
             var cabin = Look(root, "Items/Cabin");
             dso.FindProperty("cabin").objectReferenceValue = cabin != null ? cabin.gameObject : null;
+            // 足音。乗り込んだら止める。Player の下にあるのでガレージと一緒には消えない
+            dso.FindProperty("feet").objectReferenceValue = Object.FindFirstObjectByType<Footsteps>(FindObjectsInactive.Include);
             var folded = Look(root, "Car/ArmsFolded");
             var onWheel = Look(root, "Car/ArmsOnWheel");
             dso.FindProperty("folded").objectReferenceValue = folded != null ? folded.gameObject : null;
@@ -2956,6 +3960,52 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
+        /// 隣の車の塗りの名と色。**色は線形で置く。**
+        ///
+        /// 絵（DriveCarPaint.png）は汚れと褪せだけを持ち、平均がほぼ白（sRGB 236 ＝ 線形 0.83）。
+        /// URP の Lit は絵に _BaseColor を掛けるので、画面に出る明るさはここの色の 0.83 倍になる。
+        ///
+        /// **一台だけ明るい色を混ぜる。** この場面の色はどれも 0.1〜0.4 に固まっていて、
+        /// 暗い車を五台並べると区画の境が読めない一つの塊になる。褪せた生成りが一台あると、
+        /// そこを手掛かりに残りの四台の輪郭も見えてくる
+        /// </summary>
+        static readonly string[] PaintNames = { "Cream", "Maroon", "Navy", "Tan" };
+
+        static readonly Color[] PaintHues =
+        {
+            new Color(0.560f, 0.540f, 0.478f),
+            new Color(0.232f, 0.084f, 0.072f),
+            new Color(0.086f, 0.112f, 0.170f),
+            new Color(0.330f, 0.266f, 0.168f),
+        };
+
+        /// <summary>
+        /// 隣の車の塗り。<see cref="Mat"/> を通さない。
+        /// あちらは名前から絵を引くので、色ごとに絵を焼くことになる。
+        /// ここでは絵 1 枚を全員で使い回し、色だけ _BaseColor で差し替える
+        /// </summary>
+        static Material Paint(int which)
+        {
+            var name = "Car" + PaintNames[which];
+            var path = Materials + name + ".mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                m = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                m.name = name;
+                AssetDatabase.CreateAsset(m, path);
+            }
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/DriveCarPaint.png");
+            if (tex == null) Debug.LogWarning("隣の車の塗りの絵が無い: Assets/Textures/DriveCarPaint.png");
+            m.SetTexture("_BaseMap", tex);
+            m.SetColor("_BaseColor", PaintHues[which]);
+            if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", 0.22f);
+            if (m.HasProperty("_Metallic")) m.SetFloat("_Metallic", 0f);
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// <summary>
         /// メーターの面のマテリアル。ほかの素材と違って Unlit で貼る。
         ///
         /// 灯りを一つも足さずに「夜に自分で光っているもの」を車内へ置ける。
@@ -3171,6 +4221,15 @@ namespace HalfAware.EditorTools
                 // 落とす代わりに緑へ寄せてある。絵（DriveCarBody.png）が持つ斑と剥げも同じ理由で、
                 // 平均を下げずに「平らな一枚板」から離すためにある
                 case "CarBody": col = new Color(0.352f, 0.440f, 0.262f); smooth = 0.18f; break;
+                // 車輪のゴム。絵（DriveCarTyre.png）が持つので、ここは絵が無いときの控え。
+                // 実物のゴムの反射率は 0.03〜0.05 で、真っ黒に塗ると灯りの下でも穴に見える
+                case "CarTyre": col = new Color(0.030f, 0.030f, 0.032f); smooth = 0.12f; break;
+                // 前照灯のガラスと番号板。消えている灯りなので、光らせず淡い面として置く。
+                // ガレージの天井の灯りを受けて、顔の中で二つだけ明るい丸になる
+                case "CarLamp": col = new Color(0.430f, 0.425f, 0.400f); smooth = 0.72f; break;
+                // 尾灯。**外装で唯一の彩り。** 暗い車体の尻に赤が二つあるだけで、
+                // どちらが前でどちらが後ろかが一目で読める
+                case "CarTail": col = new Color(0.300f, 0.042f, 0.036f); smooth = 0.66f; break;
                 // 前腕。革のライダースの袖。BuildProtagonist の上着と同じ色にしてある
                 case "Sleeve": col = new Color(0.055f, 0.053f, 0.062f); smooth = 0.22f; break;
                 // 手。夜の車内なので、肌も袖よりわずかに明るい程度に留める
@@ -3187,8 +4246,13 @@ namespace HalfAware.EditorTools
                 case "Shutter": col = new Color(0.155f, 0.150f, 0.140f); smooth = 0.24f; break;
                 // 区画の線と番号。塗り直されていない白なので、床よりわずかに明るい程度
                 case "BayPaint": col = new Color(0.310f, 0.300f, 0.262f); smooth = 0.08f; break;
-                // 油染み。地の色は床より暗く、艶だけが残る
-                case "OilStain": col = new Color(0.030f, 0.029f, 0.031f); smooth = 0.58f; break;
+                // 油染み。**α を 1 未満にするのはここだけの事情。**
+                //
+                // 濃さも色も虹も絵（DriveOilStain.png）が持っていて、ここの色は使われない。
+                // ただし <see cref="Mat"/> は α が 1 を切ったときだけ <see cref="SeeThrough"/> を
+                // 通すので、1 のままだと絵の α が捨てられて、縁の切り立った黒い塊に戻る。
+                // 0.96 は「ほぼそのまま、でも透ける」ための値で、濃さを決めているのではない
+                case "OilStain": col = new Color(0.030f, 0.029f, 0.031f, 0.96f); smooth = 0.52f; break;
                 // 排水口の受け。中は見えないので、ただ暗い
                 case "Drain": col = new Color(0.040f, 0.039f, 0.038f); smooth = 0.14f; break;
                 // 隣の車に掛かった覆い。埃をかぶった帆布

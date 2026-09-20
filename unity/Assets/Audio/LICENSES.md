@@ -22,6 +22,7 @@ https://pixabay.com/service/license-summary/
 | ファイル | 出典 | 許諾 | 加工 |
 |---|---|---|---|
 | `Step1`〜`Step5.wav` | Kenney RPG Audio（https://kenney.nl/assets/rpg-audio）の `footstep00/02/04/06/08.ogg` | CC0 1.0 | モノラル 44.1kHz へ、末尾を落として頂点を −6dB に揃えた |
+| `Concrete1`〜`Concrete4.wav` | 同上（`Step2` / `Step5` / `Step1` / `Step3` から作り直し） | CC0 1.0 | `tools/make-steps.py`。360Hz より下を落とし、1.2kHz より上を 2.6 倍に持ち上げ、時定数 48ms で尾を詰めて 0.165 秒へ切り、頂点 −6dB |
 | `LighterClick.wav` | OpenGameArt「Zippo click sound」（https://opengameart.org/content/zippo-click-sound）作者 dawith | CC0 1.0 | 金属音の当たりだけを 0.060〜0.320 秒で切り出し、頂点 −3dB |
 | `Drag.wav` | Pixabay の `crackle`。作品名と作者は未記入 | Pixabay Content License | 前後の無音を落として頂点 −8dB |
 | `Blow.wav` | Pixabay の `blow`。作品名と作者は未記入 | Pixabay Content License | 同上 |
@@ -39,11 +40,26 @@ https://pixabay.com/service/license-summary/
 ## 使うところ
 
 - 足音は `Footsteps`。進んだ距離を積んで 0.88 メートルごとに 1 つ鳴らす。直前と同じ物は選ばず、音量と高さを少し振る
+- 場面 2（小道）と場面 1（自室）は `Step1`〜`Step5`、場面 8（共用ガレージ）は `Concrete1`〜`Concrete4`。
+  同じ足音を裸のコンクリートの上で鳴らすと床が土に聞こえるので、場面 8 だけ作り直してある。
+  ガレージの反響は素材に焼かず、足元の `AudioReverbFilter`（`ParkingLot`）に持たせる
 - 雨は `RainLoop`。プレイヤーの頭上で輪にして流し、`RainCover` が屋根の下で音量を 35% まで絞る
 - インプラントジャックを抜く音は `JackPull`。`PullTimeline` の引き抜く段の頭で 1 度だけ鳴らす。チップを抜く音と同じパックから採ったが、低く伸ばして生々しさを足してある
 - 扉は `DoorShut`。自室を出るときに 1 度だけ鳴らし、1.75 秒おいてから暗転へ移る
 - ライターと息は `Cigarette`。`SmokeBeats` の時刻表に沿って、蓋 → 火 → 吸う → 吐く、の順に鳴らす
 - 吐く息の頭で `SmokePuffs.Blow()` を呼び、煙をひと息ぶん足す。音と煙は同じ時刻表から出るのでずれない
+
+## コンクリートの足音の作り直し
+
+Kenney の足音はどれも柔らかい地面のもので、2.5kHz 以上が 700Hz 以下より
+10.9〜15.5dB 弱い。裸のコンクリートは逆に高い打ちつけが勝つ。
+`tools/make-steps.py` で唸りを抜いて打音を持ち上げ、偏りを +2.5 / −0.3 / −3.0 / −7.7dB へ寄せた。
+
+**5 つ全部は使っていない。** `Step4` は元から高域がいちばん少なく、持ち上げても
+素材に無いものは出てこないので落とした。4 つ目（`Step3` 由来）だけ鈍いのはわざとで、
+毎歩きれいに踏まない一歩が混じっていた方が繰り返しに聞こえにくい。
+
+**採否はオーナーが聴いて決める。** こちらでは音を聴けないので、判断できるのは帯域の偏りだけ。
 
 ## 息の選び分け
 
