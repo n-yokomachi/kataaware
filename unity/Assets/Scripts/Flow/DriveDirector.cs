@@ -101,9 +101,10 @@ namespace HalfAware
         [SerializeField] float seatedYawLimit = 90f;
         [Tooltip("黒のまま置く秒数。**黒へ落ちるのはイグニッションを鳴らし終えるこの秒数前。** " +
             "黒が明けるのと鍵の音が鳴り終わるのが同じ瞬間になり、そこから走行音が始まる")]
-        [SerializeField] float pullHold = 4.6f;
-        [Tooltip("黒から一つ目の景色へ浮かび上がる秒数")]
-        [SerializeField] float pullFade = 1.8f;
+        [SerializeField] float pullHold = 2f;
+        [Tooltip("黒から一つ目の景色へ浮かび上がる秒数。**0 なら一瞬で切り替わる。** " +
+            "景色どうしの切り替えがフェード無しなので、場面の頭もそれに揃えてある")]
+        [SerializeField] float pullFade = 0f;
 
         [Header("腕")]
         [Tooltip("腕組みの腕。手動運転の帯だけ伏せる")]
