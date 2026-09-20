@@ -1265,7 +1265,6 @@ namespace HalfAware.EditorTools
             "doorOpen", "Assets/Audio/CarDoorOpen.wav",
             "doorShut", "Assets/Audio/CarDoorShut.wav",
             "ignition", "Assets/Audio/Ignition.wav",
-            "pullAway", "Assets/Audio/PullAway.wav",
             "paved", "Assets/Audio/DriveSealed.wav",
             "gravel", "Assets/Audio/DriveGravel.wav",
             "rain", "Assets/Audio/RainWipers.wav",

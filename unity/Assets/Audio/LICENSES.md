@@ -34,12 +34,11 @@ https://pixabay.com/service/license-summary/
 | `CarDoorOpen.wav` | Pixabay `dragon-studio-open-car-door-372469` | Pixabay Content License | モノラル 44.1kHz へ、頭の無音を落として末尾 60ms を落とした。0.92 秒 |
 | `CarDoorShut.wav` | Pixabay `freesound_community-car-door-close-6929` | Pixabay Content License | モノラル 44.1kHz へ、頭の無音を落とした。0.55 秒 |
 | `Ignition.wav` | Pixabay `freesound_community-keys-in-the-ignition-101951` | Pixabay Content License | モノラル 44.1kHz へ、頭の無音を落とした。6.72 秒 |
-| `PullAway.wav` | Pixabay `freesound_community-car-driving-interior-perspective-51388` | Pixabay Content License | 冒頭 6 秒。ステレオ 44.1kHz へ、頭 0.15 秒で立ち上げ、末尾 0.6 秒で落として次の走行音へ渡す |
 | `DriveSealed.wav` | Pixabay `freesound_community-car-driving-interior-perspective-51388`（オーナーが 22.3〜286.7 秒で切り出したもの） | Pixabay Content License | 60 秒地点から 21 秒。**6900Hz の音を抜いてある**（周りより 18dB 突き出ていた。Q 28 で −30dB、Q 60 で −24dB の二段）。+7dB、ステレオ 44.1kHz へ。頭 1.0 秒を尻へ被せて輪にした。20.00 秒 |
 | `DriveGravel.wav` | Pixabay `freesound_community-driving-a-truck-in-gravel-58271` | Pixabay Content License | 20 秒地点から 12 秒。閾値 −26dB / 比 2.5 / 持ち上げ 3dB で圧縮し、0.80 で頭打ち。ステレオ 44.1kHz へ。頭 0.75 秒を尻へ被せて輪にした。11.25 秒 |
 | `RainWipers.wav` | Pixabay `tommylynn-interior-car-in-rain-with-wipers-369260` | Pixabay Content License | 6 秒地点から 13.879 秒、+12dB。ステレオ 44.1kHz へ。頭 0.6 秒を尻へ被せて輪にした。**長さはワイパーの周期で決めてある**（包絡線の自己相関で 0.9485 秒。その 14 倍の 13.279 秒）。秒数で切ると払う拍が輪の継ぎ目で飛ぶ |
 | `Idle.wav` | Pixabay `freesound_community-car-keys-in-ignition-starting-stopping-engine-31102` | Pixabay Content License | 28 秒地点から 8.6 秒。モノラル 44.1kHz へ。頭 0.6 秒を尻へ被せて輪にした。8.00 秒。イグニッションのあと走り出すまでの間を埋める |
-| `WindowDown.wav` | Pixabay `freesound_community-car-window-down-103833` | Pixabay Content License | 1.85 秒地点から 4.45 秒。モノラル 44.1kHz へ。素材は 8.94 秒あるが、窓が動いているのは 2〜6 秒だけ |
+| `WindowDown.wav` | Pixabay `freesound_community-car-window-down-103833` | Pixabay Content License | 1.85 秒地点から 4.45 秒、+20dB。モノラル 44.1kHz へ。素材は 8.94 秒あるが、窓が動いているのは 2〜6 秒だけ。素のままだと実効 −41.9dB で、持ち上げた走行の輪（−19dB）に埋もれて聞こえなかった |
 
 切り出しの手順は ffmpeg で、`docs/` ではなくここに残す。素材そのものは repo に置かず、加工後の物だけを置いている。
 
@@ -61,7 +60,9 @@ https://pixabay.com/service/license-summary/
 走行音まで通すと、車の中にいるあいだずっとコンクリートの車庫の響きが乗る。
 
 鳴る順は、ドアを開ける → 目が運転席へ滑る → ドアを閉める → イグニッション →
-黒へ切り替えて動き出しの音 → フェードインして走行音の輪。秒数はどれも `DriveDirector` の
+黒へ切り替えて走行音の輪 → フェードイン。**動き出しの一発（PullAway）は消した。**
+舗装の走行音と同じ録音から切ったもので、オーナーの指示で外している。
+黒のあいだは走行音の輪そのものを鳴らすので、明けたときには同じ音が続いている。秒数はどれも `DriveDirector` の
 値で、オーナーが実画面を見てから決める。
 
 **走行の輪だけは大きさを揃えてある。** 三度「小さい」と差し戻され、`DriveSound` の音量が

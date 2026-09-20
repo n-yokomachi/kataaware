@@ -99,7 +99,7 @@ namespace HalfAware
         [SerializeField] float idleRough = 0.55f;
         [Tooltip("座ってから左右に振れる角度。度。片側の値。90 で前方 180 度")]
         [SerializeField] float seatedYawLimit = 90f;
-        [Tooltip("黒のまま置く秒数。ここで車の動き出す音が流れる")]
+        [Tooltip("黒のまま置く秒数。ここで走行音が鳴り始める")]
         [SerializeField] float pullHold = 4.6f;
         [Tooltip("黒から一つ目の景色へ浮かび上がる秒数")]
         [SerializeField] float pullFade = 1.8f;
@@ -455,7 +455,11 @@ namespace HalfAware
 
             // 黒へは切り替えで入る。場面 1 のドアを閉める暗転と同じ扱い
             hud.SetFade(1f);
-            if (sound != null) sound.PullAway();
+            // **黒のあいだに走り出す音を流す。** 以前は動き出しの一発（PullAway）を
+            // 置いていたが、舗装の走行音と同じ録音から切ったもので、オーナーに外された。
+            // 代わりに走行音の輪そのものをここから鳴らす。明けたときには
+            // すでに走っている音が続いているので、絵と音の辻褄も合う
+            if (sound != null) { sound.Road(At(0).gravel); sound.Weather(At(0).rain); }
             if (garage != null) garage.SetActive(false);
             world.Rolling = true;
             // 走り出したら揺れは路面が持つ。残すと二重に揺れる
@@ -468,8 +472,7 @@ namespace HalfAware
             clock.Reset();
             yield return Wait(pullHold);
 
-            // 明けるのはフェードイン。走行音と雨はここから
-            if (sound != null) { sound.Road(At(0).gravel); sound.Weather(At(0).rain); }
+            // 明けるのはフェードイン。走行音は黒のあいだから続いている
             for (var t = 0f; t < pullFade; t += Time.deltaTime)
             {
                 hud.SetFade(pullFade <= 0f ? 0f : 1f - t / pullFade);

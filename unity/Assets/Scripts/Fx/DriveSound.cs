@@ -30,8 +30,6 @@ namespace HalfAware
         [SerializeField] AudioClip doorOpen;
         [SerializeField] AudioClip doorShut;
         [SerializeField] AudioClip ignition;
-        [Tooltip("暗転の黒のあいだに流す、車が動き出す音")]
-        [SerializeField] AudioClip pullAway;
         [Tooltip("運転席の窓を下ろす音")]
         [SerializeField] AudioClip windowDown;
         [Tooltip("煙を吐く息。**Cigarette が持つのと同じ素材。**" +
@@ -66,6 +64,8 @@ namespace HalfAware
         [SerializeField] float idleVolume = 0.60f;
         [Tooltip("吐く息。口元なので単発より控えめに。場面 1 の Cigarette は 0.40")]
         [SerializeField] float breathVolume = 0.40f;
+        [Tooltip("窓を下ろす音。走行の輪の上で鳴るので単発の既定より大きく")]
+        [SerializeField] float windowVolume = 1.00f;
 
         [Header("窓")]
         [Tooltip("窓を閉めているときに走行音と雨から上を削る高さ。Hz")]
@@ -79,9 +79,6 @@ namespace HalfAware
         AudioLowPassFilter weatherMuffle;
         float cut = -1f;
         float want;
-
-        /// <summary>暗転の黒のあいだに流す音の長さ。秒。黒を何秒置くか決めるのに使う</summary>
-        public float PullAwaySeconds { get { return pullAway != null ? pullAway.length : 0f; } }
 
         /// <summary>イグニッションの長さ。秒。鳴らし終えてから震え出すのに使う</summary>
         public float IgnitionSeconds { get { return ignition != null ? ignition.length : 0f; } }
@@ -143,8 +140,16 @@ namespace HalfAware
         public void DoorOpen() { Shot(doorOpen); }
         public void DoorShut() { Shot(doorShut); }
         public void Ignition() { Shot(ignition); }
-        public void PullAway() { Shot(pullAway); }
-        public void WindowDown() { Shot(windowDown); }
+        /// <summary>
+        /// 窓を下ろす音。**単発の既定より大きく鳴らす。**
+        /// 走行の輪を素材ごと 16dB 持ち上げたので、既定の音量では埋もれて
+        /// 「消えてる？」と差し戻された
+        /// </summary>
+        public void WindowDown()
+        {
+            if (oneShot == null || windowDown == null) return;
+            oneShot.PlayOneShot(windowDown, windowVolume);
+        }
 
         /// <summary>煙を吐く息。窓を下ろし終えてから鳴らす</summary>
         public void Exhale()
