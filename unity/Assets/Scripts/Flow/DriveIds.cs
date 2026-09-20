@@ -13,6 +13,8 @@ namespace HalfAware
     {
         /// <summary>ガレージ。運転席のドアを調べると乗り込む</summary>
         public const string Door = "garage.door";
+        /// <summary>ガレージ。シャッターの開閉ボタン。読むだけで、何も動かない</summary>
+        public const string Button = "garage.button";
 
         /// <summary>帯 0 のきっかけ。助手席のメモリーチップの束</summary>
         public const string Chips = "drive.chips";

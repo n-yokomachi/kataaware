@@ -77,7 +77,7 @@ namespace HalfAware.Tests
         [Test]
         public void ItHoldsEveryIdOfScene8()
         {
-            var want = new System.Collections.Generic.List<string> { DriveIds.Door };
+            var want = new System.Collections.Generic.List<string> { DriveIds.Door, DriveIds.Button };
             for (var i = 0; i < DriveIds.Triggers.Count; i++)
             {
                 want.Add(DriveIds.Triggers[i]);

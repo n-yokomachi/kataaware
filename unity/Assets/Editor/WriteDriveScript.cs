@@ -94,6 +94,16 @@ namespace HalfAware.EditorTools
                 },
             });
 
+            // シャッターの開閉ボタン。押しても何も起きない。
+            // 二択は出さない（出すと SceneFlow.CloseChoice がプレイヤーを歩けるようにする）
+            entries.Add(new ScriptEntry
+            {
+                id = DriveIds.Button,
+                label = "シャッターのボタンを見る",
+                lines = new[] { "シャッターのボタンだが、押さなくても車で近づけば勝手に開く" },
+                hints = new ScriptHint[0],
+            });
+
             // 帯ごとのきっかけ。対象の文のあとに、DriveDirector が段を積む
             for (var i = 0; i < DriveIds.Triggers.Count; i++)
             {

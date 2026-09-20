@@ -21,6 +21,14 @@ MonoBehaviour:
     choice:
       question: "\u8ECA\u306B\u4E57\u308A\u8FBC\u3080"
       afterYes: []
+  - id: garage.button
+    label: "\u30B7\u30E3\u30C3\u30BF\u30FC\u306E\u30DC\u30BF\u30F3\u3092\u898B\u308B"
+    lines:
+    - "\u30B7\u30E3\u30C3\u30BF\u30FC\u306E\u30DC\u30BF\u30F3\u3060\u304C\u3001\u62BC\u3055\u306A\u304F\u3066\u3082\u8ECA\u3067\u8FD1\u3065\u3051\u3070\u52DD\u624B\u306B\u958B\u304F"
+    hints: []
+    choice:
+      question: 
+      afterYes: []
   - id: drive.chips
     label: "\u30C1\u30C3\u30D7\u306E\u675F\u3092\u898B\u308B"
     lines:
