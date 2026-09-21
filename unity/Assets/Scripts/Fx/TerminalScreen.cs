@@ -47,6 +47,8 @@ namespace HalfAware
         [SerializeField] Color glow = new Color(0.32f, 0.80f, 0.46f);
         [Tooltip("文字を流す速さ。UV/秒。行の高さは UV で 0.04 なので、0.06 なら 1 秒に 1.5 行進む")]
         [SerializeField] float scrollSpeed = 0.06f;
+        [Tooltip("灯った状態で始める。場面 5 は挿さったまま戻ってくるので、起動の瞬きから見せない")]
+        [SerializeField] bool startLit;
 
         static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
         static readonly int Emission = Shader.PropertyToID("_EmissionColor");
@@ -64,7 +66,10 @@ namespace HalfAware
         void Awake()
         {
             block = new MaterialPropertyBlock();
-            Paint(0f);
+            // 起動の途中からではなく、点きっぱなしの側から始める。
+            // Boot を呼ぶと二度瞬いてしまい、戻ってきたばかりの画面が点き直して見える
+            if (startLit) booted = ScreenBoot.Total;
+            Paint(booted < 0f ? 0f : ScreenBoot.Level(booted));
         }
 
         /// <summary>灯す。二度瞬いてから明るさが上がる</summary>

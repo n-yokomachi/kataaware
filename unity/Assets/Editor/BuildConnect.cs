@@ -41,13 +41,13 @@ namespace HalfAware.EditorTools
         /// <summary>戸口の内側。場面 2 の暗転から、ここで部屋の奥を向いて明ける</summary>
         static readonly Vector3 StartAt = new Vector3(0.80f, 0.05f, -2.45f);
         /// <summary>腰を下ろす場所。場面 1 が座って始まるのと同じ点</summary>
-        static readonly Vector3 SeatAt = new Vector3(1.50f, 0.05f, 1.20f);
+        public static readonly Vector3 SeatAt = new Vector3(1.50f, 0.05f, 1.20f);
         /// <summary>ソファの上の売上メモ</summary>
         static readonly Vector3 NoteAt = new Vector3(-2.40f, 0.67f, 0.19f);
         /// <summary>椅子。座面ではなく、立って見下ろせる高さに置く</summary>
         static readonly Vector3 ChairAt = new Vector3(1.50f, 0.75f, 1.20f);
         /// <summary>モニター。monitor / list / dive は順に開くので同じ点でよい</summary>
-        static readonly Vector3 ScreenAt = new Vector3(1.50f, 1.10f, 2.42f);
+        public static readonly Vector3 ScreenAt = new Vector3(1.50f, 1.10f, 2.42f);
 
         /// <summary>座ったときの目線の高さ。ConnectDirector へ渡す</summary>
         public const float SeatEyeHeight = 1.1f;
