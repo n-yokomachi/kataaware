@@ -170,7 +170,7 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// プレイヤーの rig と画面。空のシーンから組み上げるのでここで作る。
         ///
-        /// **CharacterController は効かせる。** 記憶の中でもプレイヤーが歩くので、
+        /// **CharacterController は有効にする。** 記憶の中でもプレイヤーが歩くので、
         /// 床を踏み、壁で止まる体が要る。記憶の頭で立ち位置へ据えるときだけ
         /// <see cref="DiveDirector"/> が一度切る
         /// </summary>
