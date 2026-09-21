@@ -16,6 +16,18 @@ namespace HalfAware.Tests
         {
             Assert.That(SceneMenu.Pick(1), Is.EqualTo("Room"));
             Assert.That(SceneMenu.Pick(2), Is.EqualTo("Alley"));
+            Assert.That(SceneMenu.Pick(3), Is.EqualTo("Connect"));
+            Assert.That(SceneMenu.Pick(4), Is.EqualTo("Dive"));
+            Assert.That(SceneMenu.Pick(5), Is.EqualTo("Rest"));
+            Assert.That(SceneMenu.Pick(6), Is.EqualTo("Drive"));
+        }
+
+        // 数字は鍵盤から直に読んでいて、読んでいるのは 1〜9。
+        // それより多く並べると、一覧に出ているのに押せない番号ができる
+        [Test]
+        public void EveryNumberCanBeTyped()
+        {
+            Assert.That(SceneMenu.Count, Is.LessThanOrEqualTo(9));
         }
 
         [Test]
@@ -57,6 +69,18 @@ namespace HalfAware.Tests
         public void TellsHowToClose()
         {
             Assert.That(SceneMenu.Compose("Room"), Does.Contain("Tab"));
+        }
+
+        // 組み立ての一覧に入っていないシーンは SceneManager.LoadScene が読めない。
+        // 数字を押した先で落ちるので、並べたものは全部入っていること
+        [Test]
+        public void EveryListedSceneIsInTheBuild()
+        {
+            var built = new System.Collections.Generic.List<string>();
+            foreach (var scene in UnityEditor.EditorBuildSettings.scenes)
+                built.Add(System.IO.Path.GetFileNameWithoutExtension(scene.path));
+            foreach (var name in SceneMenu.Scenes)
+                Assert.That(built, Does.Contain(name), name + " が組み立ての一覧に無い");
         }
     }
 }

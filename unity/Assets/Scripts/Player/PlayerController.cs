@@ -69,7 +69,7 @@ namespace HalfAware
         public int LogStep { get; private set; }
 
         /// <summary>
-        /// このフレームで押された数字。1〜4。押されていなければ 0。
+        /// このフレームで押された数字。1〜9。押されていなければ 0。
         /// Tab の一覧から場面を選ぶのに使う。入力の割り当ては増やさず鍵盤を直に見る
         /// </summary>
         public int MenuPick { get; private set; }
@@ -188,15 +188,16 @@ namespace HalfAware
             eye.localRotation = Quaternion.Euler(pitch + EyeTilt.x, head.Yaw + EyeTilt.y, 0f);
         }
 
-        /// <summary>押された数字の鍵盤を読む。1〜4 だけ見る</summary>
+        /// <summary>
+        /// 押された数字の鍵盤を読む。1〜9 を見る。
+        /// 場面が増えるたびにここへ足していくと、一覧に並んでいるのに押せない番号が残る
+        /// </summary>
         static int Digit()
         {
             var k = Keyboard.current;
             if (k == null) return 0;
-            if (k.digit1Key.wasPressedThisFrame) return 1;
-            if (k.digit2Key.wasPressedThisFrame) return 2;
-            if (k.digit3Key.wasPressedThisFrame) return 3;
-            if (k.digit4Key.wasPressedThisFrame) return 4;
+            for (var i = 0; i < 9; i++)
+                if (k[Key.Digit1 + i].wasPressedThisFrame) return i + 1;
             return 0;
         }
 

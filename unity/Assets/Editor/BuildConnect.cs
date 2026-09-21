@@ -77,6 +77,7 @@ namespace HalfAware.EditorTools
             var items = Items();
             var sheet = Screens();
             Wire(socket, sheet, items);
+            Register();
 
             var scene = EditorSceneManager.GetActiveScene();
             EditorSceneManager.MarkSceneDirty(scene);
@@ -88,6 +89,19 @@ namespace HalfAware.EditorTools
                 items.Count, Open(items), sheet.backs.Length, StartAt.ToString("F2"), SeatAt.ToString("F2"),
                 Vector3.Distance(new Vector3(StartAt.x, 0f, StartAt.z), new Vector3(SeatAt.x, 0f, SeatAt.z)),
                 sheet.panes.Length));
+        }
+
+        /// <summary>
+        /// 組み立ての一覧へ入れる。<c>SceneManager.LoadScene</c> は入っていないシーンを読めないので、
+        /// Tab の一覧からここへ飛べない
+        /// </summary>
+        static void Register()
+        {
+            var all = new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);
+            if (all.Exists(s => s.path == ScenePath)) return;
+            all.Add(new EditorBuildSettingsScene(ScenePath, true));
+            EditorBuildSettings.scenes = all.ToArray();
+            Debug.Log("組み立ての一覧へ Connect.unity を入れた");
         }
 
         /// <summary>
@@ -184,8 +198,8 @@ namespace HalfAware.EditorTools
             var so = new SerializedObject(flow);
             // 空だと Awake が座位の仕度を丸ごと飛ばす。場面 3 は立って始まる
             so.FindProperty("standAfter").stringValue = "";
-            // 場面 4 はまだ無い。「（仮）続く」で止める
-            so.FindProperty("nextScene").stringValue = "";
+            // 「潜る」で二択に「はい」と答えたら、そのまま場面 4 へ渡す
+            so.FindProperty("nextScene").stringValue = "Dive";
             // 場面 2 の暗転から続くので見出しを挟まない
             so.FindProperty("openingCard").stringValue = "";
             so.FindProperty("cutToBlack").boolValue = false;
