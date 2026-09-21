@@ -141,7 +141,8 @@ namespace HalfAware
                 }
             }
             if (!aimed) return;
-            // 手を戻す間は最後の狙いを保ったまま、元の向きへ帰る
+            // **手を戻しても視線は戻さない。** 挿したところを見たまま置く。
+            // 元の向きへ引き戻すと、挿し終わりに首だけが勝手に振れる
             var k = PlugTimeline.Aim(t);
             player.Yaw = Mathf.LerpAngle(fromYaw, aimYaw, k);
             player.Pitch = Mathf.Lerp(fromPitch, aimPitch, k);

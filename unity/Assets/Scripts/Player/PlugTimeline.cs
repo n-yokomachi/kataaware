@@ -48,8 +48,19 @@ namespace HalfAware
             return Mathf.SmoothStep(1f, 0f, (t - LetGoAt) / ReturnSeconds);
         }
 
-        /// <summary>視線をジャックへ寄せる強さ。0 で元の向き、1 でジャックの真正面</summary>
-        public static float Aim(float t) { return Swell(t, 0f, LookSeconds); }
+        /// <summary>
+        /// 視線をジャックへ寄せる強さ。0 で元の向き、1 でジャックの真正面。
+        ///
+        /// **上がったら戻さない。** 手は肘掛けへ戻すが、視線は挿したところを
+        /// 見たまま置いておく。元の向きへ引き戻すと、挿し終わりに首だけが
+        /// 勝手に振れて、誰かに向き直させられたように見える
+        /// </summary>
+        public static float Aim(float t)
+        {
+            if (t <= 0f) return 0f;
+            if (t >= LookSeconds) return 1f;
+            return Mathf.SmoothStep(0f, 1f, t / LookSeconds);
+        }
 
         /// <summary>左手を肘掛けへ伸ばす姿勢の強さ</summary>
         public static float Reach(float t) { return Swell(t, LookSeconds, ReachSeconds); }

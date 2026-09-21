@@ -15,16 +15,38 @@ namespace HalfAware.Tests
         }
 
         [Test]
-        public void EveryWeightStartsAndEndsAtNothing()
+        public void EveryBendStartsAndEndsAtNothing()
         {
-            Assert.AreEqual(0f, PlugTimeline.Aim(0f), 1e-4f);
             Assert.AreEqual(0f, PlugTimeline.Reach(0f), 1e-4f);
             Assert.AreEqual(0f, PlugTimeline.Carry(0f), 1e-4f);
             Assert.AreEqual(0f, PlugTimeline.Push(0f), 1e-4f);
-            Assert.AreEqual(0f, PlugTimeline.Aim(PlugTimeline.Total), 1e-4f);
             Assert.AreEqual(0f, PlugTimeline.Reach(PlugTimeline.Total), 1e-4f);
             Assert.AreEqual(0f, PlugTimeline.Carry(PlugTimeline.Total), 1e-4f);
             Assert.AreEqual(0f, PlugTimeline.Push(PlugTimeline.Total), 1e-4f);
+        }
+
+        /// <summary>手は肘掛けへ戻すが、視線は挿したところを見たまま置く</summary>
+        [Test]
+        public void HerEyesStayOnItAfterTheHandGoesBack()
+        {
+            Assert.AreEqual(0f, PlugTimeline.Aim(0f), 1e-4f);
+            Assert.AreEqual(1f, PlugTimeline.Aim(PlugTimeline.LookSeconds), 1e-4f);
+            Assert.AreEqual(1f, PlugTimeline.Aim(PlugTimeline.LetGoAt), 1e-4f);
+            Assert.AreEqual(1f, PlugTimeline.Aim(PlugTimeline.Total), 1e-4f);
+            Assert.AreEqual(1f, PlugTimeline.Aim(PlugTimeline.Total + 5f), 1e-4f);
+        }
+
+        [Test]
+        public void HerEyesTurnWithoutJumping()
+        {
+            var last = 0f;
+            for (var t = 0f; t <= PlugTimeline.LookSeconds; t += 0.01f)
+            {
+                var now = PlugTimeline.Aim(t);
+                Assert.GreaterOrEqual(now, last - 1e-4f);
+                Assert.LessOrEqual(now - last, 0.05f);
+                last = now;
+            }
         }
 
         [Test]
