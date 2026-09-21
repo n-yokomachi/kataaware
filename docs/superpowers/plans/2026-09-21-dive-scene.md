@@ -668,7 +668,23 @@ public static class DiveHandoff
 - `Play(int i)`:
   - 前の `Take` と場所を無効に。`roster[i].place` の場所と `Takes/i` を有効に
   - `body.Apply(roster[i])`、`caption.text = roster[i].row`
-  - 主の体: `take.Keys` を `roster[i].speed` 倍の速さで再生。毎フレーム `player.transform.position = place.TransformPoint(key.position)`、`player.transform.rotation = Quaternion.Euler(key.pitch, placeYaw + key.yaw, 0f)`、`player.EyeHeight = key.eyeHeight`。**首の向きはこの上に乗る**: 場面の頭で `player.HeadYawLimit = 90` を一度掛けておくと、`PlayerController` はマウスの向きを首（`HeadYaw`）と `Pitch` に入れ、体の `transform.rotation` には触らない。体の上下の傾きを `transform.rotation` の x に入れるのは、`Pitch` が一つしか無くプレイヤーの分と主の分を分けられないため。`player.Yaw` の set は使わない（首が制限されていると首を回してしまう）
+  - 主の体: `take.Keys` を `roster[i].speed` 倍の速さで再生。向きは `player.transform.rotation = Quaternion.Euler(key.pitch, placeYaw + key.yaw, 0f)`、目の高さは `player.EyeHeight = key.eyeHeight`
+  - **位置は、体を傾けたぶんを打ち消して置く。** 目はカメラとして体の子の `(0, EyeHeight, eyeLead)` にあり、`PlayerController` が毎フレームそこへ置き直す。体を x 回りに傾けると目もその弧を動くので、傾き 40 度・目の高さ 1.6・lead 0.22 では目が前へ 0.98 m、下へ 0.52 m ずれる。`BuildDiveTakes` の鍵打ちは**足元の位置**として書かれていて、目は真上にある前提なので、そのままだと壁を抜けたり相手を通り越したりする。次のように解く:
+
+```csharp
+var lead = player.Eye.localPosition.z;             // Start で一度だけ読む。EyeOffset が 0 のうちに
+var foot = place.TransformPoint(key.position);
+var spin = Quaternion.Euler(key.pitch, placeYaw + key.yaw, 0f);
+var flat = Quaternion.Euler(0f, placeYaw + key.yaw, 0f);
+var offset = new Vector3(0f, key.eyeHeight, lead);
+// 傾けない体での目の座を守り、そこへ傾けた体を合わせる
+player.transform.position = foot + flat * offset - spin * offset;
+player.transform.rotation = spin;
+player.EyeHeight = key.eyeHeight;
+```
+
+  - **首の向きはこの上に乗る**: 場面の頭で `player.HeadYawLimit = 90` を一度掛けておくと、`PlayerController` はマウスの向きを首（`HeadYaw`）と `Pitch` に入れ、体の `transform.rotation` には触らない。主の上下の傾きを体に入れるのは、`Pitch` が一つしか無くプレイヤーの分と主の分を分けられないため。`player.Yaw` の set は使わない（首が制限されていると首を回してしまう）
+  - **`Mover` は自分の時計を持たない。** `take.GetComponentsInChildren<Mover>()` を毎フレーム `Play(t)` で進める。呼ばないと 43 個が始まりの位置に止まったままになる
   - `take.Call` があれば 0.3 秒後に鳴らす
   - 尽きたら（`t >= length`）`chain.Next()` → `Play`
 - 板: 毎フレーム、`take.People` のうち目の中央に近い一人（目からの向きとの角 12 度以内、最も近い）を探す。半秒続いたら `panel.Show(person, roster[i].row, roster[target].row)`。外れて半秒で `Hide`。`panel.Grow(chain.CutSize)`
@@ -750,6 +766,7 @@ id は一つ。`dive`: 印「潜る」、文なし、二択なし。
 ## 決めていないこと
 
 - 呼ぶ声の音源（英語の合成音声をぼかす）。クリップが無い間は黙って進む
+- 眩暈の漂い（`EyeSway`）は `Dive.unity` に置いていない。`DazeVolume` のぼやけと二重像だけが効く。漂いも要るなら `BuildDive.Rig` で `EyeSway` を加える
 - 場所ごとの環境音、心音のクリップ
 - 切断の「裂ける」見え方。いまはフェードで代える
 - 板の置き場（肩の脇）と、出る・消える半秒
