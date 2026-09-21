@@ -28,12 +28,21 @@ namespace HalfAware
         [SerializeField] TMP_Text rowText;
         [Tooltip("二行目。操作")]
         [SerializeField] TMP_Text actionText;
-        [Tooltip("肩の脇へどれだけ寄せるか。m")]
-        [SerializeField] float side = 0.35f;
-        [Tooltip("足元からの高さ。m")]
-        [SerializeField] float height = 1.4f;
+        [Tooltip("肩の脇へどれだけ寄せるか。相手の体の半幅に対する割合")]
+        [SerializeField] float side = 1.6f;
+        [Tooltip("相手の頭より上へどれだけ出すか。相手の背丈に対する割合")]
+        [SerializeField] float lift = 0.12f;
+        [Tooltip("目からの距離 1 m あたりの板の大きさ。遠近で見かけの大きさを揃える。" +
+            "0.82 で、板の丈が画面の縦のおよそ 22 %（427×240 で 52 px）になる")]
+        [SerializeField] float perMetre = 0.82f;
+        [Tooltip("大きさの下限と上限")]
+        [SerializeField] float least = 0.45f;
+        [SerializeField] float most = 2.20f;
 
         Transform host;
+        /// <summary>相手の体の高さと半幅。Show のときに一度だけ測る</summary>
+        float tall = 1.7f;
+        float half = 0.25f;
         string line = "";
         float size = DiveChain.CutStart;
         int index;
@@ -63,7 +72,8 @@ namespace HalfAware
         public void Show(Transform beside, string row, string targetRow)
         {
             host = beside;
-            line = string.IsNullOrEmpty(targetRow) ? (row ?? "") : targetRow;
+            Measure(beside);
+            line = Brief(string.IsNullOrEmpty(targetRow) ? row : targetRow);
             if (!gameObject.activeSelf) gameObject.SetActive(true);
             Place();
             Paint();
@@ -100,14 +110,48 @@ namespace HalfAware
             Place();
         }
 
+        /// <summary>
+        /// 相手の体を測る。背丈も幅も模型と縮尺でまちまちで、
+        /// 高さを決め打ちにすると子どもの脇では頭の上へ大きく浮く
+        /// </summary>
+        void Measure(Transform beside)
+        {
+            tall = 1.7f;
+            half = 0.25f;
+            if (beside == null) return;
+            var parts = beside.GetComponentsInChildren<Renderer>();
+            if (parts.Length == 0) return;
+            var box = parts[0].bounds;
+            for (var i = 1; i < parts.Length; i++) box.Encapsulate(parts[i].bounds);
+            tall = Mathf.Max(0.4f, box.size.y);
+            half = Mathf.Max(0.1f, Mathf.Max(box.size.x, box.size.z) * 0.5f);
+        }
+
         void Place()
         {
             if (host == null) return;
-            transform.position = host.position + host.right * side + Vector3.up * height;
+            transform.position = host.position
+                + host.right * (half * side) + Vector3.up * (tall * (1f + lift));
             if (eye == null) return;
             var away = transform.position - eye.position;
             if (away.sqrMagnitude < 1e-6f) return;
             transform.rotation = Quaternion.LookRotation(away.normalized, Vector3.up);
+            // **見かけの大きさを揃える。** 寄られると画面の半分を覆い、
+            // 離れると行が読めなくなる。目からの距離に比例させれば、どちらも起きない
+            var span = Mathf.Clamp(away.magnitude * perMetre, least, most);
+            transform.localScale = Vector3.one * span;
+        }
+
+        /// <summary>
+        /// 板に出すぶんだけ切り出す。行は「性別　年齢　『名前』　日付 時刻」の形だが、
+        /// 板は相手の目の前に浮く小さな面で、二十数文字を流し込むと一字が数 px になって潰れる。
+        /// 日付と時刻は右上の行が出しているので、板は名前までで足りる
+        /// </summary>
+        static string Brief(string row)
+        {
+            if (string.IsNullOrEmpty(row)) return "";
+            var shut = row.IndexOf('』');
+            return shut < 0 ? row : row.Substring(0, shut + 1);
         }
 
         void Paint()

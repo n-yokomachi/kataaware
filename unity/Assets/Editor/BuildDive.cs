@@ -440,8 +440,6 @@ namespace HalfAware.EditorTools
             so.FindProperty("eye").objectReferenceValue = Look("Player/Main Camera");
             so.FindProperty("rowText").objectReferenceValue = row;
             so.FindProperty("actionText").objectReferenceValue = action;
-            so.FindProperty("side").floatValue = 0.35f;
-            so.FindProperty("height").floatValue = 1.4f;
             so.ApplyModifiedPropertiesWithoutUndo();
 
             // 目を留めた相手が決まるまで出さない。DiveDirector が Show で起こす
@@ -466,7 +464,7 @@ namespace HalfAware.EditorTools
             text.textWrappingMode = TextWrappingModes.NoWrap;
             text.enableAutoSizing = true;
             text.fontSizeMin = 0.02f;
-            text.fontSizeMax = 0.09f;
+            text.fontSizeMax = 0.14f;
             text.text = "";
             var rect = text.rectTransform;
             rect.sizeDelta = new Vector2(PanelWide * 0.94f, PanelHigh * 0.42f);

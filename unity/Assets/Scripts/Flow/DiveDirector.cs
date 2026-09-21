@@ -141,7 +141,10 @@ namespace HalfAware
         void Update()
         {
             if (cutting || chain == null || take == null) return;
-            clock += Time.deltaTime * Mathf.Max(0.05f, entry.speed);
+            // **速さで時計を倍にしない。** 主の体の速い遅いは鍵打ちの間隔が既に持っていて、
+            // ここで掛けると設計書の秒数（子どもと老人 60 秒、他 25〜35 秒）が
+            // 速さで割った実時間になる。メイは 40 秒、アルベルトは 100 秒になっていた
+            clock += Time.deltaTime;
             Carry();
             Drift();
             Voice();
