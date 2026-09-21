@@ -115,7 +115,175 @@ namespace HalfAware.EditorTools
                 Blur.Near, 0.6f, 0.7f, Tone(0.92f, 0.90f, 0.86f), Aged, false,
                 Who("Husband", 8)));
 
+            // 会話は番号で結ぶ。人ごとの Of の引数に混ぜると一行が長くなりすぎて、
+            // 設計書 7 節と突き合わせられなくなる
+            for (var i = 0; i < entries.Count; i++)
+            {
+                var e = entries[i];
+                e.said = i < Talks.Length ? Talks[i] : new Said[0];
+                entries[i] = e;
+            }
+
             return entries;
+        }
+
+        /// <summary>
+        /// 記憶ごとの会話。設計書 7 節の写し。秒は記憶の頭から。
+        ///
+        /// **独白は入れない。** 顔は見せないので、誰が喋っているかは声の向きと
+        /// ここの名前でしか伝わらない。話者と鉤括弧はこの文字列に含めて、
+        /// <see cref="HudView"/> の字幕帯へそのまま流す
+        /// </summary>
+        static readonly Said[][] Talks =
+        {
+            // 1. メイ
+            new[]
+            {
+                At(0f, "母「メイ！　置いていくよ」"),
+                At(4f, "メイ「待って、まだ結んでる」"),
+                At(20f, "母「ほら、来なさい」"),
+                At(26f, "メイ「重い？」"),
+                At(30f, "母「重くなった」"),
+                At(40f, "母「気をつけて行くんだよ」"),
+            },
+            // 2. ハンナ
+            new[]
+            {
+                At(0f, "ジョルジョ「ハンナ。おはよう」"),
+                At(3f, "ハンナ「おはようございます」"),
+                At(9f, "メイ「ママ！　体操着！」"),
+                At(13f, "ハンナ「もう。ほら」"),
+                At(19f, "ハンナ「行ってらっしゃい」"),
+            },
+            // 3. アルベルト
+            new[]
+            {
+                At(0f, "ローザ「アルベルト、帰りましょう」"),
+                At(5f, "ソフィア「おじいちゃん、手」"),
+                At(10f, "アルベルト「ああ、ありがとう」"),
+                At(26f, "ソフィア「これあげる」"),
+                At(32f, "アルベルト「……石か」"),
+                At(36f, "ソフィア「白いの。きれいでしょ」"),
+                At(48f, "アルベルト「とっておくよ」"),
+            },
+            // 4. ソフィア
+            new[]
+            {
+                At(0f, "アルベルト「ソフィア、そろそろだ」"),
+                At(4f, "ソフィア「うん。立てる？」"),
+                At(9f, "アルベルト「ゆっくりならな」"),
+                At(18f, "ソフィア「はい、これ」"),
+                At(23f, "アルベルト「……石か」"),
+            },
+            // 5. エミリー
+            new[]
+            {
+                At(0f, "プリヤ「エミリー。あの、本」"),
+                At(5f, "エミリー「ああ、もう読んだの」"),
+                At(11f, "プリヤ「はい。面白かったです」"),
+                At(17f, "エミリー「次のも持ってこようか」"),
+                At(23f, "プリヤ「いいんですか」"),
+            },
+            // 6. マーク
+            new[]
+            {
+                At(0f, "リンダ「マーク、お弁当」"),
+                At(4f, "マーク「そこ置いといて」"),
+                At(12f, "ダニエル「おはよう」"),
+                At(16f, "リンダ「はい、あなたの」"),
+                At(22f, "ダニエル「いってきます」"),
+                At(28f, "リンダ「傘は」"),
+                At(31f, "ダニエル「いらない」"),
+            },
+            // 7. リンダ
+            new[]
+            {
+                At(0f, "マーク「リンダ、これどこだ」"),
+                At(4f, "リンダ「上の棚」"),
+                At(11f, "ダニエル「おはよう」"),
+                At(15f, "リンダ「はい、お弁当」"),
+                At(21f, "ダニエル「いってきます」"),
+            },
+            // 8. リー
+            new[]
+            {
+                At(0f, "アイシャ「リー先生。ここが分かりません」"),
+                At(5f, "リー「どこだ」"),
+                At(9f, "アイシャ「この式の、三行目」"),
+                At(15f, "リー「ああ、符号だな」"),
+                At(24f, "リー「おい、起きろ」"),
+                At(29f, "マテオ「……はい」"),
+            },
+            // 9. ジョルジョ
+            new[]
+            {
+                At(0f, "エレナ「ジョルジョ、新聞」"),
+                At(4f, "ジョルジョ「今取ってる」"),
+                At(11f, "ハンナ「おはようございます」"),
+                At(15f, "ジョルジョ「おはよう。今日は早いね」"),
+            },
+            // 10. ローザ
+            new[]
+            {
+                At(0f, "アルベルト「ローザ、行くぞ」"),
+                At(5f, "ローザ「はいはい」"),
+                At(11f, "ローザ「ルーカス！　戻りなさい」"),
+                At(17f, "ルーカス「はと、いっぱい」"),
+                At(23f, "ローザ「ほら、手を」"),
+            },
+            // 11. ルーカス
+            new[]
+            {
+                At(0f, "ローザ「ルーカス、戻りなさい」"),
+                At(5f, "ルーカス「はと、いっぱい」"),
+                At(12f, "ローザ「はい、これあげて」"),
+                At(19f, "ルーカス「いっぱいきた」"),
+            },
+            // 12. プリヤ
+            new[]
+            {
+                At(0f, "エミリー「プリヤ？」"),
+                At(4f, "プリヤ「あ、すみません。本、ありがとうございました」"),
+                At(12f, "エミリー「どうだった」"),
+                At(17f, "プリヤ「面白かったです」"),
+            },
+            // 13. ダニエル
+            new[]
+            {
+                At(0f, "リンダ「ダニエル、遅れるよ」"),
+                At(4f, "ダニエル「分かってる」"),
+                At(11f, "リンダ「はい、お弁当」"),
+                At(17f, "ダニエル「いってきます」"),
+            },
+            // 14. アイシャ
+            new[]
+            {
+                At(0f, "リー「アイシャ。どうした」"),
+                At(4f, "アイシャ「ここが分かりません」"),
+                At(10f, "リー「ああ、符号だな」"),
+                At(17f, "リー「おい、起きろ」"),
+            },
+            // 15. マテオ
+            new[]
+            {
+                At(0f, "アイシャ「マテオ。起きて」"),
+                At(5f, "マテオ「……ん」"),
+                At(11f, "リー「おい、起きろ」"),
+                At(16f, "マテオ「……はい」"),
+            },
+            // 16. エレナ
+            new[]
+            {
+                At(0f, "ジョルジョ「エレナ、新聞」"),
+                At(4f, "エレナ「そこ置いて」"),
+                At(11f, "ジョルジョ「隣の子、また走ってたよ」"),
+                At(17f, "エレナ「元気ねえ」"),
+            },
+        };
+
+        static Said At(float at, string line)
+        {
+            return new Said { at = at, line = line };
         }
 
         /// <summary>色味は Volume の Color Filter に入るので、透明度は触らない</summary>
@@ -146,6 +314,7 @@ namespace HalfAware.EditorTools
                 muffle = muffle,
                 heartbeat = heartbeat,
                 seen = seen ?? new Seen[0],
+                said = new Said[0],
             };
         }
 
@@ -175,6 +344,7 @@ namespace HalfAware.EditorTools
                 e.FindPropertyRelative("muffle").floatValue = entries[i].muffle;
                 e.FindPropertyRelative("heartbeat").boolValue = entries[i].heartbeat;
                 Fill(e.FindPropertyRelative("seen"), entries[i].seen);
+                Lines(e.FindPropertyRelative("said"), entries[i].said);
             }
             so.ApplyModifiedPropertiesWithoutUndo();
 
@@ -185,7 +355,22 @@ namespace HalfAware.EditorTools
             }
             EditorUtility.SetDirty(asset);
             AssetDatabase.SaveAssets();
-            Debug.Log(string.Format("場面 4 の記憶の一覧を書き出した。{0} 人 → {1}", entries.Count, Path));
+            var said = 0;
+            foreach (var e in entries) said += e.said == null ? 0 : e.said.Length;
+            Debug.Log(string.Format("場面 4 の記憶の一覧を書き出した。{0} 人、会話 {1} 行 → {2}",
+                entries.Count, said, Path));
+        }
+
+        static void Lines(SerializedProperty list, Said[] said)
+        {
+            var n = said == null ? 0 : said.Length;
+            list.arraySize = n;
+            for (var i = 0; i < n; i++)
+            {
+                var p = list.GetArrayElementAtIndex(i);
+                p.FindPropertyRelative("at").floatValue = said[i].at;
+                p.FindPropertyRelative("line").stringValue = said[i].line;
+            }
         }
 
         static void Fill(SerializedProperty list, Seen[] people)

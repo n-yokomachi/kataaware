@@ -170,9 +170,9 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// プレイヤーの rig と画面。空のシーンから組み上げるのでここで作る。
         ///
-        /// **CharacterController は動かさない。** 体は記憶ごとの鍵打ちで運ぶので、
-        /// 当たりに押し出されると鍵打ちからずれる。<see cref="PlayerController"/> が
-        /// RequireComponent で連れてくるぶんは避けられないので、そのまま無効にして置く
+        /// **CharacterController は効かせる。** 記憶の中でもプレイヤーが歩くので、
+        /// 床を踏み、壁で止まる体が要る。記憶の頭で立ち位置へ据えるときだけ
+        /// <see cref="DiveDirector"/> が一度切る
         /// </summary>
         static void Rig(Volume volume)
         {
@@ -208,10 +208,13 @@ namespace HalfAware.EditorTools
             if (body != null)
             {
                 body.height = 1.7f;
-                body.radius = 0.3f;
+                // 団地の階段は手すりの内側が 0.9 m しかない。
+                // 0.3 の半径だと登りながら両側に触れて、段の途中で止まることがある
+                body.radius = 0.26f;
                 body.center = new Vector3(0f, 0.85f, 0f);
-                body.enabled = false;
+                body.enabled = true;
             }
+            Feet(player.transform, body);
 
             // 心音は借りた体の内側で鳴るので、距離で薄れないように平らに鳴らす
             var heart = new GameObject("Heart");
@@ -230,13 +233,71 @@ namespace HalfAware.EditorTools
             hso.FindProperty("heart").objectReferenceValue = beat;
             hso.ApplyModifiedPropertiesWithoutUndo();
 
-            // 最初の記憶の頭に据える。DiveDirector が無いあいだ、開いた絵が真っ暗にならないように
+            // 最初の記憶の頭に据える。DiveDirector が無いあいだ、開いた絵が真っ暗にならないように。
+            // 当たりを入れたまま動かすと床や壁に押し出される（BuildAlley.Place と同じ手）
+            if (body != null) body.enabled = false;
             player.transform.position = PlaceOrigin(DiveIds.Estate) + FirstStand;
             player.transform.rotation = Quaternion.Euler(0f, FirstYaw, 0f);
+            if (body != null) body.enabled = true;
 
             Screen();
             var daze = new GameObject("Daze");
             daze.AddComponent<DazeVolume>();
+        }
+
+        /// <summary>
+        /// 団地・教室・台所の床。場面 8 と同じコンクリートの打音（`tools/make-steps.py`）
+        /// </summary>
+        static readonly string[] HardSteps =
+        {
+            "Assets/Audio/Concrete1.wav", "Assets/Audio/Concrete2.wav",
+            "Assets/Audio/Concrete3.wav", "Assets/Audio/Concrete4.wav",
+        };
+
+        /// <summary>公園の土と電車の板。場面 1・2 の柔らかい足音</summary>
+        static readonly string[] SoftSteps =
+        {
+            "Assets/Audio/Step1.wav", "Assets/Audio/Step2.wav", "Assets/Audio/Step3.wav",
+            "Assets/Audio/Step4.wav", "Assets/Audio/Step5.wav",
+        };
+
+        static AudioClip[] Steps(string[] paths)
+        {
+            var all = new AudioClip[paths.Length];
+            for (var i = 0; i < paths.Length; i++)
+            {
+                all[i] = AssetDatabase.LoadAssetAtPath<AudioClip>(paths[i]);
+                if (all[i] == null) Debug.LogWarning("足音の素材が無い: " + paths[i]);
+            }
+            return all;
+        }
+
+        /// <summary>
+        /// 足音。<see cref="DiveDirector"/> が記憶の頭で床の音を取り替えるので、
+        /// ここでは入れ物だけを組んで、コンクリートを初めの一組として入れておく。
+        ///
+        /// 響きは付けない。五つの場所は屋外の階段から電車の中まで広さも素材も違い、
+        /// 一つの <c>AudioReverbFilter</c> で通すと、どこかの場所で必ず嘘になる
+        /// </summary>
+        static void Feet(Transform player, CharacterController body)
+        {
+            var feet = new GameObject("Feet");
+            feet.transform.SetParent(player, false);
+            feet.transform.localPosition = new Vector3(0f, 0.02f, 0f);
+
+            var src = feet.AddComponent<AudioSource>();
+            src.playOnAwake = false;
+            src.loop = false;
+            // 耳と同じ体に付いているので、距離で減らさない
+            src.spatialBlend = 0f;
+            src.volume = 0.55f;
+
+            var steps = feet.AddComponent<Footsteps>();
+            var so = new SerializedObject(steps);
+            so.FindProperty("body").objectReferenceValue = body;
+            so.FindProperty("source").objectReferenceValue = src;
+            Fill(so.FindProperty("clips"), Steps(HardSteps));
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         /// <summary>
@@ -301,11 +362,11 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 暗転と幕と、右上の行。
+        /// 暗転と幕と、字幕帯と、右上の行。
         ///
-        /// **字幕帯は出さない。** この場面で呼ばれた言葉を持っているのは右上の行の方で、
-        /// 帯を出すと二つの場所で同じことを言うことになる。入れ物だけは
-        /// <see cref="HudView"/> が要るので置いてある
+        /// 右上の行はいま潜っている人が誰かを、字幕帯は記憶の中のやりとりを持つ。
+        /// 呼ばれた言葉だけは右上の行と重なるが、そちらは名前と歳と日付の一行で、
+        /// 帯に出るのは鉤括弧の台詞なので、同じことを二度言うことにはならない
         /// </summary>
         static HudView Screen()
         {
@@ -511,6 +572,10 @@ namespace HalfAware.EditorTools
                 Object.FindFirstObjectByType<Volume>(FindObjectsInactive.Include);
             dso.FindProperty("body").objectReferenceValue = body;
             dso.FindProperty("panel").objectReferenceValue = holo;
+            dso.FindProperty("feet").objectReferenceValue =
+                Object.FindFirstObjectByType<Footsteps>(FindObjectsInactive.Include);
+            Fill(dso.FindProperty("hardSteps"), Steps(HardSteps));
+            Fill(dso.FindProperty("softSteps"), Steps(SoftSteps));
             dso.FindProperty("roster").objectReferenceValue = roster;
             Fill(dso.FindProperty("places"), Named(places, DiveIds.Places));
             Fill(dso.FindProperty("takes"), Numbered(takes, roster.Count));
@@ -738,8 +803,46 @@ namespace HalfAware.EditorTools
         /// <summary>素材ごとに溜めた面を、その素材のマテリアルで一枚に焼いて置く</summary>
         static Transform Emit(Transform parent, string name, Bank bank, string material)
         {
-            var made = bank.Emit(parent, name, Mat(material), false, Generated);
+            return Emit(parent, name, bank, material, false);
+        }
+
+        /// <summary>
+        /// 当たりを入れて置く。
+        ///
+        /// **入れるのは床と壁だけ。** 記憶の中をプレイヤーが歩くようになったので、
+        /// 踏む面と外へ出さない面が要る。天井・遠景の書き割り・家具の細かいところは、
+        /// 入れても歩く先が変わらないわりに、引っ掛かって抜け出せない隅が増える
+        /// </summary>
+        static Transform Emit(Transform parent, string name, Bank bank, string material, bool collide)
+        {
+            var made = bank.Emit(parent, name, Mat(material), collide, Generated);
             return made != null ? made.transform : null;
+        }
+
+        /// <summary>
+        /// 見えない仕切り。
+        ///
+        /// 団地の地面も公園の地面も、端から先は何も無い虚空で、歩いて行けば落ちる。
+        /// 絵に出さずに止めたいので、レンダラーを持たない当たりだけを置く
+        /// </summary>
+        static void Fence(Transform place, string name, Vector3 at, Vector3 size)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(place, false);
+            go.transform.localPosition = at;
+            go.AddComponent<BoxCollider>().size = size;
+        }
+
+        /// <summary>場所の地面をぐるりと囲う。x と z の幅、囲いの高さ、厚み</summary>
+        static void Ring(Transform place, string name, Vector2 x, Vector2 z, float high)
+        {
+            const float thick = 0.4f;
+            var mid = new Vector3((x.x + x.y) * 0.5f, high * 0.5f, (z.x + z.y) * 0.5f);
+            var span = new Vector3(x.y - x.x, high, z.y - z.x);
+            Fence(place, name + "X0", new Vector3(x.x - thick * 0.5f, mid.y, mid.z), new Vector3(thick, high, span.z));
+            Fence(place, name + "X1", new Vector3(x.y + thick * 0.5f, mid.y, mid.z), new Vector3(thick, high, span.z));
+            Fence(place, name + "Z0", new Vector3(mid.x, mid.y, z.x - thick * 0.5f), new Vector3(span.x, high, thick));
+            Fence(place, name + "Z1", new Vector3(mid.x, mid.y, z.y + thick * 0.5f), new Vector3(span.x, high, thick));
         }
 
         /// <summary>
@@ -788,7 +891,7 @@ namespace HalfAware.EditorTools
             for (var i = parent.childCount - 1; i >= 0; i--) Object.DestroyImmediate(parent.GetChild(i).gameObject);
         }
 
-        static void Fill(SerializedProperty row, Transform[] all)
+        static void Fill(SerializedProperty row, Object[] all)
         {
             row.arraySize = all.Length;
             for (var i = 0; i < all.Length; i++) row.GetArrayElementAtIndex(i).objectReferenceValue = all[i];

@@ -16,6 +16,19 @@ namespace HalfAware
         public int target;
     }
 
+    /// <summary>
+    /// 記憶の中で交わされる一行。顔は見せないので、誰が喋っているかは
+    /// 声の向きとこの文字列の名前でしか伝わらない。話者と鉤括弧は line に含める
+    /// </summary>
+    [Serializable]
+    public struct Said
+    {
+        [Tooltip("記憶の頭からの秒")]
+        public float at;
+        [Tooltip("話者と鉤括弧つきの一行")]
+        public string line;
+    }
+
     /// <summary>記憶一つ分の値。場所と人の形はシーン（Take）が持ち、ここは数と文字だけ</summary>
     [Serializable]
     public struct DiveEntry
@@ -39,5 +52,7 @@ namespace HalfAware
         public float muffle;
         public bool heartbeat;
         public Seen[] seen;
+        [Tooltip("記憶の頭からの秒で流す会話。設計書 7 節")]
+        public Said[] said;
     }
 }

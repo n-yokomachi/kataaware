@@ -28,6 +28,20 @@ namespace HalfAware
         /// <summary>これまでに鳴らした歩数。動作確認から読む</summary>
         public int Steps { get; private set; }
 
+        /// <summary>いま鳴らす音の数。動作確認から読む</summary>
+        public int ClipCount { get { return clips == null ? 0 : clips.Length; } }
+
+        /// <summary>
+        /// 床の音を取り替える。場面 4 は一つのシーンに五つの場所が同居していて、
+        /// 潜る先によってコンクリートと土を履き替える。
+        /// 直前に鳴らした番号も忘れる。取り替えた先の並びでは別の音を指している
+        /// </summary>
+        public void Use(AudioClip[] next)
+        {
+            clips = next ?? new AudioClip[0];
+            last = -1;
+        }
+
         /// <summary>
         /// 積んだ距離に distance を足して、鳴らすべき歩数を返す。
         /// 残りは次に持ち越す。止まっているあいだは 0

@@ -163,7 +163,7 @@ namespace HalfAware.EditorTools
             Flightup(slab, EstateLanding2 - LandingDeep * 0.5f, Floor * 2f);
             // 右の家の床
             slab.FaceY(EstateTop, 3.0f, 7.0f, -18.6f, EstateFace, 1);
-            Emit(place, "EstateFloor", slab, "Floor");
+            Emit(place, "EstateFloor", slab, "Floor", true);
 
             var wall = new Bank { Texel = 0.3f };
             // 階段が背にしている壁。ここが無いと、階段が虚空に掛かっているように見える
@@ -185,7 +185,7 @@ namespace HalfAware.EditorTools
             wall.FaceX(7.0f, -18.6f, EstateFace, EstateTop, EstateTop + 2.5f, -1);
             wall.FaceZ(-18.6f, 3.0f, 7.0f, EstateTop, EstateTop + 2.5f, 1);
             wall.FaceZ(EstateFace - 0.02f, 3.0f, 7.0f, EstateTop, EstateTop + 2.5f, -1);
-            Emit(place, "EstateWall", wall, "Wall");
+            Emit(place, "EstateWall", wall, "Wall", true);
 
             var sky = new Bank { Texel = 0.3f };
             sky.FaceY(EstateTop + 2.5f, 3.0f, 7.0f, -18.6f, EstateFace, -1);
@@ -198,17 +198,18 @@ namespace HalfAware.EditorTools
             Handrail(rail, EstateLanding1 - LandingDeep * 0.5f, Floor);
             Bar(rail, EstateLanding2 - LandingDeep * 0.5f, EstateLanding2 + LandingDeep * 0.5f, Floor * 2f);
             Handrail(rail, EstateLanding2 - LandingDeep * 0.5f, Floor * 2f);
-            Bar(rail, EstateWalk - LandingDeep * 0.5f, EstateWalk + LandingDeep * 0.5f, EstateTop);
-            // 三階の廊下の外側。手すりは廊下の長さぶん通す
+            // 三階の廊下の外側。**階段の口（x -0.6〜0.6）は空ける。**
+            // 手すりに当たりを入れたので、廊下の長さぶん通すと階段を上がってきた先が塞がる。
+            // 一度通した版では、上がり切ったところで壁に突き当たって廊下へ出られなかった
             for (var i = 0; i < 2; i++)
             {
                 var y = EstateTop + 0.5f + i * 0.45f;
-                rail.Box(new Vector3(3.2f, y, EstateWalk + LandingDeep * 0.5f), new Vector3(7.6f, 0.05f, 0.05f));
+                rail.Box(new Vector3(3.8f, y, EstateWalk + LandingDeep * 0.5f), new Vector3(6.4f, 0.05f, 0.05f));
             }
-            for (var i = 0; i <= 6; i++)
-                rail.Box(new Vector3(-0.6f + i * 1.3f, EstateTop + 0.48f, EstateWalk + LandingDeep * 0.5f),
+            for (var i = 0; i <= 5; i++)
+                rail.Box(new Vector3(StairHalf + i * 1.28f, EstateTop + 0.48f, EstateWalk + LandingDeep * 0.5f),
                     new Vector3(0.05f, 0.96f, 0.05f));
-            Emit(place, "EstateRail", rail, "Rail");
+            Emit(place, "EstateRail", rail, "Rail", true);
 
             // 戸はどちらも開いている。記憶 0 は母が戸口に立ち、記憶 8 は新聞を持って中へ入り、
             // 記憶 15 は中から夫を迎える。閉めた戸を置くと、その三つが同じ場所で成り立たなくなる
@@ -236,6 +237,17 @@ namespace HalfAware.EditorTools
             Pane(place, "EstateTv", EstateTv + new Vector3(0f, 0f, 0.06f),
                 new Vector2(0.72f, 0.44f), Vector3.forward, Glow("GlowTv", new Color(0.72f, 0.82f, 1f), 1.35f));
 
+            // 地面の端から先は虚空なので、見えない仕切りで囲う。
+            // 建物の中まで歩ける必要は無いが、裏へ回れても困らないので地面ごと囲う
+            Ring(place, "EstateFence", new Vector2(-6f, 10f), new Vector2(-20f, 7f), 3.5f);
+            // 階段と三階の廊下の外側は手すりが受け持つ。EstateRail に当たりを入れてあるので、
+            // ここへ仕切りを重ねると階段を上がってきた先が塞がる。
+            // **廊下の両端だけは手すりが無い。** 歩いて確かめたら、廊下を +x へ歩き切って
+            // 三階から地面へ落ちた。絵に手すりを増やさずに止めたいので、仕切りで塞ぐ
+            Fence(place, "EstateWalkEndA", new Vector3(-0.7f, EstateTop + 0.75f, EstateWalk),
+                new Vector3(0.2f, 1.5f, LandingDeep));
+            Fence(place, "EstateWalkEndB", new Vector3(7.1f, EstateTop + 0.75f, EstateWalk),
+                new Vector3(0.2f, 1.5f, LandingDeep));
             // 朝の低い日射し。階段の側から当てるので、三階の戸口に立つ人は逆光になる
             var sun = Lamp(place, "Morning", LightType.Directional, new Vector3(0f, 12f, 0f),
                 new Vector3(30f, -148f, 0f), new Color(1f, 0.95f, 0.86f), 1.7f, 10f);
@@ -302,7 +314,7 @@ namespace HalfAware.EditorTools
         {
             var dirt = new Bank { Texel = 0.25f };
             dirt.FaceY(0f, -9f, 9f, -9f, 13f, 1);
-            Emit(place, "ParkGround", dirt, "Ground");
+            Emit(place, "ParkGround", dirt, "Ground", true);
 
             var wood = new Bank { Texel = 0.5f };
             Bench(wood, BenchA);
@@ -324,7 +336,7 @@ namespace HalfAware.EditorTools
             }
             stone.Box(new Vector3(-GateHalf, 1.2f, GateZ), new Vector3(0.35f, 2.4f, 0.35f));
             stone.Box(new Vector3(GateHalf, 1.2f, GateZ), new Vector3(0.35f, 2.4f, 0.35f));
-            Emit(place, "ParkStone", stone, "Wall");
+            Emit(place, "ParkStone", stone, "Wall", true);
 
             var pool = new Bank { Texel = 0.2f };
             pool.FaceY(0.06f, Pond.x - PondR, Pond.x + PondR, Pond.z - PondR * 0.4f, Pond.z + PondR, 1);
@@ -343,6 +355,8 @@ namespace HalfAware.EditorTools
 
             // 鳩は場所ではなく記憶の側に置く（BuildDiveTakes.Doves）。
             // 飛び立つ秒が記憶ごとに違うので、場所に置くと四つの記憶で同じ瞬間に飛ぶことになる
+
+            Ring(place, "ParkFence", new Vector2(-9f, 9f), new Vector2(-9f, 13f), 3.5f);
 
             // 午後の低い日。**門の側（+z）から差す。** 門へ歩く人はこれで逆光になり、
             // 遠景の板の影も場所の外へ伸びる。逆向きに当てていたときは、板の影が
@@ -371,7 +385,7 @@ namespace HalfAware.EditorTools
         {
             var deck = new Bank { Texel = 0.5f };
             deck.FaceY(0f, -CarHalf, CarHalf, -CarLong, CarLong, 1);
-            Emit(place, "TrainFloor", deck, "Floor");
+            Emit(place, "TrainFloor", deck, "Floor", true);
 
             var shell = new Bank { Texel = 0.4f };
             // 側壁。窓の帯を抜く
@@ -383,7 +397,7 @@ namespace HalfAware.EditorTools
             shell.FaceXHoles(CarHalf, -CarLong, CarLong, 0f, CarHigh, -1, holes);
             shell.FaceZ(-CarLong, -CarHalf, CarHalf, 0f, CarHigh, 1);
             shell.FaceZ(CarLong, -CarHalf, CarHalf, 0f, CarHigh, -1);
-            Emit(place, "TrainShell", shell, "Wall");
+            Emit(place, "TrainShell", shell, "Wall", true);
 
             var roof = new Bank { Texel = 0.4f };
             roof.FaceY(CarHigh, -CarHalf, CarHalf, -CarLong, CarLong, -1);
@@ -439,7 +453,7 @@ namespace HalfAware.EditorTools
             var deck = new Bank { Texel = 0.4f };
             deck.FaceY(0f, -2.5f, 2.5f, -5f, 3.2f, 1);
             KitchenSteps(deck);
-            Emit(place, "KitchenFloor", deck, "Floor");
+            Emit(place, "KitchenFloor", deck, "Floor", true);
 
             var wall = new Bank { Texel = 0.35f };
             wall.FaceZ(3.2f, -2.5f, 2.5f, 0f, HouseHigh, -1);
@@ -460,7 +474,7 @@ namespace HalfAware.EditorTools
             wall.FaceZHoles(KitchenDoorZ - 0.08f, -2.5f, 2.5f, 0f, HouseHigh, -1, gap);
             // 階段の吹き抜け。玄関の +x 側だけ天井が抜ける
             wall.FaceX(1.35f, -5f, KitchenDoorZ, HouseHigh, 4.2f, 1);
-            Emit(place, "KitchenWall", wall, "Wall");
+            Emit(place, "KitchenWall", wall, "Wall", true);
 
             var roof = new Bank { Texel = 0.35f };
             roof.FaceY(HouseHigh, -2.5f, 2.5f, KitchenDoorZ, 3.2f, -1);
@@ -486,6 +500,12 @@ namespace HalfAware.EditorTools
             var leaf = new Bank { Texel = 0.4f };
             leaf.Box(new Vector3(-2.42f, DoorHigh * 0.5f, -0.95f), new Vector3(0.05f, DoorHigh, 0.86f));
             Emit(place, "KitchenDoor", leaf, "Door");
+
+            // 玄関のドアの向こうは白い光の板だけで、床はそこで切れている。
+            // 三つの記憶がどれもこの戸口から出ていくので、絵としては開けたまま残し、
+            // 抜けられないように見えない仕切りだけを立てる
+            Fence(place, "KitchenDoorway", new Vector3(-2.55f, DoorHigh * 0.5f, -1.95f),
+                new Vector3(0.2f, DoorHigh, 1.1f));
 
             // ドアの外。開けると白く飛ぶ朝の光
             Pane(place, "KitchenOutside", new Vector3(-2.72f, 1.05f, -1.95f), new Vector2(1.1f, 2.1f),
@@ -537,7 +557,7 @@ namespace HalfAware.EditorTools
             var deck = new Bank { Texel = 0.4f };
             deck.FaceY(0f, -4f, 4f, -4f, 5f, 1);
             deck.Box(new Vector3(0f, 0.075f, 4.05f), new Vector3(6f, 0.15f, 1.1f));
-            Emit(place, "ClassFloor", deck, "Floor");
+            Emit(place, "ClassFloor", deck, "Floor", true);
 
             var wall = new Bank { Texel = 0.35f };
             wall.FaceZ(5f, -4f, 4f, 0f, ClassHigh, -1);
@@ -548,7 +568,7 @@ namespace HalfAware.EditorTools
             for (var i = 0; i < 3; i++)
                 holes.Add(new Vector4(-2.6f + i * 2.3f, -2.6f + i * 2.3f + 1.8f, 1.0f, 2.5f));
             wall.FaceXHoles(-4f, -4f, 5f, 0f, ClassHigh, 1, holes);
-            Emit(place, "ClassWall", wall, "Wall");
+            Emit(place, "ClassWall", wall, "Wall", true);
 
             var roof = new Bank { Texel = 0.35f };
             roof.FaceY(ClassHigh, -4f, 4f, -4f, 5f, -1);

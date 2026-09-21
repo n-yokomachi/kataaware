@@ -68,7 +68,8 @@ namespace HalfAware
         {
             if (blur == null && tone == null) Borrow();
 
-            // 鍵打ちの eyeHeight が毎フレーム上書きするので、ここは呼ばれた直後の高さだけを決める
+            // 記憶の中でも歩くので、目の高さを毎フレーム書き直す者はもういない。
+            // ここで入れた値がその記憶のあいだ残る
             if (player != null) player.EyeHeight = entry.eyeHeight;
 
             Blurred(entry.blur, entry.blurAmount);

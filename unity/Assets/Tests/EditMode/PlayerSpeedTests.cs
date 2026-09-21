@@ -12,6 +12,22 @@ namespace HalfAware.Tests
             Assert.Greater(PlayerController.Speed(true), PlayerController.Speed(false));
         }
 
+        // 場面 4 は記憶ごとに借りる体が違う。倍率は基準の速さに掛かる
+        [Test]
+        public void TheBorrowedBodyScalesTheWalk()
+        {
+            Assert.AreEqual(PlayerController.WalkSpeed * 0.6f, PlayerController.Speed(false, 0.6f), 1e-4f);
+            Assert.AreEqual(PlayerController.RunSpeed * 1.6f, PlayerController.Speed(true, 1.6f), 1e-4f);
+        }
+
+        // 一覧に倍率を書き忘れると 0 になる。そのまま掛けると一歩も歩けない
+        [Test]
+        public void AMissingScaleFallsBackToTheBaseSpeed()
+        {
+            Assert.AreEqual(PlayerController.WalkSpeed, PlayerController.Speed(false, 0f), 1e-4f);
+            Assert.AreEqual(PlayerController.WalkSpeed, PlayerController.Speed(false, -1f), 1e-4f);
+        }
+
         [Test]
         public void RunningIsNotSoFastItBreaksTheRoom()
         {

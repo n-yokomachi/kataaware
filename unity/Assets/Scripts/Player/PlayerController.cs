@@ -39,6 +39,19 @@ namespace HalfAware
             return running ? RunSpeed : WalkSpeed;
         }
 
+        /// <summary>借りた体の速さ。倍率が 0 以下なら基準のまま歩かせる</summary>
+        public static float Speed(bool running, float scale)
+        {
+            return Speed(running) * (scale > 0f ? scale : 1f);
+        }
+
+        /// <summary>
+        /// 歩く速さの倍率。基準が 1。場面 4 は記憶ごとに借りる体が違い、
+        /// 六歳の子と七十八歳の老人が同じ速さで歩くと体を借りている感じが消える。
+        /// 直列化しない。掛けるのは場面の側で、場面を抜ければ 1 へ戻す
+        /// </summary>
+        public float SpeedScale { get; set; } = 1f;
+
         /// <summary>今このフレームで走っているか。動作確認から読む</summary>
         public bool Running { get; private set; }
 
@@ -222,7 +235,7 @@ namespace HalfAware
             var keys = Keyboard.current;
             Running = local.sqrMagnitude > 0.01f && keys != null
                 && (keys.leftShiftKey.isPressed || keys.rightShiftKey.isPressed);
-            body.SimpleMove(transform.TransformDirection(local) * Speed(Running));
+            body.SimpleMove(transform.TransformDirection(local) * Speed(Running, SpeedScale));
         }
     }
 }

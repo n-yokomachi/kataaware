@@ -76,6 +76,58 @@ namespace HalfAware.Tests
             Same(roster, DiveIds.Classroom, 7, 13, 14);
         }
 
+        // 会話は設計書 7 節の写し。どの記憶も名前を呼ばれた瞬間から始まるので、
+        // 一行目は必ず 0 秒にある
+        [Test]
+        public void EveryMemoryOpensWithSomeoneCallingTheName()
+        {
+            var roster = Load();
+            for (var i = 0; i < roster.Count; i++)
+            {
+                var said = roster[i].said;
+                Assert.That(said, Is.Not.Null.And.Not.Empty, i + " 番に会話が無い");
+                Assert.That(said[0].at, Is.EqualTo(0f).Within(1e-3f), i + " 番の一行目が 0 秒にない");
+            }
+        }
+
+        // 秒が前後していると、後の行を出した後で前の行が出ることになる。
+        // 記憶が尽きた後に置かれた行はそのまま出ずに終わる
+        [Test]
+        public void TheLinesRunInOrderAndFitInsideTheMemory()
+        {
+            var roster = Load();
+            for (var i = 0; i < roster.Count; i++)
+            {
+                var said = roster[i].said;
+                for (var k = 1; k < said.Length; k++)
+                    Assert.That(said[k].at, Is.GreaterThanOrEqualTo(said[k - 1].at),
+                        i + " 番の " + k + " 行目が前の行より前にある");
+                Assert.That(said[said.Length - 1].at, Is.LessThan(roster[i].length),
+                    i + " 番の終いの行が記憶の長さ " + roster[i].length + " 秒を越えている");
+            }
+        }
+
+        // 顔は見せないので、誰が喋っているかは話者の名前と鉤括弧でしか伝わらない。
+        // 独白は入れない決まりなので、鉤括弧の無い行があってはいけない
+        [Test]
+        public void EveryLineNamesWhoIsSpeaking()
+        {
+            var roster = Load();
+            for (var i = 0; i < roster.Count; i++)
+            {
+                var said = roster[i].said;
+                for (var k = 0; k < said.Length; k++)
+                {
+                    var line = said[k].line;
+                    Assert.That(line, Is.Not.Null.And.Not.Empty, i + " 番の " + k + " 行目が空");
+                    var open = line.IndexOf('「');
+                    Assert.That(open, Is.GreaterThan(0), i + " 番の " + k + " 行目に話者が無い: " + line);
+                    Assert.That(line.EndsWith("」"), Is.True,
+                        i + " 番の " + k + " 行目が鉤括弧で閉じていない: " + line);
+                }
+            }
+        }
+
         static void Same(DiveRoster roster, string place, params int[] which)
         {
             for (var i = 0; i < which.Length; i++)
