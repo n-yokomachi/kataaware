@@ -49,7 +49,7 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// Volume の profile から override を引く。
+        /// Volume の profile から override を取り出す。
         /// profile を持たない Volume を渡されても落ちないようにしてある
         /// </summary>
         void Borrow()

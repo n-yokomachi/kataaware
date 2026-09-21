@@ -32,7 +32,7 @@ namespace HalfAware
         /// <summary>鍵打ちの最後の at。DiveEntry.length と揃っているかを組み立てが見直す</summary>
         public float Length { get { return HostPath.Length(keys); } }
 
-        /// <summary>名前で引く。見つからなければ null</summary>
+        /// <summary>名前で探す。見つからなければ null</summary>
         public Transform Person(string name)
         {
             if (people == null || string.IsNullOrEmpty(name)) return null;
