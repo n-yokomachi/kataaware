@@ -13,6 +13,8 @@ namespace HalfAware
         public const float Stride = 0.88f;
 
         [SerializeField] CharacterController body;
+        [Tooltip("歩けるかどうかを見る。空なら親から拾う")]
+        [SerializeField] PlayerController walker;
         [SerializeField] AudioSource source;
         [SerializeField] AudioClip[] clips = new AudioClip[0];
         [Tooltip("音の大きさの振れ。同じ音に聞こえないように")]
@@ -43,9 +45,19 @@ namespace HalfAware
             return steps;
         }
 
+        void Awake()
+        {
+            if (walker == null) walker = GetComponentInParent<PlayerController>();
+        }
+
         void Update()
         {
             if (body == null) return;
+            // **動けない間は鳴らさない。** CharacterController の velocity は
+            // Move を呼ばなくなっても最後の値を持ち越す。歩いている途中で何かを調べて
+            // 操作を取り上げると、その場に止まったまま足音だけが鳴り続ける。
+            // 半端に積んだ距離も捨てる。次に歩き出したところから数え直す
+            if (walker != null && !walker.CanMove) { walked = 0f; return; }
             var speed = BodyMotion.GroundSpeed(body.velocity);
             var steps = Advance(ref walked, speed * Time.deltaTime);
             for (var i = 0; i < steps; i++) Play();
