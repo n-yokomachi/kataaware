@@ -303,7 +303,7 @@ namespace HalfAware.EditorTools
 
         // ---- 道具 ------------------------------------------------------------
 
-        /// <summary>繋ぎ先を引く。黙って null を渡すと、再生して初めて気づくことになる</summary>
+        /// <summary>繋ぎ先を探す。黙って null を渡すと、再生して初めて気づくことになる</summary>
         static Transform Look(string path)
         {
             var go = GameObject.Find(path);

@@ -202,7 +202,7 @@ namespace HalfAware
             Carry();
         }
 
-        /// <summary>id の場所。一覧の並びで引く</summary>
+        /// <summary>id の場所。一覧の並びで探す</summary>
         Transform Where(string id)
         {
             var which = System.Array.IndexOf(DiveIds.Places, id);
