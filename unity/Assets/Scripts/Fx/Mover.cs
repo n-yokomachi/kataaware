@@ -23,6 +23,8 @@ namespace HalfAware
         [SerializeField] float span = 1f;
         [Tooltip("端を滑らかに繋ぐ。鳩の飛び立ちのように弾けるものは切る")]
         [SerializeField] bool ease = true;
+        [Tooltip("足元を床へ下ろす。飛ぶものは切る")]
+        [SerializeField] bool ground = true;
 
         public Vector3 From { get { return from; } }
         public Vector3 To { get { return to; } }
@@ -39,7 +41,30 @@ namespace HalfAware
         public void Play(float t)
         {
             transform.localPosition = Where(t);
+            if (ground) Land();
         }
+
+        /// <summary>
+        /// 足元を真下の床へ下ろす。
+        ///
+        /// **一直線では段を追えない。** 階段を降りる人も、教壇から降りる人も、
+        /// 始まりと終わりを結んだ線の途中では段板から浮いたり沈んだりする。
+        /// 実測で最大 1.64 m 宙に立っていた。線は前後左右だけに使い、
+        /// 上下はその場の床に任せる
+        /// </summary>
+        void Land()
+        {
+            RaycastHit floor;
+            var from = transform.position + Vector3.up * Reach;
+            if (!Physics.Raycast(from, Vector3.down, out floor, Reach + Drop)) return;
+            var at = transform.position;
+            transform.position = new Vector3(at.x, floor.point.y, at.z);
+        }
+
+        /// <summary>床を探し始める高さ。頭の上の荷棚や天井を拾わないよう、足元のすぐ上から</summary>
+        const float Reach = 0.3f;
+        /// <summary>そこから下へ探す長さ。これより下に何も無ければ、線のままにしておく</summary>
+        const float Drop = 4f;
 
         /// <summary>t 秒の位置。始まる前は開始位置、終わった後は終了位置</summary>
         public Vector3 Where(float t)

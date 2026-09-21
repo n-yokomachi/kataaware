@@ -136,8 +136,14 @@ namespace HalfAware.EditorTools
             return made;
         }
 
-        /// <summary>人や鳩を一直線に動かす。位置は Take のローカル</summary>
-        static void Move(Transform who, Vector3 from, Vector3 to, float at, float span, bool ease)
+        /// <summary>
+        /// 人や鳩を一直線に動かす。位置は Take のローカル。
+        ///
+        /// <paramref name="ground"/> を立てると足元が真下の床へ下りる。
+        /// 階段を降りる人も教壇から降りる人も、線の上下だけでは段を追えない
+        /// </summary>
+        static void Move(Transform who, Vector3 from, Vector3 to, float at, float span,
+            bool ease, bool ground = true)
         {
             if (who == null) return;
             var mover = who.gameObject.AddComponent<Mover>();
@@ -147,6 +153,7 @@ namespace HalfAware.EditorTools
             so.FindProperty("at").floatValue = at;
             so.FindProperty("span").floatValue = span;
             so.FindProperty("ease").boolValue = ease;
+            so.FindProperty("ground").boolValue = ground;
             so.ApplyModifiedPropertiesWithoutUndo();
             who.localPosition = from;
         }
@@ -169,8 +176,9 @@ namespace HalfAware.EditorTools
                 var spread = new Vector3(Mathf.Cos(a) * (0.5f + i * 0.13f), 0f, Mathf.Sin(a) * (0.5f + i * 0.11f));
                 var bird = Piece(flock, "Dove" + i, mesh, Mat("Bird"));
                 bird.localRotation = Quaternion.Euler(0f, i * 47f + 20f, 0f);
+                // 飛ぶので床へは下ろさない
                 Move(bird, at + spread, at + spread * 2.4f + new Vector3(0f, 3.4f + i * 0.2f, 0.6f),
-                    when + i * 0.06f, 1.6f, false);
+                    when + i * 0.06f, 1.6f, false, false);
             }
         }
 

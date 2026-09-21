@@ -41,6 +41,8 @@ namespace HalfAware
         [SerializeField] DiveRoster roster;
         [Tooltip("五つの場所。DiveIds.Places の並び")]
         [SerializeField] Transform[] places = new Transform[0];
+        [Tooltip("場所ごとの空の色。places と同じ並び。開口の向こうと、見上げた先に出る")]
+        [SerializeField] Color[] skies = new Color[0];
         [Tooltip("十六の記憶。一覧の番号の並び")]
         [SerializeField] Transform[] takes = new Transform[0];
 
@@ -199,6 +201,7 @@ namespace HalfAware
 
             if (place != null) place.gameObject.SetActive(true);
             else Debug.LogWarning("DiveDirector: 場所が無い " + entry.place, this);
+            Sky(entry.place);
             take.gameObject.SetActive(true);
             // 同じ人へ戻れば頭から流し直す。Mover は有効になった瞬間に開始位置へ戻る
             movers = take.GetComponentsInChildren<Mover>(true);
@@ -234,6 +237,21 @@ namespace HalfAware
         static bool Soft(string place)
         {
             return place == DiveIds.Park || place == DiveIds.Train;
+        }
+
+        /// <summary>
+        /// 空の色。場所ごとに時刻が違うので、開口の向こうと見上げた先の色を変える。
+        ///
+        /// **空は張っていない。** 記憶はどれも屋内か暗がりで、天球を回すほどの
+        /// 空は映らない。カメラの塗り潰しを場所に合わせて差し替えるだけで足りる
+        /// </summary>
+        void Sky(string id)
+        {
+            var eye = Camera.main;
+            if (eye == null) return;
+            var which = System.Array.IndexOf(DiveIds.Places, id);
+            if (which < 0 || which >= skies.Length) return;
+            eye.backgroundColor = skies[which];
         }
 
         /// <summary>id の場所。一覧の並びで探す</summary>

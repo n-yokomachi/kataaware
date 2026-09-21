@@ -578,9 +578,29 @@ namespace HalfAware.EditorTools
             Fill(dso.FindProperty("softSteps"), Steps(SoftSteps));
             dso.FindProperty("roster").objectReferenceValue = roster;
             Fill(dso.FindProperty("places"), Named(places, DiveIds.Places));
+            var sky = dso.FindProperty("skies");
+            sky.arraySize = Skies.Length;
+            for (var i = 0; i < Skies.Length; i++) sky.GetArrayElementAtIndex(i).colorValue = Skies[i];
             Fill(dso.FindProperty("takes"), Numbered(takes, roster.Count));
             dso.ApplyModifiedPropertiesWithoutUndo();
         }
+
+        /// <summary>
+        /// 場所ごとの空の色。<see cref="DiveIds.Places"/> と同じ並び。
+        ///
+        /// 開口の向こうと、見上げた先に出る。時刻は記憶の行のとおりで、
+        /// 団地が朝の七時と九時、公園が午後の三時台、電車が夕方の六時台、
+        /// 台所が朝の七時前、教室が昼前。**真っ黒のままにしない。**
+        /// 公園で見上げる記憶と、団地の廊下から外を向いたときに画面の上が抜ける
+        /// </summary>
+        static readonly Color[] Skies =
+        {
+            new Color(0.42f, 0.47f, 0.55f),   // 団地。朝の薄い青
+            new Color(0.60f, 0.57f, 0.48f),   // 公園。午後の黄ばんだ白
+            new Color(0.07f, 0.08f, 0.11f),   // 電車。夜の街。窓は自分で光る
+            new Color(0.50f, 0.56f, 0.62f),   // 台所。朝の白
+            new Color(0.70f, 0.72f, 0.74f),   // 教室。昼の白
+        };
 
         /// <summary>右上の行。HUD の下に一枚だけある</summary>
         static TMP_Text Caption()
