@@ -84,7 +84,7 @@ namespace HalfAware.EditorTools
             var places = Places(root);
             var takes = Takes(root, roster);
             Panel(root);
-            Wire(root);
+            Wire(root, roster, places, takes);
             Register();
 
             var scene = EditorSceneManager.GetActiveScene();
@@ -273,7 +273,11 @@ namespace HalfAware.EditorTools
             volume.isGlobal = true;
             volume.priority = 0f;
             volume.weight = 1f;
-            volume.profile = profile;
+            // **profile ではなく sharedProfile へ入れる。** profile の set は直列化されない方を
+            // 差し替えるので、保存して開き直すと中身の無い Volume になり、
+            // ぼやけも色味も掛からないまま記憶だけが流れる。
+            // 再生中はこの profile の写しが使われるので、HostBody が書き換えてもアセットは汚れない
+            volume.sharedProfile = profile;
             return volume;
         }
 
@@ -472,14 +476,14 @@ namespace HalfAware.EditorTools
         // ---- 繋ぎ込み --------------------------------------------------------
 
         /// <summary>
-        /// 繋ぐのは板と体まで。
+        /// 板・体・段を繋ぐ。
         ///
-        /// **DiveDirector はまだ無い（Task 9）。** ここで要求すると組み立てそのものが通らなくなり、
-        /// 場所も記憶も目で見られないまま次の段へ進むことになる。段が出来たら、
-        /// player・hud・caption・daze・volume・body・panel・roster・places・takes を
-        /// この Wire から渡す
+        /// <see cref="DiveDirector"/> は <c>Dive</c> の根に付ける。場所も記憶も板も
+        /// その下にあるので、根に置けば繋ぎ先が全部ひと続きの枝の中に収まる。
+        /// <c>CanMove</c> と <c>HeadYawLimit</c> は直列化されない性質なので、ここでは渡さない。
+        /// 掛けるのは <see cref="DiveDirector"/> が再生のたびに行う
         /// </summary>
-        static void Wire(Transform root)
+        static void Wire(Transform root, DiveRoster roster, Transform places, Transform takes)
         {
             var panel = root.Find("HoloPanel");
             if (panel == null) { Debug.LogWarning("板が無い。目を繋げない"); return; }
@@ -494,6 +498,59 @@ namespace HalfAware.EditorTools
             bso.FindProperty("volume").objectReferenceValue = Object.FindFirstObjectByType<Volume>(FindObjectsInactive.Include);
             bso.FindProperty("ear").objectReferenceValue = Object.FindFirstObjectByType<AudioLowPassFilter>(FindObjectsInactive.Include);
             bso.ApplyModifiedPropertiesWithoutUndo();
+
+            var director = root.GetComponent<DiveDirector>();
+            if (director == null) director = root.gameObject.AddComponent<DiveDirector>();
+            var dso = new SerializedObject(director);
+            dso.FindProperty("player").objectReferenceValue =
+                Object.FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
+            dso.FindProperty("hud").objectReferenceValue =
+                Object.FindFirstObjectByType<HudView>(FindObjectsInactive.Include);
+            dso.FindProperty("caption").objectReferenceValue = Caption();
+            dso.FindProperty("daze").objectReferenceValue =
+                Object.FindFirstObjectByType<DazeVolume>(FindObjectsInactive.Include);
+            dso.FindProperty("volume").objectReferenceValue =
+                Object.FindFirstObjectByType<Volume>(FindObjectsInactive.Include);
+            dso.FindProperty("body").objectReferenceValue = body;
+            dso.FindProperty("panel").objectReferenceValue = holo;
+            dso.FindProperty("roster").objectReferenceValue = roster;
+            Fill(dso.FindProperty("places"), Named(places, DiveIds.Places));
+            Fill(dso.FindProperty("takes"), Numbered(takes, roster.Count));
+            dso.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>右上の行。HUD の下に一枚だけある</summary>
+        static TMP_Text Caption()
+        {
+            var at = Look("Hud/Caption");
+            if (at == null) return null;
+            var text = at.GetComponent<TMP_Text>();
+            if (text == null) Debug.LogWarning("右上の行に TMP_Text が付いていない");
+            return text;
+        }
+
+        /// <summary>名前の並びで子を引く。並びがそのまま繋ぎ先の並びになる</summary>
+        static Transform[] Named(Transform parent, string[] names)
+        {
+            var all = new Transform[names.Length];
+            for (var i = 0; i < names.Length; i++)
+            {
+                all[i] = parent != null ? parent.Find(names[i]) : null;
+                if (all[i] == null) Debug.LogWarning("繋ぎ先が見つからない: " + names[i]);
+            }
+            return all;
+        }
+
+        /// <summary>番号の名前で子を引く。一覧の番号がそのまま繋ぎ先の並びになる</summary>
+        static Transform[] Numbered(Transform parent, int count)
+        {
+            var all = new Transform[count];
+            for (var i = 0; i < count; i++)
+            {
+                all[i] = parent != null ? parent.Find(i.ToString()) : null;
+                if (all[i] == null) Debug.LogWarning("繋ぎ先が見つからない: 記憶 " + i);
+            }
+            return all;
         }
 
         /// <summary>
