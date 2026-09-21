@@ -592,7 +592,7 @@ namespace HalfAware.EditorTools
             return text;
         }
 
-        /// <summary>名前の並びで子を引く。並びがそのまま繋ぎ先の並びになる</summary>
+        /// <summary>名前の並びで子を探す。並びがそのまま繋ぎ先の並びになる</summary>
         static Transform[] Named(Transform parent, string[] names)
         {
             var all = new Transform[names.Length];
@@ -604,7 +604,7 @@ namespace HalfAware.EditorTools
             return all;
         }
 
-        /// <summary>番号の名前で子を引く。一覧の番号がそのまま繋ぎ先の並びになる</summary>
+        /// <summary>番号の名前で子を探す。一覧の番号がそのまま繋ぎ先の並びになる</summary>
         static Transform[] Numbered(Transform parent, int count)
         {
             var all = new Transform[count];
@@ -757,7 +757,7 @@ namespace HalfAware.EditorTools
 
         // ---- 道具 ----------------------------------------------------------
 
-        /// <summary>繋ぎ先を引く。黙って null を渡すと、再生して初めて気づくことになる</summary>
+        /// <summary>繋ぎ先を探す。黙って null を渡すと、再生して初めて気づくことになる</summary>
         static Transform Look(string path)
         {
             var go = GameObject.Find(path);
