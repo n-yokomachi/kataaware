@@ -21,8 +21,13 @@ namespace HalfAware
     /// **<see cref="PlayerController"/> より先に動かす。** 記憶を切り替えたフレームに
     /// 前の記憶の入力で歩かれると、据えたはずの立ち位置から動いた所で絵が始まる。
     ///
-    /// **`E 次へ` は無い。** 板が出ていないときの E は何もしない。
-    /// 記憶は尽きるまで流れ、尽きたら端末が次を選ぶ
+    /// **記憶は勝手に終わらない。** 会話が尽きたら端末が次の人を選ぶ版は、
+    /// 「勝手に他人の記憶に飛んでいる」と差し戻された（設計書 1・2・4 節）。
+    /// 記憶から出る道は、人の脇の板の `潜る` と `切断` の二つだけで、どちらも
+    /// プレイヤーが選ぶ。そのためここから <see cref="DiveChain.Next"/> は呼ばない。
+    /// あちらは最初の一人を決める <see cref="DiveChain"/> の作りの一部として残してある。
+    ///
+    /// **`E 次へ` は無い。** 板が出ていないときの E は何もしない
     /// </summary>
     [DefaultExecutionOrder(-15)]
     public sealed class DiveDirector : MonoBehaviour
@@ -65,8 +70,10 @@ namespace HalfAware
         [SerializeField] AudioClip[] softSteps = new AudioClip[0];
 
         [Header("会話")]
-        [Tooltip("次の行が無いときに字幕を消すまで。秒")]
+        [Tooltip("一行を出したままにしておく秒数")]
         [SerializeField] float talkSeconds = 4f;
+        [Tooltip("一行出してから、次の行を出せるようになるまでの間。秒")]
+        [SerializeField] float lineGap = 1.5f;
 
         [Header("眩暈")]
         [Tooltip("cutAfter 人まで渡ったときの眩暈の濃さ")]
@@ -95,10 +102,12 @@ namespace HalfAware
         /// <summary>記憶の頭からの秒</summary>
         float clock;
         bool called;
-        /// <summary>次に出す会話の行。entry.said での番号</summary>
+        /// <summary>次に出す会話の行。entry.said での番号。この行の点だけが armed</summary>
         int spoken;
         /// <summary>この秒で字幕を消す。0 以下なら出ていない</summary>
         float silence;
+        /// <summary>この秒までは次の行を出さない。点が近いと、読む間もなく次が重なる</summary>
+        float held;
         /// <summary>いま目を留めている相手。外していれば null</summary>
         Transform aimed;
         /// <summary>板がいま誰の脇に出ているか</summary>
@@ -119,6 +128,9 @@ namespace HalfAware
 
         /// <summary>いまの記憶の再生位置。秒。動作確認から読む</summary>
         public float Clock { get { return clock; } }
+
+        /// <summary>これまでに出した会話の行数。動作確認から読む</summary>
+        public int Spoken { get { return spoken; } }
 
         void Awake()
         {
@@ -167,19 +179,17 @@ namespace HalfAware
         void Update()
         {
             if (cutting || chain == null || take == null) return;
-            // **速さで時計を倍にしない。** entry.speed が掛かるのは歩く速さだけで、
-            // 記憶の長さには掛けない。ここで掛けると設計書の秒数（子どもと老人 60 秒、
-            // 他 25〜35 秒）が速さで割った実時間になる。メイは 40 秒、アルベルトは 100 秒になっていた
+            // **速さで時計を倍にしない。** entry.speed が掛かるのは歩く速さだけ。
+            // この時計が運ぶのは人と鳩の動き（Mover）と、名前を呼ぶ声の頭だけで、
+            // 速さを掛けると設計書の秒数で書かれたその二つが早回しになる
             clock += Time.deltaTime;
             Drift();
             Voice();
             Talk();
             Watch();
             Choose();
-            if (cutting || clock < entry.length) return;
-            // 尽きたら端末が次を選ぶ。終わりの合図は入れず、そのまま次の記憶へ切り替える
-            chain.Next();
-            Play(chain.Current);
+            // ここで記憶を閉じない。会話を出し切っても、鍵打ちの秒を過ぎても、
+            // 場所はそのまま続く。出る道は Choose の `潜る` と `切断` だけ
         }
 
         // ---- 記憶の切り替え --------------------------------------------------
@@ -227,6 +237,7 @@ namespace HalfAware
             lastStep = 0;
             spoken = 0;
             silence = 0f;
+            held = 0f;
             if (panel != null) panel.Hide();
             if (hud != null) { hud.SetSubtitle(null); hud.SetPrompt(null); }
             // 首は溜めた向きを体へ渡して正面へ戻す。前の記憶で振り向いたままだと、
@@ -319,10 +330,15 @@ namespace HalfAware
         /// <summary>
         /// 記憶の中のやりとりを字幕帯に出す。設計書 7 節。
         ///
+        /// **送るのは歩くこと。** 一行目は記憶に入った瞬間（名前を呼ばれる声）に出て、
+        /// 二行目からは、場所に置いた点へ主が入るたびに一つずつ出る。秒で流していた版は、
+        /// 何をすれば進むのか読めないと差し戻された。
+        ///
+        /// 点は順に armed になるので、先の点の中を通り抜けても順番は飛ばない。
+        /// 入らなければその行は出ないまま残り、後から戻れば出る。
+        ///
         /// **独白は無い。** 顔は見せないので、誰が喋っているかは声の向きと
         /// 一行に含まれた名前でしか伝わらない。
-        /// 一行は次の行の秒まで出したままにする。読み終わる前に消えるより、
-        /// 次が来るまで残っている方が追える。次が無ければ talkSeconds で消す。
         ///
         /// <c>Dive.unity</c> に SceneFlow は無いので、<see cref="HudView"/> を直に触る
         /// </summary>
@@ -330,16 +346,30 @@ namespace HalfAware
         {
             if (hud == null) return;
             var said = entry.said;
-            if (said != null && spoken < said.Length && clock >= said[spoken].at)
+            if (clock >= held && DiveEntry.Due(said, spoken, Footing()) >= 0)
             {
                 hud.SetSubtitle(said[spoken].line, SubtitleKind.Line);
                 spoken++;
-                silence = spoken < said.Length ? said[spoken].at : clock + talkSeconds;
+                held = clock + lineGap;
+                silence = clock + talkSeconds;
                 return;
             }
             if (silence <= 0f || clock < silence) return;
             silence = 0f;
             hud.SetSubtitle(null);
+        }
+
+        /// <summary>
+        /// 主の足元を場所のローカルで。会話の点は場所のローカルで置いてあるので、
+        /// 世界の座で測ると場所ごとの離し（<c>BuildDive.PlaceOrigin</c>）のぶんだけずれる。
+        ///
+        /// **高さも一緒に測る。** 団地は同じ場所に三つの階が重なっているので、
+        /// 平らに潰すと、一階の点が三階に立っているだけで開いてしまう
+        /// </summary>
+        Vector3 Footing()
+        {
+            var at = player.transform.position;
+            return place != null ? place.InverseTransformPoint(at) : at;
         }
 
         /// <summary>渡るたびに眩暈を一段濃くする。cutAfter 人で最大に達し、以後は最大のまま</summary>
@@ -471,8 +501,8 @@ namespace HalfAware
         /// 近づくと `E ○○` が出るのは場面 1・2・3・8 で通した決まりなので、
         /// 同じ場所・同じ書式に載せる。
         ///
-        /// **ここは `潜る` 専用にする。** 会話の字幕は記憶の時計で勝手に流れるもので、
-        /// 送りを待たせない。案内を出さないことが、そのまま「待たなくていい」という合図になる
+        /// **ここは `潜る` 専用にする。** 会話は歩いて点へ入れば出るもので、鍵を待たせない。
+        /// 案内を出さないことが、そのまま「この行に押す鍵は無い」という合図になる
         /// </summary>
         void Guide()
         {
