@@ -382,12 +382,20 @@ namespace HalfAware.EditorTools
             var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
             if (font == null) Debug.LogWarning("字の形が無い: " + FontPath);
 
-            var band = Layer(go.transform, "SubtitleBand", new Color(0f, 0f, 0f, 0.75f), true);
-            Frame(band, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f),
+            // **場面 4 の帯だけ薄く、細くする。** 場面 1・2・3・8 では、字幕が出ている
+            // あいだ画面の下の案内が消えて、E で送る。その画と見分けが付かないと、
+            // 記憶の時計で勝手に流れる会話まで送り待ちに見える。
+            // 案内を出さないだけでは合図にならない（絵が同じなので）。
+            // 場面 4 の字幕は全部が自動で流れる会話で、`Choice` は一度も出ないから、
+            // 帯の見た目を変えても二択と取り違えることは起きない
+            var band = Layer(go.transform, "SubtitleBand", new Color(0f, 0f, 0f, 0.35f), true);
+            Frame(band, new Vector2(0.15f, 0f), new Vector2(0.85f, 0f), new Vector2(0.5f, 0f),
                 new Vector2(0f, 40f), new Vector2(0f, 120f));
             var subtitle = Line(band, "Subtitle", font, 28f, Color.white, TextAlignmentOptions.Left);
+            // 帯が狭くなったぶん、左右の余白も詰める。160 のままだと
+            // 一行に入る幅が七割の帯の中でさらに七割になって、二行の文が四行に割れる
             Frame(subtitle.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f),
-                Vector2.zero, new Vector2(-160f, -24f));
+                Vector2.zero, new Vector2(-96f, -24f));
             band.gameObject.SetActive(false);
 
             var prompt = Line(go.transform, "Prompt", font, 22f, Color.white, TextAlignmentOptions.Center);

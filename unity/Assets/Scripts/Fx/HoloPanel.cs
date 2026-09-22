@@ -32,10 +32,12 @@ namespace HalfAware
         [SerializeField] TMP_Text rowText;
         [Tooltip("二行目。操作")]
         [SerializeField] TMP_Text actionText;
-        [Tooltip("肩の脇へどれだけ寄せるか。相手の体の半幅に対する割合")]
-        [SerializeField] float side = 1.6f;
-        [Tooltip("相手の頭より上へどれだけ出すか。相手の背丈に対する割合")]
-        [SerializeField] float lift = 0.12f;
+        [Tooltip("肩の高さ。相手の背丈に対する割合")]
+        [SerializeField] float shoulder = 0.82f;
+        // 体の縁と板の縁のあいだ。狭いのは、寄るほど体の幅が角度を食って
+        // 板の外の縁が画面の右へはみ出すため。0.05 で 1.65 m まで収まる
+        [Tooltip("相手の体の縁と板の縁のあいだ。m")]
+        [SerializeField] float gap = 0.05f;
         [Tooltip("目からの距離 1 m あたりの板の大きさ。遠近で見かけの大きさを揃える。" +
             "0.82 で、板の丈が画面の縦のおよそ 19 %（427×240 で 42 px）になる")]
         [SerializeField] float perMetre = 0.82f;
@@ -50,6 +52,8 @@ namespace HalfAware
         /// <summary>相手の体の高さと半幅。Show のときに一度だけ測る</summary>
         float tall = 1.7f;
         float half = 0.25f;
+        /// <summary>板そのものの幅。m。寄せ幅を出すのに要る。Pane の大きさが唯一の出どころ</summary>
+        float wide = 0.92f;
         string line = "";
         float size = DiveChain.CutStart;
         int index;
@@ -68,6 +72,8 @@ namespace HalfAware
 
         void Awake()
         {
+            var pane = transform.Find("Pane");
+            if (pane != null) wide = pane.localScale.x;
             Paint();
         }
 
@@ -134,18 +140,36 @@ namespace HalfAware
             half = Mathf.Max(0.1f, Mathf.Max(box.size.x, box.size.z) * 0.5f);
         }
 
+        /// <summary>
+        /// 肩の脇へ置く。設計書 5 節の「肩の脇」。
+        ///
+        /// **頭の上には置かない。** 二 m ほどまで寄ると、頭の上の板が右上の行
+        /// （いま潜っている人の行）と重なり、端末の緑どうしが二重になって
+        /// どちらも読めなかった（オーナーの差し戻し）
+        /// </summary>
         void Place()
         {
-            if (host == null) return;
-            transform.position = host.position
-                + host.right * (half * side) + Vector3.up * (tall * (1f + lift));
-            if (eye == null) return;
-            var away = transform.position - eye.position;
+            if (host == null || eye == null) return;
+            var at = host.position + Vector3.up * (tall * shoulder);
+            var away = at - eye.position;
             if (away.sqrMagnitude < 1e-6f) return;
-            transform.rotation = Quaternion.LookRotation(away.normalized, Vector3.up);
             // **見かけの大きさを揃える。** 寄られると画面の半分を覆い、
-            // 離れると行が読めなくなる。目からの距離に比例させれば、どちらも起きない
+            // 離れると行が読めなくなる。目からの距離に比例させれば、どちらも起きない。
+            // 測るのは肩までの距離。板の位置から測ると、寄せ幅と大きさが互いを押し合う
             var span = Mathf.Clamp(away.magnitude * perMetre, least, most);
+            // 寄せるのは目から見た真横で、いつも主の右。
+            // 相手の向きで寄せる側を決めると、横を向いた人では板が顔の前か後ろへ回り込み、
+            // 相手の周りを歩くと左右が入れ替わる瞬間に板が飛ぶ。
+            // いつも同じ側に出るなら、どこを見れば読めるかが決まっている
+            var flat = eye.right;
+            flat.y = 0f;
+            if (flat.sqrMagnitude < 1e-6f) flat = host.right;
+            flat.Normalize();
+            // 板の内側の縁が体に掛からないところまで出す。
+            // 体の幅は相手ごとに、板の幅は遠近で変わるので、どちらも数に入れる
+            transform.position = at + flat * (half + gap + wide * span * 0.5f);
+            transform.rotation = Quaternion.LookRotation(
+                (transform.position - eye.position).normalized, Vector3.up);
             transform.localScale = Vector3.one * span;
         }
 
