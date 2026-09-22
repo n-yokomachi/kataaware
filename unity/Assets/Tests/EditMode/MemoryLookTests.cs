@@ -14,65 +14,72 @@ namespace HalfAware.Tests
     {
         // ---- 目の疲れ ----------------------------------------------------------
 
+        static DiveChain Chain() { return new DiveChain(16, new[] { 0, 1, 2, 4, 5, 7 }, 8, new System.Random(1)); }
+
         [Test]
-        public void TheFirstBodySeesAsClearlyAsHerOwn()
+        public void NothingBlursWhileTheWayOutIsStillShut()
         {
-            Assert.AreEqual(0f, HostBody.StrainOf(DiveChain.CutStart), 1e-4f);
+            var chain = Chain();
+            for (var i = 1; i <= 8; i++)
+            {
+                Assert.AreEqual(0f, chain.Past, 1e-4f, "まだ切断が押せないのに曇っている: " + chain.Hops + " 人目");
+                chain.Hop(i);
+            }
+            Assert.IsTrue(chain.CanCut);
+            Assert.AreEqual(0f, chain.Past, 1e-4f, "押せるようになった瞬間はまだ素のまま");
         }
 
         [Test]
-        public void TheEyesGiveOutJustAsTheCutComesOfAge()
+        public void AfterTheWayOutOpensEachNewHeadCostsHerSight()
         {
-            Assert.AreEqual(1f, HostBody.StrainOf(1f), 1e-4f);
-        }
-
-        [Test]
-        public void TheFirstHalfOfTheNightCostsHerNothing()
-        {
-            Assert.AreEqual(0f, HostBody.StrainOf(HostBody.Quiet), 1e-4f);
-            var chain = new DiveChain(16, new[] { 0, 1, 2, 4, 5, 7 }, 8, new System.Random(1));
-            for (var i = 1; i <= 4; i++)
+            var chain = Chain();
+            for (var i = 1; i <= 8; i++) chain.Hop(i);
+            var before = chain.Past;
+            for (var i = 9; i <= 15; i++)
             {
                 chain.Hop(i);
-                Assert.AreEqual(0f, HostBody.StrainOf(chain.CutSize), 1e-4f,
-                    "四人目までは素のままであるべき: " + i + " 人目");
+                Assert.Greater(chain.Past, before, "押せた後も曇りが増えていない: " + chain.Hops + " 人目");
+                before = chain.Past;
             }
         }
 
+        /// <summary>
+        /// 疲れが出きるのは、`切断` が押せるようになってからもう一度同じ人数を渡ったとき。
+        ///
+        /// 名簿が十六人なので、実際の場面 4 では渡れて十五人、疲れは 0.88 止まりになる。
+        /// 目が完全に溶ける前にプレイヤーが帰る作りで、それでよい
+        /// </summary>
         [Test]
-        public void AfterThatEachNewHeadCostsHerMoreSight()
+        public void TheEyesOnlyGiveOutAfterTwiceTheWayOut()
         {
-            var chain = new DiveChain(16, new[] { 0, 1, 2, 4, 5, 7 }, 8, new System.Random(1));
-            for (var i = 1; i <= 4; i++) chain.Hop(i);
-            var before = HostBody.StrainOf(chain.CutSize);
-            for (var i = 5; i <= 8; i++)
-            {
-                chain.Hop(i);
-                var now = HostBody.StrainOf(chain.CutSize);
-                Assert.Greater(now, before, "渡るたびに疲れが増えていない: " + i + " 人目");
-                before = now;
-            }
-            Assert.AreEqual(1f, before, 1e-4f);
+            var wide = new DiveChain(32, new[] { 0, 1, 2, 4, 5, 7 }, 8, new System.Random(1));
+            for (var i = 1; i <= 16; i++) wide.Hop(i);
+            Assert.AreEqual(16, wide.Hops);
+            Assert.AreEqual(1f, wide.Past, 1e-4f);
+
+            var roster = Chain();
+            for (var i = 1; i <= 15; i++) roster.Hop(i);
+            Assert.AreEqual(0.875f, roster.Past, 1e-3f, "十六人の名簿では 0.88 で止まる");
         }
 
         [Test]
         public void GoingBackToTheSameHeadCostsHerNothing()
         {
-            var chain = new DiveChain(16, new[] { 0, 1, 2, 4, 5, 7 }, 8, new System.Random(1));
-            for (var i = 1; i <= 6; i++) chain.Hop(i);
-            var before = HostBody.StrainOf(chain.CutSize);
+            var chain = Chain();
+            for (var i = 1; i <= 10; i++) chain.Hop(i);
             var hops = chain.Hops;
+            var before = chain.Past;
             for (var k = 0; k < 5; k++) { chain.Hop(3); chain.Hop(5); }
             Assert.AreEqual(hops, chain.Hops, "同じ人へ戻っただけで人数が増えている");
-            Assert.AreEqual(before, HostBody.StrainOf(chain.CutSize), 1e-4f,
-                "同じ人へ戻っただけで目が疲れている");
+            Assert.AreEqual(before, chain.Past, 1e-4f, "同じ人へ戻っただけで目が疲れている");
         }
 
         [Test]
-        public void NoAmountOfWalkingPushesTheStrainPastItself()
+        public void TheStrainNeverRunsPastItself()
         {
-            Assert.AreEqual(0f, HostBody.StrainOf(0f), 1e-4f);
-            Assert.AreEqual(1f, HostBody.StrainOf(4f), 1e-4f);
+            var wide = new DiveChain(32, new[] { 0, 1, 2, 4, 5, 7 }, 8, new System.Random(1));
+            for (var i = 1; i < 32; i++) wide.Hop(i);
+            Assert.AreEqual(1f, wide.Past, 1e-4f);
         }
 
         // ---- 角の白い膜 --------------------------------------------------------

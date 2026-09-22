@@ -51,6 +51,16 @@ namespace HalfAware
 
         public float CutSize { get { return Mathf.Lerp(CutStart, 1f, Mathf.Clamp01((float)Hops / threshold)); } }
 
+        /// <summary>
+        /// `切断` が押せるようになってから、さらにどれだけ渡ったか。0 から 1。
+        ///
+        /// **目の疲れはここからしか出さない。** `切断` が育つのに合わせて疲れも上げていたが、
+        /// 三度続けて「まだ早い」と差し戻された。threshold 人に届くまでは素のままで、
+        /// そこから先、もう threshold 人ぶん渡るあいだで 0 から 1 へ上がる。
+        /// 帰る口が開いてもなお潜り続けたぶんだけ目が利かなくなる、という形
+        /// </summary>
+        public float Past { get { return Mathf.Clamp01((float)(Hops - threshold) / threshold); } }
+
         /// <summary>板で選んだ先へ</summary>
         public void Hop(int target)
         {

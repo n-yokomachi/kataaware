@@ -61,8 +61,8 @@ namespace HalfAware
         ///
         /// **一人目からぼやけていては、渡り歩いた結果に見えない。** 借りた目の出来を
         /// そのまま出すと、潜った瞬間に世界が溶けて、何を見ればよいのか分からないと
-        /// 差し戻された。<see cref="DiveChain.CutSize"/> と同じ歩みで 0 から 1 へ上げ、
-        /// `切断` が押せるようになったところで出きるようにする
+        /// 差し戻された。<see cref="DiveChain.Past"/> がそのまま入る。
+        /// `切断` が押せるようになるまでは 0 で、そこから先で上がる
         /// </summary>
         public float Strain
         {
@@ -76,21 +76,8 @@ namespace HalfAware
             }
         }
 
-        /// <summary>
-        /// <see cref="DiveChain.CutSize"/> を 0〜1 の疲れに読み替える。
-        ///
-        /// **前半は素のまま。** `切断` が育ち始めた時点で疲れも上がる作りにしていたが、
-        /// それでもまだ早いと差し戻された。半分まで育つあいだは 0 で置き、
-        /// そこから `潜る` と同じ大きさになるまでで 0 から 1 へ上げる。
-        /// threshold が 8 人なら、四人目までは素のまま、五人目から曇り始める
-        /// </summary>
-        public static float StrainOf(float cutSize)
-        {
-            return Mathf.Clamp01((cutSize - Quiet) / (1f - Quiet));
-        }
-
-        /// <summary>疲れが出始める `切断` の大きさ。<see cref="DiveChain.CutStart"/> と 1 の中ほど</summary>
-        public const float Quiet = (DiveChain.CutStart + 1f) * 0.5f;   // 0.7
+        // 疲れがどこから出るかは <see cref="DiveChain.Past"/> が決める。
+        // ここは渡された数を着るだけで、何人渡ったかも threshold も知らない
 
         void Awake()
         {
