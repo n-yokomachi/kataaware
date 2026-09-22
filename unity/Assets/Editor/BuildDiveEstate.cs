@@ -29,33 +29,56 @@ namespace HalfAware.EditorTools
     {
         // ---- 団地 ------------------------------------------------------------
         //
-        // 外階段を一本、まっすぐ上へ通す。折り返しにしないのは、記憶 0 の子どもが
-        // 下から三階まで一息に駆け上がるのを、道筋を折らずに鍵打ちで書けるようにするため。
+        // 外階段は半階ごとに折り返す。集合住宅の階段は一階ぶんを一息に上がる形ではなく、
+        // 半階上がって踊り場で 180 度向きを変え、また半階上がる。三階まで六本。
+        //
+        // **折り返しの向きは廊下が決めている。** 階の高さに来る踊り場はそのまま廊下なので、
+        // 一本おきに建物の面の側へ戻ってくる。地面から入る口も、だから面の側にある。
+        // 東の一本が上り始め、西の一本が上り終わり。二本のあいだには中壁が立つ。
         // 三階の廊下に戸口が三つ並び、左が記憶 0・1 の家、真ん中が記憶 8・15 の家
 
         /// <summary>階の高さ。m</summary>
         public const float Floor = 2.8f;
-        /// <summary>一階ぶんの階段が z へ伸びる長さ。勾配は 34 度で、実際の外階段に近い</summary>
-        const float Flight = 4.2f;
-        /// <summary>踊り場の奥行き</summary>
+        /// <summary>半階ぶんの階段が z へ伸びる長さ。1.4 m 上がって 2.1 m 進むので勾配は 34 度</summary>
+        const float Flight = 2.1f;
+        /// <summary>半階ぶんの段数。蹴上げ 17.5 cm・踏み面 26 cm で、実際の集合住宅の階段に近い</summary>
+        const int StepCount = 8;
+        /// <summary>廊下の奥行き。階の高さの踊り場でもある</summary>
         const float LandingDeep = 1.4f;
-        /// <summary>階段の半幅。幅 1.2 m</summary>
-        const float StairHalf = 0.6f;
-        /// <summary>一階ぶんの段数</summary>
-        const int StepCount = 16;
+        /// <summary>折り返しの踊り場の奥行き。階段一本の幅より広くないと向きが変えられない</summary>
+        const float StairTurn = 1.3f;
+        /// <summary>階段一本の幅</summary>
+        const float StairWide = 1.1f;
+        /// <summary>二本のあいだの中壁。厚みの半分。ここが抜けていると隣の一本へ落ちる</summary>
+        const float StairSpine = 0.1f;
+        /// <summary>階段の井戸の西の端。建物の西の面と揃える</summary>
+        const float StairWest = -1.2f;
+        /// <summary>階段の井戸の東の端</summary>
+        const float StairEast = StairWest + StairWide * 2f + StairSpine * 2f;              // 1.2
+        /// <summary>西の一本の真ん中。上りの終わりはいつもこちら</summary>
+        const float StairWestMid = StairWest + StairWide * 0.5f;                           // -0.65
+        /// <summary>東の一本の真ん中。上りの始まりはいつもこちら</summary>
+        const float StairEastMid = StairEast - StairWide * 0.5f;                           // 0.65
 
-        /// <summary>階段の下端。ここから -z へ上がる</summary>
-        public const float EstateFoot = 2.0f;
-        /// <summary>一つ目の踊り場の真ん中</summary>
-        public const float EstateLanding1 = EstateFoot - Flight - LandingDeep * 0.5f;      // -2.9
-        /// <summary>二つ目の踊り場の真ん中</summary>
-        public const float EstateLanding2 = EstateLanding1 - LandingDeep * 0.5f - Flight - LandingDeep * 0.5f; // -8.5
         /// <summary>三階の廊下の真ん中</summary>
-        public const float EstateWalk = EstateLanding2 - LandingDeep * 0.5f - Flight - LandingDeep * 0.5f;     // -14.1
+        public const float EstateWalk = -14.1f;
         /// <summary>建物の面。戸口はここに開く</summary>
         public const float EstateFace = EstateWalk - LandingDeep * 0.5f;                   // -14.8
         /// <summary>三階の高さ</summary>
         public const float EstateTop = Floor * 3f;                                         // 8.4
+        /// <summary>折り返しの踊り場の北の縁。階段が廊下から南へ出る線（<see cref="WalkFront"/>）から一本ぶん</summary>
+        const float StairTurnFar = EstateWalk + LandingDeep * 0.5f + Flight;               // -11.3
+        /// <summary>折り返しの踊り場の真ん中</summary>
+        public const float EstateTurn = StairTurnFar + StairTurn * 0.5f;                   // -10.65
+        /// <summary>階段の井戸の南の端</summary>
+        const float StairEnd = StairTurnFar + StairTurn;                                   // -10.0
+        /// <summary>
+        /// 階の高さの踊り場。折り返しなので廊下と同じ z に来る。
+        /// 記憶 0 の鍵打ちが見ているが、いまは先頭の一打しか使われていない
+        /// </summary>
+        public const float EstateLanding1 = EstateWalk;
+        /// <summary>二つ目。同じ井戸の同じ側へ戻るので z も同じ</summary>
+        public const float EstateLanding2 = EstateWalk;
 
         /// <summary>左の戸口の真ん中。記憶 0 の母と、記憶 1 のハンナの家</summary>
         public const float DoorA = 1.6f;
@@ -72,9 +95,11 @@ namespace HalfAware.EditorTools
 
         /// <summary>廊下の右端。三つ目の戸口のぶんだけ、元より伸びている</summary>
         const float WalkRight = 7.8f;
+        /// <summary>廊下の左端。階段の井戸まで伸ばす。折り返しの踊り場が廊下そのものだから</summary>
+        const float WalkLeft = StairWest;                                                  // -1.2
         /// <summary>建物の面の右端</summary>
         const float WallRight = 8.1f;
-        /// <summary>廊下の手すり側の縁</summary>
+        /// <summary>廊下の手すり側の縁。階段の井戸が南へ出る線でもある</summary>
         const float WalkFront = EstateWalk + LandingDeep * 0.5f;                           // -13.4
         /// <summary>廊下の天井の下面。四階の床でもある</summary>
         const float WalkRoof = EstateTop + 2.3f;
@@ -230,9 +255,9 @@ namespace HalfAware.EditorTools
             Ring(place, "EstateFence", new Vector2(-13.6f, 24.6f), new Vector2(-19.6f, BlockFace - 0.5f), 3.5f);
             // 階段と廊下の外側は手すりが受け持つ。EstateRail に当たりを入れてあるので、
             // ここへ仕切りを重ねると階段を上がってきた先が塞がる。
-            // **廊下の西の端だけは手すりが無い。** 歩いて確かめたら、階段の口から三階の外へ落ちた
-            Fence(place, "EstateWalkEndA", new Vector3(-0.7f, EstateTop + 0.75f, EstateWalk),
-                new Vector3(0.2f, 1.5f, LandingDeep));
+            // **西の端には何も重ねない。** 折り返しの階段はここから廊下へ出てくるので、
+            // 落ちる先を閉じているのは井戸の西の壁のほう
+            //
             // 東の端は戸境の壁が閉じているが、壁は面が二枚きりで、
             // 走り込んだときに抜けることがある。仕切りを重ねて押さえる
             Fence(place, "EstateWalkEndB", new Vector3(WalkRight + 0.1f, EstateTop + 0.75f, EstateWalk),
@@ -286,24 +311,36 @@ namespace HalfAware.EditorTools
         {
             // 地面。隣の棟の足元まで伸ばす。ここで切ると、棟が虚空に浮いて見える
             b.Slab.FaceY(0f, -14f, 25f, -20f, BlockFace, 1);
-            // 踊り場
-            b.Slab.Box(new Vector3(0f, Floor - 0.09f, EstateLanding1), new Vector3(StairHalf * 2f, 0.18f, LandingDeep));
-            b.Slab.Box(new Vector3(0f, Floor * 2f - 0.09f, EstateLanding2), new Vector3(StairHalf * 2f, 0.18f, LandingDeep));
-            // 各階の廊下。下の二層は階段と繋がっていないが、手すりの隙間から縁だけが見える
+            // 各階の廊下。階の高さに来る踊り場は廊下そのものなので、
+            // 西の端を井戸の幅まで伸ばす。下の二層もこれで階段と繋がる
             for (var f = 1; f <= 3; f++)
-                b.Slab.Box(new Vector3((WalkRight - StairHalf) * 0.5f, Floor * f - 0.09f, EstateWalk),
-                    new Vector3(WalkRight + StairHalf, 0.18f, LandingDeep));
+                b.Slab.Box(new Vector3((WalkRight + WalkLeft) * 0.5f, Floor * f - 0.09f, EstateWalk),
+                    new Vector3(WalkRight - WalkLeft, 0.18f, LandingDeep));
+            // 折り返しの踊り場。半階ぶん上がった先に、井戸の幅いっぱいで渡す
+            for (var h = 0; h < 3; h++)
+                b.Slab.Box(new Vector3((StairWest + StairEast) * 0.5f, Floor * h + Floor * 0.5f - 0.09f, EstateTurn),
+                    new Vector3(StairEast - StairWest, 0.18f, StairTurn));
             // 最上階の廊下の天井。裸電球を吊るす面が要る。頭上 2.3 m なので当たりが入っていても触らない
-            b.Slab.Box(new Vector3((WalkRight - StairHalf) * 0.5f, WalkRoof + 0.1f, EstateWalk),
-                new Vector3(WalkRight + StairHalf, 0.2f, LandingDeep + 0.3f));
+            b.Slab.Box(new Vector3((WalkRight + WalkLeft) * 0.5f, WalkRoof + 0.1f, EstateWalk),
+                new Vector3(WalkRight - WalkLeft, 0.2f, LandingDeep + 0.3f));
 
-            // 段鼻と番号板と硝子。廊下でいちばん明るい細かい面をここへ集める
-            EstateFlight(b.Slab, b.Bright, EstateFoot, 0f);
-            EstateFlight(b.Slab, b.Bright, EstateLanding1 - LandingDeep * 0.5f, Floor);
-            EstateFlight(b.Slab, b.Bright, EstateLanding2 - LandingDeep * 0.5f, Floor * 2f);
+            // 六本の段。東の一本で半階上がり、折り返して西の一本でまた半階上がる。
+            // 段鼻の明るい線は b.Bright へ集める
+            for (var h = 0; h < 3; h++)
+            {
+                var y = Floor * h;
+                EstateFlight(b.Slab, b.Bright, StairEastMid, WalkFront, y, Flight);
+                EstateFlight(b.Slab, b.Bright, StairWestMid, StairTurnFar, y + Floor * 0.5f, -Flight);
+            }
 
-            // 階段が背にしている壁。ここが無いと、階段が虚空に掛かっているように見える
-            b.Wall.FaceX(-0.9f, EstateFace, 3f, 0f, 11.2f, 1);
+            // 階段の井戸の西の壁。建物の西の面をそのまま南へ伸ばす。
+            // 面を一枚立てるだけでは、庭から回り込んだときに裏側が抜けて見える
+            b.Wall.Box(new Vector3(StairWest - 0.12f, 5.6f, (EstateFace + StairEnd) * 0.5f),
+                new Vector3(0.24f, 11.2f, StairEnd - EstateFace));
+            // 二本のあいだの中壁。**折り返しの踊り場までは届かせない。** 届くと向きが変えられない。
+            // 手すりで済ませないのは、隣の一本とは半階ぶんの段差があって、落ちれば 2.8 m だから
+            b.Wall.Box(new Vector3(0f, 4.7f, (WalkFront + StairTurnFar) * 0.5f),
+                new Vector3(StairSpine * 2f, 9.4f, Flight));
             // 建物の面。最上階に戸口を二つ開ける。三つ目は閉まっているので抜かない
             var holes = new List<Vector4>
             {
@@ -327,6 +364,10 @@ namespace HalfAware.EditorTools
                 new Vector3(0.24f, 0.5f, EstateFace - back));
             b.Wall.Box(new Vector3(-1.08f, 11.45f, (EstateFace + back) * 0.5f),
                 new Vector3(0.24f, 0.5f, EstateFace - back));
+            // 階段の井戸の西の壁にも同じ立ち上がりを載せる。
+            // 建物の縁だけが厚くて井戸の縁が薄いと、井戸が後から付け足した板に見える
+            b.Wall.Box(new Vector3(StairWest - 0.12f, 11.45f, (EstateFace + StairEnd) * 0.5f),
+                new Vector3(0.36f, 0.5f, StairEnd - EstateFace));
 
             // 右の家。四方と天井。**内側の面にも戸口を抜く。**
             // 抜かずに張ると、廊下から戸口を通り抜けられず、中からは壁が一枚塞いでいるように見える
@@ -345,82 +386,85 @@ namespace HalfAware.EditorTools
             b.Shade.FaceY(RoomRoof, RoomX0, RoomX1, RoomBack, EstateFace, -1);
             b.Shade.FaceY(EstateTop + 2.2f, PorchX0, PorchX1, PorchBack, EstateFace, -1);
 
-            // 階段脇の壁の窓。一枚の板のままだと、階段の隣に何も無い崖が立っているように見える。
-            // z を踊り場から外してあるのは、踊り場の壁に階数の札を貼るため
-            for (var f = 0; f < 4; f++)
+            // 井戸の西の壁の窓。一枚の板のままだと、階段の隣に何も無い崖が立っているように見える。
+            // 高さは西の一本の段の面から 0.8 m 上。段を上がりながら覗ける位置に来る
+            for (var h = 0; h < 3; h++)
             {
-                for (var c = 0; c < 4; c++)
-                {
-                    var y = 1.5f + f * Floor;
-                    var z = -11.4f + c * 3.8f;
-                    var into = (f == 1 && c == 3) ? b.Lit : b.Shade;
-                    into.FaceX(-0.88f, z - 0.62f, z + 0.62f, y, y + 1.15f, 1);
-                    b.Gear.Box(new Vector3(-0.86f, y + 0.575f, z), new Vector3(0.03f, 1.19f, 0.05f));
-                }
+                var y = 2.3f + h * Floor;
+                EstateHole(b, y, EstateTurn, h == 1);
+                EstateHole(b, y + 0.6f, (WalkFront + StairTurnFar) * 0.5f, false);
             }
 
-            // 踊り場の階数の札。**上がっている途中で階が読めるのはここだけ。**
-            // 廊下まで上がってしまうと、下の階の床の縁を数えるほかに手掛かりが無い
-            EstateSign(b, Floor + 1.45f, EstateLanding1, 2);
-            EstateSign(b, Floor * 2f + 1.45f, EstateLanding2, 3);
+            // 階数の札。折り返しで上がってくると、階の高さの踊り場は廊下の西の端に来る。
+            // そこの壁に貼れば、上がり切ったところと降り始めるところの両方で読める
+            EstateSign(b, Floor + 1.45f, EstateWalk, 2);
+            EstateSign(b, Floor * 2f + 1.45f, EstateWalk, 3);
 
-            // 階段と踊り場の手すり
-            EstateSlope(b.Rail, EstateFoot, 0f);
-            EstateBar(b.Rail, EstateLanding1 - LandingDeep * 0.5f, EstateLanding1 + LandingDeep * 0.5f, Floor);
-            EstateSlope(b.Rail, EstateLanding1 - LandingDeep * 0.5f, Floor);
-            EstateBar(b.Rail, EstateLanding2 - LandingDeep * 0.5f, EstateLanding2 + LandingDeep * 0.5f, Floor * 2f);
-            EstateSlope(b.Rail, EstateLanding2 - LandingDeep * 0.5f, Floor * 2f);
-            // 最上階の廊下の外側。**階段の口（x -0.6〜0.6）は空ける。**
+            // 階段の手すり。東の一本の外側と、折り返しの踊り場の東と南を回す。
+            // 西の一本の外側は井戸の壁、内側は中壁なので、手すりは要らない
+            for (var h = 0; h < 3; h++)
+            {
+                var y = Floor * h;
+                EstateSlope(b.Rail, StairEast, WalkFront, y, Flight);
+                EstateRailZ(b.Rail, StairEast, StairTurnFar, StairEnd, y + Floor * 0.5f);
+                EstateRailX(b.Rail, StairEnd, StairWest, StairEast, y + Floor * 0.5f);
+            }
+            // 最上階の廊下の外側。**階段が上がってくる西の一本（x -1.2〜-0.1）だけ空ける。**
             // 手すりに当たりを入れたので、廊下の長さぶん通すと階段を上がってきた先が塞がる。
-            // 一度通した版では、上がり切ったところで壁に突き当たって廊下へ出られなかった
-            for (var i = 0; i < 2; i++)
-            {
-                var y = EstateTop + 0.5f + i * 0.45f;
-                b.Rail.Box(new Vector3((WalkRight + StairHalf) * 0.5f, y, WalkFront),
-                    new Vector3(WalkRight - StairHalf, 0.05f, 0.05f));
-            }
-            // 支柱は 0.9 m 間隔。一本の帯だけでは、廊下ではなく宙に張った線に見える
-            for (var i = 0; i < 8; i++)
-                b.Rail.Box(new Vector3(0.65f + i * 0.9f, EstateTop + 0.48f, WalkFront),
-                    new Vector3(0.05f, 0.96f, 0.05f));
-            b.Rail.Box(new Vector3(WalkRight - 0.05f, EstateTop + 0.48f, WalkFront), new Vector3(0.05f, 0.96f, 0.05f));
+            // 一度通した版では、上がり切ったところで壁に突き当たって廊下へ出られなかった。
+            // 逆に東の一本の上は塞ぐ。ここから先は段が無く、下の段まで 2.8 m 落ちる
+            EstateRailX(b.Rail, WalkFront, -StairSpine, WalkRight, EstateTop);
             // 廊下の東の端。**見えない仕切りではなく壁で閉じる。**
             // 歩いて確かめたら廊下を +x へ歩き切って落ちたので、そこに戸境の壁を立てた
             b.Wall.FaceX(WalkRight + 0.15f, EstateFace, WalkFront, EstateTop, WalkRoof, -1);
             b.Wall.FaceX(WalkRight + 0.15f, EstateFace, WalkFront, EstateTop, WalkRoof, 1);
         }
 
-        /// <summary>一階ぶんの段。踏み面と蹴込みを一段ずつ張り、角へ段鼻を跨がせる</summary>
-        static void EstateFlight(Bank b, Bank nose, float zFoot, float yFoot)
+        /// <summary>
+        /// 半階ぶんの段。踏み面と蹴込みを一段ずつ張り、角へ段鼻を跨がせる。
+        ///
+        /// <paramref name="run"/> は z へ伸びる長さで、符号が上がっていく向きを持つ。
+        /// 折り返しで一本ごとに向きが裏返るので、蹴込みの表裏と段鼻の乗る辺をここで振り分ける
+        /// </summary>
+        static void EstateFlight(Bank b, Bank nose, float xMid, float zFoot, float yFoot, float run)
         {
-            var d = Flight / StepCount;
-            var r = Floor / StepCount;
+            var rise = Floor * 0.5f;
+            var d = run / StepCount;
+            var r = rise / StepCount;
+            var half = StairWide * 0.5f;
+            // 蹴込みは上がってくる側へ向ける。取り違えると段が裏返って、下から見上げたとき消える
+            var facing = run > 0f ? -1 : 1;
+            var lip = run > 0f ? -0.008f : 0.008f;
             for (var i = 0; i < StepCount; i++)
             {
-                b.FaceZ(zFoot - i * d, -StairHalf, StairHalf, yFoot + i * r, yFoot + (i + 1) * r, 1);
-                b.FaceY(yFoot + (i + 1) * r, -StairHalf, StairHalf, zFoot - (i + 1) * d, zFoot - i * d, 1);
+                var z0 = zFoot + d * i;
+                var z1 = zFoot + d * (i + 1);
+                b.FaceZ(z0, xMid - half, xMid + half, yFoot + i * r, yFoot + (i + 1) * r, facing);
+                b.FaceY(yFoot + (i + 1) * r, xMid - half, xMid + half,
+                    Mathf.Min(z0, z1), Mathf.Max(z0, z1), 1);
                 // 段鼻は角へ跨がせる。踏み面の上に載せるだけでは、見上げたとき蹴込みしか見えず、
                 // 段が数えられない。下から見上げる絵がこの場所のいちばん長い絵なので、そこを優先する
-                nose.Box(new Vector3(0f, yFoot + (i + 1) * r - 0.006f, zFoot - i * d + 0.008f),
-                    new Vector3(StairHalf * 2f - 0.04f, 0.05f, 0.075f));
+                nose.Box(new Vector3(xMid, yFoot + (i + 1) * r - 0.006f, z0 + lip),
+                    new Vector3(StairWide - 0.04f, 0.05f, 0.075f));
             }
             // 段の裏。下から見上げたときに段が宙に浮いて見えないように、斜めの板を一枚通す
-            var dir = new Vector3(0f, Floor, -Flight).normalized;
-            b.Box(new Vector3(0f, yFoot + Floor * 0.5f - 0.24f, zFoot - Flight * 0.5f),
-                new Vector3(StairHalf * 2f, 0.3f, Mathf.Sqrt(Flight * Flight + Floor * Floor)),
+            var dir = new Vector3(0f, rise, run).normalized;
+            b.Box(new Vector3(xMid, yFoot + rise * 0.5f - 0.24f, zFoot + run * 0.5f),
+                new Vector3(StairWide, 0.28f, Mathf.Sqrt(run * run + rise * rise)),
                 Quaternion.LookRotation(dir, Vector3.up));
         }
 
         /// <summary>斜めの手すり。段と同じ勾配で二本通し、支柱を 0.9 m 間隔で立てる</summary>
-        static void EstateSlope(Bank b, float zFoot, float yFoot)
+        static void EstateSlope(Bank b, float xRail, float zFoot, float yFoot, float run)
         {
-            var dir = new Vector3(0f, Floor, -Flight).normalized;
+            var rise = Floor * 0.5f;
+            var dir = new Vector3(0f, rise, run).normalized;
             var rot = Quaternion.LookRotation(dir, Vector3.up);
-            var len = Mathf.Sqrt(Flight * Flight + Floor * Floor);
+            var len = Mathf.Sqrt(run * run + rise * rise);
             for (var i = 0; i < 2; i++)
             {
                 var lift = 0.55f + i * 0.45f;
-                b.Box(new Vector3(StairHalf, yFoot + Floor * 0.5f + lift, zFoot - Flight * 0.5f),
+                b.Box(new Vector3(xRail, yFoot + rise * 0.5f + lift, zFoot + run * 0.5f),
                     new Vector3(0.05f, 0.05f, len), rot);
             }
             var count = Mathf.FloorToInt(len / 0.9f) + 1;
@@ -428,33 +472,61 @@ namespace HalfAware.EditorTools
             {
                 var k = (0.45f + i * 0.9f) / len;
                 if (k > 1f) break;
-                b.Box(new Vector3(StairHalf, yFoot + Floor * k + 0.48f, zFoot - Flight * k),
+                b.Box(new Vector3(xRail, yFoot + rise * k + 0.48f, zFoot + run * k),
                     new Vector3(0.05f, 0.96f, 0.05f));
             }
         }
 
-        /// <summary>踊り場の手すり。水平に二本と、間隔を階段に合わせた支柱</summary>
-        static void EstateBar(Bank b, float z0, float z1, float y)
+        /// <summary>z へ伸びる水平の手すり。二本と、0.9 m 間隔に均した支柱</summary>
+        static void EstateRailZ(Bank b, float x, float z0, float z1, float y)
         {
             for (var i = 0; i < 2; i++)
-                b.Box(new Vector3(StairHalf, y + 0.5f + i * 0.45f, (z0 + z1) * 0.5f),
+                b.Box(new Vector3(x, y + 0.5f + i * 0.45f, (z0 + z1) * 0.5f),
                     new Vector3(0.05f, 0.05f, z1 - z0));
-            b.Box(new Vector3(StairHalf, y + 0.48f, z0 + 0.05f), new Vector3(0.05f, 0.96f, 0.05f));
-            b.Box(new Vector3(StairHalf, y + 0.48f, (z0 + z1) * 0.5f), new Vector3(0.05f, 0.96f, 0.05f));
-            b.Box(new Vector3(StairHalf, y + 0.48f, z1 - 0.05f), new Vector3(0.05f, 0.96f, 0.05f));
+            EstatePosts(b, new Vector3(x, y + 0.48f, z0 + 0.05f), new Vector3(x, y + 0.48f, z1 - 0.05f));
+        }
+
+        /// <summary>x へ伸びる水平の手すり</summary>
+        static void EstateRailX(Bank b, float z, float x0, float x1, float y)
+        {
+            for (var i = 0; i < 2; i++)
+                b.Box(new Vector3((x0 + x1) * 0.5f, y + 0.5f + i * 0.45f, z),
+                    new Vector3(x1 - x0, 0.05f, 0.05f));
+            EstatePosts(b, new Vector3(x0 + 0.05f, y + 0.48f, z), new Vector3(x1 - 0.05f, y + 0.48f, z));
+        }
+
+        /// <summary>
+        /// 手すりの支柱を端から端へ並べる。
+        ///
+        /// 間隔を 0.9 m に決め打ちせず端で割り切るのは、折り返しの踊り場のように
+        /// 1.3 m しか無い縁でも、両端に必ず一本ずつ立つようにするため
+        /// </summary>
+        static void EstatePosts(Bank b, Vector3 from, Vector3 to)
+        {
+            var count = Mathf.Max(2, Mathf.RoundToInt(Vector3.Distance(from, to) / 0.9f) + 1);
+            for (var i = 0; i < count; i++)
+                b.Box(Vector3.Lerp(from, to, i / (float)(count - 1)), new Vector3(0.05f, 0.96f, 0.05f));
+        }
+
+        /// <summary>井戸の西の壁の窓。硝子の面と縦の桟だけ</summary>
+        static void EstateHole(EstateBanks b, float y, float z, bool lit)
+        {
+            var into = lit ? b.Lit : b.Shade;
+            into.FaceX(StairWest + 0.02f, z - 0.55f, z + 0.55f, y, y + 1.15f, 1);
+            b.Gear.Box(new Vector3(StairWest + 0.04f, y + 0.575f, z), new Vector3(0.03f, 1.19f, 0.05f));
         }
 
         // ---- 階数の札 ----------------------------------------------------------
 
         /// <summary>
-        /// 踊り場の階数の札。明るい板に、数字と F を暗い棒で組む。
+        /// 階数の札。明るい板に、数字と F を暗い棒で組む。
         ///
         /// 文字を貼るには TextMeshPro の面が要るが、この場所は面を一枚に焼いてしまうので、
         /// 棒を七本並べる組み方にして mesh のまま持たせる
         /// </summary>
         static void EstateSign(EstateBanks b, float y, float z, int floor)
         {
-            b.Bright.Box(new Vector3(-0.868f, y, z), new Vector3(0.03f, 0.40f, 0.36f));
+            b.Bright.Box(new Vector3(StairWest + 0.022f, y, z), new Vector3(0.03f, 0.40f, 0.36f));
             EstateGlyph(b.Shade, y, z - 0.09f, floor == 2 ? 91 : 79);
             EstateGlyph(b.Shade, y, z + 0.09f, 113);
         }
@@ -466,7 +538,7 @@ namespace HalfAware.EditorTools
         /// </summary>
         static void EstateGlyph(Bank b, float y, float z, int bits)
         {
-            const float x = -0.845f;
+            const float x = StairWest + 0.045f;
             const float thin = 0.02f;
             const float hw = 0.055f;
             const float hh = 0.115f;
@@ -502,8 +574,8 @@ namespace HalfAware.EditorTools
                     b.Wall.FaceX(WalkRight + 0.15f, EstateFace, WalkFront, y, y + Floor - 0.18f, -1);
                     b.Wall.FaceX(WalkRight + 0.15f, EstateFace, WalkFront, y, y + Floor - 0.18f, 1);
                     // 廊下の天井の下面は上の階の床板。その縁へ庇の線を一本回すと、階の境が読める
-                    b.Shade.Box(new Vector3((WalkRight - StairHalf) * 0.5f, y + Floor - 0.24f, WalkFront - 0.03f),
-                        new Vector3(WalkRight + StairHalf, 0.08f, 0.08f));
+                    b.Shade.Box(new Vector3((WalkRight + WalkLeft) * 0.5f, y + Floor - 0.24f, WalkFront - 0.03f),
+                        new Vector3(WalkRight - WalkLeft, 0.08f, 0.08f));
                 }
                 for (var c = 0; c < 3; c++) EstateFlatDoor(b, DoorA + c * (DoorB - DoorA), y);
                 // 戸口と戸口の間の窓。戸だけが並ぶと壁が間延びする
@@ -534,20 +606,22 @@ namespace HalfAware.EditorTools
                 b.Gear.Box(new Vector3(0.35f, y + Floor - 0.45f, EstateFace + 0.07f), new Vector3(0.32f, 0.19f, 0.08f));
                 // 自転車とダンボール。床に物が出ているのが、事務所の通路と分ける
                 EstateBike(b, 7.0f, y, EstateFace + 0.45f);
+                // 置く先は戸口 A と B のあいだ。階段の井戸へ置くと、折り返して向きを変える足元が埋まる
                 for (var i = 0; i < 2; i++)
-                    b.Set.Box(new Vector3(1.05f, y + 0.18f + i * 0.34f, EstateFace + 0.30f),
+                    b.Set.Box(new Vector3(2.95f, y + 0.18f + i * 0.34f, EstateFace + 0.30f),
                         new Vector3(0.52f, 0.32f, 0.40f));
             }
         }
 
-        /// <summary>下の階の廊下の手すり。階段の口が無いので、端から端まで通す</summary>
+        /// <summary>
+        /// 下の階の廊下の手すり。**階段の井戸ぶん（x -1.2〜1.2）は空ける。**
+        ///
+        /// 折り返しの階段はこの階で一度廊下へ戻り、東の一本へ乗り換えてまた上がる。
+        /// 井戸の口を塞ぐと、上がってきた先と上がる先の両方が閉じる
+        /// </summary>
         static void EstateWalkRail(Bank rail, float y)
         {
-            for (var i = 0; i < 2; i++)
-                rail.Box(new Vector3((WalkRight - StairHalf) * 0.5f, y + 0.5f + i * 0.45f, WalkFront),
-                    new Vector3(WalkRight + StairHalf, 0.05f, 0.05f));
-            for (var i = 0; i < 10; i++)
-                rail.Box(new Vector3(-0.25f + i * 0.9f, y + 0.48f, WalkFront), new Vector3(0.05f, 0.96f, 0.05f));
+            EstateRailX(rail, WalkFront, StairEast, WalkRight, y);
         }
 
         /// <summary>
@@ -606,17 +680,18 @@ namespace HalfAware.EditorTools
         static void EstateCommon(EstateBanks b)
         {
             // 掲示板。硝子の入った枠に紙が何枚か。壁でいちばん明るい四角になる
-            b.Gear.Box(new Vector3(-0.86f, EstateTop + 1.38f, -14.05f), new Vector3(0.05f, 0.74f, 0.92f));
-            b.Shade.Box(new Vector3(-0.835f, EstateTop + 1.38f, -14.05f), new Vector3(0.02f, 0.64f, 0.82f));
+            b.Gear.Box(new Vector3(StairWest + 0.03f, EstateTop + 1.38f, -14.05f), new Vector3(0.05f, 0.74f, 0.92f));
+            b.Shade.Box(new Vector3(StairWest + 0.055f, EstateTop + 1.38f, -14.05f), new Vector3(0.02f, 0.64f, 0.82f));
             for (var i = 0; i < 4; i++)
-                b.Paper.Box(new Vector3(-0.825f, EstateTop + 1.24f + (i % 2) * 0.30f,
+                b.Paper.Box(new Vector3(StairWest + 0.065f, EstateTop + 1.24f + (i % 2) * 0.30f,
                         -13.80f - (i / 2) * 0.42f), new Vector3(0.01f, 0.24f, 0.32f));
 
-            // 消火器。赤い縦長がひとつあるだけで、廊下が共用部だと分かる
-            b.Red.Box(new Vector3(-0.40f, EstateTop + 0.30f, -14.52f), new Vector3(0.19f, 0.54f, 0.19f));
-            b.Gear.Box(new Vector3(-0.40f, EstateTop + 0.60f, -14.52f), new Vector3(0.09f, 0.10f, 0.09f));
-            b.Gear.Box(new Vector3(-0.40f, EstateTop + 0.02f, -14.52f), new Vector3(0.30f, 0.04f, 0.30f));
-            b.Paper.Box(new Vector3(-0.29f, EstateTop + 0.34f, -14.52f), new Vector3(0.01f, 0.16f, 0.13f));
+            // 消火器。赤い縦長がひとつあるだけで、廊下が共用部だと分かる。
+            // 置く先は井戸の東の隅。上がり切ったところは西の一本の出口なので、そちらは空けておく
+            b.Red.Box(new Vector3(1.05f, EstateTop + 0.30f, -14.52f), new Vector3(0.19f, 0.54f, 0.19f));
+            b.Gear.Box(new Vector3(1.05f, EstateTop + 0.60f, -14.52f), new Vector3(0.09f, 0.10f, 0.09f));
+            b.Gear.Box(new Vector3(1.05f, EstateTop + 0.02f, -14.52f), new Vector3(0.30f, 0.04f, 0.30f));
+            b.Paper.Box(new Vector3(1.16f, EstateTop + 0.34f, -14.52f), new Vector3(0.01f, 0.16f, 0.13f));
 
             // 配電盤と量水器の扉。面のいちばん端に寄せて、戸口の列を邪魔しない
             b.Gear.Box(new Vector3(0.38f, EstateTop + 1.42f, EstateFace + 0.09f), new Vector3(0.52f, 0.72f, 0.16f));
@@ -665,7 +740,7 @@ namespace HalfAware.EditorTools
                     new Vector3(0.05f, 0.76f, 0.05f));
 
             // 植木鉢。高さを変えて三つ。同じ高さで並べると棚に見える
-            var pots = new[] { 2.06f, 2.32f, 0.80f };
+            var pots = new[] { 2.06f, 2.32f, 0.62f };
             var tall = new[] { 0.26f, 0.19f, 0.30f };
             for (var i = 0; i < pots.Length; i++)
             {

@@ -219,7 +219,9 @@ namespace HalfAware.EditorTools
         static HostKey[] Hanna(Transform take)
         {
             var kid = Cast(take, "Daughter", "W_Casual", new Vector3(0.75f, EstateTop, -13.95f), 280f, 0, 0.6f);
-            Move(kid, new Vector3(0.2f, EstateTop, -13.4f), new Vector3(0.75f, EstateTop, -13.95f), 6f, 3.5f, true);
+            // 出てくるのは階段の口。折り返しになって、上がり切る一本が廊下の西へ寄ったので、
+            // 元の x 0.2 は手すりの中になった
+            Move(kid, new Vector3(-0.65f, EstateTop, -13.5f), new Vector3(0.75f, EstateTop, -13.95f), 6f, 3.5f, true);
             Cast(take, "Neighbour", "M_Casual", new Vector3(4.0f, EstateTop, -14.55f), 130f, 3, 0.95f);
             return new[]
             {
