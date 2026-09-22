@@ -190,20 +190,46 @@ namespace HalfAware.EditorTools
                 alongZ ? new Vector3(0.03f, 0.10f, run) : new Vector3(run, 0.10f, 0.03f));
         }
 
-        /// <summary>靴を一足。三和土の上に並ぶ小さな暗い塊が、土間を土間として読ませる</summary>
-        static void EstateShoes(EstateBanks b, float x, float z, float turn)
+        /// <summary>
+        /// 靴を一足。三和土の上に並ぶ小さな暗い塊が、土間を土間として読ませる。
+        ///
+        /// <paramref name="grow"/> を 1 より小さくすると子どもの靴になる。
+        /// 大人の靴の隣に小さいのが一足あるだけで、誰と誰が住んでいるかが伝わる
+        /// </summary>
+        static void EstateShoes(EstateBanks b, float x, float z, float turn, float grow = 1f)
         {
             var rot = Quaternion.Euler(0f, turn, 0f);
             for (var i = 0; i < 2; i++)
             {
-                var at = new Vector3(x + (i == 0 ? -0.09f : 0.09f), EstateTop - EstateSunk + 0.05f, z);
-                b.Shade.Box(at, new Vector3(0.11f, 0.10f, 0.26f), rot);
-                b.Shade.Box(at + new Vector3(0f, 0.04f, -0.07f), new Vector3(0.11f, 0.08f, 0.10f), rot);
+                var at = new Vector3(x + (i == 0 ? -0.09f : 0.09f) * grow,
+                    EstateTop - EstateSunk + 0.05f * grow, z);
+                b.Shade.Box(at, new Vector3(0.11f, 0.10f, 0.26f) * grow, rot);
+                b.Shade.Box(at + new Vector3(0f, 0.04f, -0.07f) * grow,
+                    new Vector3(0.11f, 0.08f, 0.10f) * grow, rot);
             }
         }
 
+        // ---- 左の家（母ハンナと娘メイ） ----------------------------------------
+        //
+        // 間取りは L 字。三和土から上がった短い廊下の西が抜けていて、そこから台所へ入り、
+        // さらに南へ回ると居間に出る。**廊下の正面は塞ぐ。** そこには EstateShell の
+        // 光る面（EstateHallLight）が立っていて、抜けを開けると光る板の中を通ることになる。
+        // 塞いだ面は曇り硝子の引き戸ということにして、枠と桟を手前へ回す。
+        // 記憶 0 の母はこの硝子を背にするので、逆光の影のまま立つ
+
+        /// <summary>左の家の西の壁の内側。建物の西の面から 0.15 m 入る</summary>
+        const float FlatX0 = -1.05f;
+        /// <summary>左の家の東の壁の内側。右の家との戸境</summary>
+        const float FlatX1 = 2.88f;
+        /// <summary>左の家の奥の壁の内側</summary>
+        const float FlatBack = -18.30f;
+        /// <summary>家の中の仕切りの厚みの半分</summary>
+        const float FlatSkin = 0.06f;
+        /// <summary>左の家の天井。玄関の天井（<c>EstateShell</c> が張る）と同じ高さで通す</summary>
+        const float FlatRoof = EstateTop + 2.2f;
+
         /// <summary>
-        /// 左の戸口の奥（記憶 0・1）。ここも玄関から始める。
+        /// 左の戸口の奥（記憶 0・1）。母ハンナ（34）と娘メイ（7）の住戸。
         ///
         /// **母の立つところだけ床の高さのまま残す。** 記憶 0 は子どもの目から母の脚を見上げる
         /// 鍵打ちがあり、三和土をそこまで下げると母が 0.15 m 浮く。
@@ -211,15 +237,81 @@ namespace HalfAware.EditorTools
         /// </summary>
         static void EstatePorch(EstateBanks b)
         {
+            EstateFlatShell(b);
+            EstateFlatGenkan(b);
+            EstateFlatKitchen(b);
+            EstateFlatRoom(b);
+        }
+
+        /// <summary>
+        /// 左の家の躯体。三和土・床板・壁・天井・幅木。
+        ///
+        /// 建物の面は外を向いた一枚きりなので、**内側にもう一枚張らないと外が見通せる。**
+        /// 戸口の分だけ抜いて、三和土の底から天井まで通す
+        /// </summary>
+        static void EstateFlatShell(EstateBanks b)
+        {
+            // 三和土と、框の蹴上げ
             b.Tile.FaceY(EstateTop - EstateSunk, PorchX0, PorchX1, PorchSill, EstateFace, 1);
             b.Tile.FaceZ(PorchSill, PorchX0, PorchX1, EstateTop - EstateSunk, EstateTop, 1);
-            b.Wall.FaceY(EstateTop, PorchX0, PorchX1, PorchBack, PorchSill, 1);
-            b.Wall.FaceX(PorchX0, PorchBack, EstateFace, EstateTop - EstateSunk, EstateTop + 2.2f, 1);
-            b.Wall.FaceX(PorchX1, PorchBack, EstateFace, EstateTop - EstateSunk, EstateTop + 2.2f, -1);
-            b.Wall.FaceZ(PorchBack, PorchX0, PorchX1, EstateTop, EstateTop + 2.2f, 1);
             b.Set.Box(new Vector3(DoorA, EstateTop - 0.09f, PorchSill + 0.035f),
                 new Vector3(PorchX1 - PorchX0, 0.18f, 0.07f));
 
+            // 床板。玄関の廊下・台所・居間の三枚。**廊下と同じ土間の色では中へ入ったことが伝わらない**
+            b.Board.FaceY(EstateTop, PorchX0, PorchX1, PorchBack, PorchSill, 1);
+            b.Board.FaceY(EstateTop, FlatX0, PorchX0, FlatBack, EstateFace, 1);
+            b.Board.FaceY(EstateTop, PorchX0, FlatX1, FlatBack, PorchBack, 1);
+
+            // 外周の壁
+            b.Wall.FaceX(FlatX0, FlatBack, EstateFace, EstateTop - EstateSunk, FlatRoof, 1);
+            b.Wall.FaceX(FlatX1, FlatBack, PorchBack, EstateTop, FlatRoof, -1);
+            b.Wall.FaceZ(FlatBack, FlatX0, FlatX1, EstateTop, FlatRoof, 1);
+            b.Wall.FaceZHoles(EstateFace - 0.02f, FlatX0, PorchX1, EstateTop - EstateSunk, FlatRoof, -1,
+                new List<Vector4>
+                {
+                    new Vector4(DoorA - DoorHalf, DoorA + DoorHalf, EstateTop - EstateSunk, EstateTop + DoorHigh),
+                });
+
+            // 三和土の西の仕切り。廊下の西は抜けているので、三和土の分だけ立てる
+            b.Wall.Box(new Vector3(PorchX0 - FlatSkin, (EstateTop - EstateSunk + FlatRoof) * 0.5f,
+                    (PorchSill + EstateFace) * 0.5f),
+                new Vector3(FlatSkin * 2f, FlatRoof - EstateTop + EstateSunk, EstateFace - PorchSill));
+            // 玄関の東の壁。この奥は物入れで、中は作らない
+            b.Wall.Box(new Vector3(PorchX1 + FlatSkin, (EstateTop - EstateSunk + FlatRoof) * 0.5f,
+                    (PorchBack + EstateFace) * 0.5f),
+                new Vector3(FlatSkin * 2f, FlatRoof - EstateTop + EstateSunk, EstateFace - PorchBack));
+            // 廊下の正面の壁と、居間の側から見た同じ壁。光る面はこの手前に立つ
+            b.Wall.FaceZ(PorchBack, PorchX0, PorchX1, EstateTop, FlatRoof, 1);
+            b.Wall.FaceZ(PorchBack - FlatSkin * 2f, PorchX0, FlatX1, EstateTop, FlatRoof, -1);
+            // 抜けの垂れ壁。天井まで抜けていると、玄関と台所の切れ目が読めない
+            b.Wall.Box(new Vector3(PorchX0 - FlatSkin, (EstateTop + HallHead + FlatRoof) * 0.5f,
+                    (PorchBack + PorchSill) * 0.5f),
+                new Vector3(FlatSkin * 2f, FlatRoof - EstateTop - HallHead, PorchSill - PorchBack));
+            // 抜けの縁。木の枠が回ると、壁に空いた穴ではなく建具の抜けに見える
+            b.Set.Box(new Vector3(PorchX0 - FlatSkin, EstateTop + HallHead, (PorchBack + PorchSill) * 0.5f),
+                new Vector3(FlatSkin * 2f + 0.03f, 0.05f, PorchSill - PorchBack + 0.10f));
+
+            // 天井。上を向いた面は日射しを受けないので、暗いままでよい
+            b.Shade.FaceY(FlatRoof, FlatX0, PorchX0, FlatBack, EstateFace, -1);
+            b.Shade.FaceY(FlatRoof, PorchX0, FlatX1, FlatBack, PorchBack, -1);
+
+            // 幅木。壁の裾に線が一本通らないと、居間の壁が塗っただけの面に見える
+            EstateSkirt(b, FlatX0 + 0.02f, FlatBack, EstateFace, true);
+            EstateSkirt(b, FlatX1 - 0.02f, FlatBack, PorchBack, true);
+            EstateSkirt(b, FlatBack + 0.02f, FlatX0, FlatX1, false);
+            EstateSkirt(b, EstateFace - 0.04f, FlatX0, PorchX0, false);
+            EstateSkirt(b, PorchBack - FlatSkin * 2f - 0.02f, PorchX0, FlatX1, false);
+        }
+
+        /// <summary>
+        /// 左の家の玄関。すのこ・下駄箱・靴・傘立てと、正面の曇り硝子の引き戸。
+        ///
+        /// **母と娘の家だと三和土で言い切る。** 大人の靴の隣に小さい靴、傘立てに短い傘、
+        /// 硝子に貼ったクレヨンの絵。戸口の正面から覗いて絵に入るのはここまでで、
+        /// 台所と居間は中へ入った人にしか見えない
+        /// </summary>
+        static void EstateFlatGenkan(EstateBanks b)
+        {
             // すのこ。板の隙間を暗い線で入れておかないと、ただの踏み台に見える
             b.Set.Box(new Vector3(1.70f, EstateTop - 0.075f, -15.12f), new Vector3(0.80f, 0.15f, 0.50f));
             for (var i = 0; i < 4; i++)
@@ -228,25 +320,202 @@ namespace HalfAware.EditorTools
 
             // 下駄箱。戸口の抜けに掛からないよう西の壁へ寄せる
             b.Set.Box(new Vector3(1.00f, EstateTop + 0.325f, -15.18f), new Vector3(0.28f, 0.95f, 0.72f));
-            b.Gear.Box(new Vector3(1.00f, EstateTop + 0.86f, -15.18f), new Vector3(0.18f, 0.14f, 0.20f));
-            EstateShoes(b, 1.28f, -15.42f, -10f);
-            EstateShoes(b, 2.10f, -15.38f, 16f);
+            b.Shade.Box(new Vector3(1.15f, EstateTop + 0.33f, -15.18f), new Vector3(0.02f, 0.80f, 0.60f));
+            b.Red.Box(new Vector3(1.00f, EstateTop + 0.87f, -15.32f), new Vector3(0.16f, 0.14f, 0.16f));
+            b.Soft.Box(new Vector3(1.00f, EstateTop + 1.02f, -15.32f), new Vector3(0.22f, 0.20f, 0.20f));
+            b.Bright.Box(new Vector3(1.00f, EstateTop + 0.90f, -15.02f), new Vector3(0.14f, 0.20f, 0.03f));
 
-            // 奥の物。光る面の手前へ影になる物を置く。
-            // 何も無いと、記憶 1 が戸口へ向いたとき、視界の半分が真っ白な板になる
-            b.Shade.Box(new Vector3(DoorA, EstateTop + 0.26f, -16.18f), new Vector3(1.20f, 0.52f, 0.30f));
-            b.Shade.Box(new Vector3(DoorA, EstateTop + 1.86f, -16.24f), new Vector3(1.34f, 0.07f, 0.22f));
-            b.Soft.Box(new Vector3(DoorA - 0.36f, EstateTop + 1.36f, -16.24f), new Vector3(0.36f, 0.92f, 0.12f));
-            b.Soft.Box(new Vector3(DoorA + 0.40f, EstateTop + 1.44f, -16.24f), new Vector3(0.30f, 0.76f, 0.12f));
+            // 靴。大人の一足と、子どもの一足。**母の通り道（すのこ）を外して置く**
+            EstateShoes(b, 1.30f, -15.46f, -10f);
+            EstateShoes(b, 2.02f, -15.44f, 16f, 0.66f);
+
+            // 傘立て。三和土の東の隅。長い傘と、子どもの短い傘
+            b.Gear.Box(new Vector3(2.24f, EstateTop + 0.07f, -15.36f), new Vector3(0.24f, 0.44f, 0.24f));
+            b.Shade.Box(new Vector3(2.20f, EstateTop + 0.32f, -15.34f), new Vector3(0.05f, 0.74f, 0.05f));
+            b.Red.Box(new Vector3(2.29f, EstateTop + 0.16f, -15.39f), new Vector3(0.05f, 0.50f, 0.05f));
+
+            // 曇り硝子の引き戸。**光る面がこの硝子。** 枠と桟を手前へ回して、
+            // ただ光る板ではなく、灯りの点いた奥の部屋の戸として読ませる
+            const float leaf = PorchBack + 0.10f;
+            for (var i = 0; i < 2; i++)
+                b.Set.Box(new Vector3(i == 0 ? PorchX0 + 0.03f : PorchX1 - 0.03f, EstateTop + 1.10f, leaf),
+                    new Vector3(0.06f, 2.20f, 0.11f));
+            b.Set.Box(new Vector3(DoorA, EstateTop + 2.18f, leaf), new Vector3(1.56f, 0.08f, 0.11f));
+            b.Set.Box(new Vector3(DoorA, EstateTop + 0.02f, leaf), new Vector3(1.56f, 0.05f, 0.11f));
+            b.Set.Box(new Vector3(DoorA, EstateTop + 1.08f, leaf - 0.01f), new Vector3(0.05f, 2.12f, 0.05f));
+            for (var i = 0; i < 2; i++)
+                b.Set.Box(new Vector3(DoorA, EstateTop + 0.72f + i * 0.76f, leaf - 0.01f),
+                    new Vector3(1.44f, 0.04f, 0.05f));
+            b.Shade.Box(new Vector3(1.44f, EstateTop + 1.06f, leaf + 0.01f), new Vector3(0.05f, 0.13f, 0.03f));
+            // 硝子へ貼った子どもの絵。逆光で影になるが、戸口の正面から見える唯一の紙になる
+            b.Shade.Box(new Vector3(1.16f, EstateTop + 1.24f, leaf + 0.01f),
+                new Vector3(0.28f, 0.22f, 0.02f), Quaternion.Euler(0f, 0f, 6f));
+
+            // 廊下の東の壁。クレヨンの絵と、掛けた通学帽と手提げ袋。
+            // **貼る高さは子どもの目。** 大人の目の高さに掛けると、住んでいるのが誰か分からない
+            for (var i = 0; i < 3; i++)
+                b.Paper.Box(new Vector3(PorchX1 - 0.02f, EstateTop + 1.02f + (i % 2) * 0.22f,
+                        -15.82f - i * 0.22f),
+                    new Vector3(0.02f, 0.24f, 0.19f), Quaternion.Euler((i - 1) * 5f, 0f, 0f));
+            b.Red.Box(new Vector3(PorchX1 - 0.04f, EstateTop + 1.24f, -15.82f), new Vector3(0.01f, 0.08f, 0.07f));
+            b.Gear.Box(new Vector3(PorchX1 - 0.04f, EstateTop + 1.58f, -16.12f), new Vector3(0.04f, 0.04f, 0.42f));
+            b.Red.Box(new Vector3(PorchX1 - 0.12f, EstateTop + 1.46f, -16.24f), new Vector3(0.20f, 0.10f, 0.22f));
+            b.Linen.Box(new Vector3(PorchX1 - 0.10f, EstateTop + 1.28f, -15.98f), new Vector3(0.16f, 0.36f, 0.14f));
+        }
+
+        /// <summary>
+        /// 台所。廊下の西の抜けを入ってすぐ。窓・流し台・吊り戸棚・冷蔵庫。
+        ///
+        /// **窓をこの家でいちばん明るい面にする。** 右の家をテレビの青が持たせているところを、
+        /// こちらは朝の白い窓が持つ。抜けをくぐって最初に目へ入るのがこれになる
+        /// </summary>
+        static void EstateFlatKitchen(EstateBanks b)
+        {
+            // 窓。硝子は光る面で済ませる。枠と桟と、端へ寄せた短いカーテン
+            b.Lit.FaceX(FlatX0 + 0.02f, -17.10f, -15.90f, EstateTop + 1.02f, EstateTop + 1.92f, 1);
+            for (var i = 0; i < 2; i++)
+                b.Gear.Box(new Vector3(FlatX0 + 0.05f, EstateTop + 1.47f, i == 0 ? -17.13f : -15.87f),
+                    new Vector3(0.06f, 0.98f, 0.06f));
+            for (var i = 0; i < 2; i++)
+                b.Gear.Box(new Vector3(FlatX0 + 0.05f, EstateTop + 0.99f + i * 0.96f, -16.50f),
+                    new Vector3(0.06f, 0.06f, 1.32f));
+            b.Gear.Box(new Vector3(FlatX0 + 0.05f, EstateTop + 1.47f, -16.50f), new Vector3(0.05f, 0.94f, 0.04f));
+            b.Gear.Box(new Vector3(FlatX0 + 0.12f, EstateTop + 2.00f, -16.50f), new Vector3(0.04f, 0.04f, 1.44f));
+            for (var i = 0; i < 2; i++)
+                b.Linen.Box(new Vector3(FlatX0 + 0.12f, EstateTop + 1.60f, i == 0 ? -17.14f : -15.86f),
+                    new Vector3(0.05f, 0.76f, 0.26f));
+
+            // 流し台。扉の並びと、天板の上のシンク・蛇口・水切り
+            b.Set.Box(new Vector3(FlatX0 + 0.31f, EstateTop + 0.42f, -16.50f), new Vector3(0.62f, 0.84f, 1.60f));
+            for (var i = 0; i < 2; i++)
+                b.Shade.Box(new Vector3(FlatX0 + 0.62f, EstateTop + 0.44f, -16.92f + i * 0.84f),
+                    new Vector3(0.02f, 0.66f, 0.38f));
+            b.Gear.Box(new Vector3(FlatX0 + 0.32f, EstateTop + 0.86f, -16.50f), new Vector3(0.66f, 0.05f, 1.64f));
+            b.Shade.Box(new Vector3(FlatX0 + 0.32f, EstateTop + 0.83f, -16.78f), new Vector3(0.46f, 0.10f, 0.54f));
+            b.Gear.Box(new Vector3(FlatX0 + 0.08f, EstateTop + 1.02f, -16.78f), new Vector3(0.05f, 0.30f, 0.05f));
+            b.Gear.Box(new Vector3(FlatX0 + 0.20f, EstateTop + 1.15f, -16.78f), new Vector3(0.28f, 0.05f, 0.05f));
+            b.Gear.Box(new Vector3(FlatX0 + 0.32f, EstateTop + 0.95f, -16.06f), new Vector3(0.34f, 0.13f, 0.30f));
+            for (var i = 0; i < 2; i++)
+                b.Bright.Box(new Vector3(FlatX0 + 0.26f + i * 0.14f, EstateTop + 1.03f, -16.06f),
+                    new Vector3(0.11f, 0.06f, 0.11f));
+
+            // 吊り戸棚
+            b.Set.Box(new Vector3(FlatX0 + 0.17f, EstateTop + 1.72f, -15.35f), new Vector3(0.34f, 0.62f, 0.72f));
+            b.Shade.Box(new Vector3(FlatX0 + 0.35f, EstateTop + 1.72f, -15.35f), new Vector3(0.02f, 0.52f, 0.02f));
+
+            // 冷蔵庫。**白い大きな面をひとつ立てる。** 右の家は暗い木ばかりで、これが無い。
+            // 扉には子どもの紙が二枚貼ってある
+            b.Linen.Box(new Vector3(0.40f, EstateTop + 0.75f, -15.12f), new Vector3(0.62f, 1.50f, 0.62f));
+            b.Shade.Box(new Vector3(0.40f, EstateTop + 1.06f, -15.44f), new Vector3(0.58f, 0.02f, 0.02f));
+            b.Gear.Box(new Vector3(0.15f, EstateTop + 1.00f, -15.45f), new Vector3(0.04f, 0.30f, 0.05f));
+            b.Paper.Box(new Vector3(0.51f, EstateTop + 1.26f, -15.44f),
+                new Vector3(0.20f, 0.16f, 0.01f), Quaternion.Euler(0f, 0f, -7f));
+            b.Paper.Box(new Vector3(0.29f, EstateTop + 0.80f, -15.44f),
+                new Vector3(0.14f, 0.18f, 0.01f), Quaternion.Euler(0f, 0f, 5f));
+
+            // 洗濯物の籠と、畳みかけの山。右の家の座布団が揃っているのと対にする
+            b.Gear.Box(new Vector3(0.42f, EstateTop + 0.18f, -17.96f), new Vector3(0.50f, 0.36f, 0.42f));
+            for (var i = 0; i < 3; i++)
+                b.Linen.Box(new Vector3(0.42f + (i % 2) * 0.05f, EstateTop + 0.40f + i * 0.09f, -17.96f),
+                    new Vector3(0.42f, 0.09f, 0.34f));
+
+            // 奥の壁へ貼った子どもの絵。**この壁がいちばん広く空いている。**
+            // 何も無い版では、台所の南が塗っただけの面のまま四畳ぶん続いていた。
+            // 貼る高さは子どもの手が届くところで揃える
+            for (var i = 0; i < 3; i++)
+                b.Paper.Box(new Vector3(-0.62f + i * 0.36f, EstateTop + 1.06f + (i % 2) * 0.16f, FlatBack + 0.03f),
+                    new Vector3(0.26f, 0.21f, 0.02f), Quaternion.Euler(0f, 0f, (i - 1) * 4f));
+            b.Red.Box(new Vector3(-0.26f, EstateTop + 1.22f, FlatBack + 0.05f), new Vector3(0.09f, 0.07f, 0.01f));
+
+            // 台所の蛍光灯
+            b.Shade.Box(new Vector3(FlatX0 + 0.62f, FlatRoof - 0.06f, -16.60f), new Vector3(0.90f, 0.10f, 0.26f));
+            b.Lit.Box(new Vector3(FlatX0 + 0.62f, FlatRoof - 0.14f, -16.60f), new Vector3(0.78f, 0.05f, 0.17f));
+        }
+
+        /// <summary>
+        /// 居間。台所から南へ回った先。卓と椅子・押し入れ・絵本の棚・時計。
+        ///
+        /// **座って暮らす右の家と作りを分ける。** あちらは低い卓と座布団、こちらは
+        /// 脚の高い卓と椅子二脚。娘の椅子だけ引き出したままで、朝の途中だと伝える
+        /// </summary>
+        static void EstateFlatRoom(EstateBanks b)
+        {
+            // 卓。天板と脚
+            b.Set.Box(new Vector3(1.95f, EstateTop + 0.68f, -17.25f), new Vector3(1.06f, 0.06f, 0.70f));
+            for (var i = 0; i < 4; i++)
+                b.Set.Box(new Vector3(1.95f + ((i & 1) == 0 ? -0.46f : 0.46f), EstateTop + 0.33f,
+                    -17.25f + ((i & 2) == 0 ? -0.28f : 0.28f)), new Vector3(0.06f, 0.64f, 0.06f));
+            // 椅子二脚。娘の側は引き出したまま
+            EstateFlatChair(b, 1.95f, -16.80f, 180f, false);
+            EstateFlatChair(b, 1.18f, -17.28f, 74f, true);
+
+            // 卓の上。茶碗と牛乳のコップ、置いたままの皿。
+            // 水筒は記憶 0 で母が娘へ渡すもので、まだ蓋が開いている
+            b.Bright.Box(new Vector3(1.72f, EstateTop + 0.75f, -17.12f), new Vector3(0.13f, 0.08f, 0.13f));
+            b.Bright.Box(new Vector3(2.22f, EstateTop + 0.77f, -17.36f), new Vector3(0.09f, 0.12f, 0.09f));
+            b.Paper.Box(new Vector3(1.98f, EstateTop + 0.72f, -17.40f), new Vector3(0.22f, 0.02f, 0.22f));
+            b.Red.Box(new Vector3(2.28f, EstateTop + 0.81f, -17.06f), new Vector3(0.10f, 0.20f, 0.10f));
+            b.Gear.Box(new Vector3(2.28f, EstateTop + 0.94f, -17.06f), new Vector3(0.11f, 0.06f, 0.11f));
+
+            // 押し入れ。襖二枚と鴨居。布団はこの中なので、床には出さない
+            for (var i = 0; i < 2; i++)
+                b.Set.Box(new Vector3(FlatX1 - 0.03f, EstateTop + 0.92f, -16.98f - i * 0.46f),
+                    new Vector3(0.05f, 1.76f, 0.45f));
+            b.Set.Box(new Vector3(FlatX1 - 0.04f, EstateTop + 1.84f, -17.21f), new Vector3(0.07f, 0.07f, 1.00f));
+            // 合わせ目。線が一本入らないと、襖二枚が一枚の板に見える
+            b.Shade.Box(new Vector3(FlatX1 - 0.06f, EstateTop + 0.92f, -17.21f), new Vector3(0.02f, 1.72f, 0.02f));
+            for (var i = 0; i < 2; i++)
+                b.Shade.Box(new Vector3(FlatX1 - 0.07f, EstateTop + 0.92f, -16.83f - i * 0.76f),
+                    new Vector3(0.02f, 0.13f, 0.05f));
+
+            // 時計とカレンダー。右の家は掛け軸と写真で、こちらは日付の紙
+            b.Bright.Box(new Vector3(FlatX1 - 0.02f, EstateTop + 1.76f, -16.62f), new Vector3(0.03f, 0.26f, 0.26f));
+            b.Shade.Box(new Vector3(FlatX1 - 0.05f, EstateTop + 1.76f, -16.62f), new Vector3(0.01f, 0.13f, 0.03f));
+            b.Paper.Box(new Vector3(FlatX1 - 0.02f, EstateTop + 1.42f, -18.02f), new Vector3(0.03f, 0.36f, 0.27f));
+
+            // 絵本の低い棚。背の高さが揃った色の帯が、子どもの物だと伝える
+            b.Set.Box(new Vector3(2.44f, EstateTop + 0.29f, -18.10f), new Vector3(0.72f, 0.58f, 0.32f));
+            b.Shade.Box(new Vector3(2.44f, EstateTop + 0.30f, -17.95f), new Vector3(0.66f, 0.02f, 0.02f));
+            for (var i = 0; i < 4; i++)
+            {
+                var into = (i % 2) == 0 ? b.Red : b.Bright;
+                into.Box(new Vector3(2.16f + i * 0.09f, EstateTop + 0.46f, -18.06f),
+                    new Vector3(0.07f, 0.26f, 0.22f), Quaternion.Euler(0f, 0f, i == 3 ? 11f : 0f));
+            }
+            // 床へ出たままの積み木
+            b.Red.Box(new Vector3(1.02f, EstateTop + 0.05f, -18.06f), new Vector3(0.10f, 0.10f, 0.10f));
+            b.Bright.Box(new Vector3(1.17f, EstateTop + 0.05f, -17.93f),
+                new Vector3(0.10f, 0.10f, 0.10f), Quaternion.Euler(0f, 24f, 0f));
+
+            // 居間の蛍光灯
+            b.Shade.Box(new Vector3(1.95f, FlatRoof - 0.06f, -17.30f), new Vector3(0.30f, 0.10f, 0.92f));
+            b.Lit.Box(new Vector3(1.95f, FlatRoof - 0.14f, -17.30f), new Vector3(0.20f, 0.05f, 0.80f));
+        }
+
+        /// <summary>椅子ひとつ。座と背と、左右の脚。<paramref name="turn"/> は背の向く向き</summary>
+        static void EstateFlatChair(EstateBanks b, float x, float z, float turn, bool cushion)
+        {
+            var rot = Quaternion.Euler(0f, turn, 0f);
+            var at = new Vector3(x, EstateTop, z);
+            b.Set.Box(at + new Vector3(0f, 0.44f, 0f), new Vector3(0.40f, 0.05f, 0.40f), rot);
+            b.Set.Box(at + rot * new Vector3(0f, 0.68f, -0.18f), new Vector3(0.40f, 0.44f, 0.05f), rot);
+            for (var i = 0; i < 2; i++)
+                b.Set.Box(at + rot * new Vector3(i == 0 ? -0.16f : 0.16f, 0.21f, 0f),
+                    new Vector3(0.05f, 0.42f, 0.36f), rot);
+            if (cushion)
+                b.Red.Box(at + new Vector3(0f, 0.51f, 0f), new Vector3(0.34f, 0.10f, 0.34f), rot);
         }
 
         // ---- 戸口 --------------------------------------------------------------
 
         /// <summary>
-        /// 戸口ひとつ。枠・番号板・郵便受け・メーター・表札・呼び鈴まで。
+        /// 戸口ひとつ。枠・番号板・呼び鈴・郵便受け・メーター。
         ///
         /// 壁に開けた穴だけでは戸口に見えない。枠と、脇に並ぶ小物が付いて初めて
-        /// 「人が出入りする戸」として読める。三つとも同じ組み合わせにして、並びを強める。
+        /// 「人が出入りする戸」として読める。三つとも同じ組み合わせ・同じ高さにして、
+        /// 並びを強める。**戸の脇へ置くのはこの四つまで。** 表札まで重ねた版では、
+        /// 戸の左に紙と板が五枚縦に並んで、どれも読めない塊になった。
+        /// 幅も戸の真ん中から 0.6 m の内側へ入らないように詰めてある。
         ///
         /// 左と真ん中の戸は開いている。記憶 0 は母が戸口に立ち、記憶 8 は新聞を持って中へ入り、
         /// 記憶 15 は中から夫を迎える。閉めた戸を置くと、その三つが同じ場所で成り立たなくなる。
@@ -264,15 +533,13 @@ namespace HalfAware.EditorTools
 
             // 番号板。廊下でいちばん明るい小さな四角になるので、戸口の位置が遠くからでも拾える
             b.Bright.Box(new Vector3(x - 0.75f, EstateTop + 1.80f, EstateFace + 0.05f), new Vector3(0.24f, 0.15f, 0.02f));
-            // 表札と呼び鈴。番号板の下へ縦に重ねる。
-            // 戸の右は開いた戸が倒れてくる側なので、住戸の札はすべて左へ寄せる
-            b.Paper.Box(new Vector3(x - 0.75f, EstateTop + 1.64f, EstateFace + 0.05f),
-                new Vector3(0.22f, 0.10f, 0.02f), Quaternion.Euler(0f, 0f, -3f));
-            b.Gear.Box(new Vector3(x - 0.75f, EstateTop + 1.46f, EstateFace + 0.06f), new Vector3(0.09f, 0.13f, 0.03f));
-            b.Bright.Box(new Vector3(x - 0.75f, EstateTop + 1.47f, EstateFace + 0.08f), new Vector3(0.04f, 0.04f, 0.02f));
+            // 呼び鈴。番号板の下へ。
+            // 戸の右は開いた戸が倒れてくる側なので、住戸の小物はすべて左へ寄せる
+            b.Gear.Box(new Vector3(x - 0.75f, EstateTop + 1.55f, EstateFace + 0.06f), new Vector3(0.09f, 0.13f, 0.03f));
+            b.Bright.Box(new Vector3(x - 0.75f, EstateTop + 1.56f, EstateFace + 0.08f), new Vector3(0.04f, 0.04f, 0.02f));
             // 郵便受け
-            b.Gear.Box(new Vector3(x - 0.75f, EstateTop + 1.28f, EstateFace + 0.06f), new Vector3(0.32f, 0.24f, 0.12f));
-            b.Shade.Box(new Vector3(x - 0.75f, EstateTop + 1.34f, EstateFace + 0.125f), new Vector3(0.22f, 0.04f, 0.02f));
+            b.Gear.Box(new Vector3(x - 0.75f, EstateTop + 1.28f, EstateFace + 0.06f), new Vector3(0.28f, 0.24f, 0.12f));
+            b.Shade.Box(new Vector3(x - 0.75f, EstateTop + 1.34f, EstateFace + 0.125f), new Vector3(0.20f, 0.04f, 0.02f));
             // メーターの箱。硝子の面だけ明るい
             b.Gear.Box(new Vector3(x + 0.80f, EstateTop + 1.42f, EstateFace + 0.09f), new Vector3(0.36f, 0.46f, 0.18f));
             b.Bright.Box(new Vector3(x + 0.80f, EstateTop + 1.50f, EstateFace + 0.185f), new Vector3(0.18f, 0.18f, 0.02f));
@@ -327,34 +594,38 @@ namespace HalfAware.EditorTools
         /// **住戸の物ではなく建物の物を置く。** 傘立てや植木鉢は住んでいる人の物で、
         /// それだけでは長屋にも見える。誰の物でもない物が並んで初めて、
         /// 管理された集合住宅の共用廊下になる。
-        /// 置く先は階段の口の側へ寄せる。記憶 0 の母子も記憶 1 のハンナも戸口の前で撮るので、
-        /// そちらへ置くと人の足元が物で埋まる
+        /// **置く先は階段の口へまとめる。** 戸口の脇へ散らすと、住戸の番号板や郵便受けと
+        /// 混ざって、どれも読めない塊になる。階段を上がり切ったところに建物の物が
+        /// 固まっていて、そこから東は住戸の列だけ、という分かれ方にする
         /// </summary>
         static void EstateCommon(EstateBanks b)
         {
-            // 掲示板。硝子の入った枠に紙が何枚か。壁でいちばん明るい四角になる
-            b.Gear.Box(new Vector3(StairWest + 0.03f, EstateTop + 1.38f, -14.05f), new Vector3(0.05f, 0.74f, 0.92f));
-            b.Shade.Box(new Vector3(StairWest + 0.055f, EstateTop + 1.38f, -14.05f), new Vector3(0.02f, 0.64f, 0.82f));
+            // 掲示板。硝子の入った枠に紙が何枚か。壁でいちばん明るい四角になる。
+            // **階数の札（EstateSign）を避けて手すり寄りへ。** 同じ壁の同じ高さに来る
+            b.Gear.Box(new Vector3(StairWest + 0.03f, EstateTop + 1.38f, -13.78f), new Vector3(0.05f, 0.74f, 0.66f));
+            b.Shade.Box(new Vector3(StairWest + 0.055f, EstateTop + 1.38f, -13.78f), new Vector3(0.02f, 0.64f, 0.58f));
             for (var i = 0; i < 4; i++)
                 b.Paper.Box(new Vector3(StairWest + 0.065f, EstateTop + 1.24f + (i % 2) * 0.30f,
-                        -13.80f - (i / 2) * 0.42f), new Vector3(0.01f, 0.24f, 0.32f));
+                        -13.62f - (i / 2) * 0.32f), new Vector3(0.01f, 0.24f, 0.24f));
 
             // 消火器。赤い縦長がひとつあるだけで、廊下が共用部だと分かる。
-            // 置く先は井戸の東の隅。上がり切ったところは西の一本の出口なので、そちらは空けておく
-            b.Red.Box(new Vector3(1.05f, EstateTop + 0.30f, -14.52f), new Vector3(0.19f, 0.54f, 0.19f));
-            b.Gear.Box(new Vector3(1.05f, EstateTop + 0.60f, -14.52f), new Vector3(0.09f, 0.10f, 0.09f));
-            b.Gear.Box(new Vector3(1.05f, EstateTop + 0.02f, -14.52f), new Vector3(0.30f, 0.04f, 0.30f));
-            b.Paper.Box(new Vector3(1.16f, EstateTop + 0.34f, -14.52f), new Vector3(0.01f, 0.16f, 0.13f));
+            // 置く先は階段の口と戸口 A のあいだ。上がり切ったところは西の一本の出口なので、
+            // そこは空けたまま、面へ寄せて据える
+            b.Red.Box(new Vector3(0.20f, EstateTop + 0.30f, -14.52f), new Vector3(0.19f, 0.54f, 0.19f));
+            b.Gear.Box(new Vector3(0.20f, EstateTop + 0.60f, -14.52f), new Vector3(0.09f, 0.10f, 0.09f));
+            b.Gear.Box(new Vector3(0.20f, EstateTop + 0.02f, -14.52f), new Vector3(0.30f, 0.04f, 0.30f));
+            b.Paper.Box(new Vector3(0.31f, EstateTop + 0.34f, -14.52f), new Vector3(0.01f, 0.16f, 0.13f));
 
-            // 配電盤と量水器の扉。面のいちばん端に寄せて、戸口の列を邪魔しない
-            b.Gear.Box(new Vector3(0.38f, EstateTop + 1.42f, EstateFace + 0.09f), new Vector3(0.52f, 0.72f, 0.16f));
-            b.Shade.Box(new Vector3(0.38f, EstateTop + 1.42f, EstateFace + 0.18f), new Vector3(0.42f, 0.60f, 0.02f));
-            b.Bright.Box(new Vector3(0.38f, EstateTop + 1.72f, EstateFace + 0.19f), new Vector3(0.20f, 0.09f, 0.02f));
-            b.Gear.Box(new Vector3(0.38f, EstateTop + 0.36f, EstateFace + 0.11f), new Vector3(0.46f, 0.52f, 0.20f));
+            // 配電盤と量水器の扉。階段の口の真上へ寄せて、戸口の列から外す
+            b.Gear.Box(new Vector3(-0.70f, EstateTop + 1.42f, EstateFace + 0.09f), new Vector3(0.52f, 0.72f, 0.16f));
+            b.Shade.Box(new Vector3(-0.70f, EstateTop + 1.42f, EstateFace + 0.18f), new Vector3(0.42f, 0.60f, 0.02f));
+            b.Bright.Box(new Vector3(-0.70f, EstateTop + 1.72f, EstateFace + 0.19f), new Vector3(0.20f, 0.09f, 0.02f));
+            b.Gear.Box(new Vector3(-0.70f, EstateTop + 0.36f, EstateFace + 0.11f), new Vector3(0.46f, 0.52f, 0.20f));
 
-            // 非常灯。緑は場面 3 の端末と同じ色で、この場面でここにしか無い
-            b.Gear.Box(new Vector3(0.90f, WalkRoof - 0.30f, EstateFace + 0.08f), new Vector3(0.34f, 0.20f, 0.10f));
-            b.Green.Box(new Vector3(0.90f, WalkRoof - 0.30f, EstateFace + 0.14f), new Vector3(0.27f, 0.14f, 0.03f));
+            // 非常灯。緑は場面 3 の端末と同じ色で、この場面でここにしか無い。
+            // 階段の口の真上が持ち場で、戸口の脇に点いていると何の灯りか読めない
+            b.Gear.Box(new Vector3(-0.35f, WalkRoof - 0.30f, EstateFace + 0.08f), new Vector3(0.34f, 0.20f, 0.10f));
+            b.Green.Box(new Vector3(-0.35f, WalkRoof - 0.30f, EstateFace + 0.14f), new Vector3(0.27f, 0.14f, 0.03f));
 
             // 天井の点検口。四本の細い棒で四角を描くだけ。
             // 天井が一枚の板のままだと、頭上に何も無い場所になる
@@ -381,34 +652,37 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// 最上階の各戸の前に出ている物。傘立て・植木鉢・ダンボール・新聞。
         ///
-        /// **人の立ち位置を避けて戸と戸のあいだへ寄せる。** 記憶 0 の母子は戸口 A の前、
-        /// 記憶 8 の主は戸口 B の前を通るので、そこへ物を置くと足元が埋まる
+        /// **戸口の前は空ける。** 戸の真ん中から左右 0.6 m、廊下の手前半分（面から 0.7 m）には
+        /// 何も置かない。記憶 0 の母子は戸口 A の前、記憶 8 の主は戸口 B の前を通るので、
+        /// そこへ物を置くと足元が埋まるうえ、戸口の列そのものが読めなくなる。
+        /// 置く先は戸と戸のあいだか、手すり際のどちらかにまとめる
         /// </summary>
         static void EstateLives(EstateBanks b)
         {
             // 傘立てと傘。戸口 A と B のあいだ
-            b.Gear.Box(new Vector3(2.60f, EstateTop + 0.24f, EstateFace + 0.20f), new Vector3(0.28f, 0.48f, 0.26f));
+            b.Gear.Box(new Vector3(2.42f, EstateTop + 0.24f, EstateFace + 0.20f), new Vector3(0.28f, 0.48f, 0.26f));
             for (var i = 0; i < 3; i++)
-                b.Shade.Box(new Vector3(2.54f + i * 0.06f, EstateTop + 0.58f, EstateFace + 0.20f + i * 0.02f),
+                b.Shade.Box(new Vector3(2.36f + i * 0.06f, EstateTop + 0.58f, EstateFace + 0.20f + i * 0.02f),
                     new Vector3(0.05f, 0.76f, 0.05f));
 
-            // 植木鉢。高さを変えて三つ。同じ高さで並べると棚に見える
-            var pots = new[] { 2.06f, 2.32f, 0.62f };
-            var tall = new[] { 0.26f, 0.19f, 0.30f };
-            for (var i = 0; i < pots.Length; i++)
+            // 植木鉢。**手すり際へ三つ、同じ鉢を等間隔で並べる。** 高さも間隔もばらばらに
+            // 散らしていた版では、置き忘れた物が転がっているようにしか見えなかった。
+            // 揃って並ぶと、そこだけ人が手を掛けている場所になる。草の背だけ変える
+            var leaf = new[] { 0.34f, 0.22f, 0.40f };
+            for (var i = 0; i < leaf.Length; i++)
             {
-                b.Red.Box(new Vector3(pots[i], EstateTop + tall[i] * 0.5f, EstateFace + 0.22f),
-                    new Vector3(0.24f, tall[i], 0.24f));
-                b.Soft.Box(new Vector3(pots[i], EstateTop + tall[i] + 0.16f, EstateFace + 0.22f),
-                    new Vector3(0.30f, 0.34f, 0.28f));
+                var x = 2.52f + i * 0.32f;
+                b.Red.Box(new Vector3(x, EstateTop + 0.12f, WalkFront - 0.26f), new Vector3(0.24f, 0.24f, 0.24f));
+                b.Soft.Box(new Vector3(x, EstateTop + 0.24f + leaf[i] * 0.5f, WalkFront - 0.26f),
+                    new Vector3(0.28f, leaf[i], 0.26f));
             }
 
-            // ダンボールの山。戸口 C の脇。潰した板を一枚立て掛ける
+            // ダンボールの山。戸口 B と C のあいだ。潰した板を一枚、山へ立て掛ける
             for (var i = 0; i < 3; i++)
-                b.Set.Box(new Vector3(7.50f - i * 0.04f, EstateTop + 0.17f + i * 0.33f, EstateFace + 0.32f),
+                b.Set.Box(new Vector3(5.20f - i * 0.04f, EstateTop + 0.17f + i * 0.33f, EstateFace + 0.32f),
                     new Vector3(0.50f, 0.32f, 0.42f));
-            b.Set.Box(new Vector3(7.10f, EstateTop + 0.46f, EstateFace + 0.30f),
-                new Vector3(0.62f, 0.92f, 0.04f), Quaternion.Euler(12f, 0f, 0f));
+            b.Set.Box(new Vector3(5.18f, EstateTop + 0.46f, EstateFace + 0.62f),
+                new Vector3(0.62f, 0.92f, 0.04f), Quaternion.Euler(-12f, 0f, 0f));
 
             // 新聞受けに差さったままの新聞。ここだけ白く、戸口の位置をもう一度拾わせる
             b.Paper.Box(new Vector3(DoorA - 0.75f, EstateTop + 1.40f, EstateFace + 0.14f),
@@ -434,10 +708,11 @@ namespace HalfAware.EditorTools
                 else b.Linen.Box(new Vector3(x, EstateTop + 1.55f, WalkFront - 0.11f), new Vector3(0.46f, 0.66f, 0.02f));
             }
 
-            // 室外機。羽根の線を三本入れると、ただの箱と見分けが付く
-            b.Gear.Box(new Vector3(3.3f, EstateTop + 0.30f, EstateFace + 0.25f), new Vector3(0.80f, 0.58f, 0.36f));
+            // 室外機。羽根の線を三本入れると、ただの箱と見分けが付く。
+            // 戸口 B の前を空けるぶん、戸口 A と B の真ん中へ寄せる
+            b.Gear.Box(new Vector3(3.10f, EstateTop + 0.30f, EstateFace + 0.25f), new Vector3(0.80f, 0.58f, 0.36f));
             for (var i = 0; i < 3; i++)
-                b.Shade.Box(new Vector3(3.3f, EstateTop + 0.18f + i * 0.12f, EstateFace + 0.44f),
+                b.Shade.Box(new Vector3(3.10f, EstateTop + 0.18f + i * 0.12f, EstateFace + 0.44f),
                     new Vector3(0.62f, 0.05f, 0.02f));
 
             // 洗濯機
