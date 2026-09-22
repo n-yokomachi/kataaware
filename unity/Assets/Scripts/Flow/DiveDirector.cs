@@ -46,8 +46,8 @@ namespace HalfAware
         [SerializeField] DiveRoster roster;
         [Tooltip("五つの場所。DiveIds.Places の並び")]
         [SerializeField] Transform[] places = new Transform[0];
-        [Tooltip("場所ごとの空の色。places と同じ並び。開口の向こうと、見上げた先に出る")]
-        [SerializeField] Color[] skies = new Color[0];
+        [Tooltip("場所ごとの空・霞・環境光・日。places と同じ並び。記憶を切り替えるたびに差し替える")]
+        [SerializeField] PlaceSky[] skies = new PlaceSky[0];
         [Tooltip("十六の記憶。一覧の番号の並び")]
         [SerializeField] Transform[] takes = new Transform[0];
 
@@ -264,18 +264,17 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// 空の色。場所ごとに時刻が違うので、開口の向こうと見上げた先の色を変える。
+        /// 空・霞・環境光・日を、場所の分へ差し替える。場所ごとに時刻が違うので、
+        /// 開口の向こうと見上げた先の色も、日の当たらない面の色も変わる。
         ///
-        /// **空は張っていない。** 記憶はどれも屋内か暗がりで、天球を回すほどの
-        /// 空は映らない。カメラの塗り潰しを場所に合わせて差し替えるだけで足りる
+        /// **一揃いで差し替える。** 団地だけが空の絵と霞を持ち、他の四つは一色の空で霞なし。
+        /// 霞だけ差し替え忘れると、団地の霞が教室の奥まで白く掛かる（<see cref="PlaceSky"/>）
         /// </summary>
         void Sky(string id)
         {
-            var eye = Camera.main;
-            if (eye == null) return;
             var which = System.Array.IndexOf(DiveIds.Places, id);
             if (which < 0 || which >= skies.Length) return;
-            eye.backgroundColor = skies[which];
+            skies[which].Apply(Camera.main);
         }
 
         /// <summary>id の場所。一覧の並びで探す</summary>

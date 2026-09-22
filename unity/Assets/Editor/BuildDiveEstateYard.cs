@@ -4,7 +4,7 @@ using UnityEngine;
 namespace HalfAware.EditorTools
 {
     /// <summary>
-    /// 場面 4 の団地。手すりの外の景色と、隣の棟から遠くの街並みまで。
+    /// 場面 4 の団地。手すりの外の景色と、隣の棟から中の棟まで。その先は書き割り。
     ///
     /// **手すりの向こうは背景ではなく距離の作り。** 棟を一つ立てただけでは、
     /// 廊下を歩いても景色が動かず、一枚の書き割りになる。
@@ -17,8 +17,10 @@ namespace HalfAware.EditorTools
     /// <item><term>中 (z 2 〜 35)</term><description>
     /// 道路と歩道、隣の棟、同じ団地の別の棟を三つ、給水塔。
     /// 窓の四角が等間隔に並ぶだけの書き割りで、棟の端の陰から次の棟が出入りする</description></item>
-    /// <item><term>奥 (z 50 〜 100)</term><description>
-    /// 街並みの影。高さのまちまちなビルの列と鉄塔と堤防の線。輪郭だけで、ほとんど動かない</description></item>
+    /// <item><term>奥 (中心から 80 m より先)</term><description>
+    /// 組まずに撮って貼る書き割り（<c>BuildDiveEstateFar.cs</c>）。本物の地面は中心から 80 m の
+    /// 正十六角形で切れ、そこから先の地面も街並みも、板の輪に貼った絵が持つ。
+    /// 前はここにビル十二棟と鉄塔二基と堤防を組んでいたが、書き割りへ置き換えて外した</description></item>
     /// </list>
     ///
     /// **高さは <see cref="EstateTop"/> と <see cref="Floor"/> から導く。**
@@ -47,7 +49,7 @@ namespace HalfAware.EditorTools
         /// 敷地の中。舗装から街灯まで。
         ///
         /// ここに置く物はすべて素材ごとの入れ物（<see cref="EstateBanks"/>）へ溜める。
-        /// 自前の地の色が要る物（植え込み・中の棟・奥の街並み）は
+        /// 自前の地の色が要る物（植え込み・中の棟）は
         /// 場所の Transform を受け取る <see cref="EstateBlockWall"/> の側に置いてある
         /// </summary>
         static void EstateYard(EstateBanks b)
@@ -332,7 +334,7 @@ namespace HalfAware.EditorTools
         // ---- 手すりの外・中と奥の層 --------------------------------------------
 
         /// <summary>
-        /// 隣の棟と、中の棟と、奥の街並みと、敷地の植え込み。
+        /// 隣の棟と、中の棟と、敷地の植え込みと、奥の書き割り。
         ///
         /// <see cref="EstateYard"/> は場所の Transform を受け取らないので、
         /// 自前の地の色を持つ物はこちらへまとめる。
@@ -343,11 +345,18 @@ namespace HalfAware.EditorTools
             var slabs = new Bank { Texel = 0.4f };
             var panes = new Bank { Texel = 0.4f };
             var mid = new Bank { Texel = 0.35f };
-            var sky = new Bank { Texel = 0.3f };
+            var land = new Bank { Texel = 0.35f };
 
             EstateNextBlock(b, slabs, panes);
             EstateMidBlocks(mid, panes);
-            EstateFarSkyline(sky);
+            // 遠い地面。敷地の地面は隣の棟の足元（z 9.5）で切れているので、その先を一枚で塞ぐ。
+            // 塞がないと棟の脇に空の色がそのまま抜けて、棟が虚空に立って見える。
+            // 敷地の地面より少し下へ置くので、手前では地面に隠れる。
+            //
+            // **縁は書き割りの輪と同じ中心・同じ向きの正多角形にする**（BuildDiveEstateFar.cs）。
+            // そうすると撮った絵の中の地面の始まりが、どの板でも同じ高さの一本の線になり、
+            // 中心から見て本物の地面の縁とちょうど繋がる
+            land.FanY(new Vector3(EstateFarCentre.x, -0.05f, EstateFarCentre.z), EstateFarRim());
 
             // 遠いほど空の色へ寄せる。同じ色で並べると、どれが手前か分からなくなる
             NoShadow(EstateEmit(place, "EstateBlock", slabs,
@@ -355,10 +364,13 @@ namespace HalfAware.EditorTools
             NoShadow(EstateEmit(place, "EstateBlockPane", panes, Mat("Ceiling"), false));
             NoShadow(EstateEmit(place, "EstateMid", mid,
                 Glow("EstateMid", new Color(0.54f, 0.58f, 0.66f), 0.44f), false));
-            NoShadow(EstateEmit(place, "EstateSky", sky,
-                Glow("EstateSky", new Color(0.60f, 0.64f, 0.72f), 0.56f), false));
+            // 遠い地面は中の棟と同じ青い灰色にしない。棟と同じ色だと、敷地の外が何も無い虚空に読める。
+            // 枯れた芝と土の色にして、団地の外の空き地と畑に見せる。書き割りの地面も同じマテリアルで撮る
+            NoShadow(EstateEmit(place, "EstateLand", land, EstateLandMat(), false));
 
             EstateYardGreen(place);
+            // 60 m より先は組まない。撮った絵を板の輪に貼る
+            EstateBackdrop(place);
         }
 
         /// <summary>隣の棟の間口の数。東を短くして、中の棟が端から顔を出せるようにした</summary>
@@ -424,7 +436,7 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 中の層。同じ団地の別の棟を三つと、給水塔と、棟の足元を受ける地面。
+        /// 中の層。同じ団地の別の棟を三つと、給水塔。棟の足元を受ける地面は <see cref="EstateBlockWall"/> が張る。
         ///
         /// **三つとも向きと距離を変える。** 東の棟は隣の棟の東の端から顔を出し、
         /// 西の棟は妻をこちらへ向け、高層棟は隣の棟の屋上の向こうに頭だけを出す。
@@ -432,11 +444,6 @@ namespace HalfAware.EditorTools
         /// </summary>
         static void EstateMidBlocks(Bank mid, Bank panes)
         {
-            // 遠い地面。敷地の地面は隣の棟の足元（z 9.5）で切れているので、その先を一枚で塞ぐ。
-            // 塞がないと棟の脇に空の色がそのまま抜けて、棟が虚空に立って見える。
-            // 敷地の地面より少し下へ置くので、手前では地面に隠れる
-            mid.FaceY(-0.05f, -130f, 140f, -26f, 170f, 1);
-
             // 東の棟。隣の棟の東の端のすぐ向こう
             EstateMidBlock(mid, panes, 17.5f, 39.0f, 19.0f, 4, true);
             // 西の棟。妻を東へ向けて、廊下の西端から角が見えるように
@@ -483,63 +490,6 @@ namespace HalfAware.EditorTools
                     var x = x0 + 0.8f + (i + 0.5f) * step;
                     panes.FaceZ(z - 0.14f, x - 0.62f, x + 0.62f, y, y + 1.10f, -1);
                 }
-            }
-        }
-
-        /// <summary>
-        /// 奥の層。遠くの街並みの影と、鉄塔二基と、堤防の線。
-        ///
-        /// **輪郭だけでよい。** 空の色より少しだけ暗い一色で、窓も帯も入れない。
-        /// 高さがまちまちの箱が横に並んでいれば、それだけで団地の向こうに街があることになる。
-        /// 廊下を歩いてもここはほとんど動かず、動かないことが遠さを伝える
-        /// </summary>
-        static void EstateFarSkyline(Bank sky)
-        {
-            var wide = new[] { 16f, 10f, 22f, 12f, 18f, 9f, 24f, 13f, 20f, 11f, 17f, 26f };
-            var high = new[] { 31f, 44f, 26f, 38f, 22f, 47f, 29f, 35f, 24f, 41f, 27f, 33f };
-            var at = -86f;
-            for (var i = 0; i < wide.Length; i++)
-            {
-                var z = 52f + (i % 3) * 6f;
-                sky.FaceZ(z, at, at + wide[i], 0f, high[i], -1);
-                // 角を一つ。廊下の端から見たときに、面が一枚きりだと紙に見える
-                if (i % 2 == 0)
-                {
-                    if (at + wide[i] * 0.5f < 3f) sky.FaceX(at + wide[i], z, z + 14f, 0f, high[i], 1);
-                    else sky.FaceX(at, z, z + 14f, 0f, high[i], -1);
-                }
-                at += wide[i] + 5f;
-            }
-
-            EstateFarTower(sky, -52f, 46f, 36f);
-            EstateFarTower(sky, 58f, 50f, 30f);
-
-            // 堤防の線。街並みの足元を一本の帯で閉じる。
-            // ここが空のままだと、ビルが宙に並んでいるように見える
-            var ridge = new[] { 9f, 17f, 12f, 24f, 14f, 20f, 11f, 18f, 9f };
-            for (var i = 0; i + 1 < ridge.Length; i++)
-            {
-                var x0 = -132f + i * 34f;
-                var x1 = x0 + 34f;
-                sky.Quad(new Vector3(x1, 0f, 100f), new Vector3(x0, 0f, 100f),
-                    new Vector3(x0, ridge[i], 100f), new Vector3(x1, ridge[i + 1], 100f));
-            }
-        }
-
-        /// <summary>
-        /// 鉄塔一基。柱を一枚の台形で、腕木を三段。
-        /// 骨組みまで作ってもこの距離では潰れるので、影の形だけ置く
-        /// </summary>
-        static void EstateFarTower(Bank sky, float x, float z, float high)
-        {
-            var foot = high * 0.13f;
-            sky.Quad(new Vector3(x + foot, 0f, z), new Vector3(x - foot, 0f, z),
-                new Vector3(x - 0.7f, high, z), new Vector3(x + 0.7f, high, z));
-            for (var i = 0; i < 3; i++)
-            {
-                var y = high * (0.54f + i * 0.17f);
-                var arm = high * (0.21f - i * 0.05f);
-                sky.FaceZ(z - 0.2f, x - arm, x + arm, y, y + 0.55f, -1);
             }
         }
 

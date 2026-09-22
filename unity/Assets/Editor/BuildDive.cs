@@ -139,10 +139,20 @@ namespace HalfAware.EditorTools
         // ---- シーンの地 ----------------------------------------------------
 
         /// <summary>
+        /// 環境光の三色。空の絵を持たない場所（公園・電車・台所・教室）は、実行時もこの値のまま。
+        /// シーンにもこの値を置くので、エディタで開いたときの見え方もこれになる
+        /// </summary>
+        static readonly Color StageAmbientSky = new Color(0.135f, 0.145f, 0.170f);
+        static readonly Color StageAmbientEquator = new Color(0.085f, 0.088f, 0.100f);
+        static readonly Color StageAmbientGround = new Color(0.040f, 0.040f, 0.046f);
+
+        /// <summary>
         /// カメラの設定と、場所の外側の暗さ。
         ///
-        /// **空は張らない。** 記憶はどれも屋内か暗がりで、空が映るのは団地の階段と公園だけ。
-        /// そこも霞んだ一色でよいので、カメラの塗り潰しで済ませる。
+        /// **シーンに置くのは空を持たない場所の値。** 記憶はどれも屋内か暗がりで、
+        /// 空が映るのは団地の階段と公園だけ。団地は空・霞・環境光を一揃いで持ち
+        /// （<see cref="EstatePlaceSky"/>）、記憶を切り替えるたびに <see cref="DiveDirector"/> が
+        /// 場所の分へ差し替える。ここに置くのは、それ以外の場所と同じ、霞なし・一色の空・暗い環境光。
         /// 環境光を切ると屋内が真っ黒になるので、灯りの届かないところの下限としてだけ置く
         /// </summary>
         static void Stage()
@@ -159,10 +169,11 @@ namespace HalfAware.EditorTools
 
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.135f, 0.145f, 0.170f);
-            RenderSettings.ambientEquatorColor = new Color(0.085f, 0.088f, 0.100f);
-            RenderSettings.ambientGroundColor = new Color(0.040f, 0.040f, 0.046f);
+            RenderSettings.ambientSkyColor = StageAmbientSky;
+            RenderSettings.ambientEquatorColor = StageAmbientEquator;
+            RenderSettings.ambientGroundColor = StageAmbientGround;
             RenderSettings.fog = false;
+            RenderSettings.sun = null;
         }
 
         // ---- プレイヤーと画面 -------------------------------------------------
@@ -626,7 +637,13 @@ namespace HalfAware.EditorTools
             Fill(dso.FindProperty("places"), Named(places, DiveIds.Places));
             var sky = dso.FindProperty("skies");
             sky.arraySize = Skies.Length;
-            for (var i = 0; i < Skies.Length; i++) sky.GetArrayElementAtIndex(i).colorValue = Skies[i];
+            for (var i = 0; i < Skies.Length; i++)
+            {
+                // 団地だけ空・霞・環境光・日を一揃いで持つ。他の四つは一色の空のまま
+                var id = DiveIds.Places[i];
+                var each = id == DiveIds.Estate ? EstatePlaceSky(places.Find(id)) : PlainSky(Skies[i]);
+                WriteSky(sky.GetArrayElementAtIndex(i), each);
+            }
             Fill(dso.FindProperty("takes"), Numbered(takes, roster.Count));
             dso.ApplyModifiedPropertiesWithoutUndo();
         }
@@ -637,7 +654,10 @@ namespace HalfAware.EditorTools
         /// 開口の向こうと、見上げた先に出る。時刻は記憶の行のとおりで、
         /// 団地が朝の七時と九時、公園が午後の三時台、電車が夕方の六時台、
         /// 台所が朝の七時前、教室が昼前。**真っ黒のままにしない。**
-        /// 公園で見上げる記憶と、団地の廊下から外を向いたときに画面の上が抜ける
+        /// 公園で見上げる記憶と、団地の廊下から外を向いたときに画面の上が抜ける。
+        ///
+        /// 団地の行はもう使わない。団地は <see cref="EstatePlaceSky"/> の空の絵と霞の色で塗る。
+        /// 並びを <see cref="DiveIds.Places"/> と揃えておくために、行だけ残してある
         /// </summary>
         static readonly Color[] Skies =
         {
@@ -647,6 +667,20 @@ namespace HalfAware.EditorTools
             new Color(0.50f, 0.56f, 0.62f),   // 台所。朝の白
             new Color(0.70f, 0.72f, 0.74f),   // 教室。昼の白
         };
+
+        /// <summary><see cref="PlaceSky"/> を一つ、直列化された枠へ書き込む</summary>
+        static void WriteSky(SerializedProperty at, PlaceSky sky)
+        {
+            at.FindPropertyRelative("skybox").objectReferenceValue = sky.skybox;
+            at.FindPropertyRelative("flat").colorValue = sky.flat;
+            at.FindPropertyRelative("haze").boolValue = sky.haze;
+            at.FindPropertyRelative("hazeColor").colorValue = sky.hazeColor;
+            at.FindPropertyRelative("hazeDensity").floatValue = sky.hazeDensity;
+            at.FindPropertyRelative("ambientSky").colorValue = sky.ambientSky;
+            at.FindPropertyRelative("ambientEquator").colorValue = sky.ambientEquator;
+            at.FindPropertyRelative("ambientGround").colorValue = sky.ambientGround;
+            at.FindPropertyRelative("sun").objectReferenceValue = sky.sun;
+        }
 
         /// <summary>右上の行。HUD の下に一枚だけある</summary>
         static TMP_Text Caption()

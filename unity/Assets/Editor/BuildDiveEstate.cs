@@ -283,6 +283,12 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
+        /// 朝の日射しの向き（Euler）。**空の絵の日もこの向きに描く**（<see cref="EstateSunward"/>）。
+        /// ここだけ直すと、空の明るい所と影の向きが食い違う。組み直せば空の絵も焼き直される
+        /// </summary>
+        static readonly Vector3 EstateMorningAim = new Vector3(30f, -148f, 0f);
+
+        /// <summary>
         /// 灯り。朝の日射しと、廊下の電球と、部屋の中。
         ///
         /// 数を増やすと WebGL で持たないので、点は一階ぶんの廊下と部屋の中だけに置き、
@@ -292,9 +298,10 @@ namespace HalfAware.EditorTools
         {
             // 朝の低い日射し。階段の側から当てるので、三階の戸口に立つ人は逆光になる
             var sun = Lamp(place, "Morning", LightType.Directional, new Vector3(0f, 12f, 0f),
-                new Vector3(30f, -148f, 0f), new Color(1f, 0.95f, 0.86f), 2.0f, 10f);
+                EstateMorningAim, new Color(1f, 0.95f, 0.86f), 2.0f, 10f);
             sun.shadows = LightShadows.Soft;
-            // 日の当たらない側の下限。環境光は五つの場所で分け合っていて、ここだけ上げられない。
+            // 日の当たらない側の下限。日と反対の空（南南西の低い所）から来る青い光の代わり。
+            // 環境光も空から取った青にしてあるが（EstateAmbient）、部屋の中まで同じだけ明るくなるので弱く置いている。
             // これが無いと、日陰へ入った途端に人の輪郭しか見えなくなる
             Lamp(place, "Fill", LightType.Directional, new Vector3(0f, 12f, 0f),
                 new Vector3(20f, 22f, 0f), new Color(0.66f, 0.72f, 0.86f), 0.55f, 10f);
