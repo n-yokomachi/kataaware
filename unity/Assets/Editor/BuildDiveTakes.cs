@@ -11,17 +11,26 @@ namespace HalfAware.EditorTools
     /// 位置はどれも場所のローカルで、<c>yaw</c> は +z を 0 とした度、<c>pitch</c> は下が正。
     /// 鍵打ちの最後の <c>at</c> は一覧の <c>length</c> と揃える。揃っていなければ見直しが言う。
     ///
-    /// **顔は見せない。** 背を向ける・帽子の影に入る・逆光になる向きで置く。
-    /// 買い手と同じ濃い色のマテリアルなので、どの人も暗がりでは影にしか見えない。
-    /// それでもこちらを正面から向いている人は作らないようにしてある。
+    /// **顔は影で隠す。向きでは隠さない。** 買い手と同じ濃い色のマテリアルなので、
+    /// どの人も暗がりでは影にしか見えない。逆光・帽子の影・伏せた角度でそこを確かめる。
+    /// 背を向けて隠していた頃は、話しかけてくる相手まで後ろを向いていて、
+    /// 誰が喋っているのか読めなかった。**相手をしている人はプレイヤーの方を向ける。**
+    /// 目安は、その人の台詞が出る点への向きとの差が 90 度未満。
+    /// 誰の相手もしていない人（記憶 8 の隣の母親は自分の娘を見ている）はこの限りではない。
     ///
     /// 秒・位置・向きはすべて仮置き。オーナーが実機で見て詰める
     /// </summary>
     public static partial class BuildDive
     {
-        /// <summary>組み終えた直後に立っている場所。記憶 0 の頭と同じ点</summary>
-        static readonly Vector3 FirstStand = new Vector3(0f, 0f, 2.4f);
-        const float FirstYaw = 176f;
+        /// <summary>
+        /// 組み終えた直後に立っている場所。記憶 0 の頭と同じ点。
+        ///
+        /// **階段の下の、上り口のすぐ手前。** 庭の真ん中（z 2.4）から始めていた頃は、
+        /// 潜った直後に何も無い地面を 15.8 m 歩かされてから、ようやく一段目に着いた
+        /// </summary>
+        static readonly Vector3 FirstStand = new Vector3(StairEastMid, 0f, WalkFront - 0.45f);
+        /// <summary>始まりの向き。東の一本は +z へ上がっていくので、0 度でそのまま階段が正面に来る</summary>
+        const float FirstYaw = 0f;
 
         /// <summary>同じ体つきは一つの mesh を使い回す。人ごとに焼くと repo が 30 MB 増える</summary>
         static readonly Dictionary<string, Mesh> figures = new Dictionary<string, Mesh>();
@@ -137,6 +146,45 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
+        /// 戸口を一枚で塞ぐ。位置は <see cref="Cast"/> と同じく Take のローカル。
+        ///
+        /// **建物の面の穴は場所の側（<c>BuildDiveEstate</c>）が開けていて、記憶からは触れない。**
+        /// 開いている戸は記憶ごとに違う（記憶 0 の朝はまだ老夫婦が出てきていない）ので、
+        /// 閉めたい記憶だけ、開いた穴の手前へ戸の板を落として塞ぐ。
+        /// 当たりも入れるので、覗けないし通り抜けられない。
+        ///
+        /// 高さは三和土の底（<see cref="EstateSunk"/> のぶん下がる）から戸の頭まで。
+        /// 建物の面の穴は床から上だけだが、居間の側の穴は三和土の底から開いているので、
+        /// 低い方へ合わせないと足元に隙間が残る
+        /// </summary>
+        static Transform Shut(Transform take, string name, float x)
+        {
+            const float high = DoorHigh + EstateSunk;
+            var mesh = Shape("EstateShut", 0.4f, b =>
+            {
+                b.Box(new Vector3(0f, high * 0.5f, 0f), new Vector3(DoorHalf * 2f, high, 0.05f));
+                // 面を囲う細い線。鉄扉の折り返しの縁。開いている戸（EstateLeaf）と同じ組み合わせ
+                b.Box(new Vector3(0f, EstateSunk + 1.06f, 0.026f),
+                    new Vector3(DoorHalf * 2f - 0.10f, 1.52f, 0.015f));
+                // 換気口。細い羽根が三枚
+                for (var i = 0; i < 3; i++)
+                    b.Box(new Vector3(0f, EstateSunk + 1.80f + i * 0.07f, 0.036f),
+                        new Vector3(DoorHalf * 1.1f, 0.035f, 0.02f));
+                // 新聞受けと覗き穴。目の高さの黒い点ひとつで、そこが住戸の戸になる
+                b.Box(new Vector3(0f, EstateSunk + 0.34f, 0.036f), new Vector3(DoorHalf * 0.86f, 0.05f, 0.02f));
+                b.Box(new Vector3(0f, EstateSunk + 1.52f, 0.036f), new Vector3(0.07f, 0.07f, 0.015f));
+                // 把手
+                b.Box(new Vector3(DoorHalf - 0.13f, EstateSunk + 1.00f, 0.06f), new Vector3(0.05f, 0.05f, 0.12f));
+            });
+            var leaf = Piece(take, name, mesh, Mat("Door"));
+            leaf.localPosition = new Vector3(x, EstateTop - EstateSunk, EstateFace + 0.05f);
+            var box = leaf.gameObject.AddComponent<BoxCollider>();
+            box.center = new Vector3(0f, high * 0.5f, 0f);
+            box.size = new Vector3(DoorHalf * 2f + 0.06f, high, 0.14f);
+            return leaf;
+        }
+
+        /// <summary>
         /// 人や鳩を一直線に動かす。位置は Take のローカル。
         ///
         /// <paramref name="ground"/> を立てると足元が真下の床へ下りる。
@@ -190,23 +238,31 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Mei(Transform take)
         {
-            Cast(take, "Mother", "W_Casual", new Vector3(DoorA, EstateTop, EstateFace - 0.25f), 150f, 1, 1f);
+            // **母は廊下の側（+z）を向く。** 150 度では戸口の奥を向いていて、
+            // 廊下から上がってきたメイには背中しか見えなかった。
+            // 顔が影になるのは向きではなく、戸口の奥の灯りを背にしているから
+            Cast(take, "Mother", "W_Casual",
+                new Vector3(DoorA, EstateTop - EstateSunk, EstateFace - 0.25f), 0f, 1, 1f);
+            // 隣は老夫婦の家。この朝はまだ一度も出てきていないので、戸を閉めて穴を塞ぐ
+            Shut(take, "ShutB", DoorB);
             return new[]
             {
-                K(0f,   0f,   0f,       2.4f,   176f,  48f, 0.55f),  // しゃがんで靴紐。指と地面しか見えない
-                K(3f,   0f,   0f,       2.3f,   180f, -32f, 1.00f),  // 立って階段の上を仰ぐ
-                K(10f,  0f,   Floor,    EstateLanding1, 180f, -12f, 1.00f),
-                K(17f,  0f,   Floor*2f, EstateLanding2, 180f, -10f, 1.00f),
-                K(23f,  0.9f, EstateTop, -13.9f, 149f,  22f, 1.00f), // 三階。母の脚
-                K(25f,  1.25f, EstateTop, -14.2f, 149f, -42f, 1.45f), // 抱き上げられる
-                K(28f,  1.25f, EstateTop, -14.2f, 236f, -34f, 1.50f), // 回る。空、団地の壁
-                K(31f,  1.25f, EstateTop, -14.2f, 160f,   6f, 1.00f), // 降ろされる
-                K(35f,  1.25f, EstateTop, -14.0f, 350f,   2f, 1.00f), // 背中を押されて向きが変わる
-                K(40f,  0f,   EstateTop, -13.6f,   0f,  12f, 1.00f),
-                K(47f,  0f,   Floor*2f, EstateLanding2,   0f,   8f, 1.00f),
-                K(49f,  0f,   Floor*2f, EstateLanding2, 166f, -26f, 1.00f), // 振り返る。戸口の母は逆光
-                K(54f,  0f,   Floor,    EstateLanding1,   0f,   8f, 1.00f),
-                K(60f,  0f,   0f,       2.4f,     0f,   0f, 1.00f),
+                // 階段の下。上り口のすぐ手前で、始まりの立ち位置（FirstStand）と同じ点
+                K(0f,   StairEastMid, 0f, WalkFront - 0.45f,   0f,  48f, 0.55f),  // しゃがんで靴紐。指と地面しか見えない
+                K(3f,   StairEastMid, 0f, WalkFront - 0.35f,   0f, -32f, 1.00f),  // 立って階段の上を仰ぐ
+                // 三階建てになって、上りは折り返しが二つ・階の高さの踊り場が一つになった
+                K(10f,  0f,   Floor * 0.5f, EstateTurn,     180f, -12f, 1.00f),  // 一つ目の折り返し
+                K(17f,  0f,   Floor,        EstateLanding1,   0f, -10f, 1.00f),  // 二階の廊下
+                K(23f,  0.9f, EstateTop, EstateWalk + 0.20f, 149f,  22f, 1.00f), // 三階。母の脚
+                K(25f,  1.25f, EstateTop, EstateWalk - 0.10f, 149f, -42f, 1.45f), // 抱き上げられる
+                K(28f,  1.25f, EstateTop, EstateWalk - 0.10f, 236f, -34f, 1.50f), // 回る。空、団地の壁
+                K(31f,  1.25f, EstateTop, EstateWalk - 0.10f, 160f,   6f, 1.00f), // 降ろされる
+                K(35f,  1.25f, EstateTop, EstateWalk + 0.10f, 350f,   2f, 1.00f), // 背中を押されて向きが変わる
+                K(40f,  0f,   EstateTop, EstateWalk + 0.40f,   0f,  12f, 1.00f),
+                K(45f,  0f,   Floor * 1.5f, EstateTurn,     180f,   8f, 1.00f),  // 降りる途中の折り返し
+                K(49f,  0f,   Floor,        EstateLanding2, 166f, -26f, 1.00f),  // 振り返る。戸口の母は逆光
+                K(54f,  0f,   Floor * 0.5f, EstateTurn,     180f,   8f, 1.00f),
+                K(60f,  StairEastMid, 0f, WalkFront - 0.45f,  96f,   0f, 1.00f), // 降り切って、庭の側へ向き直る
             };
         }
 
@@ -218,22 +274,30 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Hanna(Transform take)
         {
-            var kid = Cast(take, "Daughter", "W_Casual", new Vector3(0.75f, EstateTop, -13.95f), 280f, 0, 0.6f);
+            // **娘は廊下の壁の側へ寄せて止める。** 歩く線（EstateWalk）の上に立たせると、
+            // 東の点からも西の点からも真横に来て、どちらを向いても片方に背を向けることになる
+            var stood = new Vector3(StairEast - 0.45f, EstateTop, EstateWalk - 0.35f);
+            var kid = Cast(take, "Daughter", "W_Casual", stood, 0f, 0, 0.6f);
             // 出てくるのは階段の口。折り返しになって、上がり切る一本が廊下の西へ寄ったので、
             // 元の x 0.2 は手すりの中になった
-            Move(kid, new Vector3(-0.65f, EstateTop, -13.5f), new Vector3(0.75f, EstateTop, -13.95f), 6f, 3.5f, true);
-            Cast(take, "Neighbour", "M_Casual", new Vector3(4.0f, EstateTop, -14.55f), 130f, 3, 0.95f);
+            Move(kid, new Vector3(StairWestMid, EstateTop, WalkFront - 0.10f), stood, 6f, 3.5f, true);
+            // 老人も廊下の側（+z）を向く。130 度では自分の戸口の方を向いていて、
+            // 廊下から寄っていくハンナには背中しか見えなかった
+            Cast(take, "Neighbour", "M_Casual",
+                new Vector3(DoorB - 0.20f, EstateTop, EstateFace + 0.25f), 0f, 3, 0.95f);
+            // ハンナは出しなに鍵を掛けたところ。自分の戸は閉まっている
+            Shut(take, "ShutA", DoorA);
             return new[]
             {
-                K(0f,  1.9f,  EstateTop, -14.1f, 178f,  20f, 1.55f),  // ドアに鍵を掛けている
-                K(3f,  1.9f,  EstateTop, -14.1f, 102f,   2f, 1.55f),  // 隣の戸口からの声
-                K(6f,  1.85f, EstateTop, -14.05f, 102f,   4f, 1.55f), // 老人が会釈する
-                K(10f, 1.8f,  EstateTop, -14.05f, 275f,   8f, 1.55f), // 娘が二段飛ばしで上がってくる
-                K(14f, 1.75f, EstateTop, -14.05f, 275f,  38f, 1.55f), // 体操着の袋を渡す
-                K(18f, 1.75f, EstateTop, -14.05f, 275f,  24f, 1.55f), // 抱き上げる
-                K(22f, 1.75f, EstateTop, -14.05f, 275f,  40f, 1.55f), // 降ろす。駆け下りていく
-                K(25f, 1.75f, EstateTop, -14.05f, 108f,   4f, 1.55f), // 老人はまだ新聞を広げている
-                K(30f, 0.6f,  EstateTop, -13.7f,    6f,  12f, 1.55f),
+                K(0f,  1.9f,  EstateTop, EstateWalk,         178f,  20f, 1.55f),  // ドアに鍵を掛けている
+                K(3f,  1.9f,  EstateTop, EstateWalk,         102f,   2f, 1.55f),  // 隣の戸口からの声
+                K(6f,  1.85f, EstateTop, EstateWalk + 0.05f, 102f,   4f, 1.55f),  // 老人が会釈する
+                K(10f, 1.8f,  EstateTop, EstateWalk + 0.05f, 275f,   8f, 1.55f),  // 娘が二段飛ばしで上がってくる
+                K(14f, 1.75f, EstateTop, EstateWalk + 0.05f, 275f,  38f, 1.55f),  // 体操着の袋を渡す
+                K(18f, 1.75f, EstateTop, EstateWalk + 0.05f, 275f,  24f, 1.55f),  // 抱き上げる
+                K(22f, 1.75f, EstateTop, EstateWalk + 0.05f, 275f,  40f, 1.55f),  // 降ろす。駆け下りていく
+                K(25f, 1.75f, EstateTop, EstateWalk + 0.05f, 108f,   4f, 1.55f),  // 老人はまだ新聞を広げている
+                K(30f, 0.6f,  EstateTop, EstateWalk + 0.30f,   6f,  12f, 1.55f),
             };
         }
 
@@ -404,17 +468,25 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Giorgio(Transform take)
         {
-            Cast(take, "Wife", "W_Formal", new Vector3(DoorB, EstateTop, -15.25f), 340f, 0, 0.95f);
-            Cast(take, "Mother", "W_Casual", new Vector3(1.9f, EstateTop, -14.05f), 285f, 1, 1f);
+            // **妻は三和土ではなく居間に置く。** 三和土に立たせると、新聞を渡しに入ってくる
+            // ジョルジョの通り道（会話の点）とそのまま重なって、体の中へ入り込む。
+            // テレビの脇へ寄せて、抜けの側（-x）を向かせる
+            Cast(take, "Wife", "W_Formal",
+                new Vector3(EstateTv.x + 0.15f, EstateTop, EstateTv.z + 1.55f), 292f, 0, 0.95f);
+            // 隣の母親は娘を抱き上げているところ。こちらではなく西の娘を見ているので、向きはそのまま
+            Cast(take, "Mother", "W_Casual", new Vector3(1.9f, EstateTop, EstateWalk + 0.05f), 285f, 1, 1f);
+            // 隣は鍵を掛けて出てきたところなので、戸は閉まっている
+            Shut(take, "ShutA", DoorA);
             return new[]
             {
-                K(0f,  4.3f, EstateTop, -14.05f, 270f,   6f, 1.65f),  // 隣を眺めている
-                K(4f,  4.3f, EstateTop, -14.05f, 270f,  12f, 1.65f),  // 母親が娘を抱き上げる
-                K(8f,  4.25f, EstateTop, -14.2f, 183f,  10f, 1.65f),  // 戸の内側から妻の声
-                K(12f, 4.2f, EstateTop, -14.35f, 183f,  22f, 1.65f),  // 新聞を渡す
-                K(16f, 4.2f, EstateTop, -15.1f,  183f,   6f, 1.65f),  // 中へ入る
-                K(20f, 4.4f, EstateTop, -16.2f,  200f,  10f, 1.65f),  // テレビの音
-                K(25f, 4.4f, EstateTop, -16.3f,  210f,  40f, 1.20f),  // 靴を脱ぐと視界が揺れる
+                K(0f,  4.3f,  EstateTop, EstateWalk + 0.05f, 270f,   6f, 1.65f),  // 隣を眺めている
+                K(4f,  4.3f,  EstateTop, EstateWalk + 0.05f, 270f,  12f, 1.65f),  // 母親が娘を抱き上げる
+                K(8f,  4.25f, EstateTop, EstateWalk - 0.10f, 183f,  10f, 1.65f),  // 戸の内側から妻の声
+                K(12f, 4.2f,  EstateTop, EstateWalk - 0.25f, 183f,  22f, 1.65f),  // 新聞を渡す
+                // 戸口から先は三和土で、床より EstateSunk のぶん下がる
+                K(16f, 4.2f,  EstateTop - EstateSunk, EstateFace - 0.30f, 183f,   6f, 1.65f),  // 中へ入る
+                K(20f, 4.3f,  EstateTop - EstateSunk, HallSill + 0.20f,   200f,  40f, 1.20f),  // 靴を脱ぐと視界が揺れる
+                K(25f, 4.4f,  EstateTop, HallWall - 0.40f,   210f,  10f, 1.65f),  // テレビの音
             };
         }
 
@@ -565,8 +637,13 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Elena(Transform take)
         {
-            var man = Cast(take, "Husband", "M_Casual", new Vector3(3.5f, EstateTop, -16.1f), 200f, 0, 0.95f);
-            Move(man, new Vector3(4.3f, EstateTop, -14.95f), new Vector3(3.5f, EstateTop, -16.1f), 6f, 5f, true);
+            // 座る先は抜けを入ってすぐの西寄り。元の点は仕切りの壁へ 0.26 m めり込んでいた。
+            // 向きも 200 度から直す。**居間の点はどれも夫の南東にあるので、そちらへ向ける**
+            var sat = new Vector3(HallGap0 + 0.15f, EstateTop, HallWall - 0.50f);
+            var man = Cast(take, "Husband", "M_Casual", sat, 120f, 0, 0.95f);
+            Move(man, new Vector3(DoorB + 0.10f, EstateTop - EstateSunk, EstateFace - 0.15f), sat, 6f, 5f, true);
+            // 隣は鍵を掛けて出ていったあと。戸は閉まっている
+            Shut(take, "ShutA", DoorA);
             return new[]
             {
                 K(0f,  4.95f, EstateTop, -16.62f, 168f,   8f, 1.15f),  // テレビの前
@@ -631,9 +708,12 @@ namespace HalfAware.EditorTools
         {
             S(0.00f, Floor * 0.5f, EstateTurn, 1.50f),                  // メイ「えー」　一つ目の折り返し
             S(0.20f, EstateTop, EstateWalk + 0.25f, 0.95f),             // 母「はい、水筒」　三階へ上がりきったところ
-            S(DoorA, EstateTop, PorchSill - 0.35f, 0.85f),              // メイ「ありがとう」　玄関。母の前
+            // **戸口の手前。** 三和土の奥（PorchSill の先）に置いていた頃は、母を通り越して
+            // 家の中に立つことになり、背中側から水筒を受け取っていた。灯りの逆光も裏返っていた
+            S(DoorA, EstateTop, EstateFace + 0.50f, 0.85f),             // メイ「ありがとう」　戸口。母の正面
             S(DoorA + 1.15f, EstateTop, EstateWalk + 0.15f, 0.85f),     // 母「もう、毎日でしょ」　廊下へ出たところ
-            S(DoorA - 0.95f, EstateTop, EstateWalk + 0.45f, 0.85f),     // メイ「わっ」　向きを変えられて階段の側へ
+            // 手すりへ寄せすぎると体が通らない。廊下で立てるのは z EstateWalk + 0.40 まで
+            S(DoorA - 0.95f, EstateTop, EstateWalk + 0.30f, 0.85f),     // メイ「わっ」　向きを変えられて階段の側へ
             S(0.00f, Floor * 1.5f, EstateTurn, 1.50f),                  // 母「気をつけてね」　降りる途中の折り返し
             S(StairEastMid, 0f, WalkFront - 0.35f, 1.40f),              // メイ「いってきます」　階段を降り切った地面
         };
@@ -645,12 +725,16 @@ namespace HalfAware.EditorTools
         static readonly TalkSpot[] HannaSpots =
         {
             S(3.00f, EstateTop, EstateWalk - 0.15f, 0.85f),             // ハンナ「おはようございます」　老人の方へ一歩
-            S(4.20f, EstateTop, EstateWalk - 0.25f, 0.85f),             // ジョルジョ「今日は遅いんだね」　老人の脇
+            // 老人の立つところ（EstateFace + 0.25）へ半歩ぶんしか離れていなかったので、廊下の側へ出す
+            S(4.20f, EstateTop, EstateWalk + 0.25f, 0.85f),             // ジョルジョ「今日は遅いんだね」　老人の脇
             S(5.15f, EstateTop, EstateWalk + 0.20f, 0.85f),             // ハンナ「ええ、午後からで」　廊下の東
-            S(1.90f, EstateTop, EstateWalk + 0.50f, 0.85f),             // メイ「ママ！」　娘が上がってくる側へ戻る
-            S(0.80f, EstateTop, EstateWalk + 0.20f, 0.80f),             // ハンナ「どうしたの」　娘の前
-            S(-0.30f, EstateTop, EstateWalk + 0.40f, 0.80f),            // メイ「体操着、わすれた」　階段の頭
-            S(0.00f, Floor * 2.5f, EstateTurn, 1.40f),                  // ハンナ「……もう」　降り始めた先の折り返し
+            // 手すりの内側（z EstateWalk + 0.50）は体が通らない。前の点との間も一歩ぶん空ける
+            S(2.55f, EstateTop, EstateWalk + 0.25f, 0.85f),             // メイ「ママ！」　娘が上がってくる側へ戻る
+            S(1.45f, EstateTop, EstateWalk + 0.20f, 0.80f),             // ハンナ「どうしたの」　娘の前
+            S(-0.30f, EstateTop, EstateWalk + 0.30f, 0.80f),            // メイ「体操着、わすれた」　階段の頭
+            // 三階建てになって折り返しは y 1.4 と 4.2 の二つだけ。
+            // 最上階から降り始めた先は Floor * 1.5。Floor * 2.5（7.0）には、もう何も無い
+            S(0.00f, Floor * 1.5f, EstateTurn, 1.40f),                  // ハンナ「……もう」　降り始めた先の折り返し
         };
 
         /// <summary>
