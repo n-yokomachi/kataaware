@@ -325,10 +325,10 @@ MonoBehaviour:
       where: {x: 4.1499996, y: 5.45, z: -15.2}
       radius: 0.7
     - line: "\u30B8\u30E7\u30EB\u30B8\u30E7\u300C\u96A3\u3001\u307E\u305F\u5FD8\u308C\u3082\u306E\u300D"
-      where: {x: 3.9, y: 5.6, z: -16.199999}
+      where: {x: 4.2, y: 5.6, z: -16.1}
       radius: 0.8
     - line: "\u30A8\u30EC\u30CA\u300C\u3042\u3089\u3042\u3089\u300D"
-      where: {x: 4.6, y: 5.6, z: -17.1}
+      where: {x: 4.36, y: 5.6, z: -17.08}
       radius: 0.95
   - row: "\u5973\u300072\u3000\u300E\u30ED\u30FC\u30B6\u300F\u30002156/03/02 15:50"
     place: park
@@ -522,17 +522,17 @@ MonoBehaviour:
       where: {x: 0, y: 0, z: 0}
       radius: 0
     - line: "\u30A8\u30EC\u30CA\u300C\u306A\u3042\u306B\u300D"
-      where: {x: 4, y: 5.6, z: -15.95}
+      where: {x: 3.95, y: 5.6, z: -17}
       radius: 0.8
     - line: "\u30B8\u30E7\u30EB\u30B8\u30E7\u300C\u65B0\u805E\u3001\u3042\u3063\u305F\u3088\u300D"
-      where: {x: 3.35, y: 5.6, z: -17.05}
+      where: {x: 3.55, y: 5.6, z: -17.72}
       radius: 0.8
     - line: "\u30A8\u30EC\u30CA\u300C\u305D\u3053\u7F6E\u3044\u3068\u3044\u3066\u300D"
-      where: {x: 3.6, y: 5.6, z: -18.05}
+      where: {x: 4.55, y: 5.6, z: -18.3}
       radius: 0.85
     - line: "\u30B8\u30E7\u30EB\u30B8\u30E7\u300C\u96A3\u306E\u5B50\u3001\u307E\u305F\u8D70\u3063\u3066\u305F\u300D"
-      where: {x: 5.3, y: 5.6, z: -17.95}
+      where: {x: 5.62, y: 5.6, z: -17.45}
       radius: 0.9
     - line: "\u30A8\u30EC\u30CA\u300C\u5143\u6C17\u306D\u3048\u300D"
-      where: {x: 6.2, y: 5.6, z: -16.8}
+      where: {x: 6.25, y: 5.6, z: -16.4}
       radius: 0.95
