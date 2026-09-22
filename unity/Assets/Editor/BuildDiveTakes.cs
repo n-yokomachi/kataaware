@@ -510,11 +510,11 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Giorgio(Transform take)
         {
-            // **妻は三和土ではなく居間に置く。** 三和土に立たせると、新聞を渡しに入ってくる
-            // ジョルジョの通り道（会話の点）とそのまま重なって、体の中へ入り込む。
-            // テレビの脇へ寄せて、抜けの側（-x）を向かせる
-            Cast(take, "Wife", "W_Formal",
-                new Vector3(EstateTv.x + 0.15f, EstateTop, EstateTv.z + 1.55f), 292f, 0, 0.95f);
+            // **妻は廊下の突き当たりの硝子戸の奥に立たせる。** 戸口の前から廊下を真っ直ぐ
+            // 覗いた線の先で、引き込み残った硝子戸の一枚越しに胸から上が見える。
+            // 「新聞、来てる？」は戸口の前で聞くので、そこから姿が見えないと誰の声か分からない。
+            // 通り道（廊下の真ん中）から西へ外し、戸口の方を向かせる
+            Cast(take, "Wife", "W_Formal", new Vector3(RoomHall0 + 0.12f, EstateTop, RoomEnd - 0.54f), 9f, 0, 0.95f);
             // 隣の母親は娘を抱き上げているところ。こちらではなく西の娘を見ているので、向きはそのまま
             Cast(take, "Mother", "W_Casual", new Vector3(1.9f, EstateTop, EstateWalk + 0.05f), 285f, 1, 1f);
             // 隣は鍵を掛けて出てきたところなので、戸は閉まっている
@@ -680,24 +680,28 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Elena(Transform take)
         {
-            // 座る先は抜けを入ってすぐの西寄り。元の点は仕切りの壁へ 0.26 m めり込んでいた。
-            // 向きも 200 度から直す。**居間の点はどれも夫の南東にあるので、そちらへ向ける**
-            var sat = new Vector3(HallGap0 + 0.15f, EstateTop, HallWall - 0.50f);
-            var man = Cast(take, "Husband", "M_Casual", sat, 120f, 0, 0.95f);
+            // 座る先は廊下の硝子戸を抜けてすぐの座布団。炬燵の北の辺に、妻と並んで座る。
+            // **歩く線は廊下の真ん中の一本（RoomWalk）。** Mover は始まりと終わりを
+            // 一直線に結ぶだけなので、三和土の始まりと座る所を同じ x に揃えて、
+            // 廊下の壁も硝子戸も手すりも跨がないようにする。向きは炬燵とテレビの方
+            var sat = new Vector3(RoomWalk, EstateTop, RoomEnd - 0.34f);
+            var man = Cast(take, "Husband", "M_Casual", sat, 180f, 0, 0.95f);
             // 夫が三和土から座るところまで歩くのは、名を呼ばれて返事をしてから。
             // 二行目（エレナ「なあに」）が出たら数え始める
-            Move(man, new Vector3(DoorB + 0.10f, EstateTop - EstateSunk, EstateFace - 0.15f), sat, 0f, 5f, true, true, 2);
+            Move(man, new Vector3(RoomWalk, EstateTop - EstateSunk, EstateFace - 0.15f), sat, 0f, 5f, true, true, 2);
             // 隣は鍵を掛けて出ていったあと。戸は閉まっている
             Shut(take, "ShutA", DoorA);
             Ajar(take, "AjarB", DoorB);
             return new[]
             {
-                K(0f,  4.95f, EstateTop, -16.62f, 168f,   8f, 1.15f),  // テレビの前
-                K(3f,  4.95f, EstateTop, -16.62f, 339f,   2f, 1.15f),  // 戸口から夫の声
-                K(9f,  4.95f, EstateTop, -16.62f, 308f,   0f, 1.15f),  // 新聞を持って入ってくる
-                K(14f, 4.95f, EstateTop, -16.62f, 290f,   8f, 1.15f),  // 隣に座る
-                K(18f, 4.95f, EstateTop, -16.62f, 288f,  16f, 1.15f),  // 新聞を広げる音
-                K(25f, 4.95f, EstateTop, -16.62f, 168f,  26f, 1.15f),  // テレビの光が床に当たっている
+                // 座っているのは炬燵の北の辺の東、座椅子の上。夫の座る所の 0.74 m 東。
+                // 戸口は廊下の東の壁の陰で見えないので、声の方へは廊下の突き当たりの抜けを向く
+                K(0f,  5.10f, EstateTop, -17.02f, 171f,   8f, 1.15f),  // テレビの前
+                K(3f,  5.10f, EstateTop, -17.02f, 292f,   2f, 1.15f),  // 戸口から夫の声
+                K(9f,  5.10f, EstateTop, -17.02f, 296f,   0f, 1.15f),  // 新聞を持って入ってくる
+                K(14f, 5.10f, EstateTop, -17.02f, 272f,   8f, 1.15f),  // 隣に座る
+                K(18f, 5.10f, EstateTop, -17.02f, 270f,  16f, 1.15f),  // 新聞を広げる音
+                K(25f, 5.10f, EstateTop, -17.02f, 171f,  26f, 1.15f),  // テレビの光が床に当たっている
             };
         }
 
@@ -785,28 +789,33 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 8. ジョルジョ。廊下で隣を眺めてから自分の戸口へ戻り、新聞を渡して中へ入る。
-        /// 妻の声は戸の内側から来るので、後の二行は三和土と居間に置く
+        /// 妻の声は戸の内側から来るので、後の三行は三和土・家の中の廊下・茶の間に置く
         /// </summary>
         static readonly TalkSpot[] GiorgioSpots =
         {
             S(3.10f, EstateTop, EstateWalk + 0.35f, 0.85f),             // ジョルジョ「ああ」　隣を眺めたまま西へ一歩
             S(DoorB, EstateTop, EstateWalk + 0.30f, 0.80f),             // エレナ「新聞、来てる？」　自分の戸口の前
             S(DoorB - 0.05f, EstateTop - EstateSunk, HallSill + 0.35f, 0.70f), // ジョルジョ「来てるよ」　三和土
-            S(3.90f, EstateTop, HallWall - 0.30f, 0.80f),               // ジョルジョ「隣、また忘れもの」　居間への抜け
-            S(4.60f, EstateTop, -17.10f, 0.95f),                        // エレナ「あらあら」　居間
+            S(4.20f, EstateTop, HallSill - 0.55f, 0.80f),               // ジョルジョ「隣、また忘れもの」　廊下の真ん中
+            // 硝子戸を抜けてすぐ。点の広さ（0.95 m）で、廊下の突き当たりに着いたところで出る
+            S(RoomWalk, EstateTop, RoomEnd - 0.42f, 0.95f),             // エレナ「あらあら」　茶の間
         };
 
         /// <summary>
-        /// 15. エレナ。居間から出ない記憶なので、点も居間の中で回す。
-        /// 戸口の側・夫の座るところ・卓・テレビの前・東の隅の順に一巡する
+        /// 15. エレナ。茶の間から出ない記憶なので、点も茶の間と、そこへ開いた台所の中で回す。
+        /// 硝子戸の側・夫の座るところの脇・炬燵の奥・テレビの前・台所の前の順に一巡する。
+        ///
+        /// **隣り合う点は、後の点の広さより離す。** 近いと、先の点で台詞が出た途端に
+        /// 次の点も同じ所で出て、二行が重なる
         /// </summary>
         static readonly TalkSpot[] ElenaSpots =
         {
-            S(4.00f, EstateTop, -15.95f, 0.80f),                        // エレナ「なあに」　抜けの側
-            S(3.35f, EstateTop, -17.05f, 0.80f),                        // ジョルジョ「新聞、あったよ」　夫の座るところ
-            S(3.60f, EstateTop, -18.05f, 0.85f),                        // エレナ「そこ置いといて」　卓の奥
-            S(5.30f, EstateTop, -17.95f, 0.90f),                        // ジョルジョ「隣の子、また走ってた」　テレビの前
-            S(6.20f, EstateTop, -16.80f, 0.95f),                        // エレナ「元気ねえ」　居間の東
+            // 夫が戸口から一直線に歩いてくる線（RoomWalk）から西へ外す
+            S(3.95f, EstateTop, RoomEnd - 0.34f, 0.80f),               // エレナ「なあに」　硝子戸の側
+            S(3.55f, EstateTop, -17.72f, 0.80f),                        // ジョルジョ「新聞、あったよ」　夫の座るところの脇
+            S(4.45f, EstateTop, -18.33f, 0.85f),                        // エレナ「そこ置いといて」　炬燵の奥
+            S(5.62f, EstateTop, -17.45f, 0.90f),                        // ジョルジョ「隣の子、また走ってた」　テレビの前
+            S(6.25f, EstateTop, -16.40f, 0.95f),                        // エレナ「元気ねえ」　台所の前
         };
     }
 }
