@@ -4,15 +4,19 @@ using UnityEngine;
 namespace HalfAware
 {
     /// <summary>
-    /// 人の脇に浮く板。一行目にその人の行、二行目に `E 潜る　　　切断`。
+    /// 人の脇に浮く板。一行目にその人の行、二行目に `潜る　　　切断`。
+    ///
+    /// **`E` は板に書かない。** 鍵の案内は画面の下の `E ○○` が持っている
+    /// （場面 1・2・3・8 と同じ場所・同じ書式で <see cref="DiveDirector"/> が出す）。
+    /// 板にも書くと、一つの操作に `E` が二つ出て、どちらを押す話なのか読めなくなる。
+    /// 板に残すのは、誰の脇に出ているかと、`切断` がどれだけ育ったかだけ。
     ///
     /// **Quad も 3D の TextMeshPro も法線が -z。** どちらも -z の側から見たときに
     /// 表が見えるので、目の方へ向けるには forward を目から離す向きに置く。
     /// 表を向けるつもりで目の方へ forward を向けると、板も字もまとめて裏になって消える
     /// （場面 3 の窓で踏んだ）。
     ///
-    /// 出るまでと消えるまでの半秒は DiveDirector が数える。板は言われたとおりに出るだけ。
-    /// 位置も色も秒数もオーナーが決めるので、ここの値は仮置き
+    /// いつ出していつ消すかは DiveDirector が決める。板は言われたとおりに出るだけ
     /// </summary>
     public sealed class HoloPanel : MonoBehaviour
     {
@@ -33,11 +37,14 @@ namespace HalfAware
         [Tooltip("相手の頭より上へどれだけ出すか。相手の背丈に対する割合")]
         [SerializeField] float lift = 0.12f;
         [Tooltip("目からの距離 1 m あたりの板の大きさ。遠近で見かけの大きさを揃える。" +
-            "0.82 で、板の丈が画面の縦のおよそ 22 %（427×240 で 52 px）になる")]
+            "0.82 で、板の丈が画面の縦のおよそ 19 %（427×240 で 42 px）になる")]
         [SerializeField] float perMetre = 0.82f;
         [Tooltip("大きさの下限と上限")]
         [SerializeField] float least = 0.45f;
-        [SerializeField] float most = 2.20f;
+        // **上限はそのまま「見かけの大きさが揃う距離」。** 2.20 だと 2.7 m から先は
+        // 板ごと縮んで字が潰れ、部屋の向こう側の人が読めなかった。2.60 で 3.2 m まで伸びる。
+        // これ以上伸ばすと板の実寸が 2.5 m を超えて、廊下の壁を突き抜けたところが欠ける
+        [SerializeField] float most = 2.60f;
 
         Transform host;
         /// <summary>相手の体の高さと半幅。Show のときに一度だけ測る</summary>
@@ -165,7 +172,7 @@ namespace HalfAware
             var cut = "<size=" + Mathf.RoundToInt(Mathf.Clamp01(size) * 100f) + "%>"
                 + (index == 1 ? Choice.Cursor : "") + Cut + "</size>";
             if (!Ready) cut = "<color=#" + ColorUtility.ToHtmlStringRGB(Dead) + ">" + cut + "</color>";
-            return "E " + (index == 0 ? Choice.Cursor : "") + Dive + "　　　" + cut;
+            return (index == 0 ? Choice.Cursor : "") + Dive + "　　　" + cut;
         }
     }
 }

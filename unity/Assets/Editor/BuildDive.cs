@@ -463,10 +463,13 @@ namespace HalfAware.EditorTools
         /// **設計書は「掌ほど」だが、そこまで小さくすると行が読めない。** 一行目は
         /// 「女　34　『ハンナ』　2156/03/02 09:02」の二十数文字で、掌ほどの板に収めると
         /// 一文字が一度に満たない。読める大きさから逆に決めてある。
-        /// 行の書式を短くできるなら、板もそのぶん小さく戻せる
+        /// 行の書式を短くできるなら、板もそのぶん小さく戻せる。
+        ///
+        /// 高さだけ 0.28 から広げてある。二行を <see cref="Text3D"/> の大きさで並べると
+        /// 上下の余りが 3 px ほどしか残らず、縁に触れて見えた
         /// </summary>
-        const float PanelWide = 0.86f;
-        const float PanelHigh = 0.28f;
+        const float PanelWide = 0.92f;
+        const float PanelHigh = 0.30f;
 
         /// <summary>
         /// 人の脇に浮く板。
@@ -494,8 +497,8 @@ namespace HalfAware.EditorTools
             pane.GetComponent<MeshRenderer>().sharedMaterial = holo;
 
             var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
-            var row = Text3D(go.transform, "Row", font, new Vector3(0f, 0.062f, -0.004f), Terminal);
-            var action = Text3D(go.transform, "Action", font, new Vector3(0f, -0.066f, -0.004f), Terminal);
+            var row = Text3D(go.transform, "Row", font, new Vector3(0f, 0.066f, -0.004f), Terminal);
+            var action = Text3D(go.transform, "Action", font, new Vector3(0f, -0.070f, -0.004f), Terminal);
 
             var so = new SerializedObject(panel);
             so.FindProperty("eye").objectReferenceValue = Look("Player/Main Camera");
@@ -510,8 +513,15 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// 世界に浮く一行。
         ///
-        /// **字の大きさは自動に任せる。** 行は「女　34　『ハンナ』　2156/03/02 09:02」のような
-        /// 二十数文字で、掌ほどの板に固定の大きさで流し込むと左右へ突き抜ける
+        /// **字の大きさは自動に任せる。** 行は「女　34　『ハンナ』」までで、
+        /// 名前の長さが人によって 8〜11 文字ぶん変わる。固定の大きさで流し込むと
+        /// 長い名前が板の左右へ突き抜ける。
+        ///
+        /// **上限は板の幅から逆に出す。** 0.14 だった頃は、一番長い
+        /// 「男　78　『アルベルト』」でも板の幅の 15 % しか使わず、427×240 で撮ると
+        /// 一文字が 2 px（漢字の墨が 1.96×2.38 px）にしかならなかった。
+        /// 0.74 なら同じ行が板の幅の 94 % に届き、一文字が 10 px になる。
+        /// 下限は、行の書式が伸びたときに潰れきらない所で止める
         /// </summary>
         static TMP_Text Text3D(Transform parent, string name, TMP_FontAsset font, Vector3 at, Color col)
         {
@@ -524,11 +534,11 @@ namespace HalfAware.EditorTools
             text.alignment = TextAlignmentOptions.Center;
             text.textWrappingMode = TextWrappingModes.NoWrap;
             text.enableAutoSizing = true;
-            text.fontSizeMin = 0.02f;
-            text.fontSizeMax = 0.14f;
+            text.fontSizeMin = 0.50f;
+            text.fontSizeMax = 0.74f;
             text.text = "";
             var rect = text.rectTransform;
-            rect.sizeDelta = new Vector2(PanelWide * 0.94f, PanelHigh * 0.42f);
+            rect.sizeDelta = new Vector2(PanelWide * 0.94f, PanelHigh * 0.46f);
             return text;
         }
 

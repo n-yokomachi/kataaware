@@ -53,8 +53,10 @@ namespace HalfAware
         [Header("板")]
         [Tooltip("目の中央からこの角度の内側にいる人だけ拾う。度")]
         [SerializeField] float watchAngle = 12f;
-        [Tooltip("目を留めてから板が出るまで、外してから消えるまで。秒")]
+        [Tooltip("目を留めてから板が出るまで、別の人へ乗り換えるまで。秒")]
         [SerializeField] float watchSeconds = 0.5f;
+        [Tooltip("画面の端からこれだけ外へ出るまでは板を消さない。画面の幅・高さに対する割合")]
+        [SerializeField] float edgeMargin = 0.08f;
 
         [Header("足音")]
         [Tooltip("団地・教室・台所の床。コンクリート")]
@@ -88,6 +90,8 @@ namespace HalfAware
         Transform place;
         Mover[] movers = new Mover[0];
         CharacterController hull;
+        /// <summary>目のカメラ。人が画面に映っているかを見るのに要る</summary>
+        Camera lens;
         /// <summary>記憶の頭からの秒</summary>
         float clock;
         bool called;
@@ -119,6 +123,8 @@ namespace HalfAware
         void Awake()
         {
             if (player != null) hull = player.GetComponent<CharacterController>();
+            if (player != null && player.Eye != null) lens = player.Eye.GetComponent<Camera>();
+            if (lens == null) lens = Camera.main;
             if (player == null || roster == null || roster.Count == 0)
             {
                 Debug.LogError("DiveDirector: player か記憶の一覧が未接続", this);
@@ -222,7 +228,7 @@ namespace HalfAware
             spoken = 0;
             silence = 0f;
             if (panel != null) panel.Hide();
-            if (hud != null) hud.SetSubtitle(null);
+            if (hud != null) { hud.SetSubtitle(null); hud.SetPrompt(null); }
             // 首は溜めた向きを体へ渡して正面へ戻す。前の記憶で振り向いたままだと、
             // 次の記憶が始まった瞬間に壁を見ていることになる
             player.ReleaseHead();
@@ -348,52 +354,133 @@ namespace HalfAware
 
         /// <summary>
         /// 目を留めた相手の脇に板を出す。一つの記憶に人が何人いても、
-        /// 出るのは目を留めている一人だけ
+        /// 出るのは一人だけ。
+        ///
+        /// **一度出た板は、中央から外れたくらいでは消さない。** 目の中央から外れて
+        /// 半秒で消していた頃は、歩きながら人を画面の中央に留め続けられず、
+        /// 近づくだけで消えていた（オーナーの差し戻し）。消えるのは、
+        /// その人が画面から外れたときと、別の人がもっと中央へ来たときの二つだけ
         /// </summary>
         void Watch()
         {
             if (panel == null) return;
+            if (shown != null && !OnScreen(shown)) Drop();
+
             var who = Nearest();
+            // もっと中央に近い人が現れなければ、狙いは出ている人のまま
+            if (who == null) who = shown;
             if (who != aimed) { aimed = who; dwell = 0f; }
             else dwell += Time.deltaTime;
-            if (dwell < watchSeconds) return;
-            if (aimed != null)
+
+            // 出すのも、別の人へ乗り換えるのも、同じだけ目を留めてから
+            if (aimed != null && aimed != shown && dwell >= watchSeconds)
             {
-                if (shown != aimed)
-                {
-                    shown = aimed;
-                    lastStep = 0;
-                    panel.Show(aimed, entry.row, Row(Target(aimed)));
-                }
-                panel.Grow(chain.CutSize);
+                shown = aimed;
+                lastStep = 0;
+                panel.Show(aimed, entry.row, Row(Target(aimed)));
             }
-            else if (shown != null)
-            {
-                shown = null;
-                panel.Hide();
-            }
+            if (shown == null) return;
+            panel.Grow(chain.CutSize);
+            Guide();
         }
 
-        /// <summary>目の中央にいちばん近い人。誰も角の内側にいなければ null</summary>
+        /// <summary>板と、画面の下の案内をまとめて下げる</summary>
+        void Drop()
+        {
+            shown = null;
+            aimed = null;
+            dwell = 0f;
+            if (panel != null) panel.Hide();
+            if (hud != null) hud.SetPrompt(null);
+        }
+
+        /// <summary>
+        /// その人がまだ画面に映っているか。一度出た板を消してよいかは、これだけで決める。
+        /// 端でふつりと消えないように、少し外へ出るまでは映っていることにする
+        /// </summary>
+        bool OnScreen(Transform who)
+        {
+            if (who == null || !who.gameObject.activeInHierarchy) return false;
+            if (lens == null) return true;
+            var at = lens.WorldToViewportPoint(Head(who));
+            if (at.z <= 0f) return false;
+            return at.x >= -edgeMargin && at.x <= 1f + edgeMargin
+                && at.y >= -edgeMargin && at.y <= 1f + edgeMargin;
+        }
+
+        /// <summary>その人の顔のあたり。足元で測ると、近くに立つほど下を向かないと拾えない</summary>
+        static Vector3 Head(Transform who)
+        {
+            return who.position + Vector3.up * 1.2f;
+        }
+
+        /// <summary>
+        /// 目の中央にいちばん近い人。誰も角の内側にいなければ null。
+        ///
+        /// **いま板が出ている人より中央に近い人しか返さない。** 二人が並んで立つ記憶で、
+        /// 首を少し振るたびに板が行き来すると、どちらの脇に出ているのか読めなくなる
+        /// </summary>
         Transform Nearest()
         {
             var eye = player.Eye;
             if (eye == null || take == null) return null;
             Transform best = null;
             var closest = watchAngle;
+            if (shown != null)
+            {
+                var held = Vector3.Angle(eye.forward, Head(shown) - eye.position);
+                if (held < closest) closest = held;
+            }
             var people = take.People;
             for (var i = 0; i < people.Length; i++)
             {
                 var who = people[i];
                 if (who == null || !who.gameObject.activeInHierarchy) continue;
-                var toward = who.position + Vector3.up * 1.2f - eye.position;
+                var toward = Head(who) - eye.position;
                 if (toward.sqrMagnitude < 1e-4f) continue;
                 var apart = Vector3.Angle(eye.forward, toward);
-                if (apart > closest) continue;
+                if (apart >= closest) continue;
                 closest = apart;
                 best = who;
             }
             return best;
+        }
+
+        // ---- 画面の下の案内 --------------------------------------------------
+
+        /// <summary>鍵の案内の頭。場面 1・2・3・8 の `E ○○` と同じ書式</summary>
+        const string Key = "E  ";
+
+        /// <summary>`E` の後ろに続く、潜る先の言い方</summary>
+        const string DiveLabel = "この人の記憶へ潜る";
+
+        /// <summary>選んでいない方に付ける余白。<see cref="Choice.Compose"/> と同じ形に揃える</summary>
+        const string Blank = "　　";
+
+        /// <summary>
+        /// 上下で選べることを言い添える。<see cref="Choice"/> の二択は左右で動かすので、
+        /// 印だけ倣っても軸までは伝わらない
+        /// </summary>
+        const string Axis = "（↑↓ で選ぶ）";
+
+        /// <summary>
+        /// 板が出ているあいだ、画面の下に `E ○○` を出す。
+        ///
+        /// **潜るのはプレイヤーが決めることだと、この一行で伝える。** 板の二行目だけでは
+        /// 「自分が選んでいるのかどうか分からない」と差し戻された。調べられるものに
+        /// 近づくと `E ○○` が出るのは場面 1・2・3・8 で通した決まりなので、
+        /// 同じ場所・同じ書式に載せる。
+        ///
+        /// **ここは `潜る` 専用にする。** 会話の字幕は記憶の時計で勝手に流れるもので、
+        /// 送りを待たせない。案内を出さないことが、そのまま「待たなくていい」という合図になる
+        /// </summary>
+        void Guide()
+        {
+            if (hud == null || panel == null || chain == null) return;
+            if (!chain.CanCut) { hud.SetPrompt(Key + DiveLabel); return; }
+            var dive = (panel.Index == 0 ? Choice.Cursor : Blank) + DiveLabel;
+            var cut = (panel.Index == 1 ? Choice.Cursor : Blank) + HoloPanel.Cut;
+            hud.SetPrompt(Key + dive + Blank + cut + "　" + Axis);
         }
 
         /// <summary>その人の飛び先。一覧に無ければ -1</summary>
@@ -430,7 +517,12 @@ namespace HalfAware
             if (panel == null || shown == null) return;
             // 車輪を手前へ回すと 1。上が `潜る`、下が `切断` なので向きを裏返す
             var step = -player.LogStep;
-            if (step != 0 && step != lastStep) panel.Select(step > 0 ? 1 : 0);
+            if (step != 0 && step != lastStep)
+            {
+                panel.Select(step > 0 ? 1 : 0);
+                // 案内は Watch が毎フレーム出しているが、選んだ手応えを一フレーム遅らせない
+                Guide();
+            }
             lastStep = step;
             if (!player.InteractPressed) return;
             if (panel.Index == 1 && chain.CanCut) { Cut(); return; }
