@@ -22,9 +22,17 @@ namespace HalfAware
         /// <summary>詰まった耳。Hz</summary>
         public const float Shut = 900f;
 
-        /// <summary>老眼。手元から 1.2 m までがぼやける</summary>
-        public const float NearStart = 0.2f;
-        public const float NearEnd = 1.2f;
+        // **URP の Gaussian は遠い側しかぼかせない。** 焦点までの距離を持たないので、
+        // 「手元がぼやけて遠くは見える」は作れない。老眼のつもりで 0.2〜1.2 m と置いていたのは
+        // 「0.2 m から先が全部ぼける」で、板も部屋も丸ごと溶けていた。
+        // 二つの体の差は、ぼける向きではなくぼけ始める距離で出す。
+        //
+        // どちらの始まりも、肩の脇に浮く板（相手まで 0.9〜3.2 m）より手前には置かない。
+        // 板は主の端末が描くもので、借りた目の出来には従わない
+
+        /// <summary>年寄りの目。腕を伸ばした先から先がぼやけ、4 m で溶ける</summary>
+        public const float NearStart = 1.6f;
+        public const float NearEnd = 4f;
         /// <summary>近視。3 m から先がぼやけ、8 m で溶ける</summary>
         public const float FarStart = 3f;
         public const float FarEnd = 8f;
