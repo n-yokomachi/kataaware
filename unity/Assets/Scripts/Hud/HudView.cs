@@ -31,6 +31,8 @@ namespace HalfAware
         [Tooltip("Tab で出す、これまでの文のログ")]
         [SerializeField] GameObject logPanel;
         [SerializeField] TMP_Text logText;
+        [Tooltip("画面の角へ向かって白く溶ける膜。場面 4 だけが使う。無い場面では null")]
+        [SerializeField] ScreenHaze hazeLayer;
 
         float baseFontSize;
         TMPro.TextAlignmentOptions listlessAlignment = TMPro.TextAlignmentOptions.Center;
@@ -49,6 +51,19 @@ namespace HalfAware
             SetFade(0f);
             SetCurtain(false);
             SetLog(null);
+            SetHaze(0f);
+        }
+
+        /// <summary>
+        /// 角の白い膜の強さ。0 で消える。
+        /// 膜を持たない場面で呼ばれても黙って何もしない
+        /// </summary>
+        public void SetHaze(float amount)
+        {
+            if (hazeLayer == null) return;
+            hazeLayer.Amount = amount;
+            var on = amount > 1e-4f;
+            if (hazeLayer.gameObject.activeSelf != on) hazeLayer.gameObject.SetActive(on);
         }
 
         /// <summary>

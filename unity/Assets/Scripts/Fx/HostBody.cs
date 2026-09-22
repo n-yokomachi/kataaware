@@ -51,6 +51,40 @@ namespace HalfAware
         DepthOfField blur;
         ColorAdjustments tone;
 
+        /// <summary>いま着ている体のぼやけ方と強さ。<see cref="Strain"/> が変わったら掛け直す</summary>
+        Blur kind = Blur.Sharp;
+        float amount;
+        float strain;
+
+        /// <summary>
+        /// 目の疲れ。0 で素のまま、1 でその体のぼやけが出きる。
+        ///
+        /// **一人目からぼやけていては、渡り歩いた結果に見えない。** 借りた目の出来を
+        /// そのまま出すと、潜った瞬間に世界が溶けて、何を見ればよいのか分からないと
+        /// 差し戻された。<see cref="DiveChain.CutSize"/> と同じ歩みで 0 から 1 へ上げ、
+        /// `切断` が押せるようになったところで出きるようにする
+        /// </summary>
+        public float Strain
+        {
+            get { return strain; }
+            set
+            {
+                var next = Mathf.Clamp01(value);
+                if (Mathf.Approximately(next, strain)) return;
+                strain = next;
+                Blurred(kind, amount);
+            }
+        }
+
+        /// <summary>
+        /// <see cref="DiveChain.CutSize"/> を 0〜1 の疲れに読み替える。
+        /// `切断` が <see cref="DiveChain.CutStart"/> の大きさで出ているあいだは 0
+        /// </summary>
+        public static float StrainOf(float cutSize)
+        {
+            return Mathf.Clamp01((cutSize - DiveChain.CutStart) / (1f - DiveChain.CutStart));
+        }
+
         void Awake()
         {
             Borrow();
@@ -96,6 +130,8 @@ namespace HalfAware
         /// <summary>素の体へ戻す。場面を抜けるときに呼ぶ</summary>
         public void Clear()
         {
+            kind = Blur.Sharp;
+            amount = 0f;
             if (player != null) player.EyeHeight = PlayerController.StandingEyeHeight;
             if (blur != null) blur.active = false;
             if (tone != null) tone.colorFilter.Override(Color.white);
@@ -103,20 +139,35 @@ namespace HalfAware
             Heart(false);
         }
 
+        /// <summary>
+        /// ぼやけを掛け直す。**疲れが 0 のあいだは掛けない。**
+        ///
+        /// ぼけ始める距離も疲れで動かす。強さだけを上げると、遠くが一様に濁るだけで
+        /// 「目が利かなくなってきた」に読めない。疲れていないうちは遠くの遠くから、
+        /// 疲れるほど手前から溶け始める
+        /// </summary>
         void Blurred(Blur kind, float amount)
         {
+            this.kind = kind;
+            this.amount = amount;
             if (blur == null) return;
-            if (kind == Blur.Sharp)
+            var force = Mathf.Clamp01(amount) * strain;
+            if (kind == Blur.Sharp || force <= 1e-3f)
             {
                 blur.active = false;
                 return;
             }
+            var start = kind == Blur.Near ? NearStart : FarStart;
+            var end = kind == Blur.Near ? NearEnd : FarEnd;
             blur.active = true;
             blur.mode.Override(DepthOfFieldMode.Gaussian);
-            blur.gaussianStart.Override(kind == Blur.Near ? NearStart : FarStart);
-            blur.gaussianEnd.Override(kind == Blur.Near ? NearEnd : FarEnd);
-            blur.gaussianMaxRadius.Override(Mathf.Clamp01(amount) * 1.5f);
+            blur.gaussianStart.Override(Mathf.Lerp(Clearest, start, strain));
+            blur.gaussianEnd.Override(Mathf.Lerp(Clearest + (end - start), end, strain));
+            blur.gaussianMaxRadius.Override(force * 1.5f);
         }
+
+        /// <summary>疲れが 0 に近いときのぼけ始め。ここまで遠ければ画の中にはまず入らない</summary>
+        const float Clearest = 24f;
 
         void Heart(bool beating)
         {

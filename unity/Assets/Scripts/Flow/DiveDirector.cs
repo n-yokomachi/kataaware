@@ -224,6 +224,7 @@ namespace HalfAware
 
             if (body != null) body.Apply(entry);
             if (caption != null) caption.text = entry.row ?? "";
+            Wear();
             Deepen();
 
             // 床の音は場所ごとに変える。団地・教室・台所はコンクリート、公園は土、電車は板
@@ -414,6 +415,22 @@ namespace HalfAware
             Guide();
         }
 
+        /// <summary>
+        /// 渡り歩いた分だけ目を疲れさせ、画面の角を白く曇らせる。
+        ///
+        /// **一人目は素のまま。** 借りた目の出来を最初から出すと、潜った瞬間に世界が溶けて
+        /// 何を見ればよいのか分からないと差し戻された。`切断` が育つのと同じ歩みで上げ、
+        /// 押せるようになったところで出きる。
+        ///
+        /// 角の白い膜だけは最初から出しておく。あれは目の出来ではなく、
+        /// 他人の記憶の中にいること自体の見え方だから
+        /// </summary>
+        void Wear()
+        {
+            if (body != null) body.Strain = HostBody.StrainOf(chain.CutSize);
+            if (hud != null) hud.SetHaze(1f);
+        }
+
         /// <summary>板と、画面の下の案内をまとめて下げる</summary>
         void Drop()
         {
@@ -587,8 +604,9 @@ namespace HalfAware
                 // 設計書の「画面が裂ける」はまだ作っていない。いまは暗転で代える
                 yield return hud.FadeTo(1f, cutSeconds);
             }
-            // 借りた体の色味とぼやけは、自室が出る前に落とす
+            // 借りた体の色味とぼやけ、角の白い膜は、自室が出る前に落とす
             if (body != null) body.Clear();
+            if (hud != null) hud.SetHaze(0f);
             if (volume != null) volume.weight = 0f;
             if (!SceneExit.Continues(nextScene))
             {

@@ -382,6 +382,22 @@ namespace HalfAware.EditorTools
             var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
             if (font == null) Debug.LogWarning("字の形が無い: " + FontPath);
 
+            // 記憶の中にいるあいだ、画面の角へ向かって白く溶ける膜。
+            // **いちばん先に置く。** キャンバスは並びの順に重ねるので、
+            // 後から置く字幕・案内・右上の行は、どれも膜の上に出て読める
+            var haze = new GameObject("Haze", typeof(RectTransform), typeof(CanvasRenderer), typeof(ScreenHaze));
+            haze.transform.SetParent(go.transform, false);
+            var hazeRect = haze.GetComponent<RectTransform>();
+            Frame(hazeRect, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            var hazeView = haze.GetComponent<ScreenHaze>();
+            var hso = new SerializedObject(hazeView);
+            hso.FindProperty("from").floatValue = HazeFrom;
+            hso.FindProperty("upto").floatValue = HazeUpto;
+            hso.FindProperty("depth").floatValue = HazeDepth;
+            hso.FindProperty("amount").floatValue = 0f;
+            hso.ApplyModifiedPropertiesWithoutUndo();
+            haze.SetActive(false);
+
             // **場面 4 の帯だけ薄く、細くする。** 場面 1・2・3・8 では、字幕が出ている
             // あいだ画面の下の案内が消えて、E で送る。その画と見分けが付かないと、
             // 記憶の時計で勝手に流れる会話まで送り待ちに見える。
@@ -427,9 +443,21 @@ namespace HalfAware.EditorTools
             so.FindProperty("centerText").objectReferenceValue = centre;
             so.FindProperty("fadeLayer").objectReferenceValue = fade.GetComponent<Image>();
             so.FindProperty("curtainLayer").objectReferenceValue = curtain.GetComponent<Image>();
+            so.FindProperty("hazeLayer").objectReferenceValue = hazeView;
             so.ApplyModifiedPropertiesWithoutUndo();
             return hud;
         }
+
+        /// <summary>
+        /// 角の白い膜の形。真ん中からの隔たりで測り、辺の真ん中が 1、角が 1.41。
+        ///
+        /// 立ち上がりを 0.52 に置くのは、画面の真ん中の半分を素のまま残すため。
+        /// ここを下げると、見ている物の上にまで白が乗って、記憶の絵ではなく曇りに見える
+        /// </summary>
+        const float HazeFrom = 0.52f;
+        const float HazeUpto = 1.38f;
+        /// <summary>角での濃さ。字幕と右上の行が読めることを条件に決めた</summary>
+        const float HazeDepth = 0.34f;
 
         static RectTransform Layer(Transform parent, string name, Color col, bool blocks)
         {

@@ -54,6 +54,13 @@ namespace HalfAware
         float half = 0.25f;
         /// <summary>板そのものの幅。m。寄せ幅を出すのに要る。Pane の大きさが唯一の出どころ</summary>
         float wide = 0.92f;
+        /// <summary>板そのものの丈。m。物に埋まっていないか測るのに要る</summary>
+        float high = 0.30f;
+        /// <summary>いま出している側。1 が主の右、-1 が左。毎フレーム選び直すと左右に飛ぶ</summary>
+        float side = 1f;
+        /// <summary>主の体。板が目の近くまで引かれたとき、自分の当たりを物と数えないため</summary>
+        Collider mine;
+        readonly Collider[] caught = new Collider[8];
         string line = "";
         float size = DiveChain.CutStart;
         int index;
@@ -73,7 +80,8 @@ namespace HalfAware
         void Awake()
         {
             var pane = transform.Find("Pane");
-            if (pane != null) wide = pane.localScale.x;
+            if (pane != null) { wide = pane.localScale.x; high = pane.localScale.y; }
+            if (eye != null) mine = eye.GetComponentInParent<Collider>();
             Paint();
         }
 
@@ -157,21 +165,104 @@ namespace HalfAware
             // 離れると行が読めなくなる。目からの距離に比例させれば、どちらも起きない。
             // 測るのは肩までの距離。板の位置から測ると、寄せ幅と大きさが互いを押し合う
             var span = Mathf.Clamp(away.magnitude * perMetre, least, most);
-            // 寄せるのは目から見た真横で、いつも主の右。
+            // 寄せるのは目から見た真横。
             // 相手の向きで寄せる側を決めると、横を向いた人では板が顔の前か後ろへ回り込み、
-            // 相手の周りを歩くと左右が入れ替わる瞬間に板が飛ぶ。
-            // いつも同じ側に出るなら、どこを見れば読めるかが決まっている
+            // 相手の周りを歩くと左右が入れ替わる瞬間に板が飛ぶ
             var flat = eye.right;
             flat.y = 0f;
             if (flat.sqrMagnitude < 1e-6f) flat = host.right;
             flat.Normalize();
-            // 板の内側の縁が体に掛からないところまで出す。
-            // 体の幅は相手ごとに、板の幅は遠近で変わるので、どちらも数に入れる
-            transform.position = at + flat * (half + gap + wide * span * 0.5f);
-            transform.rotation = Quaternion.LookRotation(
-                (transform.position - eye.position).normalized, Vector3.up);
+
+            // **いま出している側を先に試す。** 毎フレーム左右を選び直すと、
+            // 壁際を歩くあいだ板が右と左を行き来して読めない
+            if (Settle(at, flat, span, side)) return;
+            if (Settle(at, flat, span, -side)) { side = -side; return; }
+            Pull(at, flat, span);
+        }
+
+        /// <summary>
+        /// その側へ出せるなら出して true。
+        ///
+        /// 板の内側の縁が体に掛からないところまで出す。
+        /// 体の幅は相手ごとに、板の幅は遠近で変わるので、どちらも数に入れる
+        /// </summary>
+        bool Settle(Vector3 at, Vector3 flat, float span, float which)
+        {
+            var pos = at + flat * which * (half + gap + wide * span * 0.5f);
+            if (!Clear(pos, span)) return false;
+            Put(pos, span);
+            return true;
+        }
+
+        /// <summary>
+        /// 左右どちらも塞がっているときに、目の側へ引いてくる。
+        ///
+        /// **相手の脇に留めるより、読めることを採る。** 廊下や部屋の中では、
+        /// 肩の脇に出した板が壁や箪笥に食い込んで、行が半分欠けた（オーナーの差し戻し）。
+        /// 引いた先で距離に合わせて大きさを取り直すので、見かけの大きさは変わらない
+        /// </summary>
+        void Pull(Vector3 at, Vector3 flat, float span)
+        {
+            var want = at + flat * side * (half + gap + wide * span * 0.5f);
+            var back = eye.position - want;
+            var reach = back.magnitude;
+            if (reach > 1e-4f)
+            {
+                back /= reach;
+                for (var k = 1; k <= Tries; k++)
+                {
+                    var pos = want + back * (reach * k / (Tries + 1f));
+                    var near = Mathf.Clamp((pos - eye.position).magnitude * perMetre, least, most);
+                    if (!Clear(pos, near)) continue;
+                    Put(pos, near);
+                    return;
+                }
+            }
+            // どこも空いていなければ目のすぐ前に出す。埋まって読めないよりはまし
+            var edge = want - eye.position;
+            var head = edge.sqrMagnitude > 1e-6f ? edge.normalized : eye.forward;
+            Put(eye.position + head * Close, Mathf.Clamp(Close * perMetre, least, most));
+        }
+
+        /// <summary>目から見えて、なおかつ物に食い込んでいないか</summary>
+        bool Clear(Vector3 pos, float span)
+        {
+            var rot = Facing(pos);
+            var box = new Vector3(wide * span * 0.5f, high * span * 0.5f, Thin);
+            var n = Physics.OverlapBoxNonAlloc(pos, box, caught, rot, ~0, QueryTriggerInteraction.Ignore);
+            for (var i = 0; i < n; i++)
+                if (caught[i] != null && caught[i] != mine) return false;
+
+            var away = pos - eye.position;
+            var reach = away.magnitude - Thin;
+            if (reach <= 0f) return true;
+            RaycastHit hit;
+            if (!Physics.Raycast(eye.position, away / (reach + Thin), out hit, reach, ~0, QueryTriggerInteraction.Ignore))
+                return true;
+            return hit.collider == mine;
+        }
+
+        void Put(Vector3 pos, float span)
+        {
+            transform.position = pos;
+            transform.rotation = Facing(pos);
             transform.localScale = Vector3.one * span;
         }
+
+        /// <summary>目から離れる向きへ forward を置く。Quad も 3D の字も -z から見て表だから</summary>
+        Quaternion Facing(Vector3 pos)
+        {
+            var away = pos - eye.position;
+            if (away.sqrMagnitude < 1e-6f) return transform.rotation;
+            return Quaternion.LookRotation(away.normalized, Vector3.up);
+        }
+
+        /// <summary>板の厚みの半分。面には厚みが無いので、測るときだけ持たせる</summary>
+        const float Thin = 0.02f;
+        /// <summary>目の側へ引くときに試す刻みの数</summary>
+        const int Tries = 6;
+        /// <summary>最後の逃げ場。目からこれだけ前へ置く</summary>
+        const float Close = 0.7f;
 
         /// <summary>
         /// 板に出すぶんだけ切り出す。行は「性別　年齢　『名前』　日付 時刻」の形だが、
