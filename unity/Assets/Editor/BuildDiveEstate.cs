@@ -308,6 +308,13 @@ namespace HalfAware.EditorTools
             // 右の家は蛍光灯の下。テレビの光だけでは卓も座布団も沈む
             Lamp(place, "RoomB", LightType.Point, new Vector3(5.0f, RoomRoof - 0.35f, -17.3f),
                 Vector3.zero, new Color(1f, 0.93f, 0.84f), 3.4f, 7f);
+            // 左の家（記憶 0・1）。天井の蛍光灯は光る面で置いてあるが、あれは Unlit なので
+            // 面が光るだけで周りを照らさない。玄関から奥を覗くと床も壁も沈んだままになる
+            Lamp(place, "RoomAHall", LightType.Point, new Vector3(-0.35f, RoomRoof - 0.45f, -16.5f),
+                Vector3.zero, new Color(1f, 0.93f, 0.84f), 3.2f, 5.0f);
+            // 居間。卓と押し入れに届けばよいので、右の家より届く先を短く切る
+            Lamp(place, "RoomA", LightType.Point, new Vector3(1.95f, RoomRoof - 0.45f, -17.3f),
+                Vector3.zero, new Color(1f, 0.93f, 0.84f), 3.2f, 5.0f);
             // テレビは光る面だけでは床に届かない。記憶 15 の最後の鍵打ちが
             // 「テレビの光が床に当たっている」を見るので、青い灯りを一つ据える
             Lamp(place, "TvGlow", LightType.Point, EstateTv + new Vector3(0f, -0.15f, 0.55f),
