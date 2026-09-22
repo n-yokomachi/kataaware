@@ -157,6 +157,38 @@ namespace HalfAware.EditorTools
         /// 建物の面の穴は床から上だけだが、居間の側の穴は三和土の底から開いているので、
         /// 低い方へ合わせないと足元に隙間が残る
         /// </summary>
+        /// <summary>
+        /// 開いた戸。枠の外へ振り出して壁へ寄せる。
+        ///
+        /// **場所ではなく記憶が持つ。** 場所は四つの記憶で使い回すので、場所に置いた板は
+        /// 記憶ごとに消せない。記憶 0 では隣の老夫婦はまだ一度も出てきていないのに
+        /// その戸が開いた穴になっていた（オーナーの差し戻し）。開けるか閉めるかは
+        /// 記憶ごとの話なので、<see cref="Shut"/> と対にして記憶の子として置く。
+        ///
+        /// **メーターの箱より手前へ置く。** 面に貼り付けると、板の中からメーターの角が生えてくる
+        /// </summary>
+        static Transform Ajar(Transform take, string name, float x)
+        {
+            const float half = 0.43f;
+            var mesh = Shape("EstateAjar", 0.4f, b =>
+            {
+                b.Box(new Vector3(0f, DoorHigh * 0.5f, 0f), new Vector3(half * 2f, DoorHigh, 0.05f));
+                // 面を囲う細い線。鉄扉の折り返しの縁。閉じた戸（Shut）と同じ組み合わせ
+                b.Box(new Vector3(0f, 1.06f, 0.026f), new Vector3(half * 2f - 0.10f, 1.52f, 0.015f));
+                // 換気口。細い羽根が三枚
+                for (var i = 0; i < 3; i++)
+                    b.Box(new Vector3(0f, 1.80f + i * 0.07f, 0.036f), new Vector3(half * 1.1f, 0.035f, 0.02f));
+                // 新聞受けと覗き穴
+                b.Box(new Vector3(0f, 0.34f, 0.036f), new Vector3(half * 0.86f, 0.05f, 0.02f));
+                b.Box(new Vector3(0f, 1.52f, 0.036f), new Vector3(0.07f, 0.07f, 0.015f));
+                // 把手。開いた戸なので、振り出した先の端に来る
+                b.Box(new Vector3(half - 0.09f, 1.00f, 0.05f), new Vector3(0.05f, 0.05f, 0.12f));
+            });
+            var leaf = Piece(take, name, mesh, Mat("Door"));
+            leaf.localPosition = new Vector3(x + 0.92f, EstateTop, EstateFace + 0.26f);
+            return leaf;
+        }
+
         static Transform Shut(Transform take, string name, float x)
         {
             const float high = DoorHigh + EstateSunk;
@@ -244,6 +276,8 @@ namespace HalfAware.EditorTools
             Cast(take, "Mother", "W_Casual",
                 new Vector3(DoorA, EstateTop - EstateSunk, EstateFace - 0.25f), 0f, 1, 1f);
             // 隣は老夫婦の家。この朝はまだ一度も出てきていないので、戸を閉めて穴を塞ぐ
+            // メイの家は母が戸口に立っているので開いている。隣はまだ誰も出てきていない
+            Ajar(take, "AjarA", DoorA);
             Shut(take, "ShutB", DoorB);
             return new[]
             {
@@ -287,6 +321,7 @@ namespace HalfAware.EditorTools
                 new Vector3(DoorB - 0.20f, EstateTop, EstateFace + 0.25f), 0f, 3, 0.95f);
             // ハンナは出しなに鍵を掛けたところ。自分の戸は閉まっている
             Shut(take, "ShutA", DoorA);
+            Ajar(take, "AjarB", DoorB);
             return new[]
             {
                 K(0f,  1.9f,  EstateTop, EstateWalk,         178f,  20f, 1.55f),  // ドアに鍵を掛けている
@@ -477,6 +512,7 @@ namespace HalfAware.EditorTools
             Cast(take, "Mother", "W_Casual", new Vector3(1.9f, EstateTop, EstateWalk + 0.05f), 285f, 1, 1f);
             // 隣は鍵を掛けて出てきたところなので、戸は閉まっている
             Shut(take, "ShutA", DoorA);
+            Ajar(take, "AjarB", DoorB);
             return new[]
             {
                 K(0f,  4.3f,  EstateTop, EstateWalk + 0.05f, 270f,   6f, 1.65f),  // 隣を眺めている
@@ -644,6 +680,7 @@ namespace HalfAware.EditorTools
             Move(man, new Vector3(DoorB + 0.10f, EstateTop - EstateSunk, EstateFace - 0.15f), sat, 6f, 5f, true);
             // 隣は鍵を掛けて出ていったあと。戸は閉まっている
             Shut(take, "ShutA", DoorA);
+            Ajar(take, "AjarB", DoorB);
             return new[]
             {
                 K(0f,  4.95f, EstateTop, -16.62f, 168f,   8f, 1.15f),  // テレビの前

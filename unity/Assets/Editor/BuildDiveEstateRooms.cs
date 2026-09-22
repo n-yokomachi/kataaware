@@ -521,7 +521,18 @@ namespace HalfAware.EditorTools
         /// 記憶 15 は中から夫を迎える。閉めた戸を置くと、その三つが同じ場所で成り立たなくなる。
         /// 右は中を作っていないので閉めておく
         /// </summary>
-        static void EstateDoorway(EstateBanks b, float x, bool open)
+        /// <summary>
+        /// 戸口。枠と住戸の小物は場所が持ち、**戸の板そのものは記憶が持つ**。
+        ///
+        /// 記憶 0 では隣の老夫婦はまだ一度も出てきていないのに、その戸が開いた穴になっていた。
+        /// 記憶ごとに開け閉めするには、板を記憶の子として置くしかない（場所は四つの記憶で
+        /// 使い回すので、場所に置いた板は記憶ごとに消せない）。
+        ///
+        /// <paramref name="hung"/> が true の戸口は板を置かず、丁番だけ残す。
+        /// <see cref="BuildDiveTakes"/> の <c>Shut</c> と <c>Ajar</c> がそこへ板を掛ける。
+        /// false の戸口（<see cref="DoorC"/>）は中を作っていないので、場所が閉めたまま持つ
+        /// </summary>
+        static void EstateDoorway(EstateBanks b, float x, bool hung)
         {
             const float jamb = DoorHalf + 0.06f;
             b.Gear.Box(new Vector3(x - jamb, EstateTop + (DoorHigh + 0.12f) * 0.5f, EstateFace + 0.05f),
@@ -544,13 +555,10 @@ namespace HalfAware.EditorTools
             b.Gear.Box(new Vector3(x + 0.80f, EstateTop + 1.42f, EstateFace + 0.09f), new Vector3(0.36f, 0.46f, 0.18f));
             b.Bright.Box(new Vector3(x + 0.80f, EstateTop + 1.50f, EstateFace + 0.185f), new Vector3(0.18f, 0.18f, 0.02f));
 
-            if (open)
+            if (hung)
             {
-                // **開いた戸はメーターの箱より手前へ置く。** 面に貼り付けると、
-                // 戸の板の中からメーターの角が生えてくる
-                EstateLeaf(b, x + 0.92f, 0.43f, EstateFace + 0.26f);
-                b.Gear.Box(new Vector3(x + 1.26f, EstateTop + 1.0f, EstateFace + 0.31f), new Vector3(0.05f, 0.05f, 0.12f));
-                // 丁番。戸が壁から浮いて見えないように、枠との間を三つで繋ぐ
+                // 丁番だけ。板は記憶が掛けるので、ここには置かない。
+                // 丁番が無いと、記憶が開いた板を置いたときに壁から浮いて見える
                 for (var i = 0; i < 3; i++)
                     b.Gear.Box(new Vector3(x + 0.51f, EstateTop + 0.40f + i * 0.62f, EstateFace + 0.16f),
                         new Vector3(0.07f, 0.16f, 0.22f));
