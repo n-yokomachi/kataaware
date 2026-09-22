@@ -25,11 +25,23 @@ namespace HalfAware
         [SerializeField] bool ease = true;
         [Tooltip("足元を床へ下ろす。飛ぶものは切る")]
         [SerializeField] bool ground = true;
+        [Tooltip("何行目の台詞が出たら動き出すか。-1 なら記憶の時計で動く")]
+        [SerializeField] int cue = -1;
 
         public Vector3 From { get { return from; } }
         public Vector3 To { get { return to; } }
         public float At { get { return at; } }
         public float Span { get { return span; } }
+
+        /// <summary>
+        /// 動き出す合図。これだけの行数が出たら動き始める。-1 なら記憶の時計で動く。
+        ///
+        /// **会話が歩いて進むのに、人だけ秒で動くのはちぐはぐ。** 台詞はプレイヤーが
+        /// 点へ入るまで待つのに、娘は記憶が始まって 6 秒で階段を駆け上がっていた。
+        /// まだ話しかけられてもいないうちに動き出す人を見て、意図した動きなのかと問われた。
+        /// 合図を持つ者は、その行が出てから数え始める
+        /// </summary>
+        public int Cue { get { return cue; } }
 
         /// <summary>頭から流し直すので、有効になった瞬間は開始位置に戻しておく</summary>
         void OnEnable()

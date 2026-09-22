@@ -11,8 +11,9 @@ namespace HalfAware
     /// 端末が列の順に、列が尽きれば一覧から無作為に選ぶ。端末は一度潜った人を飛ばすが、
     /// プレイヤーは板で戻ってよい。
     ///
-    /// `切断` は初め四割の大きさで押せず、人を渡るごとに大きくなって、
-    /// threshold 人で `潜る` と同じ大きさになり、そこから押せる
+    /// `切断` は初め四割の大きさで押せず、**新しい人の頭へ移るたびに**大きくなって、
+    /// threshold 人で `潜る` と同じ大きさになり、そこから押せる。
+    /// 一度潜った人へ戻っても大きさは変わらない
     /// </summary>
     public sealed class DiveChain
     {
@@ -26,7 +27,15 @@ namespace HalfAware
         readonly HashSet<int> visited = new HashSet<int>();
 
         public int Current { get; private set; }
-        public int Hops { get; private set; }
+
+        /// <summary>
+        /// これまでに頭を借りた人の数。最初の一人を 0 として数える。
+        ///
+        /// **同じ人へ戻っても増えない。** 一度見た記憶をもう一度流し直しているだけなので、
+        /// 渡り歩いた距離にはならない。増える作りにしていたが、同じ相手を往復するだけで
+        /// 目が利かなくなり `切断` が育つのはおかしいと差し戻された
+        /// </summary>
+        public int Hops { get { return visited.Count - 1; } }
 
         public DiveChain(int count, int[] listed, int threshold, System.Random random)
         {
@@ -47,7 +56,6 @@ namespace HalfAware
         {
             Current = Mathf.Clamp(target, 0, count - 1);
             visited.Add(Current);
-            Hops++;
         }
 
         /// <summary>尽きたので端末が選ぶ</summary>

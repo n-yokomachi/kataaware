@@ -16,6 +16,31 @@ namespace HalfAware.Tests
         }
 
         [Test]
+        public void TheSameHeadTwiceIsStillOneHead()
+        {
+            var chain = Fresh();
+            chain.Hop(4);
+            chain.Hop(9);
+            Assert.AreEqual(2, chain.Hops);
+            chain.Hop(4);
+            chain.Hop(9);
+            chain.Hop(4);
+            Assert.AreEqual(2, chain.Hops, "一度潜った人へ戻っただけで人数が増えている");
+            Assert.AreEqual(4, chain.Current);
+        }
+
+        [Test]
+        public void TheCutStopsGrowingWhenSheOnlyRetracesHerSteps()
+        {
+            var chain = Fresh();
+            chain.Hop(4);
+            var size = chain.CutSize;
+            for (var i = 0; i < 6; i++) chain.Hop(4);
+            Assert.AreEqual(size, chain.CutSize, 1e-4f);
+            Assert.IsFalse(chain.CanCut);
+        }
+
+        [Test]
         public void HoppingGoesWhereSheChose()
         {
             var chain = Fresh();

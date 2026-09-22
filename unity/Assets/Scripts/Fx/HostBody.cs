@@ -78,12 +78,19 @@ namespace HalfAware
 
         /// <summary>
         /// <see cref="DiveChain.CutSize"/> を 0〜1 の疲れに読み替える。
-        /// `切断` が <see cref="DiveChain.CutStart"/> の大きさで出ているあいだは 0
+        ///
+        /// **前半は素のまま。** `切断` が育ち始めた時点で疲れも上がる作りにしていたが、
+        /// それでもまだ早いと差し戻された。半分まで育つあいだは 0 で置き、
+        /// そこから `潜る` と同じ大きさになるまでで 0 から 1 へ上げる。
+        /// threshold が 8 人なら、四人目までは素のまま、五人目から曇り始める
         /// </summary>
         public static float StrainOf(float cutSize)
         {
-            return Mathf.Clamp01((cutSize - DiveChain.CutStart) / (1f - DiveChain.CutStart));
+            return Mathf.Clamp01((cutSize - Quiet) / (1f - Quiet));
         }
+
+        /// <summary>疲れが出始める `切断` の大きさ。<see cref="DiveChain.CutStart"/> と 1 の中ほど</summary>
+        public const float Quiet = (DiveChain.CutStart + 1f) * 0.5f;   // 0.7
 
         void Awake()
         {

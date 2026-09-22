@@ -72,6 +72,8 @@ namespace HalfAware
         [Header("会話")]
         [Tooltip("一行を出したままにしておく秒数")]
         [SerializeField] float talkSeconds = 4f;
+        [Tooltip("一行目だけ長く出しておく秒。名を呼ぶ声なので、相手を探す間が要る")]
+        [SerializeField] float firstSeconds = 9f;
         [Tooltip("一行出してから、次の行を出せるようになるまでの間。秒")]
         [SerializeField] float lineGap = 1.5f;
 
@@ -96,6 +98,8 @@ namespace HalfAware
         Take take;
         Transform place;
         Mover[] movers = new Mover[0];
+        /// <summary>合図を持つ者が動き出した時刻。まだ合図が来ていなければ負</summary>
+        float[] cued = new float[0];
         CharacterController hull;
         /// <summary>目のカメラ。人が画面に映っているかを見るのに要る</summary>
         Camera lens;
@@ -221,6 +225,8 @@ namespace HalfAware
             take.gameObject.SetActive(true);
             // 同じ人へ戻れば頭から流し直す。Mover は有効になった瞬間に開始位置へ戻る
             movers = take.GetComponentsInChildren<Mover>(true);
+            cued = new float[movers.Length];
+            for (var m = 0; m < cued.Length; m++) cued[m] = -1f;
 
             if (body != null) body.Apply(entry);
             if (caption != null) caption.text = entry.row ?? "";
@@ -314,7 +320,18 @@ namespace HalfAware
         void Drift()
         {
             for (var i = 0; i < movers.Length; i++)
-                if (movers[i] != null) movers[i].Play(clock);
+            {
+                if (movers[i] == null) continue;
+                // 合図を持たない者は記憶の時計で動く。鳩の飛び立ちのように、
+                // 会話と関わりなく起きる出来事はこちら
+                if (movers[i].Cue < 0) { movers[i].Play(clock); continue; }
+                if (cued[i] < 0f)
+                {
+                    if (spoken < movers[i].Cue) { movers[i].Play(0f); continue; }
+                    cued[i] = clock;
+                }
+                movers[i].Play(clock - cued[i]);
+            }
         }
 
         /// <summary>
@@ -350,9 +367,11 @@ namespace HalfAware
             if (clock >= held && DiveEntry.Due(said, spoken, Footing()) >= 0)
             {
                 hud.SetSubtitle(said[spoken].line, SubtitleKind.Line);
+                // **一行目だけ長く置く。** 記憶に入った瞬間に出る名を呼ぶ声で、
+                // 相手を探して振り向くあいだに消えると、誰が話しかけたのか分からない
+                silence = clock + (spoken == 0 ? firstSeconds : talkSeconds);
                 spoken++;
                 held = clock + lineGap;
-                silence = clock + talkSeconds;
                 return;
             }
             if (silence <= 0f || clock < silence) return;

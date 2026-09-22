@@ -223,7 +223,7 @@ namespace HalfAware.EditorTools
         /// 階段を降りる人も教壇から降りる人も、線の上下だけでは段を追えない
         /// </summary>
         static void Move(Transform who, Vector3 from, Vector3 to, float at, float span,
-            bool ease, bool ground = true)
+            bool ease, bool ground = true, int cue = -1)
         {
             if (who == null) return;
             var mover = who.gameObject.AddComponent<Mover>();
@@ -234,6 +234,7 @@ namespace HalfAware.EditorTools
             so.FindProperty("span").floatValue = span;
             so.FindProperty("ease").boolValue = ease;
             so.FindProperty("ground").boolValue = ground;
+            so.FindProperty("cue").intValue = cue;
             so.ApplyModifiedPropertiesWithoutUndo();
             who.localPosition = from;
         }
@@ -314,7 +315,9 @@ namespace HalfAware.EditorTools
             var kid = Cast(take, "Daughter", "W_Casual", stood, 0f, 0, 0.6f);
             // 出てくるのは階段の口。折り返しになって、上がり切る一本が廊下の西へ寄ったので、
             // 元の x 0.2 は手すりの中になった
-            Move(kid, new Vector3(StairWestMid, EstateTop, WalkFront - 0.10f), stood, 6f, 3.5f, true);
+            // 娘が駆け上がってくるのは、老人とのやりとりが終わってから。
+            // 四行目（ハンナ「ええ、午後からで」）が出たら数え始める
+            Move(kid, new Vector3(StairWestMid, EstateTop, WalkFront - 0.10f), stood, 0f, 3.5f, true, true, 4);
             // 老人も廊下の側（+z）を向く。130 度では自分の戸口の方を向いていて、
             // 廊下から寄っていくハンナには背中しか見えなかった
             Cast(take, "Neighbour", "M_Casual",
@@ -324,7 +327,11 @@ namespace HalfAware.EditorTools
             Ajar(take, "AjarB", DoorB);
             return new[]
             {
-                K(0f,  1.9f,  EstateTop, EstateWalk,         178f,  20f, 1.55f),  // ドアに鍵を掛けている
+                // **始まりは娘の方を向く。** 鍵を掛けた戸（178 度）を向いて始めていたが、
+                // 目の前が自分の戸の板だけになって、誰の記憶に入ったのか読めなかった。
+                // 階段の口に立つ娘へ向けておけば、最初の一枚で母娘だと分かる。
+                // 老人の声は東から来るので、探して振り向くだけの間を字幕の側で持たせている
+                K(0f,  1.9f,  EstateTop, EstateWalk,         283f,  13f, 1.55f),  // 階段の口の娘を見ている
                 K(3f,  1.9f,  EstateTop, EstateWalk,         102f,   2f, 1.55f),  // 隣の戸口からの声
                 K(6f,  1.85f, EstateTop, EstateWalk + 0.05f, 102f,   4f, 1.55f),  // 老人が会釈する
                 K(10f, 1.8f,  EstateTop, EstateWalk + 0.05f, 275f,   8f, 1.55f),  // 娘が二段飛ばしで上がってくる
@@ -677,7 +684,9 @@ namespace HalfAware.EditorTools
             // 向きも 200 度から直す。**居間の点はどれも夫の南東にあるので、そちらへ向ける**
             var sat = new Vector3(HallGap0 + 0.15f, EstateTop, HallWall - 0.50f);
             var man = Cast(take, "Husband", "M_Casual", sat, 120f, 0, 0.95f);
-            Move(man, new Vector3(DoorB + 0.10f, EstateTop - EstateSunk, EstateFace - 0.15f), sat, 6f, 5f, true);
+            // 夫が三和土から座るところまで歩くのは、名を呼ばれて返事をしてから。
+            // 二行目（エレナ「なあに」）が出たら数え始める
+            Move(man, new Vector3(DoorB + 0.10f, EstateTop - EstateSunk, EstateFace - 0.15f), sat, 0f, 5f, true, true, 2);
             // 隣は鍵を掛けて出ていったあと。戸は閉まっている
             Shut(take, "ShutA", DoorA);
             Ajar(take, "AjarB", DoorB);

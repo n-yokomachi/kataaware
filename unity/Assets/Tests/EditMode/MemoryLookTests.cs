@@ -27,11 +27,25 @@ namespace HalfAware.Tests
         }
 
         [Test]
-        public void EachHeadSheWearsCostsHerALittleMoreSight()
+        public void TheFirstHalfOfTheNightCostsHerNothing()
+        {
+            Assert.AreEqual(0f, HostBody.StrainOf(HostBody.Quiet), 1e-4f);
+            var chain = new DiveChain(16, new[] { 0, 1, 2, 4, 5, 7 }, 8, new System.Random(1));
+            for (var i = 1; i <= 4; i++)
+            {
+                chain.Hop(i);
+                Assert.AreEqual(0f, HostBody.StrainOf(chain.CutSize), 1e-4f,
+                    "四人目までは素のままであるべき: " + i + " 人目");
+            }
+        }
+
+        [Test]
+        public void AfterThatEachNewHeadCostsHerMoreSight()
         {
             var chain = new DiveChain(16, new[] { 0, 1, 2, 4, 5, 7 }, 8, new System.Random(1));
+            for (var i = 1; i <= 4; i++) chain.Hop(i);
             var before = HostBody.StrainOf(chain.CutSize);
-            for (var i = 1; i <= 8; i++)
+            for (var i = 5; i <= 8; i++)
             {
                 chain.Hop(i);
                 var now = HostBody.StrainOf(chain.CutSize);
@@ -39,6 +53,19 @@ namespace HalfAware.Tests
                 before = now;
             }
             Assert.AreEqual(1f, before, 1e-4f);
+        }
+
+        [Test]
+        public void GoingBackToTheSameHeadCostsHerNothing()
+        {
+            var chain = new DiveChain(16, new[] { 0, 1, 2, 4, 5, 7 }, 8, new System.Random(1));
+            for (var i = 1; i <= 6; i++) chain.Hop(i);
+            var before = HostBody.StrainOf(chain.CutSize);
+            var hops = chain.Hops;
+            for (var k = 0; k < 5; k++) { chain.Hop(3); chain.Hop(5); }
+            Assert.AreEqual(hops, chain.Hops, "同じ人へ戻っただけで人数が増えている");
+            Assert.AreEqual(before, HostBody.StrainOf(chain.CutSize), 1e-4f,
+                "同じ人へ戻っただけで目が疲れている");
         }
 
         [Test]
