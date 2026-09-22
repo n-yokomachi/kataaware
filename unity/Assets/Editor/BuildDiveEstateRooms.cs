@@ -239,10 +239,11 @@ namespace HalfAware.EditorTools
             for (var i = 0; i < 2; i++)
                 b.Gear.Box(new Vector3(3.95f, EstateTop + 0.97f + i * 0.96f, RoomBack + 0.05f),
                     new Vector3(0.86f, 0.06f, 0.06f));
-            // 短いカーテン。東へ寄せて開けてある。西は箪笥が窓の脇まで来ているので寄せない
-            b.Gear.Box(new Vector3(4.05f, EstateTop + 2.00f, RoomBack + 0.13f), new Vector3(1.00f, 0.05f, 0.05f));
+            // 短いカーテン。西の箪笥の脇へ寄せて開けてある。
+            // **東へ寄せない。** 窓の東の下は炬燵の奥の通り道で、記憶 15 の点がある
+            b.Gear.Box(new Vector3(3.95f, EstateTop + 2.00f, RoomBack + 0.13f), new Vector3(0.84f, 0.05f, 0.05f));
             for (var i = 0; i < 3; i++)
-                b.Soft.Box(new Vector3(4.20f + i * 0.13f, EstateTop + 1.40f, RoomBack + 0.11f + (i % 2) * 0.05f),
+                b.Soft.Box(new Vector3(3.62f + i * 0.13f, EstateTop + 1.40f, RoomBack + 0.11f + (i % 2) * 0.05f),
                     new Vector3(0.14f, 1.14f, 0.05f));
 
             // テレビと台

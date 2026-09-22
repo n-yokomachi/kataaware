@@ -813,7 +813,7 @@ namespace HalfAware.EditorTools
             // 夫が戸口から一直線に歩いてくる線（RoomWalk）から西へ外す
             S(3.95f, EstateTop, RoomEnd - 0.34f, 0.80f),               // エレナ「なあに」　硝子戸の側
             S(3.55f, EstateTop, -17.72f, 0.80f),                        // ジョルジョ「新聞、あったよ」　夫の座るところの脇
-            S(4.45f, EstateTop, -18.33f, 0.85f),                        // エレナ「そこ置いといて」　炬燵の奥
+            S(4.55f, EstateTop, -18.30f, 0.85f),                        // エレナ「そこ置いといて」　炬燵の奥
             S(5.62f, EstateTop, -17.45f, 0.90f),                        // ジョルジョ「隣の子、また走ってた」　テレビの前
             S(6.25f, EstateTop, -16.40f, 0.95f),                        // エレナ「元気ねえ」　台所の前
         };
