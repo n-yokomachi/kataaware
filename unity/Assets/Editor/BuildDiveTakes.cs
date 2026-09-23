@@ -348,42 +348,42 @@ namespace HalfAware.EditorTools
         // ---- 1. 女 34『ハンナ』 団地の廊下。30 秒 --------------------------------
 
         /// <summary>
-        /// 鍵を掛けたところで隣の老人に呼ばれ、駆け上がってきた娘に体操着を渡す。
-        /// 娘は背を向けて置く。設計書の「腕の中で顔は肩に埋まって見えない」に合わせたもの
+        /// A の戸に鍵を掛けたところで隣の老人に呼ばれ、階段から駆けてきた娘に体操着を渡す。
+        /// 老人は B の戸口、娘は階段の口。ハンナは二人のあいだの自分の戸の前に立つ
         /// </summary>
         static HostKey[] Hanna(Transform take)
         {
-            // **娘は廊下の壁の側へ寄せて止める。** 歩く線（EstateWalk）の上に立たせると、
-            // 東の点からも西の点からも真横に来て、どちらを向いても片方に背を向けることになる
-            var stood = new Vector3(StairEast - 0.45f, EstateTop, EstateWalk - 0.35f);
-            var kid = Cast(take, "Daughter", "W_Casual", stood, 0f, 0, 0.6f);
-            // 出てくるのは階段の口。折り返しになって、上がり切る一本が廊下の西へ寄ったので、
-            // 元の x 0.2 は手すりの中になった
-            // 娘が駆け上がってくるのは、老人とのやりとりが終わってから。
-            // 四行目（ハンナ「ええ、午後からで」）が出たら数え始める
-            Move(kid, new Vector3(StairWestMid, EstateTop, WalkFront - 0.10f), stood, 0f, 3.5f, true, true, 4);
-            // 老人も廊下の側（+z）を向く。130 度では自分の戸口の方を向いていて、
-            // 廊下から寄っていくハンナには背中しか見えなかった
+            // **娘は階段の口からデッキを東へ駆けて、ハンナの西の脇で止まる。**
+            // 上がり切る一本（西の一本）は南へ上がってデッキへ出るので、段の途中から
+            // A の戸の前まで一直線に結ぶと、二本のあいだの中壁を抜ける。
+            // 出てくるのは踊り場の上（階段の口）からにして、中壁の端から 0.4 m 南を通す。
+            // 始まりの一枚にも娘が入る（下の鍵打ちの先頭の向き）
+            var stood = new Vector3(4.30f, EstateTop, EstateWalk - 0.05f);
+            var kid = Cast(take, "Daughter", "W_Casual", stood, 80f, 0, 0.6f);
+            // 娘が駆けてくるのは、老人とのやりとりが終わってから。
+            // 四行目（ハンナ「ええ、午後からで」）が出たら数え始める。6 m を 3.5 秒で
+            Move(kid, new Vector3(StairWestMid, EstateTop, WalkFront - 0.35f), stood, 0f, 3.5f, true, true, 4);
+            // 老人は B の戸口の前で、西のハンナの方を向く。新聞を取りに出たところ
             Cast(take, "Neighbour", "M_Casual",
-                new Vector3(DoorB - 0.20f, EstateTop, EstateFace + 0.25f), 0f, 3, 0.95f);
-            // ハンナは出しなに鍵を掛けたところ。自分の戸は閉まっている
+                new Vector3(DoorB - 0.25f, EstateTop, EstateFace + 0.45f), 272f, 3, 0.95f);
+            // ハンナは出しなに鍵を掛けたところ。自分の戸は閉まっている。老人の戸は開いている
             Shut(take, "ShutA", DoorA);
             Ajar(take, "AjarB", DoorB);
             return new[]
             {
-                // **始まりは娘の方を向く。** 鍵を掛けた戸（178 度）を向いて始めていたが、
+                // **始まりは娘の方を向く。** 鍵を掛けた戸を向いて始めていたが、
                 // 目の前が自分の戸の板だけになって、誰の記憶に入ったのか読めなかった。
                 // 階段の口に立つ娘へ向けておけば、最初の一枚で母娘だと分かる。
-                // 老人の声は東から来るので、探して振り向くだけの間を字幕の側で持たせている
-                K(0f,  1.9f,  EstateTop, EstateWalk,         283f,  13f, 1.55f),  // 階段の口の娘を見ている
-                K(3f,  1.9f,  EstateTop, EstateWalk,         102f,   2f, 1.55f),  // 隣の戸口からの声
-                K(6f,  1.85f, EstateTop, EstateWalk + 0.05f, 102f,   4f, 1.55f),  // 老人が会釈する
-                K(10f, 1.8f,  EstateTop, EstateWalk + 0.05f, 275f,   8f, 1.55f),  // 娘が二段飛ばしで上がってくる
-                K(14f, 1.75f, EstateTop, EstateWalk + 0.05f, 275f,  38f, 1.55f),  // 体操着の袋を渡す
-                K(18f, 1.75f, EstateTop, EstateWalk + 0.05f, 275f,  24f, 1.55f),  // 抱き上げる
-                K(22f, 1.75f, EstateTop, EstateWalk + 0.05f, 275f,  40f, 1.55f),  // 降ろす。駆け下りていく
-                K(25f, 1.75f, EstateTop, EstateWalk + 0.05f, 108f,   4f, 1.55f),  // 老人はまだ新聞を広げている
-                K(30f, 0.6f,  EstateTop, EstateWalk + 0.30f,   6f,  12f, 1.55f),
+                // 老人の声は背の側（東）から来るので、探して振り向くだけの間を字幕の側で持たせている
+                K(0f,  5.05f, EstateTop, EstateWalk - 0.40f, 280f,   4f, 1.55f),  // 階段の口の娘を見ている
+                K(3f,  5.05f, EstateTop, EstateWalk - 0.40f,  93f,   2f, 1.55f),  // 隣の戸口からの声
+                K(6f,  5.30f, EstateTop, EstateWalk - 0.35f,  92f,   4f, 1.55f),  // 老人が会釈する
+                K(10f, 5.25f, EstateTop, EstateWalk - 0.30f, 275f,   6f, 1.55f),  // 娘がデッキを駆けてくる
+                K(14f, 5.20f, EstateTop, EstateWalk - 0.25f, 272f,  38f, 1.55f),  // 体操着の袋を渡す
+                K(18f, 5.20f, EstateTop, EstateWalk - 0.25f, 272f,  24f, 1.55f),  // 抱き上げる
+                K(22f, 5.20f, EstateTop, EstateWalk - 0.25f, 275f,  40f, 1.55f),  // 降ろす。駆け戻っていく
+                K(25f, 5.20f, EstateTop, EstateWalk - 0.25f,  92f,   4f, 1.55f),  // 老人はまだ新聞を広げている
+                K(30f, 3.00f, EstateTop, EstateWalk + 0.30f, 280f,   8f, 1.55f),  // 階段の方へ歩き出す
             };
         }
 
