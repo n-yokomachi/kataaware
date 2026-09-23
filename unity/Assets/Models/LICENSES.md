@@ -5,6 +5,7 @@
 | `kenney/` | Kenney Furniture Kit（https://kenney.nl/assets/furniture-kit） | Creative Commons CC0 1.0 |
 | `quaternius/` | Quaternius Ultimate Modular Women（https://quaternius.com/packs/ultimatemodularwomen.html） | 下の注記を参照 |
 | `quaternius/` | Quaternius Ultimate Modular Men（https://quaternius.com/packs/ultimatemodularcharacters.html） | 下の注記を参照 |
+| `rocketbox/` | Microsoft Rocketbox Avatar Library（https://github.com/microsoft/Microsoft-Rocketbox） | MIT。下の注記を参照 |
 | `generated/` | 自作。`Assets/Editor/ProcMesh.cs` で断面を張って作った物 | 本作の一部 |
 
 Kenney の素材は CC0 なので表示の義務は無いが、どこから来た物かを残すために記録する。
@@ -76,3 +77,48 @@ Beach・Farmer はこの街に合わないので入れていない。
 立ち姿はそのぶん腿を寄せて揃えている（`BuildAlley.Stride`）。
 **骨を identity へ戻してはいけない。** mesh はこの姿勢に合わせて皮を張ってあるので、
 大きくずらすと体が裂ける。
+
+## Microsoft Rocketbox について
+
+主人公と片割れの体と顔は、Microsoft Rocketbox Avatar Library の `Female_Adult_14`（一覧の番号で「女大 14」）から作った。
+
+- 出どころ: https://github.com/microsoft/Microsoft-Rocketbox の `Assets/Avatars/Adults/Female_Adult_14/`（2026-09-23 に落とした）
+- 許諾: MIT License（同じリポジトリの `LICENSE.md`）。配るものには下の著作権の表示と許諾の文を添える
+
+```
+MIT License
+
+Copyright (c) 2020 Microsoft
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+落とした元のファイルは `unity/RawAssets/rocketbox/Female_Adult_14/` に置き、リポジトリに入れていない（`Assets` の外で、`unity/.gitignore` で外してある）。
+
+| 元のファイル | リポジトリに入れた物 |
+|---|---|
+| `Female_Adult_14.fbx`（0.6 MB） | `rocketbox/Female_Adult_14/Female_Adult_14.fbx`。手を加えずに写した |
+| `f017_head_color.tga`（2048、顔・頭皮の髪・首と胸・口の中・目の玉） | `rocketbox/Female_Adult_14/f017_head_color.png`（512 に縮めた写し） |
+| `f017_body_color.tga`（2048、服・手・靴） | `rocketbox/Female_Adult_14/f017_body_color.png`（512 に縮めた写し） |
+| `f017_opacity_color.tga`（2048、髪の房とまつ毛の色と透け） | `rocketbox/Female_Adult_14/f017_opacity_color.png`（512 に縮めた写し） |
+
+- 縮めた写しは `Assets/Editor/Rocketbox/RocketboxTextures.cs`（メニューの HalfAware/Rocketbox/Shrink the textures）で、元の TGA から作り直せる。線形の光で 4×4 を平均し、透けのある絵は α で重みを付けた
+- `rocketbox/Female_Adult_14/Painted/` は、縮めた写しに組み立ての手順（`Assets/Editor/Rocketbox/RocketboxPaint.cs`）で手を入れた物。髪とカーディガンを黒に、虹彩を琥珀色に、目の下に黒子、顔に控えめな手入れ
+- 法線と光沢のテクスチャ、付いてくる動き（3ds Max の形式で Unity では読めない）は落としていない
+- 取り込みの設定は `Assets/Editor/Rocketbox/RocketboxImport.cs` が `Assets/Models/rocketbox/` の下にだけ掛ける。Rocketbox に同梱の `FixRocketboxMaxImport.cs` はプロジェクトの全部の取り込みに掛かり、Quaternius の模型を取り込むたびに例外を出すので入れていない
