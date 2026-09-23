@@ -43,6 +43,15 @@ namespace HalfAware.EditorTools.Rocketbox
         /// <summary>立ちの初めのこまで、上腕が真下から前へ出る角度（横から見て、度。負は後ろ）</summary>
         public const float ArmForward = -2f;
 
+        /// <summary>
+        /// 胸（Spine2 から上）を後ろへ起こす角度（度）。Quaternius の立ちは背中が丸まって胸が落ちているので、胸を起こして軽い反りにする
+        /// </summary>
+        public const float ChestLift = 6f;
+        /// <summary>立ちの初めのこまで、首の付け根を腰（腿の付け根の中点）の真上からどれだけ前に置くか（横から見て、m）</summary>
+        public const float NeckOverHips = 0f;
+        /// <summary>立ちの初めのこまでの顔の向き（度。正は下向き、0 で目の高さの前）</summary>
+        public const float HeadPitch = 0f;
+
         [MenuItem("HalfAware/Rocketbox/Retarget the idle and walk")]
         public static void Menu()
         {
@@ -61,6 +70,7 @@ namespace HalfAware.EditorTools.Rocketbox
             using (var job = new Job())
             {
                 sb.AppendLine(job.CalibrateArms(idle));
+                sb.AppendLine(job.CalibrateTrunk(idle));
                 foreach (var clip in new[] { idle, walk })
                 {
                     string note;
@@ -146,6 +156,100 @@ namespace HalfAware.EditorTools.Rocketbox
             readonly Dictionary<Transform, Vector3> srcRestPos = new Dictionary<Transform, Vector3>();
             /// <summary>腕の骨（上腕・前腕・手）に掛ける世界の回し。左右それぞれ</summary>
             readonly Dictionary<string, Quaternion> armFix = new Dictionary<string, Quaternion>();
+            /// <summary>背骨から頭の骨に掛ける世界の回し（横から見た起こし。子の骨ほど上の骨の分を足してある）</summary>
+            readonly Dictionary<string, Quaternion> trunkFix = new Dictionary<string, Quaternion>();
+            /// <summary>束ねた姿勢の頭の骨の世界の向き（顔の向きを測るため）</summary>
+            Quaternion headBind;
+
+            /// <summary>
+            /// 立ちの初めのこまの背骨を直す量を決める。Quaternius の立ちをそのまま写すと、上体が前に傾いて背中が丸まり、
+            /// それを補うように顔が上を向いていた。胸を <see cref="ChestLift"/> 度起こし、背骨の根（Spine）で上体を後ろへ回して
+            /// 首の付け根を腰の真上（<see cref="NeckOverHips"/>）へ、首と頭で顔を <see cref="HeadPitch"/> の向きへ戻す。
+            /// 同じ回しを歩きにも掛ける（歩きの中での前傾の変化は残る）
+            /// </summary>
+            public string CalibrateTrunk(AnimationClip idle)
+            {
+                trunkFix.Clear();
+                Pose(idle, 0f);
+                var before = Trunk();
+                float lean = 0f, head = 0f;
+                for (var it = 0; it < 4; it++)
+                {
+                    SetTrunk(lean, head);
+                    Pose(idle, 0f);
+                    var hips = Mid(D("Bip01 L Thigh"), D("Bip01 R Thigh"));
+                    var neck = D("Bip01 Neck").position;
+                    lean -= Mathf.Atan2(neck.z - hips.z - NeckOverHips, neck.y - hips.y) * Mathf.Rad2Deg;
+                    SetTrunk(lean, head);
+                    Pose(idle, 0f);
+                    head -= FacePitch() - HeadPitch;
+                }
+                SetTrunk(lean, head);
+                Pose(idle, 0f);
+                var after = Trunk();
+                ResetSource();
+                return string.Format(CultureInfo.InvariantCulture,
+                    "背骨の直し（立ちの初めのこま）: 胸を {0:0.0}° 起こし、上体を {1:0.0}° 後ろへ、顔を {2:0.0}° 回す。直す前 {3} → 直した後 {4}",
+                    ChestLift, -lean, head, before, after);
+            }
+
+            void SetTrunk(float lean, float head)
+            {
+                // 正の角は前へ倒す向き（模型は +z を向く）
+                Func<float, Quaternion> rx = deg => Quaternion.AngleAxis(deg, Vector3.right);
+                trunkFix["Spine"] = rx(lean);
+                trunkFix["Spine1"] = rx(lean);
+                trunkFix["Spine2"] = rx(lean - ChestLift);
+                trunkFix["Neck"] = rx(lean - ChestLift + head * 0.5f);
+                trunkFix["Head"] = rx(lean - ChestLift + head);
+            }
+
+            /// <summary>横から見た、腰から首の付け根への線の傾き（度、前が正）、背中の折れ、首の付け根と腰の前後のずれ（cm、前が正）、顔の向き（度、下が正）</summary>
+            string Trunk()
+            {
+                var hips = Mid(D("Bip01 L Thigh"), D("Bip01 R Thigh"));
+                var neck = D("Bip01 Neck").position;
+                var chest = D("Bip01 Spine2").position;
+                var tilt = Mathf.Atan2(neck.z - hips.z, neck.y - hips.y) * Mathf.Rad2Deg;
+                // 背中の折れ: 腰→胸と胸→首の付け根の向きの差（上が前へ折れるほど正 = 丸まり）
+                var lower = Mathf.Atan2(chest.z - hips.z, chest.y - hips.y) * Mathf.Rad2Deg;
+                var upper = Mathf.Atan2(neck.z - chest.z, neck.y - chest.y) * Mathf.Rad2Deg;
+                return string.Format(CultureInfo.InvariantCulture, "背骨の傾き {0:0.0}°・背中の折れ {1:0.0}°・首の付け根と腰の前後のずれ {2:0.0} cm・顔の向き {3:0.0}°",
+                    tilt, upper - lower, (neck.z - hips.z) * 100f, FacePitch());
+            }
+
+            /// <summary>顔の向き（度、下向きが正）。束ねた姿勢で顔は +z を向く</summary>
+            float FacePitch()
+            {
+                var f = D("Bip01 Head").rotation * Quaternion.Inverse(headBind) * Vector3.forward;
+                return Mathf.Atan2(-f.y, f.z) * Mathf.Rad2Deg;
+            }
+
+            /// <summary>元の動きの t 秒の姿を、Rocketbox の骨へ写す（腕と背骨の直しと、腰の位置合わせを含む）</summary>
+            void Pose(AnimationClip clip, float t)
+            {
+                ResetSource();
+                clip.SampleAnimation(src, t);
+                foreach (var j in joints)
+                {
+                    var r = j.Src.rotation * j.Offset;
+                    Quaternion c;
+                    if (trunkFix.TryGetValue(j.Name, out c)) r = c * r;
+                    if (armFix.TryGetValue(j.Name, out c)) r = c * r;
+                    j.Dst.rotation = r;
+                }
+                // 腰の前後左右: 腿の付け根の中点を、脚の長さの比で縮めた Quaternius の中点へ
+                var dstPelvis = D("Bip01 Pelvis");
+                var srcMid = Mid(S("UpperLeg.L"), S("UpperLeg.R")) - src.transform.position;
+                var want = dst.transform.position + srcMid * legScale;
+                var move = want - Mid(D("Bip01 L Thigh"), D("Bip01 R Thigh"));
+                move.y = 0f;
+                dstPelvis.position += move;
+                // 高さ: 低い方の足が床から浮く量を揃える（着いている足は床に着いたまま）
+                var srcLift = Mathf.Min(S("Foot.L").position.y, S("Foot.R").position.y) - src.transform.position.y - srcFootRest;
+                var dstAnkle = Mathf.Min(D("Bip01 L Foot").position.y, D("Bip01 R Foot").position.y) - dst.transform.position.y;
+                dstPelvis.position += Vector3.up * (dstAnkleRest + srcLift * legScale - dstAnkle);
+            }
 
             /// <summary>
             /// Quaternius の立ちの初めのこまの上腕の向きを測り、<see cref="ArmOpen"/>・<see cref="ArmForward"/> へ回す量を決める
@@ -186,6 +290,7 @@ namespace HalfAware.EditorTools.Rocketbox
                         srcRestPos[t] = t.localPosition;
                     }
                     avatar = dst.GetComponent<Animator>().avatar;
+                    headBind = D("Bip01 Head").rotation;
                     if (avatar == null || !avatar.isValid || !avatar.isHuman) throw new InvalidOperationException("Rocketbox の Avatar が Humanoid でない");
                     Map();
                     var srcLeg = Vector3.Distance(S("UpperLeg.L").position, S("LowerLeg.L").position) + Vector3.Distance(S("LowerLeg.L").position, S("LowerLeg.L_end").position);
@@ -319,36 +424,13 @@ namespace HalfAware.EditorTools.Rocketbox
                 var muscles = new List<float[]>();
                 var bodyP = new List<Vector3>();
                 var bodyQ = new List<Quaternion>();
-                var dstPelvis = D("Bip01 Pelvis");
-                var dstL = D("Bip01 L Thigh");
-                var dstR = D("Bip01 R Thigh");
-                var srcL = S("UpperLeg.L");
-                var srcR = S("UpperLeg.R");
                 var lowFoot = float.MaxValue;
                 try
                 {
                     for (var f = 0; f < frames; f++)
                     {
                         var t = Mathf.Min(clip.length, f / fps);
-                        ResetSource();
-                        clip.SampleAnimation(src, t);
-                        foreach (var j in joints)
-                        {
-                            var r = j.Src.rotation * j.Offset;
-                            Quaternion c;
-                            if (armFix.TryGetValue(j.Name, out c)) r = c * r;
-                            j.Dst.rotation = r;
-                        }
-                        // 腰の前後左右: 腿の付け根の中点を、脚の長さの比で縮めた Quaternius の中点へ
-                        var srcMid = Mid(srcL, srcR) - src.transform.position;
-                        var want = dst.transform.position + srcMid * legScale;
-                        var move = want - Mid(dstL, dstR);
-                        move.y = 0f;
-                        dstPelvis.position += move;
-                        // 高さ: 低い方の足が床から浮く量を揃える（着いている足は床に着いたまま）
-                        var srcLift = Mathf.Min(S("Foot.L").position.y, S("Foot.R").position.y) - src.transform.position.y - srcFootRest;
-                        var dstAnkle = Mathf.Min(D("Bip01 L Foot").position.y, D("Bip01 R Foot").position.y) - dst.transform.position.y;
-                        dstPelvis.position += Vector3.up * (dstAnkleRest + srcLift * legScale - dstAnkle);
+                        Pose(clip, t);
                         lowFoot = Mathf.Min(lowFoot, Mathf.Min(D("Bip01 L Toe0").position.y, D("Bip01 R Toe0").position.y) - dst.transform.position.y);
                         handler.GetHumanPose(ref pose);
                         muscles.Add((float[])pose.muscles.Clone());
