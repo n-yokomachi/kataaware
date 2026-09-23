@@ -213,7 +213,7 @@ namespace HalfAware.EditorTools.Rocketbox
             /// - 頭: 眉間から下唇への線が <see cref="FaceTilt"/> 度になるよう前へ倒す（束ねた姿勢は 8.8° で顎が上がって見えた）
             /// - 腕: 上腕は体の横に <see cref="StandArmOpen"/> 度開いてまっすぐ下ろし、肘は <see cref="StandElbow"/> 度、
             ///   前腕をひねって手のひらを太ももの側へ（人差し指の付け根が小指の付け根より前、<see cref="StandPalmTurn"/> 度だけ後ろ寄り）、手首はまっすぐ。指は軽く曲げる
-            /// 元の立ちからは、初めのこまからの胴・首・頭・腕の揺れ（呼吸と重心の動き）だけを <see cref="StandSway"/> の割合で足す
+            /// 元の立ちからは、初めのこまからの胴・首・頭・腕の揺れ（呼吸と重心の動き）だけを <see cref="StandSway"/> の割合で重ねる
             /// </summary>
             public string CalibrateStand(AnimationClip idle)
             {
@@ -226,7 +226,7 @@ namespace HalfAware.EditorTools.Rocketbox
                 idle.SampleAnimation(src, 0f);
                 foreach (var j in joints) srcIdle0[j.Src] = j.Src.rotation;
                 standClip = idle;
-                // 胴と首: Rocketbox の束ねた姿勢（まっすぐ立った背骨）のまま。元の立ちからは揺れだけを足す
+                // 胴と首: Rocketbox の束ねた姿勢（まっすぐ立った背骨）のまま。元の立ちからは揺れだけを重ねる
                 foreach (var name in new[] { "Pelvis", "Spine", "Spine1", "Spine2", "Neck" }) standPose[name] = dstBind[JointDst(name)];
                 // 脚: 腿の付け根から足首へまっすぐ（膝は StandKnee だけ前へ）。足は床に平ら（束ねた姿勢の向き）
                 foreach (var side in new[] { "L", "R" })
