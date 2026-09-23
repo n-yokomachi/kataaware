@@ -189,6 +189,79 @@ namespace HalfAware.EditorTools.Study
             return string.Format("段 3: 目の玉 三角 {0}（二つで）絵 {1}×{1} / {2}", tris, size, r);
         }
 
+        /// <summary>
+        /// ほくろの大きさを変えて撮り比べる（段 2 の面と絵で、柔らかい光、正面と左 30 度、三つの近さ）。
+        /// 絵はその場で作ってアセットにしない。tag は <c>sweep_r{半径 mm}</c>
+        /// </summary>
+        public static string MoleSweep(float[] radiiMm)
+        {
+            var sb = new System.Text.StringBuilder();
+            var skin = SkinMaterial();
+            var smooth = skin.GetFloat("_Smoothness");
+            var made = new List<Object>();
+            try
+            {
+                using (var rig = new FaceStudy.Rig(FaceStudy.Lighting.Soft))
+                {
+                    foreach (var mm in radiiMm)
+                    {
+                        var l = FacePaint.Layout.Stage2();
+                        l.moleR = mm * 0.001f;
+                        Func<Color32[], bool, Texture2D> tex = (px, lin) =>
+                        {
+                            var t = new Texture2D(512, 512, TextureFormat.RGBA32, true, false);
+                            t.hideFlags = HideFlags.HideAndDontSave;
+                            t.wrapMode = TextureWrapMode.Clamp;
+                            t.filterMode = FilterMode.Bilinear;
+                            t.SetPixels32(px);
+                            t.Apply(true);
+                            made.Add(t);
+                            return t;
+                        };
+                        var with = FacePaint.Face(512, FaceMesh.Area2, l, false, true);
+                        var bare = FacePaint.Face(512, FaceMesh.Area2, l, false, false);
+                        Func<Texture2D, Material> mat = t =>
+                        {
+                            var m = new Material(skin);
+                            m.hideFlags = HideFlags.HideAndDontSave;
+                            m.SetColor("_BaseColor", Color.white);
+                            m.SetTexture("_BaseMap", t);
+                            FacePaint.MakeOpaque(m, false, smooth);
+                            made.Add(m);
+                            return m;
+                        };
+                        var withMat = mat(tex(with.Pixels(), false));
+                        var bareMat = mat(tex(bare.Pixels(), false));
+                        var mask = tex(with.MaskPixels(), false);
+                        var tag = string.Format(System.Globalization.CultureInfo.InvariantCulture, "sweep_r{0:0.0}", mm);
+                        using (var who = Build(2, false))
+                        {
+                            var face = who.MaskSlots[0].renderer;
+                            face.sharedMaterial = withMat;
+                            who.MaskSlots.Clear();
+                            who.MaskSlots.Add(new MaskSlot(face, 0, mask));
+                            who.MoleOff.Clear();
+                            who.MoleOff.Add(new KeyValuePair<MaskSlot, Material>(new MaskSlot(face, 0, null), bareMat));
+                            rig.Light(who);
+                            foreach (var d in FaceStudy.Distances)
+                                foreach (var yaw in new[] { -30f, 0f })
+                                {
+                                    var name = string.Format(System.Globalization.CultureInfo.InvariantCulture, "sweep/{0}_{1:0.0}m_{2}", tag, d, FaceStudy.YawName(yaw));
+                                    var m = FaceStudy.ShootOne(rig, who, d, yaw, name, null);
+                                    FaceStudy.Record(tag, "Soft", d, yaw, m);
+                                    sb.AppendLine(name + " " + m.Short());
+                                }
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                foreach (var o in made) if (o != null) Object.DestroyImmediate(o);
+            }
+            return sb.ToString();
+        }
+
         /// <summary>頭の Skin マテリアル（素体の FBX の中）</summary>
         public static Material SkinMaterial()
         {

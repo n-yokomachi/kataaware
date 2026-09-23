@@ -457,7 +457,7 @@ namespace HalfAware.EditorTools.Study
             }
         }
 
-        static Measure ShootOne(Rig rig, FaceSubject who, float d, float yaw, string name, GameObject glass)
+        public static Measure ShootOne(Rig rig, FaceSubject who, float d, float yaw, string name, GameObject glass)
         {
             var c = who.FaceCentre;
             var eye = c + Quaternion.AngleAxis(yaw, Vector3.up) * who.Forward * d;
@@ -703,7 +703,7 @@ namespace HalfAware.EditorTools.Study
 
         const string CsvHead = "tag,light,distance,yaw,face_px,ipd_px,mole_px,mole_subpixel,mole_luma,ring_luma,delta_luma,iris_px,amber_px,iris_h,iris_s,iris_v,mole_change_px,mole_change_max,eye_centre_h,eye_centre_s,eye_centre_v";
 
-        static void Record(string tag, string light, float d, float yaw, Measure m)
+        public static void Record(string tag, string light, float d, float yaw, Measure m)
         {
             Directory.CreateDirectory(OutDir);
             var path = Path.Combine(OutDir, "measure.csv");
