@@ -95,6 +95,7 @@ namespace HalfAware.EditorTools.Rocketbox
             Dress(her, skin, twin && mode == TwinMode.MoleOnly);
             Shape(her, skin.JawScale, skin.JawClose);
             if (skin.Look != null) ShapeFace(her, skin.Look);
+            if (skin.Look != null && (skin.Look.noseFlatten > 0f || skin.Look.noseNarrow > 0f)) ShapeNose(her, skin);
             AddAnimator(her);
             return her;
         }
@@ -157,6 +158,96 @@ namespace HalfAware.EditorTools.Rocketbox
                 else s.z *= 1f - k.chinShort;
                 jaw.localScale = s;
             }
+        }
+
+        /// <summary>
+        /// 鼻を低く・細くする（<see cref="RocketboxPaint.Look"/> の noseFlatten・noseNarrow）。頭の面の頂点を動かすので、メッシュを写してから直す
+        /// （写しは skin.Made に入れる。どちらも 0 なら写さない）。束ねた姿勢のまま、模型の根の向きで測る。
+        /// - 高さ: 鼻筋から鼻の下まで、頬の内側（真ん中から 2.4〜3 cm）の面から前へ出た分を noseFlatten の割合だけ後ろへ
+        /// - 小鼻: 鼻の骨の高さから 2 cm 下まで、真ん中へ noseNarrow の割合だけ寄せる
+        /// 動かした頂点の法線は、となりの三角から付け直す
+        /// </summary>
+        static void ShapeNose(GameObject her, Skin skin)
+        {
+            var k = skin.Look;
+            var smr = her.GetComponentInChildren<SkinnedMeshRenderer>();
+            var ms = smr.sharedMaterials;
+            var headSlot = -1;
+            for (var i = 0; i < ms.Length; i++) if (ms[i] != null && (ms[i] == skin.Head || ms[i] == skin.HeadTwin)) headSlot = i;
+            if (headSlot < 0) return;
+            var a = Maps.Get(skin.Person, 512).Anchors;
+            var mesh = Keep(skin, Object.Instantiate(smr.sharedMesh));
+            mesh.name = smr.sharedMesh.name + "_nose";
+            var v = mesh.vertices;
+            var nrm = mesh.normals;
+            var tris = mesh.GetTriangles(headSlot);
+            var root = her.transform;
+            Func<Vector3, Vector3> toRoot = q => root.InverseTransformPoint(smr.transform.TransformPoint(q));
+            Func<Vector3, Vector3> fromRoot = q => smr.transform.InverseTransformPoint(root.TransformPoint(q));
+            var headVerts = new HashSet<int>(tris);
+            var rp = new Dictionary<int, Vector3>();
+            foreach (var i in headVerts) rp[i] = toRoot(v[i]);
+            var eyeY = (a.eyeL.y + a.eyeR.y) * 0.5f;
+            // 頬の内側の面の奥行き（2 mm ごと）
+            float y0 = a.nose.y - 0.030f, step = 0.002f;
+            var bins = Mathf.CeilToInt((eyeY + 0.012f - y0) / step) + 1;
+            var zs = new float[bins];
+            var zn = new int[bins];
+            foreach (var kv in rp)
+            {
+                var p = kv.Value;
+                var ax = Mathf.Abs(p.x);
+                if (ax < 0.024f || ax > 0.030f || p.z < a.nose.z - 0.050f) continue;
+                var b = Mathf.RoundToInt((p.y - y0) / step);
+                for (var d = -1; d <= 1; d++)
+                    if (b + d >= 0 && b + d < bins) { zs[b + d] += p.z; zn[b + d]++; }
+            }
+            var moved = new HashSet<int>();
+            foreach (var kv in rp)
+            {
+                var p = kv.Value;
+                var ax = Mathf.Abs(p.x);
+                if (ax > 0.030f || p.z < a.nose.z - 0.045f) continue;
+                var q = p;
+                var w = RocketboxPaint.Smooth(0.030f, 0.012f, ax) * RocketboxPaint.Smooth(eyeY + 0.006f, eyeY - 0.006f, p.y) * RocketboxPaint.Smooth(a.nose.y - 0.020f, a.nose.y - 0.012f, p.y);
+                var b = Mathf.Clamp(Mathf.RoundToInt((p.y - y0) / step), 0, bins - 1);
+                if (w > 0f && k.noseFlatten > 0f && zn[b] > 0)
+                {
+                    var h = Mathf.Max(0f, p.z - zs[b] / zn[b]);
+                    q.z -= h * Mathf.Clamp01(k.noseFlatten) * w;
+                }
+                var wa = RocketboxPaint.Smooth(a.nose.y + 0.010f, a.nose.y, p.y) * RocketboxPaint.Smooth(a.nose.y - 0.020f, a.nose.y - 0.012f, p.y) * RocketboxPaint.Smooth(0.030f, 0.018f, ax);
+                if (wa > 0f && k.noseNarrow > 0f) q.x *= 1f - Mathf.Clamp01(k.noseNarrow) * wa;
+                if ((q - p).sqrMagnitude < 1e-12f) continue;
+                v[kv.Key] = fromRoot(q);
+                moved.Add(kv.Key);
+            }
+            if (moved.Count == 0) return;
+            var acc = new Dictionary<int, Vector3>();
+            for (var t = 0; t < tris.Length; t += 3)
+            {
+                int i0 = tris[t], i1 = tris[t + 1], i2 = tris[t + 2];
+                if (!moved.Contains(i0) && !moved.Contains(i1) && !moved.Contains(i2)) continue;
+                var fn = Vector3.Cross(v[i1] - v[i0], v[i2] - v[i0]);
+                foreach (var i in new[] { i0, i1, i2 })
+                {
+                    if (!moved.Contains(i)) continue;
+                    Vector3 s;
+                    acc.TryGetValue(i, out s);
+                    acc[i] = s + fn;
+                }
+            }
+            foreach (var kv in acc)
+            {
+                var n = kv.Value.normalized;
+                // 元の法線と逆を向いたら（三角の向きが逆の面）、裏返す
+                if (Vector3.Dot(n, nrm[kv.Key]) < 0f) n = -n;
+                nrm[kv.Key] = n;
+            }
+            mesh.vertices = v;
+            mesh.normals = nrm;
+            mesh.RecalculateBounds();
+            smr.sharedMesh = mesh;
         }
 
         static void Dress(GameObject her, Skin skin, bool twinHead)

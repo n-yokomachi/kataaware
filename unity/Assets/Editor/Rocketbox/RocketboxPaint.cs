@@ -133,6 +133,22 @@ namespace HalfAware.EditorTools.Rocketbox
             public float lidOpen;
             [Tooltip("鼻の骨の倍率（1 で元のまま）")]
             public float noseScale = 1f;
+
+            [Header("鼻を目立たなくする（0 で何もしない。Nose(1) が中、Nose(2) が強）")]
+            [Tooltip("鼻のまわりの陰影（鼻筋の明るさ・小鼻の横の影・鼻の穴の暗さ）を、まわり 1 cm の肌の明るさへ寄せる割合（顔のテクスチャ）")]
+            public float noseShade;
+            [Tooltip("鼻の高さ（頬の内側の面からの出っ張り）を縮める割合（頭の面の頂点を動かす）")]
+            public float noseFlatten;
+            [Tooltip("小鼻の幅を縮める割合（頭の面の頂点を動かす）")]
+            public float noseNarrow;
+
+            /// <summary>鼻を目立たなくする強さの段（0 で何もしない、1 が中、2 が強）。陰影・高さ・小鼻の幅の三つをまとめて入れる</summary>
+            public void Nose(int level)
+            {
+                noseShade = level >= 2 ? 0.75f : level == 1 ? 0.45f : 0f;
+                noseFlatten = level >= 2 ? 0.45f : level == 1 ? 0.25f : 0f;
+                noseNarrow = level >= 2 ? 0.15f : level == 1 ? 0.08f : 0f;
+            }
             [Tooltip("顎を縦に縮める割合（顎から下を短く。0.06 で 6 %）")]
             public float chinShort;
 
@@ -378,6 +394,25 @@ namespace HalfAware.EditorTools.Rocketbox
                     var cb = Mathf.Lerp(Cb[i], Cbb[i], wc);
                     var cr = Mathf.Lerp(Cr[i], Crb[i], wc);
                     px[i] = FromYCC(y, cb, cr, px[i].a);
+                }
+            }
+
+            // 1b. 鼻のまわりの陰影を、まわり 1 cm の肌の明るさへ寄せる（色は残し、明るさだけ）
+            if (k.noseShade > 0f)
+            {
+                var L = new float[n * n];
+                for (var i = 0; i < px.Length; i++) L[i] = Lum(px[i]);
+                var Lb = Blur(L, s.On, n, Mathf.Max(3, Mathf.RoundToInt(12 * scale)));
+                for (var i = 0; i < px.Length; i++)
+                {
+                    if (!s.On[i] || hair[i] > 0.1f) continue;
+                    var p = s.P[i];
+                    if (InEyeWide(p, a.eyeL) || InEyeWide(p, a.eyeR)) continue;
+                    var w = NoseZone(p, a);
+                    if (w <= 0f) continue;
+                    var g = Mathf.Clamp(Mathf.Lerp(1f, Lb[i] / Mathf.Max(0.02f, L[i]), Mathf.Clamp01(k.noseShade) * w), 0.6f, 1.8f);
+                    var c = px[i];
+                    px[i] = new Color(Mathf.Clamp01(c.r * g), Mathf.Clamp01(c.g * g), Mathf.Clamp01(c.b * g), c.a);
                 }
             }
 
@@ -650,6 +685,19 @@ namespace HalfAware.EditorTools.Rocketbox
         {
             var half = Mathf.Abs(a.mouthL.x - a.mouthR.x) * 0.5f + 0.008f;
             return Mathf.Abs(p.x) < half && p.y > a.lowerLip.y - 0.012f && p.y < a.upperLip.y + 0.008f && p.z > a.mouthL.z - 0.040f;
+        }
+
+        /// <summary>
+        /// 鼻の陰影を寄せる所の重み（0〜1）。鼻筋（目の高さ）から鼻の下（鼻の骨の 1.2〜2 cm 下）まで、真ん中から 1.4 cm は全部、2.6 cm で 0。
+        /// 顔の前だけ（鼻の骨の 3.5〜5 cm 奥より前）
+        /// </summary>
+        public static float NoseZone(Vector3 p, Anchors a)
+        {
+            var eyeY = (a.eyeL.y + a.eyeR.y) * 0.5f;
+            var across = Smooth(0.026f, 0.014f, Mathf.Abs(p.x));
+            var along = Smooth(eyeY + 0.004f, eyeY - 0.008f, p.y) * Smooth(a.nose.y - 0.020f, a.nose.y - 0.012f, p.y);
+            var front = Smooth(a.nose.z - 0.050f, a.nose.z - 0.035f, p.z);
+            return across * along * front;
         }
 
         static bool InNose(Vector3 p, Anchors a)
