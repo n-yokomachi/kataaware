@@ -345,7 +345,9 @@ namespace HalfAware.EditorTools
             FlatPart(wall, unit, StairLine - HallSkin, StairLine + HallSkin,
                 InnerFoot + InnerGo * low, LoungeWall - HallSkin, f3, WalkRoof);
 
-            // 勾配なりの板。段鼻を結んだ線から 0.5〜1.0 m 上。箱の頭の段々はこの中に隠れる
+            // 勾配なりの板。段鼻を結んだ線から 0.5〜1.0 m 上。箱の頭の段々はこの中に隠れる。
+            // **厚みは仕切りより 3 mm ずつ厚いだけにする。** 板にも当たりがあるので、1 cm ずつ出していた頃は
+            // その分だけ階段と廊下が狭まり、体の中心が動ける幅が 0.30 m ちょうどまで削れていた
             var pitch = InnerRise / InnerGo;
             var d0 = InnerFoot + InnerGo * NewelSteps;
             var d1 = InnerFoot + InnerGo * low;
@@ -356,7 +358,7 @@ namespace HalfAware.EditorTools
             var len = dir.magnitude;
             var rot = Quaternion.LookRotation(dir.normalized, Vector3.up);
             var cos = (d1 - d0) / len;
-            wall.Box(mid, new Vector3(HallSkin * 2f + 0.02f, 0.5f * cos, len), rot);
+            wall.Box(mid, new Vector3(HallSkin * 2f + 0.006f, 0.5f * cos, len), rot);
             // 笠木。木の手すり
             var cap = rot * new Vector3(0f, 0.25f * cos + 0.025f, 0f);
             b.Set.Box(mid + cap, new Vector3(0.14f, 0.05f, len + 0.04f), rot);
