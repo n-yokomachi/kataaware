@@ -41,7 +41,7 @@ namespace HalfAware.EditorTools.Rocketbox
         }
 
         /// <summary>胸元を体の人の頭の面で作るとき（<see cref="RocketboxPerson.ChestFromBody"/>）の継ぎ目の高さ（頭の骨から下へ、m）と、重ねる帯の幅（m）</summary>
-        const float ChestCut = 0.085f, ChestOverlap = 0.015f;
+        internal const float ChestCut = 0.085f, ChestOverlap = 0.015f;
         /// <summary>
         /// 顔の人の絵の前髪を額の肌にする三角の、髪の人の殻の不透明さの上限（三角の真ん中で測る）。
         /// 絵を肌にするのは 0.5 より透ける画素だけなので、0.5〜この値の三角は殻の不透明な縁の下に入り、肌と髪の境は三角の辺でなく殻の縁になる

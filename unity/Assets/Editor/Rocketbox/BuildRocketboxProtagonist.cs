@@ -18,7 +18,7 @@ namespace HalfAware.EditorTools.Rocketbox
     public static class BuildRocketboxProtagonist
     {
         /// <summary>主人公にする人。オーナーが見比べて、女大 14 の顔と体に女大 08 の髪を載せた人に決めた</summary>
-        public static readonly RocketboxPerson Chosen = RocketboxPerson.Face14Hair08;
+        public static readonly RocketboxPerson Chosen = RocketboxPerson.Face14Hair14BodySports02;
 
         /// <summary>立ちと歩きの状態機械（今の Protagonist.controller の写しに、Humanoid へ移し替えた動きを差した物。<see cref="RocketboxRetarget"/> が作る）</summary>
         public const string Controller = "Assets/Animation/Humanoid/ProtagonistHumanoid.controller";
@@ -178,7 +178,10 @@ namespace HalfAware.EditorTools.Rocketbox
             for (var i = 0; i < ms.Length; i++) if (ms[i] != null && (ms[i] == skin.Head || ms[i] == skin.HeadTwin)) headSlot = i;
             if (headSlot < 0) return;
             var a = Maps.Get(skin.Person, 512).Anchors;
-            var mesh = Keep(skin, Object.Instantiate(smr.sharedMesh));
+            // 描いた組（アセット）で組み立てるとき（場面に置く主人公）は、直したメッシュもアセットにする（場面を保存しても消えないように）
+            var persist = skin.Head != null && AssetDatabase.Contains(skin.Head);
+            var mesh = Object.Instantiate(smr.sharedMesh);
+            if (!persist) Keep(skin, mesh);
             mesh.name = smr.sharedMesh.name + "_nose";
             var v = mesh.vertices;
             var nrm = mesh.normals;
@@ -265,6 +268,13 @@ namespace HalfAware.EditorTools.Rocketbox
             mesh.vertices = v;
             mesh.normals = nrm;
             mesh.RecalculateBounds();
+            if (persist)
+            {
+                var path = skin.Person.Dir + skin.Person.Name + "_nose_mesh.asset";
+                RocketboxCompose.Save(mesh, path);
+                Object.DestroyImmediate(mesh);
+                mesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            }
             smr.sharedMesh = mesh;
         }
 
@@ -280,7 +290,7 @@ namespace HalfAware.EditorTools.Rocketbox
                     // 組み合わせたメッシュはマテリアルの名前を持たない。面の組の順が体・頭・髪
                     ms = skin.Person.IsHairSwap
                         ? HairSwapSlots(skin, body, head)
-                        : new[] { body, head, skin.Hair };
+                        : (skin.Chest != null ? new[] { body, head, skin.Hair, skin.Chest } : new[] { body, head, skin.Hair });
                 }
                 else
                 {
@@ -536,7 +546,11 @@ namespace HalfAware.EditorTools.Rocketbox
             var px = ToColors(RocketboxTextures.ReadPng(who.ChestSrc, out n, out n));
             var k = look.Clone();
             k.matchSkinAll = true;
-            return MatchBodyPersonSkin(px, Maps.Get(who.BodyFrom, 512).Head, who, head, k, out note);
+            var chestMaps = Maps.Get(who.BodyFrom, 512);
+            px = MatchBodyPersonSkin(px, chestMaps.Head, who, head, k, out note);
+            // ネックレスは頭の面と同じ位置に描く（二人の骨と束ねた姿勢は同じなので、頭の人の顔の骨の位置で決めてよい）
+            RocketboxPaint.Necklace(px, chestMaps.Head, Maps.Get(who, 512).Anchors, look);
+            return px;
         }
 
         /// <summary>

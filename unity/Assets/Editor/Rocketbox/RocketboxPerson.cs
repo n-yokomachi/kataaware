@@ -124,6 +124,11 @@ namespace HalfAware.EditorTools.Rocketbox
             k.hairLowest = 0.17f;
             // 元の模型は口が少し開いていて、斜めから歯が見える。2.5 度で唇が軽く合う（4 度で下唇が潰れ、6 度で上唇を突き抜けた）
             k.jawClose = 2.5f;
+            // 鼻を目立たなくする: 中（陰影・高さ・小鼻）に、小さな暗い所を寄せる・鼻のまわりだけぼかすを重ねる
+            // （320×180 では鼻の穴や小鼻の脇の暗い画素が一つ拾われるだけで点に見えた）
+            k.Nose(1);
+            k.noseDark = 0.7f;
+            k.noseBlur = 2f;
         });
 
         /// <summary>
@@ -290,6 +295,25 @@ namespace HalfAware.EditorTools.Rocketbox
             Dress(Compose("Face14_Hair14", "女大 14 の顔と髪（主人公の候補、服は今の主人公）", Adult14, Adult14), OutfitProtagonist);
 
         /// <summary>
+        /// 主人公: 女大 14 の頭（14 の顔と 14 の髪、黒）を、スポーツ 02 の体（灰のタンクトップ、紺のカーゴパンツ、白いスニーカー、腕時計）に載せた人。
+        /// 服は元の色のまま（白い丸首のシャツは塗らない）。首の付け根より下の胸元はスポーツ 02 の頭の面で作り、肌は一つの比で揃える。
+        /// 胸元にネックレス（細い銀の鎖と小さな飾り）を描く
+        /// </summary>
+        public static readonly RocketboxPerson Face14Hair14BodySports02 =
+            BodyChest(Dress(Compose("Face14_Hair14_BodySports02", "女大 14 の顔と髪をスポーツ 02 の体に（主人公）", Adult14, Sports02), OutfitProtagonistSports02));
+
+        /// <summary>主人公（スポーツ 02 の体）の服: 元の色のまま。腕の肌を頭の肌に揃え、首の付け根の上の 14 のネックレスの鎖は消し、胸元に描き直す</summary>
+        static void OutfitProtagonistSports02(RocketboxPaint.Look k)
+        {
+            OutfitSports02(k);
+            k.necklace = true;
+        }
+
+        /// <summary>主人公の片割れ（仮）: 主人公と同じ女大 14 の顔と髪と体。髪は 14 の元の茶色（塗らない）。模型ごと裏返して組み立てる。体は F3 で 02 にする</summary>
+        public static readonly RocketboxPerson Face14Hair14Twin =
+            Twin(Face14Hair14BodySports02, Dress(Compose("Face14_Hair14_Twin", "女大 14 の顔と髪と体（片割れ）", Adult14, Adult14), OutfitProtagonist));
+
+        /// <summary>
         /// 主人公の候補: スポーツ 02 の顔に女大 14 の髪（頭の面の髪の所と前髪の塊、髪の房）をかつらとして合わせた人。体は女大 14（今の主人公の服）。
         /// スポーツ 02 の結んだ髪は除く。スポーツ 02 の絵の生え際は 14 の髪より低く、前髪の下に一色で塗った頭皮が帯に見えたので、
         /// 14 の殻が透ける所の頭皮は額の肌にする（<see cref="BareForehead"/>。スポーツ 02 の額は盛り上がっていないので、ここでは折れ目が出ない）
@@ -343,7 +367,7 @@ namespace HalfAware.EditorTools.Rocketbox
 
         /// <summary>手を入れて撮り比べる人の全部</summary>
         public static readonly RocketboxPerson[] All = { Adult14, Adult08, Head08Body14, Face14Hair08, Face14Hair08Body03, Face14Hair08Body02, Face14Hair08Body11, Face14Hair08Body11Legs22,
-            Face14Hair08BodySports02, FaceSports02Hair08, FaceSports02Hair08Body14, Face14Hair14, FaceSports02Hair14 };
+            Face14Hair08BodySports02, FaceSports02Hair08, FaceSports02Hair08Body14, Face14Hair14, Face14Hair14BodySports02, Face14Hair14Twin, FaceSports02Hair14 };
 
         /// <summary>取り込んだ一人（元の FBX とテクスチャを持つ人）</summary>
         public static readonly RocketboxPerson[] Sources = { Adult14, Adult08, Adult03, Adult02, Adult11, Party02, Sports02 };

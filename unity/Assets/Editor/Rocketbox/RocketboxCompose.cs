@@ -158,7 +158,42 @@ namespace HalfAware.EditorTools.Rocketbox
             // 頭の人の頂点は、直した世界の位置を体の人のメッシュの中へ戻す（二つの SkinnedMeshRenderer は同じ置き方）
             var headLocal = new Vector3[hv.Length];
             for (var i = 0; i < hv.Length; i++) headLocal[i] = worldToBody.MultiplyPoint3x4(moved[i]);
-            var headTris = Pack(hm.GetTriangles(headSub), i => headLocal[i], i => worldToBody.MultiplyVector(headToWorld.MultiplyVector(hNorm[i])).normalized, i => huv[i], hwOf, verts, norms, uvs, weights);
+            // 胸元を体の人の頭の面で作るとき（RocketboxPerson.ChestFromBody）は、頭の人の頭の面のうち首の付け根より下を除く
+            var chestCut = a.head.y - RocketboxHairSwap.ChestCut;
+            var headAllTris = hm.GetTriangles(headSub);
+            if (who.ChestFromBody)
+            {
+                var keepTris = new List<int>();
+                for (var t = 0; t < headAllTris.Length; t += 3)
+                {
+                    if ((moved[headAllTris[t]].y + moved[headAllTris[t + 1]].y + moved[headAllTris[t + 2]].y) / 3f < chestCut) continue;
+                    keepTris.Add(headAllTris[t]);
+                    keepTris.Add(headAllTris[t + 1]);
+                    keepTris.Add(headAllTris[t + 2]);
+                }
+                headAllTris = keepTris.ToArray();
+            }
+            var headTris = Pack(headAllTris, i => headLocal[i], i => worldToBody.MultiplyVector(headToWorld.MultiplyVector(hNorm[i])).normalized, i => huv[i], hwOf, verts, norms, uvs, weights);
+
+            // 胸元（ChestFromBody）: 体の人の頭の面のうち、首の付け根から 1.5 cm 上より下の三角を体の人の UV のまま使う。重なる帯は 1 mm 内側へ
+            int[] chestTris = null;
+            if (who.ChestFromBody)
+            {
+                var bodyHead = bm.GetTriangles(bodySkinSub);
+                var list = new List<int>();
+                for (var t = 0; t < bodyHead.Length; t += 3)
+                {
+                    var cp = (bw[bodyHead[t]] + bw[bodyHead[t + 1]] + bw[bodyHead[t + 2]]) / 3f;
+                    if (cp.y > chestCut + RocketboxHairSwap.ChestOverlap) continue;
+                    var cu = (bUv[bodyHead[t]] + bUv[bodyHead[t + 1]] + bUv[bodyHead[t + 2]]) / 3f;
+                    if (who.BodyFrom.DropFromHead != null && who.BodyFrom.DropFromHead(cu, cp)) continue;
+                    list.Add(bodyHead[t]);
+                    list.Add(bodyHead[t + 1]);
+                    list.Add(bodyHead[t + 2]);
+                }
+                chestTris = Pack(list.ToArray(), i => worldToBody.MultiplyPoint3x4(bw[i] - bNormWorld(bodyToWorld, bNorm[i]) * (bw[i].y > chestCut - 0.005f ? 0.001f : 0f)),
+                    i => bNorm[i], i => bUv[i], i => bWeights[i], verts, norms, uvs, weights);
+            }
 
             // 胸元の埋め: 体の人の肌の三角のうち、頭の人の肌から離れている前側の所
             var headSurface = new Surface(moved, hm.GetTriangles(headSub));
@@ -169,7 +204,7 @@ namespace HalfAware.EditorTools.Rocketbox
             {
                 Vector3 v0 = bw[skinTris[t]], v1 = bw[skinTris[t + 1]], v2 = bw[skinTris[t + 2]];
                 var c = (v0 + v1 + v2) / 3f;
-                if (c.y > eyeY - 0.12f || c.z < neckZ + 0.03f) continue;
+                if (who.ChestFromBody || c.y > eyeY - 0.12f || c.z < neckZ + 0.03f) continue;
                 // 三角の頂点・辺の中点・重心のどこかが頭の人の肌から 1.2 mm より離れていれば、覆われていない所がある
                 var open = false;
                 foreach (var pt in new[] { v0, v1, v2, (v0 + v1) * 0.5f, (v1 + v2) * 0.5f, (v2 + v0) * 0.5f, c })
@@ -207,10 +242,11 @@ namespace HalfAware.EditorTools.Rocketbox
             mesh.SetUVs(0, uvs);
             mesh.boneWeights = weights.ToArray();
             mesh.bindposes = bm.bindposes;
-            mesh.subMeshCount = 3;
+            mesh.subMeshCount = chestTris != null ? 4 : 3;
             mesh.SetTriangles(bodyTris, 0);
             mesh.SetTriangles(headTris, 1);
             mesh.SetTriangles(hairTris, 2);
+            if (chestTris != null) mesh.SetTriangles(chestTris, 3);
             mesh.RecalculateBounds();
             Save(mesh, who.CompositeMesh);
 
