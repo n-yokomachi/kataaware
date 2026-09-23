@@ -217,8 +217,16 @@ namespace HalfAware.EditorTools.Rocketbox
                 hairCards.Add(hairOpacity[t + 2]);
             }
 
+            // かつら: 髪の人の髪（殻と房）を、顔の人の頭に合わせて変形する
+            string wigNote = null;
+            var rest = hw;
+            if (who.Wig)
+            {
+                rest = FitWig(who, hw, shellArr, faceHairTris, fw, faceHead, huv, shellPaint, a, out wigNote);
+            }
+
             // 髪の殻と房が顔（耳・頬）や服の内側に入っていれば外へ
-            var moved = (Vector3[])hw.Clone();
+            var moved = (Vector3[])rest.Clone();
             var clothes = new RocketboxCompose.Surface(bw, bm.GetTriangles(Slot(bodySmr, who.BodyFrom.BodySlot)));
             int outOfFace = 0, outOfClothes = 0, clothesInside = 0;
             float maxFace = 0f, maxClothes = 0f, worstClothes = 0f;
@@ -237,7 +245,8 @@ namespace HalfAware.EditorTools.Rocketbox
                 var p = moved[i];
                 Vector3 q, n;
                 var card = cardSet.Contains(i);
-                if (p.z > a.eyeL.z - (card ? 0.05f : 0.03f) && p.y > a.eyeL.y + (card ? -0.01f : 0.02f))
+                // かつらでは額の上の押し出しをしない（髪全体を合わせてある）
+                if (!who.Wig && p.z > a.eyeL.z - (card ? 0.05f : 0.03f) && p.y > a.eyeL.y + (card ? -0.01f : 0.02f))
                 {
                     var dh = headSurf.Closest(p, 0.04f, out q, out n);
                     if (!float.IsInfinity(dh) && EdgeDistance(q, headEdges) > 0.0003f)
@@ -273,7 +282,7 @@ namespace HalfAware.EditorTools.Rocketbox
             }
             // 押し出した量をとなりの頂点へならす。押し出した頂点と押し出さなかった頂点が交互に並ぶと、
             // 殻が波打つため。押し出した量より引っ込めることはしない
-            var smoothed = Smooth(hairVerts, shellTris, hairCards, hw, moved, 6);
+            var smoothed = Smooth(hairVerts, shellTris, hairCards, rest, moved, 6);
 
             // 顔の人の頭の面を、髪の人の殻（押し出した後）の内側へ沈める。殻の外か 3 mm 内側までにある頂点を、殻の 3 mm 内側へ。
             // - 顔の人の髪の殻の頂点（顔の人のボブが突き抜けないように）。殻の透明な所の下で顔の縁（生え際）に近い物は、
@@ -530,7 +539,8 @@ namespace HalfAware.EditorTools.Rocketbox
                 + (legsNote != null ? "\n" + legsNote : "")
                 + (headDropped > 0 ? "\n顔の人の頭の面から除いた三角（結んだ髪など） " + headDropped : "")
                 + (chestNote != null ? "\n" + chestNote : "")
-                + (domeNote != null ? "\n" + domeNote : "");
+                + (domeNote != null ? "\n" + domeNote : "")
+                + (wigNote != null ? "\n" + wigNote : "");
         }
 
         // ---- 見分け -----------------------------------------------------------
@@ -715,6 +725,164 @@ namespace HalfAware.EditorTools.Rocketbox
             }
             coverCache[who.Name] = c;
             return c;
+        }
+
+        /// <summary>かつらで、顔の人の頭皮を殻の内側に入れる深さ（m）と、それより外に残してよい頭皮の点の割合</summary>
+        const float WigMargin = 0.003f, WigOutside = 0.60f, WigGrowMax = 0.08f;
+
+        /// <summary>
+        /// 髪の人の髪（殻と房）を一つのかつらとして、顔の人の頭に合わせる。返すのは髪の人の頂点の新しい位置（束ねた姿勢、世界）。
+        /// 二人の骨と束ねた姿勢は同じなので、頭はもともとほぼ重なっている。
+        /// 1. 頭皮の点の組: 髪の人の殻が不透明な頭の面の頂点（耳の中ほどより上）ごとに、頭の真ん中からその頂点への向きの線が
+        ///    顔の人の頭の面と交わる点を組にする（二人の頭のテクスチャの並びは同じではないので、UV では組にできなかった）
+        /// 2. 髪の人の点の重心のまわりの小さな回し（上下 −6〜6°、左右の傾き −3〜3°）ごとに、縦・横・奥行きの拡大と位置のずれを最小二乗で求め、
+        ///    残りが一番小さい物を取る。残りの大きい組（中央値の 2 倍より上。顔の人の盛り上がった前髪など）を外して、もう一度求める
+        /// 3. 顔の人の頭皮（髪の殻の三角の頂点。目の 3 cm 下より上）のうち、殻の不透明な所の下にある物が、殻の内側に <see cref="WigMargin"/>
+        ///    入るまで、顔の人の頭の重心のまわりに全体を大きくする（外に残る点が <see cref="WigOutside"/> 以下になるまで、0.5 % ずつ。<see cref="WigGrowMax"/> まで）。
+        ///    外に残った頭皮は、あとの沈める手順で殻の内側へ下げる（殻の不透明な所の下なので見えない）
+        /// </summary>
+        public static Vector3[] FitWig(RocketboxPerson who, Vector3[] hw, int[] shellArr, List<int> faceHairTris, Vector3[] fw, int[] faceHead,
+            Vector2[] huv, RocketboxPaint.HeadResult shellPaint, RocketboxPaint.Anchors a, out string note)
+        {
+            var eyeY = (a.eyeL.y + a.eyeR.y) * 0.5f;
+            var centre = new Vector3(0f, eyeY - 0.01f, a.eyeL.z - 0.08f);
+            // 顔の人の頭の面に線を当てる
+            var go = new GameObject("WigProbe") { hideFlags = HideFlags.HideAndDontSave };
+            var probe = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+            var A = new List<Vector3>();
+            var B = new List<Vector3>();
+            try
+            {
+                probe.vertices = fw;
+                probe.triangles = faceHead;
+                var mc = go.AddComponent<MeshCollider>();
+                mc.sharedMesh = probe;
+                Physics.SyncTransforms();
+                var backfaces = Physics.queriesHitBackfaces;
+                Physics.queriesHitBackfaces = true;
+                try
+                {
+                    foreach (var i in new HashSet<int>(shellArr))
+                    {
+                        var ph = hw[i];
+                        if (ph.y < eyeY - 0.03f || AlphaAt(shellPaint, huv[i]) < 0.5f) continue;
+                        var dir = (ph - centre).normalized;
+                        RaycastHit hit;
+                        if (!mc.Raycast(new Ray(centre + dir * 0.3f, -dir), out hit, 0.3f)) continue;
+                        if ((hit.point - ph).magnitude > 0.03f) continue;
+                        A.Add(ph);
+                        B.Add(hit.point);
+                    }
+                }
+                finally { Physics.queriesHitBackfaces = backfaces; }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(go);
+                UnityEngine.Object.DestroyImmediate(probe);
+            }
+            if (A.Count < 50)
+            {
+                note = "かつら: 頭皮の点の組が足りない（" + A.Count + "）。髪を元の位置に置いた";
+                return hw;
+            }
+            var keep = new bool[A.Count];
+            for (var i = 0; i < keep.Length; i++) keep[i] = true;
+            Vector3 cA = Vector3.zero, cB = Vector3.zero, bestS = Vector3.one;
+            var bestR = Quaternion.identity;
+            float bestPitch = 0f, bestRoll = 0f;
+            double rms = 0;
+            int used = 0;
+            for (var pass = 0; pass < 2; pass++)
+            {
+                cA = Vector3.zero; cB = Vector3.zero; used = 0;
+                for (var i = 0; i < A.Count; i++) if (keep[i]) { cA += A[i]; cB += B[i]; used++; }
+                cA /= used;
+                cB /= used;
+                var bestSse = double.MaxValue;
+                for (var pitch = -6; pitch <= 6; pitch++)
+                    for (var roll = -3; roll <= 3; roll++)
+                    {
+                        var R = Quaternion.Euler(pitch, 0f, roll);
+                        double xx = 0, xb = 0, yy = 0, yb = 0, zz = 0, zb = 0, bb = 0;
+                        for (var i = 0; i < A.Count; i++)
+                        {
+                            if (!keep[i]) continue;
+                            var ar = R * (A[i] - cA);
+                            var br = B[i] - cB;
+                            xx += ar.x * ar.x; xb += ar.x * br.x;
+                            yy += ar.y * ar.y; yb += ar.y * br.y;
+                            zz += ar.z * ar.z; zb += ar.z * br.z;
+                            bb += br.sqrMagnitude;
+                        }
+                        var sse = bb - (xb * xb / xx + yb * yb / yy + zb * zb / zz);
+                        if (sse < bestSse)
+                        {
+                            bestSse = sse;
+                            bestR = R;
+                            bestS = new Vector3((float)(xb / xx), (float)(yb / yy), (float)(zb / zz));
+                            bestPitch = pitch;
+                            bestRoll = roll;
+                        }
+                    }
+                rms = Math.Sqrt(Math.Max(0.0, bestSse) / used);
+                if (pass == 1) break;
+                // 残りの大きい組を外す
+                var res = new List<float>();
+                var each = new float[A.Count];
+                for (var i = 0; i < A.Count; i++)
+                {
+                    var r = bestR * (A[i] - cA);
+                    each[i] = (cB + new Vector3(r.x * bestS.x, r.y * bestS.y, r.z * bestS.z) - B[i]).magnitude;
+                    res.Add(each[i]);
+                }
+                res.Sort();
+                var cut = Mathf.Max(0.002f, res[res.Count / 2] * 2f);
+                for (var i = 0; i < A.Count; i++) keep[i] = each[i] <= cut;
+            }
+            Func<Vector3, float, Vector3> place = (h, g) =>
+            {
+                var r = bestR * (h - cA);
+                return cB + g * new Vector3(r.x * bestS.x, r.y * bestS.y, r.z * bestS.z);
+            };
+            // 顔の人の頭皮の点
+            var scalp = new List<Vector3>();
+            foreach (var i in new HashSet<int>(faceHairTris)) if (fw[i].y > eyeY - 0.03f) scalp.Add(fw[i]);
+            var grow = 1f;
+            var outside = 0f;
+            var moved = new Vector3[hw.Length];
+            var curve = new System.Text.StringBuilder();
+            for (var step = 0; step <= Mathf.RoundToInt(WigGrowMax / 0.005f); step++)
+            {
+                grow = 1f + 0.005f * step;
+                for (var i = 0; i < hw.Length; i++) moved[i] = place(hw[i], grow);
+                var surf = new RocketboxCompose.Surface(moved, shellArr);
+                int outCount = 0, counted = 0;
+                foreach (var p in scalp)
+                {
+                    var outward = (p - cB).normalized;
+                    Vector3 q, n;
+                    int k;
+                    var d = surf.Closest(p, 0.05f, out q, out n, out k, fn2 => Vector3.Dot(fn2, outward) >= 0.2f);
+                    if (float.IsInfinity(d)) continue;
+                    // 殻の透ける所（髪の人の額や顔）の下の頭皮は数えない（かつらでは隠れない）
+                    if (AlphaAt(shellPaint, UvAt(q, k, shellArr, moved, huv)) < 0.5f) continue;
+                    counted++;
+                    var sd = Vector3.Dot(p - q, n) >= 0f ? d : -d;
+                    if (sd > -WigMargin) outCount++;
+                }
+                outside = counted > 0 ? outCount / (float)counted : 0f;
+                if (step % 4 == 0) curve.AppendFormat(CultureInfo.InvariantCulture, "{0}{1:0} %→{2:0} %", curve.Length > 0 ? "・" : "", (grow - 1f) * 100f, outside * 100f);
+                if (outside <= WigOutside) break;
+            }
+            var shift = cB - cA;
+            note = string.Format(CultureInfo.InvariantCulture,
+                "かつら: 頭皮の点の組 {0}（うち合わせに使った {13}）、拡大 横 {1:0.000}・縦 {2:0.000}・奥行き {3:0.000}、回し 上下 {4:+0;-0;0}°・左右の傾き {5:+0;-0;0}°、" +
+                "重心のずれ 横 {6:+0.0;-0.0} mm・縦 {7:+0.0;-0.0} mm・奥行き {8:+0.0;-0.0} mm、合わせた後の残り {9:0.0} mm（二乗平均）、" +
+                "頭皮を殻の {10:0} mm 内側へ入れるために全体を {11:0.0} % 大きくした（殻の不透明な所の下で外に残る頭皮の点 {12:0.0} %。大きくした割合と外に残る点: {14}。残りは殻の内側へ沈める）",
+                A.Count, bestS.x, bestS.y, bestS.z, bestPitch, bestRoll, shift.x * 1000f, shift.y * 1000f, shift.z * 1000f, rms * 1000.0,
+                WigMargin * 1000f, (grow - 1f) * 100f, outside * 100f, used, curve);
+            return moved;
         }
 
         static float CoverAt(float[] cover, int n, Vector2 uv)

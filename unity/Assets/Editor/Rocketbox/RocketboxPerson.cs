@@ -68,6 +68,12 @@ namespace HalfAware.EditorTools.Rocketbox
         /// 絵は肌で埋め、形は額の球へ載せる。今は肌と髪の境が三角の辺でぎざぎざになり、額との境に折れ目が見えるので使っていない
         /// </summary>
         public bool BareForehead;
+        /// <summary>
+        /// 髪の人の髪（殻と房）を一つのかつらとして、顔の人の頭に合わせて変形する（<see cref="RocketboxHairSwap.FitWig"/>）。
+        /// 頭皮の点どうしから拡大（縦・横・奥行き）・位置のずれ・小さな回しを求め、顔の人の頭皮がどこも殻の内側に入るまで全体を少し大きくする。
+        /// 切ると、髪の人の髪を元の位置に置き、頂点ごとに押し出す（前のやり方）
+        /// </summary>
+        public bool Wig;
         /// <summary>胸元の絵（体の人の頭のテクスチャ）</summary>
         public string ChestSrc { get { return ChestFromBody ? BodyFrom.HeadSrc : null; } }
 
