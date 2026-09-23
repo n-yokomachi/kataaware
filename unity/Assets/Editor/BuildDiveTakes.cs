@@ -145,74 +145,115 @@ namespace HalfAware.EditorTools
             return made;
         }
 
+        // ---- 戸の板 ------------------------------------------------------------
+        //
+        // **場所ではなく記憶が持つ。** 場所は四つの記憶で使い回すので、場所に置いた板は
+        // 記憶ごとに消せない。記憶 0 では隣の老夫婦はまだ一度も出てきていないのに
+        // その戸が開いた穴になっていた（オーナーの差し戻し）。開けるか閉めるかは
+        // 記憶ごとの話なので、Shut と Ajar を対にして記憶の子として置く。
+        //
+        // **形と色は建物の閉めた戸（<c>EstateDoorway</c>）を写す。** ロンドンの玄関の戸で、
+        // 下に鏡板が二枚、上に細い硝子、腰の高さに真鍮の郵便受けの口、その上に番地とノッカー。
+        // 色は一戸ずつ違い、<see cref="EstateDoorPaint"/> が返す（A は青、B は赤）。
+        // 日本の鉄扉（換気口・新聞受け・覗き穴）だった頃の板は外した。
+        //
+        // 建物の面の穴・枠・欄間・丁番は場所の側（<c>BuildDiveEstate</c>）が持ち、記憶からは触れない。
+        // 丁番は東の枠にあり、開いた戸はそこを軸に外（デッキの側）へ振り出して壁へ寄せる
+
+        /// <summary>戸の番地。建物の面の欄間と揃える（<c>EstateFront</c> の 12 + 戸口の番号 × 2）</summary>
+        static int EstateDoorNumber(float x)
+        {
+            if (Mathf.Abs(x - DoorA) < 0.5f) return 12;
+            if (Mathf.Abs(x - DoorB) < 0.5f) return 14;
+            return 16;
+        }
+
+        /// <summary>真鍮・硝子・郵便受けの口の暗がり・番地のマテリアル。建物の戸口と同じもの</summary>
+        static Material EstateDoorMat(string which)
+        {
+            switch (which)
+            {
+                // 建物の真鍮（EstateGear）は Rail の金物、口の暗がり（EstateShade）は Ceiling
+                case "Brass": return Mat("Rail");
+                case "Slot": return Mat("Ceiling");
+                case "Glass": return AssetDatabase.LoadAssetAtPath<Material>(Materials + "EstateGlaze.mat");
+                default: return AssetDatabase.LoadAssetAtPath<Material>(Materials + "EstatePale.mat");
+            }
+        }
+
         /// <summary>
-        /// 戸口を一枚で塞ぐ。位置は <see cref="Cast"/> と同じく Take のローカル。
-        ///
-        /// **建物の面の穴は場所の側（<c>BuildDiveEstate</c>）が開けていて、記憶からは触れない。**
-        /// 開いている戸は記憶ごとに違う（記憶 0 の朝はまだ老夫婦が出てきていない）ので、
-        /// 閉めたい記憶だけ、開いた穴の手前へ戸の板を落として塞ぐ。
+        /// 閉めた戸。戸口の穴の手前へ据えて塞ぐ。位置は <see cref="Cast"/> と同じく Take のローカル。
         /// 当たりも入れるので、覗けないし通り抜けられない。
         ///
-        /// 高さは三和土の底（<see cref="EstateSunk"/> のぶん下がる）から戸の頭まで。
-        /// 建物の面の穴は床から上だけだが、居間の側の穴は三和土の底から開いているので、
-        /// 低い方へ合わせないと足元に隙間が残る
+        /// 表（デッキの側）の形は <c>EstateDoorway</c> の閉めた戸と同じ寸法で組む。
+        /// 番地は欄間にも入っているが、戸そのものにも付ける（C と下の住戸の戸と揃える）
         /// </summary>
-        /// <summary>
-        /// 開いた戸。枠の外へ振り出して壁へ寄せる。
-        ///
-        /// **場所ではなく記憶が持つ。** 場所は四つの記憶で使い回すので、場所に置いた板は
-        /// 記憶ごとに消せない。記憶 0 では隣の老夫婦はまだ一度も出てきていないのに
-        /// その戸が開いた穴になっていた（オーナーの差し戻し）。開けるか閉めるかは
-        /// 記憶ごとの話なので、<see cref="Shut"/> と対にして記憶の子として置く。
-        ///
-        /// **メーターの箱より手前へ置く。** 面に貼り付けると、板の中からメーターの角が生えてくる
-        /// </summary>
-        static Transform Ajar(Transform take, string name, float x)
+        static Transform Shut(Transform take, string name, float x)
         {
-            const float half = 0.43f;
-            var mesh = Shape("EstateAjar", 0.4f, b =>
+            var leaf = Piece(take, name, Shape("EstateShut", 0.4f, b =>
             {
-                b.Box(new Vector3(0f, DoorHigh * 0.5f, 0f), new Vector3(half * 2f, DoorHigh, 0.05f));
-                // 面を囲う細い線。鉄扉の折り返しの縁。閉じた戸（Shut）と同じ組み合わせ
-                b.Box(new Vector3(0f, 1.06f, 0.026f), new Vector3(half * 2f - 0.10f, 1.52f, 0.015f));
-                // 換気口。細い羽根が三枚
-                for (var i = 0; i < 3; i++)
-                    b.Box(new Vector3(0f, 1.80f + i * 0.07f, 0.036f), new Vector3(half * 1.1f, 0.035f, 0.02f));
-                // 新聞受けと覗き穴
-                b.Box(new Vector3(0f, 0.34f, 0.036f), new Vector3(half * 0.86f, 0.05f, 0.02f));
-                b.Box(new Vector3(0f, 1.52f, 0.036f), new Vector3(0.07f, 0.07f, 0.015f));
-                // 把手。開いた戸なので、振り出した先の端に来る
-                b.Box(new Vector3(half - 0.09f, 1.00f, 0.05f), new Vector3(0.05f, 0.05f, 0.12f));
-            });
-            var leaf = Piece(take, name, mesh, Mat("Door"));
-            leaf.localPosition = new Vector3(x + 0.92f, EstateTop, EstateFace + 0.26f);
+                b.Box(new Vector3(0f, DoorHigh * 0.5f, 0.045f), new Vector3(DoorHalf * 2f, DoorHigh, 0.05f));
+                // 鏡板。下に二枚
+                for (var i = 0; i < 2; i++)
+                    b.Box(new Vector3(i == 0 ? -0.2f : 0.2f, 0.50f, 0.075f), new Vector3(0.30f, 0.62f, 0.015f));
+            }), EstateDoorPaint(x));
+            leaf.localPosition = new Vector3(x, EstateTop, EstateFace);
+
+            // 上の細い硝子
+            Piece(leaf, "Glass", Shape("EstateShutGlass", 0.5f, b =>
+                b.FaceZ(0.072f, -0.12f, 0.12f, 1.40f, 1.85f, 1)), EstateDoorMat("Glass"));
+            // 郵便受けの真鍮の板・ノッカー・把手・鍵
+            Piece(leaf, "Brass", Shape("EstateShutBrass", 0.5f, b =>
+            {
+                b.Box(new Vector3(0f, 1.00f, 0.078f), new Vector3(0.30f, 0.09f, 0.012f));
+                b.Box(new Vector3(0f, 1.42f, 0.085f), new Vector3(0.10f, 0.03f, 0.03f));
+                b.Box(new Vector3(-0.34f, 1.02f, 0.10f), new Vector3(0.05f, 0.05f, 0.08f));
+                b.Box(new Vector3(-0.34f, 1.20f, 0.075f), new Vector3(0.05f, 0.07f, 0.02f));
+            }), EstateDoorMat("Brass"));
+            // 郵便受けの横長の口
+            Piece(leaf, "Slot", Shape("EstateShutSlot", 0.5f, b =>
+                b.FaceZ(0.085f, -0.12f, 0.12f, 0.985f, 1.015f, 1)), EstateDoorMat("Slot"));
+            // 番地
+            var number = EstateDoorNumber(x);
+            Piece(leaf, "Number", Shape("EstateShutNo" + number, 0.5f, b =>
+                EstateDigits(b, 0f, 1.24f, 0.074f, 1, number, 0.12f)), EstateDoorMat("Number"));
+
+            var box = leaf.gameObject.AddComponent<BoxCollider>();
+            box.center = new Vector3(0f, DoorHigh * 0.5f, 0.045f);
+            box.size = new Vector3(DoorHalf * 2f + 0.06f, DoorHigh, 0.14f);
             return leaf;
         }
 
-        static Transform Shut(Transform take, string name, float x)
+        /// <summary>
+        /// 開いた戸。東の枠の丁番を軸に、外へ 180 度振り出して壁へ寄せる。
+        ///
+        /// **見えているのは戸の裏（住戸の側）。** 振り出すと表は壁を向くので、
+        /// デッキから見えるのは裏の鏡板と、郵便受けの内側の覆い、夜錠、把手。
+        /// 振り出すと左右が入れ替わるので、表では西の端にあった把手と錠は東の端に来る。
+        /// 裏も戸の色で塗る。白くすると、開いている戸だけ色が抜けて一戸ずつの塗り分けが読めない。
+        ///
+        /// **メーターの物入れは戸の西にある。** 東へ寄せる板とは重ならない
+        /// </summary>
+        static Transform Ajar(Transform take, string name, float x)
         {
-            const float high = DoorHigh + EstateSunk;
-            var mesh = Shape("EstateShut", 0.4f, b =>
+            var leaf = Piece(take, name, Shape("EstateAjar", 0.4f, b =>
             {
-                b.Box(new Vector3(0f, high * 0.5f, 0f), new Vector3(DoorHalf * 2f, high, 0.05f));
-                // 面を囲う細い線。鉄扉の折り返しの縁。開いている戸（EstateLeaf）と同じ組み合わせ
-                b.Box(new Vector3(0f, EstateSunk + 1.06f, 0.026f),
-                    new Vector3(DoorHalf * 2f - 0.10f, 1.52f, 0.015f));
-                // 換気口。細い羽根が三枚
-                for (var i = 0; i < 3; i++)
-                    b.Box(new Vector3(0f, EstateSunk + 1.80f + i * 0.07f, 0.036f),
-                        new Vector3(DoorHalf * 1.1f, 0.035f, 0.02f));
-                // 新聞受けと覗き穴。目の高さの黒い点ひとつで、そこが住戸の戸になる
-                b.Box(new Vector3(0f, EstateSunk + 0.34f, 0.036f), new Vector3(DoorHalf * 0.86f, 0.05f, 0.02f));
-                b.Box(new Vector3(0f, EstateSunk + 1.52f, 0.036f), new Vector3(0.07f, 0.07f, 0.015f));
-                // 把手
-                b.Box(new Vector3(DoorHalf - 0.13f, EstateSunk + 1.00f, 0.06f), new Vector3(0.05f, 0.05f, 0.12f));
-            });
-            var leaf = Piece(take, name, mesh, Mat("Door"));
-            leaf.localPosition = new Vector3(x, EstateTop - EstateSunk, EstateFace + 0.05f);
-            var box = leaf.gameObject.AddComponent<BoxCollider>();
-            box.center = new Vector3(0f, high * 0.5f, 0f);
-            box.size = new Vector3(DoorHalf * 2f + 0.06f, high, 0.14f);
+                b.Box(new Vector3(0f, DoorHigh * 0.5f, 0f), new Vector3(DoorHalf * 2f, DoorHigh, 0.05f));
+                for (var i = 0; i < 2; i++)
+                    b.Box(new Vector3(i == 0 ? -0.2f : 0.2f, 0.50f, 0.032f), new Vector3(0.30f, 0.62f, 0.015f));
+            }), EstateDoorPaint(x));
+            // 丁番の芯は枠の外（x + 0.51）。板の厚みの真ん中を面から 0.25 の所に置き、丁番の出に掛ける
+            leaf.localPosition = new Vector3(x + 0.51f + DoorHalf, EstateTop, EstateFace + 0.25f);
+
+            Piece(leaf, "Glass", Shape("EstateAjarGlass", 0.5f, b =>
+                b.FaceZ(0.026f, -0.12f, 0.12f, 1.40f, 1.85f, 1)), EstateDoorMat("Glass"));
+            // 郵便受けの内側の覆い・夜錠・把手
+            Piece(leaf, "Brass", Shape("EstateAjarBrass", 0.5f, b =>
+            {
+                b.Box(new Vector3(0f, 1.00f, 0.05f), new Vector3(0.32f, 0.12f, 0.05f));
+                b.Box(new Vector3(0.34f, 1.22f, 0.045f), new Vector3(0.10f, 0.08f, 0.04f));
+                b.Box(new Vector3(0.36f, 1.02f, 0.06f), new Vector3(0.05f, 0.05f, 0.07f));
+            }), EstateDoorMat("Brass"));
             return leaf;
         }
 
@@ -266,38 +307,41 @@ namespace HalfAware.EditorTools
         // ---- 0. 女 6『メイ』 団地の外階段。60 秒 ---------------------------------
 
         /// <summary>
-        /// 靴紐を結んでいた階段の下から、三階の戸口まで駆け上がって抱き上げられ、
+        /// 靴紐を結んでいた階段の下から、三階のデッキを A の戸口まで駆けて抱き上げられ、
         /// 降ろされて降りる。母は戸口の奥の灯りを背にしているので、顔は影になる
         /// </summary>
         static HostKey[] Mei(Transform take)
         {
-            // **母は廊下の側（+z）を向く。** 150 度では戸口の奥を向いていて、
-            // 廊下から上がってきたメイには背中しか見えなかった。
-            // 顔が影になるのは向きではなく、戸口の奥の灯りを背にしているから
+            // **母は戸口の敷居に立ち、デッキの西（階段の側）を向く。** メイは階段を上がり切ると
+            // デッキを東へ駆けてくるので、そちらへ顔を向けておく。デッキの幅の真ん中から
+            // 見上げる所（下の鍵打ちの 23 秒）への向きは 310 度で、差は 10 度。
+            // 顔が影になるのは向きではなく、背にした玄関の灯り（RoomAHall）と四階の張り出しのせい。
+            // 穴の奥（面から内）へ入れると、デッキの西からは戸口の東の縁に隠れて選べない
             Cast(take, "Mother", "W_Casual",
-                new Vector3(DoorA, EstateTop - EstateSunk, EstateFace - 0.25f), 0f, 1, 1f);
-            // 隣は老夫婦の家。この朝はまだ一度も出てきていないので、戸を閉めて穴を塞ぐ
-            // メイの家は母が戸口に立っているので開いている。隣はまだ誰も出てきていない
+                new Vector3(DoorA, EstateTop, EstateFace + 0.05f), 320f, 1, 1f);
+            // メイの家は母が戸口に立っているので開いている。隣の老夫婦はまだ一度も出てきていない
             Ajar(take, "AjarA", DoorA);
             Shut(take, "ShutB", DoorB);
             return new[]
             {
-                // 階段の下。上り口のすぐ手前で、始まりの立ち位置（FirstStand）と同じ点
+                // 階段の下。上り口のすぐ手前で、始まりの立ち位置（FirstStand）と同じ点。正面に東の一本の段
                 K(0f,   StairEastMid, 0f, WalkFront - 0.45f,   0f,  48f, 0.55f),  // しゃがんで靴紐。指と地面しか見えない
                 K(3f,   StairEastMid, 0f, WalkFront - 0.35f,   0f, -32f, 1.00f),  // 立って階段の上を仰ぐ
-                // 三階建てになって、上りは折り返しが二つ・階の高さの踊り場が一つになった
-                K(10f,  0f,   Floor * 0.5f, EstateTurn,     180f, -12f, 1.00f),  // 一つ目の折り返し
-                K(17f,  0f,   Floor,        EstateLanding1,   0f, -10f, 1.00f),  // 二階の廊下
-                K(23f,  0.9f, EstateTop, EstateWalk + 0.20f, 149f,  22f, 1.00f), // 三階。母の脚
-                K(25f,  1.25f, EstateTop, EstateWalk - 0.10f, 149f, -42f, 1.45f), // 抱き上げられる
-                K(28f,  1.25f, EstateTop, EstateWalk - 0.10f, 236f, -34f, 1.50f), // 回る。空、団地の壁
-                K(31f,  1.25f, EstateTop, EstateWalk - 0.10f, 160f,   6f, 1.00f), // 降ろされる
-                K(35f,  1.25f, EstateTop, EstateWalk + 0.10f, 350f,   2f, 1.00f), // 背中を押されて向きが変わる
-                K(40f,  0f,   EstateTop, EstateWalk + 0.40f,   0f,  12f, 1.00f),
+                // 東の一本を北へ上がり、折り返して西の一本を南へ。半階ごとに向きが入れ替わる
+                K(8f,   0f,   Floor * 0.5f, EstateTurn,     180f, -12f, 1.00f),  // 一つ目の折り返し
+                K(12f,  0f,   Floor,        EstateLanding1,   0f, -10f, 1.00f),  // 二階の踊り場
+                K(16f,  0f,   Floor * 1.5f, EstateTurn,     180f, -12f, 1.00f),  // 二つ目の折り返し
+                K(20f,  StairWestMid, EstateTop, WalkFront - 0.30f, 100f, -4f, 1.00f), // 三階のデッキ。東に戸が並ぶ
+                K(23f,  4.60f, EstateTop, EstateWalk,       124f,  22f, 1.00f),  // A の戸口の前。母の脚
+                K(25f,  5.00f, EstateTop, EstateWalk - 0.40f, 124f, -42f, 1.45f), // 抱き上げられる
+                K(28f,  5.00f, EstateTop, EstateWalk - 0.40f, 215f, -34f, 1.50f), // 回る。空、四階の張り出し、隣の戸口
+                K(31f,  5.00f, EstateTop, EstateWalk - 0.40f, 140f,   6f, 1.00f), // 降ろされる
+                K(35f,  4.70f, EstateTop, EstateWalk - 0.10f, 280f,   2f, 1.00f), // 背中を押されて向きが変わる
+                K(40f,  StairWestMid, EstateTop, WalkFront - 0.30f, 0f, 12f, 1.00f), // 西の一本を北へ降り始める
                 K(45f,  0f,   Floor * 1.5f, EstateTurn,     180f,   8f, 1.00f),  // 降りる途中の折り返し
-                K(49f,  0f,   Floor,        EstateLanding2, 166f, -26f, 1.00f),  // 振り返る。戸口の母は逆光
+                K(49f,  0f,   Floor,        EstateLanding2,  60f, -26f, 1.00f),  // 二階の踊り場で振り返る
                 K(54f,  0f,   Floor * 0.5f, EstateTurn,     180f,   8f, 1.00f),
-                K(60f,  StairEastMid, 0f, WalkFront - 0.45f,  96f,   0f, 1.00f), // 降り切って、庭の側へ向き直る
+                K(60f,  1.80f, 0f,          WalkFront - 0.45f, 20f,  0f, 1.00f), // 降り切って、庭への小道へ
             };
         }
 
