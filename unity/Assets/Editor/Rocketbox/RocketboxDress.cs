@@ -21,24 +21,34 @@ namespace HalfAware.EditorTools.Rocketbox
         // ---- 形の値（m、割合） ----
         /// <summary>襟ぐり: 首の骨（首の付け根）から下へ。前・横・後ろ</summary>
         public const float NeckDropFront = 0.04f, NeckDropSide = 0.015f, NeckDropBack = 0.025f;
+        /// <summary>前の浅い V ネック: 首の付け根から V の先までの深さと、V が首の付け根の高さへ戻る左右の幅</summary>
+        public const float VDepth = 0.075f, VHalf = 0.075f;
+        /// <summary>腰帯の高さ（腰の切り替えから上へ）と、厚み（胴の面から外へ）</summary>
+        public const float WaistBand = 0.045f, WaistBandThick = 0.003f;
         /// <summary>胴の面を型から外へ出す量</summary>
         public const float BodiceOffset = 0.005f;
         /// <summary>胴の面をならすとき、型の面から離しておく最小の量（型の段をならすため、出す量より小さい）</summary>
         public const float BodiceMin = 0.0025f;
         /// <summary>腰の切り替えの高さ（腰の骨から上へ）</summary>
-        public const float WaistAbovePelvis = 0.09f;
+        public const float WaistAbovePelvis = 0.14f;
         /// <summary>胴の面が上腕を覆う長さ（上腕の長さの割合。袖の付け根の下に隠れる）</summary>
         public const float CapT = 0.16f;
         /// <summary>袖の付け根と袖口（上腕の長さの割合）</summary>
-        public const float SleeveT0 = 0.05f, SleeveT1 = 0.72f;
-        /// <summary>袖と腕の間の隙間と、袖口での広がり（外の側）</summary>
-        public const float SleeveBase = 0.010f, SleeveFlare = 0.045f;
+        public const float SleeveT0 = 0.05f, SleeveT1 = 0.58f;
+        /// <summary>袖と腕の間の隙間と、パフの膨らみ（袖の中ほどで一番大きい）。袖口の帯は袖の長さの SleeveBand（割合）</summary>
+        public const float SleeveBase = 0.005f, SleevePuff = 0.026f, SleeveBand = 0.12f;
         /// <summary>裾の高さと、裾の半径（腰の真ん中から）、ひだの波の深さと数</summary>
-        public const float HemY = 0.33f, HemR = 0.38f, WaveAmp = 0.028f;
-        public const int Waves = 9;
+        public const float HemY = 0.11f, HemR = 0.30f, WaveAmp = 0.014f;
+        public const int Waves = 11;
+        /// <summary>段の切り替えの高さ（膝の少し下）と、そこでの上の段の半径、下の段の張り出し</summary>
+        public const float TierY = 0.44f, TierR = 0.24f, TierStep = 0.010f;
+        /// <summary>裾の小さな波（スカラップ）の数と、上下の深さ</summary>
+        public const int Scallops = 56;
+        public const float ScallopDepth = 0.006f;
         /// <summary>スカートの裾で脚の骨に付ける割合（残りは腰の骨）</summary>
-        public const float LegShare = 0.65f;
-        const int SkirtRings = 16, SkirtSegs = 72, SleeveRings = 8, SleeveSegs = 24;
+        public const float LegShare = 0.85f;
+        const int UpperRings = 10, LowerRings = 12, SkirtSegs = 72, SleeveRings = 10, SleeveSegs = 24;
+        const int SkirtRings = UpperRings + LowerRings + 1;
 
         /// <summary>骨の位置（束ねた姿勢）と、形の基準の高さ</summary>
         public sealed class Frame
@@ -95,7 +105,9 @@ namespace HalfAware.EditorTools.Rocketbox
             var dz = p.z - f.neckZ;
             var th = Mathf.Atan2(p.x, dz);
             var c = Mathf.Cos(th);
-            var drop = c >= 0f ? Mathf.Lerp(NeckDropSide, NeckDropFront, c * c) : Mathf.Lerp(NeckDropSide, NeckDropBack, c * c);
+            // 前は浅い V: 真ん中で VDepth、左右 VHalf で首の横の深さへ戻る
+            var vDrop = NeckDropSide + (VDepth - NeckDropSide) * Mathf.Max(0f, 1f - Mathf.Abs(p.x) / VHalf);
+            var drop = c >= 0f ? Mathf.Lerp(NeckDropSide, vDrop, Mathf.Sqrt(c)) : Mathf.Lerp(NeckDropSide, NeckDropBack, c * c);
             var margin = c >= 0f ? Mathf.Lerp(NeckMarginSide, NeckMarginFront, c * c) : Mathf.Lerp(NeckMarginSide, NeckMarginBack, c * c);
             var radial = new Vector2(p.x, dz).magnitude - (NeckRadius + margin);
             return Mathf.Max((f.neckY - drop) - p.y, p.y < f.neckY + 0.03f ? radial : -1f);
@@ -117,10 +129,12 @@ namespace HalfAware.EditorTools.Rocketbox
             return g;
         }
 
-        /// <summary>頭の人の面で、服の下に隠れる所（襟ぐりより 5 mm 内）</summary>
+        /// <summary>頭の人の面で、服の下に隠れる所（襟ぐりより前は 5 mm、後ろは 3 cm 内）</summary>
         public static bool UnderDress(Frame f, Vector3 p)
         {
-            return Neck(f, p) > 0.005f;
+            // 後ろは首の柱が服の襟より内にあるので、3 cm 下まで残す（5 mm で切ると、うなじと襟の間から胸の面の裏が暗い帯に見えた）
+            var back = RocketboxPaint.Smooth(0.2f, -0.4f, Mathf.Cos(Mathf.Atan2(p.x, p.z - f.neckZ)));
+            return Neck(f, p) > Mathf.Lerp(0.005f, 0.03f, back);
         }
 
         /// <summary>体の人の面のうち、服の外に出る所（袖口より先の腕と手）だけを残す。袖の中へ 3 cm 重ねる</summary>
@@ -244,6 +258,17 @@ namespace HalfAware.EditorTools.Rocketbox
             var bodiceVerts = verts.Count - bodiceStart;
             // 型の段（キャミソールの縁の厚みなど）をならす: となりの頂点の平均へ 30 回寄せ、型の面から BodiceMin より内へは入れない
             SmoothBodice(bodiceStart, verts.Count, outTris, bodPos, templ, bw, toLocal, verts, norms);
+            // 腰帯: 腰の切り替えから WaistBand 上までを WaistBandThick だけ外へ（縁は 5 mm で滑らかに）
+            var toWorld = toLocal.inverse;
+            for (var i = 0; i < bodPos.Count; i++)
+            {
+                var y = bodPos[i].y;
+                var wgt = RocketboxPaint.Smooth(f.waistY - 0.012f + 0.000f, f.waistY - 0.012f + 0.005f, y) * RocketboxPaint.Smooth(f.waistY + WaistBand + 0.005f, f.waistY + WaistBand, y);
+                if (wgt <= 0f) continue;
+                var n = toWorld.MultiplyVector(norms[bodiceStart + i]).normalized;
+                bodPos[i] += n * WaistBandThick * wgt;
+                verts[bodiceStart + i] = toLocal.MultiplyPoint3x4(bodPos[i]);
+            }
             // 胴の UV は腰のまわりの向き。背中の真ん中で 0 と 1 がつながるので、またぐ三角の小さい側の頂点を写し、右へ BodiceU だけずらす
             var wrapCopy = new Dictionary<int, int>();
             var wrapped = 0;
@@ -278,11 +303,47 @@ namespace HalfAware.EditorTools.Rocketbox
             // ---- スカート ----
             var skirtTris = Skirt(f, bw, templ, bwts, bodPos, toLocal, verts, norms, uvs, weights, outTris);
 
+            // 裏の布: 表の三角を向きを逆にして写し、LiningGap だけ内へ下げる（法線も内向き）。
+            // 両面を一枚で描くと裏が表の向きの光で照らされて暗く、襟ぐりの両脇から灰色の三角に見えた
+            // 表の三角の巻きを法線の向きに揃える（袖とスカートの筒は、作り方によって巻きが内向きになる）
+            var flipped = 0;
+            for (var t = 0; t < outTris.Count; t += 3)
+            {
+                int i0 = outTris[t], i1 = outTris[t + 1], i2 = outTris[t + 2];
+                var fn = Vector3.Cross(verts[i1] - verts[i0], verts[i2] - verts[i0]);
+                if (Vector3.Dot(fn, norms[i0] + norms[i1] + norms[i2]) >= 0f) continue;
+                outTris[t + 1] = i2;
+                outTris[t + 2] = i1;
+                flipped++;
+            }
+            var lining = new Dictionary<int, int>();
+            var front = outTris.Count;
+            for (var t = 0; t < front; t += 3)
+            {
+                var ids = new int[3];
+                for (var e = 0; e < 3; e++)
+                {
+                    var i = outTris[t + e];
+                    int c;
+                    if (!lining.TryGetValue(i, out c))
+                    {
+                        verts.Add(verts[i] - norms[i] * LiningGap);
+                        norms.Add(-norms[i]);
+                        uvs.Add(uvs[i]);
+                        weights.Add(weights[i]);
+                        c = verts.Count - 1;
+                        lining[i] = c;
+                    }
+                    ids[e] = c;
+                }
+                outTris.Add(ids[0]); outTris.Add(ids[2]); outTris.Add(ids[1]);
+            }
+
             note = string.Format(CultureInfo.InvariantCulture,
                 "ワンピース: 胴 {0} 頂点（型の三角をそのまま {1}、切った {2}。襟ぐりは首の付け根の {3:0.0}/{4:0.0}/{5:0.0} cm 下、腰の切り替え {6:0.000} m）、" +
-                "袖 {7} 三角（上腕の {8:0.00}〜{9:0.00}、広がり {10:0.0} cm）、スカート {11} 三角（裾 {12:0.00} m、半径 {13:0.00} m、ひだ {14} 本）",
+                "袖 {7} 三角（上腕の {8:0.00}〜{9:0.00}、パフの膨らみ {10:0.0} cm）、スカート {11} 三角（裾 {12:0.00} m、半径 {13:0.00} m、段の切り替え {15:0.00} m、ひだ {14} 本）",
                 bodiceVerts, kept, clipped, NeckDropFront * 100f, NeckDropSide * 100f, NeckDropBack * 100f, f.waistY,
-                sleeveTris, SleeveT0, SleeveT1, SleeveFlare * 100f, skirtTris, HemY, HemR, Waves);
+                sleeveTris, SleeveT0, SleeveT1, SleevePuff * 100f, skirtTris, HemY, HemR, Waves, TierY);
             return outTris.ToArray();
         }
 
@@ -424,9 +485,13 @@ namespace HalfAware.EditorTools.Rocketbox
                     var kk = k % SleeveSegs;
                     var ang = kk / (float)SleeveSegs * 2f * Mathf.PI - Mathf.PI;
                     var dir = Mathf.Cos(ang) * inner + Mathf.Sin(ang) * side2;
-                    // 体の側（ang 0）は狭く、外の側（ang ±π）ほど広げる
+                    // パフ: 付け根から膨らみ、袖口の帯（SleeveBand）で腕へ絞る。体の側（ang 0）は控えめ、外の側（ang ±π）ほど膨らむ。
+                    // 付け根と袖口の縁には細かいギャザーの波
                     var outer = 0.5f - 0.5f * Mathf.Cos(ang);
-                    var r = rRing[j, kk] + SleeveBase * (0.8f + 0.2f * u) + SleeveFlare * Mathf.Pow(u, 1.3f) * (0.3f + 0.7f * outer);
+                    var body = 1f - SleeveBand;
+                    var puff = u < body ? Mathf.Pow(Mathf.Sin(Mathf.PI * Mathf.Clamp01(u / body)), 0.7f) : 0f;
+                    var gather = 0.0025f * Mathf.Sin(14f * ang) * (RocketboxPaint.Smooth(0.2f, 0f, u) + RocketboxPaint.Smooth(body - 0.12f, body, u) * (u < body ? 1f : 0f));
+                    var r = rRing[j, kk] + SleeveBase + SleevePuff * puff * (0.45f + 0.55f * outer) + gather * puff;
                     pos[j, k] = s + a * (t * len) + dir * r;
                 }
             }
@@ -478,11 +543,12 @@ namespace HalfAware.EditorTools.Rocketbox
             for (var pass = 0; pass < SkirtSegs; pass++)
                 for (var k = 0; k < SkirtSegs; k++)
                     if (rTop[k] <= 0f) rTop[k] = Mathf.Max(rTop[(k + SkirtSegs - 1) % SkirtSegs], rTop[(k + 1) % SkirtSegs]);
-            // 体の太さ（腰と腿。スカートはここから 2 cm 以上離す）
+            // 輪の高さ: 上の段は腰から段の切り替えまで、下の段は切り替えの 5 mm 下から裾まで
             var ringY = new float[SkirtRings + 1];
-            for (var j = 0; j <= SkirtRings; j++) ringY[j] = Mathf.Lerp(yTop, HemY, j / (float)SkirtRings);
+            for (var j = 0; j <= UpperRings; j++) ringY[j] = Mathf.Lerp(yTop, TierY, j / (float)UpperRings);
+            for (var j = 0; j <= LowerRings; j++) ringY[UpperRings + 1 + j] = Mathf.Lerp(TierY - 0.005f, HemY, j / (float)LowerRings);
+            // 体の太さ（腰と脚の骨に付いた頂点だけ。スカートはここから 2 cm 以上離す）
             var rBody = new float[SkirtRings + 1, SkirtSegs];
-            // 腰と脚の骨に付いた頂点だけ（束ねた姿勢では手が腰の高さにあるので、腕と手は外す）
             var hip = new HashSet<int>();
             foreach (var n in new[] { "Bip01 Pelvis", "Bip01 Spine", "Bip01 L Thigh", "Bip01 R Thigh", "Bip01 L Calf", "Bip01 R Calf" })
             {
@@ -509,48 +575,73 @@ namespace HalfAware.EditorTools.Rocketbox
             var pos = new Vector3[SkirtRings + 1, SkirtSegs + 1];
             for (var j = 0; j <= SkirtRings; j++)
             {
-                var s = j / (float)SkirtRings;
+                var upper = j <= UpperRings;
                 for (var k = 0; k <= SkirtSegs; k++)
                 {
                     var kk = k % SkirtSegs;
                     var th = kk / (float)SkirtSegs * 2f * Mathf.PI - Mathf.PI;
-                    var flare = 1f - Mathf.Pow(1f - s, 2.0f);
-                    var r = rTop[kk] - 0.001f + (HemR - rTop[kk]) * flare + WaveAmp * Mathf.Pow(s, 1.3f) * Mathf.Sin(Waves * th);
+                    float r;
+                    var y = ringY[j];
+                    if (upper)
+                    {
+                        // 上の段: 腰のギャザーから柔らかく垂れて、切り替えへゆるく広がる
+                        var u = j / (float)UpperRings;
+                        r = rTop[kk] - 0.001f + (TierR - rTop[kk]) * Mathf.Pow(u, 0.8f) + 0.4f * WaveAmp * u * Mathf.Sin(Waves * th);
+                    }
+                    else
+                    {
+                        // 下の段: 切り替えで TierStep だけ張り出し、裾へわずかに広がる。縦のゆるい波のひだ
+                        var v = (j - UpperRings - 1) / (float)LowerRings;
+                        r = TierR + TierStep + (HemR - TierR - TierStep) * Mathf.Pow(v, 0.9f) + WaveAmp * (0.4f + 0.6f * v) * Mathf.Sin(Waves * th + 0.6f);
+                        // 裾のスカラップ（縁を小さな波に）
+                        if (j == SkirtRings) y += ScallopDepth * (0.5f + 0.5f * Mathf.Cos(Scallops * th));
+                    }
                     var body = 0f;
                     for (var d = -1; d <= 1; d++) body = Mathf.Max(body, rBody[j, (kk + d + SkirtSegs) % SkirtSegs]);
                     if (j > 0 && body > 0f) r = Mathf.Max(r, body + 0.02f);
-                    pos[j, k] = new Vector3(Mathf.Sin(th) * r, ringY[j], f.zc + Mathf.Cos(th) * r);
+                    pos[j, k] = new Vector3(Mathf.Sin(th) * r, y, f.zc + Mathf.Cos(th) * r);
                 }
             }
             var grid = new int[SkirtRings + 1, SkirtSegs + 1];
+            var total = yTop - HemY;
             for (var j = 0; j <= SkirtRings; j++)
                 for (var k = 0; k <= SkirtSegs; k++)
                 {
                     var p = pos[j, k];
-                    var du = pos[Mathf.Min(j + 1, SkirtRings), k] - pos[Mathf.Max(j - 1, 0), k];
+                    var j0 = j == UpperRings + 1 ? j : Mathf.Max(j - 1, 0);
+                    var j1 = j == UpperRings ? j : Mathf.Min(j + 1, SkirtRings);
+                    var du = pos[j1, k] - pos[j0, k];
+                    if (du.sqrMagnitude < 1e-10f) du = Vector3.down;
                     var dv = pos[j, Mathf.Min(k + 1, SkirtSegs)] - pos[j, Mathf.Max(k - 1, 0)];
                     var n = Vector3.Cross(du, dv).normalized;
                     var radial = new Vector3(p.x, 0f, p.z - f.zc);
                     if (Vector3.Dot(n, radial) < 0f) n = -n;
-                    var s = j / (float)SkirtRings;
+                    var s = Mathf.Clamp01((yTop - ringY[j]) / total);
                     var th = (k % SkirtSegs) / (float)SkirtSegs * 2f * Mathf.PI - Mathf.PI;
-                    // 腰の骨を中心に、脚の骨は裾で LegShare まで。向きで左右の腿を混ぜ（前と後ろの真ん中は半分ずつ）、膝より下は脛を少し。
-                    // 脚の割合を 4 割にしたら、大きく踏み出す一歩で前の膝が裾の前から出た
-                    var wp = Mathf.Lerp(1f, 1f - LegShare, Mathf.Pow(s, 0.7f));
+                    // 腰の骨を中心に、脚の骨は裾で LegShare まで。向きで左右の腿を混ぜ（前と後ろの真ん中は半分ずつ）、膝より下は脛を混ぜる。
+                    // くるぶしまでの丈なので、脛の割合を膝の下で 5 割まで上げる（裾を脚について行かせ、踏み出す脛が裾から出ないように）
+                    // 膝の高さ（丈の 6 割）までに脚の割合を LegShare まで上げ、左右の向きの混ぜ方を鋭くする（踏み出す膝の前の布がその脚について行く）
+                    var wp = Mathf.Lerp(1f, 1f - LegShare, RocketboxPaint.Smooth(0f, 0.6f, s));
                     var legs = 1f - wp;
-                    var sl = RocketboxPaint.Smooth(0.5f, -0.5f, Mathf.Sin(th));
-                    var calf = 0.2f * RocketboxPaint.Smooth(f.kneeY + 0.05f, f.kneeY - 0.10f, p.y);
+                    var sl = RocketboxPaint.Smooth(0.45f, -0.45f, Mathf.Sin(th));
+                    var calf = 0.5f * RocketboxPaint.Smooth(f.kneeY + 0.05f, f.kneeY - 0.20f, p.y);
                     var w = Top4(new[] { pel, lt, rt, lc, rc }, new[] { wp, legs * sl * (1f - calf), legs * (1f - sl) * (1f - calf), legs * sl * calf, legs * (1f - sl) * calf });
                     grid[j, k] = Add(verts, norms, uvs, weights, toLocal, p, n, new Vector2(k / (float)SkirtSegs, 0.5f * (1f - s)), w);
                 }
             var tris = 0;
             for (var j = 0; j < SkirtRings; j++)
+            {
+                if (j == UpperRings)
+                {
+                    // 段の切り替え: 上の段の最後の輪と下の段の最初の輪を、内向きの細い帯でつなぐ（隙間を見せない）
+                }
                 for (var k = 0; k < SkirtSegs; k++)
                 {
                     outTris.Add(grid[j, k]); outTris.Add(grid[j + 1, k]); outTris.Add(grid[j + 1, k + 1]);
                     outTris.Add(grid[j, k]); outTris.Add(grid[j + 1, k + 1]); outTris.Add(grid[j, k + 1]);
                     tris += 2;
                 }
+            }
             return tris;
         }
 
@@ -567,8 +658,11 @@ namespace HalfAware.EditorTools.Rocketbox
 
         // ---- 布の絵 -------------------------------------------------------------
 
-        /// <summary>生成りの布の色（sRGB）</summary>
-        public static readonly Color Cloth = new Color(0.87f, 0.83f, 0.74f);
+        /// <summary>裏の布を表から内へ下げる量（m）</summary>
+        const float LiningGap = 0.0008f;
+
+        /// <summary>布の色（sRGB）。黄みを抜いた白</summary>
+        public static readonly Color Cloth = new Color(0.95f, 0.94f, 0.92f);
 
         /// <summary>
         /// ワンピースの絵を描く（n×n）。組み合わせたメッシュのワンピースの面の組（一番後ろ）を UV に並べ、画素ごとの束ねた姿勢の位置から描く:
@@ -704,12 +798,10 @@ namespace HalfAware.EditorTools.Rocketbox
             return Mathf.Lerp(a, b, ty);
         }
 
-        /// <summary>仕上げの段のマテリアル: 布の絵。スカートと袖の内側も見えるので両面を描く</summary>
+        /// <summary>仕上げの段のマテリアル: 布の絵。裏の布は内向きの三角で作ってあるので、表だけを描く</summary>
         public static Material Textured(Texture tex)
         {
-            var m = BuildRocketboxProtagonist.Lit("Dress", tex, 0.08f, false);
-            m.SetFloat("_Cull", (float)CullMode.Off);
-            return m;
+            return BuildRocketboxProtagonist.Lit("Dress", tex, 0.08f, false);
         }
 
         static int Add(List<Vector3> verts, List<Vector3> norms, List<Vector2> uvs, List<BoneWeight> weights, Matrix4x4 toLocal,
@@ -768,12 +860,11 @@ namespace HalfAware.EditorTools.Rocketbox
             return w;
         }
 
-        /// <summary>形の段のマテリアル: 生成りの一色（陰影だけ）。スカートと袖の内側も見えるので両面を描く</summary>
+        /// <summary>形の段のマテリアル: 生成りの一色（陰影だけ）。裏の布は内向きの三角で作ってある</summary>
         public static Material Plain()
         {
             var m = BuildRocketboxProtagonist.Lit("Dress", null, 0.08f, false);
             m.SetColor("_BaseColor", new Color(0.86f, 0.82f, 0.74f));
-            m.SetFloat("_Cull", (float)CullMode.Off);
             return m;
         }
     }

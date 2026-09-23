@@ -558,6 +558,7 @@ namespace HalfAware.EditorTools.Rocketbox
             px = RocketboxPaint.MatchSkin(px, legMaps.Body, head.Px, head.Hair, headMaps.Head, headMaps.Anchors, k, out note);
             // 服を一色の布に（長衣。足とサンダルの高さより上）
             if (look.dress) RocketboxPaint.Dress(px, legMaps.Body, look, -1f, who.LegsCut + 0.05f, true);
+            if (look.brownShoes) RocketboxPaint.BrownShoes(px, legMaps.Body, look, 0.14f);
             return px;
         }
 

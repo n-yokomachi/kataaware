@@ -176,6 +176,9 @@ namespace HalfAware.EditorTools.Rocketbox
             public bool flatHair;
             [Header("ワンピース（上の服と借りたスカートを同じ布の色に。布の明暗は元のまま）")]
             public bool dress;
+            [Tooltip("膝から下を借りた人の靴（暗い革）を茶の革に塗る")]
+            public bool brownShoes;
+            public Color brownShadow = new Color(0.16f, 0.09f, 0.05f), brownShine = new Color(0.52f, 0.33f, 0.18f);
             public Color dressShadow = new Color(0.56f, 0.53f, 0.48f), dressShine = new Color(0.95f, 0.93f, 0.88f);
             [Header("ネックレス（首の付け根の両脇から胸の真ん中へ垂れる鎖と、丸い飾り）")]
             public bool necklace;
@@ -1331,6 +1334,22 @@ namespace HalfAware.EditorTools.Rocketbox
                         c.a = px[i].a;
                         px[i] = c;
                     }
+        }
+
+        /// <summary>足の高さ（toY より下）の、肌でない暗い所（靴の革と底）を茶の革に塗る。明暗は元のまま</summary>
+        public static void BrownShoes(Color[] px, Surface s, Look k, float toY)
+        {
+            var V = new float[px.Length];
+            var w = new float[px.Length];
+            for (var i = 0; i < px.Length; i++)
+            {
+                float h, sat, v;
+                Color.RGBToHSV(px[i], out h, out sat, out v);
+                V[i] = v;
+                if (!s.On[i] || s.P[i].y > toY) continue;
+                w[i] = Smooth(0.45f, 0.2f, SkinLike(px[i])) * Smooth(0.55f, 0.40f, v);
+            }
+            Recolour(px, V, w, k.brownShadow, k.brownShine);
         }
 
         static void Recolour(Color[] px, float[] V, float[] w, Color shadow, Color shine)

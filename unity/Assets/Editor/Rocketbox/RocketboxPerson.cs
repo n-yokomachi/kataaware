@@ -352,6 +352,7 @@ namespace HalfAware.EditorTools.Rocketbox
             k.chestSkin = true;
             k.matchSkinAll = true;
             k.naturalHair = true;
+            k.brownShoes = true;
         }
 
         /// <summary>主人公の候補: 女大 14 の顔と髪（14 の元の頭そのまま。額の上の前髪の塊も元の形）。服は今の主人公と同じ</summary>
@@ -374,8 +375,7 @@ namespace HalfAware.EditorTools.Rocketbox
         }
 
         /// <summary>主人公の片割れ（仮）: 主人公と同じ女大 14 の顔と髪と体。髪は 14 の元の茶色（塗らない）。模型ごと裏返して組み立てる。体は F3 で 02 にする</summary>
-        public static readonly RocketboxPerson Face14Hair14Twin =
-            Twin(Face14Hair14BodySports02, Dress(Compose("Face14_Hair14_Twin", "女大 14 の顔と髪と体（片割れ）", Adult14, Adult14), OutfitProtagonist));
+        public static readonly RocketboxPerson Face14Hair14Twin = Twin(Face14Hair14BodySports02, Face14Hair14MadeDress);
 
         /// <summary>
         /// 主人公の候補: スポーツ 02 の顔に女大 14 の髪（頭の面の髪の所と前髪の塊、髪の房）をかつらとして合わせた人。体は女大 14（今の主人公の服）。
@@ -431,7 +431,7 @@ namespace HalfAware.EditorTools.Rocketbox
 
         /// <summary>手を入れて撮り比べる人の全部</summary>
         public static readonly RocketboxPerson[] All = { Adult14, Adult08, Head08Body14, Face14Hair08, Face14Hair08Body03, Face14Hair08Body02, Face14Hair08Body11, Face14Hair08Body11Legs22,
-            Face14Hair08BodySports02, FaceSports02Hair08, FaceSports02Hair08Body14, Face14Hair14, Face14Hair14BodySports02, Face14Hair14Twin, FaceSports02Hair14,
+            Face14Hair08BodySports02, FaceSports02Hair08, FaceSports02Hair08Body14, Face14Hair14, Face14Hair14BodySports02, FaceSports02Hair14,
             Face14Hair14Body18Robe10, Face14Hair14MadeDress };
 
         /// <summary>取り込んだ一人（元の FBX とテクスチャを持つ人）</summary>
