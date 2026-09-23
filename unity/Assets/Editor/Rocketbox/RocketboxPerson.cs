@@ -66,7 +66,8 @@ namespace HalfAware.EditorTools.Rocketbox
         /// 華奢にする（<see cref="RocketboxCompose.Slim"/>）。腕と脚の太さ、手首と足首、胴の幅、手の大きさ、肩幅の片側の狭め（m）。長さは変えない
         /// </summary>
         public bool Slim;
-        public float SlimLimb = 0.90f, SlimWrist = 0.94f, SlimTorso = 0.94f, HandScale = 0.95f, ShoulderIn = 0.006f, SlimNeck = 1f;
+        /// <summary>華奢の値。オーナーが見比べて「強」に決めた（腕と脚 0.85、手首と足首さらに 0.92、胴 左右 0.91・前後 0.955、手 0.92、肩幅 片側 1.2 cm、首の付け根 0.95）</summary>
+        public float SlimLimb = 0.85f, SlimWrist = 0.92f, SlimTorso = 0.91f, HandScale = 0.92f, ShoulderIn = 0.012f, SlimNeck = 0.95f;
 
         /// <summary>一から作るワンピースを着せる（<see cref="RocketboxDress"/>）。体の人の面は袖口より先の腕と手だけを残す</summary>
         public bool MadeDress;
@@ -378,7 +379,7 @@ namespace HalfAware.EditorTools.Rocketbox
         /// 胸元にネックレス（細い銀の鎖と小さな飾り）を描く
         /// </summary>
         public static readonly RocketboxPerson Face14Hair14BodySports02 =
-            BodyChest(Dress(Compose("Face14_Hair14_BodySports02", "女大 14 の顔と髪をスポーツ 02 の体に（主人公）", Adult14, Sports02), OutfitProtagonistSports02));
+            SlimOn(BodyChest(Dress(Compose("Face14_Hair14_BodySports02", "女大 14 の顔と髪をスポーツ 02 の体に（主人公）", Adult14, Sports02), OutfitProtagonistSports02)));
 
         /// <summary>主人公（スポーツ 02 の体）の服: 元の色のまま。腕の肌を頭の肌に揃え、首の付け根の上の 14 のネックレスの鎖は消し、胸元に描き直す</summary>
         static void OutfitProtagonistSports02(RocketboxPaint.Look k)
@@ -387,7 +388,7 @@ namespace HalfAware.EditorTools.Rocketbox
             k.necklace = true;
         }
 
-        /// <summary>主人公の候補: 今の主人公（<see cref="Face14Hair14BodySports02"/>）に、片割れと同じ華奢の値を掛けた人（主人公の既定はまだ変えない）</summary>
+        /// <summary>主人公の候補（見比べ用に残す）: 主人公に華奢を掛けた人。主人公（<see cref="Face14Hair14BodySports02"/>）も華奢になったので、今は同じ形</summary>
         public static readonly RocketboxPerson Face14Hair14BodySports02Slim =
             SlimOn(BodyChest(Dress(Compose("Face14_Hair14_BodySports02_Slim", "女大 14 の顔と髪をスポーツ 02 の体に、華奢（主人公の候補）", Adult14, Sports02), OutfitProtagonistSports02)));
 
