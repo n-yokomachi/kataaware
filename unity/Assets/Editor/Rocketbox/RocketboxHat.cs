@@ -23,7 +23,7 @@ namespace HalfAware.EditorTools.Rocketbox
         public const float CrownHeight = 0.080f, CrownDome = 0.014f, CrownMargin = 0.010f, BrimWidth = 0.100f, BrimDroop = 0.018f, RibbonHeight = 0.028f;
         /// <summary>山の天辺の細り（付け根の半径に対する割合）</summary>
         public const float CrownTaper = 0.90f;
-        /// <summary>山の付け根（つば）の高さ（目の高さから上へ）。浅めの被り方で、つばが目元にかからない</summary>
+        /// <summary>山の付け根（つば）の高さ（目の高さから上へ）の基準。Look.hatDepth（既定 −2 cm）を足した所に被る</summary>
         public const float BandAboveEyes = 0.068f;
         const int Segs = 64, SideRings = 6, TopRings = 6, BrimRings = 6;
         /// <summary>麦わらの色（sRGB）</summary>
@@ -41,6 +41,8 @@ namespace HalfAware.EditorTools.Rocketbox
         {
             var eyeY = (a.eyeL.y + a.eyeR.y) * 0.5f;
             var bandY = eyeY + BandAboveEyes + k.hatDepth;
+            // 山の大きさは深さによらず、浅めの被り方の高さで測る（深い所で測ると、ボブの広がった髪で山が大きくなった）
+            var measureY = eyeY + BandAboveEyes;
             var mesh = smr.sharedMesh;
             var v = mesh.vertices;
             var bw = mesh.boneWeights;
@@ -50,7 +52,7 @@ namespace HalfAware.EditorTools.Rocketbox
             {
                 if (bw[i].boneIndex0 != headIdx || bw[i].weight0 < 0.5f) continue;
                 var p = root.InverseTransformPoint(smr.transform.TransformPoint(v[i]));
-                if (Mathf.Abs(p.y - bandY) > 0.012f) continue;
+                if (Mathf.Abs(p.y - measureY) > 0.012f) continue;
                 pts.Add(p);
             }
             var f = new Fit();
@@ -65,6 +67,9 @@ namespace HalfAware.EditorTools.Rocketbox
                 float x0 = float.MaxValue, x1 = float.MinValue, z0 = float.MaxValue, z1 = float.MinValue;
                 foreach (var p in pts) { x0 = Mathf.Min(x0, p.x); x1 = Mathf.Max(x1, p.x); z0 = Mathf.Min(z0, p.z); z1 = Mathf.Max(z1, p.z); }
                 f.centre = new Vector3((x0 + x1) * 0.5f, bandY, (z0 + z1) * 0.5f);
+                // 深く被ると、測った高さより下の頭は少し広いので、下げた分だけゆとりを足す
+                var extra = Mathf.Max(0f, -k.hatDepth) * 0.25f;
+                x1 += extra; x0 -= extra; z1 += extra; z0 -= extra;
                 f.rx = (x1 - x0) * 0.5f + CrownMargin;
                 f.rz = (z1 - z0) * 0.5f + CrownMargin;
             }
@@ -121,12 +126,12 @@ namespace HalfAware.EditorTools.Rocketbox
             }, j => (rTop + (CrownHeight - RibbonHeight) * (j / (float)SideRings)) / sTotal * 0.94f, SideRings, true);
             // リボン（山より 1.5 mm 外）
             var ribbonGrow = 1f + 0.0015f / rTop;
-            grid((j, ang) => at(ang, ribbonGrow, Mathf.Lerp(RibbonHeight, 0f, j / 2f)), j => 0.95f + 0.05f * (j / 2f), 2, true);
-            // つば（山の付け根から外へ。縁がわずかに下がる）
+            grid((j, ang) => at(ang, ribbonGrow, Mathf.Lerp(RibbonHeight, -0.003f, j / 2f)), j => 0.95f + 0.05f * (j / 2f), 2, true);
+            // つば（山の付け根の少し内から外へ。縁がわずかに下がる。内の縁をリボンの下へ入れて、つばとリボンの間から帯の裏が覗かないように）
             grid((j, ang) =>
             {
                 var t = j / (float)BrimRings;
-                var rho = 1f + BrimWidth / rTop * t;
+                var rho = 0.96f + (BrimWidth / rTop + 0.04f) * t;
                 return at(ang, rho, -BrimDroop * t * t);
             }, j => (rTop + CrownHeight - RibbonHeight + BrimWidth * (j / (float)BrimRings)) / sTotal * 0.94f, BrimRings, true);
             // 三角の巻きを外向きに揃える（天辺とつばは上、山の横とリボンは軸から外）。巻きが内向きだと、両面で描いても内向きの法線で照らされて暗く見えた

@@ -39,7 +39,7 @@ namespace HalfAware.EditorTools.Rocketbox
         /// <summary>袖の付け根と袖口（上腕の長さの割合）</summary>
         public const float SleeveT0 = 0.05f, SleeveT1 = 0.58f;
         /// <summary>袖と腕の間の隙間と、パフの膨らみ（袖の中ほどで一番大きい）。袖口の帯は袖の長さの SleeveBand（割合）</summary>
-        public const float SleeveBase = 0.005f, SleevePuff = 0.026f, SleeveBand = 0.12f;
+        public const float SleeveBase = 0.004f, SleevePuff = 0.014f, SleeveBand = 0.14f;
         /// <summary>裾の高さと、裾の半径（腰の真ん中から）、ひだの波の深さと数</summary>
         public const float HemY = 0.11f, HemR = 0.30f, WaveAmp = 0.014f;
         public const int Waves = 11;
@@ -492,7 +492,8 @@ namespace HalfAware.EditorTools.Rocketbox
                     // 付け根と袖口の縁には細かいギャザーの波
                     var outer = 0.5f - 0.5f * Mathf.Cos(ang);
                     var body = 1f - SleeveBand;
-                    var puff = u < body ? Mathf.Pow(Mathf.Sin(Mathf.PI * Mathf.Clamp01(u / body)), 0.7f) : 0f;
+                    // 膨らみは肩の付け根寄り（袖の 3 割の所）で一番大きく、袖口の帯へ細る
+                    var puff = u < body ? Mathf.Sin(Mathf.PI * Mathf.Pow(Mathf.Clamp01(u / body), 0.6f)) : 0f;
                     var gather = 0.0025f * Mathf.Sin(14f * ang) * (RocketboxPaint.Smooth(0.2f, 0f, u) + RocketboxPaint.Smooth(body - 0.12f, body, u) * (u < body ? 1f : 0f));
                     var r = rRing[j, kk] + SleeveBase + SleevePuff * puff * (0.45f + 0.55f * outer) + gather * puff;
                     pos[j, k] = s + a * (t * len) + dir * r;

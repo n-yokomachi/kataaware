@@ -67,6 +67,13 @@ namespace HalfAware.EditorTools.Rocketbox
             var bv = bm.vertices;
             var hv = hm.vertices;
             var bw = World(bv, bodyToWorld);
+            // 華奢にする（体の人の頂点を骨の軸へ寄せる。長さは変えない）
+            string slimNote = null;
+            if (who.Slim)
+            {
+                bw = Slim(who, bodySmr, bw, bm.boneWeights, out slimNote);
+                for (var i = 0; i < bv.Length; i++) bv[i] = worldToBody.MultiplyPoint3x4(bw[i]);
+            }
             var hw = World(hv, headToWorld);
 
             var bodyClothes = new Surface(bw, bm.GetTriangles(bodySub));
@@ -301,13 +308,113 @@ namespace HalfAware.EditorTools.Rocketbox
                 "胸元を体の人の肌の三角で埋めた数 {17}\n{15}\n書いた所: {16}",
                 who, verts.Count, (bodyTris.Length + headTris.Length + hairTris.Length) / 3, bodyTris.Length / 3, headTris.Length / 3, hairTris.Length / 3,
                 snapped, maxSnap * 1000f, pushedIn, maxIn * 1000f, hairInside, worstHair * 1000f, pushedOut, HairOver * 1000f, maxOut * 1000f,
-                seam, who.CompositeMesh, patch.Count / 3) + (legsNote != null ? "\n" + legsNote : "") + (dressNote != null ? "\n" + dressNote : "");
+                seam, who.CompositeMesh, patch.Count / 3) + (legsNote != null ? "\n" + legsNote : "") + (dressNote != null ? "\n" + dressNote : "")
+                + (slimNote != null ? "\n" + slimNote : "");
         }
 
         /// <summary>位置の 0.2 mm ごとの鍵（UV の継ぎ目で分かれた同じ位置の頂点を一つに見る）</summary>
         static long PosKey(Vector3 p)
         {
             return ((long)Mathf.RoundToInt(p.x * 5000f) + 100000) * 10000000000L + ((long)Mathf.RoundToInt(p.y * 5000f) + 100000) * 100000L + (Mathf.RoundToInt(p.z * 5000f) + 50000);
+        }
+
+        /// <summary>
+        /// 華奢にする（<see cref="RocketboxPerson.Slim"/>）。頂点を、付いている骨ごとの変形の重み付きの和へ動かす（束ねた姿勢の世界の位置）:
+        /// - 腕（上腕・前腕）と脚（腿・脛）: 骨の軸（骨から子の骨への線）へ SlimLimb の割合で寄せる。前腕と脛は先ほど細く（手首と足首は SlimWrist 倍をさらに掛ける）
+        /// - 手と指: 手の骨のまわりに HandScale 倍
+        /// - 足: 足首の骨のまわりに横だけ SlimWrist 倍
+        /// - 胴（腰・背骨）: 左右を SlimTorso 倍、前後はその半分だけ細く（胴の前後の真ん中のまわり。胸が平たくならないように）
+        /// - 鎖骨と腕と手: ShoulderIn だけ体の側へ（肩幅を狭める）
+        /// 頭と首は動かさない
+        /// </summary>
+        public static Vector3[] Slim(RocketboxPerson who, SkinnedMeshRenderer smr, Vector3[] w, BoneWeight[] bwts, out string note)
+        {
+            var bones = smr.bones;
+            var byName = new Dictionary<string, Transform>();
+            foreach (var t in smr.transform.root.GetComponentsInChildren<Transform>(true)) byName[t.name] = t;
+            Func<string, Vector3> at = n => { Transform t; return byName.TryGetValue(n, out t) ? t.position : Vector3.zero; };
+            // 胴の前後の真ん中（高さ 1 cm ごと）
+            var torso = new HashSet<string> { "Bip01 Pelvis", "Bip01 Spine", "Bip01 Spine1", "Bip01 Spine2" };
+            var zMin = new Dictionary<int, float>();
+            var zMax = new Dictionary<int, float>();
+            for (var i = 0; i < w.Length; i++)
+            {
+                if (!torso.Contains(bones[bwts[i].boneIndex0].name) || bwts[i].weight0 < 0.6f) continue;
+                if (Mathf.Abs(w[i].x) > 0.12f) continue;
+                var k = Mathf.RoundToInt(w[i].y * 100f);
+                float a;
+                zMin[k] = zMin.TryGetValue(k, out a) ? Mathf.Min(a, w[i].z) : w[i].z;
+                zMax[k] = zMax.TryGetValue(k, out a) ? Mathf.Max(a, w[i].z) : w[i].z;
+            }
+            Func<float, float> zc = y =>
+            {
+                var k = Mathf.RoundToInt(y * 100f);
+                for (var d = 0; d < 20; d++)
+                    foreach (var kk in new[] { k - d, k + d })
+                        if (zMin.ContainsKey(kk)) return (zMin[kk] + zMax[kk]) * 0.5f;
+                return 0f;
+            };
+            var o = new Vector3[w.Length];
+            int moved = 0;
+            float maxMove = 0f;
+            for (var i = 0; i < w.Length; i++)
+            {
+                var p = w[i];
+                var sum = Vector3.zero;
+                var ws = 0f;
+                var bw = bwts[i];
+                var ids = new[] { bw.boneIndex0, bw.boneIndex1, bw.boneIndex2, bw.boneIndex3 };
+                var wts = new[] { bw.weight0, bw.weight1, bw.weight2, bw.weight3 };
+                for (var e = 0; e < 4; e++)
+                {
+                    if (wts[e] <= 0f) continue;
+                    var n = bones[ids[e]].name;
+                    var q = p;
+                    var sideSign = n.Contains(" L ") ? -1f : n.Contains(" R ") ? 1f : 0f;
+                    Func<string, string, float, float, Vector3> limb = (from, to, s0, s1) =>
+                    {
+                        var a0 = at(from);
+                        var a1 = at(to);
+                        var ax = a1 - a0;
+                        var len2 = Mathf.Max(1e-6f, ax.sqrMagnitude);
+                        var t = Mathf.Clamp01(Vector3.Dot(p - a0, ax) / len2);
+                        var c = a0 + ax * t;
+                        var sc = Mathf.Lerp(s0, s1, t);
+                        return c + (p - c) * sc;
+                    };
+                    var side = sideSign < 0f ? "L" : "R";
+                    if (n.EndsWith(" Thigh")) q = limb(n, "Bip01 " + side + " Calf", who.SlimLimb, who.SlimLimb);
+                    else if (n.EndsWith(" Calf")) q = limb(n, "Bip01 " + side + " Foot", who.SlimLimb, who.SlimLimb * who.SlimWrist);
+                    else if (n.EndsWith(" Foot") || n.Contains(" Toe"))
+                    {
+                        var f0 = at("Bip01 " + side + " Foot");
+                        q = new Vector3(f0.x + (p.x - f0.x) * who.SlimWrist, p.y, p.z);
+                    }
+                    else if (n.EndsWith(" UpperArm")) q = limb(n, "Bip01 " + side + " Forearm", who.SlimLimb, who.SlimLimb);
+                    else if (n.EndsWith(" Forearm")) q = limb(n, "Bip01 " + side + " Hand", who.SlimLimb, who.SlimLimb * who.SlimWrist);
+                    else if (n.EndsWith(" Hand") || n.Contains(" Finger"))
+                    {
+                        var h0 = at("Bip01 " + side + " Hand");
+                        q = h0 + (p - h0) * who.HandScale;
+                    }
+                    else if (torso.Contains(n))
+                    {
+                        var z0 = zc(p.y);
+                        q = new Vector3(p.x * who.SlimTorso, p.y, z0 + (p.z - z0) * Mathf.Lerp(1f, who.SlimTorso, 0.5f));
+                    }
+                    // 肩幅: 鎖骨・腕・手を体の側へ
+                    if (sideSign != 0f && (n.Contains("Clavicle") || n.Contains("Arm") || n.EndsWith(" Hand") || n.Contains(" Finger")))
+                        q.x -= sideSign * who.ShoulderIn * (n.Contains("Clavicle") ? 0.6f : 1f);
+                    sum += q * wts[e];
+                    ws += wts[e];
+                }
+                o[i] = ws > 0f ? sum / ws : p;
+                var dm = (o[i] - p).magnitude;
+                if (dm > 1e-5f) { moved++; maxMove = Mathf.Max(maxMove, dm); }
+            }
+            note = string.Format(CultureInfo.InvariantCulture, "華奢: 腕と脚 {0:0.00} 倍、手首と足首 さらに {1:0.00} 倍、胴 左右 {2:0.00} 倍・前後 {3:0.00} 倍、手 {4:0.00} 倍、肩幅 {5:0.0} cm 狭める（動かした頂点 {6}、最大 {7:0.0} mm）",
+                who.SlimLimb, who.SlimWrist, who.SlimTorso, Mathf.Lerp(1f, who.SlimTorso, 0.5f), who.HandScale, who.ShoulderIn * 200f, moved, maxMove * 1000f);
+            return o;
         }
 
         /// <summary>重心が cut より上の三角だけ</summary>
@@ -331,6 +438,11 @@ namespace HalfAware.EditorTools.Rocketbox
             var legsSmr = Smr(who.LegsFrom.Model);
             var lm = legsSmr.sharedMesh;
             var lw = World(lm.vertices, legsSmr.transform.localToWorldMatrix);
+            if (who.Slim)
+            {
+                string legsSlim;
+                lw = Slim(who, legsSmr, lw, lm.boneWeights, out legsSlim);
+            }
             var lwts = lm.boneWeights;
             var bones = legsSmr.bones;
             Func<int, bool> armish = i =>
