@@ -195,17 +195,18 @@ namespace HalfAware.EditorTools
             FlatThing(b.Soft, u, LaneWest + 0.10f, 0.58f, f3 + 0.62f, new Vector3(0.17f, 1.00f, 0.42f));
             FlatThing(b.Red, u, LaneWest + 0.10f, 1.02f, f3 + 0.70f, new Vector3(0.16f, 0.92f, 0.38f));
             FlatThing(b.Shade, u, LaneWest + 0.09f, 0.80f, f3 + 1.64f, new Vector3(0.18f, 0.07f, 0.24f));
-            // 傘立てと杖
-            FlatThing(b.Gear, u, 3.52f, 0.40f, f3, new Vector3(0.22f, 0.45f, 0.22f));
-            FlatThing(b.Shade, u, 3.50f, 0.38f, f3 + 0.20f, new Vector3(0.04f, 0.62f, 0.04f));
-            FlatThing(b.Set, u, 3.56f, 0.44f, f3 + 0.10f, new Vector3(0.03f, 0.84f, 0.03f), 0f);
-            // 玄関の小卓と花瓶、壁の鏡。戸口のすぐ東、階段の上り口の手前
-            FlatThing(b.Set, u, 5.15f, 0.55f, f3, new Vector3(0.28f, 0.80f, 0.50f));
-            FlatThing(b.Blue, u, 5.15f, 0.48f, f3 + 0.80f, new Vector3(0.10f, 0.20f, 0.10f));
-            FlatThing(b.Yellow, u, 5.15f, 0.48f, f3 + 1.00f, new Vector3(0.20f, 0.14f, 0.20f));
-            FlatThing(b.Gear, u, 5.15f, 0.68f, f3 + 0.80f, new Vector3(0.14f, 0.02f, 0.10f));
-            FlatThing(b.Set, u, FlatInner - 0.015f, 0.55f, f3 + 1.15f, new Vector3(0.03f, 0.62f, 0.46f));
-            FlatThing(b.Glaze, u, FlatInner - 0.035f, 0.55f, f3 + 1.19f, new Vector3(0.01f, 0.54f, 0.38f));
+            // 傘立てと杖。コートの下、台所の戸口の手前
+            FlatThing(b.Gear, u, LaneWest + 0.12f, 1.28f, f3, new Vector3(0.22f, 0.45f, 0.22f));
+            FlatThing(b.Shade, u, LaneWest + 0.10f, 1.26f, f3 + 0.20f, new Vector3(0.04f, 0.62f, 0.04f));
+            FlatThing(b.Set, u, LaneWest + 0.16f, 1.32f, f3 + 0.10f, new Vector3(0.03f, 0.84f, 0.03f), 0f);
+            // 玄関の小卓と花瓶、壁の鏡。戸口の西、デッキ側の壁の内側。
+            // 戸口の東は開いた戸が戸境の壁へ寄るので（BuildDiveTakes の Ajar）何も置かない
+            FlatThing(b.Set, u, 3.65f, FrontIn + 0.14f, f3, new Vector3(0.50f, 0.80f, 0.28f));
+            FlatThing(b.Blue, u, 3.52f, FrontIn + 0.13f, f3 + 0.80f, new Vector3(0.10f, 0.20f, 0.10f));
+            FlatThing(b.Yellow, u, 3.52f, FrontIn + 0.13f, f3 + 1.00f, new Vector3(0.20f, 0.14f, 0.20f));
+            FlatThing(b.Gear, u, 3.76f, FrontIn + 0.17f, f3 + 0.80f, new Vector3(0.14f, 0.02f, 0.10f));
+            FlatThing(b.Set, u, 3.65f, FrontIn + 0.015f, f3 + 1.15f, new Vector3(0.46f, 0.62f, 0.03f));
+            FlatThing(b.Glaze, u, 3.65f, FrontIn + 0.035f, f3 + 1.19f, new Vector3(0.38f, 0.54f, 0.01f));
             // 廊下の細長い敷物と、壁の写真
             FlatThing(b.Red, u, (LaneWest + LaneEast) * 0.5f, 2.95f, f3, new Vector3(0.62f, 0.012f, 2.70f));
             EstateFrameOn(b, u, LaneWest + 0.01f, 2.60f, f3 + 1.45f, 0.36f, 0.28f, 1);

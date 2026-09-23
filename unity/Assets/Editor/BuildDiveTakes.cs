@@ -158,7 +158,8 @@ namespace HalfAware.EditorTools
         // 日本の鉄扉（換気口・新聞受け・覗き穴）だった頃の板は外した。
         //
         // 建物の面の穴・枠・欄間・丁番は場所の側（<c>BuildDiveEstate</c>）が持ち、記憶からは触れない。
-        // 丁番は東の枠にあり、開いた戸はそこを軸に外（デッキの側）へ振り出して壁へ寄せる
+        // **ロンドンの住戸の玄関の戸は内開き。** 丁番は戸口の内側の面の東の縁にあり、
+        // 開いた戸はそこを軸に住戸の中へ開いて、玄関の東の壁（戸境の壁）へ寄せる
 
         /// <summary>戸の番地。建物の面の戸口と揃える（<c>EstateFront</c> の 12 + 戸口の番号 × 2）</summary>
         static int EstateDoorNumber(float x)
@@ -226,35 +227,75 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 開いた戸。東の枠の丁番を軸に、外へ 180 度振り出して壁へ寄せる。
+        /// 開いた戸。住戸の中へ開き、戸口の内側の面の東の縁の丁番を軸に、玄関の東の壁（戸境の壁）へ寄せる。
         ///
-        /// **見えているのは戸の裏（住戸の側）。** 振り出すと表は壁を向くので、
-        /// デッキから見えるのは裏の鏡板と、郵便受けの内側の覆い、夜錠、把手。
-        /// 振り出すと左右が入れ替わるので、表では西の端にあった把手と錠は東の端に来る。
-        /// 裏も戸の色で塗る。白くすると、開いている戸だけ色が抜けて一戸ずつの塗り分けが読めない。
+        /// **ロンドンの住戸の玄関の戸は内開き。** 前はデッキの側へ 180 度振り出して表の壁に寄せていたが、
+        /// 開き方が逆だった。
         ///
-        /// **メーターの物入れは戸の西にある。** 東へ寄せる板とは重ならない
+        /// **板の先が戸境の壁に当たるまで開く。** 丁番から戸境の壁までは 0.25 m あり、
+        /// 90 度では板が壁から浮く。先を壁へ当てると 101 度ほど開いて斜めに寄る。
+        /// 板は戸口の幅の外（東の縁の線より東）に収めるので、戸口の 1.0 m を食わない。
+        /// 板の先は階段の一段目のすぐ手前に来るので、仕切りの下の段を開けて
+        /// （BuildDiveEstateFlat の <see cref="NewelSteps"/>）、板の先と仕切りの端のあいだを 1.0 m 以上取る。
+        /// 当たりも入れる。板と戸境の壁のあいだの三角は、先が壁に付いているので体が入り込まない。
+        ///
+        /// **表は玄関の中の西を向く。** 番地・郵便受けの口・ノッカー・把手は表に、閉めた戸（<see cref="Shut"/>）と
+        /// 同じ位置で付ける。デッキから覗くと、戸口の東の縁の奥に表が斜めに見える。
+        /// 裏（戸境の壁の側）は郵便受けの内側の覆い・夜錠・把手。
+        /// 裏も戸の色で塗る。白くすると、開いている戸だけ色が抜けて一戸ずつの塗り分けが読めない
         /// </summary>
         static Transform Ajar(Transform take, string name, float x)
         {
+            const float thick = 0.05f;
+            var wide = DoorHalf * 2f;
+            // 板の先の裏（東の面）を戸境の壁の面から 5 mm 手前で止める開き。丁番から壁までは FlatInner - DoorAt
+            var room = FlatInner - DoorAt - DoorHalf - thick - 0.004f;
+            var lean = Mathf.Asin(room / wide);
+            // 板のローカルは、丁番の縁が x = 0、戸先が x = -wide（閉めたときの西）、
+            // 裏の面が z = 0、表の面が z = thick（閉めたときのデッキの側）
             var leaf = Piece(take, name, Shape("EstateAjar", 0.4f, b =>
             {
-                b.Box(new Vector3(0f, DoorHigh * 0.5f, 0f), new Vector3(DoorHalf * 2f, DoorHigh, 0.05f));
+                b.Box(new Vector3(-DoorHalf, DoorHigh * 0.5f, thick * 0.5f), new Vector3(wide, DoorHigh, thick));
+                // 鏡板。表と裏に二枚ずつ
                 for (var i = 0; i < 2; i++)
-                    b.Box(new Vector3(i == 0 ? -0.2f : 0.2f, 0.50f, 0.032f), new Vector3(0.30f, 0.62f, 0.015f));
+                {
+                    var px = -DoorHalf + (i == 0 ? -0.2f : 0.2f);
+                    b.Box(new Vector3(px, 0.50f, thick + 0.0075f), new Vector3(0.30f, 0.62f, 0.015f));
+                    b.Box(new Vector3(px, 0.50f, -0.0075f), new Vector3(0.30f, 0.62f, 0.015f));
+                }
             }), EstateDoorPaint(x));
-            // 丁番の芯は枠の外（x + 0.51）。板の厚みの真ん中を面から 0.25 の所に置き、丁番の出に掛ける
-            leaf.localPosition = new Vector3(x + 0.51f + DoorHalf, EstateTop, EstateFace + 0.25f);
+            // 丁番の芯。表の面の丁番の側の縁が、戸口の東の縁の線（x + DoorHalf）に来る
+            leaf.localPosition = new Vector3(x + DoorHalf + thick * Mathf.Cos(lean), EstateTop, EstateFace - FaceSkin - 0.005f);
+            leaf.localRotation = Quaternion.Euler(0f, -90f - lean * Mathf.Rad2Deg, 0f);
 
             Piece(leaf, "Glass", Shape("EstateAjarGlass", 0.5f, b =>
-                b.FaceZ(0.026f, -0.12f, 0.12f, 1.40f, 1.85f, 1)), EstateDoorMat("Glass"));
-            // 郵便受けの内側の覆い・夜錠・把手
+            {
+                b.FaceZ(thick + 0.001f, -DoorHalf - 0.12f, -DoorHalf + 0.12f, 1.40f, 1.85f, 1);
+                b.FaceZ(-0.001f, -DoorHalf - 0.12f, -DoorHalf + 0.12f, 1.40f, 1.85f, -1);
+            }), EstateDoorMat("Glass"));
             Piece(leaf, "Brass", Shape("EstateAjarBrass", 0.5f, b =>
             {
-                b.Box(new Vector3(0f, 1.00f, 0.05f), new Vector3(0.32f, 0.12f, 0.05f));
-                b.Box(new Vector3(0.34f, 1.22f, 0.045f), new Vector3(0.10f, 0.08f, 0.04f));
-                b.Box(new Vector3(0.36f, 1.02f, 0.06f), new Vector3(0.05f, 0.05f, 0.07f));
+                // 表。郵便受けの真鍮の板・ノッカー・把手・鍵。把手と鍵は戸先の側
+                b.Box(new Vector3(-DoorHalf, 1.00f, thick + 0.006f), new Vector3(0.30f, 0.09f, 0.012f));
+                b.Box(new Vector3(-DoorHalf, 1.42f, thick + 0.015f), new Vector3(0.10f, 0.03f, 0.03f));
+                b.Box(new Vector3(-wide + 0.16f, 1.02f, thick + 0.04f), new Vector3(0.05f, 0.05f, 0.08f));
+                b.Box(new Vector3(-wide + 0.16f, 1.20f, thick + 0.01f), new Vector3(0.05f, 0.07f, 0.02f));
+                // 裏。郵便受けの内側の覆い・夜錠・把手
+                b.Box(new Vector3(-DoorHalf, 1.00f, -0.025f), new Vector3(0.32f, 0.12f, 0.05f));
+                b.Box(new Vector3(-wide + 0.16f, 1.22f, -0.02f), new Vector3(0.10f, 0.08f, 0.04f));
+                b.Box(new Vector3(-wide + 0.14f, 1.02f, -0.035f), new Vector3(0.05f, 0.05f, 0.07f));
             }), EstateDoorMat("Brass"));
+            // 郵便受けの横長の口
+            Piece(leaf, "Slot", Shape("EstateAjarSlot", 0.5f, b =>
+                b.FaceZ(thick + 0.013f, -DoorHalf - 0.12f, -DoorHalf + 0.12f, 0.985f, 1.015f, 1)), EstateDoorMat("Slot"));
+            // 番地。閉めた戸と同じ高さ
+            var number = EstateDoorNumber(x);
+            Piece(leaf, "Number", Shape("EstateAjarNo" + number, 0.5f, b =>
+                EstateDigits(b, -DoorHalf, 1.24f, thick + 0.004f, 1, number, 0.12f)), EstateDoorMat("Number"));
+
+            var box = leaf.gameObject.AddComponent<BoxCollider>();
+            box.center = new Vector3(-DoorHalf, DoorHigh * 0.5f, thick * 0.5f);
+            box.size = new Vector3(wide, DoorHigh, thick);
             return leaf;
         }
 
@@ -564,7 +605,7 @@ namespace HalfAware.EditorTools
         static HostKey[] Giorgio(Transform take)
         {
             // **妻は開いた玄関の奥、足拭きの上に立たせる。** 「新聞、来てる？」は戸口の前で聞くので、
-            // デッキの戸口の前から姿が見えないと誰の声か分からない。戸口の穴（x ±0.45）の
+            // デッキの戸口の前から姿が見えないと誰の声か分からない。戸口の穴（x ±0.5）の
             // 真ん中の線の上、住戸の中の階段の上り口の手前に置き、戸口の方（デッキ）を向かせる。
             // 背にした玄関の灯り（RoomBHall）で顔は影になる。
             // 台所の窓越しも考えたが、窓の下半分はレースで、立った妻の胸はその裏に沈む

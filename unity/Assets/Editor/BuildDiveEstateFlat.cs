@@ -56,6 +56,13 @@ namespace HalfAware.EditorTools
         const float InnerRise = Floor / InnerRisers;                                        // 0.2
         /// <summary>最後の蹴上げ。ここから南が四階の踊り場</summary>
         const float InnerHead = InnerFoot + InnerGo * (InnerRisers - 1);                    // 4.42
+        /// <summary>
+        /// 住戸の中の階段の下の、廊下との仕切りを立てない段の数。**上り口の脇は親柱と手すりだけにする。**
+        /// 玄関の戸は内へ開いて東の戸境の壁に寄るので（BuildDiveTakes の Ajar）、板の先は一段目のすぐ手前に来る。
+        /// 仕切りを一段目から立てると、板の先と仕切りの端のあいだが 0.9 m ほどしかなく、
+        /// 体の中心が 0.3 m 動けない。二段ぶん仕切りを下げると、その間は 1.0 m を超える
+        /// </summary>
+        const int NewelSteps = 2;
         /// <summary>台所の南の仕切りの真ん中。仕切りに配膳の小窓を抜く</summary>
         const float CookBack = 3.65f;
         /// <summary>居間の北の仕切りの真ん中。廊下はここで居間の戸口に突き当たる</summary>
@@ -170,7 +177,7 @@ namespace HalfAware.EditorTools
             // 台所は陶板、ほかは敷き込みの絨毯。**戸口に段は付けない。** デッキと同じ高さのまま入る
             b.Tile.FaceY(f3, ox + FlatIn, ox + KitchenWall, FlatZ(CookBack), FlatZ(FrontIn), 1);
             carpet.FaceY(f3, ox + KitchenWall, ox + FlatInner, FlatZ(InnerFoot), FlatZ(FrontIn), 1);
-            carpet.FaceY(f3, ox + KitchenWall, ox + StairLine, FlatZ(LoungeWall), FlatZ(InnerFoot), 1);
+            carpet.FaceY(f3, ox + KitchenWall, ox + TreadWest, FlatZ(LoungeWall), FlatZ(InnerFoot), 1);
             carpet.FaceY(f3, ox + FlatIn, ox + KitchenWall, FlatZ(LoungeWall), FlatZ(CookBack), 1);
             carpet.FaceY(f3, ox + FlatIn, ox + FlatInner, FlatZ(FlatBackIn), FlatZ(LoungeWall), 1);
             b.Cast.FaceY(f3, ox + DoorAt - DoorHalf, ox + DoorAt + DoorHalf, FlatZ(FrontIn), EstateFace, 1);
@@ -322,6 +329,9 @@ namespace HalfAware.EditorTools
         /// **下の半分は段と一緒に上がる手すり壁、上の半分は天井まで。** 階段の西は廊下で、
         /// 段を上がるにつれて廊下の床から離れていく。手すり壁が無いと 2 m を超えて落ちる。
         /// 段ごとに段の頭へ揃えた箱を立て、その上に勾配なりの板と笠木を渡す。
+        ///
+        /// **一段目と二段目の脇は壁を立てない。**（<see cref="NewelSteps"/>）上り口に親柱を立て、
+        /// 笠木の続きの手すりと手摺子だけを渡す。段の高さは 0.4 m までなので、脇から落ちても段一つ。
         /// 階段の上り口の低い所では、玄関から段と廊下の両方が見える
         /// </summary>
         static void EstateStairWall(EstateBanks b, int unit, Bank wall)
@@ -329,7 +339,7 @@ namespace HalfAware.EditorTools
             var ox = FlatWest + FlatWide * unit;
             const float f3 = EstateTop;
             const int low = 7;
-            for (var i = 0; i < low; i++)
+            for (var i = NewelSteps; i < low; i++)
                 FlatPart(wall, unit, StairLine - HallSkin, StairLine + HallSkin,
                     InnerFoot + InnerGo * i, InnerFoot + InnerGo * (i + 1), f3, f3 + InnerRise * (i + 1) + 0.75f);
             FlatPart(wall, unit, StairLine - HallSkin, StairLine + HallSkin,
@@ -337,9 +347,9 @@ namespace HalfAware.EditorTools
 
             // 勾配なりの板。段鼻を結んだ線から 0.5〜1.0 m 上。箱の頭の段々はこの中に隠れる
             var pitch = InnerRise / InnerGo;
-            var d0 = InnerFoot;
+            var d0 = InnerFoot + InnerGo * NewelSteps;
             var d1 = InnerFoot + InnerGo * low;
-            var y0 = f3 + InnerRise + 0.75f;
+            var y0 = f3 + InnerRise * (NewelSteps + 1) + 0.75f;
             var y1 = y0 + (d1 - d0) * pitch;
             var mid = new Vector3(ox + StairLine, (y0 + y1) * 0.5f, FlatZ((d0 + d1) * 0.5f));
             var dir = new Vector3(0f, y1 - y0, -(d1 - d0));
@@ -348,14 +358,38 @@ namespace HalfAware.EditorTools
             var cos = (d1 - d0) / len;
             wall.Box(mid, new Vector3(HallSkin * 2f + 0.02f, 0.5f * cos, len), rot);
             // 笠木。木の手すり
-            b.Set.Box(mid + rot * new Vector3(0f, 0.25f * cos + 0.025f, 0f), new Vector3(0.14f, 0.05f, len + 0.04f), rot);
-            // 上り口の親柱
-            FlatThing(b.Set, unit, StairLine, InnerFoot + 0.05f, f3, new Vector3(0.12f, 1.12f, 0.12f));
+            var cap = rot * new Vector3(0f, 0.25f * cos + 0.025f, 0f);
+            b.Set.Box(mid + cap, new Vector3(0.14f, 0.05f, len + 0.04f), rot);
+
+            // 壁を立てない下の段。笠木の線を上り口の親柱まで下ろし、段ごとに手摺子を二本
+            // 笠木の芯の線（d と高さ）。板の法線の向きへ持ち上げた分、d も少し手前へずれている
+            var capD = EstateFace - (mid + cap).z;
+            var capY = (mid + cap).y;
+            System.Func<float, float> rail = d => capY + (d - capD) * pitch;
+            var end = capD - (d1 - d0) * 0.5f;
+            var foot = InnerFoot + 0.06f;
+            var a = new Vector3(ox + StairLine, rail(foot), FlatZ(foot));
+            var z = new Vector3(ox + StairLine, rail(end), FlatZ(end));
+            var run = z - a;
+            b.Set.Box((a + z) * 0.5f, new Vector3(0.08f, 0.05f, run.magnitude + 0.04f),
+                Quaternion.LookRotation(run.normalized, Vector3.up));
+            FlatThing(b.Set, unit, StairLine, foot, f3, new Vector3(0.12f, a.y - f3 + 0.08f, 0.12f));
+            for (var i = 0; i < NewelSteps; i++)
+                for (var k = 0; k < 2; k++)
+                {
+                    var d = InnerFoot + InnerGo * (i + 0.25f + 0.5f * k);
+                    if (d < foot + 0.10f) continue;
+                    var tread = f3 + InnerRise * (i + 1);
+                    FlatThing(b.Set, unit, StairLine, d, tread, new Vector3(0.03f, rail(d) - tread, 0.03f));
+                }
         }
 
         /// <summary>
         /// 住戸の中の階段。玄関のすぐ先から南へ、14 段で四階の踊り場まで上がる。
-        /// 絨毯を段ごとに蹴込みと踏み面で張り、段鼻に金物を一本。戸境の壁に木の手すり
+        /// 絨毯を段ごとに蹴込みと踏み面で張り、段鼻に金物を一本。戸境の壁に木の手すり。
+        ///
+        /// 仕切りを立てない下の段（<see cref="NewelSteps"/>）は、仕切りの厚みの分だけ西へ伸ばし、
+        /// 廊下の側に段の脇の板を張る。張らないと段の下の虚空が見える
         /// </summary>
         static void EstateInnerStair(EstateBanks b, int unit, Bank carpet)
         {
@@ -365,9 +399,12 @@ namespace HalfAware.EditorTools
             {
                 var d0 = InnerFoot + InnerGo * i;
                 var y0 = f3 + InnerRise * i;
-                carpet.FaceZ(FlatZ(d0), ox + TreadWest, ox + FlatInner, y0, y0 + InnerRise, 1);
-                carpet.FaceY(y0 + InnerRise, ox + TreadWest, ox + FlatInner, FlatZ(d0 + InnerGo), FlatZ(d0), 1);
-                b.Gear.FaceZ(FlatZ(d0) + 0.004f, ox + TreadWest, ox + FlatInner, y0 + InnerRise - 0.025f, y0 + InnerRise, 1);
+                var west = ox + (i < NewelSteps ? LaneEast : TreadWest);
+                carpet.FaceZ(FlatZ(d0), west, ox + FlatInner, y0, y0 + InnerRise, 1);
+                carpet.FaceY(y0 + InnerRise, west, ox + FlatInner, FlatZ(d0 + InnerGo), FlatZ(d0), 1);
+                b.Gear.FaceZ(FlatZ(d0) + 0.004f, west, ox + FlatInner, y0 + InnerRise - 0.025f, y0 + InnerRise, 1);
+                if (i < NewelSteps)
+                    b.Frame.FaceX(west, FlatZ(d0 + InnerGo), FlatZ(d0), f3, y0 + InnerRise, -1);
             }
             carpet.FaceZ(FlatZ(InnerHead), ox + TreadWest, ox + FlatInner, f3 + InnerRise * (InnerRisers - 1), EstateUpper, 1);
 

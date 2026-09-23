@@ -134,7 +134,7 @@ namespace HalfAware.EditorTools
         const float PartyHalf = 0.1f;
         /// <summary>
         /// 住戸の西の縁から玄関の戸の真ん中まで。戸は住戸の東寄り、台所の窓は西寄り。
-        /// 開いた戸は東へ振り出すので（BuildDiveTakes の Ajar）、窓の前に掛からない側に戸を寄せる
+        /// 戸は内開きで、開くと住戸の中で東の戸境の壁へ寄る（BuildDiveTakes の Ajar）
         /// </summary>
         const float DoorAt = 4.55f;
 
@@ -650,7 +650,7 @@ namespace HalfAware.EditorTools
             }
 
             // B の老夫婦の鉢植え。戸の向かいの腰壁の際に三つ並べる。
-            // デッキで人が手を掛けているのはここだけにする。戸の脇はメーターの物入れと開いた戸が占める
+            // デッキで人が手を掛けているのはここだけにする。戸の脇はメーターの物入れが占める
             for (var i = 0; i < 3; i++)
             {
                 var x = DoorB - 0.55f + i * 0.40f;
@@ -832,9 +832,11 @@ namespace HalfAware.EditorTools
 
             if (leaf == null)
             {
-                // 丁番だけ。板と番地は記憶が掛けるので、ここには置かない
+                // 丁番だけ。板と番地は記憶が掛けるので、ここには置かない。
+                // 戸は内開きなので、丁番は戸口の内側の面の東の縁に付く
                 for (var i = 0; i < 3; i++)
-                    b.Gear.Box(new Vector3(x + 0.51f, y + 0.40f + i * 0.62f, z + 0.16f), new Vector3(0.07f, 0.16f, 0.22f));
+                    b.Gear.Box(new Vector3(x + DoorHalf + 0.025f, y + 0.25f + i * 0.75f, z - FaceSkin - 0.012f),
+                        new Vector3(0.03f, 0.10f, 0.025f));
                 return;
             }
 
