@@ -23,7 +23,7 @@ namespace HalfAware.EditorTools.Rocketbox
         public const float CrownHeight = 0.080f, CrownDome = 0.014f, CrownMargin = 0.010f, BrimWidth = 0.100f, BrimDroop = 0.018f, RibbonHeight = 0.028f;
         /// <summary>山の天辺の細り（付け根の半径に対する割合）</summary>
         public const float CrownTaper = 0.90f;
-        /// <summary>山の付け根（つば）の高さ（目の高さから上へ）の基準。Look.hatDepth（既定 −3 cm）を足した所に被る。既定では後ろへ 18° 傾け（hatTilt）、0.8 cm 後ろへずらす（hatShift）</summary>
+        /// <summary>山の付け根（つば）の高さ（目の高さから上へ）の基準。Look.hatDepth（既定 −3.4 cm）を足した所に被る。既定では後ろへ 22° 傾け（hatTilt）、1.1 cm 後ろへずらす（hatShift）</summary>
         public const float BandAboveEyes = 0.068f;
         const int Segs = 64, SideRings = 6, TopRings = 6, BrimRings = 6;
         /// <summary>麦わらの色（sRGB）</summary>
@@ -124,18 +124,15 @@ namespace HalfAware.EditorTools.Rocketbox
                 var taper = Mathf.Lerp(CrownTaper * 0.92f, 1f, 1f - Mathf.Pow(1f - t, 1.6f));
                 return at(ang, taper, h);
             }, j => (rTop + (CrownHeight - RibbonHeight) * (j / (float)SideRings)) / sTotal * 0.94f, SideRings, true);
-            // リボン（山より 1.5 mm 外）
+            // リボン（山より 1.5 mm 外）。下の縁はつばの内の縁と同じ輪（同じ頂点の位置）にして継ぎ目を閉じる
+            // （つばの内の縁をリボンの下へ重ねていたら、後ろへ傾けたとき重なりがぎざぎざに見え、隙間を空けると帽子の内側が覗いた）
             var ribbonGrow = 1f + 0.0015f / rTop;
-            // リボンの下の縁は、つばの面のその半径での高さの 0.5 mm 下（上に隙間があると、後ろへ傾けたとき後ろの隙間から帽子の内側が暗い線に見え、
-            // 下へ出しすぎると、前でつばの下から白く覗いた）
-            var ribT = (ribbonGrow - 0.96f) / (BrimWidth / rTop + 0.04f);
-            var ribBottom = -BrimDroop * ribT * ribT - 0.0005f;
-            grid((j, ang) => at(ang, ribbonGrow, Mathf.Lerp(RibbonHeight, ribBottom, j / 2f)), j => 0.95f + 0.05f * (j / 2f), 2, true);
-            // つば（山の付け根の少し内から外へ。縁がわずかに下がる。内の縁をリボンの下へ入れて、つばとリボンの間から帯の裏が覗かないように）
+            grid((j, ang) => at(ang, ribbonGrow, Mathf.Lerp(RibbonHeight, 0f, j / 2f)), j => 0.95f + 0.05f * (j / 2f), 2, true);
+            // つば（リボンの下の縁から外へ。縁がわずかに下がる）
             grid((j, ang) =>
             {
                 var t = j / (float)BrimRings;
-                var rho = 0.96f + (BrimWidth / rTop + 0.04f) * t;
+                var rho = ribbonGrow + BrimWidth / rTop * t;
                 return at(ang, rho, -BrimDroop * t * t);
             }, j => (rTop + CrownHeight - RibbonHeight + BrimWidth * (j / (float)BrimRings)) / sTotal * 0.94f, BrimRings, true);
             // 三角の巻きを外向きに揃える（天辺とつばは上、山の横とリボンは軸から外）。巻きが内向きだと、両面で描いても内向きの法線で照らされて暗く見えた
@@ -148,9 +145,27 @@ namespace HalfAware.EditorTools.Rocketbox
                 var rel = c - f.centre;
                 var h = Vector3.Dot(rel, up);
                 var radial = rel - up * h;
-                var side = h > RibbonHeight * 0.2f && h < CrownHeight - 0.004f && Vector3.Dot(fn.normalized, up) < 0.7f && Vector3.Dot(fn.normalized, up) > -0.7f;
+                // 向きで分ける（高さで分けると、リボンの下の段の三角が上向き扱いになって裏返り、裏の麦わらの色が歯のように覗いた）
+                var side = Mathf.Abs(Vector3.Dot(fn.normalized, up)) < 0.7f;
                 var want = side ? radial : up;
                 if (Vector3.Dot(fn, want) < 0f) { var tmp = tris[t + 1]; tris[t + 1] = tris[t + 2]; tris[t + 2] = tmp; }
+            }
+            // 内側の面: 頂点を写して三角の向きを逆にする（法線は内向きになり、帽子の内側とつばの裏が麦わらの色で陰る）。
+            // 両面を一枚で描くと内側が外向きの法線で照らされて暗い灰色の帯に見えた。リボンの内側は麦わらの色にする（こめかみで白く覗かないように）
+            var outer = verts.Count;
+            var outerTris = tris.Count;
+            for (var i = 0; i < outer; i++)
+            {
+                verts.Add(verts[i]);
+                var uv = uvs[i];
+                if (uv.y > 0.945f) uv.y = 0.90f;
+                uvs.Add(uv);
+            }
+            for (var t = 0; t < outerTris; t += 3)
+            {
+                tris.Add(tris[t] + outer);
+                tris.Add(tris[t + 2] + outer);
+                tris.Add(tris[t + 1] + outer);
             }
             var m = new Mesh { name = "Hat" };
             m.SetVertices(verts);
@@ -236,7 +251,6 @@ namespace HalfAware.EditorTools.Rocketbox
                 RocketboxTextures.WritePng(c32, 256, 256, persistDir + "Painted/Hat.png", false);
                 tex = AssetDatabase.LoadAssetAtPath<Texture2D>(persistDir + "Painted/Hat.png");
                 mat = BuildRocketboxProtagonist.Lit("Hat", tex, 0.05f, false);
-                mat.SetFloat("_Cull", (float)CullMode.Off);
                 var mp = persistDir + "Painted/Hat.mat";
                 var old = AssetDatabase.LoadAssetAtPath<Material>(mp);
                 if (old != null) { old.CopyPropertiesFromMaterial(mat); old.shaderKeywords = mat.shaderKeywords; EditorUtility.SetDirty(old); Object.DestroyImmediate(mat); mat = old; }
@@ -248,7 +262,6 @@ namespace HalfAware.EditorTools.Rocketbox
                 tex = BuildRocketboxProtagonist.Tex(Paint(256), 256, false, 256);
                 made.Add(tex);
                 mat = BuildRocketboxProtagonist.Lit("Hat", tex, 0.05f, false);
-                mat.SetFloat("_Cull", (float)CullMode.Off);
                 made.Add(mat);
             }
             var go = new GameObject("Hat");
@@ -295,7 +308,7 @@ namespace HalfAware.EditorTools.Rocketbox
                     else
                     {
                         var rTop = (f.rx + f.rz) * 0.5f;
-                        var tb = Mathf.Clamp01((rho - 0.96f) / (BrimWidth / rTop + 0.04f));
+                        var tb = Mathf.Clamp01((rho - 1f) / (BrimWidth / rTop));
                         var under = -BrimDroop * tb * tb - 0.005f;
                         if (q.y > under) { q.y = under; moved = true; }
                     }

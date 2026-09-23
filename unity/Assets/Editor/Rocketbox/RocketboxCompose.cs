@@ -75,6 +75,12 @@ namespace HalfAware.EditorTools.Rocketbox
                 for (var i = 0; i < bv.Length; i++) bv[i] = worldToBody.MultiplyPoint3x4(bw[i]);
             }
             var hw = World(hv, headToWorld);
+            // 首も細くするときは、頭の人の頂点にも同じ手を掛ける（首の骨に付いた頂点だけが動く。体の人の首元と揃う）
+            if (who.Slim && who.SlimNeck < 1f)
+            {
+                string headSlim;
+                hw = Slim(who, headSmr, hw, hm.boneWeights, out headSlim, true);
+            }
 
             var bodyClothes = new Surface(bw, bm.GetTriangles(bodySub));
             var bodySkin = new Surface(bw, bm.GetTriangles(bodySkinSub));
@@ -325,9 +331,10 @@ namespace HalfAware.EditorTools.Rocketbox
         /// - 足: 足首の骨のまわりに横だけ SlimWrist 倍
         /// - 胴（腰・背骨）: 左右を SlimTorso 倍、前後はその半分だけ細く（胴の前後の真ん中のまわり。胸が平たくならないように）
         /// - 鎖骨と腕と手: ShoulderIn だけ体の側へ（肩幅を狭める）
-        /// 頭と首は動かさない
+        /// - 首: 首の骨の軸へ、付け根で SlimNeck、頭の付け根で 1 倍（顔との継ぎ目は動かさない）。neckOnly なら首だけ（頭の人の頂点に掛ける）
+        /// 頭は動かさない
         /// </summary>
-        public static Vector3[] Slim(RocketboxPerson who, SkinnedMeshRenderer smr, Vector3[] w, BoneWeight[] bwts, out string note)
+        public static Vector3[] Slim(RocketboxPerson who, SkinnedMeshRenderer smr, Vector3[] w, BoneWeight[] bwts, out string note, bool neckOnly = false)
         {
             var bones = smr.bones;
             var byName = new Dictionary<string, Transform>();
@@ -383,7 +390,9 @@ namespace HalfAware.EditorTools.Rocketbox
                         return c + (p - c) * sc;
                     };
                     var side = sideSign < 0f ? "L" : "R";
-                    if (n.EndsWith(" Thigh")) q = limb(n, "Bip01 " + side + " Calf", who.SlimLimb, who.SlimLimb);
+                    if (n == "Bip01 Neck") q = limb(n, "Bip01 Head", who.SlimNeck, 1f);
+                    else if (neckOnly) q = p;
+                    else if (n.EndsWith(" Thigh")) q = limb(n, "Bip01 " + side + " Calf", who.SlimLimb, who.SlimLimb);
                     else if (n.EndsWith(" Calf")) q = limb(n, "Bip01 " + side + " Foot", who.SlimLimb, who.SlimLimb * who.SlimWrist);
                     else if (n.EndsWith(" Foot") || n.Contains(" Toe"))
                     {
@@ -403,7 +412,7 @@ namespace HalfAware.EditorTools.Rocketbox
                         q = new Vector3(p.x * who.SlimTorso, p.y, z0 + (p.z - z0) * Mathf.Lerp(1f, who.SlimTorso, 0.5f));
                     }
                     // 肩幅: 鎖骨・腕・手を体の側へ
-                    if (sideSign != 0f && (n.Contains("Clavicle") || n.Contains("Arm") || n.EndsWith(" Hand") || n.Contains(" Finger")))
+                    if (!neckOnly && sideSign != 0f && (n.Contains("Clavicle") || n.Contains("Arm") || n.EndsWith(" Hand") || n.Contains(" Finger")))
                         q.x -= sideSign * who.ShoulderIn * (n.Contains("Clavicle") ? 0.6f : 1f);
                     sum += q * wts[e];
                     ws += wts[e];
@@ -412,8 +421,8 @@ namespace HalfAware.EditorTools.Rocketbox
                 var dm = (o[i] - p).magnitude;
                 if (dm > 1e-5f) { moved++; maxMove = Mathf.Max(maxMove, dm); }
             }
-            note = string.Format(CultureInfo.InvariantCulture, "華奢: 腕と脚 {0:0.00} 倍、手首と足首 さらに {1:0.00} 倍、胴 左右 {2:0.00} 倍・前後 {3:0.00} 倍、手 {4:0.00} 倍、肩幅 {5:0.0} cm 狭める（動かした頂点 {6}、最大 {7:0.0} mm）",
-                who.SlimLimb, who.SlimWrist, who.SlimTorso, Mathf.Lerp(1f, who.SlimTorso, 0.5f), who.HandScale, who.ShoulderIn * 200f, moved, maxMove * 1000f);
+            note = string.Format(CultureInfo.InvariantCulture, "華奢: 腕と脚 {0:0.00} 倍、手首と足首 さらに {1:0.00} 倍、胴 左右 {2:0.00} 倍・前後 {3:0.00} 倍、手 {4:0.00} 倍、肩幅 {5:0.0} cm 狭める、首の付け根 {8:0.00} 倍（動かした頂点 {6}、最大 {7:0.0} mm）",
+                who.SlimLimb, who.SlimWrist, who.SlimTorso, Mathf.Lerp(1f, who.SlimTorso, 0.5f), who.HandScale, who.ShoulderIn * 200f, moved, maxMove * 1000f, who.SlimNeck);
             return o;
         }
 

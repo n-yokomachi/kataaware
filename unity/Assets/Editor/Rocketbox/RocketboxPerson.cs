@@ -66,7 +66,7 @@ namespace HalfAware.EditorTools.Rocketbox
         /// 華奢にする（<see cref="RocketboxCompose.Slim"/>）。腕と脚の太さ、手首と足首、胴の幅、手の大きさ、肩幅の片側の狭め（m）。長さは変えない
         /// </summary>
         public bool Slim;
-        public float SlimLimb = 0.90f, SlimWrist = 0.94f, SlimTorso = 0.94f, HandScale = 0.95f, ShoulderIn = 0.006f;
+        public float SlimLimb = 0.90f, SlimWrist = 0.94f, SlimTorso = 0.94f, HandScale = 0.95f, ShoulderIn = 0.006f, SlimNeck = 1f;
 
         /// <summary>一から作るワンピースを着せる（<see cref="RocketboxDress"/>）。体の人の面は袖口より先の腕と手だけを残す</summary>
         public bool MadeDress;
