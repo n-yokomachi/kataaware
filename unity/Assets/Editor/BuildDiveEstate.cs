@@ -158,6 +158,9 @@ namespace HalfAware.EditorTools
         /// <summary>隣の棟の面。敷地の担当が見ている</summary>
         const float BlockFace = 9.5f;
 
+        /// <summary>デッキの灯りの x。三階の踊り場の上と、各戸の台所の窓と戸口のあいだ</summary>
+        static readonly float[] DeckLamps = { 0f, FlatWest + 2.7f, FlatWest + FlatWide + 2.7f, FlatWest + FlatWide * 2f + 2.7f };
+
         // ---- 住戸 B の内側 -------------------------------------------------------
         //
         // 名前は日本の間取りの頃のまま残す（BuildDiveTakes が見ている）。値は新しい棟に合わせる
@@ -377,11 +380,11 @@ namespace HalfAware.EditorTools
             Lamp(place, "Fill", LightType.Directional, new Vector3(0f, 12f, 0f),
                 new Vector3(20f, 22f, 0f), new Color(0.66f, 0.72f, 0.86f), 0.55f, 10f);
 
-            // デッキの灯り。一戸に一つ、台所の窓と戸口のあいだの天井に。
-            // 朝なので点いていなくてもよいが、四階の床の下は日が入らず、戸の前が沈む
-            for (var i = 0; i < 3; i++)
-                Lamp(place, "Bulb" + i, LightType.Point,
-                    new Vector3(FlatWest + FlatWide * i + 2.7f, WalkRoof - 0.25f, EstateWalk),
+            // デッキの灯り。三階の踊り場の上に一つと、一戸に一つ（台所の窓と戸口のあいだの天井）。
+            // 朝なので点いていなくてもよいが、四階の床の下は日が入らず、戸の前が沈む。
+            // 踊り場は三方を壁に囲まれていて、灯りが無いとダストシュートの口が見えない
+            for (var i = 0; i < DeckLamps.Length; i++)
+                Lamp(place, "Bulb" + i, LightType.Point, new Vector3(DeckLamps[i], WalkRoof - 0.25f, EstateWalk),
                     Vector3.zero, new Color(1f, 0.92f, 0.80f), 1.8f, 4.2f);
 
             for (var unit = 0; unit < 2; unit++)
@@ -624,13 +627,13 @@ namespace HalfAware.EditorTools
                 else EstateDoorway(b, ox + DoorAt, EstateTop, null, 12 + unit * 2);
                 // 戸の前の足拭き。デッキの側に置く
                 b.Soft.Box(new Vector3(ox + DoorAt, EstateTop + 0.012f, EstateFace + 0.42f), new Vector3(0.78f, 0.024f, 0.46f));
-                // デッキの灯り。天井から下がる箱と、光る乳白の面
-                b.Gear.Box(new Vector3(ox + 2.7f, WalkRoof - 0.05f, EstateWalk), new Vector3(0.40f, 0.10f, 0.26f));
-                b.Lit.Box(new Vector3(ox + 2.7f, WalkRoof - 0.11f, EstateWalk), new Vector3(0.32f, 0.03f, 0.18f));
             }
-            // 三階の踊り場の上の灯り。上がり切ったところが暗いと、デッキの奥が一段明るく見えてしまう
-            b.Gear.Box(new Vector3(0f, WalkRoof - 0.05f, EstateWalk), new Vector3(0.40f, 0.10f, 0.26f));
-            b.Lit.Box(new Vector3(0f, WalkRoof - 0.11f, EstateWalk), new Vector3(0.32f, 0.03f, 0.18f));
+            // デッキの灯り。天井から下がる箱と、光る乳白の面。点の灯り（EstateLamps）と同じ位置
+            foreach (var x in DeckLamps)
+            {
+                b.Gear.Box(new Vector3(x, WalkRoof - 0.05f, EstateWalk), new Vector3(0.40f, 0.10f, 0.26f));
+                b.Lit.Box(new Vector3(x, WalkRoof - 0.11f, EstateWalk), new Vector3(0.32f, 0.03f, 0.18f));
+            }
 
             // B の老夫婦の鉢植え。戸の向かいの腰壁の際に三つ並べる。
             // デッキで人が手を掛けているのはここだけにする。戸の脇はメーターの物入れと開いた戸が占める
