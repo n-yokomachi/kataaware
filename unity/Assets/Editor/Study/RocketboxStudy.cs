@@ -104,9 +104,10 @@ namespace HalfAware.EditorTools.Study
                 {
                     if (slots[i] == skin.Head || slots[i] == skin.HeadTwin) headSlot = i;
                     if (slots[i] == skin.Hair) hairSlot = i;
+                    if (skin.Lash != null && slots[i] == skin.Lash) who.MaskSlots.Add(new MaskSlot(smr, i, HairMask(who, v.Person.LashSrc)));
                 }
                 who.MaskSlots.Add(new MaskSlot(smr, headSlot, mask));
-                who.MaskSlots.Add(new MaskSlot(smr, hairSlot, HairMask(who, v.Person)));
+                who.MaskSlots.Add(new MaskSlot(smr, hairSlot, HairMask(who, v.Person.HairSrc)));
                 if (!v.Raw && look.moleDiameter > 0f)
                     who.MoleOff.Add(new KeyValuePair<MaskSlot, Material>(new MaskSlot(smr, headSlot, null), bareHead));
                 who.Note = string.Format(CultureInfo.InvariantCulture, "{0}{1}", v.Raw ? "手を入れる前" : (twinHead ? info.Note : (skin.HeadInfo != null ? skin.HeadInfo.Note : "")), v.Twin ? "（片割れ " + v.Mode + "）" : "");
@@ -121,10 +122,10 @@ namespace HalfAware.EditorTools.Study
         }
 
         /// <summary>髪の房の印。α は髪のマテリアルと同じ閾値で切り、色は地の灰</summary>
-        static Texture2D HairMask(FaceSubject who, RocketboxPerson person)
+        static Texture2D HairMask(FaceSubject who, string opacityPath)
         {
             int n;
-            var px = RocketboxTextures.ReadPng(person.HairSrc, out n, out n);
+            var px = RocketboxTextures.ReadPng(opacityPath, out n, out n);
             var o = new Color32[px.Length];
             for (var i = 0; i < px.Length; i++) o[i] = new Color32(38, 38, 38, px[i].a >= 115 ? (byte)255 : (byte)0);
             var t = new Texture2D(n, n, TextureFormat.RGBA32, true, false);
@@ -322,6 +323,39 @@ namespace HalfAware.EditorTools.Study
             return sb.ToString();
         }
 
+        /// <summary>
+        /// 生え際まわりの寄り。額の上を 0.55 m から、正面・左右 30 度・左右の横・後ろ・上で、画角 32 度・960×540
+        /// （ゲームの見え方ではない）。地を緑にして、面の隙間から向こうが見えれば分かるようにする
+        /// </summary>
+        public static string ShootHairline(Variant v, FaceStudy.Lighting light)
+        {
+            var sb = new StringBuilder();
+            using (var rig = new FaceStudy.Rig(light))
+            using (var who = Subject(v))
+            {
+                rig.Light(who);
+                rig.Camera.backgroundColor = new Color(0.10f, 0.60f, 0.20f);
+                var c = who.FaceCentre + Vector3.up * 0.05f;
+                foreach (var yaw in new[] { 0f, -30f, 30f, -90f, 90f, 180f })
+                {
+                    rig.Place(c + Quaternion.AngleAxis(yaw, Vector3.up) * who.Forward * 0.55f + Vector3.up * 0.06f, c);
+                    rig.Camera.fieldOfView = 32f;
+                    Save(rig, string.Format(CultureInfo.InvariantCulture, "{0}_{1}_hairline_{2}", v.Tag, FaceStudy.LightName(light), Mathf.Abs(yaw) < 0.5f ? "front" : Mathf.Abs(yaw - 180f) < 0.5f ? "back" : FaceStudy.YawName(yaw)), sb);
+                }
+                rig.Place(c + Vector3.up * 0.5f + who.Forward * 0.25f, c);
+                Save(rig, string.Format(CultureInfo.InvariantCulture, "{0}_{1}_hairline_top", v.Tag, FaceStudy.LightName(light)), sb);
+            }
+            return sb.ToString();
+        }
+
+        static void Save(FaceStudy.Rig rig, string name, StringBuilder sb)
+        {
+            var shot = rig.Render(FaceStudy.BigW, FaceStudy.BigH);
+            try { FaceStudy.Save(shot, Path.Combine(OutDir, name + ".png")); }
+            finally { Object.DestroyImmediate(shot); }
+            sb.AppendLine(name);
+        }
+
         /// <summary>立ちの初めのこまと、歩きの一回りを 6 こまで、髪が服に入り込んでいないかを測る</summary>
         public static string HairCheck(Variant v)
         {
@@ -397,11 +431,12 @@ namespace HalfAware.EditorTools.Study
                     var fwd = who.Forward;
                     var right = who.Right;
                     var slots = smr.sharedMaterials;
-                    int headSlot = -1, hairSlot = -1;
+                    int headSlot = -1, hairSlot = -1, shellSlot = -1;
                     for (var i = 0; i < slots.Length; i++)
                     {
                         if (slots[i] != null && slots[i].name.StartsWith("Head", StringComparison.Ordinal)) headSlot = i;
                         if (slots[i] != null && slots[i].name.StartsWith("Hair", StringComparison.Ordinal)) hairSlot = i;
+                        if (slots[i] != null && slots[i].name.StartsWith("Shell", StringComparison.Ordinal)) shellSlot = i;
                     }
                     // 頭のテクスチャで髪と見なした重み
                     var look = v.Look();
@@ -427,7 +462,7 @@ namespace HalfAware.EditorTools.Study
                     // 肩の上面: 体の肌と服の、肩の関節の真上あたり（左右 12〜17 cm、前後 6 cm 以内）の一番高い所
                     for (var s = 0; s < smr.sharedMesh.subMeshCount; s++)
                     {
-                        if (s == hairSlot) continue;
+                        if (s == hairSlot || s == shellSlot) continue;
                         foreach (var i in smr.sharedMesh.GetTriangles(s))
                         {
                             var p = smr.transform.TransformPoint(verts[i]);
@@ -438,11 +473,16 @@ namespace HalfAware.EditorTools.Study
                     }
                     for (var s = 0; s < smr.sharedMesh.subMeshCount; s++)
                     {
-                        if (s != headSlot && s != hairSlot) continue;
+                        if (s != headSlot && s != hairSlot && s != shellSlot) continue;
                         foreach (var i in smr.sharedMesh.GetTriangles(s))
                         {
                             if (!seen.Add(i)) continue;
                             var p = smr.transform.TransformPoint(verts[i]);
+                            if (s == shellSlot)
+                            {
+                                hairAt(p);
+                                continue;
+                            }
                             if (s == hairSlot)
                             {
                                 var lash = false;
@@ -453,6 +493,8 @@ namespace HalfAware.EditorTools.Study
                             var local = p - head;
                             // 顎の先: 顔の真ん中で、唇とほぼ同じだけ前へ出ている所の一番低い所（首の前は出ていないので入らない）
                             if (Mathf.Abs(Vector3.Dot(local, right)) < 0.015f && Vector3.Dot(local, fwd) > 0.09f) chin = Mathf.Min(chin, p.y - ground);
+                            // 顔と髪が別の人なら、顔の面の髪（埋め）は殻の内側なので数えない
+                            if (shellSlot >= 0) continue;
                             var n = info.N;
                             var x = Mathf.Clamp((int)(uv[i].x * n), 0, n - 1);
                             var yy = Mathf.Clamp((int)(uv[i].y * n), 0, n - 1);

@@ -81,6 +81,12 @@ namespace HalfAware.EditorTools.Rocketbox
 
             [Header("体の肌の色を頭に揃える（頭と体が別の人のとき）")]
             public bool matchSkin;
+
+            [Header("別の人の髪を載せるとき（顔の人の頭のテクスチャ）")]
+            [Tooltip("頭皮を兼ねた髪の殻を、毛筋の明暗の無い影の色一色で塗る（別の人の髪の下地にし、殻の外に見えても目立たせない）")]
+            public bool flatHair;
+            [Tooltip("眉より上の額とこめかみで、元の前髪の影が焼き込まれて暗い肌を、額の真ん中の明るさまで上げる量（0〜1）")]
+            public float liftForehead;
             [Tooltip("揃える強さ（0〜1）")]
             public float skinMatch = 1f;
 
@@ -275,11 +281,44 @@ namespace HalfAware.EditorTools.Rocketbox
                 }
             }
 
-            // 2. 髪を黒に
+            // 2. 髪を黒に（別の人の髪を載せるときは、毛筋の無い影の色一色）
             for (var i = 0; i < px.Length; i++)
             {
                 if (hair[i] <= 0f) continue;
-                px[i] = Color.Lerp(px[i], HairRamp(V[i], k), hair[i]);
+                var ink = k.flatHair ? k.hairShadow : HairRamp(V[i], k);
+                ink.a = px[i].a;
+                px[i] = Color.Lerp(px[i], ink, hair[i]);
+            }
+
+            // 2b. 元の前髪の影で暗い額とこめかみの肌を、額の真ん中の明るさまで上げる（別の人の髪を載せるとき）
+            if (k.liftForehead > 0f)
+            {
+                var browTop = Mathf.Max(Mathf.Max(a.browInL.y, a.browOutL.y), Mathf.Max(a.browInR.y, a.browOutR.y));
+                var refs = new List<float>();
+                for (var i = 0; i < px.Length; i++)
+                {
+                    if (!s.On[i] || hair[i] > 0.1f) continue;
+                    var p = s.P[i];
+                    if (Mathf.Abs(p.x) < 0.02f && p.y > browTop + 0.008f && p.y < browTop + 0.035f && p.z > a.eyeL.z) refs.Add(Lum(px[i]));
+                }
+                if (refs.Count > 0)
+                {
+                    refs.Sort();
+                    var lref = refs[refs.Count / 2];
+                    for (var i = 0; i < px.Length; i++)
+                    {
+                        if (!s.On[i] || hair[i] >= 0.5f) continue;
+                        var p = s.P[i];
+                        var zone = Smooth(browTop - 0.006f, browTop + 0.004f, p.y) * Smooth(a.head.z - 0.01f, a.head.z + 0.02f, p.z) * (1f - hair[i] * 2f);
+                        if (zone <= 0f) continue;
+                        var l = Lum(px[i]);
+                        if (l >= lref * 0.97f || l < 0.05f) continue;
+                        var gain = Mathf.Min(1.8f, lref / l);
+                        var g = Mathf.Lerp(1f, gain, zone * Mathf.Clamp01(k.liftForehead));
+                        var c = px[i];
+                        px[i] = new Color(Mathf.Clamp01(c.r * g), Mathf.Clamp01(c.g * g), Mathf.Clamp01(c.b * g), c.a);
+                    }
+                }
             }
 
             // 3. 眉。髪に合わせて暗く（常に）、手入れでさらにはっきり

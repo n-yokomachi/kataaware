@@ -125,7 +125,9 @@ namespace HalfAware.EditorTools.Rocketbox
                 if (skin.Person.IsComposite)
                 {
                     // 組み合わせたメッシュはマテリアルの名前を持たない。面の組の順が体・頭・髪
-                    ms = new[] { skin.Body, head, skin.Hair };
+                    ms = skin.Person.IsHairSwap
+                        ? new[] { skin.Body, head, skin.Shell, skin.Hair, skin.Lash }
+                        : new[] { skin.Body, head, skin.Hair };
                 }
                 else
                 {
@@ -166,6 +168,8 @@ namespace HalfAware.EditorTools.Rocketbox
         {
             public readonly RocketboxPerson Person;
             public Material Body, Head, HeadTwin, Hair;
+            /// <summary>顔と髪が別の人のとき: 髪の殻（髪の人の頭のテクスチャ）と、まつ毛（顔の人の透けの絵）</summary>
+            public Material Shell, Lash;
             /// <summary>顎の骨の左右の倍率（<see cref="RocketboxPaint.Look.JawScale"/>）</summary>
             public float JawScale = 1f;
             /// <summary>撮り比べで測るための、頭の印の絵と黒子の位置</summary>
@@ -233,6 +237,16 @@ namespace HalfAware.EditorTools.Rocketbox
             else bodyTex = Load(who.BodySrc);
             var hair = RocketboxTextures.ReadPng(who.HairSrc, out n, out n);
             WritePainted(RocketboxPaint.Hair(ToColors(hair), look), n, dir + "Hair.png", true, 512);
+            if (who.IsHairSwap)
+            {
+                var shell = PaintShell(who);
+                WritePainted(shell.Px, 512, dir + "Shell.png", false, HeadSize);
+                WritePainted(ToColors(shell.Spec), 512, dir + "Shell_spec.png", true, SpecSize);
+                var lash = RocketboxTextures.ReadPng(who.LashSrc, out n, out n);
+                WritePainted(RocketboxPaint.Hair(ToColors(lash), look), n, dir + "Lash.png", true, 512);
+                SaveMaterial(LitHead("Shell", Load(dir + "Shell.png"), Load(dir + "Shell_spec.png")), dir + "Shell.mat");
+                SaveMaterial(Lit("Lash", Load(dir + "Lash.png"), 0.34f, true), dir + "Lash.mat");
+            }
 
             SaveMaterial(Lit("Body", bodyTex, 0.12f, false), dir + "Body.mat");
             var spec = Load(dir + "Head_self_spec.png");
@@ -248,6 +262,31 @@ namespace HalfAware.EditorTools.Rocketbox
         /// 体のテクスチャに手を入れる（ニットを黒に、頭と体が別の人なら手の肌を頭の肌に揃える）。
         /// どちらもしないなら null（縮めた写しをそのまま使う）
         /// </summary>
+        /// <summary>
+        /// 髪の殻の絵: 髪の人の頭のテクスチャを、髪の人の値で黒く塗る（使うのは髪の所だけなので、黒子と手入れは描かない）
+        /// </summary>
+        public static RocketboxPaint.HeadResult PaintShell(RocketboxPerson who)
+        {
+            var hair = who.HairFrom;
+            var maps = Maps.Get(hair, 512);
+            var k = hair.Look();
+            k.moleDiameter = 0f;
+            k.beauty = 0f;
+            int n;
+            var tex = ToColors(RocketboxTextures.ReadPng(hair.HeadSrc, out n, out n));
+            var r = RocketboxPaint.Head(tex, maps.Head, maps.Anchors, k, false, hair.IrisUv, hair.IrisRadius);
+            // 耳のまわりから後ろの肌も殻に入れるので、そこは髪の影の色で塗り、照り返しを 0 にする
+            for (var i = 0; i < r.Px.Length; i++)
+            {
+                if (!maps.Head.On[i] || !RocketboxHairSwap.IsSidePoint(maps.Head.P[i], maps.Anchors)) continue;
+                var c = k.hairShadow;
+                c.a = r.Px[i].a;
+                r.Px[i] = Color.Lerp(r.Px[i], c, 1f - r.Hair[i]);
+                r.Spec[i] = new Color32(0, 0, 0, r.Spec[i].a);
+            }
+            return r;
+        }
+
         static Color[] PaintBody(RocketboxPerson who, RocketboxPaint.Look look, Maps maps, RocketboxPaint.HeadResult head, out string skinNote)
         {
             skinNote = null;
@@ -273,8 +312,11 @@ namespace HalfAware.EditorTools.Rocketbox
                 Head = AssetDatabase.LoadAssetAtPath<Material>(dir + "Head_self.mat"),
                 HeadTwin = AssetDatabase.LoadAssetAtPath<Material>(dir + "Head_twin.mat"),
                 Hair = AssetDatabase.LoadAssetAtPath<Material>(dir + "Hair.mat"),
+                Shell = AssetDatabase.LoadAssetAtPath<Material>(dir + "Shell.mat"),
+                Lash = AssetDatabase.LoadAssetAtPath<Material>(dir + "Lash.mat"),
             };
             if (s.Body == null || s.Head == null || s.Hair == null) return null;
+            if (who.IsHairSwap && (s.Shell == null || s.Lash == null)) return null;
             if (twinHead && s.HeadTwin == null) return null;
             return s;
         }
@@ -308,6 +350,14 @@ namespace HalfAware.EditorTools.Rocketbox
                 else skin.Body = Keep(skin, Lit("Body", Load(who.BodySrc), 0.12f, false));
                 var hair = RocketboxPaint.Hair(ToColors(RocketboxTextures.ReadPng(who.HairSrc, out n, out n)), look);
                 skin.Hair = Keep(skin, Lit("Hair", Keep(skin, Tex(hair, n, true, 512)), 0.34f, true));
+                if (who.IsHairSwap)
+                {
+                    var shell = PaintShell(who);
+                    var shellSpec = Keep(skin, Tex(ToColors(shell.Spec), 512, true, SpecSize));
+                    skin.Shell = Keep(skin, LitHead("Shell", Keep(skin, Tex(shell.Px, 512, false, headSize)), shellSpec));
+                    var lash = RocketboxPaint.Hair(ToColors(RocketboxTextures.ReadPng(who.LashSrc, out n, out n)), look);
+                    skin.Lash = Keep(skin, Lit("Lash", Keep(skin, Tex(lash, n, true, 512)), 0.34f, true));
+                }
                 return skin;
             }
             catch
@@ -337,6 +387,11 @@ namespace HalfAware.EditorTools.Rocketbox
             skin.Head = Keep(skin, Lit("Head_raw", Load(who.HeadSrc), 0.22f, false));
             skin.Body = Keep(skin, Lit("Body_raw", Load(who.BodySrc), 0.12f, false));
             skin.Hair = Keep(skin, Lit("Hair_raw", Load(who.HairSrc), 0.34f, true));
+            if (who.IsHairSwap)
+            {
+                skin.Shell = Keep(skin, Lit("Shell_raw", Load(who.ShellSrc), 0.22f, false));
+                skin.Lash = Keep(skin, Lit("Lash_raw", Load(who.LashSrc), 0.34f, true));
+            }
             return skin;
         }
 
@@ -364,7 +419,7 @@ namespace HalfAware.EditorTools.Rocketbox
                 if (who.IsComposite)
                 {
                     // 頭と顔の骨は頭の人、体は体の人の地図（骨の束ねた姿勢は同じ）
-                    var h = Get(who.HeadFrom, n);
+                    var h = Get(who.FaceFrom, n);
                     m = new Maps { Head = h.Head, Anchors = h.Anchors, Body = Get(who.BodyFrom, n).Body };
                     cache[key] = m;
                     return m;

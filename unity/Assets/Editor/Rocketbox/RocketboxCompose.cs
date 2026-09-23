@@ -40,6 +40,7 @@ namespace HalfAware.EditorTools.Rocketbox
         public static string BuildMesh(RocketboxPerson who)
         {
             if (!who.IsComposite) throw new ArgumentException("頭と体が同じ人: " + who);
+            if (who.IsHairSwap) return RocketboxHairSwap.BuildMesh(who);
             var bodySmr = Smr(who.BodyFrom.Model);
             var headSmr = Smr(who.HeadFrom.Model);
             var bm = bodySmr.sharedMesh;
@@ -295,6 +296,8 @@ namespace HalfAware.EditorTools.Rocketbox
                 int n;
                 var headTex = BuildRocketboxProtagonist.ToColors(RocketboxTextures.ReadPng(who.HeadSrc, out n, out n));
                 var paint = RocketboxPaint.Head(headTex, maps.Head, maps.Anchors, who.Look(), false, who.IrisUv, who.IrisRadius);
+                // 顔と髪が別の人なら、髪は面の組 2（殻）と 3（房）で、どちらも全部が髪
+                var hairSubs = who.IsHairSwap ? new[] { 2, 3 } : new[] { 1, 2 };
                 var uv = smr.sharedMesh.uv;
                 var eyes = new List<Vector3>();
                 foreach (var t in her.GetComponentsInChildren<Transform>(true))
@@ -302,11 +305,11 @@ namespace HalfAware.EditorTools.Rocketbox
                 int count = 0, inside = 0;
                 float worst = 0f;
                 var seen = new HashSet<int>();
-                for (var sub = 1; sub <= 2; sub++)
+                foreach (var sub in hairSubs)
                     foreach (var i in smr.sharedMesh.GetTriangles(sub))
                     {
                         if (!seen.Add(i)) continue;
-                        if (sub == 1 && HairAt(paint, uv[i]) <= 0.5f) continue;
+                        if (!who.IsHairSwap && sub == 1 && HairAt(paint, uv[i]) <= 0.5f) continue;
                         var lash = false;
                         foreach (var e in eyes) if (Vector3.Distance(w[i], e) < 0.035f) lash = true;
                         if (lash) continue;
@@ -433,7 +436,7 @@ namespace HalfAware.EditorTools.Rocketbox
             return new List<int>(s);
         }
 
-        static void Save(Mesh mesh, string path)
+        public static void Save(Mesh mesh, string path)
         {
             var dir = System.IO.Path.GetDirectoryName(path).Replace('\\', '/');
             if (!AssetDatabase.IsValidFolder(dir))
