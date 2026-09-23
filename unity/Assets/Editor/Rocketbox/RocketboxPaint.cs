@@ -180,7 +180,7 @@ namespace HalfAware.EditorTools.Rocketbox
             [Tooltip("帽子を被る")]
             public bool hat;
             [Tooltip("前後の傾き（度、正で前が下がる）・左右の傾き（度）・上下（m、正で上）・前後のずれ（m、正で前）")]
-            public float hatTilt = -8f, hatRoll, hatDepth = -0.02f, hatShift;
+            public float hatTilt = -18f, hatRoll, hatDepth = -0.030f, hatShift = -0.008f;
             [Tooltip("膝から下を借りた人の靴（暗い革）を茶の革に塗る")]
             public bool brownShoes;
             public Color brownShadow = new Color(0.16f, 0.09f, 0.05f), brownShine = new Color(0.52f, 0.33f, 0.18f);

@@ -23,7 +23,7 @@ namespace HalfAware.EditorTools.Rocketbox
         public const float CrownHeight = 0.080f, CrownDome = 0.014f, CrownMargin = 0.010f, BrimWidth = 0.100f, BrimDroop = 0.018f, RibbonHeight = 0.028f;
         /// <summary>山の天辺の細り（付け根の半径に対する割合）</summary>
         public const float CrownTaper = 0.90f;
-        /// <summary>山の付け根（つば）の高さ（目の高さから上へ）の基準。Look.hatDepth（既定 −2 cm）を足した所に被る</summary>
+        /// <summary>山の付け根（つば）の高さ（目の高さから上へ）の基準。Look.hatDepth（既定 −3 cm）を足した所に被る。既定では後ろへ 18° 傾け（hatTilt）、0.8 cm 後ろへずらす（hatShift）</summary>
         public const float BandAboveEyes = 0.068f;
         const int Segs = 64, SideRings = 6, TopRings = 6, BrimRings = 6;
         /// <summary>麦わらの色（sRGB）</summary>
@@ -126,7 +126,11 @@ namespace HalfAware.EditorTools.Rocketbox
             }, j => (rTop + (CrownHeight - RibbonHeight) * (j / (float)SideRings)) / sTotal * 0.94f, SideRings, true);
             // リボン（山より 1.5 mm 外）
             var ribbonGrow = 1f + 0.0015f / rTop;
-            grid((j, ang) => at(ang, ribbonGrow, Mathf.Lerp(RibbonHeight, -0.003f, j / 2f)), j => 0.95f + 0.05f * (j / 2f), 2, true);
+            // リボンの下の縁は、つばの面のその半径での高さの 0.5 mm 下（上に隙間があると、後ろへ傾けたとき後ろの隙間から帽子の内側が暗い線に見え、
+            // 下へ出しすぎると、前でつばの下から白く覗いた）
+            var ribT = (ribbonGrow - 0.96f) / (BrimWidth / rTop + 0.04f);
+            var ribBottom = -BrimDroop * ribT * ribT - 0.0005f;
+            grid((j, ang) => at(ang, ribbonGrow, Mathf.Lerp(RibbonHeight, ribBottom, j / 2f)), j => 0.95f + 0.05f * (j / 2f), 2, true);
             // つば（山の付け根の少し内から外へ。縁がわずかに下がる。内の縁をリボンの下へ入れて、つばとリボンの間から帯の裏が覗かないように）
             grid((j, ang) =>
             {
@@ -271,16 +275,31 @@ namespace HalfAware.EditorTools.Rocketbox
                 if (bwts[i].boneIndex0 != headIdx || bwts[i].weight0 < 0.5f) continue;
                 var p = root.InverseTransformPoint(smr.transform.TransformPoint(hv[i]));
                 var q = inv * (p - f.centre);
-                // つばの 1.2 cm 下から 2 cm 上へかけて寄せる量を 0 から 1 へ（寄せた所と寄せない所の髪の段を見せない）
-                var wgt = RocketboxPaint.Smooth(-0.012f, 0.02f, q.y);
-                if (wgt <= 0f) continue;
+                // つばの面より上（2 mm 上から）は山の内側へ全部寄せる。つばの面の近くで山より外にある髪は、つばの下 5 mm へ下げる
+                // （後ろへ傾けると、山の後ろの付け根で、リボンとつばの間から髪が細い線になって覗いた）
+                if (q.y < -0.02f) continue;
                 var ex = q.x / f.rx;
                 var ez = q.z / f.rz;
                 var rho = Mathf.Sqrt(ex * ex + ez * ez);
                 var moved = false;
                 var ts = Mathf.Clamp01((CrownHeight - q.y) / (CrownHeight - RibbonHeight));
                 var allowed = 0.92f * Mathf.Lerp(CrownTaper * 0.92f, 1f, 1f - Mathf.Pow(1f - ts, 1.6f));
-                if (rho > allowed) { var sc = Mathf.Lerp(1f, allowed / rho, wgt); q.x *= sc; q.z *= sc; moved = true; }
+                if (rho > allowed)
+                {
+                    if (q.y >= 0.002f)
+                    {
+                        q.x *= allowed / rho;
+                        q.z *= allowed / rho;
+                        moved = true;
+                    }
+                    else
+                    {
+                        var rTop = (f.rx + f.rz) * 0.5f;
+                        var tb = Mathf.Clamp01((rho - 0.96f) / (BrimWidth / rTop + 0.04f));
+                        var under = -BrimDroop * tb * tb - 0.005f;
+                        if (q.y > under) { q.y = under; moved = true; }
+                    }
+                }
                 var top = CrownHeight + CrownDome * (1f - Mathf.Min(1f, rho * rho)) - 0.008f;
                 if (q.y > top) { q.y = top; moved = true; }
                 if (!moved) continue;
