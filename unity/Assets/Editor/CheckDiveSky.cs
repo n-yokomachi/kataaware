@@ -468,8 +468,9 @@ namespace HalfAware.EditorTools
                     headings.Add(new[] { 300f, 310f, 320f });
                     spots.Add(new KeyValuePair<string, Vector3>("踊り場", new Vector3(0f, BuildDive.EstateTop - BuildDive.Floor * 0.5f + 1.62f, -10.4f)));
                     headings.Add(new[] { 50f, 60f, 70f, 80f });
-                    spots.Add(new KeyValuePair<string, Vector3>("庭の南東の隅", new Vector3(23f, 1.62f, -18.5f)));
-                    headings.Add(new[] { 90f, 135f, 180f, 225f });
+                    // 棟の裏へは回れなくなったので（見えない仕切りの南は z -15）、庭の東の塀の際から東と南東を見る
+                    spots.Add(new KeyValuePair<string, Vector3>("庭の東の塀の際", new Vector3(23.9f, 1.62f, -8.0f)));
+                    headings.Add(new[] { 45f, 90f, 135f, 180f });
                     for (var s = 0; s < spots.Count; s++)
                     {
                         var at = spots[s].Value;

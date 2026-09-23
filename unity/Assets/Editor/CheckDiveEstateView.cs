@@ -130,7 +130,7 @@ namespace HalfAware.EditorTools
                 go.transform.position = place.TransformPoint(new Vector3(c.x - 3f, c.y, c.z));
                 var west = cam.WorldToViewportPoint(world);
                 var dist = new Vector2(point.x - c.x, point.z - c.z).magnitude;
-                return string.Format("{0}: {1:0.0} 画素（中心からの水平の距離 {2:0.0} m、画面の x {3:0}→{4:0}）",
+                return string.Format("{0}: {1:0.0} 画素（廊下からの水平の距離 {2:0.0} m、画面の x {3:0}→{4:0}）",
                     label, (west.x - east.x) * 960f, dist, east.x * 960f, west.x * 960f);
             }
             finally
