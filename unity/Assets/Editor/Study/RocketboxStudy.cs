@@ -316,7 +316,7 @@ namespace HalfAware.EditorTools.Study
                     BuildRocketboxProtagonist.MakeHead(scratch, look, 512, false, out info, out mask);
                     who.Made.AddRange(scratch.Made);
 
-                    float low = float.MaxValue, back = float.MaxValue, front = float.MaxValue, side = float.MaxValue, chin = float.MaxValue;
+                    float low = float.MaxValue, back = float.MaxValue, front = float.MaxValue, side = float.MaxValue, chin = float.MaxValue, top = float.MinValue;
                     var seen = new HashSet<int>();
                     Action<Vector3> hairAt = p =>
                     {
@@ -329,6 +329,18 @@ namespace HalfAware.EditorTools.Study
                         else if (f > 0.03f) front = Mathf.Min(front, y);
                         if (Mathf.Abs(r) > 0.07f && Mathf.Abs(f) < 0.06f) side = Mathf.Min(side, y);
                     };
+                    // 肩の上面: 体の肌と服の、肩の関節の真上あたり（左右 12〜17 cm、前後 6 cm 以内）の一番高い所
+                    for (var s = 0; s < smr.sharedMesh.subMeshCount; s++)
+                    {
+                        if (s == hairSlot) continue;
+                        foreach (var i in smr.sharedMesh.GetTriangles(s))
+                        {
+                            var p = smr.transform.TransformPoint(verts[i]);
+                            var local = p - head;
+                            var r = Mathf.Abs(Vector3.Dot(local, right));
+                            if (r > 0.12f && r < 0.17f && Mathf.Abs(Vector3.Dot(local, fwd)) < 0.06f && p.y - ground < shoulder + 0.12f) top = Mathf.Max(top, p.y - ground);
+                        }
+                    }
                     for (var s = 0; s < smr.sharedMesh.subMeshCount; s++)
                     {
                         if (s != headSlot && s != hairSlot) continue;
@@ -344,17 +356,18 @@ namespace HalfAware.EditorTools.Study
                                 continue;
                             }
                             var local = p - head;
-                            if (Mathf.Abs(Vector3.Dot(local, right)) < 0.015f && Vector3.Dot(local, fwd) > 0.05f) chin = Mathf.Min(chin, p.y - ground);
+                            // 顎の先: 顔の真ん中で、唇とほぼ同じだけ前へ出ている所の一番低い所（首の前は出ていないので入らない）
+                            if (Mathf.Abs(Vector3.Dot(local, right)) < 0.015f && Vector3.Dot(local, fwd) > 0.09f) chin = Mathf.Min(chin, p.y - ground);
                             var n = info.N;
                             var x = Mathf.Clamp((int)(uv[i].x * n), 0, n - 1);
                             var yy = Mathf.Clamp((int)(uv[i].y * n), 0, n - 1);
                             if (info.Hair[yy * n + x] > 0.5f) hairAt(p);
                         }
                     }
-                    Func<float, string> vsShoulder = y => y == float.MaxValue ? "無し" : string.Format(CultureInfo.InvariantCulture, "{0:0.000} m（肩の関節から {1:+0.0;-0.0} cm）", y, (y - shoulder) * 100f);
+                    Func<float, string> vsShoulder = y => y == float.MaxValue ? "無し" : string.Format(CultureInfo.InvariantCulture, "{0:0.000} m（肩の上面から {1:+0.0;-0.0} cm、肩の関節から {2:+0.0;-0.0} cm、顎の先から {3:+0.0;-0.0} cm）", y, (y - top) * 100f, (y - shoulder) * 100f, (y - chin) * 100f);
                     return string.Format(CultureInfo.InvariantCulture,
-                        "{0}: 肩の関節 {1:0.000} m、顎の先 {2:0.000} m / 髪の一番下 {3}、後ろ {4}、前 {5}、横 {6}",
-                        v.Person, shoulder, chin, vsShoulder(low), vsShoulder(back), vsShoulder(front), vsShoulder(side));
+                        "{0}: 床から 肩の上面 {1:0.000} m、肩の関節 {2:0.000} m、顎の先 {3:0.000} m / 髪の一番下 {4}、後ろ {5}、前 {6}、横 {7}",
+                        v.Person, top, shoulder, chin, vsShoulder(low), vsShoulder(back), vsShoulder(front), vsShoulder(side));
                 }
                 finally
                 {
