@@ -44,6 +44,11 @@ namespace HalfAware.EditorTools.Rocketbox
 
         readonly System.Action<RocketboxPaint.Look> tune;
 
+        /// <summary>服の色（主人公）。<see cref="Look"/> の最後に掛ける。null なら体の人の服のまま</summary>
+        public System.Action<RocketboxPaint.Look> Outfit;
+        /// <summary>服の色（片割れ）。<see cref="TwinLook"/> で、主人公の見た目の上に掛ける。null なら片割れも主人公と同じ服</summary>
+        public System.Action<RocketboxPaint.Look> TwinOutfit;
+
         RocketboxPerson(string name, string prefix, string label, System.Action<RocketboxPaint.Look> tune)
         {
             Name = name;
@@ -83,6 +88,8 @@ namespace HalfAware.EditorTools.Rocketbox
         {
             k.blackenKnit = true;
             k.hairLowest = 0.17f;
+            // 元の模型は口が少し開いていて、斜めから歯が見える。2.5 度で唇が軽く合う（4 度で下唇が潰れ、6 度で上唇を突き抜けた）
+            k.jawClose = 2.5f;
         });
 
         /// <summary>
@@ -104,7 +111,42 @@ namespace HalfAware.EditorTools.Rocketbox
         public static readonly RocketboxPerson Head08Body14 = Compose("Head08_Body14", "女大 08 の頭と女大 14 の体", Adult08, Adult14);
 
         /// <summary>女大 14 の顔と体に、女大 08 の髪（長さと形ごと）を載せた人</summary>
-        public static readonly RocketboxPerson Face14Hair08 = ComposeHair("Face14_Hair08", "女大 14 の顔と体に女大 08 の髪", Adult14, Adult08, Adult14);
+        public static readonly RocketboxPerson Face14Hair08 = Dress(ComposeHair("Face14_Hair08", "女大 14 の顔と体に女大 08 の髪", Adult14, Adult08, Adult14),
+            // 主人公: 都会のモード系。カーディガン・パンツ・靴を黒、中のトップスを濃い灰
+            k =>
+            {
+                k.blackenKnit = true;
+                k.recolourPants = true;
+                k.pantsShadow = new Color(0.010f, 0.010f, 0.012f);
+                k.pantsShine = new Color(0.070f, 0.070f, 0.078f);
+                k.recolourShoes = true;
+                k.shoeShadow = new Color(0.008f, 0.008f, 0.009f);
+                k.shoeShine = new Color(0.100f, 0.098f, 0.100f);
+                k.recolourTop = true;
+                k.topShadow = new Color(0.035f, 0.035f, 0.038f);
+                k.topShine = new Color(0.200f, 0.200f, 0.210f);
+            },
+            // 片割れ: 田舎のアースカラー。カーディガンは女大 14 の元の生成りのまま、パンツをオリーブ、靴を茶の革、中のトップスをテラコッタ
+            k =>
+            {
+                k.blackenKnit = false;
+                k.recolourPants = true;
+                k.pantsShadow = new Color(0.085f, 0.085f, 0.045f);
+                k.pantsShine = new Color(0.420f, 0.400f, 0.250f);
+                k.recolourShoes = true;
+                k.shoeShadow = new Color(0.060f, 0.035f, 0.020f);
+                k.shoeShine = new Color(0.380f, 0.240f, 0.140f);
+                k.recolourTop = true;
+                k.topShadow = new Color(0.110f, 0.055f, 0.035f);
+                k.topShine = new Color(0.520f, 0.300f, 0.190f);
+            });
+
+        static RocketboxPerson Dress(RocketboxPerson p, System.Action<RocketboxPaint.Look> self, System.Action<RocketboxPaint.Look> twin)
+        {
+            p.Outfit = self;
+            p.TwinOutfit = twin;
+            return p;
+        }
 
         /// <summary>手を入れて撮り比べる人の全部</summary>
         public static readonly RocketboxPerson[] All = { Adult14, Adult08, Head08Body14, Face14Hair08 };
@@ -158,11 +200,21 @@ namespace HalfAware.EditorTools.Rocketbox
                     k.flatHair = true;
                     k.liftForehead = 1f;
                 }
+                if (Outfit != null) Outfit(k);
                 return k;
             }
             var own = new RocketboxPaint.Look();
             if (tune != null) tune(own);
+            if (Outfit != null) Outfit(own);
             return own;
+        }
+
+        /// <summary>片割れの見た目。主人公の見た目に <see cref="TwinOutfit"/> を掛ける（顔・髪・黒子は同じ。黒子は模型ごと裏返して右目の下へ）</summary>
+        public RocketboxPaint.Look TwinLook()
+        {
+            var k = Look();
+            if (TwinOutfit != null) TwinOutfit(k);
+            return k;
         }
 
         public override string ToString() { return Label + "（" + Name + "）"; }

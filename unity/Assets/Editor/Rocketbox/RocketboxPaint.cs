@@ -41,6 +41,17 @@ namespace HalfAware.EditorTools.Rocketbox
             public Color knitShine = new Color(0.085f, 0.087f, 0.098f);
             public float knitLo = 0.22f, knitHi = 0.68f, knitGamma = 1.10f;
 
+            [Header("服の塗り直し（パンツ・靴・中のトップス）。元の明暗を影の色から明るい色へ写す（色は sRGB）")]
+            public bool recolourPants;
+            public Color pantsShadow = new Color(0.010f, 0.010f, 0.012f), pantsShine = new Color(0.070f, 0.070f, 0.078f);
+            public bool recolourShoes;
+            public Color shoeShadow = new Color(0.008f, 0.008f, 0.009f), shoeShine = new Color(0.100f, 0.098f, 0.100f);
+            public bool recolourTop;
+            public Color topShadow = new Color(0.035f, 0.035f, 0.038f), topShine = new Color(0.200f, 0.200f, 0.210f);
+
+            [Header("口")]
+            [Tooltip("顎の骨（Bip01 MJaw）を閉じる向きへ回す角度（度）。元の模型は口が少し開いていて、斜めから歯が見える")]
+            public float jawClose;
 
             [Header("黒子")]
             [Tooltip("直径（m）。0 なら描かない")]
@@ -520,15 +531,16 @@ namespace HalfAware.EditorTools.Rocketbox
         {
             var n = s.N;
             var px = (Color[])src.Clone();
+            var H = new float[n * n];
+            var S = new float[n * n];
+            var V = new float[n * n];
+            for (var i = 0; i < px.Length; i++) Color.RGBToHSV(src[i], out H[i], out S[i], out V[i]);
+            Outfit(px, s, H, S, V, k);
             if (!k.blackenKnit)
             {
                 knit = new float[n * n];
                 return px;
             }
-            var H = new float[n * n];
-            var S = new float[n * n];
-            var V = new float[n * n];
-            for (var i = 0; i < px.Length; i++) Color.RGBToHSV(src[i], out H[i], out S[i], out V[i]);
             var w = new float[n * n];
             for (var i = 0; i < px.Length; i++)
             {
@@ -553,6 +565,77 @@ namespace HalfAware.EditorTools.Rocketbox
             }
             knit = w;
             return px;
+        }
+
+        /// <summary>
+        /// パンツ（デニム。色相 190 度前後の青で、脛から腰まで）、靴（足首より下）、中のトップス（胸の高さの暗い茶）を塗り直す。
+        /// 場所は UV の島の中は束ねた姿勢の高さと色で決め、島の外（詰め物）はとなりの島の中から広げる。
+        /// 色は元の明るさ（その所の 5〜95 % の幅）を影の色から明るい色へ写す（布の皺や縫い目の明暗を残す）
+        /// </summary>
+        static void Outfit(Color[] px, Surface s, float[] H, float[] S, float[] V, Look k)
+        {
+            if (!k.recolourPants && !k.recolourShoes && !k.recolourTop) return;
+            var n = s.N;
+            var pants = new float[n * n];
+            var shoes = new float[n * n];
+            var top = new float[n * n];
+            for (var i = 0; i < px.Length; i++)
+            {
+                if (!s.On[i]) { pants[i] = shoes[i] = top[i] = -1f; continue; }
+                var y = s.P[i].y;
+                // 脛から腿（カーディガンの裾より下）は全部デニム（明るい縫い目も含める）。腰はデニムの青だけ
+                var denim = HueNear(H[i] * 360f, 192f, 25f, 12f) * Band(S[i], 0.06f, 0.09f, 0.45f, 0.55f);
+                pants[i] = Smooth(0.10f, 0.14f, y) * Mathf.Max(Smooth(0.86f, 0.82f, y), denim * Smooth(1.00f, 0.95f, y));
+                shoes[i] = Smooth(0.18f, 0.15f, y) * (1f - pants[i]);
+                // 中のトップス: 胸の V の開きから見える、彩度の高い暗い茶（色相 0〜40 度・彩度 0.55〜0.8・明るさ 0.09〜0.15。ニットは彩度 0.18）
+                top[i] = Smooth(1.00f, 1.05f, y) * Smooth(1.55f, 1.50f, y) * HueNear(H[i] * 360f, 20f, 20f, 8f)
+                    * Smooth(0.35f, 0.45f, S[i]) * Smooth(0.30f, 0.24f, V[i]);
+            }
+            if (k.recolourPants) Recolour(px, V, Spread(pants, n), k.pantsShadow, k.pantsShine);
+            if (k.recolourShoes) Recolour(px, V, Spread(shoes, n), k.shoeShadow, k.shoeShine);
+            if (k.recolourTop) Recolour(px, V, Spread(top, n), k.topShadow, k.topShine);
+        }
+
+        /// <summary>負の値（島の外）を、となりの値の平均で 4 回まで広げる。届かない所は 0</summary>
+        static float[] Spread(float[] w, int n)
+        {
+            for (var pass = 0; pass < 4; pass++)
+            {
+                var next = (float[])w.Clone();
+                for (var y = 0; y < n; y++)
+                    for (var x = 0; x < n; x++)
+                    {
+                        var i = y * n + x;
+                        if (w[i] >= 0f) continue;
+                        float sum = 0f;
+                        var cnt = 0;
+                        if (x > 0 && w[i - 1] >= 0f) { sum += w[i - 1]; cnt++; }
+                        if (x < n - 1 && w[i + 1] >= 0f) { sum += w[i + 1]; cnt++; }
+                        if (y > 0 && w[i - n] >= 0f) { sum += w[i - n]; cnt++; }
+                        if (y < n - 1 && w[i + n] >= 0f) { sum += w[i + n]; cnt++; }
+                        if (cnt > 0) next[i] = sum / cnt;
+                    }
+                w = next;
+            }
+            for (var i = 0; i < w.Length; i++) if (w[i] < 0f) w[i] = 0f;
+            return w;
+        }
+
+        static void Recolour(Color[] px, float[] V, float[] w, Color shadow, Color shine)
+        {
+            var vs = new List<float>();
+            for (var i = 0; i < px.Length; i++) if (w[i] > 0.5f) vs.Add(V[i]);
+            if (vs.Count == 0) return;
+            vs.Sort();
+            var lo = vs[(int)(vs.Count * 0.05f)];
+            var hi = Mathf.Max(lo + 0.02f, vs[(int)(vs.Count * 0.95f)]);
+            for (var i = 0; i < px.Length; i++)
+            {
+                if (w[i] <= 0f) continue;
+                var c = Color.Lerp(shadow, shine, Mathf.Clamp01((V[i] - lo) / (hi - lo)));
+                c.a = px[i].a;
+                px[i] = Color.Lerp(px[i], c, Mathf.Clamp01(w[i]));
+            }
         }
 
         // ---- 髪の房（透けの絵） -----------------------------------------------
