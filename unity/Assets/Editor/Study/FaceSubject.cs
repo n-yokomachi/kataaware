@@ -33,7 +33,7 @@ namespace HalfAware.EditorTools.Study
         public GameObject Root;
         /// <summary>顔の表面の中心（鼻筋の上、目と口の中ほど）。Root の中</summary>
         public Vector3 FaceCentreLocal;
-        /// <summary>目の高さの顔の中心。幅を測る線をここに引く。Root の中</summary>
+        /// <summary>目の高さの顔の中心。顔の幅はこの高さで測る。Root の中</summary>
         public Vector3 EyeLineLocal;
         public Vector3 ForwardLocal = Vector3.forward;
         /// <summary>目の高さの肌の左右の広がり。m</summary>

@@ -739,8 +739,16 @@ namespace HalfAware.EditorTools.Study
 
         public static string SheetOf(string[] tags, IList<string> rows, string outName, int scale = 2)
         {
+            return SheetOf(tags, rows, outName, scale, new RectInt(0, 0, GameW, GameH));
+        }
+
+        /// <summary>
+        /// 切り出し付きの一覧。crop は 320×180 の中の矩形（x, y は左下から）。顔の周りだけを大きく並べるときに使う
+        /// </summary>
+        public static string SheetOf(string[] tags, IList<string> rows, string outName, int scale, RectInt crop)
+        {
             const int gap = 4;
-            int cw = GameW * scale, ch = GameH * scale;
+            int cw = crop.width * scale, ch = crop.height * scale;
             var W = tags.Length * cw + (tags.Length + 1) * gap;
             var H = rows.Count * ch + (rows.Count + 1) * gap;
             var sheet = new Texture2D(W, H, TextureFormat.RGBA32, false);
@@ -762,7 +770,7 @@ namespace HalfAware.EditorTools.Study
                     int oy = H - (gap + ri * (ch + gap)) - ch;
                     for (var y = 0; y < ch; y++)
                         for (var x = 0; x < cw; x++)
-                            fill[(oy + y) * W + ox + x] = px[(y / scale) * t.width + x / scale];
+                            fill[(oy + y) * W + ox + x] = px[(crop.y + y / scale) * t.width + crop.x + x / scale];
                     Object.DestroyImmediate(t);
                 }
             sheet.SetPixels32(fill);

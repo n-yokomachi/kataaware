@@ -246,7 +246,7 @@ namespace HalfAware.EditorTools.Study
 
         /// <summary>
         /// 段 2 の顔の面を作る。頭の肌の深さを滑らかにした地（模型の鼻は外す）に、<see cref="Relief"/> を載せる。
-        /// 縁は頭の肌の角ばった面の手前 1.5 mm に沿わせ、縁から内へ起伏を効かせる。
+        /// 縁は頭の肌の角ばった面の手前 1.5 mm に沿わせ、起伏は縁から内側でだけ付ける。
         /// 楕円の外と、頭の正面から外れた所（深さ 0.165 m 未満）には三角を張らない
         /// </summary>
         public static Mesh BuildPlate2(GameObject her, Transform plate, FacePaint.Layout l)
