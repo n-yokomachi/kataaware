@@ -26,9 +26,9 @@ namespace HalfAware.EditorTools.Rocketbox
     /// - 鎖骨は写さず、Rocketbox の束ねた姿勢の向き（体の外へ 13 度下がる）のままにする。
     ///   Quaternius の肩の骨は胸の中ほどから肩の付け根へ 34 度上がって伸びる作りで、これを Rocketbox の鎖骨の向きに合わせると、
     ///   鎖骨が 47 度持ち上がって肩の付け根が 8 cm 上がり、肩が盛り上がって見えた
-    /// - 腕は、Quaternius の立ちの初めのこまで上腕が体から 25 度開き、14 度後ろへ引かれている。
-    ///   上腕・前腕・手を肩の付け根まわりに一緒に回して、立ちの初めのこまで <see cref="ArmOpen"/> 度開き、
-    ///   <see cref="ArmForward"/> 度前へ出るようにする。同じ回し方を歩きにも掛けるので、振りの幅は変わらない
+    /// - 立ちの腕と脚は、Quaternius の立ちを写さず、Rocketbox の骨の上で直立の形を決める（<see cref="Job.CalibrateStand"/>）。
+    ///   Quaternius の立ちは腕が体の前に来て肘が曲がっており、骨ごとの直しを重ねても直立に見えなかった。元の立ちからは腕の揺れだけを残す
+    /// - 歩きの腕は、上腕・前腕・手を肩の付け根まわりに一緒に回して、振りの真ん中が体の横に来るようにする（振りの幅は変わらない）
     /// </summary>
     public static class RocketboxRetarget
     {
@@ -38,11 +38,6 @@ namespace HalfAware.EditorTools.Rocketbox
         public const string SourceIdle = "Assets/Animation/Idle.anim";
         public const string SourceWalk = "Assets/Animation/Walk.anim";
 
-        /// <summary>立ちの初めのこまで、上腕が体の横から外へ開く角度（正面から見て、度）</summary>
-        public const float ArmOpen = 8f;
-        /// <summary>立ちの初めのこまで、上腕が真下から前へ出る角度（横から見て、度。負は後ろ）</summary>
-        public const float ArmForward = -2f;
-
         /// <summary>
         /// 胸（Spine2 から上）を後ろへ起こす角度（度）。Quaternius の立ちは背中が丸まって胸が落ちているので、胸を起こして軽い反りにする
         /// </summary>
@@ -51,6 +46,24 @@ namespace HalfAware.EditorTools.Rocketbox
         public const float NeckOverHips = 0f;
         /// <summary>立ちの初めのこまでの顔の向き（度。正は下向き、0 で目の高さの前）</summary>
         public const float HeadPitch = 0f;
+
+        // ---- 立ちの形（腕と脚は、元の立ちを写さず Rocketbox の骨の上で決める） ----
+        /// <summary>立ち: 上腕が体の横から外へ開く角度（正面から見て、度）</summary>
+        public const float StandArmOpen = 3f;
+        /// <summary>立ち: 手首を、腰の関節を通る縦の線からどれだけ前に置くか（横から見て、m）。上腕の前後の傾きで合わせる</summary>
+        public const float StandWrist = 0f;
+        /// <summary>立ち: 手（手首と中指の付け根の中ほど）と太ももの外側の隙間（正面から見て、m）。前腕を内へ寄せて合わせる</summary>
+        public const float StandHandGap = 0.015f;
+        /// <summary>立ち: 肘の曲げ（度。前腕が上腕の延長から前へ出る角度）</summary>
+        public const float StandElbow = 8f;
+        /// <summary>立ち・歩き: 指の曲げ（Humanoid の指の Stretched の筋肉の値。1 でまっすぐ、0 で軽く曲げた力の抜けた形）</summary>
+        public const float FingerStretch = 0.2f;
+        /// <summary>立ち: 元の立ちの揺れ（呼吸と重心の動き）を腕に残す割合（1 で元のまま、0 で止める）</summary>
+        public const float StandSway = 1f;
+        /// <summary>立ち: 腰（腿の付け根の中点）を足首の中点の真上からどれだけ前に置くか（横から見て、m）</summary>
+        public const float HipsOverAnkles = 0f;
+        /// <summary>歩き: 腕の振りの真ん中で、上腕が体の横から外へ開く角度と、真下から前へ出る角度（度）</summary>
+        public const float WalkArmOpen = 5f, WalkArmForward = 0f;
 
         [MenuItem("HalfAware/Rocketbox/Retarget the idle and walk")]
         public static void Menu()
@@ -69,8 +82,9 @@ namespace HalfAware.EditorTools.Rocketbox
             var made = new Dictionary<AnimationClip, AnimationClip>();
             using (var job = new Job())
             {
-                sb.AppendLine(job.CalibrateArms(idle));
+                sb.AppendLine(job.CalibrateArms(walk));
                 sb.AppendLine(job.CalibrateTrunk(idle));
+                sb.AppendLine(job.CalibrateStand(idle));
                 foreach (var clip in new[] { idle, walk })
                 {
                     string note;
@@ -160,6 +174,151 @@ namespace HalfAware.EditorTools.Rocketbox
             readonly Dictionary<string, Quaternion> trunkFix = new Dictionary<string, Quaternion>();
             /// <summary>束ねた姿勢の頭の骨の世界の向き（顔の向きを測るため）</summary>
             Quaternion headBind;
+            /// <summary>束ねた姿勢の Rocketbox の骨の世界の向きと位置</summary>
+            readonly Dictionary<Transform, Quaternion> dstBind = new Dictionary<Transform, Quaternion>();
+            readonly Dictionary<Transform, Vector3> dstBindPos = new Dictionary<Transform, Vector3>();
+            /// <summary>立ちの形の腕の骨の世界の向き（揺れを掛ける前）と、脚に掛ける世界の回し</summary>
+            readonly Dictionary<string, Quaternion> standArm = new Dictionary<string, Quaternion>();
+            readonly Dictionary<string, Quaternion> standLeg = new Dictionary<string, Quaternion>();
+            /// <summary>元の立ちの初めのこまの、腕の骨の世界の向き（揺れを測る基）</summary>
+            readonly Dictionary<Transform, Quaternion> srcIdle0 = new Dictionary<Transform, Quaternion>();
+            /// <summary>立ちの形を使う動き（立ち）</summary>
+            AnimationClip standClip;
+
+            /// <summary>
+            /// 立ちの形を決める。元の立ちは腕が体の前に来て肘が曲がっていたので、骨ごとの直しをやめ、腕は Rocketbox の束ねた姿勢から
+            /// 直接決める: 上腕は体の横に <see cref="StandArmOpen"/> 度開いてまっすぐ下ろし、肘は <see cref="StandElbow"/> 度、
+            /// 前腕をひねって手のひらを太ももの側へ（人差し指の付け根が小指の付け根より前）、手首はまっすぐ。
+            /// 元の立ちからは、初めのこまからの腕の揺れだけを <see cref="StandSway"/> の割合で残す。
+            /// 脚は、腰が足首の真上（<see cref="HipsOverAnkles"/>）に来るよう、両脚を腰の関節まわりに前後へ回す
+            /// </summary>
+            public string CalibrateStand(AnimationClip idle)
+            {
+                standClip = null;
+                standArm.Clear();
+                standLeg.Clear();
+                Pose(idle, 0f);
+                var before = Stand();
+                ResetSource();
+                idle.SampleAnimation(src, 0f);
+                foreach (var j in joints) srcIdle0[j.Src] = j.Src.rotation;
+                standClip = idle;
+                // 上腕の前後の傾きで手首を腰の関節の縦の線へ、前腕の内への寄せで手を太ももの横へ合わせる
+                float fwd = 0f, inward = 0f;
+                for (var it = 0; it < 6; it++)
+                {
+                    SetArms(fwd, inward);
+                    Pose(idle, 0f);
+                    float wrist, gap, elbow;
+                    StandMeasure(out wrist, out gap, out elbow);
+                    var armLen = Vector3.Distance(D("Bip01 L UpperArm").position, D("Bip01 L Hand").position);
+                    var foreLen = Vector3.Distance(D("Bip01 L Forearm").position, D("Bip01 L Hand").position);
+                    fwd -= Mathf.Atan2(wrist - StandWrist, armLen) * Mathf.Rad2Deg;
+                    inward += Mathf.Atan2(gap - StandHandGap, foreLen) * Mathf.Rad2Deg;
+                }
+                SetArms(fwd, inward);
+                // 脚: 腰を足首の真上へ
+                float lean = 0f;
+                for (var it = 0; it < 4; it++)
+                {
+                    SetLegs(lean);
+                    Pose(idle, 0f);
+                    var hips = Mid(D("Bip01 L Thigh"), D("Bip01 R Thigh"));
+                    var ankle = Mid(D("Bip01 L Foot"), D("Bip01 R Foot"));
+                    var off = ankle.z - (hips.z - HipsOverAnkles);
+                    lean += Mathf.Atan2(off, hips.y - ankle.y) * Mathf.Rad2Deg;
+                }
+                SetLegs(lean);
+                Pose(idle, 0f);
+                var after = Stand();
+                ResetSource();
+                return string.Format(CultureInfo.InvariantCulture,
+                    "立ちの形: 上腕の開き {0:0}°・肘 {1:0}°・手のひらを太ももへ・指 {2:0.00}、脚を {3:0.0}° 回す。直す前 {4} → 直した後 {5}",
+                    StandArmOpen, StandElbow, FingerStretch, lean, before, after);
+            }
+
+            /// <summary>立ちの腕の骨の世界の向き。fwd は上腕を前へ出す角（度）、inward は前腕を体の側へ寄せる角（度）</summary>
+            void SetArms(float fwd, float inward)
+            {
+                foreach (var side in new[] { "L", "R" })
+                {
+                    var sign = side == "L" ? -1f : 1f;
+                    var up = D("Bip01 " + side + " UpperArm");
+                    var fo = D("Bip01 " + side + " Forearm");
+                    var ha = D("Bip01 " + side + " Hand");
+                    var mid = D("Bip01 " + side + " Finger2");
+                    var index = D("Bip01 " + side + " Finger1");
+                    var pinky = D("Bip01 " + side + " Finger4");
+                    var dU = dstBindPos[fo] - dstBindPos[up];
+                    var dF = dstBindPos[ha] - dstBindPos[fo];
+                    var dH = dstBindPos[mid] - dstBindPos[ha];
+                    var palm = dstBindPos[index] - dstBindPos[pinky];
+                    var wantU = new Vector3(sign * Mathf.Tan(StandArmOpen * Mathf.Deg2Rad), -1f, Mathf.Tan(fwd * Mathf.Deg2Rad)).normalized;
+                    // 肘を前へ曲げ（下向きを x まわりに負へ回すと前へ出る）、前腕を体の側へ寄せる（z まわり。左は +x、右は −x へ）
+                    var wantF = Quaternion.AngleAxis(-sign * inward, Vector3.forward) * Quaternion.AngleAxis(-StandElbow, Vector3.right) * wantU;
+                    // 手のひらを太ももの側へ: 小指の付け根から人差し指の付け根への向きを前へ（親指が前）
+                    var ahead = Vector3.forward;
+                    standArm["UpperArm." + side] = Quaternion.FromToRotation(dU, wantU) * dstBind[up];
+                    standArm["LowerArm." + side] = Frame(wantF, ahead) * Quaternion.Inverse(Frame(dF, palm)) * dstBind[fo];
+                    standArm["Hand." + side] = Frame(wantF, ahead) * Quaternion.Inverse(Frame(dH, palm)) * dstBind[ha];
+                }
+            }
+
+            void SetLegs(float deg)
+            {
+                // 正の角は、脚の先（足首）を後ろへ動かす向き。足は床に平らなまま（足の骨は回さない）
+                var q = Quaternion.AngleAxis(deg, Vector3.right);
+                foreach (var side in new[] { "L", "R" })
+                {
+                    standLeg["UpperLeg." + side] = q;
+                    standLeg["LowerLeg." + side] = q;
+                }
+            }
+
+            /// <summary>aim を前、side を上にした向きの枠</summary>
+            static Quaternion Frame(Vector3 aim, Vector3 side)
+            {
+                return Quaternion.LookRotation(aim.normalized, Vector3.ProjectOnPlane(side, aim.normalized).normalized);
+            }
+
+            /// <summary>
+            /// 立ちの測り（横から見て前が正、cm）: 手首と腰の関節を通る縦の線の前後のずれ（左右の大きい方）、
+            /// 正面から見た手と太ももの隙間（左右の大きい方）、肘の曲げ、腰と足首の前後のずれ
+            /// </summary>
+            string Stand()
+            {
+                float wrist, gap, elbow;
+                StandMeasure(out wrist, out gap, out elbow);
+                var hips = Mid(D("Bip01 L Thigh"), D("Bip01 R Thigh"));
+                var ankle = Mid(D("Bip01 L Foot"), D("Bip01 R Foot"));
+                return string.Format(CultureInfo.InvariantCulture, "手首と腰の関節の前後のずれ {0:+0.0;-0.0} cm・手と太ももの隙間 {1:0.0} cm・肘の曲げ {2:0}°・腰と足首の前後のずれ {3:+0.0;-0.0} cm",
+                    wrist * 100f, gap * 100f, elbow, (hips.z - ankle.z) * 100f);
+            }
+
+            void StandMeasure(out float wrist, out float gap, out float elbow)
+            {
+                wrist = 0f;
+                gap = 0f;
+                elbow = 0f;
+                foreach (var side in new[] { "L", "R" })
+                {
+                    var thigh = D("Bip01 " + side + " Thigh").position;
+                    var hand = D("Bip01 " + side + " Hand").position;
+                    var fingers = D("Bip01 " + side + " Finger2").position;
+                    var dz = hand.z - thigh.z;
+                    if (Mathf.Abs(dz) > Mathf.Abs(wrist)) wrist = dz;
+                    // 手の中ほど（手首と中指の付け根の間）の高さでの、太ももの外側の面までの左右の隙間（太ももの半径は 7 cm と見る）
+                    var palmMid = (hand + fingers) * 0.5f;
+                    var calf = D("Bip01 " + side + " Calf").position;
+                    var t = Mathf.InverseLerp(thigh.y, calf.y, palmMid.y);
+                    var axis = Vector3.Lerp(thigh, calf, t);
+                    var g = Mathf.Abs(palmMid.x - axis.x) - 0.07f;
+                    gap = Mathf.Max(gap, g);
+                    var u = D("Bip01 " + side + " Forearm").position - D("Bip01 " + side + " UpperArm").position;
+                    var f = hand - D("Bip01 " + side + " Forearm").position;
+                    elbow = Mathf.Max(elbow, Vector3.Angle(u, f));
+                }
+            }
 
             /// <summary>
             /// 立ちの初めのこまの背骨を直す量を決める。Quaternius の立ちをそのまま写すと、上体が前に傾いて背中が丸まり、
@@ -230,12 +389,21 @@ namespace HalfAware.EditorTools.Rocketbox
             {
                 ResetSource();
                 clip.SampleAnimation(src, t);
+                var stand = clip == standClip;
                 foreach (var j in joints)
                 {
                     var r = j.Src.rotation * j.Offset;
                     Quaternion c;
                     if (trunkFix.TryGetValue(j.Name, out c)) r = c * r;
-                    if (armFix.TryGetValue(j.Name, out c)) r = c * r;
+                    if (stand && standArm.TryGetValue(j.Name, out c))
+                    {
+                        // 立ちの形に、元の立ちの初めのこまからの揺れを割合で掛ける
+                        Quaternion s0;
+                        var sway = srcIdle0.TryGetValue(j.Src, out s0) ? j.Src.rotation * Quaternion.Inverse(s0) : Quaternion.identity;
+                        r = Quaternion.Slerp(Quaternion.identity, sway, StandSway) * c;
+                    }
+                    else if (armFix.TryGetValue(j.Name, out c)) r = c * r;
+                    if (stand && standLeg.TryGetValue(j.Name, out c)) r = c * r;
                     j.Dst.rotation = r;
                 }
                 // 腰の前後左右: 腿の付け根の中点を、脚の長さの比で縮めた Quaternius の中点へ
@@ -252,24 +420,36 @@ namespace HalfAware.EditorTools.Rocketbox
             }
 
             /// <summary>
-            /// Quaternius の立ちの初めのこまの上腕の向きを測り、<see cref="ArmOpen"/>・<see cref="ArmForward"/> へ回す量を決める
+            /// 歩きの腕: Quaternius の歩きの一回りで上腕の向きを平均し、振りの真ん中が <see cref="WalkArmOpen"/>・<see cref="WalkArmForward"/> へ
+            /// 来るように回す量を決める（振りの幅は変わらない）。立ちの腕は <see cref="CalibrateStand"/> で決める
             /// </summary>
-            public string CalibrateArms(AnimationClip idle)
+            public string CalibrateArms(AnimationClip walk)
             {
-                ResetSource();
-                idle.SampleAnimation(src, 0f);
-                var sb = new StringBuilder("腕の直し: ");
+                var mean = new Dictionary<string, Vector3>();
+                var steps = 24;
+                for (var k = 0; k < steps; k++)
+                {
+                    ResetSource();
+                    walk.SampleAnimation(src, walk.length * k / steps);
+                    foreach (var side in new[] { "L", "R" })
+                    {
+                        Vector3 m;
+                        mean.TryGetValue(side, out m);
+                        mean[side] = m + (S("LowerArm." + side).position - S("UpperArm." + side).position).normalized;
+                    }
+                }
+                var sb = new StringBuilder("歩きの腕の直し（振りの真ん中）: ");
                 foreach (var side in new[] { "L", "R" })
                 {
                     var sign = side == "L" ? -1f : 1f;
-                    var d = (S("LowerArm." + side).position - S("UpperArm." + side).position).normalized;
+                    var d = mean[side].normalized;
                     var open = Mathf.Atan2(Mathf.Abs(d.x), -d.y) * Mathf.Rad2Deg;
                     var fwd = Mathf.Atan2(d.z, -d.y) * Mathf.Rad2Deg;
                     // 開きと前後の角から向きを作る（下向きを基に、x へ開き、z へ出す）
-                    var want = new Vector3(sign * Mathf.Tan(ArmOpen * Mathf.Deg2Rad), -1f, Mathf.Tan(ArmForward * Mathf.Deg2Rad)).normalized;
+                    var want = new Vector3(sign * Mathf.Tan(WalkArmOpen * Mathf.Deg2Rad), -1f, Mathf.Tan(WalkArmForward * Mathf.Deg2Rad)).normalized;
                     var fix = Quaternion.FromToRotation(d, want);
                     foreach (var bone in new[] { "UpperArm.", "LowerArm.", "Hand." }) armFix[bone + side] = fix;
-                    sb.AppendFormat(CultureInfo.InvariantCulture, "{0} 開き {1:0}°→{2:0}°、前後 {3:0}°→{4:0}°（{5:0.0}° 回す）/ ", side, open, ArmOpen, fwd, ArmForward, Quaternion.Angle(Quaternion.identity, fix));
+                    sb.AppendFormat(CultureInfo.InvariantCulture, "{0} 開き {1:0}°→{2:0}°、前後 {3:0}°→{4:0}°（{5:0.0}° 回す）/ ", side, open, WalkArmOpen, fwd, WalkArmForward, Quaternion.Angle(Quaternion.identity, fix));
                 }
                 ResetSource();
                 return sb.ToString();
@@ -291,6 +471,11 @@ namespace HalfAware.EditorTools.Rocketbox
                     }
                     avatar = dst.GetComponent<Animator>().avatar;
                     headBind = D("Bip01 Head").rotation;
+                    foreach (var t in dst.GetComponentsInChildren<Transform>(true))
+                    {
+                        dstBind[t] = t.rotation;
+                        dstBindPos[t] = t.position;
+                    }
                     if (avatar == null || !avatar.isValid || !avatar.isHuman) throw new InvalidOperationException("Rocketbox の Avatar が Humanoid でない");
                     Map();
                     var srcLeg = Vector3.Distance(S("UpperLeg.L").position, S("LowerLeg.L").position) + Vector3.Distance(S("LowerLeg.L").position, S("LowerLeg.L_end").position);
@@ -433,6 +618,13 @@ namespace HalfAware.EditorTools.Rocketbox
                         Pose(clip, t);
                         lowFoot = Mathf.Min(lowFoot, Mathf.Min(D("Bip01 L Toe0").position.y, D("Bip01 R Toe0").position.y) - dst.transform.position.y);
                         handler.GetHumanPose(ref pose);
+                        // 指は軽く曲げた力の抜けた形（Quaternius の指は写していない）
+                        for (var m = 0; m < pose.muscles.Length; m++)
+                        {
+                            var mn = HumanTrait.MuscleName[m];
+                            if (mn.EndsWith("Stretched", StringComparison.Ordinal) && (mn.StartsWith("Left", StringComparison.Ordinal) || mn.StartsWith("Right", StringComparison.Ordinal)) && (mn.Contains("Thumb") || mn.Contains("Index") || mn.Contains("Middle") || mn.Contains("Ring") || mn.Contains("Little")))
+                                pose.muscles[m] = FingerStretch;
+                        }
                         muscles.Add((float[])pose.muscles.Clone());
                         bodyP.Add(pose.bodyPosition);
                         bodyQ.Add(pose.bodyRotation);
