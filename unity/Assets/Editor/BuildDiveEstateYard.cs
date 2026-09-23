@@ -12,10 +12,10 @@ namespace HalfAware.EditorTools
     ///
     /// <list type="table">
     /// <item><term>手前 (z -13 〜 0)</term><description>
-    /// 敷地の中。舗装の継ぎ目、白線の駐車場と車、集合ポスト、ゴミ集積所、遊具、街灯、植え込み。
+    /// 敷地の中。舗装の継ぎ目、白線の駐車場と車、ゴミ集積所、遊具、街灯、植え込み。
     /// 形が細かく、廊下を歩くと画面の上でいちばん大きく動く</description></item>
     /// <item><term>中 (z 2 〜 35)</term><description>
-    /// 道路と歩道、隣の棟、同じ団地の別の棟を三つ、給水塔。
+    /// 道路と歩道、隣の棟、同じ団地の別の棟を三つ。
     /// 窓の四角が等間隔に並ぶだけの書き割りで、棟の端の陰から次の棟が出入りする</description></item>
     /// <item><term>奥 (中心から 80 m より先)</term><description>
     /// 組まずに撮って貼る書き割り（<c>BuildDiveEstateFar.cs</c>）。本物の地面は中心から 80 m の
@@ -25,7 +25,7 @@ namespace HalfAware.EditorTools
     ///
     /// **高さは <see cref="EstateTop"/> と <see cref="Floor"/> から導く。**
     /// 階数が変われば廊下の目の高さも動くので、目の高さとの関係で決まる物
-    /// （電柱の頭・電線・街灯の笠）を直値で書くと、階数を直した途端に関係が崩れる。
+    /// （街灯の笠）を直値で書くと、階数を直した途端に関係が崩れる。
     /// 実寸で決まっている物（生垣 0.9 m、車 4 m、ゴミ小屋 1.6 m）はそのまま書く
     /// </summary>
     public static partial class BuildDive
@@ -59,7 +59,6 @@ namespace HalfAware.EditorTools
             EstateYardLife(b);
             EstateYardPlay(b);
             EstateYardRoad(b);
-            EstateYardPole(b);
         }
 
         /// <summary>
@@ -128,59 +127,14 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 暮らしの道具。駐輪場、物干し台、低い棟、室外機、集合ポスト、ゴミ集積所。
+        /// 暮らしの道具。ゴミ集積所。
+        /// 駐輪場・物干し台・低い棟・室外機・集合ポスト・掲示板は日本の団地の物なので外した。
         ///
         /// 地面の上に人の背丈ほどの塊がいくつも散っていると、
         /// 手前の層と隣の棟のあいだに段が生まれて、距離が読めるようになる
         /// </summary>
         static void EstateYardLife(EstateBanks b)
         {
-            // 駐輪場。屋根が水平に一枚あると、地面との間に距離が生まれる
-            const float shedRoof = 2.34f;
-            b.Gear.Box(new Vector3(5.3f, shedRoof, -8.5f), new Vector3(8.2f, 0.09f, 2.6f));
-            for (var i = 0; i < 16; i++)
-                b.Shade.Box(new Vector3(1.45f + i * 0.51f, shedRoof + 0.06f, -8.5f), new Vector3(0.05f, 0.05f, 2.6f));
-            for (var i = 0; i < 6; i++)
-                b.Gear.Box(new Vector3(1.5f + (i % 3) * 3.8f, shedRoof * 0.5f, i < 3 ? -9.6f : -7.4f),
-                    new Vector3(0.12f, shedRoof, 0.12f));
-            for (var i = 0; i < 7; i++) EstateBike(b, 2.0f + i * 1.05f, 0f, -8.4f);
-
-            // 物干し台。地面の上に洗濯物が一枚あると、そこが暮らしの庭だと分かる
-            for (var i = 0; i < 2; i++)
-                b.Gear.Box(new Vector3(13.0f + i * 2.2f, 0.90f, -5.0f), new Vector3(0.10f, 1.80f, 0.10f));
-            b.Gear.Box(new Vector3(14.1f, 1.76f, -5.0f), new Vector3(2.4f, 0.05f, 0.05f));
-            for (var i = 0; i < 4; i++)
-                b.Linen.Box(new Vector3(13.3f + i * 0.54f, 1.42f, -5.0f), new Vector3(0.42f, 0.62f, 0.02f));
-
-            // 低い棟。隣の棟より手前に低い塊があると、奥行きが二段になる
-            const float lowHigh = Floor + 0.6f;
-            b.Wall.Box(new Vector3(16.0f, lowHigh * 0.5f, -11.4f), new Vector3(8.0f, lowHigh, 4.4f));
-            b.Wall.Box(new Vector3(16.0f, lowHigh + 0.12f, -11.4f), new Vector3(8.4f, 0.24f, 4.8f));
-            for (var i = 0; i < 4; i++)
-                b.Shade.FaceZ(-9.18f, 13.1f + i * 1.9f, 14.1f + i * 1.9f, 1.10f, 2.30f, -1);
-            // 室外機の列。低い棟の脇に並べる。同じ箱が等間隔で並ぶ形がもう一つ増える
-            for (var i = 0; i < 5; i++)
-            {
-                var x = 10.6f + i * 0.98f;
-                b.Gear.Box(new Vector3(x, 0.32f, -9.0f), new Vector3(0.80f, 0.58f, 0.36f));
-                b.Shade.Box(new Vector3(x, 0.32f, -8.81f), new Vector3(0.62f, 0.40f, 0.02f));
-            }
-
-            // 集合ポスト。階段を下りた先。同じ口が三段四列に並ぶ
-            b.Gear.Box(new Vector3(2.6f, 1.12f, -11.9f), new Vector3(1.70f, 1.06f, 0.34f));
-            b.Gear.Box(new Vector3(2.6f, 1.70f, -11.9f), new Vector3(1.90f, 0.10f, 0.50f));
-            b.Gear.Box(new Vector3(1.90f, 0.30f, -11.9f), new Vector3(0.10f, 0.60f, 0.10f));
-            b.Gear.Box(new Vector3(3.30f, 0.30f, -11.9f), new Vector3(0.10f, 0.60f, 0.10f));
-            for (var i = 0; i < 4; i++)
-                for (var j = 0; j < 3; j++)
-                    b.Shade.FaceZ(-12.08f, 1.86f + i * 0.40f, 2.18f + i * 0.40f,
-                        0.72f + j * 0.32f, 0.94f + j * 0.32f, -1);
-
-            // 掲示板。ポストの隣。薄い板が一枚立っているだけで、敷地の入口らしくなる
-            b.Gear.Box(new Vector3(5.6f, 1.28f, -11.9f), new Vector3(1.60f, 1.00f, 0.10f));
-            b.Gear.Box(new Vector3(5.6f, 0.39f, -11.9f), new Vector3(0.12f, 0.78f, 0.12f));
-            b.Paper.Box(new Vector3(5.6f, 1.28f, -11.98f), new Vector3(1.36f, 0.78f, 0.02f));
-
             // ゴミ集積所。三方を囲った小屋。敷地の隅にこれがあると団地の裏に見える
             b.Gear.Box(new Vector3(21.8f, 0.80f, -11.0f), new Vector3(3.40f, 1.60f, 0.10f));
             b.Gear.Box(new Vector3(20.15f, 0.80f, -10.0f), new Vector3(0.10f, 1.60f, 2.10f));
@@ -191,7 +145,7 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 遊具。滑り台と砂場とベンチ。
+        /// 遊具。滑り台とベンチ。砂場は日本の公園の形なので外した。
         ///
         /// 敷地の東の隅に、地面から 1.5 m ほどの高さの形をひとかたまり置く。
         /// 手前の層が駐車場と駐輪場だけだと、高さが二種類しか無くて平らに見える
@@ -213,16 +167,7 @@ namespace HalfAware.EditorTools
                 b.Gear.Box(new Vector3(slideX, 0.52f + i * 0.44f, slideZ - 1.02f + i * 0.14f),
                     new Vector3(0.84f, 0.05f, 0.05f));
 
-            // 砂場。縁の板を四角に回す
-            const float sandX = 20.4f;
-            const float sandZ = -5.4f;
-            b.Set.FaceY(0.07f, sandX - 1.55f, sandX + 1.55f, sandZ - 1.55f, sandZ + 1.55f, 1);
-            b.Set.Box(new Vector3(sandX, 0.11f, sandZ - 1.65f), new Vector3(3.40f, 0.22f, 0.20f));
-            b.Set.Box(new Vector3(sandX, 0.11f, sandZ + 1.65f), new Vector3(3.40f, 0.22f, 0.20f));
-            b.Set.Box(new Vector3(sandX - 1.65f, 0.11f, sandZ), new Vector3(0.20f, 0.22f, 3.10f));
-            b.Set.Box(new Vector3(sandX + 1.65f, 0.11f, sandZ), new Vector3(0.20f, 0.22f, 3.10f));
-
-            // ベンチ二脚。砂場の側へ向ける
+            // ベンチ二脚。滑り台の側へ向ける
             for (var i = 0; i < 2; i++)
             {
                 var x = 18.4f + i * 3.6f;
@@ -252,11 +197,6 @@ namespace HalfAware.EditorTools
                 b.Bright.FaceY(0.06f, -13.2f + i * 3.0f, -11.4f + i * 3.0f,
                     (RoadNear + RoadFar) * 0.5f - 0.08f, (RoadNear + RoadFar) * 0.5f + 0.08f, 1);
 
-            // ガードレール。支柱を 3.6 m 間隔で
-            for (var i = 0; i < 11; i++)
-                b.Gear.Box(new Vector3(-12.8f + i * 3.6f, 0.34f, RoadNear - 0.35f), new Vector3(0.10f, 0.68f, 0.10f));
-            b.Bright.Box(new Vector3(5.5f, 0.62f, RoadNear - 0.35f), new Vector3(37.6f, 0.24f, 0.06f));
-
             // 街灯。8 m 間隔で五本。笠は道路の側へ張り出す。
             // 高さは目の高さから導く。柱の頭が廊下の目より下にあると、上から見下ろす形になる
             var lampHigh = Mathf.Min(4.6f, eye - 1.0f);
@@ -266,68 +206,6 @@ namespace HalfAware.EditorTools
                 b.Gear.Box(new Vector3(x, lampHigh * 0.5f, 1.10f), new Vector3(0.14f, lampHigh, 0.14f));
                 b.Gear.Box(new Vector3(x, lampHigh - 0.06f, 1.52f), new Vector3(0.09f, 0.09f, 0.90f));
                 b.Gear.Box(new Vector3(x, lampHigh - 0.18f, 1.92f), new Vector3(0.44f, 0.14f, 0.62f));
-            }
-        }
-
-        /// <summary>
-        /// 電柱と電線。
-        ///
-        /// **電線は目の高さのすぐ下を横切る。** 廊下から 10 m の所にあるので、
-        /// 廊下を東西に歩くあいだ、景色の中でいちばん大きく動くのがこの線になる。
-        /// 高さを直値で書くと階数を直した途端に目の高さから外れるので、
-        /// <see cref="EstateTop"/> から導く
-        /// </summary>
-        static void EstateYardPole(EstateBanks b)
-        {
-            const float eye = EstateTop + 1.62f;
-            const float wireY = eye - 0.35f;
-            const float poleTop = wireY + 1.10f;
-
-            var poles = new[] { -4.5f, 8.5f, 21.5f };
-            foreach (var x in poles)
-            {
-                b.Gear.Box(new Vector3(x, poleTop * 0.5f, -3.2f), new Vector3(0.24f, poleTop, 0.24f));
-                for (var i = 0; i < 2; i++)
-                    b.Gear.Box(new Vector3(x, wireY + 0.36f + i * 0.55f, -3.2f), new Vector3(0.09f, 0.09f, 1.7f));
-                b.Gear.Box(new Vector3(x, wireY - 1.94f, -3.2f), new Vector3(0.52f, 0.62f, 0.44f));
-            }
-            // 電線。撓みが無いと物差しを渡したように見える
-            var hang = new[] { -14f, -4.5f, 8.5f, 21.5f, 25f };
-            for (var i = 0; i + 1 < hang.Length; i++)
-            {
-                for (var w = 0; w < 3; w++)
-                {
-                    var y = wireY + (w - 1) * 0.28f;
-                    var z = -3.2f + (w - 1) * 0.62f;
-                    EstateWire(b.Gear, new Vector3(hang[i], y, z), new Vector3(hang[i + 1], y, z), 0.34f, 0.035f);
-                }
-            }
-            // もう一本を奥へ渡す。線が一面だけだと、手前と奥の区別が付かない
-            EstateWire(b.Gear, new Vector3(-14f, poleTop + 0.25f, 1.4f),
-                new Vector3(25f, poleTop + 0.05f, 1.4f), 0.9f, 0.035f);
-        }
-
-        /// <summary>
-        /// 撓んだ線を一本。真っ直ぐな棒では電線に見えないので、
-        /// 途中の点を拾って短い棒で繋ぐ。
-        ///
-        /// 途中の点は四つ。電線は十三本あって、一本ごとに箱が並ぶので、
-        /// 点を増やすとここだけで頂点が千を超える
-        /// </summary>
-        static void EstateWire(Bank b, Vector3 from, Vector3 to, float sag, float thick)
-        {
-            const int span = 4;
-            var last = from;
-            for (var i = 1; i <= span; i++)
-            {
-                var k = i / (float)span;
-                var at = Vector3.Lerp(from, to, k);
-                at.y -= sag * 4f * k * (1f - k);
-                var dir = at - last;
-                if (dir.sqrMagnitude > 1e-6f)
-                    b.Box((last + at) * 0.5f, new Vector3(thick, thick, dir.magnitude),
-                        Quaternion.LookRotation(dir, Vector3.up));
-                last = at;
             }
         }
 
@@ -417,22 +295,11 @@ namespace HalfAware.EditorTools
                     // 朝日の当たる手すりが明るく、その下の影が暗いと、階の帯が横へ通る
                     b.Far.Box(new Vector3(x, y - 0.42f, BlockFace - 0.42f), new Vector3(1.90f, 0.86f, 0.10f));
                     panes.Box(new Vector3(x, y - 0.84f, BlockFace - 0.22f), new Vector3(1.94f, 0.08f, 0.44f));
-                    // 竿と洗濯物。明るい手すりの前に暗い形が下がると、棟に人が住んでいることになる
-                    if ((i + j) % 3 != 0) continue;
-                    panes.Box(new Vector3(x, y + 0.02f, BlockFace - 0.50f), new Vector3(1.70f, 0.05f, 0.05f));
-                    for (var k = 0; k < 3; k++)
-                        panes.Box(new Vector3(x - 0.5f + k * 0.5f, y - 0.26f, BlockFace - 0.50f),
-                            new Vector3(0.36f, 0.52f, 0.02f));
                 }
             }
             // 屋上。立ち上がりと塔屋と水槽。棟の頭が切り落とされて見えないように
             panes.Box(new Vector3((BlockWest + BlockEast) * 0.5f, BlockHigh + 0.25f, BlockFace - 0.18f),
                 new Vector3(BlockEast - BlockWest, 0.50f, 0.36f));
-            panes.Box(new Vector3(-4.5f, BlockHigh + 1.30f, BlockFace - 0.6f), new Vector3(4.2f, 2.6f, 1.2f));
-            panes.Box(new Vector3(7.5f, BlockHigh + 2.50f, BlockFace - 0.6f), new Vector3(3.0f, 1.8f, 1.2f));
-            for (var i = 0; i < 4; i++)
-                panes.Box(new Vector3(6.4f + (i % 2) * 2.2f, BlockHigh + 1.10f, BlockFace - 0.3f - (i / 2) * 0.6f),
-                    new Vector3(0.16f, 3.0f, 0.16f));
         }
 
         /// <summary>
@@ -451,17 +318,6 @@ namespace HalfAware.EditorTools
             // 高層棟。隣の棟の屋上より高い形を一つ置くと、棟の列が平らに並ばなくなる
             EstateMidBlock(mid, panes, -2.0f, 12.0f, 33.0f, 10, true);
 
-            // 給水塔。西の棟の手前。棟とは違う形が一つあると、団地の敷地の広さが伝わる。
-            // **西の棟の屋上より高くする。** 棟に埋もれると、細い脚は空を背にしないと見えない
-            const float tankX = -16.5f;
-            const float tankZ = 10.5f;
-            const float tankFoot = 15.0f;
-            for (var i = 0; i < 4; i++)
-                mid.Box(new Vector3(tankX + ((i % 2) * 2f - 1f) * 1.7f, tankFoot * 0.5f, tankZ + ((i / 2) * 2f - 1f) * 1.7f),
-                    new Vector3(0.34f, tankFoot, 0.34f));
-            mid.Box(new Vector3(tankX, tankFoot * 0.62f, tankZ), new Vector3(3.8f, 0.24f, 3.8f));
-            mid.Box(new Vector3(tankX, tankFoot + 1.7f, tankZ), new Vector3(4.6f, 3.4f, 4.6f));
-            mid.Box(new Vector3(tankX, tankFoot + 3.7f, tankZ), new Vector3(3.1f, 0.6f, 3.1f));
         }
 
         /// <summary>
