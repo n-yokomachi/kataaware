@@ -323,14 +323,19 @@ namespace HalfAware.EditorTools.Rocketbox
 
         /// <summary>
         /// 片割れ（女大 11 の体）の服。茶色のワンピースを白に近い生成りに（布の陰影は元の明暗から）、ベルトとブーツは元の茶のまま。
-        /// 女大 11 は小さな V 首で胸元の肌を少し見せるので、片割れの頭のテクスチャは丸首のシャツを塗らず、首から下の女大 14 の中のトップスを肌で塗る。
-        /// 脚の肌も頭の肌に揃える
+        /// 深い V 首は避け、首の付け根より少し下の浅い丸首にする: 片割れの頭のテクスチャの首から下と、体のテクスチャの V の肌を、
+        /// ワンピースと同じ生成りの布として塗る（V の中の、女大 14 の胸と女大 11 の肌の継ぎ目も布の下に入る）。脚の肌は頭の肌に揃える
         /// </summary>
         static void Outfit11(RocketboxPaint.Look k)
         {
             k.blackenKnit = false;
-            k.shirt = false;
-            k.chestSkin = true;
+            k.shirt = true;
+            // 襟ぐりは首の付け根より少し下で、肩の側へ上がる丸み（女大 11 の V の縁の上の端より上で閉じる）。色は光の当たったワンピースに揃えた生成り
+            k.shirtColour = new Color(0.78f, 0.75f, 0.69f);
+            k.neckFront = 0.098f;
+            k.neckBack = 0.072f;
+            k.neckRound = 14f;
+            k.topNeckSkin = true;
             k.matchSkinAll = true;
             k.recolourTop = true;
             k.topHue = 25f;

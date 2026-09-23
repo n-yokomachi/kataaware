@@ -300,19 +300,30 @@ namespace HalfAware.EditorTools.Rocketbox
                 // 胸元の埋め: 体の人の肌の三角で、顔の人の肌が届かない所。0.7 mm 内側へ下げる。
                 // UV は埋めの真ん中に一番近い顔の人の肌の頂点の物を全部に使う（頂点ごとに一番近い物を使うと、UV の島をまたいで暗い点が並んだ）
                 var patch = RocketboxCompose.ChestPatch(who.BodyFrom, new RocketboxCompose.Surface(sunkPos, faceHead), eyeY, a.head.z, EdgeSegments(faceHead, fw, sunkPos));
-                var patchUvAll = Vector2.zero;
-                if (patch.Count > 0)
+                // 埋めの UV: 首の前の付け根（頭の骨から 6 cm 下の、首の前の面）に一番近い顔の人の肌の頂点の物（胸元の塗りに左右されない肌の色）。
+                // 丸首の服を塗るときは、襟ぐりより下の頂点に、襟ぐりより 3 cm 下の胸の前の頂点の物（布の色）を使う
+                var look = who.Look();
+                Func<Vector3, Vector2> nearestUv = at =>
                 {
-                    // 首の前の付け根（頭の骨から 6 cm 下の、首の前の面）に一番近い顔の人の肌の頂点。胸元の塗りに左右されない肌の色
-                    var mid = new Vector3(0f, a.head.y - 0.06f, a.head.z + 0.08f);
                     var best = float.MaxValue;
+                    var uv = Vector2.zero;
                     foreach (var h in new HashSet<int>(faceTris))
                     {
-                        var d = (sunkPos[h] - mid).sqrMagnitude;
-                        if (d < best) { best = d; patchUvAll = fuv[h]; }
+                        var d = (sunkPos[h] - at).sqrMagnitude;
+                        if (d < best) { best = d; uv = fuv[h]; }
                     }
-                }
-                Func<int, Vector2> patchUv = i => patchUvAll;
+                    return uv;
+                };
+                var neckUv = nearestUv(new Vector3(0f, a.head.y - 0.06f, a.head.z + 0.08f));
+                var chestUv = look.shirt ? nearestUv(new Vector3(0f, a.head.y - look.neckFront - 0.03f, a.head.z + 0.10f)) : neckUv;
+                Func<int, Vector2> patchUv = i =>
+                {
+                    if (!look.shirt) return neckUv;
+                    var p = bw[i];
+                    var front = RocketboxPaint.Smooth(a.head.z - 0.01f, a.head.z + 0.06f, p.z);
+                    var line = Mathf.Lerp(a.head.y - look.neckBack, a.head.y - look.neckFront, front) + look.neckRound * p.x * p.x;
+                    return p.y < line ? chestUv : neckUv;
+                };
                 var bodyToWorld = bodySmr.transform.localToWorldMatrix;
                 var patchTris = Pack(patch.ToArray(), i => toLocal.MultiplyPoint3x4(bw[i] - bodyToWorld.MultiplyVector(bn[i]).normalized * 0.0007f), i => bn[i], patchUv, i => Re(bwts[i], bodyRemap), verts, norms, uvs, weights);
                 var all = new int[headTris.Length + patchTris.Length];

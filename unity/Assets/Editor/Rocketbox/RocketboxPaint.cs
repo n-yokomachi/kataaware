@@ -58,6 +58,8 @@ namespace HalfAware.EditorTools.Rocketbox
             public float topLow = 1.00f, topHigh = 1.55f, topHalfWidth = 0.30f;
             [Tooltip("中のトップスの塗りから外す UV の四角（別の島の小物。女大 11 のベルト）。幅 0 なら外さない")]
             public Rect topKeepUv;
+            [Tooltip("体のテクスチャで胸の開きに見える肌（胸の高さで真ん中の肌）も中のトップスとして塗る（襟ぐりを浅くするとき）")]
+            public bool topNeckSkin;
 
             [Header("丸首のシャツ（頭のテクスチャの首から下の肌を、白い丸首のシャツとして塗る）")]
             public bool shirt;
@@ -636,6 +638,7 @@ namespace HalfAware.EditorTools.Rocketbox
                 top[i] = Smooth(k.topLow, k.topLow + 0.05f, y) * Smooth(k.topHigh, k.topHigh - 0.05f, y) * Smooth(k.topHalfWidth + 0.02f, k.topHalfWidth - 0.02f, ax)
                     * HueNear(H[i] * 360f, k.topHue, k.topHueWidth, 8f)
                     * Smooth(k.topSatMin - 0.05f, k.topSatMin + 0.05f, S[i]) * Smooth(k.topValMax + 0.03f, k.topValMax - 0.03f, V[i]);
+                if (k.topNeckSkin) top[i] = Mathf.Max(top[i], Smooth(1.18f, 1.23f, y) * Smooth(0.14f, 0.10f, ax) * SkinLike(px[i]));
             }
             if (k.recolourPants) Recolour(px, V, Spread(pants, n), k.pantsShadow, k.pantsShine);
             if (k.recolourShoes) Recolour(px, V, Spread(shoes, n), k.shoeShadow, k.shoeShine);
