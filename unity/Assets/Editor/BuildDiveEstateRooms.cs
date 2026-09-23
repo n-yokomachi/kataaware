@@ -64,14 +64,14 @@ namespace HalfAware.EditorTools
             // ---- 台所 ----
             // 白い戸棚に黄色の天板。デッキ側の窓の下に流し、西の壁に沿ってコンロ
             EstateKitchenRun(b, u, b.Frame, b.Yellow);
-            // 背の高い冷蔵庫。扉に娘の絵と磁石
-            FlatThing(b.Frame, u, 2.86f, 0.58f, f3, new Vector3(0.62f, 1.80f, 0.64f));
-            b.Shade.FaceZ(FlatZ(0.905f), FlatWest + 2.56f, FlatWest + 3.16f, f3 + 1.10f, f3 + 1.12f, -1);
-            FlatThing(b.Gear, u, 2.60f, 0.92f, f3 + 1.20f, new Vector3(0.03f, 0.40f, 0.03f));
-            FlatThing(b.Paper, u, 2.95f, 0.905f, f3 + 1.25f, new Vector3(0.22f, 0.28f, 0.01f), 6f);
-            FlatThing(b.Paper, u, 2.80f, 0.905f, f3 + 0.70f, new Vector3(0.20f, 0.24f, 0.01f), -4f);
-            FlatThing(b.Blue, u, 3.07f, 0.91f, f3 + 1.52f, new Vector3(0.05f, 0.05f, 0.02f));
-            FlatThing(b.Red, u, 2.72f, 0.91f, f3 + 1.00f, new Vector3(0.05f, 0.05f, 0.02f));
+            // 背の高い冷蔵庫。扉に娘の絵と磁石。窓の下の並びと仕切りのあいだに収める
+            FlatThing(b.Frame, u, 2.80f, 0.58f, f3, new Vector3(0.56f, 1.80f, 0.64f));
+            b.Shade.FaceZ(FlatZ(0.905f), FlatWest + 2.54f, FlatWest + 3.06f, f3 + 1.10f, f3 + 1.12f, -1);
+            FlatThing(b.Gear, u, 2.56f, 0.92f, f3 + 1.20f, new Vector3(0.03f, 0.40f, 0.03f));
+            FlatThing(b.Paper, u, 2.90f, 0.905f, f3 + 1.25f, new Vector3(0.22f, 0.28f, 0.01f), 6f);
+            FlatThing(b.Paper, u, 2.74f, 0.905f, f3 + 0.70f, new Vector3(0.20f, 0.24f, 0.01f), -4f);
+            FlatThing(b.Blue, u, 3.00f, 0.91f, f3 + 1.52f, new Vector3(0.05f, 0.05f, 0.02f));
+            FlatThing(b.Red, u, 2.66f, 0.91f, f3 + 1.00f, new Vector3(0.05f, 0.05f, 0.02f));
             // やかん・トースター・果物の鉢・弁当箱
             FlatThing(b.Red, u, 0.40f, 1.25f, f3 + 0.88f, new Vector3(0.16f, 0.22f, 0.16f));
             FlatThing(b.Gear, u, 0.40f, 1.60f, f3 + 0.88f, new Vector3(0.18f, 0.18f, 0.28f));
@@ -149,7 +149,8 @@ namespace HalfAware.EditorTools
             FlatThing(b.Frame, u, 2.70f, 0.52f, f4, new Vector3(0.80f, 0.52f, 0.52f));
             EstateChair(b, b.Blue, b.Frame, u, 2.70f, 0.02f, f4, 180f, 0.75f);
             FlatThing(b.Paper, u, 2.55f, 0.50f, f4 + 0.52f, new Vector3(0.30f, 0.01f, 0.22f), -8f);
-            FlatThing(b.Yellow, u, 4.40f, 0.70f, f4, new Vector3(0.60f, 0.40f, 0.40f));
+            // 玩具の箱。戸の板を寄せる東の脇は空けておく
+            FlatThing(b.Yellow, u, 4.80f, 0.70f, f4, new Vector3(0.60f, 0.40f, 0.40f));
             FlatThing(b.Paper, u, FlatIn + 0.01f, -0.40f, f4 + 1.20f, new Vector3(0.01f, 0.50f, 0.40f));
             FlatThing(b.Paper, u, 1.50f, BedWall - HallSkin - 0.01f, f4 + 1.10f, new Vector3(0.42f, 0.52f, 0.01f), 3f);
             EstateCurtains(b, u, b.Blue, FrontWin0, FrontWin1, BedFrontIn, f4, BedHead, -1);
@@ -213,11 +214,11 @@ namespace HalfAware.EditorTools
             // ---- 台所 ----
             // 緑の戸棚に白い天板。据え置きのコンロに直火のコーヒー沸かし
             EstateKitchenRun(b, u, b.Moss, b.Frame);
-            FlatThing(b.Frame, u, 2.86f, 0.58f, f3, new Vector3(0.60f, 0.90f, 0.62f));
-            FlatThing(b.Shade, u, 2.86f, 0.58f, f3 + 0.90f, new Vector3(0.52f, 0.012f, 0.52f));
-            b.Shade.FaceZ(FlatZ(0.895f), FlatWest + FlatWide + 2.62f, FlatWest + FlatWide + 3.10f, f3 + 0.20f, f3 + 0.62f, -1);
-            FlatThing(b.Gear, u, 2.74f, 0.52f, f3 + 0.91f, new Vector3(0.10f, 0.20f, 0.10f));
-            FlatThing(b.Red, u, 2.86f, 0.90f, f3 + 0.40f, new Vector3(0.30f, 0.40f, 0.02f));
+            FlatThing(b.Frame, u, 2.80f, 0.58f, f3, new Vector3(0.56f, 0.90f, 0.62f));
+            FlatThing(b.Shade, u, 2.80f, 0.58f, f3 + 0.90f, new Vector3(0.48f, 0.012f, 0.52f));
+            b.Shade.FaceZ(FlatZ(0.895f), FlatWest + FlatWide + 2.58f, FlatWest + FlatWide + 3.02f, f3 + 0.20f, f3 + 0.62f, -1);
+            FlatThing(b.Gear, u, 2.70f, 0.52f, f3 + 0.91f, new Vector3(0.10f, 0.20f, 0.10f));
+            FlatThing(b.Red, u, 2.80f, 0.90f, f3 + 0.40f, new Vector3(0.30f, 0.40f, 0.02f));
             // 冷蔵庫。西の並びの南の端
             FlatThing(b.Frame, u, 0.40f, 3.20f, f3, new Vector3(0.60f, 1.60f, 0.62f));
             FlatThing(b.Gear, u, 0.72f, 3.00f, f3 + 1.00f, new Vector3(0.03f, 0.36f, 0.03f));
@@ -323,8 +324,9 @@ namespace HalfAware.EditorTools
             FlatThing(b.Frame, u, 2.80f, 0.55f, f4 + 0.72f, new Vector3(0.42f, 0.28f, 0.20f));
             FlatThing(b.Blue, u, 2.45f, 0.50f, f4 + 0.72f, new Vector3(0.10f, 0.10f, 0.10f));
             EstateChair(b, b.Red, b.Set, u, 2.80f, 0.02f, f4, 180f);
+            // 布地の箱。戸の板を寄せる東の脇は空けておく
             for (var i = 0; i < 2; i++)
-                FlatThing(b.Paper, u, 4.45f, 0.65f, f4 + i * 0.36f, new Vector3(0.52f - i * 0.06f, 0.36f, 0.44f), i * 8f);
+                FlatThing(b.Paper, u, 4.80f, 0.65f, f4 + i * 0.36f, new Vector3(0.52f - i * 0.06f, 0.36f, 0.44f), i * 8f);
             EstateCurtains(b, u, b.Red, FrontWin0, FrontWin1, BedFrontIn, f4, BedHead, -1);
 
             // ---- 夫婦の寝室（奥の寝室） ----
@@ -344,8 +346,8 @@ namespace HalfAware.EditorTools
             FlatThing(b.Frame, u, 5.00f, 7.00f, f4 + 0.75f, new Vector3(0.20f, 0.004f, 0.20f));
             FlatThing(b.Red, u, 2.20f, 6.40f, f4, new Vector3(0.10f, 0.06f, 0.24f));
             FlatThing(b.Red, u, 2.20f, 6.62f, f4, new Vector3(0.10f, 0.06f, 0.24f));
-            EstateChair(b, b.Set, b.Set, u, 2.90f, 4.10f, f4, 200f);
-            FlatThing(b.Moss, u, 2.90f, 4.10f, f4 + 0.49f, new Vector3(0.36f, 0.08f, 0.36f), 20f);
+            EstateChair(b, b.Set, b.Set, u, 2.80f, 4.10f, f4, 200f);
+            FlatThing(b.Moss, u, 2.80f, 4.10f, f4 + 0.49f, new Vector3(0.36f, 0.08f, 0.36f), 20f);
             EstateCurtains(b, u, b.Red, RearWin0, RearWin1, FlatBackIn, f4, BedHead, 1);
             EstateCurtains(b, u, b.Red, RearWin2, RearWin3, FlatBackIn, f4, BedHead, 1);
             for (var i = 0; i < 2; i++)
@@ -520,10 +522,10 @@ namespace HalfAware.EditorTools
             // 便器と水槽
             FlatThing(suite, unit, 2.80f, 3.08f, f4, new Vector3(0.38f, 0.42f, 0.55f));
             FlatThing(suite, unit, 2.80f, 3.32f, f4 + 0.42f, new Vector3(0.40f, 0.36f, 0.14f));
-            // 手拭い掛け。廊下との仕切りの面
-            FlatThing(b.Gear, unit, KitchenWall - HallSkin - 0.05f, 1.75f, f4 + 1.10f, new Vector3(0.03f, 0.03f, 0.56f));
-            FlatThing(towel, unit, KitchenWall - HallSkin - 0.07f, 1.62f, f4 + 0.62f, new Vector3(0.04f, 0.50f, 0.26f));
-            FlatThing(mat, unit, KitchenWall - HallSkin - 0.07f, 1.90f, f4 + 0.72f, new Vector3(0.04f, 0.40f, 0.22f));
+            // 手拭い掛け。表の寝室との仕切りの面。廊下との仕切りには戸口が開いている
+            FlatThing(b.Gear, unit, 1.50f, BedWall + HallSkin + 0.05f, f4 + 1.10f, new Vector3(0.56f, 0.03f, 0.03f));
+            FlatThing(towel, unit, 1.37f, BedWall + HallSkin + 0.07f, f4 + 0.62f, new Vector3(0.26f, 0.50f, 0.04f));
+            FlatThing(mat, unit, 1.65f, BedWall + HallSkin + 0.07f, f4 + 0.72f, new Vector3(0.22f, 0.40f, 0.04f));
             // 足拭き
             FlatThing(mat, unit, 1.10f, 2.20f, f4, new Vector3(0.50f, 0.012f, 0.80f));
         }

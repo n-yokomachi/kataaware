@@ -15,6 +15,11 @@ namespace HalfAware.EditorTools
     /// 正面に階段が上がっていき、右に廊下が伸びる。居間は廊下の突き当たりの戸口の幅ぶんしか
     /// 見えない。戸を開けて居間が丸見えになるのは集合住宅の住戸ではない。
     ///
+    /// **戸口と通路は壁から壁まで 1.0 m。** プレイヤーの体（CharacterController の半径 0.26 と
+    /// skinWidth 0.08）は壁から 0.34 離れて止まるので、体の中心が動ける幅は 0.32 残る。
+    /// 0.9 m の廊下では 0.22、0.8 m の戸口では 0.12 しかなく、真っ直ぐ入れなかった。
+    /// 開いた戸の板は戸口の幅の外（壁の側）へ寄せ、戸口の幅を食わせない。
+    ///
     /// 寸法は住戸のローカルで持つ。u は住戸の西の縁（戸境の壁の真ん中）から東へ、
     /// d はデッキ側の面から南（奥）へ。z は <see cref="FlatZ"/> で場所のローカルへ直す
     /// </summary>
@@ -32,15 +37,15 @@ namespace HalfAware.EditorTools
         const float FlatBackIn = FlatDeep - FaceSkin;                                       // 8.35
 
         // 三階
-        /// <summary>台所と廊下の仕切りの真ん中</summary>
-        const float KitchenWall = 3.3f;
+        /// <summary>台所と廊下の仕切りの真ん中。四階では廊下と浴室の仕切り</summary>
+        const float KitchenWall = 3.15f;
         /// <summary>住戸の中の階段と廊下の仕切りの真ん中</summary>
-        const float StairLine = 4.3f;
-        /// <summary>廊下の西と東の面。幅 0.9 m</summary>
-        const float LaneWest = KitchenWall + HallSkin;                                      // 3.35
-        const float LaneEast = StairLine - HallSkin;                                        // 4.25
-        /// <summary>住戸の中の階段の西の縁。東は戸境の壁で、幅 0.95 m</summary>
-        const float TreadWest = StairLine + HallSkin;                                       // 4.35
+        const float StairLine = 4.25f;
+        /// <summary>廊下の西と東の面。幅 1.0 m。四階の廊下も同じ線</summary>
+        const float LaneWest = KitchenWall + HallSkin;                                      // 3.2
+        const float LaneEast = StairLine - HallSkin;                                        // 4.2
+        /// <summary>住戸の中の階段の西の縁。東は戸境の壁で、幅 1.0 m</summary>
+        const float TreadWest = StairLine + HallSkin;                                       // 4.3
         /// <summary>住戸の中の階段の最初の蹴上げ。玄関の戸から 1.3 m 奥</summary>
         const float InnerFoot = 1.3f;
         /// <summary>住戸の中の階段の踏み面</summary>
@@ -55,9 +60,9 @@ namespace HalfAware.EditorTools
         const float CookBack = 3.65f;
         /// <summary>居間の北の仕切りの真ん中。廊下はここで居間の戸口に突き当たる</summary>
         const float LoungeWall = 4.65f;
-        /// <summary>台所の戸口の両端（d）。玄関の先、廊下の西の壁に開く</summary>
-        const float KitchenDoor0 = 1.45f;
-        const float KitchenDoor1 = 2.25f;
+        /// <summary>台所の戸口の両端（d）。玄関の先、廊下の西の壁に開く。幅 1.0 m</summary>
+        const float KitchenDoor0 = 1.40f;
+        const float KitchenDoor1 = 2.40f;
         /// <summary>配膳の小窓の両端（u）</summary>
         const float HatchWest = 1.2f;
         const float HatchEast = 2.2f;
@@ -71,15 +76,15 @@ namespace HalfAware.EditorTools
         const float BathWall = 3.45f;
         /// <summary>踊り場の南の仕切りの真ん中。ここから南が奥の寝室</summary>
         const float LandWall = 5.55f;
-        /// <summary>表の寝室の戸口の両端（u）</summary>
-        const float BedDoor0 = 3.4f;
-        const float BedDoor1 = 4.2f;
-        /// <summary>浴室の戸口の両端（d）</summary>
-        const float BathDoor0 = 2.2f;
-        const float BathDoor1 = 2.95f;
-        /// <summary>奥の寝室の戸口の両端（u）。階段を上がり切った正面</summary>
-        const float RearDoor0 = 4.45f;
-        const float RearDoor1 = 5.2f;
+        /// <summary>表の寝室の戸口の両端（u）。四階の廊下の突き当たりで、廊下の幅そのまま</summary>
+        const float BedDoor0 = LaneWest;                                                    // 3.2
+        const float BedDoor1 = LaneEast;                                                    // 4.2
+        /// <summary>浴室の戸口の両端（d）。四階の廊下の北の端、表の寝室の戸口のすぐ南</summary>
+        const float BathDoor0 = 1.40f;
+        const float BathDoor1 = 2.40f;
+        /// <summary>奥の寝室の戸口の両端（u）。階段を上がり切った正面。東の脇に戸の板を寄せる隙を残す</summary>
+        const float RearDoor0 = 4.25f;
+        const float RearDoor1 = 5.25f;
 
         // 窓（u と、床からの高さ）
         const float KitchenWin0 = 0.8f;
@@ -263,15 +268,16 @@ namespace HalfAware.EditorTools
             }
 
             // ---- 開いた戸の板。どれも部屋の側へ 90 度開けて、壁に寄せてある ----
+            // **板は戸口の幅の外に置く。** 戸口の縁の線より内へ出すと、板の厚みの分だけ戸口が狭まる
             // 台所。蝶番は南の縁で、板は台所の中へ
-            FlatThing(b.Frame, unit, KitchenWall - HallSkin - 0.40f, KitchenDoor1 - 0.03f, f3,
-                new Vector3(0.78f, HallHead - 0.02f, 0.04f));
+            FlatThing(b.Frame, unit, KitchenWall - HallSkin - 0.49f, KitchenDoor1 + 0.02f, f3,
+                new Vector3(0.98f, HallHead - 0.02f, 0.04f));
             // 居間。蝶番は東の縁で、板は居間の中へ
-            FlatThing(b.Frame, unit, LaneEast - 0.03f, LoungeWall + HallSkin + 0.40f, f3,
-                new Vector3(0.04f, HallHead - 0.02f, 0.78f));
+            FlatThing(b.Frame, unit, LaneEast + 0.02f, LoungeWall + HallSkin + 0.49f, f3,
+                new Vector3(0.04f, HallHead - 0.02f, 0.98f));
             // 表の寝室。蝶番は東の縁。部屋の広い西の側を塞がない
-            FlatThing(b.Frame, unit, BedDoor1 - 0.03f, BedWall - HallSkin - 0.40f, f4,
-                new Vector3(0.04f, HallHead - 0.02f, 0.78f));
+            FlatThing(b.Frame, unit, BedDoor1 + 0.02f, BedWall - HallSkin - 0.49f, f4,
+                new Vector3(0.04f, HallHead - 0.02f, 0.98f));
 
             // 吊り下げの灯り。点の灯りの位置に笠と電球を下げて、明るさの出どころを見せる
             foreach (var lamp in FlatLamps)
@@ -282,12 +288,12 @@ namespace HalfAware.EditorTools
                 b.Frame.Box(at + new Vector3(0f, 0.08f, 0f), new Vector3(0.34f, 0.16f, 0.34f));
                 b.Lit.Box(at + new Vector3(0f, -0.02f, 0f), new Vector3(0.12f, 0.06f, 0.12f));
             }
-            // 浴室。蝶番は北の縁
-            FlatThing(b.Frame, unit, KitchenWall - HallSkin - 0.38f, BathDoor0 + 0.03f, f4,
-                new Vector3(0.74f, HallHead - 0.02f, 0.04f));
-            // 奥の寝室。蝶番は東の縁
-            FlatThing(b.Frame, unit, RearDoor1 - 0.03f, LandWall + HallSkin + 0.38f, f4,
-                new Vector3(0.04f, HallHead - 0.02f, 0.74f));
+            // 浴室。蝶番は北の縁で、板は表の寝室との仕切りに寄る
+            FlatThing(b.Frame, unit, KitchenWall - HallSkin - 0.49f, BathDoor0 - 0.02f, f4,
+                new Vector3(0.98f, HallHead - 0.02f, 0.04f));
+            // 奥の寝室。蝶番は東の縁で、板は戸境の壁に寄る
+            FlatThing(b.Frame, unit, RearDoor1 + 0.02f, LandWall + HallSkin + 0.49f, f4,
+                new Vector3(0.04f, HallHead - 0.02f, 0.98f));
 
             // ---- 幅木 ----
             // 壁の裾に白い線が一本通らないと、壁が塗っただけの面に見える

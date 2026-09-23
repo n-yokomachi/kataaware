@@ -147,7 +147,11 @@ namespace HalfAware.EditorTools
         /// 戸口が二つでは並びに見えず、三つ目が入って初めて等間隔の列として読める
         /// </summary>
         public const float DoorC = DoorB + FlatWide;                                       // 16.55
-        const float DoorHalf = 0.45f;
+        /// <summary>
+        /// 玄関の戸口の幅の半分。壁から壁まで 1.0 m で、体の中心が動ける幅は 0.32 m 残る。
+        /// 0.9 m では 0.22 しかなく、体が戸口の縁に擦れて入りにくかった
+        /// </summary>
+        const float DoorHalf = 0.5f;
         const float DoorHigh = 2.0f;
 
         /// <summary>下の住戸の前庭の北の縁。低い煉瓦の塀と門がここに並ぶ</summary>
@@ -710,15 +714,15 @@ namespace HalfAware.EditorTools
                         new Vector3(0.30f, 0.92f, 0.30f));
                 // 西の塀（隣の前庭との境）。A は小道との境
                 EstateLowWall(b, EstateFace, GardenEdge - thick, side, wallHigh, false);
-                // 小道。門から玄関まで、敷石の目地を横に入れる
-                b.Cast.FaceY(0.03f, ox + DoorAt - 0.45f, ox + DoorAt + 0.45f, EstateFace, GardenEdge - thick, 1);
+                // 小道。門から玄関まで、戸の幅で。敷石の目地を横に入れる
+                b.Cast.FaceY(0.03f, ox + DoorAt - DoorHalf, ox + DoorAt + DoorHalf, EstateFace, GardenEdge - thick, 1);
                 for (var i = 1; i < 5; i++)
-                    b.Shade.FaceY(0.034f, ox + DoorAt - 0.45f, ox + DoorAt + 0.45f,
+                    b.Shade.FaceY(0.034f, ox + DoorAt - DoorHalf, ox + DoorAt + DoorHalf,
                         EstateFace + i * 0.55f - 0.01f, EstateFace + i * 0.55f + 0.01f, 1);
                 // 芝。小道の両脇
                 var east = unit == 2 ? WalkRight : ox + FlatWide - thick * 0.5f;
-                b.Turf.FaceY(0.02f, side + thick * 0.5f, ox + DoorAt - 0.45f, EstateFace, GardenEdge - thick, 1);
-                b.Turf.FaceY(0.02f, ox + DoorAt + 0.45f, east, EstateFace, GardenEdge - thick, 1);
+                b.Turf.FaceY(0.02f, side + thick * 0.5f, ox + DoorAt - DoorHalf, EstateFace, GardenEdge - thick, 1);
+                b.Turf.FaceY(0.02f, ox + DoorAt + DoorHalf, east, EstateFace, GardenEdge - thick, 1);
                 // ごみの缶と、塀際の低い植え込み
                 b.Gear.Box(new Vector3(ox + 3.55f, 0.36f, EstateFace + 0.45f), new Vector3(0.46f, 0.72f, 0.46f));
                 b.Gear.Box(new Vector3(ox + 3.55f, 0.75f, EstateFace + 0.45f), new Vector3(0.52f, 0.06f, 0.52f));
