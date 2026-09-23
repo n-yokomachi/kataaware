@@ -50,10 +50,11 @@ namespace HalfAware.EditorTools
                 Blur.Near, 0.7f, 0.6f, Tone(0.98f, 0.92f, 0.78f), Aged, false,
                 Who("Granddaughter", 3), Who("Wife", 9)));
 
-            // 3. 同じ公園。祖父を引っ張って立たせ、拾った石を握らせる
+            // 3. 同じ公園。祖父を引っ張って立たせ、拾った石を握らせる。
+            // 芝生の奥をイヤホンをした少女（11 のプリヤ）が横切る。公園から電車へ出る口はここ一つ
             entries.Add(Of("女　7　『ソフィア』　2156/03/02 15:47", DiveIds.Park, 30f, 1.05f,
                 Blur.Sharp, 0f, 1.4f, Tone(1.00f, 0.96f, 0.84f), 0f, true,
-                Who("Grandfather", 2), Who("Grandmother", 9)));
+                Who("Grandfather", 2), Who("Grandmother", 9), Who("Passerby", 11)));
 
             // 4. 夕方の電車。後輩に本を返され、揺れて腕を掴まれる
             entries.Add(Of("女　19　『エミリー』　2156/03/02 18:20", DiveIds.Train, 30f, 1.58f,
@@ -95,10 +96,11 @@ namespace HalfAware.EditorTools
                 Blur.Sharp, 0f, 1.1f, Tone(0.92f, 0.96f, 1.00f), 0f, false,
                 Who("Senior", 4)));
 
-            // 12. 同じ家の階段。母に呼ばれて降り、昼食の袋を受け取って出ていく
+            // 12. 同じ家の階段。母に呼ばれて降り、昼食の袋を受け取って出ていく。
+            // 玄関の外で同級生（13 のアイシャ）が待っている。台所から教室へ出る口はここ一つ
             entries.Add(Of("男　15　『ダニエル』　2156/03/03 06:56", DiveIds.Kitchen, 25f, 1.65f,
                 Blur.Sharp, 0f, 1.2f, Tone(0.90f, 0.95f, 1.00f), 0f, false,
-                Who("Mother", 6), Who("Father", 5)));
+                Who("Mother", 6), Who("Father", 5), Who("Classmate", 13)));
 
             // 13. 同じ教室。手を挙げていて先生が近づいてくる
             entries.Add(Of("女　16　『アイシャ』　2156/03/03 11:38", DiveIds.Classroom, 25f, 1.20f,

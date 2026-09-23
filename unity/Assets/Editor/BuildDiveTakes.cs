@@ -432,6 +432,14 @@ namespace HalfAware.EditorTools
             var gran = Cast(take, "Grandmother", "W_Formal", new Vector3(2.2f, 0f, 0.4f), 10f, 0, 0.95f);
             Move(gran, new Vector3(2.2f, 0f, 0.4f), new Vector3(0.6f, 0f, 5.4f), 14f, 16f, true);
             Doves(take, new Vector3(-1.2f, 0.09f, 4.4f), 21f);
+            // 通りすがり。イヤホンをした少女（記憶 11 のプリヤ）が、小径の東の芝生の奥を北から南へ横切り、
+            // 三脚目のベンチの北東で止まる。公園から電車へ出る口はここ一つ（設計書 6 節）。
+            // ソフィアがしゃがんでいた所から東を向けば、植え込みの南の端より手前を通って見える。
+            // 会話とは関わらないので記憶の時計で動く
+            var stop = new Vector3(6.4f, 0f, 2.4f);
+            var teen = Cast(take, "Passerby", "W_Casual", stop, 188f, 0, 0.92f);
+            Earphones(teen);
+            Move(teen, new Vector3(7.6f, 0f, 10.5f), stop, 3f, 9f, true);
             return new[]
             {
                 K(0f,  -0.9f, 0f, 0.9f, 200f,  55f, 0.55f),  // しゃがんで白い石を拾っている
@@ -657,6 +665,15 @@ namespace HalfAware.EditorTools
         {
             Cast(take, "Mother", "W_Casual", new Vector3(0.1f, 0f, 0.2f), 300f, 1, 1f);
             Cast(take, "Father", "M_Casual", new Vector3(-1.05f, 0f, 2.2f), 350f, 0, 1f);
+            // 通りすがり。玄関の外の踊り場で待っている同級生（記憶 13 のアイシャ）。
+            // 台所から教室へ出る口はここ一つ（設計書 6 節）。
+            // 設計書の「台所の窓の外」は、窓の外が朝の光を塗った板で、その先に何も無いので立たせられない。
+            // 開いたままの玄関の戸の先で、白く飛ぶ外の光の前に立つ。
+            // **外（通りの側）を向かせ、背中と鞄をダニエルに見せる。** 家の方を向かせると、
+            // 戸口の脇の灯り（HallGlow、0.55 m 先）が正面から当たって顔の造りまで見えた。
+            // 誰の相手もしていない人なので、向きで隠してよい（この関数群の頭の決まり）
+            var mate = Cast(take, "Classmate", "W_Casual", new Vector3(-3.15f, 0f, -1.95f), 270f, 0, 1f);
+            Satchel(mate);
             return new[]
             {
                 K(0f,  StairX, 1.85f, -3.3f,   0f,  30f, 1.65f),  // 階段の途中。手すり
@@ -784,6 +801,37 @@ namespace HalfAware.EditorTools
                 }
             }), AssetDatabase.LoadAssetAtPath<Material>(Materials + "EstateFrame.mat"));
             bags.localPosition = Vector3.zero;
+        }
+
+        /// <summary>
+        /// 白いイヤホンを両耳に、線を胸まで。耳の高さは体つきの形の頭から測る。
+        /// 遠目には点にしかならないが、近づいて見たときに「聞いている人」だと読める
+        /// </summary>
+        static void Earphones(Transform who)
+        {
+            var filter = who.GetComponent<MeshFilter>();
+            if (filter == null || filter.sharedMesh == null) return;
+            var box = filter.sharedMesh.bounds;
+            var ear = box.max.y - 0.13f;
+            var mid = box.center.z;
+            var buds = Piece(who, "Earphones", Shape("Earphones" + Mathf.RoundToInt(ear * 100f), 0.5f, b =>
+            {
+                for (var i = 0; i < 2; i++)
+                {
+                    var x = i == 0 ? -0.075f : 0.075f;
+                    b.Box(new Vector3(x, ear, mid), new Vector3(0.03f, 0.03f, 0.03f));
+                    b.Box(new Vector3(x * 0.6f, ear - 0.20f, mid + 0.05f), new Vector3(0.008f, 0.40f, 0.008f));
+                }
+            }), AssetDatabase.LoadAssetAtPath<Material>(Materials + "EstateFrame.mat"));
+            buds.localPosition = Vector3.zero;
+        }
+
+        /// <summary>学校の鞄。背中に一つ。肩紐は付けない</summary>
+        static void Satchel(Transform who)
+        {
+            var bag = Piece(who, "Satchel", Shape("Satchel", 0.5f, b =>
+                b.Box(new Vector3(0f, 1.22f, -0.19f), new Vector3(0.30f, 0.36f, 0.12f))), Mat("Cloth"));
+            bag.localPosition = Vector3.zero;
         }
     }
 }
