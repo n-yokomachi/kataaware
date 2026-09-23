@@ -38,10 +38,13 @@ namespace HalfAware.EditorTools.Study
             public int HeadSize = 512;
             /// <summary>立ちの動きの初めのこまで立たせる（false なら取り込んだままの A の字）</summary>
             public bool Idle = true;
+            /// <summary>見た目に重ねる手（顔の候補など）。null なら人の見た目のまま</summary>
+            public System.Action<RocketboxPaint.Look> Tune;
 
             public RocketboxPaint.Look Look()
             {
                 var k = Person.Look();
+                if (Tune != null) Tune(k);
                 k.beauty = Beauty;
                 k.moleDiameter = MoleMm / 1000f;
                 return k;

@@ -106,6 +106,33 @@ namespace HalfAware.EditorTools.Rocketbox
             /// <summary>顎の骨の左右の倍率</summary>
             public float JawScale { get { return 1f - Mathf.Clamp01(beauty) * jawSlim; } }
 
+            [Header("顔を寄せる（手入れの上に重ねる。0 と 1 倍で何もしない。色は顔のテクスチャへ、形は骨へ）")]
+            [Tooltip("年齢の出る影（ほうれい線・目の下のくまとたるみ・額のしわ）を持ち上げる量（0〜1）")]
+            public float ageSoften;
+            [Tooltip("肌のむらを整える量（手入れの均しに足す。0〜1）")]
+            public float skinEven;
+            [Tooltip("頬と唇の血色（0〜1）")]
+            public float blush;
+            public Color blushColour = new Color(0.90f, 0.72f, 0.74f);
+            [Tooltip("上瞼の際を締め、目尻の先へ伸ばして切れ長に（0〜1）")]
+            public float catEye;
+            [Tooltip("眉を整える（縁を締めて少し濃く。0〜1）")]
+            public float browTidy;
+            [Tooltip("鼻筋の脇を暗く、真ん中を明るくして細く見せる（0〜1）")]
+            public float noseSlim;
+            [Tooltip("頬骨の下のわずかな影（0〜1）")]
+            public float cheekShade;
+            [Tooltip("唇の輪郭をはっきり（0〜1）")]
+            public float lipLine;
+            [Tooltip("目の玉の骨の倍率（1 で元のまま）")]
+            public float eyeScale = 1f;
+            [Tooltip("瞼の骨を目の玉の中心から外へ動かす割合（0.06 で 6 %）")]
+            public float lidOpen;
+            [Tooltip("鼻の骨の倍率（1 で元のまま）")]
+            public float noseScale = 1f;
+            [Tooltip("顎を縦に縮める割合（顎から下を短く。0.06 で 6 %）")]
+            public float chinShort;
+
             [Header("艶（頭のマテリアルの Specular の絵。RGB = 照り返しの強さ、A = 滑らかさ）")]
             [Tooltip("肌の照り返しの強さ（線形の値）。髪はここを 0 にする")]
             public float skinSpecular = 0.04f;
@@ -303,7 +330,7 @@ namespace HalfAware.EditorTools.Rocketbox
             var b = Mathf.Clamp01(k.beauty);
 
             // 1. 肌のむら（手入れ）。明るさの形は残し、色のむらと細かい斑だけを均す
-            if (b > 0f)
+            if (b > 0f || k.skinEven > 0f)
             {
                 var Y = new float[n * n];
                 var Cb = new float[n * n];
@@ -317,8 +344,8 @@ namespace HalfAware.EditorTools.Rocketbox
                 for (var i = 0; i < px.Length; i++)
                 {
                     if (skin[i] <= 0f) continue;
-                    var wc = b * k.evenChroma * skin[i];
-                    var wl = b * k.evenLuma * skin[i];
+                    var wc = Mathf.Clamp01(b * k.evenChroma + k.skinEven * 0.5f) * skin[i];
+                    var wl = Mathf.Clamp01(b * k.evenLuma + k.skinEven * 0.4f) * skin[i];
                     var y = Mathf.Lerp(Y[i], Y4[i] + (Y[i] - Y1[i]), wl);
                     var cb = Mathf.Lerp(Cb[i], Cbb[i], wc);
                     var cr = Mathf.Lerp(Cr[i], Crb[i], wc);
@@ -373,7 +400,8 @@ namespace HalfAware.EditorTools.Rocketbox
             for (var i = 0; i < px.Length; i++)
             {
                 if (brow[i] <= 0f) continue;
-                var w = brow[i] * browAmount;
+                // 眉を整える（browTidy）: 縁の薄い所を落とし、芯を少し濃く
+                var w = Mathf.Lerp(brow[i], Smooth(0.25f, 0.55f, brow[i]), Mathf.Clamp01(k.browTidy)) * Mathf.Clamp01(browAmount + 0.2f * k.browTidy);
                 var c = px[i];
                 var grey = c.r * 0.30f + c.g * 0.59f + c.b * 0.11f;
                 var dark = Color.Lerp(c, new Color(grey, grey, grey), 0.35f) * 0.38f;
@@ -401,7 +429,7 @@ namespace HalfAware.EditorTools.Rocketbox
                         if (!InEye(p, eye)) continue;
                         var up = Smooth(eye.y - 0.0015f, eye.y + 0.0020f, p.y);
                         var lower = 0.30f * (1f - up);
-                        var w = Mathf.Clamp01(near[i] * 2.2f) * (up + lower) * b * k.lashLine;
+                        var w = Mathf.Clamp01(Mathf.Clamp01(near[i] * 2.2f) * (up + lower) * b * k.lashLine * (1f + k.catEye));
                         px[i] = Color.Lerp(px[i], new Color(k.lashColour.r, k.lashColour.g, k.lashColour.b, px[i].a), w);
                     }
                 }
@@ -449,6 +477,9 @@ namespace HalfAware.EditorTools.Rocketbox
                     px[i] = new Color(c.r * (1f - w), c.g * (1f - w * 1.05f), c.b * (1f - w * 1.05f), c.a);
                 }
             }
+
+            // 6c. 顔を寄せる（手入れの上に重ねる。どれも 0 で何もしない）
+            FaceTouch(px, s, a, k, hair, brow, src, n);
 
             // 6b. 丸首のシャツ
             if (k.shirt) Shirt(px, s, a, k);
@@ -762,6 +793,178 @@ namespace HalfAware.EditorTools.Rocketbox
                     px[kv.Key] = c;
                 }
             }
+        }
+
+        /// <summary>
+        /// 顔を寄せる（<see cref="Look"/> の ageSoften・blush・catEye・noseSlim・cheekShade・lipLine）。場所は顔の骨からの距離で決める。
+        /// - 年齢の出る影: 目の下（くまとたるみ）・ほうれい線・額のしわの所で、細かい暗がり（1 画素でぼかした明るさが 6 画素でぼかした明るさより暗い分）を持ち上げる
+        /// - 血色: 頬の高い所に薄い赤み、唇の赤みを少し強く
+        /// - 切れ長: 目尻の先へ上がる短い線を上瞼の際の色で描く
+        /// - 鼻筋: 鼻筋の両脇を少し暗く、真ん中を少し明るく
+        /// - 頬骨の下: 耳の前から口の端へ下がる帯を少し暗く
+        /// - 唇の輪郭: 唇の縁のすぐ外を少し暗く
+        /// </summary>
+        static void FaceTouch(Color[] px, Surface s, Anchors a, Look k, float[] hair, float[] brow, Color[] src, int n)
+        {
+            if (k.ageSoften <= 0f && k.blush <= 0f && k.catEye <= 0f && k.noseSlim <= 0f && k.cheekShade <= 0f && k.lipLine <= 0f) return;
+            var scale = n / 512f;
+            var eyeY = (a.eyeL.y + a.eyeR.y) * 0.5f;
+            var browTop = Mathf.Max(Mathf.Max(a.browInL.y, a.browOutL.y), Mathf.Max(a.browInR.y, a.browOutR.y));
+            var front = new float[px.Length];
+            for (var i = 0; i < px.Length; i++) front[i] = s.On[i] ? Smooth(a.head.z - 0.01f, a.head.z + 0.03f, s.P[i].z) * (1f - Mathf.Clamp01(hair[i] * 2f)) : 0f;
+
+            if (k.ageSoften > 0f)
+            {
+                var Y = new float[px.Length];
+                for (var i = 0; i < px.Length; i++) Y[i] = Lum(px[i]);
+                var y1 = Blur(Y, s.On, n, Mathf.Max(1, Mathf.RoundToInt(1 * scale)));
+                var y6 = Blur(Y, s.On, n, Mathf.Max(2, Mathf.RoundToInt(6 * scale)));
+                // 目の下のくまは広いので、頬の高い所（頬の骨から 1.2 cm 以内）の明るさの中ほどまで持ち上げる
+                var cheekLums = new List<float>();
+                for (var i = 0; i < px.Length; i++)
+                {
+                    if (front[i] <= 0.5f) continue;
+                    var p = s.P[i];
+                    if (Vector2.Distance(new Vector2(p.x, p.y), new Vector2(a.cheekL.x, a.cheekL.y)) < 0.012f || Vector2.Distance(new Vector2(p.x, p.y), new Vector2(a.cheekR.x, a.cheekR.y)) < 0.012f)
+                        cheekLums.Add(y1[i]);
+                }
+                cheekLums.Sort();
+                var cheekRef = cheekLums.Count > 0 ? cheekLums[cheekLums.Count / 2] : 0f;
+                for (var i = 0; i < px.Length; i++)
+                {
+                    if (front[i] <= 0f) continue;
+                    var p = s.P[i];
+                    var zone = 0f;
+                    var under = 0f;
+                    foreach (var eye in new[] { a.eyeL, a.eyeR })
+                    {
+                        var e = Mathf.Sqrt(Sq((p.x - eye.x) / 0.019f) + Sq((p.y - (eye.y - 0.013f)) / 0.009f));
+                        under = Mathf.Max(under, Smooth(1f, 0.5f, e) * Smooth(eye.y - 0.004f, eye.y - 0.008f, p.y));
+                    }
+                    zone = under;
+                    foreach (var side in new[] { -1f, 1f })
+                    {
+                        var corner = side < 0f ? a.mouthL : a.mouthR;
+                        var from = new Vector2(side * 0.016f, a.nose.y - 0.003f);
+                        var to = new Vector2(corner.x + side * 0.006f, corner.y - 0.002f);
+                        var d = SegDist(new Vector2(p.x, p.y), from, to);
+                        zone = Mathf.Max(zone, Smooth(0.009f, 0.003f, d));
+                    }
+                    zone = Mathf.Max(zone, Smooth(browTop + 0.006f, browTop + 0.014f, p.y) * Smooth(eyeY + 0.075f, eyeY + 0.06f, p.y) * Smooth(0.05f, 0.04f, Mathf.Abs(p.x)));
+                    zone *= front[i] * (1f - brow[i]);
+                    if (zone <= 0f) continue;
+                    var lift = Mathf.Max(0f, y6[i] - y1[i]) * 1.4f * k.ageSoften * zone
+                        + Mathf.Max(0f, cheekRef * 0.97f - y1[i]) * 0.8f * k.ageSoften * under * front[i];
+                    var g = Mathf.Min(1.3f, (Y[i] + lift) / Mathf.Max(0.05f, Y[i]));
+                    var c = px[i];
+                    px[i] = new Color(Mathf.Clamp01(c.r * g), Mathf.Clamp01(c.g * g), Mathf.Clamp01(c.b * g), c.a);
+                }
+            }
+
+            // 唇の所（元の赤みが肌より強い所）
+            var lip = new float[px.Length];
+            {
+                var cy = (a.upperLip.y + a.lowerLip.y) * 0.5f;
+                var half = Mathf.Abs(a.mouthL.x - a.mouthR.x) * 0.5f + 0.003f;
+                for (var i = 0; i < px.Length; i++)
+                {
+                    if (!s.On[i]) continue;
+                    var p = s.P[i];
+                    if (p.z < a.mouthL.z - 0.012f) continue;
+                    var e = Mathf.Sqrt(Sq(p.x / half) + Sq((p.y - cy) / 0.0115f));
+                    var zone = Smooth(1.0f, 0.70f, e);
+                    if (zone <= 0f) continue;
+                    var c = src[i];
+                    lip[i] = zone * Smooth(0.26f, 0.31f, (c.r - c.g) / Mathf.Max(0.05f, c.r));
+                }
+            }
+
+            for (var i = 0; i < px.Length; i++)
+            {
+                if (!s.On[i]) continue;
+                var p = s.P[i];
+                var c = px[i];
+                // 血色: 頬の高い所と唇
+                if (k.blush > 0f && front[i] > 0f)
+                {
+                    var w = 0f;
+                    foreach (var cheek in new[] { a.cheekL, a.cheekR })
+                    {
+                        var e = Mathf.Sqrt(Sq((p.x - cheek.x * 1.12f) / 0.020f) + Sq((p.y - (cheek.y - 0.004f)) / 0.013f));
+                        w = Mathf.Max(w, Smooth(1f, 0.2f, e));
+                    }
+                    w = w * front[i] * k.blush * 0.5f + lip[i] * k.blush * 0.35f;
+                    c = Color.Lerp(c, new Color(c.r * k.blushColour.r / 0.9f, c.g * k.blushColour.g / 0.9f, c.b * k.blushColour.b / 0.9f, c.a), Mathf.Clamp01(w));
+                }
+                // 鼻筋
+                if (k.noseSlim > 0f && front[i] > 0f)
+                {
+                    var along = Smooth(eyeY - 0.002f, eyeY - 0.008f, p.y) * Smooth(a.nose.y + 0.000f, a.nose.y + 0.006f, p.y);
+                    var side = Smooth(0.0045f, 0.0015f, Mathf.Abs(Mathf.Abs(p.x) - 0.0095f));
+                    var mid = Smooth(0.0035f, 0.001f, Mathf.Abs(p.x));
+                    var g = 1f - 0.12f * k.noseSlim * side * along + 0.05f * k.noseSlim * mid * along;
+                    c = new Color(Mathf.Clamp01(c.r * g), Mathf.Clamp01(c.g * g), Mathf.Clamp01(c.b * g), c.a);
+                }
+                // 頬骨の下
+                if (k.cheekShade > 0f && front[i] > 0f)
+                {
+                    var w = 0f;
+                    foreach (var side in new[] { -1f, 1f })
+                    {
+                        var corner = side < 0f ? a.mouthL : a.mouthR;
+                        var d = SegDist(new Vector2(p.x, p.y), new Vector2(side * 0.060f, eyeY - 0.030f), new Vector2(corner.x + side * 0.012f, corner.y + 0.012f));
+                        w = Mathf.Max(w, Smooth(0.008f, 0.002f, d));
+                    }
+                    var g = 1f - 0.09f * k.cheekShade * w * front[i];
+                    c = new Color(c.r * g, c.g * (g - 0.005f * w), c.b * (g - 0.005f * w), c.a);
+                }
+                px[i] = c;
+            }
+
+            // 唇の輪郭: 唇の縁のすぐ外を少し暗く
+            if (k.lipLine > 0f)
+            {
+                var near = Blur(lip, s.On, n, Mathf.Max(1, Mathf.RoundToInt(2 * scale)));
+                for (var i = 0; i < px.Length; i++)
+                {
+                    var w = Smooth(0.08f, 0.35f, near[i]) * (1f - Smooth(0.35f, 0.7f, lip[i]));
+                    if (w <= 0f) continue;
+                    var g = 1f - 0.22f * k.lipLine * w;
+                    var c = px[i];
+                    px[i] = new Color(c.r * g, c.g * g * 0.98f, c.b * g * 0.98f, c.a);
+                }
+            }
+
+            // 切れ長: 目尻の先へ上がる短い線
+            if (k.catEye > 0f)
+            {
+                foreach (var eye in new[] { a.eyeL, a.eyeR })
+                {
+                    var outward = Mathf.Sign(eye.x);
+                    var from = new Vector2(eye.x + outward * 0.0115f, eye.y + 0.0012f);
+                    var to = new Vector2(eye.x + outward * 0.0185f, eye.y + 0.0042f);
+                    for (var i = 0; i < px.Length; i++)
+                    {
+                        if (!s.On[i]) continue;
+                        var p = s.P[i];
+                        if (p.z < eye.z - 0.012f) continue;
+                        var q = new Vector2(p.x, p.y);
+                        var t = Mathf.Clamp01(Vector2.Dot(q - from, to - from) / (to - from).sqrMagnitude);
+                        var d = SegDist(q, from, to);
+                        var width = Mathf.Lerp(0.0011f, 0.0003f, t);
+                        var w = Smooth(width + 0.0004f, width, d) * k.catEye;
+                        if (w <= 0f) continue;
+                        px[i] = Color.Lerp(px[i], new Color(k.lashColour.r, k.lashColour.g, k.lashColour.b, px[i].a), Mathf.Clamp01(w));
+                    }
+                }
+            }
+        }
+
+        static float SegDist(Vector2 p, Vector2 a, Vector2 b)
+        {
+            var ab = b - a;
+            var t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / Mathf.Max(1e-12f, ab.sqrMagnitude));
+            return Vector2.Distance(p, a + ab * t);
         }
 
         /// <summary>負の値（島の外）を、となりの値の平均で 4 回まで広げる。届かない所は 0</summary>

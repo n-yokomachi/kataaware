@@ -63,6 +63,7 @@ namespace HalfAware.EditorTools.Rocketbox
             if (skin == null) throw new InvalidOperationException("手を入れたマテリアルを作れない: " + who.Painted);
             skin.JawScale = who.Look().JawScale;
             skin.JawClose = who.Look().jawClose;
+            skin.Look = who.Look();
             return Assemble(parent, twin, skin, Twin);
         }
 
@@ -93,6 +94,7 @@ namespace HalfAware.EditorTools.Rocketbox
             }
             Dress(her, skin, twin && mode == TwinMode.MoleOnly);
             Shape(her, skin.JawScale, skin.JawClose);
+            if (skin.Look != null) ShapeFace(her, skin.Look);
             AddAnimator(her);
             return her;
         }
@@ -117,6 +119,43 @@ namespace HalfAware.EditorTools.Rocketbox
                 else if (a.y >= a.z) s.y *= jaw;
                 else s.z *= jaw;
                 t.localScale = s;
+            }
+        }
+
+        /// <summary>
+        /// 顔の形を寄せる（<see cref="RocketboxPaint.Look"/> の eyeScale・lidOpen・noseScale・chinShort）。
+        /// 目の玉の骨を拡げ、瞼の骨を目の玉の中心から外へ、鼻の骨を縮め、顎の骨を縦に縮める。どれも Humanoid に当てていない骨なので動きに上書きされない
+        /// </summary>
+        static void ShapeFace(GameObject her, RocketboxPaint.Look k)
+        {
+            var bones = new Dictionary<string, Transform>();
+            foreach (var t in her.GetComponentsInChildren<Transform>(true)) bones[t.name] = t;
+            Func<string, Transform> B = name => { Transform t; return bones.TryGetValue(name, out t) ? t : null; };
+            foreach (var side in new[] { "L", "R" })
+            {
+                var eye = B("Bip01 " + side + "Eye");
+                if (eye == null) continue;
+                if (!Mathf.Approximately(k.lidOpen, 0f))
+                    foreach (var lid in new[] { "EyeBlinkTop", "EyeBlinkBottom" })
+                    {
+                        var t = B("Bip01 " + side + lid);
+                        if (t != null) t.position = eye.position + (t.position - eye.position) * (1f + k.lidOpen);
+                    }
+                if (!Mathf.Approximately(k.eyeScale, 1f)) eye.localScale *= k.eyeScale;
+            }
+            var nose = B("Bip01 MNose");
+            if (nose != null && !Mathf.Approximately(k.noseScale, 1f)) nose.localScale *= k.noseScale;
+            var jaw = B("Bip01 MJaw");
+            if (jaw != null && k.chinShort > 0f)
+            {
+                // 顎の骨の軸のうち、模型の上下に沿う軸を縮める
+                var ax = jaw.InverseTransformDirection(her.transform.up);
+                var a = new Vector3(Mathf.Abs(ax.x), Mathf.Abs(ax.y), Mathf.Abs(ax.z));
+                var s = jaw.localScale;
+                if (a.x >= a.y && a.x >= a.z) s.x *= 1f - k.chinShort;
+                else if (a.y >= a.z) s.y *= 1f - k.chinShort;
+                else s.z *= 1f - k.chinShort;
+                jaw.localScale = s;
             }
         }
 
@@ -179,6 +218,8 @@ namespace HalfAware.EditorTools.Rocketbox
             public Material Legs;
             /// <summary>顎の骨の左右の倍率（<see cref="RocketboxPaint.Look.JawScale"/>）</summary>
             public float JawScale = 1f;
+            /// <summary>形の手入れ（目・瞼・鼻・顎の骨）に使う見た目（<see cref="ShapeFace"/>）</summary>
+            public RocketboxPaint.Look Look;
             /// <summary>顎を閉じる向きへ回す角度（<see cref="RocketboxPaint.Look.jawClose"/>）</summary>
             public float JawClose;
             /// <summary>撮り比べで測るための、頭の印の絵と黒子の位置</summary>
@@ -392,7 +433,7 @@ namespace HalfAware.EditorTools.Rocketbox
         /// </summary>
         public static Skin MakeSkin(RocketboxPerson who, RocketboxPaint.Look look, int headSize, bool withTwinHead)
         {
-            var skin = new Skin(who) { JawScale = look.JawScale, JawClose = look.jawClose };
+            var skin = new Skin(who) { JawScale = look.JawScale, JawClose = look.jawClose, Look = look };
             try
             {
                 var maps = Maps.Get(who, 512);
