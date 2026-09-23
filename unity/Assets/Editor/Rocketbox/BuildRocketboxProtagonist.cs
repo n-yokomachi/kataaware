@@ -330,7 +330,7 @@ namespace HalfAware.EditorTools.Rocketbox
             }
             for (var i = 0; i < alpha.Length; i++) if (alpha[i] < 0f) alpha[i] = 1f;
             // 髪の中の明るい毛筋で透けに開いた小さな穴（幅 4 画素まで）を閉じる（顔の人のこめかみの肌が点になって覗いたため）
-            alpha = MinMax(MinMax(alpha, n, 2, true), n, 2, false);
+            alpha = RocketboxPaint.MinMax(RocketboxPaint.MinMax(alpha, n, 2, true), n, 2, false);
             for (var i = 0; i < r.Px.Length; i++)
             {
                 var c = r.Px[i];
@@ -338,28 +338,6 @@ namespace HalfAware.EditorTools.Rocketbox
                 r.Px[i] = c;
             }
             return r;
-        }
-
-        /// <summary>縦横 (2r+1) 画素の四角の中の最大（max）か最小。絵の外は数えない</summary>
-        static float[] MinMax(float[] a, int n, int r, bool max)
-        {
-            var tmp = new float[a.Length];
-            var o = new float[a.Length];
-            for (var y = 0; y < n; y++)
-                for (var x = 0; x < n; x++)
-                {
-                    var v = a[y * n + x];
-                    for (var k = Mathf.Max(0, x - r); k <= Mathf.Min(n - 1, x + r); k++) v = max ? Mathf.Max(v, a[y * n + k]) : Mathf.Min(v, a[y * n + k]);
-                    tmp[y * n + x] = v;
-                }
-            for (var y = 0; y < n; y++)
-                for (var x = 0; x < n; x++)
-                {
-                    var v = tmp[y * n + x];
-                    for (var k = Mathf.Max(0, y - r); k <= Mathf.Min(n - 1, y + r); k++) v = max ? Mathf.Max(v, tmp[k * n + x]) : Mathf.Min(v, tmp[k * n + x]);
-                    o[y * n + x] = v;
-                }
-            return o;
         }
 
         static Color[] PaintBody(RocketboxPerson who, RocketboxPaint.Look look, Maps maps, RocketboxPaint.HeadResult head, out string skinNote)

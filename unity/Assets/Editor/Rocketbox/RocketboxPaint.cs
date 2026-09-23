@@ -264,6 +264,9 @@ namespace HalfAware.EditorTools.Rocketbox
                 var skinCol = Smooth(0.40f, 0.52f, Vb[i]) * Band(S[i], 0.18f, 0.24f, 0.62f, 0.70f) * HueNear(H[i] * 360f, 20f, 16f, 10f);
                 skin[i] = guarded || InEyeWide(p, a.eyeL) || InEyeWide(p, a.eyeR) ? 0f : (1f - hair[i]) * faceAndNeck * skinCol * (1f - Mathf.Clamp01(bw * 2f));
             }
+            // 別の人の髪を載せるとき（一色で塗るとき）は、髪の中の明るい毛筋（幅 6 画素まで）も髪にする。
+            // 明るい毛筋は暗さで髪と見なされず、別の人の髪の分け目から明るい茶の筋になって覗いた
+            if (k.flatHair) hair = MinMax(MinMax(hair, n, 3, true), n, 3, false);
             hair = Blur(hair, s.On, n, 1);
 
             var b = Mathf.Clamp01(k.beauty);
@@ -298,7 +301,9 @@ namespace HalfAware.EditorTools.Rocketbox
                 if (hair[i] <= 0f) continue;
                 var ink = k.flatHair ? k.hairShadow : HairRamp(V[i], k);
                 ink.a = px[i].a;
-                px[i] = Color.Lerp(px[i], ink, hair[i]);
+                // 一色で塗るときは、髪と見なす度合いが半ばの所（元の明るい毛筋）も塗り切る。
+                // 別の人の髪の殻は分け目で透けて、顔の人の頭皮がそこから覗き、毛筋が明るい茶の筋に見えたため
+                px[i] = Color.Lerp(px[i], ink, k.flatHair ? Smooth(0.15f, 0.45f, hair[i]) : hair[i]);
             }
 
             // 2b. 元の前髪の影で暗い額とこめかみの肌を、額の真ん中の明るさまで上げる（別の人の髪を載せるとき）
@@ -594,6 +599,28 @@ namespace HalfAware.EditorTools.Rocketbox
             if (k.recolourPants) Recolour(px, V, Spread(pants, n), k.pantsShadow, k.pantsShine);
             if (k.recolourShoes) Recolour(px, V, Spread(shoes, n), k.shoeShadow, k.shoeShine);
             if (k.recolourTop) Recolour(px, V, Spread(top, n), k.topShadow, k.topShine);
+        }
+
+        /// <summary>縦横 (2r+1) 画素の四角の中の最大（max）か最小。絵の外は数えない</summary>
+        public static float[] MinMax(float[] a, int n, int r, bool max)
+        {
+            var tmp = new float[a.Length];
+            var o = new float[a.Length];
+            for (var y = 0; y < n; y++)
+                for (var x = 0; x < n; x++)
+                {
+                    var v = a[y * n + x];
+                    for (var k = Mathf.Max(0, x - r); k <= Mathf.Min(n - 1, x + r); k++) v = max ? Mathf.Max(v, a[y * n + k]) : Mathf.Min(v, a[y * n + k]);
+                    tmp[y * n + x] = v;
+                }
+            for (var y = 0; y < n; y++)
+                for (var x = 0; x < n; x++)
+                {
+                    var v = tmp[y * n + x];
+                    for (var k = Mathf.Max(0, y - r); k <= Mathf.Min(n - 1, y + r); k++) v = max ? Mathf.Max(v, tmp[k * n + x]) : Mathf.Min(v, tmp[k * n + x]);
+                    o[y * n + x] = v;
+                }
+            return o;
         }
 
         /// <summary>負の値（島の外）を、となりの値の平均で 4 回まで広げる。届かない所は 0</summary>
