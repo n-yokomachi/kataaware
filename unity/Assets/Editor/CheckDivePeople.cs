@@ -346,7 +346,7 @@ namespace HalfAware.EditorTools
         {
             var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
             var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
-            var d = UnityEngine.Object.FindObjectOfType<HalfAware.DiveDirector>();
+            var d = UnityEngine.Object.FindFirstObjectByType<HalfAware.DiveDirector>();
             var T = typeof(HalfAware.DiveDirector);
             System.Func<string, System.Reflection.FieldInfo> F = n => T.GetField(n, flags);
             var player = (HalfAware.PlayerController)F("player").GetValue(d);

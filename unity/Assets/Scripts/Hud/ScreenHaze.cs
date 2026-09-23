@@ -26,8 +26,9 @@ namespace HalfAware
         [SerializeField] float from = 0.52f;
         [Tooltip("濃さが上限に届く隔たり")]
         [SerializeField] float upto = 1.38f;
+        // Graphic に同じ名前の depth（キャンバスの重なりの深さ）があるので、名前を分ける
         [Tooltip("角での濃さの上限。0 で何も出ない")]
-        [SerializeField, Range(0f, 1f)] float depth = 0.34f;
+        [SerializeField, Range(0f, 1f)] float corner = 0.34f;
         [Tooltip("全体の強さ。DiveDirector が場面ごとに書き換える")]
         [SerializeField, Range(0f, 1f)] float amount = 1f;
 
@@ -47,8 +48,8 @@ namespace HalfAware
         /// <summary>角での濃さ。組み立てから一度だけ決める</summary>
         public float Depth
         {
-            get { return depth; }
-            set { depth = Mathf.Clamp01(value); SetVerticesDirty(); }
+            get { return corner; }
+            set { corner = Mathf.Clamp01(value); SetVerticesDirty(); }
         }
 
         /// <summary>膜は絵でしかないので、鍵や指を受け取らない</summary>
@@ -65,9 +66,9 @@ namespace HalfAware
         /// </summary>
         public float Veil(float reach)
         {
-            if (upto <= from) return reach >= upto ? depth * amount : 0f;
+            if (upto <= from) return reach >= upto ? corner * amount : 0f;
             var k = Mathf.Clamp01((reach - from) / (upto - from));
-            return Mathf.SmoothStep(0f, 1f, k) * depth * amount;
+            return Mathf.SmoothStep(0f, 1f, k) * corner * amount;
         }
 
         protected override void OnPopulateMesh(VertexHelper vh)

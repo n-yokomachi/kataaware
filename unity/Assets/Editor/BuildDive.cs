@@ -404,7 +404,7 @@ namespace HalfAware.EditorTools
             var hso = new SerializedObject(hazeView);
             hso.FindProperty("from").floatValue = HazeFrom;
             hso.FindProperty("upto").floatValue = HazeUpto;
-            hso.FindProperty("depth").floatValue = HazeDepth;
+            hso.FindProperty("corner").floatValue = HazeDepth;
             hso.FindProperty("amount").floatValue = 0f;
             hso.ApplyModifiedPropertiesWithoutUndo();
             haze.SetActive(false);
