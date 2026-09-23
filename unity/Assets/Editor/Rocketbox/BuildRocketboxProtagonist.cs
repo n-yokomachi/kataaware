@@ -163,7 +163,9 @@ namespace HalfAware.EditorTools.Rocketbox
         /// <summary>
         /// 鼻を低く・細くする（<see cref="RocketboxPaint.Look"/> の noseFlatten・noseNarrow）。頭の面の頂点を動かすので、メッシュを写してから直す
         /// （写しは skin.Made に入れる。どちらも 0 なら写さない）。束ねた姿勢のまま、模型の根の向きで測る。
-        /// - 高さ: 鼻筋から鼻の下まで、頬の内側（真ん中から 2.4〜3 cm）の面から前へ出た分を noseFlatten の割合だけ後ろへ
+        /// - 高さ: 鼻筋から鼻の下まで、頬の内側（真ん中から 2.4〜3 cm）の面から前へ出た分を noseFlatten の割合だけ後ろへ。
+        ///   鼻の下の面（鼻の穴のまわり）も鼻先と同じだけ下げ、上唇との間（鼻の骨の 1.8〜2.4 cm 下）で弱める
+        ///   （鼻の骨の 1.2 cm 下で弱めていたので、鼻の下の面が前を向いて、鼻の穴が暗い点に見えた）
         /// - 小鼻: 鼻の骨の高さから 2 cm 下まで、真ん中へ noseNarrow の割合だけ寄せる
         /// 動かした頂点の法線は、となりの三角から付け直す
         /// </summary>
@@ -202,6 +204,20 @@ namespace HalfAware.EditorTools.Rocketbox
                 for (var d = -1; d <= 1; d++)
                     if (b + d >= 0 && b + d < bins) { zs[b + d] += p.z; zn[b + d]++; }
             }
+            // 鼻先の高さ（鼻の骨の 1.6 cm 下から 4 mm 上まで）での、左右 1 mm ごとの一番の出っ張り。
+            // 鼻先より下の頂点（鼻の穴のまわりの下の面）は、真上の鼻先と同じだけ下げる（鼻先だけ下げると、下の面が前を向いて鼻の穴が暗い点に見えた）
+            var colMax = new Dictionary<int, float>();
+            foreach (var kv in rp)
+            {
+                var p = kv.Value;
+                if (Mathf.Abs(p.x) > 0.030f || p.z < a.nose.z - 0.045f || p.y < a.nose.y - 0.016f || p.y > a.nose.y + 0.004f) continue;
+                var b = Mathf.Clamp(Mathf.RoundToInt((p.y - y0) / step), 0, bins - 1);
+                if (zn[b] == 0) continue;
+                var col = Mathf.RoundToInt(p.x * 1000f);
+                var h = p.z - zs[b] / zn[b];
+                float m;
+                if (!colMax.TryGetValue(col, out m) || h > m) colMax[col] = h;
+            }
             var moved = new HashSet<int>();
             foreach (var kv in rp)
             {
@@ -209,14 +225,16 @@ namespace HalfAware.EditorTools.Rocketbox
                 var ax = Mathf.Abs(p.x);
                 if (ax > 0.030f || p.z < a.nose.z - 0.045f) continue;
                 var q = p;
-                var w = RocketboxPaint.Smooth(0.030f, 0.012f, ax) * RocketboxPaint.Smooth(eyeY + 0.006f, eyeY - 0.006f, p.y) * RocketboxPaint.Smooth(a.nose.y - 0.020f, a.nose.y - 0.012f, p.y);
+                var w = RocketboxPaint.Smooth(0.030f, 0.012f, ax) * RocketboxPaint.Smooth(eyeY + 0.006f, eyeY - 0.006f, p.y) * RocketboxPaint.Smooth(a.nose.y - 0.024f, a.nose.y - 0.018f, p.y);
                 var b = Mathf.Clamp(Mathf.RoundToInt((p.y - y0) / step), 0, bins - 1);
                 if (w > 0f && k.noseFlatten > 0f && zn[b] > 0)
                 {
                     var h = Mathf.Max(0f, p.z - zs[b] / zn[b]);
+                    float tip;
+                    if (p.y < a.nose.y - 0.004f && colMax.TryGetValue(Mathf.RoundToInt(p.x * 1000f), out tip)) h = Mathf.Max(h, tip);
                     q.z -= h * Mathf.Clamp01(k.noseFlatten) * w;
                 }
-                var wa = RocketboxPaint.Smooth(a.nose.y + 0.010f, a.nose.y, p.y) * RocketboxPaint.Smooth(a.nose.y - 0.020f, a.nose.y - 0.012f, p.y) * RocketboxPaint.Smooth(0.030f, 0.018f, ax);
+                var wa = RocketboxPaint.Smooth(a.nose.y + 0.010f, a.nose.y, p.y) * RocketboxPaint.Smooth(a.nose.y - 0.024f, a.nose.y - 0.018f, p.y) * RocketboxPaint.Smooth(0.030f, 0.018f, ax);
                 if (wa > 0f && k.noseNarrow > 0f) q.x *= 1f - Mathf.Clamp01(k.noseNarrow) * wa;
                 if ((q - p).sqrMagnitude < 1e-12f) continue;
                 v[kv.Key] = fromRoot(q);

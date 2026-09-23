@@ -410,7 +410,8 @@ namespace HalfAware.EditorTools.Rocketbox
                     if (InEyeWide(p, a.eyeL) || InEyeWide(p, a.eyeR)) continue;
                     var w = NoseZone(p, a);
                     if (w <= 0f) continue;
-                    var g = Mathf.Clamp(Mathf.Lerp(1f, Lb[i] / Mathf.Max(0.02f, L[i]), Mathf.Clamp01(k.noseShade) * w), 0.6f, 1.8f);
+                    // 鼻の穴の暗い画素を大きく持ち上げると橙に浮くので、明るくするのは 1.35 倍まで
+                    var g = Mathf.Clamp(Mathf.Lerp(1f, Lb[i] / Mathf.Max(0.02f, L[i]), Mathf.Clamp01(k.noseShade) * w), 0.6f, 1.35f);
                     var c = px[i];
                     px[i] = new Color(Mathf.Clamp01(c.r * g), Mathf.Clamp01(c.g * g), Mathf.Clamp01(c.b * g), c.a);
                 }
