@@ -611,7 +611,8 @@ namespace HalfAware.EditorTools
         /// 北の面（デッキ側）の小物。戸口・台所の窓・メーターの物入れ・二階の窓・デッキの灯り。
         ///
         /// **戸は一戸ずつ色が違う。** 下の住戸は黄・緑・赤、上は A が青、B が赤、C が緑。
-        /// A と B の戸の板は記憶が掛けるので（BuildDiveTakes の Shut / Ajar）、ここでは枠と欄間と番地だけ。
+        /// A と B の戸の板は記憶が掛けるので（BuildDiveTakes の Shut / Ajar）、ここでは枠と欄間だけ。
+        /// 番地も戸の板が持つ。
         /// 戸の色は <see cref="EstateDoorPaint"/> が返す
         /// </summary>
         static void EstateFront(EstateBanks b)
@@ -807,8 +808,9 @@ namespace HalfAware.EditorTools
         /// 戸口ひとつ。白い枠・欄間の硝子・番地。
         ///
         /// <paramref name="leaf"/> が null の戸口は板を置かない。A と B の戸で、
-        /// 記憶が <c>Shut</c> と <c>Ajar</c> で板を掛ける。建物の面には穴が抜いてあり、
-        /// 番地は欄間の硝子に入れる。丁番だけ残すのは、開いた板が壁から浮いて見えないため。
+        /// 記憶が <c>Shut</c> と <c>Ajar</c> で板を掛ける。建物の面には穴が抜いてある。
+        /// **番地は欄間には入れない。** 記憶の閉めた戸は板そのものに番地を持つので、
+        /// 欄間にも入れると閉めた戸で番地が二つ並んだ。丁番だけ残すのは、開いた板が壁から浮いて見えないため。
         ///
         /// <paramref name="leaf"/> を渡した戸口は、閉めた戸を面の手前へ据える（C と下の住戸）。
         /// **郵便受けの口と番地は戸そのものに付ける。** ロンドンの玄関の戸は、腰の高さに
@@ -830,9 +832,7 @@ namespace HalfAware.EditorTools
 
             if (leaf == null)
             {
-                // 番地は欄間の硝子に白で入れる
-                EstateDigits(b.Bright, x, y + DoorHigh + 0.25f, z + 0.016f, 1, number, 0.20f);
-                // 丁番だけ。板は記憶が掛けるので、ここには置かない
+                // 丁番だけ。板と番地は記憶が掛けるので、ここには置かない
                 for (var i = 0; i < 3; i++)
                     b.Gear.Box(new Vector3(x + 0.51f, y + 0.40f + i * 0.62f, z + 0.16f), new Vector3(0.07f, 0.16f, 0.22f));
                 return;

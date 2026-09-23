@@ -160,7 +160,7 @@ namespace HalfAware.EditorTools
         // 建物の面の穴・枠・欄間・丁番は場所の側（<c>BuildDiveEstate</c>）が持ち、記憶からは触れない。
         // 丁番は東の枠にあり、開いた戸はそこを軸に外（デッキの側）へ振り出して壁へ寄せる
 
-        /// <summary>戸の番地。建物の面の欄間と揃える（<c>EstateFront</c> の 12 + 戸口の番号 × 2）</summary>
+        /// <summary>戸の番地。建物の面の戸口と揃える（<c>EstateFront</c> の 12 + 戸口の番号 × 2）</summary>
         static int EstateDoorNumber(float x)
         {
             if (Mathf.Abs(x - DoorA) < 0.5f) return 12;
@@ -186,7 +186,8 @@ namespace HalfAware.EditorTools
         /// 当たりも入れるので、覗けないし通り抜けられない。
         ///
         /// 表（デッキの側）の形は <c>EstateDoorway</c> の閉めた戸と同じ寸法で組む。
-        /// 番地は欄間にも入っているが、戸そのものにも付ける（C と下の住戸の戸と揃える）
+        /// 番地は戸そのものに付ける（C と下の住戸の戸と揃える）。A と B の欄間には入れない。
+        /// 欄間にも入れていた頃は、閉めた戸で番地が二つ並んだ
         /// </summary>
         static Transform Shut(Transform take, string name, float x)
         {
