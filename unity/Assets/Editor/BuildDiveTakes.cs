@@ -550,30 +550,31 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 新聞を取りに出て、隣の母親が娘を抱き上げるのを眺めていたところ。
-        /// 記憶 1 と同じ朝の同じ廊下を、二軒隣の目で見ている
+        /// 記憶 1 と同じ朝の同じデッキを、隣の B の戸口の前から見ている
         /// </summary>
         static HostKey[] Giorgio(Transform take)
         {
-            // **妻は廊下の突き当たりの硝子戸の奥に立たせる。** 戸口の前から廊下を真っ直ぐ
-            // 覗いた線の先で、引き込み残った硝子戸の一枚越しに胸から上が見える。
-            // 「新聞、来てる？」は戸口の前で聞くので、そこから姿が見えないと誰の声か分からない。
-            // 通り道（廊下の真ん中）から西へ外し、戸口の方を向かせる
-            Cast(take, "Wife", "W_Formal", new Vector3(RoomHall0 + 0.12f, EstateTop, RoomEnd - 0.54f), 9f, 0, 0.95f);
-            // 隣の母親は娘を抱き上げているところ。こちらではなく西の娘を見ているので、向きはそのまま
-            Cast(take, "Mother", "W_Casual", new Vector3(1.9f, EstateTop, EstateWalk + 0.05f), 285f, 1, 1f);
-            // 隣は鍵を掛けて出てきたところなので、戸は閉まっている
+            // **妻は開いた玄関の奥、足拭きの上に立たせる。** 「新聞、来てる？」は戸口の前で聞くので、
+            // デッキの戸口の前から姿が見えないと誰の声か分からない。戸口の穴（x ±0.45）の
+            // 真ん中の線の上、住戸の中の階段の上り口の手前に置き、戸口の方（デッキ）を向かせる。
+            // 背にした玄関の灯り（RoomBHall）で顔は影になる。
+            // 台所の窓越しも考えたが、窓の下半分はレースで、立った妻の胸はその裏に沈む
+            Cast(take, "Wife", "W_Formal", new Vector3(DoorB - 0.15f, EstateTop, EstateFace - 0.85f), 355f, 0, 0.95f);
+            // 隣の母親は A の戸の前で娘を抱き上げているところ。記憶 1 でハンナが立っていた所。
+            // こちらではなく西の娘を見ている
+            Cast(take, "Mother", "W_Casual", new Vector3(5.05f, EstateTop, EstateWalk - 0.35f), 270f, 1, 1f);
+            // 隣は鍵を掛けて出てきたところなので、戸は閉まっている。自分の戸は開けて出てきた
             Shut(take, "ShutA", DoorA);
             Ajar(take, "AjarB", DoorB);
             return new[]
             {
-                K(0f,  4.3f,  EstateTop, EstateWalk + 0.05f, 270f,   6f, 1.65f),  // 隣を眺めている
-                K(4f,  4.3f,  EstateTop, EstateWalk + 0.05f, 270f,  12f, 1.65f),  // 母親が娘を抱き上げる
-                K(8f,  4.25f, EstateTop, EstateWalk - 0.10f, 183f,  10f, 1.65f),  // 戸の内側から妻の声
-                K(12f, 4.2f,  EstateTop, EstateWalk - 0.25f, 183f,  22f, 1.65f),  // 新聞を渡す
-                // 戸口から先は三和土で、床より EstateSunk のぶん下がる
-                K(16f, 4.2f,  EstateTop - EstateSunk, EstateFace - 0.30f, 183f,   6f, 1.65f),  // 中へ入る
-                K(20f, 4.3f,  EstateTop - EstateSunk, HallSill + 0.20f,   200f,  40f, 1.20f),  // 靴を脱ぐと視界が揺れる
-                K(25f, 4.4f,  EstateTop, HallWall - 0.40f,   210f,  10f, 1.65f),  // テレビの音
+                K(0f,  11.10f, EstateTop, EstateWalk - 0.05f, 268f,   6f, 1.65f),  // 戸口の前で隣を眺めている
+                K(4f,  11.10f, EstateTop, EstateWalk - 0.05f, 268f,  12f, 1.65f),  // 母親が娘を抱き上げる
+                K(8f,  11.12f, EstateTop, EstateWalk - 0.15f, 183f,  10f, 1.65f),  // 戸の内側から妻の声
+                K(12f, 11.10f, EstateTop, EstateWalk - 0.50f, 183f,  22f, 1.65f),  // 新聞を渡す
+                K(16f, 11.10f, EstateTop, HallSill - 0.10f,   183f,   6f, 1.65f),  // 中へ入る
+                K(20f, RoomWalk, EstateTop, HallSill - 1.60f, 180f,  10f, 1.65f),  // 廊下を居間へ
+                K(25f, RoomWalk, EstateTop, RoomEnd - 0.40f,  200f,  10f, 1.65f),  // テレビの音
             };
         }
 
