@@ -126,8 +126,8 @@ namespace HalfAware
         {
             switch (band)
             {
-                case AgeBand.Toddler: return new Proportion { head = 1.42f, arm = 0.82f, leg = 0.76f };
-                case AgeBand.Child: return new Proportion { head = 1.26f, arm = 0.90f, leg = 0.87f };
+                case AgeBand.Toddler: return new Proportion { head = 1.42f, arm = 0.80f, leg = 0.72f };
+                case AgeBand.Child: return new Proportion { head = 1.26f, arm = 0.88f, leg = 0.83f };
                 case AgeBand.Teen: return new Proportion { head = 1.03f, arm = 1f, leg = 1f };
                 default: return new Proportion { head = 1f, arm = 1f, leg = 1f };
             }
