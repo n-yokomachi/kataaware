@@ -246,6 +246,101 @@ namespace HalfAware.EditorTools.Study
         }
 
         /// <summary>全身。正面・横（本人の左 90 度）・斜め（左 45 度）・後ろ。2.2 m から腰の高さを見る。320×180 と 960×540</summary>
+        /// <summary>
+        /// 上半身（肩の形）。胸の高さを 1.2 m から、正面と横（本人の左 90 度）と背中で。320×180 と 960×540
+        /// </summary>
+        public static string ShootUpper(Variant v, FaceStudy.Lighting light)
+        {
+            var sb = new StringBuilder();
+            using (var rig = new FaceStudy.Rig(light))
+            using (var who = Subject(v))
+            {
+                rig.Light(who);
+                var an = who.Root.GetComponentInChildren<Animator>();
+                var chest = an.GetBoneTransform(HumanBodyBones.UpperChest) ?? an.GetBoneTransform(HumanBodyBones.Chest);
+                var target = new Vector3(who.Root.transform.position.x, chest.position.y, who.Root.transform.position.z);
+                foreach (var yaw in new[] { 0f, -90f, 180f })
+                {
+                    rig.Place(target + Quaternion.AngleAxis(yaw, Vector3.up) * who.Forward * 1.2f, target);
+                    var name = string.Format(CultureInfo.InvariantCulture, "{0}_{1}_upper_{2}", v.Tag, FaceStudy.LightName(light), BodyView(yaw));
+                    SaveShots(rig, name);
+                    sb.AppendLine(name);
+                }
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// 首の継ぎ目の寄り。首の付け根を 0.45 m から、正面・左右 30 度・左右 60 度・背中で、画角 30 度・960×540
+        /// （ゲームの見え方ではない）。地の色を緑にして、面の隙間から向こうが見えれば分かるようにする
+        /// </summary>
+        public static string ShootNeck(Variant v, FaceStudy.Lighting light)
+        {
+            var sb = new StringBuilder();
+            using (var rig = new FaceStudy.Rig(light))
+            using (var who = Subject(v))
+            {
+                rig.Light(who);
+                rig.Camera.backgroundColor = new Color(0.10f, 0.60f, 0.20f);
+                var an = who.Root.GetComponentInChildren<Animator>();
+                var neck = an.GetBoneTransform(HumanBodyBones.Neck).position + Vector3.down * 0.05f;
+                foreach (var yaw in new[] { 0f, -30f, 30f, -60f, 60f, 180f })
+                {
+                    rig.Place(neck + Quaternion.AngleAxis(yaw, Vector3.up) * who.Forward * 0.45f + Vector3.up * 0.05f, neck);
+                    rig.Camera.fieldOfView = 30f;
+                    var shot = rig.Render(FaceStudy.BigW, FaceStudy.BigH);
+                    var name = string.Format(CultureInfo.InvariantCulture, "{0}_{1}_neck_{2}", v.Tag, FaceStudy.LightName(light), FaceStudy.YawName(yaw) == "front" ? "front" : Mathf.Abs(yaw - 180f) < 0.5f ? "back" : FaceStudy.YawName(yaw));
+                    try { FaceStudy.Save(shot, Path.Combine(OutDir, name + ".png")); }
+                    finally { Object.DestroyImmediate(shot); }
+                    sb.AppendLine(name);
+                }
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// 首の継ぎ目をゲームの見え方で撮る。首の付け根を 0.4 m と 1 m から、正面・横（本人の左 90 度）・後ろで。320×180 と 960×540
+        /// </summary>
+        public static string ShootSeam(Variant v, FaceStudy.Lighting light)
+        {
+            var sb = new StringBuilder();
+            using (var rig = new FaceStudy.Rig(light))
+            using (var who = Subject(v))
+            {
+                rig.Light(who);
+                var an = who.Root.GetComponentInChildren<Animator>();
+                var neck = an.GetBoneTransform(HumanBodyBones.Neck).position + Vector3.down * 0.04f;
+                foreach (var d in new[] { 0.4f, 1.0f })
+                    foreach (var yaw in new[] { 0f, -90f, 180f })
+                    {
+                        rig.Place(neck + Quaternion.AngleAxis(yaw, Vector3.up) * who.Forward * d, neck);
+                        var name = string.Format(CultureInfo.InvariantCulture, "{0}_{1}_seam_{2:0.0}m_{3}", v.Tag, FaceStudy.LightName(light), d, BodyView(yaw));
+                        SaveShots(rig, name);
+                        sb.AppendLine(name);
+                    }
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>立ちの初めのこまと、歩きの一回りを 6 こまで、髪が服に入り込んでいないかを測る</summary>
+        public static string HairCheck(Variant v)
+        {
+            var sb = new StringBuilder();
+            using (var who = Subject(v))
+            {
+                var her = who.Root.GetComponentInChildren<Animator>().gameObject;
+                sb.AppendLine(v.Person + " 立ち: " + RocketboxCompose.HairInside(her, v.Person));
+                var walk = AssetDatabase.LoadAssetAtPath<AnimationClip>(RocketboxRetarget.OutDir + "/Walk.anim");
+                for (var f = 0; f < 6; f++)
+                {
+                    var t = walk.length * f / 6f;
+                    SampleHuman(her, walk, t);
+                    sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "{0} 歩き {1:0.00} 秒: {2}", v.Person, t, RocketboxCompose.HairInside(her, v.Person)));
+                }
+            }
+            return sb.ToString();
+        }
+
         public static string ShootBody(Variant v, FaceStudy.Lighting light)
         {
             var sb = new StringBuilder();

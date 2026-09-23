@@ -74,7 +74,7 @@ namespace HalfAware.EditorTools.Rocketbox
             [Tooltip("肌の照り返しの強さ（線形の値）。髪はここを 0 にする")]
             public float skinSpecular = 0.04f;
             public float skinSmoothness = 0.22f;
-            [Tooltip("髪の滑らかさ。髪は照り返しを 0 にするので、ほぼ効かない")]
+            [Tooltip("髪の滑らかさ。髪は照り返しを 0 にするので、見た目はほとんど変わらない")]
             public float hairSmoothness = 0.10f;
             [Tooltip("目の玉の滑らかさ（主光を目に映すため）")]
             public float eyeSmoothness = 0.55f;
