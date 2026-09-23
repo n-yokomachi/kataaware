@@ -8,27 +8,20 @@ using Object = UnityEngine.Object;
 namespace HalfAware.EditorTools.Rocketbox
 {
     /// <summary>
-    /// 主人公と片割れを Microsoft Rocketbox の Female_Adult_14（女大 14）から組み立てる。
-    /// 顔も体もこの一人。髪とカーディガンを黒に、虹彩を琥珀に、目の下に黒子、顔に控えめな手入れ
-    /// （<see cref="RocketboxPaint"/>）。場面には置かない（置くのは次の段で、場面の組み立てから <see cref="Build"/> を呼ぶ）。
+    /// 主人公と片割れを Microsoft Rocketbox の一人（<see cref="RocketboxPerson"/>。今は女大 14 と女大 08 を撮り比べている）から組み立てる。
+    /// 顔も体もその一人。髪を黒に、目の下に黒子、顔に控えめな手入れ、ニットの服の人はカーディガンを黒に
+    /// （<see cref="RocketboxPaint"/>）。目は元の色のまま。場面には置かない（置くのは次の段で、場面の組み立てから <see cref="Build"/> を呼ぶ）。
     ///
     /// 片割れは主人公の鏡像。模型の根の x を裏返して、体ごと左右を入れ替える（<see cref="Twin"/>）。
     /// 黒子の絵は主人公と同じ一枚で、裏返した結果として本人の右目の下に来る。髪の分け目も逆になる
     /// </summary>
     public static class BuildRocketboxProtagonist
     {
-        public const string Dir = "Assets/Models/rocketbox/Female_Adult_14/";
-        public const string Model = Dir + "Female_Adult_14.fbx";
-        public const string HeadSrc = Dir + "f017_head_color.png";
-        public const string BodySrc = Dir + "f017_body_color.png";
-        public const string HairSrc = Dir + "f017_opacity_color.png";
-        /// <summary>手を入れたテクスチャとマテリアルの置き場（組み立てのたびに描き直す）</summary>
-        public const string Painted = Dir + "Painted/";
+        /// <summary>主人公にする人。オーナーが女大 14 と女大 08 を見比べて決める</summary>
+        public static readonly RocketboxPerson Chosen = RocketboxPerson.Adult14;
+
         /// <summary>立ちと歩きの状態機械（今の Protagonist.controller の写しに、Humanoid へ移し替えた動きを差した物。<see cref="RocketboxRetarget"/> が作る）</summary>
         public const string Controller = "Assets/Animation/Humanoid/ProtagonistHumanoid.controller";
-
-        /// <summary>FBX の中のマテリアルの名前（面の組の順は体・頭・透け）</summary>
-        public const string BodySlot = "f017_body", HeadSlot = "f017_head", HairSlot = "f017_opacity";
 
         /// <summary>片割れの作り方</summary>
         public enum TwinMode
@@ -41,14 +34,8 @@ namespace HalfAware.EditorTools.Rocketbox
 
         public const TwinMode Twin = TwinMode.MirrorWhole;
 
-        /// <summary>頭のテクスチャの大きさ（256 か 512）</summary>
+        /// <summary>頭のテクスチャの大きさ。256 では 0.4 m の黒子が薄れるので 512</summary>
         public const int HeadSize = 512;
-
-        /// <summary>今の見た目の値。手入れと黒子の大きさはオーナーが撮り比べて決める</summary>
-        public static RocketboxPaint.Look Look()
-        {
-            return new RocketboxPaint.Look();
-        }
 
         // ---- 組み立て ---------------------------------------------------------
 
@@ -58,22 +45,28 @@ namespace HalfAware.EditorTools.Rocketbox
         /// </summary>
         public static GameObject Build(Transform parent, bool twin)
         {
-            var skin = LoadPainted(twin && Twin == TwinMode.MoleOnly);
+            return Build(parent, twin, Chosen);
+        }
+
+        public static GameObject Build(Transform parent, bool twin, RocketboxPerson who)
+        {
+            var skin = LoadPainted(who, twin && Twin == TwinMode.MoleOnly);
             if (skin == null)
             {
-                Paint(Look(), Twin == TwinMode.MoleOnly);
-                skin = LoadPainted(twin && Twin == TwinMode.MoleOnly);
+                Paint(who, who.Look(), Twin == TwinMode.MoleOnly);
+                skin = LoadPainted(who, twin && Twin == TwinMode.MoleOnly);
             }
-            if (skin == null) throw new InvalidOperationException("手を入れたマテリアルを作れない: " + Painted);
-            skin.JawScale = Look().JawScale;
+            if (skin == null) throw new InvalidOperationException("手を入れたマテリアルを作れない: " + who.Painted);
+            skin.JawScale = who.Look().JawScale;
             return Assemble(parent, twin, skin, Twin);
         }
 
         /// <summary>マテリアルの組を模型に着せる。撮り比べでは描いたばかりの（アセットでない）組を渡す</summary>
         public static GameObject Assemble(Transform parent, bool twin, Skin skin, TwinMode mode)
         {
-            var src = AssetDatabase.LoadAssetAtPath<GameObject>(Model);
-            if (src == null) throw new InvalidOperationException("模型が無い: " + Model);
+            var who = skin.Person;
+            var src = AssetDatabase.LoadAssetAtPath<GameObject>(who.Model);
+            if (src == null) throw new InvalidOperationException("模型が無い: " + who.Model);
             var her = (GameObject)Object.Instantiate(src, parent);
             her.name = twin ? "Twin" : "Protagonist";
             her.transform.localPosition = Vector3.zero;
@@ -114,9 +107,9 @@ namespace HalfAware.EditorTools.Rocketbox
                 for (var i = 0; i < ms.Length; i++)
                 {
                     var n = ms[i] == null ? "" : ms[i].name;
-                    if (n == BodySlot) ms[i] = skin.Body;
-                    else if (n == HeadSlot) ms[i] = twinHead && skin.HeadTwin != null ? skin.HeadTwin : skin.Head;
-                    else if (n == HairSlot) ms[i] = skin.Hair;
+                    if (n == skin.Person.BodySlot) ms[i] = skin.Body;
+                    else if (n == skin.Person.HeadSlot) ms[i] = twinHead && skin.HeadTwin != null ? skin.HeadTwin : skin.Head;
+                    else if (n == skin.Person.HairSlot) ms[i] = skin.Hair;
                 }
                 r.sharedMaterials = ms;
                 // 骨が動いて頭が元の箱から出ても消えないように
@@ -144,6 +137,7 @@ namespace HalfAware.EditorTools.Rocketbox
 
         public sealed class Skin
         {
+            public readonly RocketboxPerson Person;
             public Material Body, Head, HeadTwin, Hair;
             /// <summary>顎の骨の左右の倍率（<see cref="RocketboxPaint.Look.JawScale"/>）</summary>
             public float JawScale = 1f;
@@ -152,6 +146,8 @@ namespace HalfAware.EditorTools.Rocketbox
             public RocketboxPaint.HeadResult HeadInfo, HeadTwinInfo;
             /// <summary>その場で作った物（アセットでない）。使い終えたら <see cref="Destroy"/></summary>
             public readonly List<Object> Made = new List<Object>();
+
+            public Skin(RocketboxPerson person) { Person = person; }
 
             public void Destroy()
             {
@@ -163,53 +159,68 @@ namespace HalfAware.EditorTools.Rocketbox
         [MenuItem("HalfAware/Rocketbox/Paint the protagonist")]
         public static void PaintMenu()
         {
-            Debug.Log(Paint(Look(), Twin == TwinMode.MoleOnly));
+            Debug.Log(Paint(Chosen, Chosen.Look(), Twin == TwinMode.MoleOnly));
+        }
+
+        [MenuItem("HalfAware/Rocketbox/Paint every Rocketbox person")]
+        public static void PaintAllMenu()
+        {
+            foreach (var who in RocketboxPerson.All) Debug.Log(Paint(who, who.Look(), Twin == TwinMode.MoleOnly));
         }
 
         /// <summary>
-        /// 縮めたテクスチャに手を入れ、Painted/ に PNG とマテリアルで書く。
-        /// withTwinHead なら片割れ用の頭（黒子が右目の下）も書く
+        /// 縮めたテクスチャに手を入れ、その人の Painted/ に PNG とマテリアルで書く。
+        /// withTwinHead なら片割れ用の頭（黒子が右目の下）も書く。服を元のままにする人は、体のマテリアルが縮めた写しをそのまま使う
         /// </summary>
-        public static string Paint(RocketboxPaint.Look look, bool withTwinHead)
+        public static string Paint(RocketboxPerson who, RocketboxPaint.Look look, bool withTwinHead)
         {
             var sb = new System.Text.StringBuilder();
-            EnsureFolder();
+            sb.AppendLine(who.ToString());
+            EnsureFolder(who);
             // 描くのはいつも 512。頭を 256 にするときは取り込みの設定で縮める
-            var maps = Maps.Get(512);
+            var maps = Maps.Get(who, 512);
+            var dir = who.Painted;
             int n;
-            var head = RocketboxTextures.ReadPng(HeadSrc, out n, out n);
-            var self = RocketboxPaint.Head(ToColors(head), maps.Head, maps.Anchors, look, false);
-            WritePainted(self.Px, n, "Head_self", false, HeadSize);
+            var head = RocketboxTextures.ReadPng(who.HeadSrc, out n, out n);
+            var self = RocketboxPaint.Head(ToColors(head), maps.Head, maps.Anchors, look, false, who.IrisUv, who.IrisRadius);
+            WritePainted(self.Px, n, dir + "Head_self.png", false, HeadSize);
             sb.AppendLine("頭（主人公）: " + self.Note + "、UV " + self.MoleUv.ToString("F4"));
             if (withTwinHead)
             {
-                var twin = RocketboxPaint.Head(ToColors(head), maps.Head, maps.Anchors, look, true);
-                WritePainted(twin.Px, n, "Head_twin", false, HeadSize);
+                var twin = RocketboxPaint.Head(ToColors(head), maps.Head, maps.Anchors, look, true, who.IrisUv, who.IrisRadius);
+                WritePainted(twin.Px, n, dir + "Head_twin.png", false, HeadSize);
                 sb.AppendLine("頭（片割れ）: " + twin.Note);
             }
-            var body = RocketboxTextures.ReadPng(BodySrc, out n, out n);
-            float[] knit;
-            WritePainted(RocketboxPaint.Body(ToColors(body), maps.Body, look, out knit), n, "Body", false, 512);
-            var hair = RocketboxTextures.ReadPng(HairSrc, out n, out n);
-            WritePainted(RocketboxPaint.Hair(ToColors(hair), look), n, "Hair", true, 512);
+            Texture2D bodyTex;
+            if (look.blackenKnit)
+            {
+                var body = RocketboxTextures.ReadPng(who.BodySrc, out n, out n);
+                float[] knit;
+                WritePainted(RocketboxPaint.Body(ToColors(body), maps.Body, look, out knit), n, dir + "Body.png", false, 512);
+                bodyTex = Load(dir + "Body.png");
+            }
+            else bodyTex = Load(who.BodySrc);
+            var hair = RocketboxTextures.ReadPng(who.HairSrc, out n, out n);
+            WritePainted(RocketboxPaint.Hair(ToColors(hair), look), n, dir + "Hair.png", true, 512);
 
-            SaveMaterial(Lit("Body", Load(Painted + "Body.png"), 0.12f, false), Painted + "Body.mat");
-            SaveMaterial(Lit("Head_self", Load(Painted + "Head_self.png"), 0.22f, false), Painted + "Head_self.mat");
-            if (withTwinHead) SaveMaterial(Lit("Head_twin", Load(Painted + "Head_twin.png"), 0.22f, false), Painted + "Head_twin.mat");
-            SaveMaterial(Lit("Hair", Load(Painted + "Hair.png"), 0.34f, true), Painted + "Hair.mat");
+            SaveMaterial(Lit("Body", bodyTex, 0.12f, false), dir + "Body.mat");
+            SaveMaterial(Lit("Head_self", Load(dir + "Head_self.png"), 0.22f, false), dir + "Head_self.mat");
+            if (withTwinHead) SaveMaterial(Lit("Head_twin", Load(dir + "Head_twin.png"), 0.22f, false), dir + "Head_twin.mat");
+            SaveMaterial(Lit("Hair", Load(dir + "Hair.png"), 0.34f, true), dir + "Hair.mat");
             AssetDatabase.SaveAssets();
-            sb.AppendLine("書いた所: " + Painted);
+            sb.AppendLine("書いた所: " + dir + (look.blackenKnit ? "" : "（体は " + who.BodySrc + " をそのまま）"));
             return sb.ToString();
         }
 
-        static Skin LoadPainted(bool twinHead)
+        static Skin LoadPainted(RocketboxPerson who, bool twinHead)
         {
-            var s = new Skin
+            var dir = who.Painted;
+            var s = new Skin(who)
             {
-                Body = AssetDatabase.LoadAssetAtPath<Material>(Painted + "Body.mat"),
-                Head = AssetDatabase.LoadAssetAtPath<Material>(Painted + "Head_self.mat"),
-                HeadTwin = AssetDatabase.LoadAssetAtPath<Material>(Painted + "Head_twin.mat"),
-                Hair = AssetDatabase.LoadAssetAtPath<Material>(Painted + "Hair.mat"),
+                Body = AssetDatabase.LoadAssetAtPath<Material>(dir + "Body.mat"),
+                Head = AssetDatabase.LoadAssetAtPath<Material>(dir + "Head_self.mat"),
+                HeadTwin = AssetDatabase.LoadAssetAtPath<Material>(dir + "Head_twin.mat"),
+                Hair = AssetDatabase.LoadAssetAtPath<Material>(dir + "Hair.mat"),
             };
             if (s.Body == null || s.Head == null || s.Hair == null) return null;
             if (twinHead && s.HeadTwin == null) return null;
@@ -220,12 +231,12 @@ namespace HalfAware.EditorTools.Rocketbox
         /// 描いたばかりの組を、アセットにせずに作る（撮り比べ用）。テクスチャは取り込みと同じく DXT に圧縮する。
         /// headSize が 256 なら頭だけ 512 で描いてから縮める
         /// </summary>
-        public static Skin MakeSkin(RocketboxPaint.Look look, int headSize, bool withTwinHead)
+        public static Skin MakeSkin(RocketboxPerson who, RocketboxPaint.Look look, int headSize, bool withTwinHead)
         {
-            var skin = new Skin { JawScale = look.JawScale };
+            var skin = new Skin(who) { JawScale = look.JawScale };
             try
             {
-                var maps = Maps.Get(512);
+                var maps = Maps.Get(who, 512);
                 RocketboxPaint.HeadResult info;
                 Texture2D mask;
                 skin.Head = MakeHead(skin, look, headSize, false, out info, out mask);
@@ -238,10 +249,14 @@ namespace HalfAware.EditorTools.Rocketbox
                     skin.MaskHeadTwin = mask;
                 }
                 int n;
-                float[] knit;
-                var body = RocketboxPaint.Body(ToColors(RocketboxTextures.ReadPng(BodySrc, out n, out n)), maps.Body, look, out knit);
-                skin.Body = Keep(skin, Lit("Body", Keep(skin, Tex(body, n, false, 512)), 0.12f, false));
-                var hair = RocketboxPaint.Hair(ToColors(RocketboxTextures.ReadPng(HairSrc, out n, out n)), look);
+                if (look.blackenKnit)
+                {
+                    float[] knit;
+                    var body = RocketboxPaint.Body(ToColors(RocketboxTextures.ReadPng(who.BodySrc, out n, out n)), maps.Body, look, out knit);
+                    skin.Body = Keep(skin, Lit("Body", Keep(skin, Tex(body, n, false, 512)), 0.12f, false));
+                }
+                else skin.Body = Keep(skin, Lit("Body", Load(who.BodySrc), 0.12f, false));
+                var hair = RocketboxPaint.Hair(ToColors(RocketboxTextures.ReadPng(who.HairSrc, out n, out n)), look);
                 skin.Hair = Keep(skin, Lit("Hair", Keep(skin, Tex(hair, n, true, 512)), 0.34f, true));
                 return skin;
             }
@@ -252,24 +267,25 @@ namespace HalfAware.EditorTools.Rocketbox
             }
         }
 
-        /// <summary>頭のマテリアルだけを描いて作る。作った物は into に入れる。印の絵（撮り比べで測る）も返す</summary>
+        /// <summary>頭のマテリアルだけを描いて作る。作った物は into に入れる（人も into の人）。印の絵（撮り比べで測る）も返す</summary>
         public static Material MakeHead(Skin into, RocketboxPaint.Look look, int headSize, bool twin, out RocketboxPaint.HeadResult info, out Texture2D mask)
         {
-            var maps = Maps.Get(512);
+            var who = into.Person;
+            var maps = Maps.Get(who, 512);
             int n;
-            var head = ToColors(RocketboxTextures.ReadPng(HeadSrc, out n, out n));
-            info = RocketboxPaint.Head(head, maps.Head, maps.Anchors, look, twin);
+            var head = ToColors(RocketboxTextures.ReadPng(who.HeadSrc, out n, out n));
+            info = RocketboxPaint.Head(head, maps.Head, maps.Anchors, look, twin, who.IrisUv, who.IrisRadius);
             mask = Keep(into, MaskTex(info.Mask, n, headSize));
             return Keep(into, Lit(twin ? "Head_twin" : "Head_self", Keep(into, Tex(info.Px, n, false, headSize)), 0.22f, false));
         }
 
         /// <summary>手を入れていない縮めたテクスチャのままの組（撮り比べの「前」）</summary>
-        public static Skin MakeRawSkin()
+        public static Skin MakeRawSkin(RocketboxPerson who)
         {
-            var skin = new Skin();
-            skin.Head = Keep(skin, Lit("Head_raw", Load(HeadSrc), 0.22f, false));
-            skin.Body = Keep(skin, Lit("Body_raw", Load(BodySrc), 0.12f, false));
-            skin.Hair = Keep(skin, Lit("Hair_raw", Load(HairSrc), 0.34f, true));
+            var skin = new Skin(who);
+            skin.Head = Keep(skin, Lit("Head_raw", Load(who.HeadSrc), 0.22f, false));
+            skin.Body = Keep(skin, Lit("Body_raw", Load(who.BodySrc), 0.12f, false));
+            skin.Hair = Keep(skin, Lit("Hair_raw", Load(who.HairSrc), 0.34f, true));
             return skin;
         }
 
@@ -286,14 +302,15 @@ namespace HalfAware.EditorTools.Rocketbox
         {
             public RocketboxPaint.Surface Head, Body;
             public RocketboxPaint.Anchors Anchors;
-            static readonly Dictionary<int, Maps> cache = new Dictionary<int, Maps>();
+            static readonly Dictionary<string, Maps> cache = new Dictionary<string, Maps>();
 
-            /// <summary>模型の束ねた姿勢から作る。同じ大きさなら使い回す</summary>
-            public static Maps Get(int n)
+            /// <summary>模型の束ねた姿勢から作る。同じ人・同じ大きさなら使い回す</summary>
+            public static Maps Get(RocketboxPerson who, int n)
             {
                 Maps m;
-                if (cache.TryGetValue(n, out m)) return m;
-                var src = AssetDatabase.LoadAssetAtPath<GameObject>(Model);
+                var key = who.Name + "/" + n;
+                if (cache.TryGetValue(key, out m)) return m;
+                var src = AssetDatabase.LoadAssetAtPath<GameObject>(who.Model);
                 var go = (GameObject)Object.Instantiate(src);
                 go.hideFlags = HideFlags.HideAndDontSave;
                 var baked = new Mesh();
@@ -310,8 +327,8 @@ namespace HalfAware.EditorTools.Rocketbox
                     int head = -1, body = -1;
                     for (var i = 0; i < names.Length; i++)
                     {
-                        if (names[i] != null && names[i].name == HeadSlot) head = i;
-                        if (names[i] != null && names[i].name == BodySlot) body = i;
+                        if (names[i] != null && names[i].name == who.HeadSlot) head = i;
+                        if (names[i] != null && names[i].name == who.BodySlot) body = i;
                     }
                     if (head < 0 || body < 0) throw new InvalidOperationException("頭か体の面の組が無い");
                     m = new Maps
@@ -320,7 +337,7 @@ namespace HalfAware.EditorTools.Rocketbox
                         Body = RocketboxPaint.Surface.Of(v, uv, smr.sharedMesh.GetTriangles(body), n),
                         Anchors = RocketboxPaint.Anchors.Of(go.transform),
                     };
-                    cache[n] = m;
+                    cache[key] = m;
                     return m;
                 }
                 finally
@@ -389,6 +406,8 @@ namespace HalfAware.EditorTools.Rocketbox
                 // 髪の房とまつ毛は透けの絵で切り抜き、両面を描く
                 m.SetFloat("_AlphaClip", 1f);
                 m.SetFloat("_Cutoff", 0.45f);
+                // URP が切り抜きのマテリアルに入れる値に揃える（描き直すたびに差分が出ないように）
+                m.SetFloat("_AlphaToMask", 1f);
                 m.EnableKeyword("_ALPHATEST_ON");
                 m.SetFloat("_Cull", (float)CullMode.Off);
                 m.SetOverrideTag("RenderType", "TransparentCutout");
@@ -397,7 +416,7 @@ namespace HalfAware.EditorTools.Rocketbox
             return m;
         }
 
-        static void WritePainted(Color[] px, int n, string name, bool alpha, int maxSize)
+        static void WritePainted(Color[] px, int n, string path, bool alpha, int maxSize)
         {
             var c32 = new Color32[px.Length];
             for (var i = 0; i < px.Length; i++)
@@ -405,7 +424,6 @@ namespace HalfAware.EditorTools.Rocketbox
                 c32[i] = px[i];
                 if (!alpha) c32[i].a = 255;
             }
-            var path = Painted + name + ".png";
             RocketboxTextures.WritePng(c32, n, n, path, alpha);
             var ti = (TextureImporter)AssetImporter.GetAtPath(path);
             if (ti != null && ti.maxTextureSize != maxSize)
@@ -430,7 +448,9 @@ namespace HalfAware.EditorTools.Rocketbox
                 old.shader = m.shader;
                 old.CopyPropertiesFromMaterial(m);
                 old.shaderKeywords = m.shaderKeywords;
-                old.renderQueue = m.renderQueue;
+                // 描き直すたびに差分が出ないよう、列はシェーダーの既定（-1）のままにし、URP が新しいマテリアルで切る MotionVectors のパスも切る
+                old.renderQueue = m.rawRenderQueue;
+                old.SetShaderPassEnabled("MotionVectors", false);
                 old.SetOverrideTag("RenderType", m.GetTag("RenderType", false));
                 EditorUtility.SetDirty(old);
                 Object.DestroyImmediate(m);
@@ -439,10 +459,10 @@ namespace HalfAware.EditorTools.Rocketbox
             AssetDatabase.CreateAsset(m, path);
         }
 
-        static void EnsureFolder()
+        static void EnsureFolder(RocketboxPerson who)
         {
-            var p = Painted.TrimEnd('/');
-            if (!AssetDatabase.IsValidFolder(p)) AssetDatabase.CreateFolder(Dir.TrimEnd('/'), "Painted");
+            var p = who.Painted.TrimEnd('/');
+            if (!AssetDatabase.IsValidFolder(p)) AssetDatabase.CreateFolder(who.Dir.TrimEnd('/'), "Painted");
         }
     }
 }

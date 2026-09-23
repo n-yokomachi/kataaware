@@ -10,7 +10,7 @@ namespace HalfAware.EditorTools.Rocketbox
     ///
     /// - 髪を黒に（頭のテクスチャの頭皮の髪と、透けの絵の髪の房。毛筋の明暗は残す）
     /// - カーディガンを黒に（ニットの目の明暗は残す）
-    /// - 虹彩を琥珀色に（虹彩は目の玉の部品で、左右の目が頭のテクスチャの同じ一枚の目の絵を使う）
+    /// - 目は元の色のまま（虹彩は目の玉の部品で、左右の目が頭のテクスチャの同じ一枚の目の絵を使う）
     /// - 黒子（主人公は本人の左 = −x の目の下、片割れは右 = +x の目の下）
     /// - 美人への控えめな手入れ（肌のむら、目元、眉、唇、頬から顎の陰り）
     ///
@@ -32,19 +32,15 @@ namespace HalfAware.EditorTools.Rocketbox
             public float hairCut = 0.38f, hairFade = 0.50f;
             [Tooltip("眉を髪に合わせて暗くする量（0〜1）")]
             public float browDarken = 0.40f;
+            [Tooltip("頭のテクスチャで髪と見なす一番低い所（目の高さから下へ m）。これより下の暗い所は胸元の影などとして外す。長い髪の人は大きく")]
+            public float hairLowest = 0.17f;
 
-            [Header("カーディガン")]
+            [Header("カーディガン（ニットの服を黒に。服を元のままにする人は false）")]
+            public bool blackenKnit = true;
             public Color knitShadow = new Color(0.012f, 0.012f, 0.014f);
             public Color knitShine = new Color(0.085f, 0.087f, 0.098f);
             public float knitLo = 0.22f, knitHi = 0.68f, knitGamma = 1.10f;
 
-            [Header("虹彩（目の玉の絵。頭のテクスチャの UV）")]
-            public Vector2 irisCentre = new Vector2(0.2634f, 0.0675f);
-            public float irisRadius = 0.0171f, pupilRadius = 0.0056f;
-            public Color irisBright = new Color(0.86f, 0.56f, 0.17f);
-            public Color irisDeep = new Color(0.24f, 0.11f, 0.03f);
-            [Tooltip("元の虹彩の一番明るい所の明度。ここを irisBright にする")]
-            public float irisPeak = 0.53f;
 
             [Header("黒子")]
             [Tooltip("直径（m）。0 なら描かない")]
@@ -186,6 +182,9 @@ namespace HalfAware.EditorTools.Rocketbox
             public Vector2 MoleUv = new Vector2(-1f, -1f);
             /// <summary>印の絵（R = 黒子、G = 虹彩、B = 他の顔の部品、地は灰）。<see cref="HalfAware.EditorTools.Study.FaceStudy"/> で測るのに使う</summary>
             public Color32[] Mask;
+            /// <summary>頭のテクスチャで髪と見なした重み（0〜1、N×N）。撮り比べで髪の長さを測るのに使う</summary>
+            public float[] Hair;
+            public int N;
             public string Note = "";
         }
 
@@ -193,7 +192,8 @@ namespace HalfAware.EditorTools.Rocketbox
         /// 頭のテクスチャ（顔・頭皮の髪・首と胸・口の中・目の玉）に手を入れる。
         /// twin なら黒子を本人の右（+x）の目の下へ
         /// </summary>
-        public static HeadResult Head(Color[] src, Surface s, Anchors a, Look k, bool twin)
+        /// <param name="irisUv">目の玉の絵の虹彩の中心（UV）。塗らない。印の絵で虹彩を測るのにだけ使う</param>
+        public static HeadResult Head(Color[] src, Surface s, Anchors a, Look k, bool twin, Vector2 irisUv, float irisRadius)
         {
             var n = s.N;
             var px = (Color[])src.Clone();
@@ -217,7 +217,7 @@ namespace HalfAware.EditorTools.Rocketbox
                 var p = s.P[i];
                 var guarded = InEye(p, a.eyeL) || InEye(p, a.eyeR) || InMouth(p, a) || InNose(p, a);
                 // 髪は顎の高さより上だけ（胸元の影を髪と取り違えない）
-                var above = Smooth(eyeY - 0.19f, eyeY - 0.15f, p.y);
+                var above = Smooth(eyeY - k.hairLowest - 0.02f, eyeY - k.hairLowest + 0.02f, p.y);
                 hair[i] = guarded ? 0f : Smooth(k.hairFade, k.hairCut, Vb[i]) * above;
                 // 頭の天辺（額の生え際より上）は明るい毛筋も髪
                 hair[i] = Mathf.Max(hair[i], Smooth(eyeY + 0.080f, eyeY + 0.095f, p.y));
@@ -348,26 +348,18 @@ namespace HalfAware.EditorTools.Rocketbox
                 }
             }
 
-            // 7. 虹彩を琥珀に。瞳は元のまま
+            // 7. 虹彩は塗らない。印の絵のために、瞳の外から虹彩の縁までの輪だけを覚える
             var irisMask = new bool[n * n];
             {
-                var cx = k.irisCentre.x * n;
-                var cy = k.irisCentre.y * n;
-                var R = k.irisRadius * n;
-                var pr = k.pupilRadius * n;
+                var cx = irisUv.x * n;
+                var cy = irisUv.y * n;
+                var R = irisRadius * n;
                 var reach = Mathf.CeilToInt(R + 2);
                 for (var y = Mathf.Max(0, (int)cy - reach); y <= Mathf.Min(n - 1, (int)cy + reach); y++)
                     for (var x = Mathf.Max(0, (int)cx - reach); x <= Mathf.Min(n - 1, (int)cx + reach); x++)
                     {
-                        var i = y * n + x;
                         var r = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(cx, cy));
-                        var w = Smooth(R + 0.7f, R - 0.7f, r) * Smooth(pr * 0.85f, pr * 1.20f, r);
-                        if (w <= 0f) continue;
-                        if (r < R && r > pr) irisMask[i] = true;
-                        var t = Mathf.Pow(Mathf.Clamp01(V[i] / k.irisPeak), 0.85f);
-                        var col = Color.Lerp(k.irisDeep, k.irisBright, t);
-                        col.a = px[i].a;
-                        px[i] = Color.Lerp(px[i], col, w);
+                        if (r < R && r > R * 0.33f) irisMask[y * n + x] = true;
                     }
             }
 
@@ -420,6 +412,8 @@ namespace HalfAware.EditorTools.Rocketbox
                 else mask[i] = new Color32(38, 38, 38, 255);
             }
             res.Mask = mask;
+            res.Hair = hair;
+            res.N = n;
             res.Px = px;
             res.Note = string.Format("手入れ {0:0.00}、黒子 {1:0.0} mm（{2}）", b, k.moleDiameter * 1000f, twin ? "右目の下" : "左目の下");
             return res;
@@ -470,6 +464,11 @@ namespace HalfAware.EditorTools.Rocketbox
         {
             var n = s.N;
             var px = (Color[])src.Clone();
+            if (!k.blackenKnit)
+            {
+                knit = new float[n * n];
+                return px;
+            }
             var H = new float[n * n];
             var S = new float[n * n];
             var V = new float[n * n];

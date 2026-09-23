@@ -20,10 +20,10 @@ namespace HalfAware.EditorTools.Rocketbox
 
         public static string ProjectRoot { get { return Path.GetDirectoryName(Application.dataPath); } }
 
-        [MenuItem("HalfAware/Rocketbox/Shrink the textures (Female_Adult_14)")]
+        [MenuItem("HalfAware/Rocketbox/Shrink the textures")]
         public static void ShrinkMenu()
         {
-            Debug.Log(Shrink("Female_Adult_14", new[] { "f017_head_color", "f017_body_color", "f017_opacity_color" }, 512));
+            foreach (var who in RocketboxPerson.All) Debug.Log(Shrink(who.Name, who.RawTextures, 512));
         }
 
         /// <summary>

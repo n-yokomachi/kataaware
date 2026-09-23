@@ -134,7 +134,7 @@ namespace HalfAware.EditorTools.Rocketbox
             {
                 src = Spawn(SourceModel, new Vector3(0f, -600f, 0f));
                 // HumanPoseHandler は体の位置を世界の原点からの値で返すので、Rocketbox は原点に置く
-                dst = Spawn(BuildRocketboxProtagonist.Model, Vector3.zero);
+                dst = Spawn(RocketboxPerson.Adult14.Model, Vector3.zero);
                 try
                 {
                     foreach (var t in src.GetComponentsInChildren<Transform>(true)) s[t.name] = t;
