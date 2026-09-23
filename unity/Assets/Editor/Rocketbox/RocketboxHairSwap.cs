@@ -247,20 +247,64 @@ namespace HalfAware.EditorTools.Rocketbox
             var bn = bm.normals; var fn = fm.normals; var hn = hm.normals;
             var bwts = bm.boneWeights; var fwts = fm.boneWeights; var hwts = hm.boneWeights;
             var bu = bm.uv;
-            var bodyTris = Pack(bm.GetTriangles(Slot(bodySmr, who.BodyFrom.BodySlot)), i => toLocal.MultiplyPoint3x4(bw[i]), i => bn[i], i => bu[i], i => Re(bwts[i], bodyRemap), verts, norms, uvs, weights);
+            var bodyAll = bm.GetTriangles(Slot(bodySmr, who.BodyFrom.BodySlot));
+            int[] legsOut = null;
+            string legsNote = null;
+            if (who.LegsFrom != null)
+            {
+                // 膝から下を別の人から借りる。体の人の三角は、重心が継ぐ高さより上の物だけ。借りる人の三角は、重心が継ぐ高さ + 3 cm より下の物。
+                // 重なる所（継ぐ高さの 1 cm 下から上）では、借りる人の肌を体の人の肌の 1.5 mm 内側へ入れる（体の人の肌が勝つ）。
+                // その下 5 cm で入れる量を 0 へ減らし、脚の形の違いを段にしない
+                var cut = who.LegsCut;
+                var kept = new List<int>();
+                for (var t = 0; t < bodyAll.Length; t += 3)
+                    if ((bw[bodyAll[t]].y + bw[bodyAll[t + 1]].y + bw[bodyAll[t + 2]].y) / 3f >= cut) { kept.Add(bodyAll[t]); kept.Add(bodyAll[t + 1]); kept.Add(bodyAll[t + 2]); }
+                bodyAll = kept.ToArray();
+                var legsSmr = Smr(who.LegsFrom.Model);
+                var lm = legsSmr.sharedMesh;
+                var lw = World(lm.vertices, legsSmr.transform.localToWorldMatrix);
+                var legAll = lm.GetTriangles(Slot(legsSmr, who.LegsFrom.BodySlot));
+                var legTris = new List<int>();
+                for (var t = 0; t < legAll.Length; t += 3)
+                    if ((lw[legAll[t]].y + lw[legAll[t + 1]].y + lw[legAll[t + 2]].y) / 3f < cut + 0.03f) { legTris.Add(legAll[t]); legTris.Add(legAll[t + 1]); legTris.Add(legAll[t + 2]); }
+                var upper = new RocketboxCompose.Surface(bw, bodyAll);
+                var lmoved = (Vector3[])lw.Clone();
+                int tucked = 0;
+                float maxTuck = 0f;
+                foreach (var i in new HashSet<int>(legTris))
+                {
+                    var p = lw[i];
+                    var w = RocketboxPaint.Smooth(cut - 0.06f, cut - 0.01f, p.y);
+                    if (w <= 0f) continue;
+                    Vector3 q, n;
+                    var s = upper.Signed(p, 0.04f, out q, out n);
+                    if (float.IsNaN(s)) continue;
+                    var d = (s + 0.0015f) * w;
+                    lmoved[i] = p - n * d;
+                    tucked++;
+                    maxTuck = Mathf.Max(maxTuck, Mathf.Abs(d));
+                }
+                var ln = lm.normals;
+                var luv = lm.uv;
+                var lwts = lm.boneWeights;
+                var legsRemap = Remap(legsSmr, bodySmr);
+                legsOut = Pack(legTris.ToArray(), i => toLocal.MultiplyPoint3x4(lmoved[i]), i => ln[i], i => luv[i], i => Re(lwts[i], legsRemap), verts, norms, uvs, weights);
+                legsNote = string.Format(CultureInfo.InvariantCulture, "膝から下: {0} の三角 {1}（継ぐ高さ {2:0.00} m）、体の人の肌の内側へ合わせた頂点 {3}（最大 {4:0.0} mm）",
+                    who.LegsFrom, legTris.Count / 3, cut, tucked, maxTuck * 1000f);
+            }
+            var bodyTris = Pack(bodyAll, i => toLocal.MultiplyPoint3x4(bw[i]), i => bn[i], i => bu[i], i => Re(bwts[i], bodyRemap), verts, norms, uvs, weights);
             var headTris = Pack(faceHead, i => toLocal.MultiplyPoint3x4(sunkPos[i]), i => fn[i], i => fuv[i], i => Re(fwts[i], faceRemap), verts, norms, uvs, weights);
             var patchCount = 0;
             if (who.BodyFrom != who.FaceFrom)
             {
                 // 胸元の埋め: 体の人の肌の三角で、顔の人の肌が届かない所。0.7 mm 内側へ下げる。
                 // UV は埋めの真ん中に一番近い顔の人の肌の頂点の物を全部に使う（頂点ごとに一番近い物を使うと、UV の島をまたいで暗い点が並んだ）
-                var patch = RocketboxCompose.ChestPatch(who.BodyFrom, new RocketboxCompose.Surface(sunkPos, faceHead), eyeY, a.head.z);
+                var patch = RocketboxCompose.ChestPatch(who.BodyFrom, new RocketboxCompose.Surface(sunkPos, faceHead), eyeY, a.head.z, EdgeSegments(faceHead, fw, sunkPos));
                 var patchUvAll = Vector2.zero;
                 if (patch.Count > 0)
                 {
-                    var mid = Vector3.zero;
-                    foreach (var i in patch) mid += bw[i];
-                    mid /= patch.Count;
+                    // 首の前の付け根（頭の骨から 6 cm 下の、首の前の面）に一番近い顔の人の肌の頂点。胸元の塗りに左右されない肌の色
+                    var mid = new Vector3(0f, a.head.y - 0.06f, a.head.z + 0.08f);
                     var best = float.MaxValue;
                     foreach (var h in new HashSet<int>(faceTris))
                     {
@@ -288,12 +332,13 @@ namespace HalfAware.EditorTools.Rocketbox
             mesh.SetUVs(0, uvs);
             mesh.boneWeights = weights.ToArray();
             mesh.bindposes = bm.bindposes;
-            mesh.subMeshCount = 5;
+            mesh.subMeshCount = legsOut != null ? 6 : 5;
             mesh.SetTriangles(bodyTris, 0);
             mesh.SetTriangles(headTris, 1);
             mesh.SetTriangles(shellOut, 2);
             mesh.SetTriangles(cardOut, 3);
             mesh.SetTriangles(lashOut, 4);
+            if (legsOut != null) mesh.SetTriangles(legsOut, 5);
             mesh.RecalculateBounds();
             RocketboxCompose.Save(mesh, who.CompositeMesh);
 
@@ -335,7 +380,8 @@ namespace HalfAware.EditorTools.Rocketbox
                 outOfFace, maxFace * 1000f, outOfClothes, clothesInside, worstClothes * 1000f,
                 gaps.Count, gaps.Count > 0 ? gsum / gaps.Count * 1000f : 0f, gaps.Count > 0 ? gaps[gaps.Count / 2] * 1000f : 0f, g5, g15,
                 bare * 10000f, who.CompositeMesh, faceUnder, outOfFront)
-                + (neckNote != null ? "\n" + neckNote + "、胸元を体の人の肌の三角で埋めた数 " + patchCount : "");
+                + (neckNote != null ? "\n" + neckNote + "、胸元を体の人の肌の三角で埋めた数 " + patchCount : "")
+                + (legsNote != null ? "\n" + legsNote : "");
         }
 
         // ---- 見分け -----------------------------------------------------------

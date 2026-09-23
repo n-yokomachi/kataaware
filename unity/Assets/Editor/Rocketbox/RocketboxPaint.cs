@@ -51,9 +51,13 @@ namespace HalfAware.EditorTools.Rocketbox
             [Tooltip("パンツ: この高さ（m）より下（足首より上）は全部パンツ。その上は pantsHue の色の所だけ（負なら暗い所だけ）")]
             public float pantsAllBelow = 0.84f;
             public float pantsHue = 192f;
+            [Tooltip("パンツ（スカート）の上の端の高さ（m）と、明るさの上限（明るい裾のシャツを外す）")]
+            public float pantsTop = 1.0f, pantsValMax = 1.01f;
             [Tooltip("中のトップス: 色相（度）とその幅、彩度の下限、明るさの上限、高さの範囲（m）、左右の幅（m、手首の輪を外す）")]
             public float topHue = 20f, topHueWidth = 20f, topSatMin = 0.40f, topValMax = 0.27f;
             public float topLow = 1.00f, topHigh = 1.55f, topHalfWidth = 0.30f;
+            [Tooltip("中のトップスの塗りから外す UV の四角（別の島の小物。女大 11 のベルト）。幅 0 なら外さない")]
+            public Rect topKeepUv;
 
             [Header("丸首のシャツ（頭のテクスチャの首から下の肌を、白い丸首のシャツとして塗る）")]
             public bool shirt;
@@ -622,9 +626,13 @@ namespace HalfAware.EditorTools.Rocketbox
                     ? HueNear(H[i] * 360f, k.pantsHue, 25f, 12f) * Band(S[i], 0.06f, 0.09f, 0.45f, 0.55f)
                     : Smooth(0.34f, 0.26f, V[i]) * Smooth(0.30f, 0.22f, S[i]);
                 var ax = Mathf.Abs(s.P[i].x);
-                pants[i] = Smooth(0.10f, 0.14f, y) * Mathf.Max(Smooth(k.pantsAllBelow + 0.02f, k.pantsAllBelow - 0.02f, y), cloth * Smooth(1.00f, 0.95f, y) * Smooth(0.26f, 0.22f, ax));
+                cloth *= Smooth(k.pantsValMax + 0.04f, k.pantsValMax - 0.04f, V[i]);
+                pants[i] = Smooth(0.10f, 0.14f, y) * Mathf.Max(Smooth(k.pantsAllBelow + 0.02f, k.pantsAllBelow - 0.02f, y), cloth * Smooth(k.pantsTop, k.pantsTop - 0.05f, y) * Smooth(0.26f, 0.22f, ax));
                 shoes[i] = Smooth(0.18f, 0.15f, y) * (1f - pants[i]);
                 // 中のトップス: 色相と彩度と明るさで見分ける（女大 14 は胸の V の開きから見える、彩度の高い暗い茶。ニットは彩度 0.18）
+                var u = (i % n + 0.5f) / n;
+                var v = (i / n + 0.5f) / n;
+                if (k.topKeepUv.width > 0f && k.topKeepUv.Contains(new Vector2(u, v))) { top[i] = 0f; continue; }
                 top[i] = Smooth(k.topLow, k.topLow + 0.05f, y) * Smooth(k.topHigh, k.topHigh - 0.05f, y) * Smooth(k.topHalfWidth + 0.02f, k.topHalfWidth - 0.02f, ax)
                     * HueNear(H[i] * 360f, k.topHue, k.topHueWidth, 8f)
                     * Smooth(k.topSatMin - 0.05f, k.topSatMin + 0.05f, S[i]) * Smooth(k.topValMax + 0.03f, k.topValMax - 0.03f, V[i]);
@@ -726,9 +734,9 @@ namespace HalfAware.EditorTools.Rocketbox
                 px[i] = Color.Lerp(px[i], c, Mathf.Clamp01(w * 1.5f));
                 if (w > 0.05f) fill.Add(i);
             }
-            // 塗った所を、まわりの肌からならす（となりの平均を 80 回）。一色のままだと、元の肌との境が角張った段に見えた
+            // 塗った所を、まわりの肌からならす（となりの平均を 400 回。まわりの肌の色が中まで届く）。一色のままだと、元の肌との境が角張った前掛けの形に見えた
             var n = s.N;
-            for (var it = 0; it < 80; it++)
+            for (var it = 0; it < 400; it++)
             {
                 var next = new Dictionary<int, Color>();
                 foreach (var i in fill)

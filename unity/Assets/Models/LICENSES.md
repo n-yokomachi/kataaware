@@ -80,9 +80,9 @@ Beach・Farmer はこの街に合わないので入れていない。
 
 ## Microsoft Rocketbox について
 
-主人公と片割れの顔と主人公の体は、Microsoft Rocketbox Avatar Library の `Female_Adult_14`（一覧の番号で「女大 14」）から、髪は `Female_Adult_08`（女大 08）から作った。片割れの体は `Female_Adult_03`（女大 03）の体を借りた（頭のテクスチャは落としていない）。
+主人公と片割れの顔と主人公の体は、Microsoft Rocketbox Avatar Library の `Female_Adult_14`（一覧の番号で「女大 14」）から、髪は `Female_Adult_08`（女大 08）から作った。片割れの体は `Female_Adult_11`（女大 11）の体を、膝から下は `Female_Party_02`（一覧の女大 19）の素足とサンダルを借りた。候補として `Female_Adult_03`（女大 03）と `Female_Adult_02`（女大 02）の体も入れてある（体だけを借りる人は、頭のテクスチャを落としていない）。
 
-- 出どころ: https://github.com/microsoft/Microsoft-Rocketbox の `Assets/Avatars/Adults/Female_Adult_14/`、`Assets/Avatars/Adults/Female_Adult_08/`、`Assets/Avatars/Adults/Female_Adult_03/`（どれも 2026-09-23 に落とした）
+- 出どころ: https://github.com/microsoft/Microsoft-Rocketbox の `Assets/Avatars/Adults/Female_Adult_14/`、`Assets/Avatars/Adults/Female_Adult_08/`、`Assets/Avatars/Adults/Female_Adult_03/`、`Assets/Avatars/Adults/Female_Adult_02/`、`Assets/Avatars/Adults/Female_Adult_11/`、`Assets/Avatars/Adults/Female_Party_02/`（どれも 2026-09-23 に落とした）
 - 許諾: MIT License（同じリポジトリの `LICENSE.md`）。配るものには下の著作権の表示と許諾の文を添える
 
 ```
@@ -124,8 +124,17 @@ SOFTWARE.
 | `Female_Adult_03.fbx`（0.8 MB） | `rocketbox/Female_Adult_03/Female_Adult_03.fbx`。手を加えずに写した |
 | `f003_body_color.tga`（2048、服・腕と肩・手・靴） | `rocketbox/Female_Adult_03/f003_body_color.png`（512 に縮めた写し） |
 | `f003_opacity_color.tga`（2048） | `rocketbox/Female_Adult_03/f003_opacity_color.png`（512 に縮めた写し） |
+| `Female_Adult_02.fbx`（0.6 MB） | `rocketbox/Female_Adult_02/Female_Adult_02.fbx`。手を加えずに写した |
+| `f002_body_color.tga`（2048） | `rocketbox/Female_Adult_02/f002_body_color.png`（512 に縮めた写し） |
+| `f002_opacity_color.tga`（1024） | `rocketbox/Female_Adult_02/f002_opacity_color.png`（512 に縮めた写し） |
+| `Female_Adult_11.fbx`（0.6 MB） | `rocketbox/Female_Adult_11/Female_Adult_11.fbx`。手を加えずに写した |
+| `f011_body_color.tga`（2048） | `rocketbox/Female_Adult_11/f011_body_color.png`（512 に縮めた写し） |
+| `f011_opacity_color.tga`（2048） | `rocketbox/Female_Adult_11/f011_opacity_color.png`（512 に縮めた写し） |
+| `Female_Party_02.fbx`（0.7 MB） | `rocketbox/Female_Party_02/Female_Party_02.fbx`。手を加えずに写した |
+| `f022_body_color.tga`（2048） | `rocketbox/Female_Party_02/f022_body_color.png`（512 に縮めた写し） |
+| `f022_opacity_color.tga`（2048） | `rocketbox/Female_Party_02/f022_opacity_color.png`（512 に縮めた写し） |
 
 - 縮めた写しは `Assets/Editor/Rocketbox/RocketboxTextures.cs`（メニューの HalfAware/Rocketbox/Shrink the textures。人は `RocketboxPerson.cs` に並べてある）で、元の TGA から作り直せる。線形の光で 4×4 を平均し、透けのある絵は α で重みを付けた
-- 人ごとの `Painted/` は、縮めた写しに組み立ての手順（`Assets/Editor/Rocketbox/RocketboxPaint.cs`）で手を入れた物。髪を黒に、目の下に黒子、顔に控えめな手入れ。女大 14 はカーディガンも黒にした。女大 08 の服と、どちらの目も元の色のまま。片割れ（`Face14_Hair08_Body03/Painted/`）は女大 03 のキャミソールとパンツを白にした
+- 人ごとの `Painted/` は、縮めた写しに組み立ての手順（`Assets/Editor/Rocketbox/RocketboxPaint.cs`）で手を入れた物。髪を黒に、目の下に黒子、顔に控えめな手入れ。女大 14 はカーディガンも黒にした。女大 08 の服と、どちらの目も元の色のまま。片割れの候補の女大 03（`Face14_Hair08_Body03/Painted/`）はキャミソールとパンツを白に、女大 02（`Face14_Hair08_Body02/Painted/`）はスカートをベージュにした。片割れ（`Face14_Hair08_Body11_Legs22/Painted/`）は女大 11 のワンピースを生成りにし、女大 19 の脚の肌を頭の肌に揃えた
 - 法線と光沢のテクスチャ、付いてくる動き（3ds Max の形式で Unity では読めない）は落としていない
 - 取り込みの設定は `Assets/Editor/Rocketbox/RocketboxImport.cs` が `Assets/Models/rocketbox/` の下にだけ掛ける。Rocketbox に同梱の `FixRocketboxMaxImport.cs` はプロジェクトの全部の取り込みに掛かり、Quaternius の模型を取り込むたびに例外を出すので入れていない

@@ -282,7 +282,7 @@ namespace HalfAware.EditorTools.Rocketbox
         /// 胸元の埋め: 体の人の肌の三角のうち、載せた顔の人の肌（headSurface）から離れている前側の物（体の人のメッシュの三角の番号）。
         /// 体の人の襟ぐりの方が深く、顔の人の肌が届かない所
         /// </summary>
-        public static List<int> ChestPatch(RocketboxPerson body, Surface headSurface, float eyeY, float neckZ)
+        public static List<int> ChestPatch(RocketboxPerson body, Surface headSurface, float eyeY, float neckZ, List<Vector3[]> headEdges = null)
         {
             var bodySmr = Smr(body.Model);
             var bm = bodySmr.sharedMesh;
@@ -298,7 +298,8 @@ namespace HalfAware.EditorTools.Rocketbox
                 foreach (var pt in new[] { v0, v1, v2, (v0 + v1) * 0.5f, (v1 + v2) * 0.5f, (v2 + v0) * 0.5f, c })
                 {
                     Vector3 q1, n1;
-                    if (headSurface.Closest(pt, 0.02f, out q1, out n1) > 0.0012f) { open = true; break; }
+                    // 顔の人の肌の縁の上に一番近い点があるなら、そこは縁の外（覆われていない）。縁の近くの三角も埋めに入れて、縁の隙間を塞ぐ
+                    if (headSurface.Closest(pt, 0.02f, out q1, out n1) > 0.0012f || (headEdges != null && EdgeDistance(q1, headEdges) <= 0.0003f)) { open = true; break; }
                 }
                 if (!open) continue;
                 patch.Add(skinTris[t]);

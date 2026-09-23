@@ -52,6 +52,12 @@ namespace HalfAware.EditorTools.Rocketbox
         /// <summary>頭のテクスチャを持つか（体だけ借りる人は頭のテクスチャを落としていない）</summary>
         public bool HasHeadTexture = true;
 
+        /// <summary>膝から下を借りる人（null なら体の人のまま）と、継ぐ高さ（m、束ねた姿勢の床から）</summary>
+        public RocketboxPerson LegsFrom;
+        public float LegsCut = 0.50f;
+        /// <summary>膝から下の絵（借りる人の体のテクスチャ）</summary>
+        public string LegsSrc { get { return LegsFrom != null ? LegsFrom.BodySrc : null; } }
+
         RocketboxPerson(string name, string prefix, string label, System.Action<RocketboxPaint.Look> tune)
         {
             Name = name;
@@ -125,6 +131,29 @@ namespace HalfAware.EditorTools.Rocketbox
             HasHeadTexture = false,
         };
 
+        /// <summary>
+        /// 女大 02。体だけを片割れに借りる（頭のテクスチャは落としていない）。服は生成りのケーブル編みの V 首のセーター、
+        /// 中に淡い青みの白の襟付きシャツ（袖口と裾も見える）、デニムの短いスカート、素足、黒い靴
+        /// </summary>
+        public static readonly RocketboxPerson Adult02 = new RocketboxPerson("Female_Adult_02", "f002", "女大 02", k =>
+        {
+            k.blackenKnit = false;
+        })
+        {
+            HasHeadTexture = false,
+        };
+
+        /// <summary>
+        /// 女大 11。体だけを片割れに借りる（頭のテクスチャは落としていない）。服はベルト付きの長袖で膝丈の茶色いワンピース、茶色のロングブーツ
+        /// </summary>
+        public static readonly RocketboxPerson Adult11 = new RocketboxPerson("Female_Adult_11", "f011", "女大 11", k =>
+        {
+            k.blackenKnit = false;
+        })
+        {
+            HasHeadTexture = false,
+        };
+
         public static readonly RocketboxPerson Face14Hair08 = Dress(ComposeHair("Face14_Hair08", "女大 14 の顔と体に女大 08 の髪", Adult14, Adult08, Adult14),
             // 主人公: 都会のモード系。カーディガンと靴を黒、パンツは女大 14 の元のダークデニム、中は白い丸首のシャツ
             // （カーディガンの開きから見える胸の肌と、中のトップスを白く塗る）
@@ -144,8 +173,48 @@ namespace HalfAware.EditorTools.Rocketbox
         /// 片割れ: 主人公と同じ顔（女大 14）と髪（女大 08）を、女大 03 の体に載せた人。模型ごと裏返して組み立てる。
         /// 服の色は <see cref="Outfit03"/>
         /// </summary>
-        public static readonly RocketboxPerson Face14Hair08Body03 = Twin(Face14Hair08,
-            Dress(ComposeHair("Face14_Hair08_Body03", "女大 14 の顔と女大 08 の髪を女大 03 の体に（片割れ）", Adult14, Adult08, Adult03), Outfit03));
+        public static readonly RocketboxPerson Face14Hair08Body03 =
+            Dress(ComposeHair("Face14_Hair08_Body03", "女大 14 の顔と女大 08 の髪を女大 03 の体に（片割れの候補）", Adult14, Adult08, Adult03), Outfit03);
+
+        /// <summary>
+        /// 片割れ: 主人公と同じ顔（女大 14）と髪（女大 08）を、女大 02 の体に載せた人。模型ごと裏返して組み立てる。
+        /// 服の色は <see cref="Outfit02"/>。女大 03 の体の人も候補として残す
+        /// </summary>
+        public static readonly RocketboxPerson Face14Hair08Body02 =
+            Dress(ComposeHair("Face14_Hair08_Body02", "女大 14 の顔と女大 08 の髪を女大 02 の体に（片割れの候補）", Adult14, Adult08, Adult02), Outfit02);
+
+        /// <summary>
+        /// 片割れ: 主人公と同じ顔（女大 14）と髪（女大 08）を、女大 11 の体（膝丈のワンピース）に載せた人。模型ごと裏返して組み立てる。
+        /// 服の色は <see cref="Outfit11"/>。女大 03 と 02 の体の人も候補として残す
+        /// </summary>
+        public static readonly RocketboxPerson Face14Hair08Body11 =
+            Dress(ComposeHair("Face14_Hair08_Body11", "女大 14 の顔と女大 08 の髪を女大 11 の体に（片割れの候補）", Adult14, Adult08, Adult11), Outfit11);
+
+        /// <summary>
+        /// 女大 19（Female_Party_02）。膝から下（素足と紐のサンダル）だけを片割れに借りる（頭のテクスチャは落としていない）
+        /// </summary>
+        public static readonly RocketboxPerson Party02 = new RocketboxPerson("Female_Party_02", "f022", "女大 19（Party_02）", k =>
+        {
+            k.blackenKnit = false;
+        })
+        {
+            HasHeadTexture = false,
+        };
+
+        /// <summary>
+        /// 片割れ: 女大 11 の体（白に近い生成りのワンピース）の膝から下を、女大 19（Party_02）の素足と紐のサンダルに替えた人。
+        /// 女大 11 のロングブーツが目立つため。継ぐのはワンピースの裾（0.59 m）のすぐ上で、継ぎ目は裾の中に隠れる
+        /// （膝の肌で継ぐと、二人の肌の色と三角の縁のぎざぎざが膝に見えた）
+        /// </summary>
+        public static readonly RocketboxPerson Face14Hair08Body11Legs22 = Twin(Face14Hair08,
+            Legs(Dress(ComposeHair("Face14_Hair08_Body11_Legs22", "女大 14 の顔と女大 08 の髪を女大 11 の体に、膝から下は女大 19（片割れ）", Adult14, Adult08, Adult11), Outfit11), Party02, 0.60f));
+
+        static RocketboxPerson Legs(RocketboxPerson p, RocketboxPerson legs, float cut)
+        {
+            p.LegsFrom = legs;
+            p.LegsCut = cut;
+            return p;
+        }
 
         static RocketboxPerson Dress(RocketboxPerson p, System.Action<RocketboxPaint.Look> self)
         {
@@ -160,10 +229,10 @@ namespace HalfAware.EditorTools.Rocketbox
         }
 
         /// <summary>手を入れて撮り比べる人の全部</summary>
-        public static readonly RocketboxPerson[] All = { Adult14, Adult08, Head08Body14, Face14Hair08, Face14Hair08Body03 };
+        public static readonly RocketboxPerson[] All = { Adult14, Adult08, Head08Body14, Face14Hair08, Face14Hair08Body03, Face14Hair08Body02, Face14Hair08Body11, Face14Hair08Body11Legs22 };
 
         /// <summary>取り込んだ一人（元の FBX とテクスチャを持つ人）</summary>
-        public static readonly RocketboxPerson[] Sources = { Adult14, Adult08, Adult03 };
+        public static readonly RocketboxPerson[] Sources = { Adult14, Adult08, Adult03, Adult02, Adult11, Party02 };
 
         public bool IsComposite { get { return FaceFrom != this || HairFrom != this || BodyFrom != this; } }
 
@@ -232,6 +301,51 @@ namespace HalfAware.EditorTools.Rocketbox
         /// 片割れ（女大 03 の体）の服。白いシャツと白いパンツ、ほかは女大 03 の元のまま。
         /// 片割れの頭のテクスチャには丸首のシャツを塗らない（女大 03 の服の襟ぐりが首元の肌を見せる形のため）
         /// </summary>
+        /// <summary>
+        /// 片割れ（女大 02 の体）の服。デニムのスカートだけベージュに、ほかは女大 02 の元のまま。
+        /// 女大 02 は V 首のセーターの中に襟付きのシャツを着ていて胸元の肌を見せないので、片割れの頭のテクスチャの首から下は
+        /// 女大 02 のシャツと同じ淡い青みの白の丸首のシャツとして塗る（女大 14 の胸の面が服の下から覗いても肌に見えないように）。素足の肌も頭の肌に揃える
+        /// </summary>
+        static void Outfit02(RocketboxPaint.Look k)
+        {
+            k.blackenKnit = false;
+            k.shirt = true;
+            k.shirtColour = new Color(0.78f, 0.81f, 0.83f);
+            k.matchSkinAll = true;
+            k.recolourPants = true;
+            k.pantsAllBelow = -1f;
+            k.pantsHue = 200f;
+            k.pantsTop = 1.08f;
+            k.pantsValMax = 0.50f;
+            k.pantsShadow = new Color(0.40f, 0.33f, 0.24f);
+            k.pantsShine = new Color(0.80f, 0.70f, 0.55f);
+        }
+
+        /// <summary>
+        /// 片割れ（女大 11 の体）の服。茶色のワンピースを白に近い生成りに（布の陰影は元の明暗から）、ベルトとブーツは元の茶のまま。
+        /// 女大 11 は小さな V 首で胸元の肌を少し見せるので、片割れの頭のテクスチャは丸首のシャツを塗らず、首から下の女大 14 の中のトップスを肌で塗る。
+        /// 脚の肌も頭の肌に揃える
+        /// </summary>
+        static void Outfit11(RocketboxPaint.Look k)
+        {
+            k.blackenKnit = false;
+            k.shirt = false;
+            k.chestSkin = true;
+            k.matchSkinAll = true;
+            k.recolourTop = true;
+            k.topHue = 25f;
+            k.topHueWidth = 25f;
+            k.topSatMin = 0.15f;
+            k.topValMax = 0.55f;
+            k.topLow = 0.45f;
+            k.topHigh = 1.60f;
+            k.topHalfWidth = 0.80f;
+            k.topShadow = new Color(0.58f, 0.55f, 0.50f);
+            k.topShine = new Color(0.95f, 0.93f, 0.88f);
+            // ベルトは UV の別の島（絵の上から 150〜190 画素の帯）。茶のまま残す
+            k.topKeepUv = new Rect(0f, 1f - 190f / 512f, 1f, 40f / 512f);
+        }
+
         static void Outfit03(RocketboxPaint.Look k)
         {
             k.blackenKnit = false;

@@ -131,7 +131,7 @@ namespace HalfAware.EditorTools.Rocketbox
                 {
                     // 組み合わせたメッシュはマテリアルの名前を持たない。面の組の順が体・頭・髪
                     ms = skin.Person.IsHairSwap
-                        ? new[] { body, head, skin.Shell, skin.Hair, skin.Lash }
+                        ? (skin.Legs != null ? new[] { body, head, skin.Shell, skin.Hair, skin.Lash, skin.Legs } : new[] { body, head, skin.Shell, skin.Hair, skin.Lash })
                         : new[] { body, head, skin.Hair };
                 }
                 else
@@ -175,6 +175,8 @@ namespace HalfAware.EditorTools.Rocketbox
             public Material Body, Head, HeadTwin, Hair;
             /// <summary>顔と髪が別の人のとき: 髪の殻（髪の人の頭のテクスチャ）と、まつ毛（顔の人の透けの絵）</summary>
             public Material Shell, Lash;
+            /// <summary>膝から下を別の人から借りるとき: その人の体のテクスチャ（肌を頭に揃えた物）</summary>
+            public Material Legs;
             /// <summary>顎の骨の左右の倍率（<see cref="RocketboxPaint.Look.JawScale"/>）</summary>
             public float JawScale = 1f;
             /// <summary>顎を閉じる向きへ回す角度（<see cref="RocketboxPaint.Look.jawClose"/>）</summary>
@@ -254,6 +256,13 @@ namespace HalfAware.EditorTools.Rocketbox
                 SaveMaterial(LitHead("Shell", Load(dir + "Shell.png"), Load(dir + "Shell_spec.png"), true), dir + "Shell.mat");
                 SaveMaterial(Lit("Lash", Load(dir + "Lash.png"), 0.34f, true), dir + "Lash.mat");
             }
+            if (who.LegsFrom != null)
+            {
+                string legsNote;
+                WritePainted(PaintLegs(who, look, self, out legsNote), 512, dir + "Legs.png", false, 512);
+                SaveMaterial(Lit("Legs", Load(dir + "Legs.png"), 0.12f, false), dir + "Legs.mat");
+                sb.AppendLine("膝から下の肌: " + legsNote);
+            }
 
             SaveMaterial(Lit("Body", bodyTex, 0.12f, false), dir + "Body.mat");
             var spec = Load(dir + "Head_self_spec.png");
@@ -329,6 +338,18 @@ namespace HalfAware.EditorTools.Rocketbox
             return r;
         }
 
+        /// <summary>膝から下を借りる人の体のテクスチャで、肌を頭の肌に揃える（サンダルの色は元のまま）</summary>
+        static Color[] PaintLegs(RocketboxPerson who, RocketboxPaint.Look look, RocketboxPaint.HeadResult head, out string note)
+        {
+            int n;
+            var px = ToColors(RocketboxTextures.ReadPng(who.LegsSrc, out n, out n));
+            var k = look.Clone();
+            k.matchSkinAll = true;
+            var headMaps = Maps.Get(who, 512);
+            var legMaps = Maps.Get(who.LegsFrom, 512);
+            return RocketboxPaint.MatchSkin(px, legMaps.Body, head.Px, head.Hair, headMaps.Head, headMaps.Anchors, k, out note);
+        }
+
         static Color[] PaintBody(RocketboxPerson who, RocketboxPaint.Look look, Maps maps, RocketboxPaint.HeadResult head, out string skinNote)
         {
             skinNote = null;
@@ -356,9 +377,11 @@ namespace HalfAware.EditorTools.Rocketbox
                 Hair = AssetDatabase.LoadAssetAtPath<Material>(dir + "Hair.mat"),
                 Shell = AssetDatabase.LoadAssetAtPath<Material>(dir + "Shell.mat"),
                 Lash = AssetDatabase.LoadAssetAtPath<Material>(dir + "Lash.mat"),
+                Legs = AssetDatabase.LoadAssetAtPath<Material>(dir + "Legs.mat"),
             };
             if (s.Body == null || s.Head == null || s.Hair == null) return null;
             if (who.IsHairSwap && (s.Shell == null || s.Lash == null)) return null;
+            if (who.LegsFrom != null && s.Legs == null) return null;
             if (twinHead && s.HeadTwin == null) return null;
             return s;
         }
@@ -399,6 +422,11 @@ namespace HalfAware.EditorTools.Rocketbox
                     skin.Shell = Keep(skin, LitHead("Shell", Keep(skin, Tex(shell.Px, 512, true, headSize)), shellSpec, true));
                     var lash = RocketboxPaint.Hair(ToColors(RocketboxTextures.ReadPng(who.LashSrc, out n, out n)), look);
                     skin.Lash = Keep(skin, Lit("Lash", Keep(skin, Tex(lash, n, true, 512)), 0.34f, true));
+                }
+                if (who.LegsFrom != null)
+                {
+                    string legsNote;
+                    skin.Legs = Keep(skin, Lit("Legs", Keep(skin, Tex(PaintLegs(who, look, skin.HeadInfo, out legsNote), 512, false, 512)), 0.12f, false));
                 }
                 return skin;
             }
