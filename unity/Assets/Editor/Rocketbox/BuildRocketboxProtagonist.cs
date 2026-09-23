@@ -315,6 +315,7 @@ namespace HalfAware.EditorTools.Rocketbox
             var ms = new List<Material> { body, head, skin.Hair };
             if (skin.Chest != null) ms.Add(skin.Chest);
             if (skin.Legs != null) ms.Add(skin.Legs);
+            if (skin.Dress != null) ms.Add(skin.Dress);
             return ms.ToArray();
         }
 
@@ -355,6 +356,8 @@ namespace HalfAware.EditorTools.Rocketbox
             public Material Legs;
             /// <summary>胸元を体の人の頭の面で作るとき: 体の人の頭のテクスチャ（肌を顔の人の肌に揃えた物）</summary>
             public Material Chest;
+            /// <summary>一から作るワンピース（<see cref="RocketboxDress"/>）</summary>
+            public Material Dress;
             /// <summary>顎の骨の左右の倍率（<see cref="RocketboxPaint.Look.JawScale"/>）</summary>
             public float JawScale = 1f;
             /// <summary>形の手入れ（目・瞼・鼻・顎の骨）に使う見た目（<see cref="ShapeFace"/>）</summary>
@@ -443,6 +446,7 @@ namespace HalfAware.EditorTools.Rocketbox
                 SaveMaterial(Lit("Legs", Load(dir + "Legs.png"), 0.12f, false), dir + "Legs.mat");
                 sb.AppendLine("膝から下の肌: " + legsNote);
             }
+            if (who.MadeDress) SaveMaterial(RocketboxDress.Plain(), dir + "Dress.mat");
             if (who.ChestFromBody)
             {
                 string chestNote;
@@ -610,11 +614,14 @@ namespace HalfAware.EditorTools.Rocketbox
                 Lash = AssetDatabase.LoadAssetAtPath<Material>(dir + "Lash.mat"),
                 Legs = AssetDatabase.LoadAssetAtPath<Material>(dir + "Legs.mat"),
                 Chest = AssetDatabase.LoadAssetAtPath<Material>(dir + "Chest.mat"),
+                Dress = AssetDatabase.LoadAssetAtPath<Material>(dir + "Dress.mat"),
             };
             if (s.Body == null || s.Head == null || s.Hair == null) return null;
             if (who.IsHairSwap && (s.Shell == null || s.Lash == null)) return null;
             if (who.LegsFrom != null && s.Legs == null) return null;
             if (who.ChestFromBody && s.Chest == null) return null;
+            if (who.MadeDress && s.Dress == null) return null;
+            if (!who.MadeDress) s.Dress = null;
             if (!who.ChestFromBody) s.Chest = null;
             if (twinHead && s.HeadTwin == null) return null;
             return s;
@@ -662,6 +669,7 @@ namespace HalfAware.EditorTools.Rocketbox
                     string legsNote;
                     skin.Legs = Keep(skin, Lit("Legs", Keep(skin, Tex(PaintLegs(who, look, skin.HeadInfo, out legsNote), 512, false, 512)), 0.12f, false));
                 }
+                if (who.MadeDress) skin.Dress = Keep(skin, RocketboxDress.Plain());
                 if (who.ChestFromBody)
                 {
                     string chestNote;

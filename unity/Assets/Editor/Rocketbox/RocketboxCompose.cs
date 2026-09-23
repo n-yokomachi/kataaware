@@ -146,12 +146,22 @@ namespace HalfAware.EditorTools.Rocketbox
             var bWeights = bm.boneWeights;
             var hWeights = hm.boneWeights;
             var bodyAll = bm.GetTriangles(bodySub);
-            int[] legsOut = null;
-            string legsNote = null;
+            int[] legsOut = null, dressOut = null;
+            string legsNote = null, dressNote = null;
             if (who.LegsFrom != null)
             {
                 bodyAll = Above(bodyAll, bw, who.LegsCut);
                 legsOut = Legs(who, bodySmr, bw, bodyAll, verts, norms, uvs, weights, out legsNote);
+            }
+            if (who.MadeDress)
+            {
+                // 一から作るワンピース: 体の人の体の面と頭の面（首から下）を型にする。体の人の面は、袖口より先の腕と手だけを残す
+                var templ = new List<int>(bm.GetTriangles(bodySub));
+                templ.AddRange(bm.GetTriangles(bodySkinSub));
+                var bnw = new Vector3[bNorm.Length];
+                for (var i = 0; i < bnw.Length; i++) bnw[i] = bodyToWorld.MultiplyVector(bNorm[i]).normalized;
+                dressOut = RocketboxDress.Build(bodySmr, templ.ToArray(), bw, bnw, bWeights, verts, norms, uvs, weights, out dressNote);
+                bodyAll = RocketboxDress.KeepArms(RocketboxDress.Frame.Of(bodySmr), bodyAll, bw);
             }
             var bodyTris = Pack(bodyAll, i => bv[i], i => bNorm[i], i => bUv[i], i => bWeights[i], verts, norms, uvs, weights);
             Func<int, BoneWeight> hwOf = i =>
@@ -253,12 +263,14 @@ namespace HalfAware.EditorTools.Rocketbox
             mesh.SetUVs(0, uvs);
             mesh.boneWeights = weights.ToArray();
             mesh.bindposes = bm.bindposes;
-            mesh.subMeshCount = 3 + (chestTris != null ? 1 : 0) + (legsOut != null ? 1 : 0);
+            mesh.subMeshCount = 3 + (chestTris != null ? 1 : 0) + (legsOut != null ? 1 : 0) + (dressOut != null ? 1 : 0);
             mesh.SetTriangles(bodyTris, 0);
             mesh.SetTriangles(headTris, 1);
             mesh.SetTriangles(hairTris, 2);
-            if (chestTris != null) mesh.SetTriangles(chestTris, 3);
-            if (legsOut != null) mesh.SetTriangles(legsOut, chestTris != null ? 4 : 3);
+            var nextSub = 3;
+            if (chestTris != null) mesh.SetTriangles(chestTris, nextSub++);
+            if (legsOut != null) mesh.SetTriangles(legsOut, nextSub++);
+            if (dressOut != null) mesh.SetTriangles(dressOut, nextSub++);
             mesh.RecalculateBounds();
             Save(mesh, who.CompositeMesh);
 
@@ -271,7 +283,7 @@ namespace HalfAware.EditorTools.Rocketbox
                 "胸元を体の人の肌の三角で埋めた数 {17}\n{15}\n書いた所: {16}",
                 who, verts.Count, (bodyTris.Length + headTris.Length + hairTris.Length) / 3, bodyTris.Length / 3, headTris.Length / 3, hairTris.Length / 3,
                 snapped, maxSnap * 1000f, pushedIn, maxIn * 1000f, hairInside, worstHair * 1000f, pushedOut, HairOver * 1000f, maxOut * 1000f,
-                seam, who.CompositeMesh, patch.Count / 3) + (legsNote != null ? "\n" + legsNote : "");
+                seam, who.CompositeMesh, patch.Count / 3) + (legsNote != null ? "\n" + legsNote : "") + (dressNote != null ? "\n" + dressNote : "");
         }
 
         /// <summary>位置の 0.2 mm ごとの鍵（UV の継ぎ目で分かれた同じ位置の頂点を一つに見る）</summary>
@@ -342,6 +354,8 @@ namespace HalfAware.EditorTools.Rocketbox
             var moved = (Vector3[])lw.Clone();
             int pulled = 0;
             float maxPull = 0f;
+            // 一から作るワンピースの人は細めない（膝から下を借りるだけ）
+            if (!who.MadeDress)
             foreach (var i in new HashSet<int>(legTris))
             {
                 var p = lw[i];

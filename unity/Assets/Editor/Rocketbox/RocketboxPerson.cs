@@ -62,6 +62,8 @@ namespace HalfAware.EditorTools.Rocketbox
         /// 女大 10 では長衣の肩掛けの裾（腰の高さに垂れる）を除く
         /// </summary>
         public System.Func<Vector2, Vector3, bool> LegsKeep;
+        /// <summary>一から作るワンピースを着せる（<see cref="RocketboxDress"/>）。体の人の面は袖口より先の腕と手だけを残す</summary>
+        public bool MadeDress;
         /// <summary>この人の腰から下を借りるとき、左右の脚に分かれて付いた布を、真ん中（左右 SkirtJoin m 以内）で両方の脚に半分ずつ付け直す（スカートが歩きで二つに割れないように）</summary>
         public float SkirtJoin;
 
@@ -329,6 +331,29 @@ namespace HalfAware.EditorTools.Rocketbox
             k.naturalHair = true;
         }
 
+        /// <summary>
+        /// 片割れの候補（U）: 女大 14 の顔と髪（茶）に、一から作った生成りのワンピース（<see cref="RocketboxDress"/>）を着せた人。
+        /// 腕と手は女大 18、膝から下は女大 19（Party_02）の素足と紐のサンダル
+        /// </summary>
+        public static readonly RocketboxPerson Face14Hair14MadeDress =
+            Legs(MadeDressOn(Dress(Compose("Face14_Hair14_MadeDress", "女大 14 の顔と髪、一から作ったワンピース（片割れの候補）", Adult14, Party01), OutfitMadeDress)), Party02, 0.50f);
+
+        static RocketboxPerson MadeDressOn(RocketboxPerson p)
+        {
+            p.MadeDress = true;
+            return p;
+        }
+
+        /// <summary>U の服: 胸元（女大 14 の頭の面の中のトップスとネックレス）は肌で塗り、腕と脚の肌を頭の肌に揃える。髪は 14 の元の茶</summary>
+        static void OutfitMadeDress(RocketboxPaint.Look k)
+        {
+            k.blackenKnit = false;
+            k.shirt = false;
+            k.chestSkin = true;
+            k.matchSkinAll = true;
+            k.naturalHair = true;
+        }
+
         /// <summary>主人公の候補: 女大 14 の顔と髪（14 の元の頭そのまま。額の上の前髪の塊も元の形）。服は今の主人公と同じ</summary>
         public static readonly RocketboxPerson Face14Hair14 =
             Dress(Compose("Face14_Hair14", "女大 14 の顔と髪（主人公の候補、服は今の主人公）", Adult14, Adult14), OutfitProtagonist);
@@ -407,7 +432,7 @@ namespace HalfAware.EditorTools.Rocketbox
         /// <summary>手を入れて撮り比べる人の全部</summary>
         public static readonly RocketboxPerson[] All = { Adult14, Adult08, Head08Body14, Face14Hair08, Face14Hair08Body03, Face14Hair08Body02, Face14Hair08Body11, Face14Hair08Body11Legs22,
             Face14Hair08BodySports02, FaceSports02Hair08, FaceSports02Hair08Body14, Face14Hair14, Face14Hair14BodySports02, Face14Hair14Twin, FaceSports02Hair14,
-            Face14Hair14Body18Robe10 };
+            Face14Hair14Body18Robe10, Face14Hair14MadeDress };
 
         /// <summary>取り込んだ一人（元の FBX とテクスチャを持つ人）</summary>
         public static readonly RocketboxPerson[] Sources = { Adult14, Adult08, Adult03, Adult02, Adult11, Party02, Sports02, Adult10, Party01 };
