@@ -23,6 +23,8 @@ namespace HalfAware.EditorTools.Rocketbox
         public const float NeckDropFront = 0.04f, NeckDropSide = 0.015f, NeckDropBack = 0.025f;
         /// <summary>胴の面を型から外へ出す量</summary>
         public const float BodiceOffset = 0.005f;
+        /// <summary>胴の面をならすとき、型の面から離しておく最小の量（型の段をならすため、出す量より小さい）</summary>
+        public const float BodiceMin = 0.0025f;
         /// <summary>腰の切り替えの高さ（腰の骨から上へ）</summary>
         public const float WaistAbovePelvis = 0.09f;
         /// <summary>胴の面が上腕を覆う長さ（上腕の長さの割合。袖の付け根の下に隠れる）</summary>
@@ -84,12 +86,27 @@ namespace HalfAware.EditorTools.Rocketbox
         }
 
         /// <summary>胴の面を残す所の値（正で残す）: 襟ぐりより下、腰の切り替えより上、上腕の付け根より体の側</summary>
-        static float Keep(Frame f, Vector3 p, int armSide)
+        /// <summary>
+        /// 襟ぐりの内側（服が覆う側）が正の値（m）。首の付け根からの下がり（前・横・後ろ）より下か、首の軸から横へ（首の太さ + 向きごとのゆとり）より外なら覆う。
+        /// 高さだけで決めると、横で肩の上の首の付け根（僧帽筋）が襟ぐりより上に出て、肌が服の外に残った
+        /// </summary>
+        public static float Neck(Frame f, Vector3 p)
         {
-            var th = Mathf.Atan2(p.x, p.z - f.neckZ);
+            var dz = p.z - f.neckZ;
+            var th = Mathf.Atan2(p.x, dz);
             var c = Mathf.Cos(th);
             var drop = c >= 0f ? Mathf.Lerp(NeckDropSide, NeckDropFront, c * c) : Mathf.Lerp(NeckDropSide, NeckDropBack, c * c);
-            var g = (f.neckY - drop) - p.y;
+            var margin = c >= 0f ? Mathf.Lerp(NeckMarginSide, NeckMarginFront, c * c) : Mathf.Lerp(NeckMarginSide, NeckMarginBack, c * c);
+            var radial = new Vector2(p.x, dz).magnitude - (NeckRadius + margin);
+            return Mathf.Max((f.neckY - drop) - p.y, p.y < f.neckY + 0.03f ? radial : -1f);
+        }
+
+        /// <summary>首の太さ（首の骨の軸から肌まで）と、襟ぐりの横へのゆとり（前・横・後ろ）</summary>
+        public const float NeckRadius = 0.058f, NeckMarginFront = 0.12f, NeckMarginSide = 0.02f, NeckMarginBack = 0.03f;
+
+        static float Keep(Frame f, Vector3 p, int armSide)
+        {
+            var g = Neck(f, p);
             g = Mathf.Min(g, p.y - (f.waistY - 0.012f));
             for (var side = 0; side < 2; side++)
             {
@@ -98,6 +115,12 @@ namespace HalfAware.EditorTools.Rocketbox
                 if (f.Arm(p, side, out t, out perp) || armSide == side) g = Mathf.Min(g, (CapT - t) * f.UpperArmLength(side));
             }
             return g;
+        }
+
+        /// <summary>頭の人の面で、服の下に隠れる所（襟ぐりより 5 mm 内）</summary>
+        public static bool UnderDress(Frame f, Vector3 p)
+        {
+            return Neck(f, p) > 0.005f;
         }
 
         /// <summary>体の人の面のうち、服の外に出る所（袖口より先の腕と手）だけを残す。袖の中へ 3 cm 重ねる</summary>
@@ -143,11 +166,15 @@ namespace HalfAware.EditorTools.Rocketbox
                 if (!(n.Contains("UpperArm") || n.Contains("Forearm") || n.Contains("Hand") || n.Contains("Finger"))) continue;
                 armBones[kv.Value] = n.Contains(" L ") ? 0 : 1;
             }
+            int headBone;
+            f.bone.TryGetValue("Bip01 Head", out headBone);
             var g = new Dictionary<int, float>();
             foreach (var i in new HashSet<int>(templ))
             {
                 int side;
                 g[i] = Keep(f, bw[i], armBones.TryGetValue(bwts[i].boneIndex0, out side) ? side : -1);
+                // 頭の骨に付いた面（体の人の髪の殻。女大 18 は肩までの髪で、首の後ろへ垂れている）は型にしない
+                if (bwts[i].boneIndex0 == headBone && bwts[i].weight0 > 0.5f) g[i] = Mathf.Min(g[i], -0.001f);
             }
             // 同じ位置の頂点（UV の継ぎ目で分かれた物）は同じ法線で出す
             var nsum = new Dictionary<long, Vector3>();
@@ -215,8 +242,34 @@ namespace HalfAware.EditorTools.Rocketbox
                 clipped++;
             }
             var bodiceVerts = verts.Count - bodiceStart;
-            // 型の段（キャミソールの縁の厚みなど）をならす: となりの頂点の平均へ 10 回寄せ、型の面から BodiceOffset より内へは入れない
+            // 型の段（キャミソールの縁の厚みなど）をならす: となりの頂点の平均へ 30 回寄せ、型の面から BodiceMin より内へは入れない
             SmoothBodice(bodiceStart, verts.Count, outTris, bodPos, templ, bw, toLocal, verts, norms);
+            // 胴の UV は腰のまわりの向き。背中の真ん中で 0 と 1 がつながるので、またぐ三角の小さい側の頂点を写し、右へ BodiceU だけずらす
+            var wrapCopy = new Dictionary<int, int>();
+            var wrapped = 0;
+            for (var t = 0; t < outTris.Count; t += 3)
+            {
+                float lo = float.MaxValue, hi = float.MinValue;
+                for (var e = 0; e < 3; e++) { var u = uvs[outTris[t + e]].x; lo = Mathf.Min(lo, u); hi = Mathf.Max(hi, u); }
+                if (hi - lo < BodiceU * 0.5f) continue;
+                for (var e = 0; e < 3; e++)
+                {
+                    var i = outTris[t + e];
+                    if (uvs[i].x >= BodiceU * 0.5f) continue;
+                    int c;
+                    if (!wrapCopy.TryGetValue(i, out c))
+                    {
+                        verts.Add(verts[i]);
+                        norms.Add(norms[i]);
+                        uvs.Add(new Vector2(uvs[i].x + BodiceU, uvs[i].y));
+                        weights.Add(weights[i]);
+                        c = verts.Count - 1;
+                        wrapCopy[i] = c;
+                    }
+                    outTris[t + e] = c;
+                }
+                wrapped++;
+            }
 
             // ---- 袖 ----
             var sleeveTris = 0;
@@ -284,7 +337,7 @@ namespace HalfAware.EditorTools.Rocketbox
             var pos = new Vector3[count];
             for (var i = 0; i < count; i++) pos[i] = bodPos[rep[i]];
             var surf = new RocketboxCompose.Surface(bw, templ);
-            for (var it = 0; it < 10; it++)
+            for (var it = 0; it < 30; it++)
             {
                 var next = (Vector3[])pos.Clone();
                 foreach (var kv in nb)
@@ -296,7 +349,7 @@ namespace HalfAware.EditorTools.Rocketbox
                     var p = Vector3.Lerp(pos[kv.Key], avg, 0.5f);
                     Vector3 q, n;
                     var d = surf.Signed(p, 0.03f, out q, out n);
-                    if (!float.IsNaN(d) && d < BodiceOffset) p += n * (BodiceOffset - d);
+                    if (!float.IsNaN(d) && d < BodiceMin) p += n * (BodiceMin - d);
                     next[kv.Key] = p;
                 }
                 pos = next;
@@ -336,24 +389,27 @@ namespace HalfAware.EditorTools.Rocketbox
             var chest = new Vector3(0f, s.y - 0.05f, s.z);
             var inner = Vector3.ProjectOnPlane(chest - s, a).normalized;
             var side2 = Vector3.Cross(a, inner).normalized;
-            // 腕の太さ（向きごと、付け根から袖口までの一番太い所）
-            var rArm = new float[SleeveSegs];
+            // 腕の太さ（輪ごと・向きごと。輪の上下 4 % の間の一番太い所）。付け根では肩の丸みに沿い、そこから下は太い所を下へ持ち越す
+            var rRing = new float[SleeveRings + 1, SleeveSegs];
             foreach (var i in new HashSet<int>(templ))
             {
                 float t, perp;
-                if (!f.Arm(bw[i], side, out t, out perp) || t < SleeveT0 || t > SleeveT1 + 0.05f) continue;
+                if (!f.Arm(bw[i], side, out t, out perp) || t < SleeveT0 - 0.04f || t > SleeveT1 + 0.05f) continue;
                 var v = Vector3.ProjectOnPlane(bw[i] - s, a);
                 var ang = Mathf.Atan2(Vector3.Dot(v, side2), Vector3.Dot(v, inner));
                 var k = ((int)Mathf.Round((ang + Mathf.PI) / (2f * Mathf.PI) * SleeveSegs)) % SleeveSegs;
-                rArm[k] = Mathf.Max(rArm[k], perp);
+                for (var j = 0; j <= SleeveRings; j++)
+                    if (Mathf.Abs(t - Mathf.Lerp(SleeveT0, SleeveT1, j / (float)SleeveRings)) < 0.06f) rRing[j, k] = Mathf.Max(rRing[j, k], perp);
             }
-            for (var pass = 0; pass < SleeveSegs; pass++)
-                for (var k = 0; k < SleeveSegs; k++)
-                    if (rArm[k] <= 0f) rArm[k] = Mathf.Max(rArm[(k + SleeveSegs - 1) % SleeveSegs], rArm[(k + 1) % SleeveSegs]);
-            // 平らにならす（一番太い所だけが出っ張らないように）
-            var sm = new float[SleeveSegs];
-            for (var k = 0; k < SleeveSegs; k++) sm[k] = Mathf.Max(rArm[k], (rArm[(k + SleeveSegs - 1) % SleeveSegs] + rArm[k] + rArm[(k + 1) % SleeveSegs]) / 3f);
-            rArm = sm;
+            for (var j = 0; j <= SleeveRings; j++)
+            {
+                for (var pass = 0; pass < SleeveSegs; pass++)
+                    for (var k = 0; k < SleeveSegs; k++)
+                        if (rRing[j, k] <= 0f) rRing[j, k] = Mathf.Max(rRing[j, (k + SleeveSegs - 1) % SleeveSegs], rRing[j, (k + 1) % SleeveSegs]);
+                var sm = new float[SleeveSegs];
+                for (var k = 0; k < SleeveSegs; k++) sm[k] = Mathf.Max(rRing[j, k], (rRing[j, (k + SleeveSegs - 1) % SleeveSegs] + rRing[j, k] + rRing[j, (k + 1) % SleeveSegs]) / 3f);
+                for (var k = 0; k < SleeveSegs; k++) rRing[j, k] = j > 0 ? Mathf.Max(sm[k], rRing[j - 1, k] - 0.004f) : sm[k];
+            }
             int upper, clav;
             f.bone.TryGetValue(side == 0 ? "Bip01 L UpperArm" : "Bip01 R UpperArm", out upper);
             f.bone.TryGetValue(side == 0 ? "Bip01 L Clavicle" : "Bip01 R Clavicle", out clav);
@@ -370,7 +426,7 @@ namespace HalfAware.EditorTools.Rocketbox
                     var dir = Mathf.Cos(ang) * inner + Mathf.Sin(ang) * side2;
                     // 体の側（ang 0）は狭く、外の側（ang ±π）ほど広げる
                     var outer = 0.5f - 0.5f * Mathf.Cos(ang);
-                    var r = rArm[kk] + SleeveBase + SleeveFlare * Mathf.Pow(u, 1.3f) * (0.3f + 0.7f * outer);
+                    var r = rRing[j, kk] + SleeveBase * (0.8f + 0.2f * u) + SleeveFlare * Mathf.Pow(u, 1.3f) * (0.3f + 0.7f * outer);
                     pos[j, k] = s + a * (t * len) + dir * r;
                 }
             }
@@ -503,7 +559,157 @@ namespace HalfAware.EditorTools.Rocketbox
         {
             var th = Mathf.Atan2(p.x, p.z - f.zc);
             var v = Mathf.InverseLerp(f.waistY - 0.02f, f.neckY + 0.02f, p.y);
-            return new Vector2(0.5f * (th + Mathf.PI) / (2f * Mathf.PI), 0.5f + 0.5f * v);
+            return new Vector2(BodiceU * (th + Mathf.PI) / (2f * Mathf.PI), 0.5f + 0.5f * v);
+        }
+
+        /// <summary>胴の UV の幅（絵の左上。背中の真ん中をまたぐ三角は右へ BodiceU ずらして、0.47 までにはみ出す）</summary>
+        const float BodiceU = 0.45f;
+
+        // ---- 布の絵 -------------------------------------------------------------
+
+        /// <summary>生成りの布の色（sRGB）</summary>
+        public static readonly Color Cloth = new Color(0.87f, 0.83f, 0.74f);
+
+        /// <summary>
+        /// ワンピースの絵を描く（n×n）。組み合わせたメッシュのワンピースの面の組（一番後ろ）を UV に並べ、画素ごとの束ねた姿勢の位置から描く:
+        /// - 布の地: 画素ごとの細かい粒（±2 %）と、横と縦の糸のむら（麻の節）、大きなむら（±2 %）
+        /// - 縫い目: 脇（胴とスカート）、肩、襟ぐりの見返し（縁の陰と 9 mm 内の縫い線）、腰の切り替え、袖の付け根と袖口、裾の折り返し（1.8 cm 上の縫い線）
+        /// - 陰: 腰の切り替えのすぐ下（胴のかぶり）とギャザー、スカートの縦のひだ（形の波に合わせて山を明るく、谷を暗く）。
+        ///   胸の下の陰は、胸の真ん中の V の溝に見えたので描かない
+        /// </summary>
+        public static Color[] Paint(RocketboxPerson who, int n, out string note)
+        {
+            var bodySmr = AssetDatabase.LoadAssetAtPath<GameObject>(who.BodyFrom.Model).GetComponentInChildren<SkinnedMeshRenderer>();
+            var f = Frame.Of(bodySmr);
+            var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(who.CompositeMesh);
+            if (mesh == null) throw new InvalidOperationException("組み合わせたメッシュが無い: " + who.CompositeMesh);
+            var M = bodySmr.transform.localToWorldMatrix;
+            var lv = mesh.vertices;
+            var wv = new Vector3[lv.Length];
+            for (var i = 0; i < lv.Length; i++) wv[i] = M.MultiplyPoint3x4(lv[i]);
+            var s = RocketboxPaint.Surface.Of(wv, mesh.uv, mesh.GetTriangles(mesh.subMeshCount - 1), n);
+            var px = new Color[n * n];
+            var yTop = f.waistY + 0.012f;
+            var lin = new Vector3(Mathf.GammaToLinearSpace(Cloth.r), Mathf.GammaToLinearSpace(Cloth.g), Mathf.GammaToLinearSpace(Cloth.b));
+            int onCount = 0;
+            for (var y = 0; y < n; y++)
+                for (var x = 0; x < n; x++)
+                {
+                    var i = y * n + x;
+                    var u = (x + 0.5f) / n;
+                    var v = (y + 0.5f) / n;
+                    var shade = 1f;
+                    // 布の地
+                    shade += (Hash(x, y) - 0.5f) * 0.04f;
+                    shade += (Noise(x * 0.08f, y * 0.9f) - 0.5f) * 0.035f;
+                    shade += (Noise(x * 0.9f + 50f, y * 0.08f) - 0.5f) * 0.03f;
+                    shade += (Noise(x * 0.02f + 11f, y * 0.02f + 7f) - 0.5f) * 0.04f;
+                    if (s.On[i])
+                    {
+                        onCount++;
+                        var p = s.P[i];
+                        var skirt = v < 0.5f;
+                        var sleeve = !skirt && u >= 0.5f;
+                        var th = Mathf.Atan2(p.x, p.z - f.zc);
+                        var r = new Vector2(p.x, p.z - f.zc).magnitude;
+                        if (!sleeve)
+                        {
+                            // 脇の縫い目
+                            var side = Mathf.Min(Mathf.Abs(Wrap(th - Mathf.PI * 0.5f)), Mathf.Abs(Wrap(th + Mathf.PI * 0.5f))) * r;
+                            shade *= 1f - 0.14f * RocketboxPaint.Smooth(0.0035f, 0.0005f, side);
+                        }
+                        if (skirt)
+                        {
+                            var sk = Mathf.Clamp01((yTop - p.y) / (yTop - HemY));
+                            // 縦のひだ（形の波に合わせる）
+                            shade *= 1f + 0.08f * Mathf.Sin(Waves * th) * Mathf.Pow(sk, 1.3f);
+                            // 腰のすぐ下: 胴のかぶりの陰とギャザー
+                            var dT = yTop - p.y;
+                            shade *= 1f - 0.10f * RocketboxPaint.Smooth(0.015f, 0f, dT);
+                            shade *= 1f - 0.07f * RocketboxPaint.Smooth(0.08f, 0f, dT) * (0.5f + 0.5f * Mathf.Sin(th * 48f));
+                            // 裾の折り返し: 縁の陰と、1.8 cm 上の縫い線
+                            var dH = p.y - HemY;
+                            shade *= 1f - 0.10f * RocketboxPaint.Smooth(0.005f, 0f, dH);
+                            shade *= 1f - 0.12f * RocketboxPaint.Smooth(0.0025f, 0.0005f, Mathf.Abs(dH - 0.018f)) * Dash(th * r, 0.006f);
+                        }
+                        else if (!sleeve)
+                        {
+                            // 襟ぐり: 縁の陰と、9 mm 内の縫い線
+                            var tn = Mathf.Atan2(p.x, p.z - f.neckZ);
+                            var dN = Neck(f, p);
+                            shade *= 1f - 0.10f * RocketboxPaint.Smooth(0.005f, 0f, dN);
+                            shade *= 1f - 0.12f * RocketboxPaint.Smooth(0.0025f, 0.0005f, Mathf.Abs(dN - 0.009f)) * Dash(tn * 0.06f, 0.006f);
+                            // 肩の縫い目（首の外、肩の一番上）
+                            if (Mathf.Abs(p.x) > 0.06f && p.y > f.neckY - 0.10f)
+                                shade *= 1f - 0.12f * RocketboxPaint.Smooth(0.004f, 0.001f, Mathf.Abs(p.z - (f.neckZ + 0.012f)));
+                            // 腰の切り替え: 縁の陰と 8 mm 上の縫い線
+                            var dW = p.y - (f.waistY - 0.012f);
+                            shade *= 1f - 0.12f * RocketboxPaint.Smooth(0.006f, 0f, dW);
+                            shade *= 1f - 0.12f * RocketboxPaint.Smooth(0.0025f, 0.0005f, Mathf.Abs(dW - 0.010f)) * Dash(th * r, 0.006f);
+                        }
+                        else
+                        {
+                            // 袖: 付け根の縁と、袖口の折り返し
+                            var sideIdx = p.x < 0f ? 0 : 1;
+                            float t, perp;
+                            f.Arm(p, sideIdx, out t, out perp);
+                            var len = f.UpperArmLength(sideIdx);
+                            var dA = (t - SleeveT0) * len;
+                            shade *= 1f - 0.12f * RocketboxPaint.Smooth(0.006f, 0f, dA);
+                            var dC = (SleeveT1 - t) * len;
+                            shade *= 1f - 0.10f * RocketboxPaint.Smooth(0.005f, 0f, dC);
+                            shade *= 1f - 0.12f * RocketboxPaint.Smooth(0.0025f, 0.0005f, Mathf.Abs(dC - 0.015f)) * Dash(perp * Mathf.Atan2(p.z, p.y) , 0.006f);
+                        }
+                    }
+                    var col = lin * shade;
+                    px[i] = new Color(Mathf.LinearToGammaSpace(Mathf.Clamp01(col.x)), Mathf.LinearToGammaSpace(Mathf.Clamp01(col.y)), Mathf.LinearToGammaSpace(Mathf.Clamp01(col.z)), 1f);
+                }
+            note = string.Format(CultureInfo.InvariantCulture, "ワンピースの絵: {0}×{0}、布の画素 {1}、色 {2}", n, onCount, Cloth);
+            return px;
+        }
+
+        /// <summary>縫い線の点線（長さ period の半分が糸）</summary>
+        static float Dash(float along, float period)
+        {
+            var k = Mathf.Repeat(along / period, 1f);
+            return k < 0.55f ? 1f : 0.25f;
+        }
+
+        static float Wrap(float a)
+        {
+            while (a > Mathf.PI) a -= 2f * Mathf.PI;
+            while (a < -Mathf.PI) a += 2f * Mathf.PI;
+            return a;
+        }
+
+        static float Hash(int x, int y)
+        {
+            unchecked
+            {
+                var h = x * 374761393 + y * 668265263;
+                h = (h ^ (h >> 13)) * 1274126177;
+                return ((h ^ (h >> 16)) & 0xffff) / 65535f;
+            }
+        }
+
+        static float Noise(float x, float y)
+        {
+            var x0 = Mathf.FloorToInt(x);
+            var y0 = Mathf.FloorToInt(y);
+            float tx = x - x0, ty = y - y0;
+            tx = tx * tx * (3f - 2f * tx);
+            ty = ty * ty * (3f - 2f * ty);
+            var a = Mathf.Lerp(Hash(x0, y0), Hash(x0 + 1, y0), tx);
+            var b = Mathf.Lerp(Hash(x0, y0 + 1), Hash(x0 + 1, y0 + 1), tx);
+            return Mathf.Lerp(a, b, ty);
+        }
+
+        /// <summary>仕上げの段のマテリアル: 布の絵。スカートと袖の内側も見えるので両面を描く</summary>
+        public static Material Textured(Texture tex)
+        {
+            var m = BuildRocketboxProtagonist.Lit("Dress", tex, 0.08f, false);
+            m.SetFloat("_Cull", (float)CullMode.Off);
+            return m;
         }
 
         static int Add(List<Vector3> verts, List<Vector3> norms, List<Vector2> uvs, List<BoneWeight> weights, Matrix4x4 toLocal,

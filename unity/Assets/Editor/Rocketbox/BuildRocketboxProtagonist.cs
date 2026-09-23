@@ -446,7 +446,13 @@ namespace HalfAware.EditorTools.Rocketbox
                 SaveMaterial(Lit("Legs", Load(dir + "Legs.png"), 0.12f, false), dir + "Legs.mat");
                 sb.AppendLine("膝から下の肌: " + legsNote);
             }
-            if (who.MadeDress) SaveMaterial(RocketboxDress.Plain(), dir + "Dress.mat");
+            if (who.MadeDress)
+            {
+                string dressNote;
+                WritePainted(RocketboxDress.Paint(who, 512, out dressNote), 512, dir + "Dress.png", false, 512);
+                SaveMaterial(RocketboxDress.Textured(Load(dir + "Dress.png")), dir + "Dress.mat");
+                sb.AppendLine(dressNote);
+            }
             if (who.ChestFromBody)
             {
                 string chestNote;
@@ -669,7 +675,11 @@ namespace HalfAware.EditorTools.Rocketbox
                     string legsNote;
                     skin.Legs = Keep(skin, Lit("Legs", Keep(skin, Tex(PaintLegs(who, look, skin.HeadInfo, out legsNote), 512, false, 512)), 0.12f, false));
                 }
-                if (who.MadeDress) skin.Dress = Keep(skin, RocketboxDress.Plain());
+                if (who.MadeDress)
+                {
+                    string dressNote;
+                    skin.Dress = Keep(skin, RocketboxDress.Textured(Keep(skin, Tex(RocketboxDress.Paint(who, 512, out dressNote), 512, false, 512))));
+                }
                 if (who.ChestFromBody)
                 {
                     string chestNote;

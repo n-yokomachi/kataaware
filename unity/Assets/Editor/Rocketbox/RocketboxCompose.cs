@@ -106,6 +106,8 @@ namespace HalfAware.EditorTools.Rocketbox
                     continue;
                 }
                 if (p.y > eyeY - 0.08f) continue;
+                // 一から作るワンピースの人: 首の付け根は服の襟ぐりが覆うので、体の人の肌へ寄せない（体の人の頭の面の髪の殻へ寄せると、首の両脇に塊が出た）
+                if (who.MadeDress) continue;
                 var wh = RocketboxPaint.Smooth(eyeY - SnapFrom, eyeY - SnapTo, p.y);
                 var near = float.MaxValue;
                 foreach (var e in neckline) near = Mathf.Min(near, Vector3.Distance(e, p));
@@ -191,6 +193,22 @@ namespace HalfAware.EditorTools.Rocketbox
                 }
                 headAllTris = keepTris.ToArray();
             }
+            // 一から作るワンピースの人: 頭の人の面のうち、襟ぐりより 5 mm 下（服の下）と、首より外の肩の面を除く
+            // （14 の頭の面は肩の上まで続き、18 の肩より高いので、首の両脇に肌の塊が服の外へ出た）
+            if (who.MadeDress)
+            {
+                var df = RocketboxDress.Frame.Of(bodySmr);
+                var keepTris = new List<int>();
+                for (var t = 0; t < headAllTris.Length; t += 3)
+                {
+                    var c = (moved[headAllTris[t]] + moved[headAllTris[t + 1]] + moved[headAllTris[t + 2]]) / 3f;
+                    if (RocketboxDress.UnderDress(df, c)) continue;
+                    keepTris.Add(headAllTris[t]);
+                    keepTris.Add(headAllTris[t + 1]);
+                    keepTris.Add(headAllTris[t + 2]);
+                }
+                headAllTris = keepTris.ToArray();
+            }
             var headTris = Pack(headAllTris, i => headLocal[i], i => worldToBody.MultiplyVector(headToWorld.MultiplyVector(hNorm[i])).normalized, i => huv[i], hwOf, verts, norms, uvs, weights);
 
             // 胸元（ChestFromBody）: 体の人の頭の面のうち、首の付け根から 1.5 cm 上より下の三角を体の人の UV のまま使う。重なる帯は 1 mm 内側へ
@@ -225,7 +243,7 @@ namespace HalfAware.EditorTools.Rocketbox
             {
                 Vector3 v0 = bw[skinTris[t]], v1 = bw[skinTris[t + 1]], v2 = bw[skinTris[t + 2]];
                 var c = (v0 + v1 + v2) / 3f;
-                if (who.ChestFromBody || c.y > eyeY - 0.12f || c.z < neckZ + 0.03f) continue;
+                if (who.ChestFromBody || who.MadeDress || c.y > eyeY - 0.12f || c.z < neckZ + 0.03f) continue;
                 // 三角の頂点・辺の中点・重心のどこかが頭の人の肌から 1.2 mm より離れていれば、覆われていない所がある
                 var open = false;
                 foreach (var pt in new[] { v0, v1, v2, (v0 + v1) * 0.5f, (v1 + v2) * 0.5f, (v2 + v0) * 0.5f, c })
