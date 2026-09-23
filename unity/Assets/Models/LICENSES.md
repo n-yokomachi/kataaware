@@ -80,9 +80,9 @@ Beach・Farmer はこの街に合わないので入れていない。
 
 ## Microsoft Rocketbox について
 
-主人公と片割れの体と顔は、Microsoft Rocketbox Avatar Library の `Female_Adult_14`（一覧の番号で「女大 14」）から作った。`Female_Adult_08`（女大 08）も、撮り比べのために同じ扱いで入れてある。
+主人公と片割れの顔と主人公の体は、Microsoft Rocketbox Avatar Library の `Female_Adult_14`（一覧の番号で「女大 14」）から、髪は `Female_Adult_08`（女大 08）から作った。片割れの体は `Female_Adult_03`（女大 03）の体を借りた（頭のテクスチャは落としていない）。
 
-- 出どころ: https://github.com/microsoft/Microsoft-Rocketbox の `Assets/Avatars/Adults/Female_Adult_14/` と `Assets/Avatars/Adults/Female_Adult_08/`（どちらも 2026-09-23 に落とした）
+- 出どころ: https://github.com/microsoft/Microsoft-Rocketbox の `Assets/Avatars/Adults/Female_Adult_14/`、`Assets/Avatars/Adults/Female_Adult_08/`、`Assets/Avatars/Adults/Female_Adult_03/`（どれも 2026-09-23 に落とした）
 - 許諾: MIT License（同じリポジトリの `LICENSE.md`）。配るものには下の著作権の表示と許諾の文を添える
 
 ```
@@ -121,8 +121,11 @@ SOFTWARE.
 | `f008_head_color.tga`（2048） | `rocketbox/Female_Adult_08/f008_head_color.png`（512 に縮めた写し） |
 | `f008_body_color.tga`（2048） | `rocketbox/Female_Adult_08/f008_body_color.png`（512 に縮めた写し） |
 | `f008_opacity_color.tga`（2048） | `rocketbox/Female_Adult_08/f008_opacity_color.png`（512 に縮めた写し） |
+| `Female_Adult_03.fbx`（0.8 MB） | `rocketbox/Female_Adult_03/Female_Adult_03.fbx`。手を加えずに写した |
+| `f003_body_color.tga`（2048、服・腕と肩・手・靴） | `rocketbox/Female_Adult_03/f003_body_color.png`（512 に縮めた写し） |
+| `f003_opacity_color.tga`（2048） | `rocketbox/Female_Adult_03/f003_opacity_color.png`（512 に縮めた写し） |
 
 - 縮めた写しは `Assets/Editor/Rocketbox/RocketboxTextures.cs`（メニューの HalfAware/Rocketbox/Shrink the textures。人は `RocketboxPerson.cs` に並べてある）で、元の TGA から作り直せる。線形の光で 4×4 を平均し、透けのある絵は α で重みを付けた
-- 人ごとの `Painted/` は、縮めた写しに組み立ての手順（`Assets/Editor/Rocketbox/RocketboxPaint.cs`）で手を入れた物。髪を黒に、目の下に黒子、顔に控えめな手入れ。女大 14 はカーディガンも黒にした。女大 08 の服と、どちらの目も元の色のまま
+- 人ごとの `Painted/` は、縮めた写しに組み立ての手順（`Assets/Editor/Rocketbox/RocketboxPaint.cs`）で手を入れた物。髪を黒に、目の下に黒子、顔に控えめな手入れ。女大 14 はカーディガンも黒にした。女大 08 の服と、どちらの目も元の色のまま。片割れ（`Face14_Hair08_Body03/Painted/`）は女大 03 のキャミソールとパンツを白にした
 - 法線と光沢のテクスチャ、付いてくる動き（3ds Max の形式で Unity では読めない）は落としていない
 - 取り込みの設定は `Assets/Editor/Rocketbox/RocketboxImport.cs` が `Assets/Models/rocketbox/` の下にだけ掛ける。Rocketbox に同梱の `FixRocketboxMaxImport.cs` はプロジェクトの全部の取り込みに掛かり、Quaternius の模型を取り込むたびに例外を出すので入れていない

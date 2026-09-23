@@ -48,6 +48,12 @@ namespace HalfAware.EditorTools.Rocketbox
             public Color shoeShadow = new Color(0.008f, 0.008f, 0.009f), shoeShine = new Color(0.100f, 0.098f, 0.100f);
             public bool recolourTop;
             public Color topShadow = new Color(0.035f, 0.035f, 0.038f), topShine = new Color(0.200f, 0.200f, 0.210f);
+            [Tooltip("パンツ: この高さ（m）より下（足首より上）は全部パンツ。その上は pantsHue の色の所だけ（負なら暗い所だけ）")]
+            public float pantsAllBelow = 0.84f;
+            public float pantsHue = 192f;
+            [Tooltip("中のトップス: 色相（度）とその幅、彩度の下限、明るさの上限、高さの範囲（m）、左右の幅（m、手首の輪を外す）")]
+            public float topHue = 20f, topHueWidth = 20f, topSatMin = 0.40f, topValMax = 0.27f;
+            public float topLow = 1.00f, topHigh = 1.55f, topHalfWidth = 0.30f;
 
             [Header("丸首のシャツ（頭のテクスチャの首から下の肌を、白い丸首のシャツとして塗る）")]
             public bool shirt;
@@ -56,6 +62,11 @@ namespace HalfAware.EditorTools.Rocketbox
             public float neckFront = 0.096f, neckBack = 0.072f;
             [Tooltip("襟ぐりの丸み。前の真ん中から横へ x（m）離れると、x² × この値だけ上がる")]
             public float neckRound = 6f;
+
+            [Tooltip("首から下の肌でない所（女大 14 の中のトップスとネックレス）を肌の色で塗る（胸元を見せる服の体に載せるとき）")]
+            public bool chestSkin;
+            [Tooltip("体の手の肌だけでなく、腕や肩の肌も頭の肌に揃える（肩や腕を出す服の体のとき）")]
+            public bool matchSkinAll;
 
             [Header("口")]
             [Tooltip("顎の骨（Bip01 MJaw）を閉じる向きへ回す角度（度）。元の模型は口が少し開いていて、斜めから歯が見える")]
@@ -435,6 +446,7 @@ namespace HalfAware.EditorTools.Rocketbox
 
             // 6b. 丸首のシャツ
             if (k.shirt) Shirt(px, s, a, k);
+            if (k.chestSkin) ChestSkin(px, s, a, hair);
 
             // 7. 虹彩は塗らない。印の絵のために、瞳の外から虹彩の縁までの輪だけを覚える
             var irisMask = new bool[n * n];
@@ -605,13 +617,17 @@ namespace HalfAware.EditorTools.Rocketbox
             {
                 if (!s.On[i]) { pants[i] = shoes[i] = top[i] = -1f; continue; }
                 var y = s.P[i].y;
-                // 脛から腿（カーディガンの裾より下）は全部デニム（明るい縫い目も含める）。腰はデニムの青だけ
-                var denim = HueNear(H[i] * 360f, 192f, 25f, 12f) * Band(S[i], 0.06f, 0.09f, 0.45f, 0.55f);
-                pants[i] = Smooth(0.10f, 0.14f, y) * Mathf.Max(Smooth(0.86f, 0.82f, y), denim * Smooth(1.00f, 0.95f, y));
+                // 脛から腿（上着の裾より下）は全部パンツ（明るい縫い目も含める）。腰はパンツの色（女大 14 はデニムの青、負なら暗い所）だけ
+                var cloth = k.pantsHue >= 0f
+                    ? HueNear(H[i] * 360f, k.pantsHue, 25f, 12f) * Band(S[i], 0.06f, 0.09f, 0.45f, 0.55f)
+                    : Smooth(0.34f, 0.26f, V[i]) * Smooth(0.30f, 0.22f, S[i]);
+                var ax = Mathf.Abs(s.P[i].x);
+                pants[i] = Smooth(0.10f, 0.14f, y) * Mathf.Max(Smooth(k.pantsAllBelow + 0.02f, k.pantsAllBelow - 0.02f, y), cloth * Smooth(1.00f, 0.95f, y) * Smooth(0.26f, 0.22f, ax));
                 shoes[i] = Smooth(0.18f, 0.15f, y) * (1f - pants[i]);
-                // 中のトップス: 胸の V の開きから見える、彩度の高い暗い茶（色相 0〜40 度・彩度 0.55〜0.8・明るさ 0.09〜0.15。ニットは彩度 0.18）
-                top[i] = Smooth(1.00f, 1.05f, y) * Smooth(1.55f, 1.50f, y) * HueNear(H[i] * 360f, 20f, 20f, 8f)
-                    * Smooth(0.35f, 0.45f, S[i]) * Smooth(0.30f, 0.24f, V[i]);
+                // 中のトップス: 色相と彩度と明るさで見分ける（女大 14 は胸の V の開きから見える、彩度の高い暗い茶。ニットは彩度 0.18）
+                top[i] = Smooth(k.topLow, k.topLow + 0.05f, y) * Smooth(k.topHigh, k.topHigh - 0.05f, y) * Smooth(k.topHalfWidth + 0.02f, k.topHalfWidth - 0.02f, ax)
+                    * HueNear(H[i] * 360f, k.topHue, k.topHueWidth, 8f)
+                    * Smooth(k.topSatMin - 0.05f, k.topSatMin + 0.05f, S[i]) * Smooth(k.topValMax + 0.03f, k.topValMax - 0.03f, V[i]);
             }
             if (k.recolourPants) Recolour(px, V, Spread(pants, n), k.pantsShadow, k.pantsShine);
             if (k.recolourShoes) Recolour(px, V, Spread(shoes, n), k.shoeShadow, k.shoeShine);
@@ -670,6 +686,70 @@ namespace HalfAware.EditorTools.Rocketbox
                 var c = k.shirtColour * (shade * rib);
                 c.a = px[i].a;
                 px[i] = Color.Lerp(px[i], c, w);
+            }
+        }
+
+        /// <summary>
+        /// 首の付け根（頭の骨から 8 cm 下）より下で肌でない所を、首元の肌の色で塗る。明暗は元の明るさの比から取る
+        /// </summary>
+        static void ChestSkin(Color[] px, Surface s, Anchors a, float[] hair)
+        {
+            var top = a.head.y - 0.08f;
+            Vector3 sum = Vector3.zero;
+            var cnt = 0;
+            var lums = new List<float>();
+            for (var i = 0; i < px.Length; i++)
+            {
+                if (!s.On[i] || hair[i] > 0.1f) continue;
+                var p = s.P[i];
+                if (p.y > top + 0.03f || p.y < top - 0.03f || p.z < a.head.z + 0.02f) continue;
+                if (SkinLike(px[i]) < 0.5f) continue;
+                sum += new Vector3(px[i].r, px[i].g, px[i].b);
+                lums.Add(Lum(px[i]));
+                cnt++;
+            }
+            if (cnt == 0) return;
+            var skin = sum / cnt;
+            lums.Sort();
+            var median = Mathf.Max(0.05f, lums[lums.Count / 2]);
+            var fill = new List<int>();
+            for (var i = 0; i < px.Length; i++)
+            {
+                if (!s.On[i] || hair[i] > 0.1f) continue;
+                var p = s.P[i];
+                var w = Smooth(top + 0.004f, top - 0.004f, p.y) * (1f - SkinLike(px[i]));
+                if (w <= 0f) continue;
+                var shade = Mathf.Clamp(Lum(px[i]) / median, 0.75f, 1.05f);
+                // 暗い服の明るさは肌より低いので、明暗は弱めに写す
+                shade = Mathf.Lerp(1f, shade, 0.3f);
+                var c = new Color(skin.x * shade, skin.y * shade, skin.z * shade, px[i].a);
+                px[i] = Color.Lerp(px[i], c, Mathf.Clamp01(w * 1.5f));
+                if (w > 0.05f) fill.Add(i);
+            }
+            // 塗った所を、まわりの肌からならす（となりの平均を 80 回）。一色のままだと、元の肌との境が角張った段に見えた
+            var n = s.N;
+            for (var it = 0; it < 80; it++)
+            {
+                var next = new Dictionary<int, Color>();
+                foreach (var i in fill)
+                {
+                    int x = i % n, y = i / n;
+                    var acc = new Color(0f, 0f, 0f, 0f);
+                    var cnt2 = 0;
+                    foreach (var j in new[] { x > 0 ? i - 1 : -1, x < n - 1 ? i + 1 : -1, y > 0 ? i - n : -1, y < n - 1 ? i + n : -1 })
+                    {
+                        if (j < 0 || !s.On[j]) continue;
+                        acc += px[j];
+                        cnt2++;
+                    }
+                    if (cnt2 > 0) next[i] = acc / cnt2;
+                }
+                foreach (var kv in next)
+                {
+                    var c = kv.Value;
+                    c.a = px[kv.Key].a;
+                    px[kv.Key] = c;
+                }
             }
         }
 
@@ -781,7 +861,7 @@ namespace HalfAware.EditorTools.Rocketbox
             for (var i = 0; i < body.Length; i++)
             {
                 if (!bodyMap.On[i]) continue;
-                if (Mathf.Abs(bodyMap.P[i].x) < 0.38f) continue;
+                if (!k.matchSkinAll && Mathf.Abs(bodyMap.P[i].x) < 0.38f) continue;
                 w[i] = SkinLike(body[i]);
                 if (w[i] < 0.5f) continue;
                 bs += Lin(body[i]);

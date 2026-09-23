@@ -46,8 +46,11 @@ namespace HalfAware.EditorTools.Rocketbox
 
         /// <summary>服の色（主人公）。<see cref="Look"/> の最後に掛ける。null なら体の人の服のまま</summary>
         public System.Action<RocketboxPaint.Look> Outfit;
-        /// <summary>服の色（片割れ）。<see cref="TwinLook"/> で、主人公の見た目の上に掛ける。null なら片割れも主人公と同じ服</summary>
-        public System.Action<RocketboxPaint.Look> TwinOutfit;
+        /// <summary>片割れにする人（顔と髪は同じで、体と服が違う）。null なら片割れも同じ人。片割れは模型ごと裏返して組み立てる</summary>
+        public RocketboxPerson TwinPerson;
+
+        /// <summary>頭のテクスチャを持つか（体だけ借りる人は頭のテクスチャを落としていない）</summary>
+        public bool HasHeadTexture = true;
 
         RocketboxPerson(string name, string prefix, string label, System.Action<RocketboxPaint.Look> tune)
         {
@@ -111,6 +114,17 @@ namespace HalfAware.EditorTools.Rocketbox
         public static readonly RocketboxPerson Head08Body14 = Compose("Head08_Body14", "女大 08 の頭と女大 14 の体", Adult08, Adult14);
 
         /// <summary>女大 14 の顔と体に、女大 08 の髪（長さと形ごと）を載せた人</summary>
+        /// <summary>
+        /// 女大 03。体だけを片割れに借りる（頭のテクスチャは落としていない）。服は紫のトップス（胴だけ、肩と腕は出ている）、暗い緑がかった黒のパンツ、紫の靴、手首に紫の輪。二の腕に竜の入れ墨
+        /// </summary>
+        public static readonly RocketboxPerson Adult03 = new RocketboxPerson("Female_Adult_03", "f003", "女大 03", k =>
+        {
+            k.blackenKnit = false;
+        })
+        {
+            HasHeadTexture = false,
+        };
+
         public static readonly RocketboxPerson Face14Hair08 = Dress(ComposeHair("Face14_Hair08", "女大 14 の顔と体に女大 08 の髪", Adult14, Adult08, Adult14),
             // 主人公: 都会のモード系。カーディガンと靴を黒、パンツは女大 14 の元のダークデニム、中は白い丸首のシャツ
             // （カーディガンの開きから見える胸の肌と、中のトップスを白く塗る）
@@ -124,34 +138,32 @@ namespace HalfAware.EditorTools.Rocketbox
                 k.topShadow = new Color(0.80f, 0.80f, 0.78f);
                 k.topShine = new Color(0.93f, 0.93f, 0.91f);
                 k.shirt = true;
-            },
-            // 片割れ: 田舎のアースカラー。カーディガンは女大 14 の元の生成りのまま、パンツをオリーブ、靴を茶の革、中のトップスをテラコッタ
-            k =>
-            {
-                k.blackenKnit = false;
-                k.recolourPants = true;
-                k.pantsShadow = new Color(0.085f, 0.085f, 0.045f);
-                k.pantsShine = new Color(0.420f, 0.400f, 0.250f);
-                k.recolourShoes = true;
-                k.shoeShadow = new Color(0.060f, 0.035f, 0.020f);
-                k.shoeShine = new Color(0.380f, 0.240f, 0.140f);
-                k.recolourTop = true;
-                k.topShadow = new Color(0.110f, 0.055f, 0.035f);
-                k.topShine = new Color(0.520f, 0.300f, 0.190f);
             });
 
-        static RocketboxPerson Dress(RocketboxPerson p, System.Action<RocketboxPaint.Look> self, System.Action<RocketboxPaint.Look> twin)
+        /// <summary>
+        /// 片割れ: 主人公と同じ顔（女大 14）と髪（女大 08）を、女大 03 の体に載せた人。模型ごと裏返して組み立てる。
+        /// 服の色は <see cref="Outfit03"/>
+        /// </summary>
+        public static readonly RocketboxPerson Face14Hair08Body03 = Twin(Face14Hair08,
+            Dress(ComposeHair("Face14_Hair08_Body03", "女大 14 の顔と女大 08 の髪を女大 03 の体に（片割れ）", Adult14, Adult08, Adult03), Outfit03));
+
+        static RocketboxPerson Dress(RocketboxPerson p, System.Action<RocketboxPaint.Look> self)
         {
             p.Outfit = self;
-            p.TwinOutfit = twin;
             return p;
         }
 
+        static RocketboxPerson Twin(RocketboxPerson self, RocketboxPerson twin)
+        {
+            self.TwinPerson = twin;
+            return twin;
+        }
+
         /// <summary>手を入れて撮り比べる人の全部</summary>
-        public static readonly RocketboxPerson[] All = { Adult14, Adult08, Head08Body14, Face14Hair08 };
+        public static readonly RocketboxPerson[] All = { Adult14, Adult08, Head08Body14, Face14Hair08, Face14Hair08Body03 };
 
         /// <summary>取り込んだ一人（元の FBX とテクスチャを持つ人）</summary>
-        public static readonly RocketboxPerson[] Sources = { Adult14, Adult08 };
+        public static readonly RocketboxPerson[] Sources = { Adult14, Adult08, Adult03 };
 
         public bool IsComposite { get { return FaceFrom != this || HairFrom != this || BodyFrom != this; } }
 
@@ -175,7 +187,15 @@ namespace HalfAware.EditorTools.Rocketbox
         /// <summary>手を入れたテクスチャとマテリアルの置き場（組み立てのたびに描き直す）</summary>
         public string Painted { get { return Dir + "Painted/"; } }
         /// <summary>元の TGA の名前（RawAssets の中）</summary>
-        public string[] RawTextures { get { return new[] { Prefix + "_head_color", Prefix + "_body_color", Prefix + "_opacity_color" }; } }
+        public string[] RawTextures
+        {
+            get
+            {
+                return HasHeadTexture
+                    ? new[] { Prefix + "_head_color", Prefix + "_body_color", Prefix + "_opacity_color" }
+                    : new[] { Prefix + "_body_color", Prefix + "_opacity_color" };
+            }
+        }
 
         /// <summary>FBX の中のマテリアルの名前（面の組は体・頭・透け）。組み合わせたメッシュは名前を持たず、面の組の順が体・頭・透け</summary>
         public string BodySlot { get { return BodyFrom.Prefix + "_body"; } }
@@ -208,12 +228,34 @@ namespace HalfAware.EditorTools.Rocketbox
             return own;
         }
 
-        /// <summary>片割れの見た目。主人公の見た目に <see cref="TwinOutfit"/> を掛ける（顔・髪・黒子は同じ。黒子は模型ごと裏返して右目の下へ）</summary>
-        public RocketboxPaint.Look TwinLook()
+        /// <summary>
+        /// 片割れ（女大 03 の体）の服。白いシャツと白いパンツ、ほかは女大 03 の元のまま。
+        /// 片割れの頭のテクスチャには丸首のシャツを塗らない（女大 03 の服の襟ぐりが首元の肌を見せる形のため）
+        /// </summary>
+        static void Outfit03(RocketboxPaint.Look k)
         {
-            var k = Look();
-            if (TwinOutfit != null) TwinOutfit(k);
-            return k;
+            k.blackenKnit = false;
+            k.shirt = false;
+            // 女大 03 は胸元と肩を見せるので、女大 14 の頭の胸元（中のトップスとネックレス）を肌で塗り、腕と肩の肌も頭の肌に揃える
+            k.chestSkin = true;
+            k.matchSkinAll = true;
+            // 胴の紫のトップス（手首の紫の輪と靴は元のまま）を白に
+            k.recolourTop = true;
+            k.topHue = 285f;
+            k.topHueWidth = 35f;
+            k.topSatMin = 0.20f;
+            k.topValMax = 1.01f;
+            k.topLow = 0.80f;
+            k.topHigh = 1.50f;
+            k.topHalfWidth = 0.24f;
+            k.topShadow = new Color(0.70f, 0.70f, 0.68f);
+            k.topShine = new Color(0.95f, 0.95f, 0.93f);
+            // 暗い緑がかった黒のパンツを白に（膝から下は全部、腰は暗い所だけ）
+            k.recolourPants = true;
+            k.pantsHue = -1f;
+            k.pantsAllBelow = 0.84f;
+            k.pantsShadow = new Color(0.64f, 0.64f, 0.62f);
+            k.pantsShine = new Color(0.93f, 0.93f, 0.91f);
         }
 
         public override string ToString() { return Label + "（" + Name + "）"; }

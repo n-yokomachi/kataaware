@@ -48,7 +48,8 @@ namespace HalfAware.EditorTools.Rocketbox
         /// </summary>
         public static GameObject Build(Transform parent, bool twin)
         {
-            return Build(parent, twin, Chosen);
+            // 片割れは、主人公と同じ顔と髪を別の体に載せた人（TwinPerson）を、模型ごと裏返して組み立てる
+            return Build(parent, twin, twin && Chosen.TwinPerson != null ? Chosen.TwinPerson : Chosen);
         }
 
         public static GameObject Build(Transform parent, bool twin, RocketboxPerson who)
@@ -90,7 +91,7 @@ namespace HalfAware.EditorTools.Rocketbox
                 smr.sharedMesh = mesh;
                 smr.name = who.Name;
             }
-            Dress(her, skin, twin, twin && mode == TwinMode.MoleOnly);
+            Dress(her, skin, twin && mode == TwinMode.MoleOnly);
             Shape(her, skin.JawScale, skin.JawClose);
             AddAnimator(her);
             return her;
@@ -119,10 +120,10 @@ namespace HalfAware.EditorTools.Rocketbox
             }
         }
 
-        static void Dress(GameObject her, Skin skin, bool twin, bool twinHead)
+        static void Dress(GameObject her, Skin skin, bool twinHead)
         {
             var head = twinHead && skin.HeadTwin != null ? skin.HeadTwin : skin.Head;
-            var body = twin && skin.BodyTwin != null ? skin.BodyTwin : skin.Body;
+            var body = skin.Body;
             foreach (var r in her.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
                 Material[] ms;
@@ -172,8 +173,6 @@ namespace HalfAware.EditorTools.Rocketbox
         {
             public readonly RocketboxPerson Person;
             public Material Body, Head, HeadTwin, Hair;
-            /// <summary>片割れの服（<see cref="RocketboxPerson.TwinOutfit"/> があるときだけ。無ければ片割れも <see cref="Body"/>）</summary>
-            public Material BodyTwin;
             /// <summary>顔と髪が別の人のとき: 髪の殻（髪の人の頭のテクスチャ）と、まつ毛（顔の人の透けの絵）</summary>
             public Material Shell, Lash;
             /// <summary>顎の骨の左右の倍率（<see cref="RocketboxPaint.Look.JawScale"/>）</summary>
@@ -243,16 +242,6 @@ namespace HalfAware.EditorTools.Rocketbox
                 bodyTex = Load(dir + "Body.png");
             }
             else bodyTex = Load(who.BodySrc);
-            if (who.TwinOutfit != null)
-            {
-                var tl = look.Clone();
-                who.TwinOutfit(tl);
-                string twinNote;
-                var twinPx = PaintBody(who, tl, maps, self, out twinNote);
-                WritePainted(twinPx ?? ToColors(RocketboxTextures.ReadPng(who.BodySrc, out n, out n)), 512, dir + "Body_twin.png", false, 512);
-                SaveMaterial(Lit("Body_twin", Load(dir + "Body_twin.png"), 0.12f, false), dir + "Body_twin.mat");
-                sb.AppendLine("片割れの服: " + dir + "Body_twin.png");
-            }
             var hair = RocketboxTextures.ReadPng(who.HairSrc, out n, out n);
             WritePainted(RocketboxPaint.Hair(ToColors(hair), look), n, dir + "Hair.png", true, 512);
             if (who.IsHairSwap)
@@ -362,7 +351,6 @@ namespace HalfAware.EditorTools.Rocketbox
             var s = new Skin(who)
             {
                 Body = AssetDatabase.LoadAssetAtPath<Material>(dir + "Body.mat"),
-                BodyTwin = AssetDatabase.LoadAssetAtPath<Material>(dir + "Body_twin.mat"),
                 Head = AssetDatabase.LoadAssetAtPath<Material>(dir + "Head_self.mat"),
                 HeadTwin = AssetDatabase.LoadAssetAtPath<Material>(dir + "Head_twin.mat"),
                 Hair = AssetDatabase.LoadAssetAtPath<Material>(dir + "Hair.mat"),
@@ -370,7 +358,6 @@ namespace HalfAware.EditorTools.Rocketbox
                 Lash = AssetDatabase.LoadAssetAtPath<Material>(dir + "Lash.mat"),
             };
             if (s.Body == null || s.Head == null || s.Hair == null) return null;
-            if (who.TwinOutfit != null && s.BodyTwin == null) return null;
             if (who.IsHairSwap && (s.Shell == null || s.Lash == null)) return null;
             if (twinHead && s.HeadTwin == null) return null;
             return s;
@@ -403,16 +390,6 @@ namespace HalfAware.EditorTools.Rocketbox
                 skin.SkinNote = skinNote;
                 if (body != null) skin.Body = Keep(skin, Lit("Body", Keep(skin, Tex(body, 512, false, 512)), 0.12f, false));
                 else skin.Body = Keep(skin, Lit("Body", Load(who.BodySrc), 0.12f, false));
-                if (who.TwinOutfit != null)
-                {
-                    var tl = look.Clone();
-                    who.TwinOutfit(tl);
-                    string twinNote;
-                    var twinBody = PaintBody(who, tl, maps, skin.HeadInfo, out twinNote);
-                    skin.BodyTwin = twinBody != null
-                        ? Keep(skin, Lit("Body_twin", Keep(skin, Tex(twinBody, 512, false, 512)), 0.12f, false))
-                        : Keep(skin, Lit("Body_twin", Load(who.BodySrc), 0.12f, false));
-                }
                 var hair = RocketboxPaint.Hair(ToColors(RocketboxTextures.ReadPng(who.HairSrc, out n, out n)), look);
                 skin.Hair = Keep(skin, Lit("Hair", Keep(skin, Tex(hair, n, true, 512)), 0.34f, true));
                 if (who.IsHairSwap)

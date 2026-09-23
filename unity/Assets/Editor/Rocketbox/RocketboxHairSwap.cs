@@ -67,6 +67,15 @@ namespace HalfAware.EditorTools.Rocketbox
 
             // 顔の人の頭の面を、顔の三角と髪の殻の三角に分ける（面は全部使う）
             var faceHead = fm.GetTriangles(Slot(faceSmr, who.FaceFrom.HeadSlot));
+            var eyeY = (a.eyeL.y + a.eyeR.y) * 0.5f;
+            // 体が別の人なら、首元の肌を体の人の肌と服に合わせる（頭の載せ替えと同じ直し）
+            string neckNote = null;
+            if (who.BodyFrom != who.FaceFrom)
+            {
+                var skinVerts = new List<int>();
+                foreach (var i in new HashSet<int>(faceHead)) if (HairAt(facePaint, fuv[i]) <= 0.5f) skinVerts.Add(i);
+                fw = RocketboxCompose.FitNeck(who.BodyFrom, fw, skinVerts, eyeY, out neckNote);
+            }
             var faceTris = new List<int>();
             var faceHairTris = new List<int>();
             for (var t = 0; t < faceHead.Length; t += 3)
@@ -240,6 +249,34 @@ namespace HalfAware.EditorTools.Rocketbox
             var bu = bm.uv;
             var bodyTris = Pack(bm.GetTriangles(Slot(bodySmr, who.BodyFrom.BodySlot)), i => toLocal.MultiplyPoint3x4(bw[i]), i => bn[i], i => bu[i], i => Re(bwts[i], bodyRemap), verts, norms, uvs, weights);
             var headTris = Pack(faceHead, i => toLocal.MultiplyPoint3x4(sunkPos[i]), i => fn[i], i => fuv[i], i => Re(fwts[i], faceRemap), verts, norms, uvs, weights);
+            var patchCount = 0;
+            if (who.BodyFrom != who.FaceFrom)
+            {
+                // 胸元の埋め: 体の人の肌の三角で、顔の人の肌が届かない所。0.7 mm 内側へ下げる。
+                // UV は埋めの真ん中に一番近い顔の人の肌の頂点の物を全部に使う（頂点ごとに一番近い物を使うと、UV の島をまたいで暗い点が並んだ）
+                var patch = RocketboxCompose.ChestPatch(who.BodyFrom, new RocketboxCompose.Surface(sunkPos, faceHead), eyeY, a.head.z);
+                var patchUvAll = Vector2.zero;
+                if (patch.Count > 0)
+                {
+                    var mid = Vector3.zero;
+                    foreach (var i in patch) mid += bw[i];
+                    mid /= patch.Count;
+                    var best = float.MaxValue;
+                    foreach (var h in new HashSet<int>(faceTris))
+                    {
+                        var d = (sunkPos[h] - mid).sqrMagnitude;
+                        if (d < best) { best = d; patchUvAll = fuv[h]; }
+                    }
+                }
+                Func<int, Vector2> patchUv = i => patchUvAll;
+                var bodyToWorld = bodySmr.transform.localToWorldMatrix;
+                var patchTris = Pack(patch.ToArray(), i => toLocal.MultiplyPoint3x4(bw[i] - bodyToWorld.MultiplyVector(bn[i]).normalized * 0.0007f), i => bn[i], patchUv, i => Re(bwts[i], bodyRemap), verts, norms, uvs, weights);
+                var all = new int[headTris.Length + patchTris.Length];
+                headTris.CopyTo(all, 0);
+                patchTris.CopyTo(all, headTris.Length);
+                headTris = all;
+                patchCount = patch.Count / 3;
+            }
             moved = smoothed;
             var shellOut = Pack(shellTris.ToArray(), i => toLocal.MultiplyPoint3x4(moved[i]), i => hn[i], i => huv[i], i => Re(hwts[i], hairRemap), verts, norms, uvs, weights);
             var cardOut = Pack(hairCards.ToArray(), i => toLocal.MultiplyPoint3x4(moved[i]), i => hn[i], i => huv[i], i => Re(hwts[i], hairRemap), verts, norms, uvs, weights);
@@ -297,7 +334,8 @@ namespace HalfAware.EditorTools.Rocketbox
                 sunk, maxSink * 1000f,
                 outOfFace, maxFace * 1000f, outOfClothes, clothesInside, worstClothes * 1000f,
                 gaps.Count, gaps.Count > 0 ? gsum / gaps.Count * 1000f : 0f, gaps.Count > 0 ? gaps[gaps.Count / 2] * 1000f : 0f, g5, g15,
-                bare * 10000f, who.CompositeMesh, faceUnder, outOfFront);
+                bare * 10000f, who.CompositeMesh, faceUnder, outOfFront)
+                + (neckNote != null ? "\n" + neckNote + "、胸元を体の人の肌の三角で埋めた数 " + patchCount : "");
         }
 
         // ---- 見分け -----------------------------------------------------------

@@ -226,6 +226,88 @@ namespace HalfAware.EditorTools.Rocketbox
                 seam, who.CompositeMesh, patch.Count / 3);
         }
 
+        /// <summary>
+        /// 顔の人の首元の肌を、体の人（顔の人と別の人）に合わせる（<see cref="BuildMesh"/> の頭の載せ替えと同じ直し。顔と髪も別の人から取るときに使う）。
+        /// skinVerts は顔の人の頭の面のうち髪でない頂点。直した世界の位置を返す
+        /// </summary>
+        public static Vector3[] FitNeck(RocketboxPerson body, Vector3[] headWorld, IEnumerable<int> skinVerts, float eyeY, out string note)
+        {
+            var bodySmr = Smr(body.Model);
+            var bm = bodySmr.sharedMesh;
+            var bw = World(bm.vertices, bodySmr.transform.localToWorldMatrix);
+            var bodyClothes = new Surface(bw, bm.GetTriangles(Slot(bodySmr, body.BodySlot)));
+            var bodySkinTris = bm.GetTriangles(Slot(bodySmr, body.HeadSlot));
+            var bodySkin = new Surface(bw, bodySkinTris);
+            var skinEdges = new List<Vector3[]>();
+            foreach (var e in BoundaryEdges(bodySkinTris)) skinEdges.Add(new[] { bw[e[0]], bw[e[1]] });
+            var neckline = new List<Vector3>();
+            foreach (var i in Boundary(bm.GetTriangles(Slot(bodySmr, body.BodySlot))))
+            {
+                Vector3 q0, n0;
+                if (bodySkin.Closest(bw[i], 0.01f, out q0, out n0) <= 0.003f) neckline.Add(bw[i]);
+            }
+            var moved = (Vector3[])headWorld.Clone();
+            int snapped = 0, pushedIn = 0;
+            float maxSnap = 0f, maxIn = 0f;
+            foreach (var i in skinVerts)
+            {
+                var p = headWorld[i];
+                if (p.y > eyeY - 0.08f) continue;
+                var wh = RocketboxPaint.Smooth(eyeY - SnapFrom, eyeY - SnapTo, p.y);
+                var near = float.MaxValue;
+                foreach (var e in neckline) near = Mathf.Min(near, Vector3.Distance(e, p));
+                var w = Mathf.Max(wh, RocketboxPaint.Smooth(0.05f, 0.02f, near));
+                if (w <= 0f) continue;
+                Vector3 q, nrm;
+                var d = bodySkin.Closest(p, SkinReach, out q, out nrm);
+                if (!float.IsInfinity(d) && EdgeDistance(q, skinEdges) > 0.0003f)
+                {
+                    moved[i] = Vector3.Lerp(p, q, w);
+                    snapped++;
+                    maxSnap = Mathf.Max(maxSnap, d * w);
+                    continue;
+                }
+                var s = bodyClothes.Signed(p, 0.08f, out q, out nrm);
+                if (float.IsNaN(s)) continue;
+                moved[i] = Vector3.Lerp(p, p - nrm * (s + SkinUnder), w);
+                pushedIn++;
+                maxIn = Mathf.Max(maxIn, Mathf.Abs(s + SkinUnder) * w);
+            }
+            note = string.Format(CultureInfo.InvariantCulture, "首元の肌を体の人の肌へ寄せた頂点 {0}（最大 {1:0.0} mm）、服の 3 mm 内側へ置いた頂点 {2}（最大 {3:0.0} mm 動かした）",
+                snapped, maxSnap * 1000f, pushedIn, maxIn * 1000f);
+            return moved;
+        }
+
+        /// <summary>
+        /// 胸元の埋め: 体の人の肌の三角のうち、載せた顔の人の肌（headSurface）から離れている前側の物（体の人のメッシュの三角の番号）。
+        /// 体の人の襟ぐりの方が深く、顔の人の肌が届かない所
+        /// </summary>
+        public static List<int> ChestPatch(RocketboxPerson body, Surface headSurface, float eyeY, float neckZ)
+        {
+            var bodySmr = Smr(body.Model);
+            var bm = bodySmr.sharedMesh;
+            var bw = World(bm.vertices, bodySmr.transform.localToWorldMatrix);
+            var skinTris = bm.GetTriangles(Slot(bodySmr, body.HeadSlot));
+            var patch = new List<int>();
+            for (var t = 0; t < skinTris.Length; t += 3)
+            {
+                Vector3 v0 = bw[skinTris[t]], v1 = bw[skinTris[t + 1]], v2 = bw[skinTris[t + 2]];
+                var c = (v0 + v1 + v2) / 3f;
+                if (c.y > eyeY - 0.12f || c.z < neckZ + 0.03f) continue;
+                var open = false;
+                foreach (var pt in new[] { v0, v1, v2, (v0 + v1) * 0.5f, (v1 + v2) * 0.5f, (v2 + v0) * 0.5f, c })
+                {
+                    Vector3 q1, n1;
+                    if (headSurface.Closest(pt, 0.02f, out q1, out n1) > 0.0012f) { open = true; break; }
+                }
+                if (!open) continue;
+                patch.Add(skinTris[t]);
+                patch.Add(skinTris[t + 1]);
+                patch.Add(skinTris[t + 2]);
+            }
+            return patch;
+        }
+
         static Vector3 bNormWorld(Matrix4x4 toWorld, Vector3 n)
         {
             return toWorld.MultiplyVector(n).normalized;
