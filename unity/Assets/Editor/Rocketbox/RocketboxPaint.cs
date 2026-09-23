@@ -176,6 +176,11 @@ namespace HalfAware.EditorTools.Rocketbox
             public bool flatHair;
             [Header("ワンピース（上の服と借りたスカートを同じ布の色に。布の明暗は元のまま）")]
             public bool dress;
+            [Header("麦わら帽子（RocketboxHat）")]
+            [Tooltip("帽子を被る")]
+            public bool hat;
+            [Tooltip("前後の傾き（度、正で前が下がる）・左右の傾き（度）・上下（m、正で上）・前後のずれ（m、正で前）")]
+            public float hatTilt, hatRoll, hatDepth, hatShift;
             [Tooltip("膝から下を借りた人の靴（暗い革）を茶の革に塗る")]
             public bool brownShoes;
             public Color brownShadow = new Color(0.16f, 0.09f, 0.05f), brownShine = new Color(0.52f, 0.33f, 0.18f);

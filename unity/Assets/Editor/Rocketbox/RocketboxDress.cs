@@ -19,8 +19,11 @@ namespace HalfAware.EditorTools.Rocketbox
     public static class RocketboxDress
     {
         // ---- 形の値（m、割合） ----
-        /// <summary>襟ぐり: 首の骨（首の付け根）から下へ。前・横・後ろ</summary>
-        public const float NeckDropFront = 0.04f, NeckDropSide = 0.015f, NeckDropBack = 0.025f;
+        /// <summary>
+        /// 襟ぐり: 首の骨（首の付け根）から下へ。前・横・後ろ。後ろは首の付け根の 2.8 cm 上まで（女大 14 の頭の面は首の後ろで付け根の 1.5 cm 上で終わるので、
+        /// 付け根より下で切ると、うなじと襟の間から向こうが抜けて黒い帯に見えた）
+        /// </summary>
+        public const float NeckDropFront = 0.04f, NeckDropSide = 0.015f, NeckDropBack = -0.028f;
         /// <summary>前の浅い V ネック: 首の付け根から V の先までの深さと、V が首の付け根の高さへ戻る左右の幅</summary>
         public const float VDepth = 0.075f, VHalf = 0.075f;
         /// <summary>腰帯の高さ（腰の切り替えから上へ）と、厚み（胴の面から外へ）</summary>
@@ -107,7 +110,7 @@ namespace HalfAware.EditorTools.Rocketbox
             var c = Mathf.Cos(th);
             // 前は浅い V: 真ん中で VDepth、左右 VHalf で首の横の深さへ戻る
             var vDrop = NeckDropSide + (VDepth - NeckDropSide) * Mathf.Max(0f, 1f - Mathf.Abs(p.x) / VHalf);
-            var drop = c >= 0f ? Mathf.Lerp(NeckDropSide, vDrop, Mathf.Sqrt(c)) : Mathf.Lerp(NeckDropSide, NeckDropBack, c * c);
+            var drop = c >= 0f ? Mathf.Lerp(NeckDropSide, vDrop, Mathf.Sqrt(c)) : Mathf.Lerp(NeckDropSide, NeckDropBack, Mathf.Sqrt(-c));
             var margin = c >= 0f ? Mathf.Lerp(NeckMarginSide, NeckMarginFront, c * c) : Mathf.Lerp(NeckMarginSide, NeckMarginBack, c * c);
             var radial = new Vector2(p.x, dz).magnitude - (NeckRadius + margin);
             return Mathf.Max((f.neckY - drop) - p.y, p.y < f.neckY + 0.03f ? radial : -1f);
@@ -665,11 +668,15 @@ namespace HalfAware.EditorTools.Rocketbox
         public static readonly Color Cloth = new Color(0.95f, 0.94f, 0.92f);
 
         /// <summary>
-        /// ワンピースの絵を描く（n×n）。組み合わせたメッシュのワンピースの面の組（一番後ろ）を UV に並べ、画素ごとの束ねた姿勢の位置から描く:
-        /// - 布の地: 画素ごとの細かい粒（±2 %）と、横と縦の糸のむら（麻の節）、大きなむら（±2 %）
-        /// - 縫い目: 脇（胴とスカート）、肩、襟ぐりの見返し（縁の陰と 9 mm 内の縫い線）、腰の切り替え、袖の付け根と袖口、裾の折り返し（1.8 cm 上の縫い線）
-        /// - 陰: 腰の切り替えのすぐ下（胴のかぶり）とギャザー、スカートの縦のひだ（形の波に合わせて山を明るく、谷を暗く）。
-        ///   胸の下の陰は、胸の真ん中の V の溝に見えたので描かない
+        /// ワンピースの絵を描く（n×n）。組み合わせたメッシュのワンピースの面の組（一番後ろ）を UV に並べ、画素ごとの束ねた姿勢の位置から描く。
+        /// 参考画像（白い綿のロングワンピース）に合わせて、320×180 で潰れて灰色のむらにならないよう、模様は大きめ・明暗ははっきりめにする:
+        /// - 布の地: 画素ごとの細かい粒と、糸のむら、大きなむら
+        /// - 胴: 前の左右に縦のピンタック（7 mm おき、4 本ずつ）、襟ぐりの縁に細いレース（縁の小さな波と穴の並び）
+        /// - 前の真ん中: 前立て（左右 8 mm の縫い線）と、V の先から裾までの小さな丸いボタン（3.5 cm おき）
+        /// - 腰帯: 横の細い筋（シャーリング、6 mm おき）
+        /// - スカート: 腰のギャザーの縦の筋と陰、縦のひだの陰、段の切り替えのアイレットのレースの帯（花の形の穴の並び）、
+        ///   下の段に散らした花の形のアイレット、裾のスカラップの縁と、その上の穴の並び
+        /// - 袖: 付け根と袖口のギャザーの筋、袖口の帯の縁のレース、袖に散らした小さなアイレット
         /// </summary>
         public static Color[] Paint(RocketboxPerson who, int n, out string note)
         {
@@ -685,6 +692,8 @@ namespace HalfAware.EditorTools.Rocketbox
             var px = new Color[n * n];
             var yTop = f.waistY + 0.012f;
             var lin = new Vector3(Mathf.GammaToLinearSpace(Cloth.r), Mathf.GammaToLinearSpace(Cloth.g), Mathf.GammaToLinearSpace(Cloth.b));
+            var k512 = 512f / n;
+            var vTip = f.neckY - VDepth;
             int onCount = 0;
             for (var y = 0; y < n; y++)
                 for (var x = 0; x < n; x++)
@@ -694,10 +703,10 @@ namespace HalfAware.EditorTools.Rocketbox
                     var v = (y + 0.5f) / n;
                     var shade = 1f;
                     // 布の地
-                    shade += (Hash(x, y) - 0.5f) * 0.04f;
-                    shade += (Noise(x * 0.08f, y * 0.9f) - 0.5f) * 0.035f;
-                    shade += (Noise(x * 0.9f + 50f, y * 0.08f) - 0.5f) * 0.03f;
-                    shade += (Noise(x * 0.02f + 11f, y * 0.02f + 7f) - 0.5f) * 0.04f;
+                    shade += (Hash(x, y) - 0.5f) * 0.035f;
+                    shade += (Noise(x * 0.08f * k512, y * 0.9f * k512) - 0.5f) * 0.03f;
+                    shade += (Noise(x * 0.9f * k512 + 50f, y * 0.08f * k512) - 0.5f) * 0.025f;
+                    shade += (Noise(x * 0.02f * k512 + 11f, y * 0.02f * k512 + 7f) - 0.5f) * 0.03f;
                     if (s.On[i])
                     {
                         onCount++;
@@ -706,53 +715,124 @@ namespace HalfAware.EditorTools.Rocketbox
                         var sleeve = !skirt && u >= 0.5f;
                         var th = Mathf.Atan2(p.x, p.z - f.zc);
                         var r = new Vector2(p.x, p.z - f.zc).magnitude;
+                        var front = Mathf.Cos(th);
                         if (!sleeve)
                         {
                             // 脇の縫い目
                             var side = Mathf.Min(Mathf.Abs(Wrap(th - Mathf.PI * 0.5f)), Mathf.Abs(Wrap(th + Mathf.PI * 0.5f))) * r;
-                            shade *= 1f - 0.14f * RocketboxPaint.Smooth(0.0035f, 0.0005f, side);
+                            shade *= 1f - 0.10f * RocketboxPaint.Smooth(0.003f, 0.0005f, side);
+                            // 前立てとボタン（V の先から裾まで）
+                            if (front > 0.8f && p.y < vTip - 0.006f)
+                            {
+                                var ax = Mathf.Abs(p.x);
+                                shade *= 1f - 0.16f * RocketboxPaint.Smooth(0.0022f, 0.0006f, Mathf.Abs(ax - 0.009f));
+                                var cy = vTip - 0.02f - Mathf.Round((vTip - 0.02f - p.y) / 0.035f) * 0.035f;
+                                var db = new Vector2(p.x, p.y - cy).magnitude;
+                                shade *= 1f - 0.50f * RocketboxPaint.Smooth(0.0045f, 0.0035f, db) * RocketboxPaint.Smooth(0.0022f, 0.0032f, db);
+                                shade *= 1f - 0.08f * RocketboxPaint.Smooth(0.0032f, 0f, db);
+                            }
                         }
                         if (skirt)
                         {
                             var sk = Mathf.Clamp01((yTop - p.y) / (yTop - HemY));
-                            // 縦のひだ（形の波に合わせる）
-                            shade *= 1f + 0.08f * Mathf.Sin(Waves * th) * Mathf.Pow(sk, 1.3f);
-                            // 腰のすぐ下: 胴のかぶりの陰とギャザー
+                            // 縦のひだの陰（形の波に合わせる）
+                            var tier = p.y < TierY;
+                            shade *= 1f + (tier ? 0.07f : 0.04f) * Mathf.Sin(Waves * th + (tier ? 0.6f : 0f)) * Mathf.Pow(sk, 0.8f);
+                            // 腰のギャザー: 縦の細い筋と、すぐ下の陰
                             var dT = yTop - p.y;
-                            shade *= 1f - 0.10f * RocketboxPaint.Smooth(0.015f, 0f, dT);
-                            shade *= 1f - 0.07f * RocketboxPaint.Smooth(0.08f, 0f, dT) * (0.5f + 0.5f * Mathf.Sin(th * 48f));
-                            // 裾の折り返し: 縁の陰と、1.8 cm 上の縫い線
+                            shade *= 1f - 0.10f * RocketboxPaint.Smooth(0.012f, 0f, dT);
+                            shade *= 1f - 0.08f * RocketboxPaint.Smooth(0.10f, 0f, dT) * (0.5f + 0.5f * Mathf.Sin(th * 64f));
+                            var arc = th * Mathf.Lerp(0.16f, HemR, sk);
+                            // 段の切り替えのアイレットの帯（切り替えの 2 cm 上から 5 cm 下）と、切り替えの縫い目の陰
+                            var dTier = p.y - TierY;
+                            shade *= 1f - 0.14f * RocketboxPaint.Smooth(0.004f, 0f, Mathf.Abs(dTier));
+                            if (dTier < 0.02f && dTier > -0.05f)
+                            {
+                                shade *= 1f - 0.08f * RocketboxPaint.Smooth(0.0015f, 0f, Mathf.Abs(dTier - 0.018f));
+                                shade *= 1f - 0.08f * RocketboxPaint.Smooth(0.0015f, 0f, Mathf.Abs(dTier + 0.048f));
+                                shade *= 1f - 0.60f * Flower(arc, p.y - TierY + 0.015f, 0.026f, 0f);
+                            }
+                            else if (tier && dTier < -0.05f && p.y > HemY + 0.045f)
+                            {
+                                // 下の段に散らした花の形のアイレット
+                                shade *= 1f - 0.50f * Flower(arc, p.y, 0.055f, 0.45f);
+                            }
+                            // 裾: スカラップの縁の陰と、その上の穴の並び
                             var dH = p.y - HemY;
-                            shade *= 1f - 0.10f * RocketboxPaint.Smooth(0.005f, 0f, dH);
-                            shade *= 1f - 0.12f * RocketboxPaint.Smooth(0.0025f, 0.0005f, Mathf.Abs(dH - 0.018f)) * Dash(th * r, 0.006f);
+                            shade *= 1f - 0.12f * RocketboxPaint.Smooth(0.006f, 0f, dH);
+                            if (dH < 0.04f)
+                            {
+                                var ca = Mathf.Round(arc / 0.012f) * 0.012f;
+                                var dh = new Vector2(arc - ca, dH - 0.022f).magnitude;
+                                shade *= 1f - 0.55f * RocketboxPaint.Smooth(0.0034f, 0.0024f, dh);
+                                shade *= 1f + 0.05f * RocketboxPaint.Smooth(0.0052f, 0.0036f, dh) * RocketboxPaint.Smooth(0.0024f, 0.0034f, dh);
+                            }
                         }
                         else if (!sleeve)
                         {
-                            // 襟ぐり: 縁の陰と、9 mm 内の縫い線
+                            // 襟ぐり: 縁のレース（縁の小さな波の陰と、4 mm 内の穴の並び）
                             var tn = Mathf.Atan2(p.x, p.z - f.neckZ);
                             var dN = Neck(f, p);
-                            shade *= 1f - 0.10f * RocketboxPaint.Smooth(0.005f, 0f, dN);
-                            shade *= 1f - 0.12f * RocketboxPaint.Smooth(0.0025f, 0.0005f, Mathf.Abs(dN - 0.009f)) * Dash(tn * 0.06f, 0.006f);
-                            // 肩の縫い目（首の外、肩の一番上）
+                            var along = tn * 0.07f;
+                            var scal = 0.5f + 0.5f * Mathf.Cos(along / 0.005f * 2f * Mathf.PI);
+                            shade *= 1f - 0.16f * RocketboxPaint.Smooth(0.0025f + 0.0015f * scal, 0f, dN);
+                            var ca = Mathf.Round(along / 0.006f) * 0.006f;
+                            var dl = new Vector2(along - ca, dN - 0.0045f).magnitude;
+                            shade *= 1f - 0.45f * RocketboxPaint.Smooth(0.0019f, 0.0011f, dl);
+                            shade *= 1f - 0.08f * RocketboxPaint.Smooth(0.0015f, 0.0003f, Mathf.Abs(dN - 0.008f));
+                            // 胸のピンタック（前の左右 1.8〜4.6 cm に 7 mm おき 4 本。襟ぐりの縁から 1.2 cm 内、腰帯より上）
+                            var wTop = f.waistY + WaistBand;
+                            if (front > 0.35f && dN > 0.012f && p.y > wTop + 0.01f)
+                            {
+                                var ax = Mathf.Abs(p.x);
+                                if (ax > 0.016f && ax < 0.046f)
+                                {
+                                    var ph = Mathf.Repeat((ax - 0.016f) / 0.0075f, 1f);
+                                    shade *= 1f - 0.20f * RocketboxPaint.Smooth(0.18f, 0f, Mathf.Abs(ph - 0.25f));
+                                    shade *= 1f + 0.06f * RocketboxPaint.Smooth(0.18f, 0f, Mathf.Abs(ph - 0.55f));
+                                }
+                            }
+                            // 肩の縫い目
                             if (Mathf.Abs(p.x) > 0.06f && p.y > f.neckY - 0.10f)
-                                shade *= 1f - 0.12f * RocketboxPaint.Smooth(0.004f, 0.001f, Mathf.Abs(p.z - (f.neckZ + 0.012f)));
-                            // 腰の切り替え: 縁の陰と 8 mm 上の縫い線
+                                shade *= 1f - 0.10f * RocketboxPaint.Smooth(0.004f, 0.001f, Mathf.Abs(p.z - (f.neckZ + 0.012f)));
+                            // 腰帯: 上下の縁の陰と、横の細い筋（シャーリング）
                             var dW = p.y - (f.waistY - 0.012f);
-                            shade *= 1f - 0.12f * RocketboxPaint.Smooth(0.006f, 0f, dW);
-                            shade *= 1f - 0.12f * RocketboxPaint.Smooth(0.0025f, 0.0005f, Mathf.Abs(dW - 0.010f)) * Dash(th * r, 0.006f);
+                            if (dW < WaistBand + 0.012f)
+                            {
+                                shade *= 1f - 0.12f * RocketboxPaint.Smooth(0.005f, 0f, dW);
+                                shade *= 1f - 0.12f * RocketboxPaint.Smooth(0.005f, 0f, Mathf.Abs(dW - WaistBand - 0.012f));
+                                if (dW > 0.006f && dW < WaistBand + 0.008f)
+                                {
+                                    var ph = Mathf.Repeat(dW / 0.006f, 1f);
+                                    shade *= 1f - 0.10f * RocketboxPaint.Smooth(0.2f, 0f, Mathf.Abs(ph - 0.5f));
+                                }
+                            }
                         }
                         else
                         {
-                            // 袖: 付け根の縁と、袖口の折り返し
+                            // 袖
                             var sideIdx = p.x < 0f ? 0 : 1;
                             float t, perp;
                             f.Arm(p, sideIdx, out t, out perp);
                             var len = f.UpperArmLength(sideIdx);
+                            var sh = f.shoulder[sideIdx];
+                            var ang = Mathf.Atan2(p.z - sh.z, p.y - sh.y);
+                            var along = ang * 0.05f;
                             var dA = (t - SleeveT0) * len;
-                            shade *= 1f - 0.12f * RocketboxPaint.Smooth(0.006f, 0f, dA);
                             var dC = (SleeveT1 - t) * len;
-                            shade *= 1f - 0.10f * RocketboxPaint.Smooth(0.005f, 0f, dC);
-                            shade *= 1f - 0.12f * RocketboxPaint.Smooth(0.0025f, 0.0005f, Mathf.Abs(dC - 0.015f)) * Dash(perp * Mathf.Atan2(p.z, p.y) , 0.006f);
+                            var bandLen = SleeveBand * (SleeveT1 - SleeveT0) * len;
+                            // 付け根の縁とギャザー
+                            shade *= 1f - 0.12f * RocketboxPaint.Smooth(0.005f, 0f, dA);
+                            shade *= 1f - 0.08f * RocketboxPaint.Smooth(0.04f, 0f, dA) * (0.5f + 0.5f * Mathf.Sin(along / 0.006f * 2f * Mathf.PI));
+                            // 袖口の帯: 帯の上の縁の陰とギャザー、袖口の縁のレース
+                            shade *= 1f - 0.14f * RocketboxPaint.Smooth(0.004f, 0f, Mathf.Abs(dC - bandLen));
+                            shade *= 1f - 0.08f * RocketboxPaint.Smooth(0.03f, 0f, Mathf.Max(0f, dC - bandLen)) * (0.5f + 0.5f * Mathf.Sin(along / 0.006f * 2f * Mathf.PI));
+                            shade *= 1f - 0.14f * RocketboxPaint.Smooth(0.003f, 0f, dC);
+                            var ca = Mathf.Round(along / 0.006f) * 0.006f;
+                            var dl = new Vector2(along - ca, dC - 0.004f).magnitude;
+                            shade *= 1f - 0.45f * RocketboxPaint.Smooth(0.0018f, 0.001f, dl);
+                            // 袖に散らした小さなアイレット
+                            if (dA > 0.01f && dC > bandLen + 0.008f) shade *= 1f - 0.50f * Flower(along, t * len, 0.032f, 0.35f);
                         }
                     }
                     var col = lin * shade;
@@ -760,6 +840,49 @@ namespace HalfAware.EditorTools.Rocketbox
                 }
             note = string.Format(CultureInfo.InvariantCulture, "ワンピースの絵: {0}×{0}、布の画素 {1}、色 {2}", n, onCount, Cloth);
             return px;
+        }
+
+        /// <summary>1024 で描いて 512 へ縮めた絵（細い筋と小さな穴が、縮めたときに消えずに柔らかく残る）</summary>
+        public static Color[] PaintSmall(RocketboxPerson who, out string note)
+        {
+            var big = Paint(who, 1024, out note);
+            var c32 = new Color32[big.Length];
+            for (var i = 0; i < big.Length; i++) c32[i] = big[i];
+            var small = RocketboxTextures.Downsample(c32, 1024, 1024, 512, false);
+            var o = new Color[small.Length];
+            for (var i = 0; i < small.Length; i++) o[i] = small[i];
+            note += "（1024 で描いて 512 へ縮めた）";
+            return o;
+        }
+
+        /// <summary>
+        /// 花の形のアイレット（真ん中の穴と、まわりの 6 枚の花びらの穴）の暗さ（0〜1）。a・b は面の上の位置（m）、cell は並べる間隔。
+        /// skip の割合の升目は描かない（散らす）
+        /// </summary>
+        static float Flower(float a, float b, float cell, float skip)
+        {
+            var row = Mathf.Floor(b / cell);
+            var off = Mathf.Repeat(row, 2f) * 0.5f * cell;
+            var col = Mathf.Floor((a + off) / cell);
+            if (skip > 0f && Hash((int)col + 1000, (int)row + 3000) < skip) return 0f;
+            var ca = (col + 0.5f) * cell - off;
+            var cb = (row + 0.5f) * cell;
+            var da = a - ca;
+            var db = b - cb;
+            var hole = RocketboxPaint.Smooth(0.0028f, 0.0018f, Mathf.Sqrt(da * da + db * db));
+            var pr = cell * 0.26f;
+            for (var k = 0; k < 6; k++)
+            {
+                var an = k * Mathf.PI / 3f;
+                var ea = da - Mathf.Cos(an) * pr;
+                var eb = db - Mathf.Sin(an) * pr;
+                // 花びらは外へ長い楕円
+                var ra = ea * Mathf.Cos(an) + eb * Mathf.Sin(an);
+                var rb = -ea * Mathf.Sin(an) + eb * Mathf.Cos(an);
+                var d = Mathf.Sqrt(ra * ra / 2.2f + rb * rb);
+                hole = Mathf.Max(hole, RocketboxPaint.Smooth(0.0022f, 0.0014f, d));
+            }
+            return hole;
         }
 
         /// <summary>縫い線の点線（長さ period の半分が糸）</summary>

@@ -96,6 +96,12 @@ namespace HalfAware.EditorTools.Rocketbox
             Shape(her, skin.JawScale, skin.JawClose);
             if (skin.Look != null) ShapeFace(her, skin.Look);
             if (skin.Look != null && (skin.Look.noseFlatten > 0f || skin.Look.noseNarrow > 0f)) ShapeNose(her, skin);
+            if (skin.Look != null && skin.Look.hat)
+            {
+                var hatSmr = her.GetComponentInChildren<SkinnedMeshRenderer>();
+                var persist = skin.Head != null && AssetDatabase.Contains(skin.Head);
+                skin.HatNote = RocketboxHat.Put(her, hatSmr, Maps.Get(skin.Person, 512).Anchors, skin.Look, persist ? skin.Person.Dir : null, skin.Made);
+            }
             AddAnimator(her);
             return her;
         }
@@ -358,6 +364,8 @@ namespace HalfAware.EditorTools.Rocketbox
             public Material Chest;
             /// <summary>一から作るワンピース（<see cref="RocketboxDress"/>）</summary>
             public Material Dress;
+            /// <summary>帽子を被せたときの測り</summary>
+            public string HatNote;
             /// <summary>顎の骨の左右の倍率（<see cref="RocketboxPaint.Look.JawScale"/>）</summary>
             public float JawScale = 1f;
             /// <summary>形の手入れ（目・瞼・鼻・顎の骨）に使う見た目（<see cref="ShapeFace"/>）</summary>
@@ -449,7 +457,7 @@ namespace HalfAware.EditorTools.Rocketbox
             if (who.MadeDress)
             {
                 string dressNote;
-                WritePainted(RocketboxDress.Paint(who, 512, out dressNote), 512, dir + "Dress.png", false, 512);
+                WritePainted(RocketboxDress.PaintSmall(who, out dressNote), 512, dir + "Dress.png", false, 512);
                 SaveMaterial(RocketboxDress.Textured(Load(dir + "Dress.png")), dir + "Dress.mat");
                 sb.AppendLine(dressNote);
             }
@@ -679,7 +687,7 @@ namespace HalfAware.EditorTools.Rocketbox
                 if (who.MadeDress)
                 {
                     string dressNote;
-                    skin.Dress = Keep(skin, RocketboxDress.Textured(Keep(skin, Tex(RocketboxDress.Paint(who, 512, out dressNote), 512, false, 512))));
+                    skin.Dress = Keep(skin, RocketboxDress.Textured(Keep(skin, Tex(RocketboxDress.PaintSmall(who, out dressNote), 512, false, 512))));
                 }
                 if (who.ChestFromBody)
                 {
