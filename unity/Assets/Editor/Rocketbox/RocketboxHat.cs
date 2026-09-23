@@ -20,12 +20,14 @@ namespace HalfAware.EditorTools.Rocketbox
     public static class RocketboxHat
     {
         /// <summary>山の高さ・天辺の盛り・山と髪のゆとり・つばの幅・つばの縁の下がり・リボンの高さ</summary>
-        public const float CrownHeight = 0.085f, CrownDome = 0.012f, CrownMargin = 0.010f, BrimWidth = 0.085f, BrimDroop = 0.012f, RibbonHeight = 0.025f;
+        public const float CrownHeight = 0.080f, CrownDome = 0.014f, CrownMargin = 0.010f, BrimWidth = 0.100f, BrimDroop = 0.018f, RibbonHeight = 0.028f;
+        /// <summary>山の天辺の細り（付け根の半径に対する割合）</summary>
+        public const float CrownTaper = 0.90f;
         /// <summary>山の付け根（つば）の高さ（目の高さから上へ）。浅めの被り方で、つばが目元にかからない</summary>
-        public const float BandAboveEyes = 0.078f;
+        public const float BandAboveEyes = 0.068f;
         const int Segs = 64, SideRings = 6, TopRings = 6, BrimRings = 6;
         /// <summary>麦わらの色（sRGB）</summary>
-        public static readonly Color Straw = new Color(0.84f, 0.71f, 0.49f);
+        public static readonly Color Straw = new Color(0.90f, 0.78f, 0.57f);
 
         /// <summary>帽子の形の基準（束ねた姿勢の、模型の根の中）: 頭の真ん中・つばの高さ・山の楕円の半径</summary>
         sealed class Fit
@@ -106,15 +108,16 @@ namespace HalfAware.EditorTools.Rocketbox
             grid((j, ang) =>
             {
                 var rho = j / (float)TopRings;
-                return at(ang, Mathf.Max(rho, 0.001f), CrownHeight + CrownDome * (1f - rho * rho));
+                return at(ang, Mathf.Max(rho, 0.001f) * CrownTaper * (1f - 0.08f * rho * rho * rho), CrownHeight + CrownDome * (1f - rho * rho));
             }, j => rTop * (j / (float)TopRings) / sTotal * 0.94f, TopRings, false);
             // 山の横（天辺の縁からリボンの上まで）。縁は少し丸める
             grid((j, ang) =>
             {
+                // 天辺の縁（細って丸い）から付け根へ広がる
                 var t = j / (float)SideRings;
                 var h = Mathf.Lerp(CrownHeight, RibbonHeight, t);
-                var round = 1f - 0.05f * Mathf.Pow(1f - t, 3f);
-                return at(ang, round, h);
+                var taper = Mathf.Lerp(CrownTaper * 0.92f, 1f, 1f - Mathf.Pow(1f - t, 1.6f));
+                return at(ang, taper, h);
             }, j => (rTop + (CrownHeight - RibbonHeight) * (j / (float)SideRings)) / sTotal * 0.94f, SideRings, true);
             // リボン（山より 1.5 mm 外）
             var ribbonGrow = 1f + 0.0015f / rTop;
@@ -126,6 +129,20 @@ namespace HalfAware.EditorTools.Rocketbox
                 var rho = 1f + BrimWidth / rTop * t;
                 return at(ang, rho, -BrimDroop * t * t);
             }, j => (rTop + CrownHeight - RibbonHeight + BrimWidth * (j / (float)BrimRings)) / sTotal * 0.94f, BrimRings, true);
+            // 三角の巻きを外向きに揃える（天辺とつばは上、山の横とリボンは軸から外）。巻きが内向きだと、両面で描いても内向きの法線で照らされて暗く見えた
+            var up = f.rot * Vector3.up;
+            for (var t = 0; t < tris.Count; t += 3)
+            {
+                Vector3 p0 = verts[tris[t]], p1 = verts[tris[t + 1]], p2 = verts[tris[t + 2]];
+                var fn = Vector3.Cross(p1 - p0, p2 - p0);
+                var c = (p0 + p1 + p2) / 3f;
+                var rel = c - f.centre;
+                var h = Vector3.Dot(rel, up);
+                var radial = rel - up * h;
+                var side = h > RibbonHeight * 0.2f && h < CrownHeight - 0.004f && Vector3.Dot(fn.normalized, up) < 0.7f && Vector3.Dot(fn.normalized, up) > -0.7f;
+                var want = side ? radial : up;
+                if (Vector3.Dot(fn, want) < 0f) { var tmp = tris[t + 1]; tris[t + 1] = tris[t + 2]; tris[t + 2] = tmp; }
+            }
             var m = new Mesh { name = "Hat" };
             m.SetVertices(verts);
             m.SetUVs(0, uvs);
@@ -140,7 +157,7 @@ namespace HalfAware.EditorTools.Rocketbox
         {
             var px = new Color[n * n];
             var lin = new Vector3(Mathf.GammaToLinearSpace(Straw.r), Mathf.GammaToLinearSpace(Straw.g), Mathf.GammaToLinearSpace(Straw.b));
-            var white = new Vector3(Mathf.GammaToLinearSpace(0.93f), Mathf.GammaToLinearSpace(0.93f), Mathf.GammaToLinearSpace(0.91f));
+            var white = new Vector3(Mathf.GammaToLinearSpace(0.99f), Mathf.GammaToLinearSpace(0.99f), Mathf.GammaToLinearSpace(0.97f));
             for (var y = 0; y < n; y++)
                 for (var x = 0; x < n; x++)
                 {
@@ -236,7 +253,7 @@ namespace HalfAware.EditorTools.Rocketbox
             mr.shadowCastingMode = ShadowCastingMode.On;
             go.hideFlags = her.hideFlags;
 
-            // 帽子の中に入る髪: 頭の骨に付いた頂点で、つばの面より上。山の楕円の 92 % より外なら 92 % へ、天辺より上なら天辺の 8 mm 下へ
+            // 帽子の中に入る髪: 頭の骨に付いた頂点で、つばの面より上。その高さの山の内側の 92 % より外なら 92 % へ、天辺より上なら天辺の 8 mm 下へ
             var hm = Object.Instantiate(smr.sharedMesh);
             hm.name = smr.sharedMesh.name + "_hat";
             var hv = hm.vertices;
@@ -249,12 +266,16 @@ namespace HalfAware.EditorTools.Rocketbox
                 if (bwts[i].boneIndex0 != headIdx || bwts[i].weight0 < 0.5f) continue;
                 var p = root.InverseTransformPoint(smr.transform.TransformPoint(hv[i]));
                 var q = inv * (p - f.centre);
-                if (q.y < 0.004f) continue;
+                // つばの 1.2 cm 下から 2 cm 上へかけて寄せる量を 0 から 1 へ（寄せた所と寄せない所の髪の段を見せない）
+                var wgt = RocketboxPaint.Smooth(-0.012f, 0.02f, q.y);
+                if (wgt <= 0f) continue;
                 var ex = q.x / f.rx;
                 var ez = q.z / f.rz;
                 var rho = Mathf.Sqrt(ex * ex + ez * ez);
                 var moved = false;
-                if (rho > 0.92f) { q.x *= 0.92f / rho; q.z *= 0.92f / rho; moved = true; }
+                var ts = Mathf.Clamp01((CrownHeight - q.y) / (CrownHeight - RibbonHeight));
+                var allowed = 0.92f * Mathf.Lerp(CrownTaper * 0.92f, 1f, 1f - Mathf.Pow(1f - ts, 1.6f));
+                if (rho > allowed) { var sc = Mathf.Lerp(1f, allowed / rho, wgt); q.x *= sc; q.z *= sc; moved = true; }
                 var top = CrownHeight + CrownDome * (1f - Mathf.Min(1f, rho * rho)) - 0.008f;
                 if (q.y > top) { q.y = top; moved = true; }
                 if (!moved) continue;
