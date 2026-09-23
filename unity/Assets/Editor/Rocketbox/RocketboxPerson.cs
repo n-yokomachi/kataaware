@@ -9,7 +9,10 @@ namespace HalfAware.EditorTools.Rocketbox
     ///
     /// 「頭はこの人、体はこの人」（<see cref="Compose"/>）や、「顔はこの人、髪はこの人、体はこの人」（<see cref="ComposeHair"/>）と
     /// 組み合わせることもできる。Rocketbox の女性は骨の並びと束ねた姿勢が同じ（どの骨も 0.3 mm 以内）なので、
-    /// 別の人の頭や髪を、体の人の骨にそのまま載せられる。組み合わせたメッシュは <see cref="RocketboxCompose"/> が作る
+    /// 別の人の頭や髪を、体の人の骨にそのまま載せられる。組み合わせたメッシュは <see cref="RocketboxCompose"/> が作る。
+    ///
+    /// 決まった二人は、主人公 <see cref="Face14Hair14BodySports02"/> と片割れ <see cref="Face14Hair14MadeDress"/>（主人公の <see cref="TwinPerson"/>）。
+    /// ほかの組み合わせは撮り比べた候補で、撮り比べの道具（<see cref="All"/> を回すメニュー）のために残してある
     /// </summary>
     public sealed class RocketboxPerson
     {
@@ -133,7 +136,10 @@ namespace HalfAware.EditorTools.Rocketbox
             return new RocketboxPerson(name, label, face, hair, body);
         }
 
-        /// <summary>女大 14。髪は顎の長さのボブ。服はニットのカーディガンで、黒に塗る</summary>
+        /// <summary>
+        /// 女大 14。二人の頭（顔と髪）はこの人。髪は顎の長さのボブ。
+        /// 体（ニットのカーディガンで、黒に塗る）は候補の人だけが使う
+        /// </summary>
         public static readonly RocketboxPerson Adult14 = new RocketboxPerson("Female_Adult_14", "f017", "女大 14", k =>
         {
             k.blackenKnit = true;
@@ -145,12 +151,12 @@ namespace HalfAware.EditorTools.Rocketbox
             k.Nose(1);
             k.noseDark = 0.7f;
             k.noseBlur = 2f;
-            // 黒子は口の下（本人の左、片割れは鏡像で右）
+            // 黒子は口の端の少し下の外（本人の左、片割れは鏡像で右）
             k.moleUnderLip = true;
         });
 
         /// <summary>
-        /// 女大 08。髪は長い。頭のテクスチャの髪が首の後ろまで続くので、髪と見なす高さを下げる。
+        /// 女大 08。髪は長い（候補の人の髪に借りた。今の二人は使わない）。頭のテクスチャの髪が首の後ろまで続くので、髪と見なす高さを下げる。
         /// 服（灰の T シャツとジーンズ）は元のまま
         /// </summary>
         public static readonly RocketboxPerson Adult08 = new RocketboxPerson("Female_Adult_08", "f008", "女大 08", k =>
@@ -164,12 +170,11 @@ namespace HalfAware.EditorTools.Rocketbox
             TempleLeft = new Vector2(0.035f, 0.01f),
         };
 
-        /// <summary>女大 08 の頭（長い髪ごと）を、女大 14 の体（黒いカーディガン）に載せた人</summary>
-        public static readonly RocketboxPerson Head08Body14 = Compose("Head08_Body14", "女大 08 の頭と女大 14 の体", Adult08, Adult14);
+        /// <summary>主人公の候補: 女大 08 の頭（長い髪ごと）を、女大 14 の体（黒いカーディガン）に載せた人</summary>
+        public static readonly RocketboxPerson Head08Body14 = Compose("Head08_Body14", "女大 08 の頭と女大 14 の体（主人公の候補）", Adult08, Adult14);
 
-        /// <summary>女大 14 の顔と体に、女大 08 の髪（長さと形ごと）を載せた人</summary>
         /// <summary>
-        /// 女大 03。体だけを片割れに借りる（頭のテクスチャは落としていない）。服は紫のトップス（胴だけ、肩と腕は出ている）、暗い緑がかった黒のパンツ、紫の靴、手首に紫の輪。二の腕に竜の入れ墨
+        /// 女大 03。体だけを片割れの候補に借りた（頭のテクスチャは落としていない）。服は紫のトップス（胴だけ、肩と腕は出ている）、暗い緑がかった黒のパンツ、紫の靴、手首に紫の輪。二の腕に竜の入れ墨
         /// </summary>
         public static readonly RocketboxPerson Adult03 = new RocketboxPerson("Female_Adult_03", "f003", "女大 03", k =>
         {
@@ -180,7 +185,7 @@ namespace HalfAware.EditorTools.Rocketbox
         };
 
         /// <summary>
-        /// 女大 02。体だけを片割れに借りる（頭のテクスチャは落としていない）。服は生成りのケーブル編みの V 首のセーター、
+        /// 女大 02。体だけを片割れの候補に借りた（頭のテクスチャは落としていない）。服は生成りのケーブル編みの V 首のセーター、
         /// 中に淡い青みの白の襟付きシャツ（袖口と裾も見える）、デニムの短いスカート、素足、黒い靴
         /// </summary>
         public static readonly RocketboxPerson Adult02 = new RocketboxPerson("Female_Adult_02", "f002", "女大 02", k =>
@@ -192,7 +197,7 @@ namespace HalfAware.EditorTools.Rocketbox
         };
 
         /// <summary>
-        /// 女大 11。体だけを片割れに借りる（頭のテクスチャは落としていない）。服はベルト付きの長袖で膝丈の茶色いワンピース、茶色のロングブーツ
+        /// 女大 11。体だけを片割れの候補に借りた（頭のテクスチャは落としていない）。服はベルト付きの長袖で膝丈の茶色いワンピース、茶色のロングブーツ
         /// </summary>
         public static readonly RocketboxPerson Adult11 = new RocketboxPerson("Female_Adult_11", "f011", "女大 11", k =>
         {
@@ -202,10 +207,11 @@ namespace HalfAware.EditorTools.Rocketbox
             HasHeadTexture = false,
         };
 
-        public static readonly RocketboxPerson Face14Hair08 = Dress(ComposeHair("Face14_Hair08", "女大 14 の顔と体に女大 08 の髪", Adult14, Adult08, Adult14), OutfitProtagonist);
+        /// <summary>主人公の候補（前に主人公に決めていた人）: 女大 14 の顔と体に、女大 08 の髪（長さと形ごと）を載せた人</summary>
+        public static readonly RocketboxPerson Face14Hair08 = Dress(ComposeHair("Face14_Hair08", "女大 14 の顔と体に女大 08 の髪（主人公の候補）", Adult14, Adult08, Adult14), OutfitProtagonist);
 
         /// <summary>
-        /// 主人公の服（女大 14 の体）: 都会のモード系。カーディガンと靴を黒、パンツは女大 14 の元のダークデニム、中は白い丸首のシャツ
+        /// 主人公の候補の服（女大 14 の体。前に主人公に決めていた服）: 都会のモード系。カーディガンと靴を黒、パンツは女大 14 の元のダークデニム、中は白い丸首のシャツ
         /// （カーディガンの開きから見える胸の肌と、中のトップスを白く塗る）
         /// </summary>
         static void OutfitProtagonist(RocketboxPaint.Look k)
@@ -225,28 +231,28 @@ namespace HalfAware.EditorTools.Rocketbox
         }
 
         /// <summary>
-        /// 片割れ: 主人公と同じ顔（女大 14）と髪（女大 08）を、女大 03 の体に載せた人。模型ごと裏返して組み立てる。
+        /// 片割れの候補: 女大 14 の顔と女大 08 の髪を、女大 03 の体に載せた人。模型ごと裏返して組み立てる。
         /// 服の色は <see cref="Outfit03"/>
         /// </summary>
         public static readonly RocketboxPerson Face14Hair08Body03 =
             Dress(ComposeHair("Face14_Hair08_Body03", "女大 14 の顔と女大 08 の髪を女大 03 の体に（片割れの候補）", Adult14, Adult08, Adult03), Outfit03);
 
         /// <summary>
-        /// 片割れ: 主人公と同じ顔（女大 14）と髪（女大 08）を、女大 02 の体に載せた人。模型ごと裏返して組み立てる。
-        /// 服の色は <see cref="Outfit02"/>。女大 03 の体の人も候補として残す
+        /// 片割れの候補: 女大 14 の顔と女大 08 の髪を、女大 02 の体に載せた人。模型ごと裏返して組み立てる。
+        /// 服の色は <see cref="Outfit02"/>
         /// </summary>
         public static readonly RocketboxPerson Face14Hair08Body02 =
             Dress(ComposeHair("Face14_Hair08_Body02", "女大 14 の顔と女大 08 の髪を女大 02 の体に（片割れの候補）", Adult14, Adult08, Adult02), Outfit02);
 
         /// <summary>
-        /// 片割れ: 主人公と同じ顔（女大 14）と髪（女大 08）を、女大 11 の体（膝丈のワンピース）に載せた人。模型ごと裏返して組み立てる。
-        /// 服の色は <see cref="Outfit11"/>。女大 03 と 02 の体の人も候補として残す
+        /// 片割れの候補: 女大 14 の顔と女大 08 の髪を、女大 11 の体（膝丈のワンピース）に載せた人。模型ごと裏返して組み立てる。
+        /// 服の色は <see cref="Outfit11"/>
         /// </summary>
         public static readonly RocketboxPerson Face14Hair08Body11 =
             Dress(ComposeHair("Face14_Hair08_Body11", "女大 14 の顔と女大 08 の髪を女大 11 の体に（片割れの候補）", Adult14, Adult08, Adult11), Outfit11);
 
         /// <summary>
-        /// 女大 19（Female_Party_02）。膝から下（素足と紐のサンダル）だけを片割れに借りる（頭のテクスチャは落としていない）
+        /// 女大 19（Female_Party_02）。膝から下（素足と紐のサンダル）だけを片割れに借りる（頭のテクスチャは落としていない）。サンダルは茶に塗る
         /// </summary>
         public static readonly RocketboxPerson Party02 = new RocketboxPerson("Female_Party_02", "f022", "女大 19（Party_02）", k =>
         {
@@ -257,7 +263,7 @@ namespace HalfAware.EditorTools.Rocketbox
         };
 
         /// <summary>
-        /// 片割れ: 女大 11 の体（白に近い生成りのワンピース）の膝から下を、女大 19（Party_02）の素足と紐のサンダルに替えた人。
+        /// 片割れの候補（前に片割れに決めていた人）: 女大 11 の体（白に近い生成りのワンピース）の膝から下を、女大 19（Party_02）の素足と紐のサンダルに替えた人。
         /// 女大 11 のロングブーツが目立つため。継ぐのはワンピースの裾（0.59 m）のすぐ上で、継ぎ目は裾の中に隠れる
         /// （膝の肌で継ぐと、二人の肌の色と三角の縁のぎざぎざが膝に見えた）
         /// </summary>
@@ -266,7 +272,8 @@ namespace HalfAware.EditorTools.Rocketbox
 
         /// <summary>
         /// Sports_Female_02（テクスチャの接頭辞は f013）。服は灰のタンクトップ、紺のカーゴパンツ、白いスニーカー、左の手首に腕時計。
-        /// 髪は後ろで一つに結んでいる（結んだ髪の一部は頭のメッシュ）。顔は手を入れない（beauty 0 で顎も細くしない）
+        /// 髪は後ろで一つに結んでいる（結んだ髪の一部は頭のメッシュ）。顔は手を入れない（beauty 0 で顎も細くしない）。
+        /// 主人公の体はこの人（頭は女大 14。胸元はこの人の頭の面で作る）
         /// </summary>
         public static readonly RocketboxPerson Sports02 = new RocketboxPerson("Sports_Female_02", "f013", "スポーツ 02", k =>
         {
@@ -281,25 +288,22 @@ namespace HalfAware.EditorTools.Rocketbox
 
         /// <summary>
         /// 主人公の候補: 女大 14 の顔と女大 08 の髪（黒）を、スポーツ 02 の体に載せた人。服は元の色のまま。
-        /// タンクトップの襟ぐりより上の胸は肌（女大 14 の頭のテクスチャの胸元の中のトップスとネックレスを肌で塗り、腕の肌も頭の肌に揃える）
+        /// タンクトップの襟ぐりより上の胸は肌（女大 14 の頭のテクスチャの胸元の中のトップスとネックレスを肌で塗り、腕の肌も頭の肌に揃える）。
+        /// 胸元はスポーツ 02 の頭の面で作る（タンクトップの襟ぐりが深く、女大 14 の頭の面の胸元では届かない。埋めの三角を一色で塗ると、
+        /// 胸元が色の違う四角の継ぎはぎに見え、女大 14 のネックレスの飾りも残った）
         /// </summary>
         public static readonly RocketboxPerson Face14Hair08BodySports02 =
             BodyChest(Dress(ComposeHair("Face14_Hair08_BodySports02", "女大 14 の顔と女大 08 の髪をスポーツ 02 の体に（主人公の候補）", Adult14, Adult08, Sports02), OutfitSports02));
 
-        /// <summary>
-        /// 主人公の候補: 女大 14 の顔と女大 08 の髪（黒）をスポーツ 02 の体に載せた人（<see cref="Face14Hair08BodySports02"/>）の胸元は、
-        /// スポーツ 02 の頭の面で作る（タンクトップの襟ぐりが深く、女大 14 の頭の面の胸元では届かない。埋めの三角を一色で塗ると、
-        /// 胸元が色の違う四角の継ぎはぎに見え、女大 14 のネックレスの飾りも残った）
-        /// </summary>
         /// <summary>主人公の候補: スポーツ 02 の顔と体に、女大 08 の髪（黒）を載せた人。服は元の色のまま</summary>
         public static readonly RocketboxPerson FaceSports02Hair08 =
             ComposeHair("FaceSports02_Hair08", "スポーツ 02 の顔と体に女大 08 の髪（主人公の候補）", Sports02, Adult08, Sports02);
 
-        /// <summary>主人公の候補: スポーツ 02 の顔と女大 08 の髪（黒）を、女大 14 の体に載せた人。服は今の主人公と同じ</summary>
+        /// <summary>主人公の候補: スポーツ 02 の顔と女大 08 の髪（黒）を、女大 14 の体に載せた人。服は <see cref="OutfitProtagonist"/>（前の主人公の服）</summary>
         public static readonly RocketboxPerson FaceSports02Hair08Body14 =
             Dress(ComposeHair("FaceSports02_Hair08_Body14", "スポーツ 02 の顔と女大 08 の髪を女大 14 の体に（主人公の候補）", Sports02, Adult08, Adult14), OutfitProtagonist);
 
-        /// <summary>スポーツ 02 の体の服: 元の色のまま。胸元は肌（シャツを塗らない）、腕の肌を頭の肌に揃える</summary>
+        /// <summary>スポーツ 02 の体の服（主人公と候補）: 元の色のまま。胸元は肌（シャツを塗らない）、腕の肌を頭の肌に揃える</summary>
         static void OutfitSports02(RocketboxPaint.Look k)
         {
             k.blackenKnit = false;
@@ -317,7 +321,10 @@ namespace HalfAware.EditorTools.Rocketbox
             SkirtJoin = 0.10f,
         };
 
-        /// <summary>女大 18（Female_Party_01）。白いキャミソール、デニムの短パン、白いロングブーツ。上半身だけを片割れの候補に借りる（頭のテクスチャは無い）</summary>
+        /// <summary>
+        /// 女大 18（Female_Party_01）。白いキャミソール、デニムの短パン、白いロングブーツ（頭のテクスチャは無い）。
+        /// 片割れは骨と、袖口より先の腕と手をこの人から借りる（ワンピースの型もこの人の体の面）。候補 T は上半身を借りた
+        /// </summary>
         public static readonly RocketboxPerson Party01 = new RocketboxPerson("Female_Party_01", "f010", "女大 18（Party_01）", k => { k.blackenKnit = false; }) { HasHeadTexture = false };
 
         /// <summary>
@@ -339,11 +346,12 @@ namespace HalfAware.EditorTools.Rocketbox
         }
 
         /// <summary>
-        /// 片割れの候補（U）: 女大 14 の顔と髪（茶）に、一から作った生成りのワンピース（<see cref="RocketboxDress"/>）を着せた人。
-        /// 腕と手は女大 18、膝から下は女大 19（Party_02）の素足と紐のサンダル
+        /// 片割れ（U。オーナーが決めた）: 女大 14 の顔と髪（元の茶）に、一から作った白いロングワンピース（<see cref="RocketboxDress"/>、参考画像）を着せた人。
+        /// 腕と手は女大 18、膝から下は女大 19（Party_02）の素足と紐のサンダル（茶に塗る）。華奢「強」。模型ごと裏返して組み立てる。
+        /// 麦わら帽子は Look.hat で被せる（既定は被らない）
         /// </summary>
         public static readonly RocketboxPerson Face14Hair14MadeDress =
-            Legs(MadeDressOn(Dress(Compose("Face14_Hair14_MadeDress", "女大 14 の顔と髪、一から作ったワンピース（片割れの候補）", Adult14, Party01), OutfitMadeDress)), Party02, 0.50f);
+            Legs(MadeDressOn(Dress(Compose("Face14_Hair14_MadeDress", "女大 14 の顔と髪、一から作ったワンピース（片割れ）", Adult14, Party01), OutfitMadeDress)), Party02, 0.50f);
 
         static RocketboxPerson MadeDressOn(RocketboxPerson p)
         {
@@ -358,7 +366,7 @@ namespace HalfAware.EditorTools.Rocketbox
             return p;
         }
 
-        /// <summary>U の服: 胸元（女大 14 の頭の面の中のトップスとネックレス）は肌で塗り、腕と脚の肌を頭の肌に揃える。髪は 14 の元の茶</summary>
+        /// <summary>片割れ（U）の服: 胸元（女大 14 の頭の面の中のトップスとネックレス）は肌で塗り、腕と脚の肌を頭の肌に揃える。髪は 14 の元の茶。サンダルは茶</summary>
         static void OutfitMadeDress(RocketboxPaint.Look k)
         {
             k.blackenKnit = false;
@@ -369,14 +377,14 @@ namespace HalfAware.EditorTools.Rocketbox
             k.brownShoes = true;
         }
 
-        /// <summary>主人公の候補: 女大 14 の顔と髪（14 の元の頭そのまま。額の上の前髪の塊も元の形）。服は今の主人公と同じ</summary>
+        /// <summary>主人公の候補: 女大 14 の顔と髪（14 の元の頭そのまま。額の上の前髪の塊も元の形）。服は <see cref="OutfitProtagonist"/>（前の主人公の服）</summary>
         public static readonly RocketboxPerson Face14Hair14 =
-            Dress(Compose("Face14_Hair14", "女大 14 の顔と髪（主人公の候補、服は今の主人公）", Adult14, Adult14), OutfitProtagonist);
+            Dress(Compose("Face14_Hair14", "女大 14 の顔と髪（主人公の候補、服は前の主人公）", Adult14, Adult14), OutfitProtagonist);
 
         /// <summary>
-        /// 主人公: 女大 14 の頭（14 の顔と 14 の髪、黒）を、スポーツ 02 の体（灰のタンクトップ、紺のカーゴパンツ、白いスニーカー、腕時計）に載せた人。
+        /// 主人公（オーナーが決めた）: 女大 14 の頭（14 の顔と 14 の髪、黒）を、スポーツ 02 の体（灰のタンクトップ、紺のカーゴパンツ、白いスニーカー、腕時計）に載せた人。
         /// 服は元の色のまま（白い丸首のシャツは塗らない）。首の付け根より下の胸元はスポーツ 02 の頭の面で作り、肌は一つの比で揃える。
-        /// 胸元にネックレス（細い銀の鎖と小さな飾り）を描く
+        /// 胸元にネックレス（細い銀の鎖と丸い飾り）を描く。黒子は口の左下。華奢「強」
         /// </summary>
         public static readonly RocketboxPerson Face14Hair14BodySports02 =
             SlimOn(BodyChest(Dress(Compose("Face14_Hair14_BodySports02", "女大 14 の顔と髪をスポーツ 02 の体に（主人公）", Adult14, Sports02), OutfitProtagonistSports02)));
@@ -392,11 +400,11 @@ namespace HalfAware.EditorTools.Rocketbox
         public static readonly RocketboxPerson Face14Hair14BodySports02Slim =
             SlimOn(BodyChest(Dress(Compose("Face14_Hair14_BodySports02_Slim", "女大 14 の顔と髪をスポーツ 02 の体に、華奢（主人公の候補）", Adult14, Sports02), OutfitProtagonistSports02)));
 
-        /// <summary>主人公の片割れ（仮）: 主人公と同じ女大 14 の顔と髪と体。髪は 14 の元の茶色（塗らない）。模型ごと裏返して組み立てる。体は F3 で 02 にする</summary>
+        /// <summary>片割れ（<see cref="Face14Hair14MadeDress"/> と同じ人）。主人公の <see cref="TwinPerson"/> に据え、髪を 14 の元の茶にする</summary>
         public static readonly RocketboxPerson Face14Hair14Twin = Twin(Face14Hair14BodySports02, Face14Hair14MadeDress);
 
         /// <summary>
-        /// 主人公の候補: スポーツ 02 の顔に女大 14 の髪（頭の面の髪の所と前髪の塊、髪の房）をかつらとして合わせた人。体は女大 14（今の主人公の服）。
+        /// 主人公の候補: スポーツ 02 の顔に女大 14 の髪（頭の面の髪の所と前髪の塊、髪の房）をかつらとして合わせた人。体は女大 14（前の主人公の服）。
         /// スポーツ 02 の結んだ髪は除く。スポーツ 02 の絵の生え際は 14 の髪より低く、前髪の下に一色で塗った頭皮が帯に見えたので、
         /// 14 の殻が透ける所の頭皮は額の肌にする（<see cref="BareForehead"/>。スポーツ 02 の額は盛り上がっていないので、ここでは折れ目が出ない）
         /// </summary>
@@ -434,7 +442,7 @@ namespace HalfAware.EditorTools.Rocketbox
             return p;
         }
 
-        /// <summary>片割れにする。片割れの髪は女大 08 の元の茶色のまま（塗らない）。主人公の髪は黒</summary>
+        /// <summary>片割れにする。片割れの髪は髪の人の元の色のまま（塗らない。今は女大 14 の茶）。主人公の髪は黒</summary>
         static RocketboxPerson Twin(RocketboxPerson self, RocketboxPerson twin)
         {
             self.TwinPerson = twin;
@@ -447,7 +455,7 @@ namespace HalfAware.EditorTools.Rocketbox
             return twin;
         }
 
-        /// <summary>手を入れて撮り比べる人の全部</summary>
+        /// <summary>手を入れて撮り比べる人の全部（決まった二人と候補）。描き直しとメッシュの組み直しのメニューが回す</summary>
         public static readonly RocketboxPerson[] All = { Adult14, Adult08, Head08Body14, Face14Hair08, Face14Hair08Body03, Face14Hair08Body02, Face14Hair08Body11, Face14Hair08Body11Legs22,
             Face14Hair08BodySports02, FaceSports02Hair08, FaceSports02Hair08Body14, Face14Hair14, Face14Hair14BodySports02, FaceSports02Hair14,
             Face14Hair14Body18Robe10, Face14Hair14MadeDress, Face14Hair14BodySports02Slim };
@@ -493,7 +501,7 @@ namespace HalfAware.EditorTools.Rocketbox
         public string HairSlot { get { return HairFrom.Prefix + "_opacity"; } }
 
         /// <summary>
-        /// この人の既定の見た目。黒子 5 mm・手入れ 弱め、目は元の色。
+        /// この人の既定の見た目。黒子 5 mm・手入れ 弱め、目は元の色（ほかは人ごとの値と服）。
         /// 組み合わせでは、頭と髪の値は頭の人から、服の値は体の人から取り、体の手の肌の色を頭の肌に揃える
         /// </summary>
         public RocketboxPaint.Look Look()
@@ -520,11 +528,7 @@ namespace HalfAware.EditorTools.Rocketbox
         }
 
         /// <summary>
-        /// 片割れ（女大 03 の体）の服。白いシャツと白いパンツ、ほかは女大 03 の元のまま。
-        /// 片割れの頭のテクスチャには丸首のシャツを塗らない（女大 03 の服の襟ぐりが首元の肌を見せる形のため）
-        /// </summary>
-        /// <summary>
-        /// 片割れ（女大 02 の体）の服。デニムのスカートだけベージュに、ほかは女大 02 の元のまま。
+        /// 片割れの候補（女大 02 の体）の服。デニムのスカートだけベージュに、ほかは女大 02 の元のまま。
         /// 女大 02 は V 首のセーターの中に襟付きのシャツを着ていて胸元の肌を見せないので、片割れの頭のテクスチャの首から下は
         /// 女大 02 のシャツと同じ淡い青みの白の丸首のシャツとして塗る（女大 14 の胸の面が服の下から覗いても肌に見えないように）。素足の肌も頭の肌に揃える
         /// </summary>
@@ -544,7 +548,7 @@ namespace HalfAware.EditorTools.Rocketbox
         }
 
         /// <summary>
-        /// 片割れ（女大 11 の体）の服。茶色のワンピースを白に近い生成りに（布の陰影は元の明暗から）、ベルトとブーツは元の茶のまま。
+        /// 片割れの候補（女大 11 の体）の服。茶色のワンピースを白に近い生成りに（布の陰影は元の明暗から）、ベルトとブーツは元の茶のまま。
         /// 深い V 首は避け、首の付け根より少し下の浅い丸首にする: 片割れの頭のテクスチャの首から下と、体のテクスチャの V の肌を、
         /// ワンピースと同じ生成りの布として塗る（V の中の、女大 14 の胸と女大 11 の肌の継ぎ目も布の下に入る）。脚の肌は頭の肌に揃える
         /// </summary>
@@ -576,6 +580,10 @@ namespace HalfAware.EditorTools.Rocketbox
             k.topKeepUv = new Rect(0f, 1f - 190f / 512f, 1f, 40f / 512f);
         }
 
+        /// <summary>
+        /// 片割れの候補（女大 03 の体）の服。白いシャツと白いパンツ、ほかは女大 03 の元のまま。
+        /// 片割れの頭のテクスチャには丸首のシャツを塗らない（女大 03 の服の襟ぐりが首元の肌を見せる形のため）
+        /// </summary>
         static void Outfit03(RocketboxPaint.Look k)
         {
             k.blackenKnit = false;

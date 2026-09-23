@@ -8,16 +8,21 @@ using Object = UnityEngine.Object;
 namespace HalfAware.EditorTools.Rocketbox
 {
     /// <summary>
-    /// 主人公と片割れを Microsoft Rocketbox の一人（<see cref="RocketboxPerson"/>。今は女大 14 と女大 08 を撮り比べている）から組み立てる。
-    /// 顔も体もその一人。髪を黒に、目の下に黒子、顔に控えめな手入れ、ニットの服の人はカーディガンを黒に
-    /// （<see cref="RocketboxPaint"/>）。目は元の色のまま。場面には置かない（置くのは次の段で、場面の組み立てから <see cref="Build"/> を呼ぶ）。
+    /// 主人公と片割れを Microsoft Rocketbox の人（<see cref="RocketboxPerson"/>）から組み立てる。
+    /// - 主人公（<see cref="Chosen"/>）: 女大 14 の頭（顔と髪。髪は黒）を、スポーツ 02 の体（灰のタンクトップ、紺のカーゴパンツ、白いスニーカー、左の手首に腕時計）に載せた人。
+    ///   胸元に細い銀の鎖と丸い飾りのネックレス
+    /// - 片割れ（<see cref="RocketboxPerson.TwinPerson"/>）: 同じ女大 14 の頭（髪は 14 の元の茶）に、一から作った白いロングワンピース（<see cref="RocketboxDress"/>）と茶のサンダル。
+    ///   麦わら帽子（<see cref="RocketboxHat"/>）は Look.hat で被せる。既定は被らない
+    /// - 二人とも: 黒子 5 mm を口の端の少し下の外に、顔に弱めの手入れと鼻を目立たなくする手入れ（<see cref="RocketboxPaint"/>）、目は元の色のまま。
+    ///   華奢「強」（<see cref="RocketboxCompose.Slim"/>）、なで肩（<see cref="RocketboxRetarget.ClavicleDrop"/>）
+    /// 場面には置かない（置くのは次の段で、場面の組み立てから <see cref="Build"/> を呼ぶ）。
     ///
     /// 片割れは主人公の鏡像。模型の根の x を裏返して、体ごと左右を入れ替える（<see cref="Twin"/>）。
-    /// 黒子の絵は主人公と同じ一枚で、裏返した結果として本人の右目の下に来る。髪の分け目も逆になる
+    /// 黒子の絵は主人公と同じ描き方で、裏返した結果として本人の右（口の右下）に来る。髪の分け目も逆になる
     /// </summary>
     public static class BuildRocketboxProtagonist
     {
-        /// <summary>主人公にする人。オーナーが見比べて、女大 14 の顔と体に女大 08 の髪を載せた人に決めた</summary>
+        /// <summary>主人公にする人。オーナーが見比べて、女大 14 の頭（顔と髪、黒）をスポーツ 02 の体に載せた人に決めた</summary>
         public static readonly RocketboxPerson Chosen = RocketboxPerson.Face14Hair14BodySports02;
 
         /// <summary>立ちと歩きの状態機械（今の Protagonist.controller の写しに、Humanoid へ移し替えた動きを差した物。<see cref="RocketboxRetarget"/> が作る）</summary>
@@ -28,7 +33,7 @@ namespace HalfAware.EditorTools.Rocketbox
         {
             /// <summary>模型の根の x を裏返す。髪の分け目も黒子も逆になる</summary>
             MirrorWhole,
-            /// <summary>同じ模型のまま、黒子だけ右目の下に描いた絵にする</summary>
+            /// <summary>同じ模型のまま、黒子だけ本人の右（+x）に描いた絵にする（見比べ用に残す。今は使っていない）</summary>
             MoleOnly,
         }
 
@@ -403,7 +408,7 @@ namespace HalfAware.EditorTools.Rocketbox
 
         /// <summary>
         /// 縮めたテクスチャに手を入れ、その人の Painted/ に PNG とマテリアルで書く。
-        /// withTwinHead なら片割れ用の頭（黒子が右目の下）も書く。服を元のままにする人は、体のマテリアルが縮めた写しをそのまま使う
+        /// withTwinHead なら片割れ用の頭（黒子を本人の右に描いた頭。<see cref="TwinMode.MoleOnly"/> のときだけ）も書く。服を元のままにする人は、体のマテリアルが縮めた写しをそのまま使う
         /// </summary>
         public static string Paint(RocketboxPerson who, RocketboxPaint.Look look, bool withTwinHead)
         {
@@ -479,10 +484,6 @@ namespace HalfAware.EditorTools.Rocketbox
             return sb.ToString();
         }
 
-        /// <summary>
-        /// 体のテクスチャに手を入れる（ニットを黒に、頭と体が別の人なら手の肌を頭の肌に揃える）。
-        /// どちらもしないなら null（縮めた写しをそのまま使う）
-        /// </summary>
         /// <summary>
         /// 髪の殻の絵: 髪の人の頭のテクスチャを、髪の人の値で黒く塗る（使うのは髪の所だけなので、黒子と手入れは描かない）
         /// </summary>
@@ -597,6 +598,10 @@ namespace HalfAware.EditorTools.Rocketbox
             return RocketboxPaint.MatchSkinBy(px, map, head.Px, head.Hair, headMaps.Head, headMaps.Anchors, ownHead, own.Head, own.Anchors, look, out note);
         }
 
+        /// <summary>
+        /// 体のテクスチャに手を入れる（ニットを黒に・パンツや靴や中のトップスの色替え・一色の布、頭と体が別の人なら手の肌を頭の肌に揃える）。
+        /// どれもしないなら null（縮めた写しをそのまま使う）
+        /// </summary>
         static Color[] PaintBody(RocketboxPerson who, RocketboxPaint.Look look, Maps maps, RocketboxPaint.HeadResult head, out string skinNote)
         {
             skinNote = null;

@@ -5,14 +5,15 @@ using UnityEngine;
 namespace HalfAware.EditorTools.Rocketbox
 {
     /// <summary>
-    /// Rocketbox の女大 14 の縮めたテクスチャ（512）に、組み立てのときに手を入れる。
-    /// 値はすべて <see cref="Look"/> にあり、後から直せる。
+    /// Rocketbox の人の縮めたテクスチャ（512）に、組み立てのときに手を入れる。
+    /// 値はすべて <see cref="Look"/> にあり、後から直せる。今の二人（女大 14 の頭）に使うのは次の所:
     ///
-    /// - 髪を黒に（頭のテクスチャの頭皮の髪と、透けの絵の髪の房。毛筋の明暗は残す）
-    /// - カーディガンを黒に（ニットの目の明暗は残す）
-    /// - 目は元の色のまま（虹彩は目の玉の部品で、左右の目が頭のテクスチャの同じ一枚の目の絵を使う）
-    /// - 黒子（主人公は本人の左 = −x の目の下か口の下、片割れは右 = +x）
-    /// - 美人への控えめな手入れ（肌のむら、目元、眉、唇、頬から顎の陰り）
+    /// - 髪を黒に（主人公だけ。頭のテクスチャの頭皮の髪と、透けの絵の髪の房。毛筋の明暗は残す）。片割れは元の茶のまま（naturalHair）
+    /// - 目は元の色のまま（目の色は変えない。虹彩は目の玉の部品で、左右の目が頭のテクスチャの同じ一枚の目の絵を使う）
+    /// - 黒子（口の端の少し下の外。主人公は本人の左 = −x、片割れは模型ごと裏返して右 = +x）
+    /// - 美人への弱めの手入れ（肌のむら、目元、眉、唇、頬から顎の陰り）と、鼻を目立たなくする手入れ
+    /// - 体の人が別のとき、腕・脚・胸元の肌を頭の肌に揃える。主人公の胸元のネックレス、片割れの茶のサンダル
+    /// 撮り比べた候補の人のための所も残してある（ニットのカーディガンを黒に、服の塗り直し、白いシャツ、一色の布など）
     ///
     /// 場所の見分けは、テクスチャの画素ごとに模型の束ねた姿勢での位置（<see cref="Surface"/>）を求め、
     /// 目・口・鼻・眉などの場所は顔の骨（Bip01 LEye など）からの距離で決める。
@@ -35,7 +36,7 @@ namespace HalfAware.EditorTools.Rocketbox
             [Tooltip("頭のテクスチャで髪と見なす一番低い所（目の高さから下へ m）。これより下の暗い所は胸元の影などとして外す。長い髪の人は大きく")]
             public float hairLowest = 0.17f;
 
-            [Header("カーディガン（ニットの服を黒に。服を元のままにする人は false）")]
+            [Header("カーディガン（女大 14 の体のニットの服を黒に。候補の人だけが使う。服を元のままにする人は false）")]
             public bool blackenKnit = true;
             public Color knitShadow = new Color(0.012f, 0.012f, 0.014f);
             public Color knitShine = new Color(0.085f, 0.087f, 0.098f);
@@ -174,14 +175,14 @@ namespace HalfAware.EditorTools.Rocketbox
             [Header("別の人の髪を載せるとき（顔の人の頭のテクスチャ）")]
             [Tooltip("頭皮を兼ねた髪の殻を、毛筋の明暗の無い影の色一色で塗る（別の人の髪の下地にし、殻の外に見えても目立たせない）")]
             public bool flatHair;
-            [Header("ワンピース（上の服と借りたスカートを同じ布の色に。布の明暗は元のまま）")]
+            [Header("一色の布（候補 T の、上の服と借りた長衣を同じ布の色に。布の明暗は元のまま。今の片割れのワンピースは RocketboxDress で作るので使わない）")]
             public bool dress;
             [Header("麦わら帽子（RocketboxHat）")]
-            [Tooltip("帽子を被る")]
+            [Tooltip("帽子を被る（片割れの麦わら帽子、RocketboxHat）。既定は被らない")]
             public bool hat;
-            [Tooltip("前後の傾き（度、正で前が下がる）・左右の傾き（度）・上下（m、正で上）・前後のずれ（m、正で前）")]
+            [Tooltip("前後の傾き（度、正で前が下がる）・左右の傾き（度）・上下（m、正で上）・前後のずれ（m、正で前）。既定は後ろへ 22 度傾けて深く被る（オーナーが決めた）")]
             public float hatTilt = -22f, hatRoll, hatDepth = -0.034f, hatShift = -0.011f;
-            [Tooltip("膝から下を借りた人の靴（暗い革）を茶の革に塗る")]
+            [Tooltip("膝から下を借りた人の靴（暗い革）を茶の革に塗る（片割れのサンダル）")]
             public bool brownShoes;
             public Color brownShadow = new Color(0.16f, 0.09f, 0.05f), brownShine = new Color(0.52f, 0.33f, 0.18f);
             public Color dressShadow = new Color(0.56f, 0.53f, 0.48f), dressShine = new Color(0.95f, 0.93f, 0.88f);
@@ -317,7 +318,7 @@ namespace HalfAware.EditorTools.Rocketbox
             /// <summary>黒子の中心（模型の根の中）と UV。黒子が無ければ UV は負</summary>
             public Vector3 Mole;
             public Vector2 MoleUv = new Vector2(-1f, -1f);
-            /// <summary>印の絵（R = 黒子、G = 虹彩、B = 他の顔の部品、地は灰）。<see cref="HalfAware.EditorTools.Study.FaceStudy"/> で測るのに使う</summary>
+            /// <summary>印の絵（R = 黒子、G = 虹彩、B = 他の顔の部品、地は灰）。<see cref="HalfAware.EditorTools.Study.FaceStudy"/> で黒子や目の画素を測るのにだけ使う（目の色は変えない）</summary>
             public Color32[] Mask;
             /// <summary>頭のマテリアルの Specular の絵（sRGB の RGB = 照り返しの強さ、A = 滑らかさ）</summary>
             public Color32[] Spec;
@@ -329,7 +330,8 @@ namespace HalfAware.EditorTools.Rocketbox
 
         /// <summary>
         /// 頭のテクスチャ（顔・頭皮の髪・首と胸・口の中・目の玉）に手を入れる。
-        /// twin なら黒子を本人の右（+x）の目の下へ
+        /// twin なら黒子を本人の右（+x）へ（<see cref="BuildRocketboxProtagonist.TwinMode.MoleOnly"/> のときだけ。今の片割れは模型ごと裏返すので false で描く）。
+        /// 黒子の所は moleUnderLip なら口の端の少し下の外（今の二人）、そうでなければ目の下
         /// </summary>
         /// <param name="irisUv">目の玉の絵の虹彩の中心（UV）。塗らない。印の絵で虹彩を測るのにだけ使う</param>
         public static HeadResult Head(Color[] src, Surface s, Anchors a, Look k, bool twin, Vector2 irisUv, float irisRadius)
