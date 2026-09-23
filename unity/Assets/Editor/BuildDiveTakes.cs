@@ -720,34 +720,70 @@ namespace HalfAware.EditorTools
         // ---- 15. 女 63『エレナ』 団地の部屋。25 秒 ---------------------------------
 
         /// <summary>
-        /// テレビの前に座ったまま。夫が新聞を持って入ってきて隣に座る。
-        /// 部屋で動くのはテレビの光と、入ってくる夫だけ
+        /// 居間の肘掛け椅子に座ったまま。夫が新聞を持って玄関から廊下を歩いてきて、隣の椅子の前に立つ。
+        /// 部屋で動くのはテレビの光と、入ってくる夫と、開いた玄関の外のデッキを通る老女だけ
         /// </summary>
         static HostKey[] Elena(Transform take)
         {
-            // 座る先は廊下の硝子戸を抜けてすぐの座布団。炬燵の北の辺に、妻と並んで座る。
-            // **歩く線は廊下の真ん中の一本（RoomWalk）。** Mover は始まりと終わりを
-            // 一直線に結ぶだけなので、三和土の始まりと座る所を同じ x に揃えて、
-            // 廊下の壁も硝子戸も手すりも跨がないようにする。向きは炬燵とテレビの方
-            var sat = new Vector3(RoomWalk, EstateTop, RoomEnd - 0.34f);
-            var man = Cast(take, "Husband", "M_Casual", sat, 180f, 0, 0.95f);
-            // 夫が三和土から座るところまで歩くのは、名を呼ばれて返事をしてから。
-            // 二行目（エレナ「なあに」）が出たら数え始める
-            Move(man, new Vector3(RoomWalk, EstateTop - EstateSunk, EstateFace - 0.15f), sat, 0f, 5f, true, true, 2);
-            // 隣は鍵を掛けて出ていったあと。戸は閉まっている
+            // **夫は名を呼んだらすぐ、玄関から居間へ歩いてくる。** 玄関で止めておいて
+            // 二行目（エレナ「なあに」）で歩き出す形にしていたが、居間の椅子からは
+            // 玄関が台所との仕切りの端と階段の手すり壁の陰になり、座ったままでは夫を選べなかった。
+            // 合図を一行目（ジョルジョ「エレナ」、記憶に入った瞬間に出る）に掛け、
+            // 呼んで 1.5 秒で歩き出す。一行目が出ている 9 秒のうちに居間へ入ってくるので、
+            // 声の方へ振り向いた先で選べる。
+            // **歩く線は廊下の真ん中の一本。** Mover は始まりと終わりを一直線に結ぶだけなので、
+            // 玄関の足拭きの西寄り（傘立ての南）から、廊下の口を抜けて北の肘掛け椅子の前まで、
+            // x をほとんど動かさずに結ぶ。台所との仕切りの端からも居間の戸の板からも 0.2 m 離れる
+            var stood = new Vector3(10.30f, EstateTop, -20.55f);
+            var man = Cast(take, "Husband", "M_Casual", stood, 195f, 0, 0.95f);
+            Move(man, new Vector3(RoomWalk, EstateTop, EstateFace - 0.70f), stood, 1.5f, 5.5f, true, true, 1);
+
+            // **通りすがり。買い物袋を提げた老女（記憶 9 のローザ）が、開いた玄関の外のデッキを通る。**
+            // 設計書の「居間の窓の下」は、居間の窓の下半分から上までがレースで覆われていて、
+            // 座った目（1.15 m）からは窓の外が見えない。棟の南の地面も見えない仕切りの外になる。
+            // そこで、居間の椅子から廊下を真っ直ぐ抜けて開いた玄関の先に見えるデッキへ置く。
+            // 西（階段の側）から歩いてきて、B の戸口の前で止まり、袋を持ち直す。
+            // **見通しは細い。** 南の椅子から見えるのは、廊下の口の角（x 9.95）と階段の手すり壁（x 10.85）の
+            // あいだを抜けて玄関の穴に入る、幅 0.4 m ほどの帯だけ。戸口の真ん中（11.15）に立たせると
+            // 体の東半分が手すり壁に隠れたので、体の芯がその帯の真ん中に来る x 10.95 で止める。
+            // 会話とは関わらないので記憶の時計で動く
+            var shopStop = new Vector3(DoorB - 0.20f, EstateTop, EstateWalk + 0.10f);
+            var shopper = Cast(take, "Shopper", "W_Formal", shopStop, 90f, 0, 0.95f);
+            ShopBags(shopper);
+            Move(shopper, new Vector3(6.00f, EstateTop, EstateWalk + 0.20f), shopStop, 8f, 7f, true);
+
+            // 隣は鍵を掛けて出ていったあと。戸は閉まっている。夫は玄関を開けたまま入ってきた
             Shut(take, "ShutA", DoorA);
             Ajar(take, "AjarB", DoorB);
             return new[]
             {
-                // 座っているのは炬燵の北の辺の東、座椅子の上。夫の座る所の 0.74 m 東。
-                // 戸口は廊下の東の壁の陰で見えないので、声の方へは廊下の突き当たりの抜けを向く
-                K(0f,  5.10f, EstateTop, -17.02f, 171f,   8f, 1.15f),  // テレビの前
-                K(3f,  5.10f, EstateTop, -17.02f, 292f,   2f, 1.15f),  // 戸口から夫の声
-                K(9f,  5.10f, EstateTop, -17.02f, 296f,   0f, 1.15f),  // 新聞を持って入ってくる
-                K(14f, 5.10f, EstateTop, -17.02f, 272f,   8f, 1.15f),  // 隣に座る
-                K(18f, 5.10f, EstateTop, -17.02f, 270f,  16f, 1.15f),  // 新聞を広げる音
-                K(25f, 5.10f, EstateTop, -17.02f, 171f,  26f, 1.15f),  // テレビの光が床に当たっている
+                // 南の肘掛け椅子。暖炉とテレビを向いて並ぶ二つのうちの奥。北の椅子は夫が座る
+                K(0f,  9.62f, EstateTop, -22.10f, 102f,   8f, 1.15f),  // テレビの前
+                K(3f,  9.62f, EstateTop, -22.10f,  12f,   2f, 1.15f),  // 玄関から夫の声。廊下の先
+                K(9f,  9.62f, EstateTop, -22.10f,  20f,   0f, 1.15f),  // 新聞を持って入ってくる
+                K(14f, 9.62f, EstateTop, -22.10f,  30f,   8f, 1.15f),  // 隣の椅子の前に立つ
+                K(18f, 9.62f, EstateTop, -22.10f,  25f,  16f, 1.15f),  // 新聞を広げる音
+                K(25f, 9.62f, EstateTop, -22.10f, 102f,  26f, 1.15f),  // テレビの光が床に当たっている
             };
+        }
+
+        /// <summary>
+        /// 買い物袋を二つ、両手に提げさせる。白いレジ袋。
+        /// 人の子として置くので、板の出る位置や光線の狙い（人の形の箱）には入らない
+        /// </summary>
+        static void ShopBags(Transform who)
+        {
+            var bags = Piece(who, "Bags", Shape("ShopBags", 0.5f, b =>
+            {
+                for (var i = 0; i < 2; i++)
+                {
+                    var x = i == 0 ? -0.27f : 0.27f;
+                    b.Box(new Vector3(x, 0.52f, 0.02f), new Vector3(0.10f, 0.30f, 0.28f));
+                    // 持ち手
+                    b.Box(new Vector3(x, 0.70f, 0.02f), new Vector3(0.02f, 0.08f, 0.12f));
+                }
+            }), AssetDatabase.LoadAssetAtPath<Material>(Materials + "EstateFrame.mat"));
+            bags.localPosition = Vector3.zero;
         }
     }
 }

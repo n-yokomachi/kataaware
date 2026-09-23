@@ -110,10 +110,12 @@ namespace HalfAware.EditorTools
                 Blur.Far, 0.7f, 0.8f, Tone(1.00f, 1.00f, 0.92f), 0f, false,
                 Who("Neighbour", 13), Who("Teacher", 7)));
 
-            // 15. 団地の部屋。テレビの前に座ったまま、新聞を持った夫が隣に座る
+            // 15. 公営住宅の居間。肘掛け椅子に座ったまま、新聞を持った夫が入ってくる。
+            // 開いた玄関の外のデッキを、買い物袋を提げた老女（9 のローザ）が通る。
+            // 公営住宅から公園へ出る口はここ一つ（設計書 6 節の通りすがり）
             entries.Add(Of("女　63　『エレナ』　2156/03/02 09:03", DiveIds.Estate, 25f, 1.15f,
                 Blur.Near, 0.6f, 0.7f, Tone(0.92f, 0.90f, 0.86f), Aged, false,
-                Who("Husband", 8)));
+                Who("Husband", 8), Who("Shopper", 9)));
 
             // 会話は番号で結ぶ。人ごとの Of の引数に混ぜると一行が長くなりすぎて、
             // 設計書 7 節と突き合わせられなくなる
