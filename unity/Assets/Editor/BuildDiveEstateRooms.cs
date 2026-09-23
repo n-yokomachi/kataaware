@@ -511,8 +511,9 @@ namespace HalfAware.EditorTools
             var ox = FlatWest + FlatWide * unit;
             // 浴槽の周りの壁の陶板。腰から肩の高さまで
             b.Tile.FaceX(ox + FlatIn + 0.005f, FlatZ(BathWall - HallSkin), FlatZ(BedWall + HallSkin), f4 + 0.55f, f4 + 1.45f, 1);
-            FlatThing(suite, unit, 0.47f, 2.20f, f4, new Vector3(0.74f, 0.56f, 1.72f));
-            FlatThing(b.Tile, unit, 0.47f, 2.20f, f4 + 0.50f, new Vector3(0.56f, 0.06f, 1.52f));
+            // 浴槽。形には当たりを入れない。歩いて入れないのは EstateTub の見えない箱
+            FlatThing(suite, unit, TubU, TubD, f4, new Vector3(TubWide, TubHigh, TubLong));
+            FlatThing(b.Fixture, unit, TubU, TubD, f4 + TubHigh - 0.06f, new Vector3(TubWide - 0.18f, 0.06f, TubLong - 0.20f));
             FlatThing(b.Gear, unit, 0.20f, 3.00f, f4 + 0.62f, new Vector3(0.10f, 0.05f, 0.04f));
             // 洗面台と鏡
             FlatThing(suite, unit, 1.90f, 3.28f, f4, new Vector3(0.16f, 0.74f, 0.16f));

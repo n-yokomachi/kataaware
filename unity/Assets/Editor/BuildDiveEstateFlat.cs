@@ -106,6 +106,14 @@ namespace HalfAware.EditorTools
         /// <summary>メーターの物入れの真ん中（u）。台所の窓と戸口のあいだ</summary>
         const float MeterAt = 3.35f;
 
+        // 浴室
+        /// <summary>浴槽の真ん中（u, d）と、間口・長さ・高さ。西の壁に沿わせる</summary>
+        const float TubU = 0.47f;
+        const float TubD = 2.20f;
+        const float TubWide = 0.74f;
+        const float TubLong = 1.72f;
+        const float TubHigh = 0.56f;
+
         /// <summary>住戸の奥行き d を場所の z へ</summary>
         static float FlatZ(float d)
         {
@@ -369,6 +377,26 @@ namespace HalfAware.EditorTools
             var z = new Vector3(ox + FlatInner - 0.06f, f3 + InnerRise + 0.9f + (InnerHead - InnerFoot) * pitch, FlatZ(InnerHead));
             var dir = z - a;
             b.Set.Box((a + z) * 0.5f, new Vector3(0.05f, 0.05f, dir.magnitude), Quaternion.LookRotation(dir.normalized, Vector3.up));
+        }
+
+        /// <summary>
+        /// 浴槽の当たり。見えない箱を、浴槽の東の縁から西の壁まで、表の寝室との仕切りから
+        /// 浴室の南の仕切りまで隙なく立てる。
+        ///
+        /// **浴室の設備は歩いて乗れない。** 家具と同じく浴槽の形には当たりを入れず、
+        /// 代わりに人の背より低くない箱で塞ぐ。stepOffset（0.3）より高いので上がれず、
+        /// 壁から壁まで詰めてあるので、浴槽の端と南の仕切りのあいだに体が挟まる隙も残らない
+        /// </summary>
+        static void EstateTub(Transform place, int unit)
+        {
+            var ox = FlatWest + FlatWide * unit;
+            var east = TubU + TubWide * 0.5f;
+            var north = BedWall + HallSkin;
+            var south = BathWall - HallSkin;
+            const float high = 1.2f;
+            Fence(place, "EstateTub" + (unit == 0 ? "A" : "B"),
+                new Vector3(ox + (FlatIn + east) * 0.5f, EstateUpper + high * 0.5f, FlatZ((north + south) * 0.5f)),
+                new Vector3(east - FlatIn, high, south - north));
         }
 
         /// <summary>住戸のローカルで箱一つ。仕切りや家具の塊に使う。y は絶対の高さ</summary>

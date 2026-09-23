@@ -260,6 +260,11 @@ namespace HalfAware.EditorTools
             public readonly Bank Moss = new Bank { Texel = 0.5f };
             /// <summary>前庭の芝と植木の葉</summary>
             public readonly Bank Turf = new Bank { Texel = 0.5f };
+            /// <summary>
+            /// 浴室の設備の陶器の面。陶板と同じ色だが当たりを入れない。
+            /// 浴槽の内側を陶板（当たりあり）で張っていた頃は、床から 0.56 m の浴槽の上に体が乗った
+            /// </summary>
+            public readonly Bank Fixture = new Bank { Texel = 0.5f };
         }
 
         // ---- 組み立て ----------------------------------------------------------
@@ -315,6 +320,7 @@ namespace HalfAware.EditorTools
             EstateEmit(place, "EstateRail", b.Rail, Mat("Rail"), true);
             EstateEmit(place, "EstateRoomFloor", b.Board, board, true);
             EstateEmit(place, "EstateTile", b.Tile, tiles, true);
+            EstateEmit(place, "EstateFixture", b.Fixture, tiles, false);
             EstateEmit(place, "EstateCast", b.Cast, cast, true);
             EstateEmit(place, "EstateFacing", b.Facing, brick, true);
             EstateEmit(place, "EstateWallA", b.WallA, wallA, true);
@@ -356,6 +362,9 @@ namespace HalfAware.EditorTools
             // デッキの東の端は妻壁が閉じているが、走り込んだときに抜けないよう仕切りを重ねる
             Fence(place, "EstateWalkEndB", new Vector3(WalkRight + 0.1f, EstateTop + 0.75f, EstateWalk),
                 new Vector3(0.2f, 1.5f, LandingDeep));
+
+            // 浴槽は歩いて入れも乗れもしない塊にする
+            for (var unit = 0; unit < 2; unit++) EstateTub(place, unit);
 
             EstateLamps(place);
         }
