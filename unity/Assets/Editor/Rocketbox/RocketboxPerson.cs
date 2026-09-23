@@ -57,6 +57,13 @@ namespace HalfAware.EditorTools.Rocketbox
         /// 引数は三角の UV の中心と、束ねた姿勢の位置の中心（m）。null なら何も除かない
         /// </summary>
         public System.Func<Vector2, Vector3, bool> DropFromHead;
+        /// <summary>
+        /// この人の腰から下を借りるとき、体の面から使う三角（引数は三角の UV の中心と、束ねた姿勢の位置の中心）。null なら全部。
+        /// 女大 10 では長衣の肩掛けの裾（腰の高さに垂れる）を除く
+        /// </summary>
+        public System.Func<Vector2, Vector3, bool> LegsKeep;
+        /// <summary>この人の腰から下を借りるとき、左右の脚に分かれて付いた布を、真ん中（左右 SkirtJoin m 以内）で両方の脚に半分ずつ付け直す（スカートが歩きで二つに割れないように）</summary>
+        public float SkirtJoin;
 
         /// <summary>
         /// 体が別の人のとき、首の付け根より下の胸元を、体の人の頭の面（体の人の頭のテクスチャで、肌を顔の人の肌に揃えた物）で作る。
@@ -290,6 +297,36 @@ namespace HalfAware.EditorTools.Rocketbox
             k.matchSkinAll = true;
         }
 
+        /// <summary>女大 10（Female_Adult_10）。黒い長衣（肩掛けの付いた床までの衣）とサンダル。長衣の下半分だけを片割れの候補に借りる（頭のテクスチャは無い）</summary>
+        public static readonly RocketboxPerson Adult10 = new RocketboxPerson("Female_Adult_10", "f201", "女大 10", k => { k.blackenKnit = false; })
+        {
+            HasHeadTexture = false,
+            // 長衣の下半分はテクスチャの下の帯（v 0.45 より下）。上の帯は肩掛けで、その裾が腰の高さに垂れている。足とサンダルは 15 cm より下
+            LegsKeep = (uv, p) => uv.y < 0.45f || p.y < 0.15f,
+            SkirtJoin = 0.10f,
+        };
+
+        /// <summary>女大 18（Female_Party_01）。白いキャミソール、デニムの短パン、白いロングブーツ。上半身だけを片割れの候補に借りる（頭のテクスチャは無い）</summary>
+        public static readonly RocketboxPerson Party01 = new RocketboxPerson("Female_Party_01", "f010", "女大 18（Party_01）", k => { k.blackenKnit = false; }) { HasHeadTexture = false };
+
+        /// <summary>
+        /// 片割れの候補（T）: 女大 14 の顔と髪（茶）を、女大 18 の上半身（キャミソール・肩・腕・手）に載せ、腰（0.95 m）から下を女大 10 の長衣の下半分とサンダルにした人。
+        /// キャミソールと長衣を同じ生成りの布に塗り、一枚のワンピースに見せる
+        /// </summary>
+        public static readonly RocketboxPerson Face14Hair14Body18Robe10 =
+            Legs(Dress(Compose("Face14_Hair14_Body18_Robe10", "女大 14 の顔と髪、女大 18 の上半身、女大 10 の長衣の下半分（片割れの候補）", Adult14, Party01), OutfitRobe), Adult10, 0.95f);
+
+        /// <summary>T の服: キャミソールと長衣を生成りの布に。胸元（女大 14 の頭の面の中のトップスとネックレス）は肌で塗り、腕と足の肌を頭の肌に揃える。髪は 14 の元の茶</summary>
+        static void OutfitRobe(RocketboxPaint.Look k)
+        {
+            k.blackenKnit = false;
+            k.shirt = false;
+            k.chestSkin = true;
+            k.matchSkinAll = true;
+            k.dress = true;
+            k.naturalHair = true;
+        }
+
         /// <summary>主人公の候補: 女大 14 の顔と髪（14 の元の頭そのまま。額の上の前髪の塊も元の形）。服は今の主人公と同じ</summary>
         public static readonly RocketboxPerson Face14Hair14 =
             Dress(Compose("Face14_Hair14", "女大 14 の顔と髪（主人公の候補、服は今の主人公）", Adult14, Adult14), OutfitProtagonist);
@@ -367,10 +404,11 @@ namespace HalfAware.EditorTools.Rocketbox
 
         /// <summary>手を入れて撮り比べる人の全部</summary>
         public static readonly RocketboxPerson[] All = { Adult14, Adult08, Head08Body14, Face14Hair08, Face14Hair08Body03, Face14Hair08Body02, Face14Hair08Body11, Face14Hair08Body11Legs22,
-            Face14Hair08BodySports02, FaceSports02Hair08, FaceSports02Hair08Body14, Face14Hair14, Face14Hair14BodySports02, Face14Hair14Twin, FaceSports02Hair14 };
+            Face14Hair08BodySports02, FaceSports02Hair08, FaceSports02Hair08Body14, Face14Hair14, Face14Hair14BodySports02, Face14Hair14Twin, FaceSports02Hair14,
+            Face14Hair14Body18Robe10 };
 
         /// <summary>取り込んだ一人（元の FBX とテクスチャを持つ人）</summary>
-        public static readonly RocketboxPerson[] Sources = { Adult14, Adult08, Adult03, Adult02, Adult11, Party02, Sports02 };
+        public static readonly RocketboxPerson[] Sources = { Adult14, Adult08, Adult03, Adult02, Adult11, Party02, Sports02, Adult10, Party01 };
 
         public bool IsComposite { get { return FaceFrom != this || HairFrom != this || BodyFrom != this; } }
 

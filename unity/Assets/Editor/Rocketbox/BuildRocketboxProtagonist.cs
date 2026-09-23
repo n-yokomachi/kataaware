@@ -290,7 +290,7 @@ namespace HalfAware.EditorTools.Rocketbox
                     // 組み合わせたメッシュはマテリアルの名前を持たない。面の組の順が体・頭・髪
                     ms = skin.Person.IsHairSwap
                         ? HairSwapSlots(skin, body, head)
-                        : (skin.Chest != null ? new[] { body, head, skin.Hair, skin.Chest } : new[] { body, head, skin.Hair });
+                        : ComposeSlots(skin, body, head);
                 }
                 else
                 {
@@ -307,6 +307,15 @@ namespace HalfAware.EditorTools.Rocketbox
                 // 骨が動いて頭が元の箱から出ても消えないように
                 r.updateWhenOffscreen = true;
             }
+        }
+
+        /// <summary>頭を載せ替えた人の、組み合わせたメッシュの面の組: 体・頭・髪、体の人の頭の面で作った胸元、借りた腰から下</summary>
+        static Material[] ComposeSlots(Skin skin, Material body, Material head)
+        {
+            var ms = new List<Material> { body, head, skin.Hair };
+            if (skin.Chest != null) ms.Add(skin.Chest);
+            if (skin.Legs != null) ms.Add(skin.Legs);
+            return ms.ToArray();
         }
 
         /// <summary>顔と髪が別の人の、組み合わせたメッシュの面の組: 体・頭・髪の殻・髪の房・まつ毛、借りた膝から下、体の人の頭の面で作った胸元</summary>
@@ -536,7 +545,10 @@ namespace HalfAware.EditorTools.Rocketbox
             k.matchSkinAll = true;
             var headMaps = Maps.Get(who, 512);
             var legMaps = Maps.Get(who.LegsFrom, 512);
-            return RocketboxPaint.MatchSkin(px, legMaps.Body, head.Px, head.Hair, headMaps.Head, headMaps.Anchors, k, out note);
+            px = RocketboxPaint.MatchSkin(px, legMaps.Body, head.Px, head.Hair, headMaps.Head, headMaps.Anchors, k, out note);
+            // 服を一色の布に（長衣。足とサンダルの高さより上）
+            if (look.dress) RocketboxPaint.Dress(px, legMaps.Body, look, -1f, who.LegsCut + 0.05f, true);
+            return px;
         }
 
         /// <summary>胸元（体の人の頭のテクスチャ）の肌を、顔の人の首元の肌に揃える</summary>
@@ -569,7 +581,7 @@ namespace HalfAware.EditorTools.Rocketbox
         static Color[] PaintBody(RocketboxPerson who, RocketboxPaint.Look look, Maps maps, RocketboxPaint.HeadResult head, out string skinNote)
         {
             skinNote = null;
-            if (!look.blackenKnit && !look.matchSkin && !look.recolourPants && !look.recolourShoes && !look.recolourTop) return null;
+            if (!look.blackenKnit && !look.matchSkin && !look.recolourPants && !look.recolourShoes && !look.recolourTop && !look.dress) return null;
             int n;
             var px = ToColors(RocketboxTextures.ReadPng(who.BodySrc, out n, out n));
             if (look.blackenKnit || look.recolourPants || look.recolourShoes || look.recolourTop)
@@ -577,6 +589,7 @@ namespace HalfAware.EditorTools.Rocketbox
                 float[] knit;
                 px = RocketboxPaint.Body(px, maps.Body, look, out knit);
             }
+            if (look.dress) RocketboxPaint.Dress(px, maps.Body, look, who.LegsFrom != null ? who.LegsCut - 0.05f : 0f, 9f, false);
             if (look.matchSkin)
                 px = who.ChestFromBody
                     ? MatchBodyPersonSkin(px, maps.Body, who, head, look, out skinNote)

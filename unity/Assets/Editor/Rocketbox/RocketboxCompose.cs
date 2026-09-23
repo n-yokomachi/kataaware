@@ -145,7 +145,15 @@ namespace HalfAware.EditorTools.Rocketbox
             var bUv = bm.uv;
             var bWeights = bm.boneWeights;
             var hWeights = hm.boneWeights;
-            var bodyTris = Pack(bm.GetTriangles(bodySub), i => bv[i], i => bNorm[i], i => bUv[i], i => bWeights[i], verts, norms, uvs, weights);
+            var bodyAll = bm.GetTriangles(bodySub);
+            int[] legsOut = null;
+            string legsNote = null;
+            if (who.LegsFrom != null)
+            {
+                bodyAll = Above(bodyAll, bw, who.LegsCut);
+                legsOut = Legs(who, bodySmr, bw, bodyAll, verts, norms, uvs, weights, out legsNote);
+            }
+            var bodyTris = Pack(bodyAll, i => bv[i], i => bNorm[i], i => bUv[i], i => bWeights[i], verts, norms, uvs, weights);
             Func<int, BoneWeight> hwOf = i =>
             {
                 var w = hWeights[i];
@@ -242,11 +250,12 @@ namespace HalfAware.EditorTools.Rocketbox
             mesh.SetUVs(0, uvs);
             mesh.boneWeights = weights.ToArray();
             mesh.bindposes = bm.bindposes;
-            mesh.subMeshCount = chestTris != null ? 4 : 3;
+            mesh.subMeshCount = 3 + (chestTris != null ? 1 : 0) + (legsOut != null ? 1 : 0);
             mesh.SetTriangles(bodyTris, 0);
             mesh.SetTriangles(headTris, 1);
             mesh.SetTriangles(hairTris, 2);
             if (chestTris != null) mesh.SetTriangles(chestTris, 3);
+            if (legsOut != null) mesh.SetTriangles(legsOut, chestTris != null ? 4 : 3);
             mesh.RecalculateBounds();
             Save(mesh, who.CompositeMesh);
 
@@ -259,8 +268,148 @@ namespace HalfAware.EditorTools.Rocketbox
                 "胸元を体の人の肌の三角で埋めた数 {17}\n{15}\n書いた所: {16}",
                 who, verts.Count, (bodyTris.Length + headTris.Length + hairTris.Length) / 3, bodyTris.Length / 3, headTris.Length / 3, hairTris.Length / 3,
                 snapped, maxSnap * 1000f, pushedIn, maxIn * 1000f, hairInside, worstHair * 1000f, pushedOut, HairOver * 1000f, maxOut * 1000f,
-                seam, who.CompositeMesh, patch.Count / 3);
+                seam, who.CompositeMesh, patch.Count / 3) + (legsNote != null ? "\n" + legsNote : "");
         }
+
+        /// <summary>重心が cut より上の三角だけ</summary>
+        static int[] Above(int[] tris, Vector3[] w, float cut)
+        {
+            var kept = new List<int>();
+            for (var t = 0; t < tris.Length; t += 3)
+                if ((w[tris[t]].y + w[tris[t + 1]].y + w[tris[t + 2]].y) / 3f >= cut) { kept.Add(tris[t]); kept.Add(tris[t + 1]); kept.Add(tris[t + 2]); }
+            return kept.ToArray();
+        }
+
+        /// <summary>
+        /// 腰（who.LegsCut）から下を、LegsFrom の人の体の面から借りる（女大 10 の長衣の下半分とサンダル）。
+        /// 借りるのは、重心が継ぐ高さ + 3 cm より下で、腕・手・鎖骨に付いた頂点を含まない三角（長衣の肩掛けと手を除く）。
+        /// 長衣は腰より太いので、腰の周へ細める: 継ぐ高さでの体の人の服の周（向きごと）の 2 mm 内側へ、継ぐ高さから <see cref="SkirtTaper"/> 下までで
+        /// 寄せる量を 1 から 0 へ減らす（腰から裾へ広がる形になる）。継ぐ高さより上の重なる帯は、全部寄せて上の服の内側に隠す
+        /// </summary>
+        static int[] Legs(RocketboxPerson who, SkinnedMeshRenderer bodySmr, Vector3[] bw, int[] upperTris, List<Vector3> verts, List<Vector3> norms, List<Vector2> uvs, List<BoneWeight> weights, out string note)
+        {
+            var cut = who.LegsCut;
+            var legsSmr = Smr(who.LegsFrom.Model);
+            var lm = legsSmr.sharedMesh;
+            var lw = World(lm.vertices, legsSmr.transform.localToWorldMatrix);
+            var lwts = lm.boneWeights;
+            var bones = legsSmr.bones;
+            Func<int, bool> armish = i =>
+            {
+                var n = bones[lwts[i].boneIndex0].name;
+                return n.Contains("Arm") || n.Contains("Hand") || n.Contains("Finger") || n.Contains("Clavicle");
+            };
+            var legAll = lm.GetTriangles(Slot(legsSmr, who.LegsFrom.BodySlot));
+            var luv0 = lm.uv;
+            var legTris = new List<int>();
+            for (var t = 0; t < legAll.Length; t += 3)
+            {
+                int i0 = legAll[t], i1 = legAll[t + 1], i2 = legAll[t + 2];
+                if ((lw[i0].y + lw[i1].y + lw[i2].y) / 3f >= cut + 0.03f) continue;
+                if (armish(i0) || armish(i1) || armish(i2)) continue;
+                if (who.LegsFrom.LegsKeep != null && !who.LegsFrom.LegsKeep((luv0[i0] + luv0[i1] + luv0[i2]) / 3f, (lw[i0] + lw[i1] + lw[i2]) / 3f)) continue;
+                legTris.Add(i0); legTris.Add(i1); legTris.Add(i2);
+            }
+            // 体の人の服の、継ぐ高さの周（腰の真ん中のまわりの向き 10° ごとの一番外の半径）
+            var zc = 0f;
+            var cnt = 0;
+            foreach (var i in new HashSet<int>(upperTris))
+                if (Mathf.Abs(bw[i].y - cut) < 0.03f) { zc += bw[i].z; cnt++; }
+            zc = cnt > 0 ? zc / cnt : 0f;
+            var ring = new float[36];
+            foreach (var i in new HashSet<int>(upperTris))
+            {
+                var p = bw[i];
+                if (Mathf.Abs(p.y - cut) > 0.03f) continue;
+                var r = new Vector2(p.x, p.z - zc);
+                if (r.magnitude > 0.30f) continue;
+                var k = ((int)Mathf.Floor((Mathf.Atan2(r.y, r.x) * Mathf.Rad2Deg + 360f) / 10f)) % 36;
+                ring[k] = Mathf.Max(ring[k], r.magnitude);
+            }
+            // 抜けた向きは、となりの向きから埋める
+            for (var pass = 0; pass < 36; pass++)
+                for (var k = 0; k < 36; k++)
+                    if (ring[k] <= 0f) ring[k] = Mathf.Max(ring[(k + 35) % 36], ring[(k + 1) % 36]);
+            var moved = (Vector3[])lw.Clone();
+            int pulled = 0;
+            float maxPull = 0f;
+            foreach (var i in new HashSet<int>(legTris))
+            {
+                var p = lw[i];
+                var w = RocketboxPaint.Smooth(cut - SkirtTaper, cut, p.y);
+                if (w <= 0f) continue;
+                var r = new Vector2(p.x, p.z - zc);
+                var a = (Mathf.Atan2(r.y, r.x) * Mathf.Rad2Deg + 360f) / 10f;
+                var k0 = ((int)Mathf.Floor(a)) % 36;
+                var target = Mathf.Lerp(ring[k0], ring[(k0 + 1) % 36], a - Mathf.Floor(a)) - 0.002f;
+                var len = r.magnitude;
+                if (len <= target || len < 1e-4f) continue;
+                var nl = Mathf.Lerp(len, target, w);
+                var q = r * (nl / len);
+                moved[i] = new Vector3(q.x, p.y, q.y + zc);
+                pulled++;
+                maxPull = Mathf.Max(maxPull, len - nl);
+            }
+            var toLocal = bodySmr.transform.worldToLocalMatrix;
+            var ln = lm.normals;
+            var luv = lm.uv;
+            var remap = new int[bones.Length];
+            var index = new Dictionary<string, int>();
+            for (var i = 0; i < bodySmr.bones.Length; i++) index[bodySmr.bones[i].name] = i;
+            for (var i = 0; i < bones.Length; i++) remap[i] = index[bones[i].name];
+            // 左右の脚の骨の入れ替え（SkirtJoin）
+            var mirror = new int[bones.Length];
+            var byName = new Dictionary<string, int>();
+            for (var i = 0; i < bones.Length; i++) byName[bones[i].name] = i;
+            for (var i = 0; i < bones.Length; i++)
+            {
+                var n = bones[i].name;
+                var m = n.Contains(" L ") ? n.Replace(" L ", " R ") : n.Contains(" R ") ? n.Replace(" R ", " L ") : n;
+                int j;
+                mirror[i] = byName.TryGetValue(m, out j) ? j : i;
+            }
+            var join = who.LegsFrom.SkirtJoin;
+            int joined = 0;
+            Func<int, BoneWeight> re = i =>
+            {
+                var w = lwts[i];
+                var mix = join > 0f && lw[i].y > 0.15f ? 0.5f * RocketboxPaint.Smooth(join, 0f, Mathf.Abs(lw[i].x)) : 0f;
+                if (mix > 0.001f)
+                {
+                    // 元の重みと、左右を入れ替えた重みを混ぜ、大きい四つを取る
+                    var acc = new Dictionary<int, float>();
+                    Action<int, float> add = (b, v) => { if (v <= 0f) return; float o; acc.TryGetValue(b, out o); acc[b] = o + v; };
+                    add(w.boneIndex0, w.weight0 * (1f - mix)); add(w.boneIndex1, w.weight1 * (1f - mix)); add(w.boneIndex2, w.weight2 * (1f - mix)); add(w.boneIndex3, w.weight3 * (1f - mix));
+                    add(mirror[w.boneIndex0], w.weight0 * mix); add(mirror[w.boneIndex1], w.weight1 * mix); add(mirror[w.boneIndex2], w.weight2 * mix); add(mirror[w.boneIndex3], w.weight3 * mix);
+                    var list = new List<KeyValuePair<int, float>>(acc);
+                    list.Sort((x, y) => y.Value.CompareTo(x.Value));
+                    var sum = 0f;
+                    for (var k = 0; k < list.Count && k < 4; k++) sum += list[k].Value;
+                    var nw = new BoneWeight();
+                    if (list.Count > 0) { nw.boneIndex0 = list[0].Key; nw.weight0 = list[0].Value / sum; }
+                    if (list.Count > 1) { nw.boneIndex1 = list[1].Key; nw.weight1 = list[1].Value / sum; }
+                    if (list.Count > 2) { nw.boneIndex2 = list[2].Key; nw.weight2 = list[2].Value / sum; }
+                    if (list.Count > 3) { nw.boneIndex3 = list[3].Key; nw.weight3 = list[3].Value / sum; }
+                    w = nw;
+                    joined++;
+                }
+                w.boneIndex0 = remap[w.boneIndex0];
+                w.boneIndex1 = remap[w.boneIndex1];
+                w.boneIndex2 = remap[w.boneIndex2];
+                w.boneIndex3 = remap[w.boneIndex3];
+                return w;
+            };
+            var toW = legsSmr.transform.localToWorldMatrix;
+            var outTris = Pack(legTris.ToArray(), i => toLocal.MultiplyPoint3x4(moved[i]), i => toLocal.MultiplyVector(toW.MultiplyVector(ln[i])).normalized, i => luv[i], re, verts, norms, uvs, weights);
+            var rMean = 0f;
+            foreach (var r in ring) rMean += r;
+            note = string.Format(CultureInfo.InvariantCulture, "腰から下: {0} の三角 {1}（継ぐ高さ {2:0.00} m）、腰の周（平均の半径 {3:0.0} cm）へ細めた頂点 {4}（最大 {5:0.0} cm、{6:0} cm 下までで 0 へ）、真ん中で両脚に付け直した頂点 {7}",
+                who.LegsFrom, legTris.Count / 3, cut, rMean / 36f * 100f, pulled, maxPull * 100f, SkirtTaper * 100f, joined);
+            return outTris;
+        }
+
+        /// <summary>腰から借りるスカートを腰の周へ細める帯の長さ（m）</summary>
+        const float SkirtTaper = 0.25f;
 
         /// <summary>
         /// 顔の人の首元の肌を、体の人（顔の人と別の人）に合わせる（<see cref="BuildMesh"/> の頭の載せ替えと同じ直し。顔と髪も別の人から取るときに使う）。

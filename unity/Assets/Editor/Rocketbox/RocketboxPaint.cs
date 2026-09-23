@@ -171,6 +171,9 @@ namespace HalfAware.EditorTools.Rocketbox
             [Header("別の人の髪を載せるとき（顔の人の頭のテクスチャ）")]
             [Tooltip("頭皮を兼ねた髪の殻を、毛筋の明暗の無い影の色一色で塗る（別の人の髪の下地にし、殻の外に見えても目立たせない）")]
             public bool flatHair;
+            [Header("ワンピース（上の服と借りたスカートを同じ布の色に。布の明暗は元のまま）")]
+            public bool dress;
+            public Color dressShadow = new Color(0.56f, 0.53f, 0.48f), dressShine = new Color(0.95f, 0.93f, 0.88f);
             [Header("ネックレス（首の後ろから胸の真ん中へ斜めに下がる面が肌と交わる線に鎖、胸の真ん中に飾り）")]
             public bool necklace;
             public Color necklaceColour = new Color(0.82f, 0.82f, 0.84f);
@@ -1271,6 +1274,48 @@ namespace HalfAware.EditorTools.Rocketbox
             }
             for (var i = 0; i < w.Length; i++) if (w[i] < 0f) w[i] = 0f;
             return w;
+        }
+
+        /// <summary>
+        /// 服（肌でない所）を一つの布の色に塗る（<see cref="Look.dress"/>）。場所は束ねた姿勢の高さ fromY〜toY。
+        /// 明るさは元の服の明るさの 5〜95 % を布の陰から明るい所へ広げる（元の服が白でも黒でも、同じ布に見える）。
+        /// 青い下着（色相 150〜225°）は、まわりの服の真ん中の明るさにしてから塗る（胸元に濃い斑が残らないように）。
+        /// pad なら UV の島の外（詰め物）も布の明るい所の色にする（縁に元の黒が滲まないように）
+        /// </summary>
+        public static void Dress(Color[] px, Surface s, Look k, float fromY, float toY, bool pad)
+        {
+            var n = s.N;
+            var V = new float[px.Length];
+            var w = new float[px.Length];
+            var blue = new bool[px.Length];
+            var vs = new List<float>();
+            for (var i = 0; i < px.Length; i++)
+            {
+                float h, sat, v;
+                Color.RGBToHSV(px[i], out h, out sat, out v);
+                V[i] = v;
+                if (!s.On[i]) continue;
+                var y = s.P[i].y;
+                if (y < fromY || y > toY) continue;
+                // 足とサンダル（15 cm より下で、テクスチャの上の帯）は塗らない
+                if (pad && y < 0.15f && (i / n + 0.5f) / n > 0.6f) continue;
+                w[i] = Smooth(0.55f, 0.25f, SkinLike(px[i]));
+                blue[i] = w[i] > 0.5f && h * 360f > 150f && h * 360f < 225f && sat > 0.2f;
+                if (w[i] > 0.5f && !blue[i]) vs.Add(v);
+            }
+            if (vs.Count == 0) return;
+            vs.Sort();
+            var mid = vs[vs.Count / 2];
+            for (var i = 0; i < px.Length; i++) if (blue[i]) V[i] = mid;
+            Recolour(px, V, w, k.dressShadow, k.dressShine);
+            if (pad)
+                for (var i = 0; i < px.Length; i++)
+                    if (!s.On[i])
+                    {
+                        var c = Color.Lerp(k.dressShadow, k.dressShine, 0.6f);
+                        c.a = px[i].a;
+                        px[i] = c;
+                    }
         }
 
         static void Recolour(Color[] px, float[] V, float[] w, Color shadow, Color shine)
