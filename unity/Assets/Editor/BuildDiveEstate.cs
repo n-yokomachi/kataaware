@@ -261,8 +261,8 @@ namespace HalfAware.EditorTools
             /// <summary>前庭の芝と植木の葉</summary>
             public readonly Bank Turf = new Bank { Texel = 0.5f };
             /// <summary>
-            /// 浴室の設備の陶器の面。陶板と同じ色だが当たりを入れない。
-            /// 浴槽の内側を陶板（当たりあり）で張っていた頃は、床から 0.56 m の浴槽の上に体が乗った
+            /// 浴室の設備の陶器の面。陶板と同じ色だがコライダーを入れない。
+            /// 浴槽の内側を陶板（コライダーあり）で張っていた頃は、床から 0.56 m の浴槽の上に体が乗った
             /// </summary>
             public readonly Bank Fixture = new Bank { Texel = 0.5f };
         }
