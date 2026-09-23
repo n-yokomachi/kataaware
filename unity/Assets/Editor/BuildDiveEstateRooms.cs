@@ -37,6 +37,15 @@ namespace HalfAware.EditorTools
         /// <summary>A の家の中の仕切りの厚みの半分。B と同じ</summary>
         const float FlatSkin = HallSkin;
 
+        /// <summary>
+        /// B の居間と寝室の窓のレースの上端。床から。
+        ///
+        /// **レースは窓の下半分だけ。** 立った目（1.62 m）より下で止め、立てば外の景色が見える。
+        /// 窓の下から上近くまで覆っていた頃は、居間に立っても窓の外が空の細い帯しか見えなかった。
+        /// A の窓にはレースを掛けない。脇へ寄せたカーテンだけ
+        /// </summary>
+        const float NetTop = 1.3f;
+
         // ---- A（母ハンナと娘メイ） ----------------------------------------------
 
         /// <summary>A の家。三階の玄関・台所・食卓・居間と、四階の娘の部屋・母の寝室・浴室</summary>
@@ -181,7 +190,7 @@ namespace HalfAware.EditorTools
         /// B の家。三階の玄関・台所・食卓・居間と、四階の夫婦の寝室・裁縫の部屋・浴室。
         ///
         /// **居間の家具は暖炉を向く。** 肘掛け椅子を二つ並べ、暖炉の隅にテレビ。
-        /// 西の壁のサイドボードに家族の写真を並べ、その上に時計。窓は下までレースで覆う
+        /// 西の壁のサイドボードに家族の写真を並べ、その上に時計。窓は下半分にレースを掛ける（<see cref="NetTop"/>）
         /// </summary>
         static void EstateRoom(EstateBanks b)
         {
@@ -310,9 +319,9 @@ namespace HalfAware.EditorTools
                 FlatThing(b.Red, u, x, 8.30f, f3 + LoungeSill, new Vector3(0.14f, 0.13f, 0.14f));
                 FlatThing(b.Turf, u, x, 8.30f, f3 + LoungeSill + 0.13f, new Vector3(0.18f, 0.18f + (i % 2) * 0.10f, 0.16f));
             }
-            // 窓を下まで覆うレースと、両脇の厚いカーテン。背の高い灯り
+            // 窓の下半分のレースと、両脇の厚いカーテン。背の高い灯り
             FlatThing(b.Paper, u, (LoungeWin0 + LoungeWin1) * 0.5f, 8.19f, f3 + LoungeSill + 0.02f,
-                new Vector3(LoungeWin1 - LoungeWin0 - 0.10f, LoungeHead - LoungeSill - 0.36f, 0.01f));
+                new Vector3(LoungeWin1 - LoungeWin0 - 0.10f, NetTop - LoungeSill - 0.02f, 0.01f));
             EstateCurtains(b, u, b.Moss, LoungeWin0, LoungeWin1, FlatBackIn, f3, LoungeHead, 1);
             FlatThing(b.Gear, u, 2.50f, 8.00f, f3, new Vector3(0.04f, 1.45f, 0.04f));
             FlatThing(b.Yellow, u, 2.50f, 8.00f, f3 + 1.36f, new Vector3(0.38f, 0.30f, 0.38f));
@@ -356,7 +365,7 @@ namespace HalfAware.EditorTools
                 var a = i == 0 ? RearWin0 : RearWin2;
                 var z = i == 0 ? RearWin1 : RearWin3;
                 FlatThing(b.Paper, u, (a + z) * 0.5f, 8.19f, f4 + BedSill + 0.02f,
-                    new Vector3(z - a - 0.10f, BedHead - BedSill - 0.40f, 0.01f));
+                    new Vector3(z - a - 0.10f, NetTop - BedSill - 0.02f, 0.01f));
             }
 
             // ---- 浴室 ----
