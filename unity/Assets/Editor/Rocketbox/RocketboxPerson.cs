@@ -285,6 +285,30 @@ namespace HalfAware.EditorTools.Rocketbox
             k.matchSkinAll = true;
         }
 
+        /// <summary>主人公の候補: 女大 14 の顔と髪（14 の元の頭そのまま。額の上の前髪の塊も元の形）。服は今の主人公と同じ</summary>
+        public static readonly RocketboxPerson Face14Hair14 =
+            Dress(Compose("Face14_Hair14", "女大 14 の顔と髪（主人公の候補、服は今の主人公）", Adult14, Adult14), OutfitProtagonist);
+
+        /// <summary>
+        /// 主人公の候補: スポーツ 02 の顔に女大 14 の髪（頭の面の髪の所と前髪の塊、髪の房）をかつらとして合わせた人。体は女大 14（今の主人公の服）。
+        /// スポーツ 02 の結んだ髪は除く。スポーツ 02 の絵の生え際は 14 の髪より低く、前髪の下に一色で塗った頭皮が帯に見えたので、
+        /// 14 の殻が透ける所の頭皮は額の肌にする（<see cref="BareForehead"/>。スポーツ 02 の額は盛り上がっていないので、ここでは折れ目が出ない）
+        /// </summary>
+        public static readonly RocketboxPerson FaceSports02Hair14 =
+            BareOn(WigOn(Dress(ComposeHair("FaceSports02_Hair14", "スポーツ 02 の顔に女大 14 の髪、体は女大 14（主人公の候補）", Sports02, Adult14, Adult14), OutfitProtagonist)));
+
+        static RocketboxPerson BareOn(RocketboxPerson p)
+        {
+            p.BareForehead = true;
+            return p;
+        }
+
+        static RocketboxPerson WigOn(RocketboxPerson p)
+        {
+            p.Wig = true;
+            return p;
+        }
+
         static RocketboxPerson BodyChest(RocketboxPerson p)
         {
             p.ChestFromBody = true;
@@ -319,7 +343,7 @@ namespace HalfAware.EditorTools.Rocketbox
 
         /// <summary>手を入れて撮り比べる人の全部</summary>
         public static readonly RocketboxPerson[] All = { Adult14, Adult08, Head08Body14, Face14Hair08, Face14Hair08Body03, Face14Hair08Body02, Face14Hair08Body11, Face14Hair08Body11Legs22,
-            Face14Hair08BodySports02, FaceSports02Hair08, FaceSports02Hair08Body14 };
+            Face14Hair08BodySports02, FaceSports02Hair08, FaceSports02Hair08Body14, Face14Hair14, FaceSports02Hair14 };
 
         /// <summary>取り込んだ一人（元の FBX とテクスチャを持つ人）</summary>
         public static readonly RocketboxPerson[] Sources = { Adult14, Adult08, Adult03, Adult02, Adult11, Party02, Sports02 };
