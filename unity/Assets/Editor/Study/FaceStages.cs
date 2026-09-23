@@ -180,8 +180,9 @@ namespace HalfAware.EditorTools.Study
             var tris = 0;
             foreach (var s in new[] { -1f, 1f })
             {
-                var front = FaceMesh.PlateZ(plate, s * l.eyeX, l.eyeY) - FaceMesh.BallSink;
-                var m = FaceMesh.Ball(s, front, l, half);
+                var depth = FaceMesh.PlateDepth(plate, s * l.eyeX, l.eyeY, 0.022f);
+                var front = depth.At(s * l.eyeX, l.eyeY) - FaceMesh.BallSink;
+                var m = FaceMesh.Ball(s, front, l, half, depth);
                 var saved = SaveMesh(m, Dir + "/EyeBall" + (s < 0 ? "L" : "R") + ".asset");
                 tris += saved.triangles.Length / 3;
             }

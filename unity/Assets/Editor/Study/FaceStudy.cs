@@ -538,6 +538,8 @@ namespace HalfAware.EditorTools.Study
             public float irisH, irisS, irisV;
             /// <summary>ほくろを消した絵と比べて、明るさが 4 以上変わった画素の数と、変わった量の最大。比べていなければ -1</summary>
             public int changePx;
+            /// <summary>両目の虹彩の中心の画素（320×180）の平均の色相・彩度・明度</summary>
+            public float eyeH, eyeS, eyeV;
             public float changeMax;
 
             /// <summary>
@@ -561,8 +563,8 @@ namespace HalfAware.EditorTools.Study
             public string Short()
             {
                 return string.Format(CultureInfo.InvariantCulture,
-                    "顔幅 {0:0.0}px 両目 {1:0.0}px ほくろ {2}{3}px ΔL {4:0.0} 変わる画素 {10}（最大 {11:0}）虹彩 {5}px（琥珀 {6}px）H {7:0} S {8:0.00} V {9:0.00}",
-                    faceW, ipd, molePx, moleSub ? "(画素未満)" : "", moleSeen ? DeltaL : float.NaN, irisPx, amberPx, irisH, irisS, irisV, changePx, changeMax);
+                    "顔幅 {0:0.0}px 両目 {1:0.0}px ほくろ {2}{3}px ΔL {4:0.0} 変わる画素 {10}（最大 {11:0}）虹彩 {5}px（琥珀 {6}px）H {7:0} S {8:0.00} V {9:0.00} 目の中心 H {12:0} S {13:0.00} V {14:0.00}",
+                    faceW, ipd, molePx, moleSub ? "(画素未満)" : "", moleSeen ? DeltaL : float.NaN, irisPx, amberPx, irisH, irisS, irisV, changePx, changeMax, eyeH, eyeS, eyeV);
             }
 
             /// <summary>
@@ -645,12 +647,29 @@ namespace HalfAware.EditorTools.Study
                 else { m.irisH = m.irisS = m.irisV = float.NaN; }
 
                 // 両目の間隔。960×540 の虹彩の印を左右に分け、重心の間を 1/3 する
-                m.ipd = IrisSpan(markBig);
+                Vector2 ca, cb;
+                m.ipd = IrisSpan(markBig, out ca, out cb);
+                // 虹彩の中心の画素。虹彩が画素の半分を覆わない近さでも、目の所の色を見る
+                m.eyeH = m.eyeS = m.eyeV = float.NaN;
+                if (!float.IsNaN(m.ipd))
+                {
+                    var er = 0f; var eg = 0f; var eb = 0f;
+                    foreach (var c in new[] { ca, cb })
+                    {
+                        var x = Mathf.Clamp(Mathf.FloorToInt(c.x / 3f), 0, w - 1);
+                        var y = Mathf.Clamp(Mathf.FloorToInt(c.y / 3f), 0, h - 1);
+                        var p = img[y * w + x];
+                        er += p.r / 510f; eg += p.g / 510f; eb += p.b / 510f;
+                    }
+                    Color.RGBToHSV(new Color(er, eg, eb), out m.eyeH, out m.eyeS, out m.eyeV);
+                    m.eyeH *= 360f;
+                }
                 return m;
             }
 
-            static float IrisSpan(Color32[] big)
+            static float IrisSpan(Color32[] big, out Vector2 a, out Vector2 bb)
             {
+                a = bb = Vector2.zero;
                 var xs = new List<Vector2>();
                 for (var i = 0; i < big.Length; i++)
                     if (big[i].g >= MarkCut && big[i].r < OtherCut) xs.Add(new Vector2(i % BigW, i / BigW));
@@ -658,7 +677,7 @@ namespace HalfAware.EditorTools.Study
                 // 二つに分ける。x の最小と最大を種に、二度だけ振り分け直す
                 float lo = float.MaxValue, hi = float.MinValue;
                 foreach (var p in xs) { lo = Mathf.Min(lo, p.x); hi = Mathf.Max(hi, p.x); }
-                Vector2 a = new Vector2(lo, 0), bb = new Vector2(hi, 0);
+                a = new Vector2(lo, 0); bb = new Vector2(hi, 0);
                 for (var it = 0; it < 4; it++)
                 {
                     Vector2 sa = Vector2.zero, sb = Vector2.zero; int na = 0, nb = 0;
@@ -682,7 +701,7 @@ namespace HalfAware.EditorTools.Study
 
         public static float Luma(Color32 c) { return 0.299f * c.r + 0.587f * c.g + 0.114f * c.b; }
 
-        const string CsvHead = "tag,light,distance,yaw,face_px,ipd_px,mole_px,mole_subpixel,mole_luma,ring_luma,delta_luma,iris_px,amber_px,iris_h,iris_s,iris_v,mole_change_px,mole_change_max";
+        const string CsvHead = "tag,light,distance,yaw,face_px,ipd_px,mole_px,mole_subpixel,mole_luma,ring_luma,delta_luma,iris_px,amber_px,iris_h,iris_s,iris_v,mole_change_px,mole_change_max,eye_centre_h,eye_centre_s,eye_centre_v";
 
         static void Record(string tag, string light, float d, float yaw, Measure m)
         {
@@ -697,9 +716,9 @@ namespace HalfAware.EditorTools.Study
                     if (!l.StartsWith(key, StringComparison.Ordinal)) lines.Add(l);
             if (lines.Count == 0 || lines[0] != CsvHead) lines.Insert(0, CsvHead);
             lines.Add(key + string.Format(CultureInfo.InvariantCulture,
-                "{0:0.0},{1:0.0},{2},{3},{4:0.0},{5:0.0},{6:0.0},{7},{8},{9:0},{10:0.00},{11:0.00},{12},{13:0}",
+                "{0:0.0},{1:0.0},{2},{3},{4:0.0},{5:0.0},{6:0.0},{7},{8},{9:0},{10:0.00},{11:0.00},{12},{13:0},{14:0},{15:0.00},{16:0.00}",
                 m.faceW, m.ipd, m.molePx, m.moleSub ? 1 : 0, m.moleLuma, m.ringLuma, m.moleSeen ? m.DeltaL : float.NaN,
-                m.irisPx, m.amberPx, m.irisH, m.irisS, m.irisV, m.changePx, m.changeMax));
+                m.irisPx, m.amberPx, m.irisH, m.irisS, m.irisV, m.changePx, m.changeMax, m.eyeH, m.eyeS, m.eyeV));
             File.WriteAllLines(path, lines.ToArray());
         }
 

@@ -257,6 +257,7 @@ namespace HalfAware.EditorTools.Study
             {
                 const float step = 0.0025f;
                 var raw = DepthMap(v, baked, new[] { SkinSub }, Area2.xMin - 0.01f, Area2.xMax + 0.01f, Area2.yMin - 0.01f, Area2.yMax + 0.01f, step);
+                var hair = DepthMap(v, baked, new[] { HairSub }, Area2.xMin - 0.01f, Area2.xMax + 0.01f, Area2.yMin - 0.01f, Area2.yMax + 0.01f, step);
                 // 模型の鼻を外す。|x| < 18 mm の稜を、両脇の値を結ぶ緩い弧に置き換える
                 var flat = new float[raw.nx, raw.ny];
                 for (var j = 0; j < raw.ny; j++)
@@ -311,8 +312,12 @@ namespace HalfAware.EditorTools.Study
                         var inner = zs + Lift + Relief(x, y, l);
                         var edge = Mathf.Max(zr, zs) + Lift;
                         var z = Mathf.Lerp(inner, edge, rim);
+                        // 髪が肌を覆っている所（額の脇に流した前髪）では、面を髪の奥へ下げる。
+                        // そのままだと肌から 1.5 mm 浮かせた面が、肌に貼り付いた前髪を突き抜ける
+                        var zh = hair.At(x, y);
+                        if (!float.IsNaN(zh) && zh > zr - 0.002f) z = Mathf.Min(z, zh - 0.0008f);
                         // どこでも頭の肌より手前に
-                        z = Mathf.Max(z, zr + 0.0006f);
+                        z = Mathf.Max(z, zr + 0.0003f);
                         index[i, j] = verts.Count;
                         verts.Add(new Vector3(x, y, z));
                         uvs.Add(new Vector2((x - Area2.xMin) / Area2.width, (y - Area2.yMin) / Area2.height));
@@ -399,7 +404,7 @@ namespace HalfAware.EditorTools.Study
         /// 目の玉の帽子。球の一部を 13×9 の格子で。UV は右目の絵（<see cref="FacePaint.Ball"/>）の矩形へ当て、
         /// 左目は u を裏返す（虹彩のずれも鏡に映る）
         /// </summary>
-        public static Mesh Ball(float s, float front, FacePaint.Layout l, float half)
+        public static Mesh Ball(float s, float front, FacePaint.Layout l, float half, Depth plateDepth)
         {
             const int nx = 13, ny = 9;
             var verts = new List<Vector3>();
@@ -412,6 +417,9 @@ namespace HalfAware.EditorTools.Study
                     var dx = Mathf.Lerp(-BallHalfX, BallHalfX, i / (float)(nx - 1));
                     var dy = Mathf.Lerp(-BallHalfY, BallHalfY, j / (float)(ny - 1));
                     var z = cz + Mathf.Sqrt(Mathf.Max(0f, BallR * BallR - dx * dx - dy * dy));
+                    // どこでも面の 0.8 mm 奥に。瞼の下で目の玉が面を突き抜けないように
+                    var zp = plateDepth.At(cx + dx, cy + dy);
+                    if (!float.IsNaN(zp)) z = Mathf.Min(z, zp - 0.0008f);
                     verts.Add(new Vector3(cx + dx, cy + dy, z));
                     var u = 0.5f + s * dx / (2f * half);
                     uvs.Add(new Vector2(u, 0.5f + dy / (2f * half)));
@@ -433,12 +441,10 @@ namespace HalfAware.EditorTools.Study
             return m;
         }
 
-        /// <summary>面の上の点の z（面のメッシュを正面から見た深さ）</summary>
-        public static float PlateZ(Mesh plateMesh, float x, float y)
+        /// <summary>面のメッシュを正面から見た深さの地図（目の周り）</summary>
+        public static Depth PlateDepth(Mesh plateMesh, float x, float y, float half)
         {
-            var v = plateMesh.vertices;
-            var d = DepthMap(v, plateMesh, new[] { 0 }, x - 0.003f, x + 0.003f, y - 0.003f, y + 0.003f, 0.001f);
-            return d.At(x, y);
+            return DepthMap(plateMesh.vertices, plateMesh, new[] { 0 }, x - half, x + half, y - half, y + half, 0.0005f);
         }
     }
 }
