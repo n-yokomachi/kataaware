@@ -49,6 +49,14 @@ namespace HalfAware.EditorTools.Rocketbox
             public bool recolourTop;
             public Color topShadow = new Color(0.035f, 0.035f, 0.038f), topShine = new Color(0.200f, 0.200f, 0.210f);
 
+            [Header("丸首のシャツ（頭のテクスチャの首から下の肌を、白い丸首のシャツとして塗る）")]
+            public bool shirt;
+            public Color shirtColour = new Color(0.90f, 0.90f, 0.88f);
+            [Tooltip("襟ぐりの高さ。頭の骨（Bip01 Head）から下へ、前の真ん中と後ろ（m）")]
+            public float neckFront = 0.096f, neckBack = 0.072f;
+            [Tooltip("襟ぐりの丸み。前の真ん中から横へ x（m）離れると、x² × この値だけ上がる")]
+            public float neckRound = 6f;
+
             [Header("口")]
             [Tooltip("顎の骨（Bip01 MJaw）を閉じる向きへ回す角度（度）。元の模型は口が少し開いていて、斜めから歯が見える")]
             public float jawClose;
@@ -266,7 +274,13 @@ namespace HalfAware.EditorTools.Rocketbox
             }
             // 別の人の髪を載せるとき（一色で塗るとき）は、髪の中の明るい毛筋（幅 6 画素まで）も髪にする。
             // 明るい毛筋は暗さで髪と見なされず、別の人の髪の分け目から明るい茶の筋になって覗いた
-            if (k.flatHair) hair = MinMax(MinMax(hair, n, 3, true), n, 3, false);
+            if (k.flatHair)
+            {
+                hair = MinMax(MinMax(hair, n, 3, true), n, 3, false);
+                // 太い毛筋も、まわり（半径 6 画素）の多くが髪なら髪にする
+                var wide = Blur(hair, s.On, n, Mathf.Max(2, Mathf.RoundToInt(6 * scale)));
+                for (var i = 0; i < hair.Length; i++) hair[i] = Mathf.Max(hair[i], Smooth(0.50f, 0.65f, wide[i]));
+            }
             hair = Blur(hair, s.On, n, 1);
 
             var b = Mathf.Clamp01(k.beauty);
@@ -418,6 +432,9 @@ namespace HalfAware.EditorTools.Rocketbox
                     px[i] = new Color(c.r * (1f - w), c.g * (1f - w * 1.05f), c.b * (1f - w * 1.05f), c.a);
                 }
             }
+
+            // 6b. 丸首のシャツ
+            if (k.shirt) Shirt(px, s, a, k);
 
             // 7. 虹彩は塗らない。印の絵のために、瞳の外から虹彩の縁までの輪だけを覚える
             var irisMask = new bool[n * n];
@@ -621,6 +638,39 @@ namespace HalfAware.EditorTools.Rocketbox
                     o[y * n + x] = v;
                 }
             return o;
+        }
+
+        /// <summary>
+        /// 首から下の肌（頭のテクスチャの首と胸の上）を、白い丸首のシャツとして塗る。襟ぐりは首の付け根で丸く、前が低く後ろが高い。
+        /// 明暗は元の肌の明るさから取り、襟ぐりのすぐ下を少し暗くしてリブに見せる。ネックレスもシャツの下に消える
+        /// </summary>
+        static void Shirt(Color[] px, Surface s, Anchors a, Look k)
+        {
+            var line = new float[px.Length];
+            var lums = new List<float>();
+            for (var i = 0; i < px.Length; i++)
+            {
+                if (!s.On[i]) continue;
+                var p = s.P[i];
+                var front = Smooth(a.head.z - 0.01f, a.head.z + 0.06f, p.z);
+                line[i] = Mathf.Lerp(a.head.y - k.neckBack, a.head.y - k.neckFront, front) + k.neckRound * p.x * p.x;
+                if (p.y < line[i] - 0.01f) lums.Add(Lum(px[i]));
+            }
+            if (lums.Count == 0) return;
+            lums.Sort();
+            var median = Mathf.Max(0.05f, lums[lums.Count / 2]);
+            for (var i = 0; i < px.Length; i++)
+            {
+                if (!s.On[i]) continue;
+                var p = s.P[i];
+                var w = Smooth(line[i] + 0.0012f, line[i] - 0.0012f, p.y);
+                if (w <= 0f) continue;
+                var shade = Mathf.Clamp(Lum(px[i]) / median, 0.80f, 1.06f);
+                var rib = 1f - 0.12f * Smooth(0.005f, 0.002f, line[i] - p.y);
+                var c = k.shirtColour * (shade * rib);
+                c.a = px[i].a;
+                px[i] = Color.Lerp(px[i], c, w);
+            }
         }
 
         /// <summary>負の値（島の外）を、となりの値の平均で 4 回まで広げる。届かない所は 0</summary>

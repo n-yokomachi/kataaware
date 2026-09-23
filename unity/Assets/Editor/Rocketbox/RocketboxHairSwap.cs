@@ -115,10 +115,28 @@ namespace HalfAware.EditorTools.Rocketbox
             float maxFace = 0f, maxClothes = 0f, worstClothes = 0f;
             var hairVerts = new HashSet<int>(shellTris);
             hairVerts.UnionWith(hairCards);
+            // 前髪: 額の上（眉より上で、目の玉の中心より 3 cm 奥より前）では、顔の人の頭の面の全部（頭皮を兼ねた髪の殻も）から外へ出す。
+            // 顔の三角だけから出していたので、髪の人の前髪が顔の人の頭皮の中に埋まり、頭皮の明るい毛筋が分け目から覗いた
+            var headSurf = new RocketboxCompose.Surface(fw, faceHead);
+            var headEdges = EdgeSegments(faceHead, fw);
+            int outOfFront = 0;
             foreach (var i in hairVerts)
             {
                 var p = moved[i];
                 Vector3 q, n;
+                if (p.z > a.eyeL.z - 0.03f && p.y > a.eyeL.y + 0.02f)
+                {
+                    var dh = headSurf.Closest(p, 0.04f, out q, out n);
+                    if (!float.IsInfinity(dh) && EdgeDistance(q, headEdges) > 0.0003f)
+                    {
+                        var sh = Vector3.Dot(p - q, n) >= 0f ? dh : -dh;
+                        if (sh < OverFace)
+                        {
+                            p = p + n * (OverFace - sh);
+                            outOfFront++;
+                        }
+                    }
+                }
                 var d = faceSurf.Closest(p, 0.04f, out q, out n);
                 if (!float.IsInfinity(d) && EdgeDistance(q, faceEdges) > 0.0003f)
                 {
@@ -269,6 +287,7 @@ namespace HalfAware.EditorTools.Rocketbox
                 "{0}: 頂点 {1}・三角 {2}（体 {3}・顔の人の頭 {4}・髪の殻 {5}・髪の房 {6}・まつ毛 {7}）\n" +
                 "顔の人の頭の面 {8} 三角のうち顔 {9}、髪の殻 {10}。髪の人の髪の三角のうち顔から 3 mm 以内の物 {11}（外へ押し出す）\n" +
                 "顔の人の髪の殻を髪の人の殻の内側へ沈めた頂点 {12}（最大 {13:0.0} mm。殻の不透明な所の下にあった顔の頂点 {26} を含む）\n" +
+                "額の上で顔の人の頭の面の内側から押し出した前髪の頂点 {27}\n" +
                 "顔（耳・頬）の内側から押し出した髪の頂点 {14}（最大 {15:0.0} mm）、服から押し出した髪の頂点 {16}（服の内側にあった {17}、一番深い所 {18:0.0} mm）\n" +
                 "生え際（顔の人の生え際の辺 {19}（目より 2 cm 上） → 髪の人の殻）: 平均 {20:0.0} mm、中央 {21:0.0} mm、5 mm 超 {22}、15 mm 超 {23}\n" +
                 "顔の人の塗った髪で、髪の人の殻から 5 mm より離れた所 {24:0.0} cm²\n書いた所: {25}",
@@ -278,7 +297,7 @@ namespace HalfAware.EditorTools.Rocketbox
                 sunk, maxSink * 1000f,
                 outOfFace, maxFace * 1000f, outOfClothes, clothesInside, worstClothes * 1000f,
                 gaps.Count, gaps.Count > 0 ? gsum / gaps.Count * 1000f : 0f, gaps.Count > 0 ? gaps[gaps.Count / 2] * 1000f : 0f, g5, g15,
-                bare * 10000f, who.CompositeMesh, faceUnder);
+                bare * 10000f, who.CompositeMesh, faceUnder, outOfFront);
         }
 
         // ---- 見分け -----------------------------------------------------------

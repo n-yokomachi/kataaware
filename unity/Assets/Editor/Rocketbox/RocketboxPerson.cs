@@ -112,19 +112,18 @@ namespace HalfAware.EditorTools.Rocketbox
 
         /// <summary>女大 14 の顔と体に、女大 08 の髪（長さと形ごと）を載せた人</summary>
         public static readonly RocketboxPerson Face14Hair08 = Dress(ComposeHair("Face14_Hair08", "女大 14 の顔と体に女大 08 の髪", Adult14, Adult08, Adult14),
-            // 主人公: 都会のモード系。カーディガン・パンツ・靴を黒、中のトップスを濃い灰
+            // 主人公: 都会のモード系。カーディガンと靴を黒、パンツは女大 14 の元のダークデニム、中は白い丸首のシャツ
+            // （カーディガンの開きから見える胸の肌と、中のトップスを白く塗る）
             k =>
             {
                 k.blackenKnit = true;
-                k.recolourPants = true;
-                k.pantsShadow = new Color(0.010f, 0.010f, 0.012f);
-                k.pantsShine = new Color(0.070f, 0.070f, 0.078f);
                 k.recolourShoes = true;
                 k.shoeShadow = new Color(0.008f, 0.008f, 0.009f);
                 k.shoeShine = new Color(0.100f, 0.098f, 0.100f);
                 k.recolourTop = true;
-                k.topShadow = new Color(0.035f, 0.035f, 0.038f);
-                k.topShine = new Color(0.200f, 0.200f, 0.210f);
+                k.topShadow = new Color(0.80f, 0.80f, 0.78f);
+                k.topShine = new Color(0.93f, 0.93f, 0.91f);
+                k.shirt = true;
             },
             // 片割れ: 田舎のアースカラー。カーディガンは女大 14 の元の生成りのまま、パンツをオリーブ、靴を茶の革、中のトップスをテラコッタ
             k =>
