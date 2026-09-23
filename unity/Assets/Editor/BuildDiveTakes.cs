@@ -32,20 +32,19 @@ namespace HalfAware.EditorTools
         /// <summary>始まりの向き。東の一本は +z へ上がっていくので、0 度でそのまま階段が正面に来る</summary>
         const float FirstYaw = 0f;
 
-        /// <summary>同じ体つきは一つの mesh を使い回す。人ごとに焼くと repo が 30 MB 増える</summary>
-        static readonly Dictionary<string, Mesh> figures = new Dictionary<string, Mesh>();
-
         static Transform Takes(Transform root, DiveRoster roster)
         {
             var parent = Child(root, "Takes");
             Clear(parent);
-            figures.Clear();
+            ForgetFigures();
 
             for (var i = 0; i < roster.Count && i < Memories.Length; i++)
             {
                 var go = new GameObject(i.ToString());
                 go.transform.SetParent(parent, false);
                 go.transform.localPosition = PlaceOrigin(roster[i].place);
+                // 人は板の相手の名前から一覧の飛び先を引いて決まる（BuildDivePeople の Cast）
+                casting = roster[i];
                 var keys = Memories[i](go.transform);
 
                 var take = go.AddComponent<Take>();
@@ -57,6 +56,8 @@ namespace HalfAware.EditorTools
 
                 // 潜るまでは伏せる。DiveDirector が一本だけ起こす
                 go.SetActive(false);
+                // 測りと持ち物のために置いた形を、模型の素へ戻してから保存する
+                UnposeFigures(go.transform);
             }
             return parent;
         }
@@ -100,50 +101,9 @@ namespace HalfAware.EditorTools
         }
 
         // ---- 人 --------------------------------------------------------------
-
-        /// <summary>
-        /// 人をひとり置く。名前は一覧の <see cref="Seen.name"/> と揃える。
-        /// build は体つきで、子どもを 0.6、老人を 0.95 にしてある
-        /// </summary>
-        static Transform Cast(Transform take, string name, string model, Vector3 at, float yaw, int pose, float build)
-        {
-            var who = Piece(take, name, Figure(model, pose, build), BuildAlley.BuyerMat());
-            who.localPosition = at;
-            who.localRotation = Quaternion.Euler(0f, yaw, 0f);
-            return who;
-        }
-
-        /// <summary>
-        /// 体つきごとに焼いた形。模型・姿勢・体つきが同じなら一つを使い回す。
-        ///
-        /// <see cref="BuildAlley.BakeOne"/> は路地裏の焼き置き場へ書くが、あちらは 62 MB あるので
-        /// repo に入れない決まりになっている。場面 4 のぶんはこちらの置き場へ移して、
-        /// 別の端末でも組み直さずに開けるようにする
-        /// </summary>
-        static Mesh Figure(string model, int pose, float build)
-        {
-            var key = "Body_" + model + "_p" + pose + "_b" + Mathf.RoundToInt(build * 100f);
-            Mesh had;
-            if (figures.TryGetValue(key, out had) && had != null) return had;
-
-            var path = Generated + key + ".asset";
-            var made = AssetDatabase.LoadAssetAtPath<Mesh>(path);
-            if (made == null)
-            {
-                var scratch = new GameObject("__figure");
-                var one = BuildAlley.BakeOne(scratch.transform, key, model, Vector3.zero, 0f,
-                    pose, Vector3.one * build, BuildAlley.BuyerMat());
-                if (one != null)
-                {
-                    var moved = AssetDatabase.MoveAsset(BuildAlley.Generated + key + ".asset", path);
-                    if (!string.IsNullOrEmpty(moved)) Debug.LogWarning("焼いた形を移せなかった: " + moved);
-                    made = AssetDatabase.LoadAssetAtPath<Mesh>(path);
-                }
-                Object.DestroyImmediate(scratch);
-            }
-            figures[key] = made;
-            return made;
-        }
+        //
+        // 人を置く Cast と、見た目・骨・動きを組むところは BuildDivePeople.cs にある。
+        // 誰かは一覧の Seen の名前と飛び先で決まるので、ここでは名前・立ち位置・向き・立ち方だけを渡す
 
         // ---- 戸の板 ------------------------------------------------------------
         //
@@ -359,8 +319,8 @@ namespace HalfAware.EditorTools
             // 見上げる所（下の鍵打ちの 23 秒）への向きは 310 度で、差は 10 度。
             // 顔が影になるのは向きではなく、背にした玄関の灯り（RoomAHall）と四階の張り出しのせい。
             // 穴の奥（面から内）へ入れると、デッキの西からは戸口の東の縁に隠れて選べない
-            Cast(take, "Mother", "W_Casual",
-                new Vector3(DoorA, EstateTop, EstateFace + 0.05f), 320f, 1, 1f);
+            Cast(take, "Mother",
+                new Vector3(DoorA, EstateTop, EstateFace + 0.05f), 320f, 1);
             // メイの家は母が戸口に立っているので開いている。隣の老夫婦はまだ一度も出てきていない
             Ajar(take, "AjarA", DoorA);
             Shut(take, "ShutB", DoorB);
@@ -401,13 +361,13 @@ namespace HalfAware.EditorTools
             // 出てくるのは踊り場の上（階段の口）からにして、中壁の端から 0.4 m 南を通す。
             // 始まりの一枚にも娘が入る（下の鍵打ちの先頭の向き）
             var stood = new Vector3(4.30f, EstateTop, EstateWalk - 0.05f);
-            var kid = Cast(take, "Daughter", "W_Casual", stood, 80f, 0, 0.6f);
+            var kid = Cast(take, "Daughter", stood, 80f, 0);
             // 娘が駆けてくるのは、老人とのやりとりが終わってから。
             // 四行目（ハンナ「ええ、午後からで」）が出たら数え始める。6 m を 3.5 秒で
             Move(kid, new Vector3(StairWestMid, EstateTop, WalkFront - 0.35f), stood, 0f, 3.5f, true, true, 4);
             // 老人は B の戸口の前で、西のハンナの方を向く。新聞を取りに出たところ
-            Cast(take, "Neighbour", "M_Casual",
-                new Vector3(DoorB - 0.25f, EstateTop, EstateFace + 0.45f), 272f, 3, 0.95f);
+            Cast(take, "Neighbour",
+                new Vector3(DoorB - 0.25f, EstateTop, EstateFace + 0.45f), 272f, 3);
             // ハンナは出しなに鍵を掛けたところ。自分の戸は閉まっている。老人の戸は開いている
             Shut(take, "ShutA", DoorA);
             Ajar(take, "AjarB", DoorB);
@@ -437,9 +397,9 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Albert(Transform take)
         {
-            var girl = Cast(take, "Granddaughter", "W_Casual", new Vector3(-0.9f, 0f, 0.7f), 0f, 0, 0.6f);
+            var girl = Cast(take, "Granddaughter", new Vector3(-0.9f, 0f, 0.7f), 0f, 0);
             Move(girl, new Vector3(-0.9f, 0f, 0.7f), new Vector3(-0.9f, 0f, 7.6f), 12f, 34f, true);
-            var wife = Cast(take, "Wife", "W_Formal", new Vector3(2.2f, 0f, 0.6f), 8f, 0, 0.95f);
+            var wife = Cast(take, "Wife", new Vector3(2.2f, 0f, 0.6f), 8f, 0);
             Move(wife, new Vector3(2.2f, 0f, 0.6f), new Vector3(0.9f, 0f, 7.2f), 16f, 38f, true);
             Doves(take, new Vector3(-1.1f, 0.09f, 5.6f), 39f);
             return new[]
@@ -469,9 +429,9 @@ namespace HalfAware.EditorTools
         {
             // 祖父はベンチの +x 側の端に立たせる。正面から向き合わせると、
             // 逆光にも帽子の影にも入らないまま、顔だけが画面いっぱいに来る
-            var old = Cast(take, "Grandfather", "M_Casual", new Vector3(0.95f, 0f, 0.35f), 20f, 3, 0.95f);
+            var old = Cast(take, "Grandfather", new Vector3(0.95f, 0f, 0.35f), 20f, 3);
             Move(old, new Vector3(0.95f, 0f, 0.35f), new Vector3(-0.5f, 0f, 4.9f), 11f, 17f, true);
-            var gran = Cast(take, "Grandmother", "W_Formal", new Vector3(2.2f, 0f, 0.4f), 10f, 0, 0.95f);
+            var gran = Cast(take, "Grandmother", new Vector3(2.2f, 0f, 0.4f), 10f, 0);
             Move(gran, new Vector3(2.2f, 0f, 0.4f), new Vector3(0.6f, 0f, 5.4f), 14f, 16f, true);
             Doves(take, new Vector3(-1.2f, 0.09f, 4.4f), 21f);
             // 通りすがり。イヤホンをした少女（記憶 11 のプリヤ）が、小径の東の芝生の奥を北から南へ横切り、
@@ -479,7 +439,7 @@ namespace HalfAware.EditorTools
             // ソフィアがしゃがんでいた所から東を向けば、植え込みの南の端より手前を通って見える。
             // 会話とは関わらないので記憶の時計で動く
             var stop = new Vector3(6.4f, 0f, 2.4f);
-            var teen = Cast(take, "Passerby", "W_Casual", stop, 188f, 0, 0.92f);
+            var teen = Cast(take, "Passerby", stop, 188f, 0);
             Earphones(teen);
             Move(teen, new Vector3(7.6f, 0f, 10.5f), stop, 3f, 9f, true);
             return new[]
@@ -504,8 +464,8 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Emily(Transform take)
         {
-            Cast(take, "Junior", "W_Casual", new Vector3(0.15f, 0f, -0.9f), 315f, 0, 0.92f);
-            Cast(take, "Passenger", "M_Suit", new Vector3(SeatX, 0f, 1.8f), 250f, 5, 1f);
+            Cast(take, "Junior", new Vector3(0.15f, 0f, -0.9f), 315f, 0);
+            Cast(take, "Passenger", new Vector3(SeatX, 0f, 1.8f), 250f, 5);
             return new[]
             {
                 K(0f,  0.2f,  0f, 0.6f,   70f,   6f, 1.58f),  // 窓の外を灯りが流れている
@@ -528,8 +488,8 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Mark(Transform take)
         {
-            Cast(take, "Wife", "W_Casual", new Vector3(0f, 0f, 0.35f), 175f, 1, 1f);
-            var son = Cast(take, "Son", "M_Casual", new Vector3(StairX, 0f, -0.7f), 190f, 0, 1f);
+            Cast(take, "Wife", new Vector3(0f, 0f, 0.35f), 175f, 1);
+            var son = Cast(take, "Son", new Vector3(StairX, 0f, -0.7f), 190f, 0);
             Move(son, new Vector3(StairX, 2.4f, -4.1f), new Vector3(StairX, 0f, -0.7f), 16f, 6f, true);
             return new[]
             {
@@ -555,8 +515,8 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Linda(Transform take)
         {
-            Cast(take, "Husband", "M_Casual", new Vector3(-1.05f, 0f, 2.2f), 350f, 0, 1f);
-            var son = Cast(take, "Son", "M_Casual", new Vector3(1.75f, 0f, -1.9f), 215f, 0, 1f);
+            Cast(take, "Husband", new Vector3(-1.05f, 0f, 2.2f), 350f, 0);
+            var son = Cast(take, "Son", new Vector3(1.75f, 0f, -1.9f), 215f, 0);
             Move(son, new Vector3(StairX, 2.4f, -4.1f), new Vector3(1.75f, 0f, -1.9f), 15f, 8f, true);
             return new[]
             {
@@ -580,8 +540,8 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Lee(Transform take)
         {
-            Cast(take, "Pupil", "W_Casual", new Vector3(DeskX[2], 0f, DeskZ[1] - 0.56f), 0f, 6, 1f);
-            Cast(take, "Sleeper", "M_Casual", new Vector3(DeskX[3], 0f, DeskZ[1] - 0.56f), 0f, 6, 1f);
+            Cast(take, "Pupil", new Vector3(DeskX[2], 0f, DeskZ[1] - 0.56f), 0f, 6);
+            Cast(take, "Sleeper", new Vector3(DeskX[3], 0f, DeskZ[1] - 0.56f), 0f, 6);
             return new[]
             {
                 K(0f,  0f,    0.15f, 4.1f,    0f, -12f, 1.70f),  // 黒板にチョークで書いている
@@ -609,10 +569,10 @@ namespace HalfAware.EditorTools
             // 真ん中の線の上、住戸の中の階段の上り口の手前に置き、戸口の方（デッキ）を向かせる。
             // 背にした玄関の灯り（RoomBHall）で顔は影になる。
             // 台所の窓越しも考えたが、窓の下半分はレースで、立った妻の胸はその裏に沈む
-            Cast(take, "Wife", "W_Formal", new Vector3(DoorB - 0.15f, EstateTop, EstateFace - 0.85f), 355f, 0, 0.95f);
+            Cast(take, "Wife", new Vector3(DoorB - 0.15f, EstateTop, EstateFace - 0.85f), 355f, 0);
             // 隣の母親は A の戸の前で娘を抱き上げているところ。記憶 1 でハンナが立っていた所。
             // こちらではなく西の娘を見ている
-            Cast(take, "Mother", "W_Casual", new Vector3(5.05f, EstateTop, EstateWalk - 0.35f), 270f, 1, 1f);
+            Cast(take, "Mother", new Vector3(5.05f, EstateTop, EstateWalk - 0.35f), 270f, 1);
             // 隣は鍵を掛けて出てきたところなので、戸は閉まっている。自分の戸は開けて出てきた
             Shut(take, "ShutA", DoorA);
             Ajar(take, "AjarB", DoorB);
@@ -636,10 +596,10 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Rosa(Transform take)
         {
-            var tot = Cast(take, "Toddler", "M_Casual", new Vector3(0.55f, 0f, 6.0f), 215f, 0, 0.55f);
+            var tot = Cast(take, "Toddler", new Vector3(0.55f, 0f, 6.0f), 215f, 0);
             Move(tot, new Vector3(0.55f, 0f, 6.0f), new Vector3(-1.5f, 0f, 4.6f), 6f, 6f, true);
-            Cast(take, "Husband", "M_Casual", new Vector3(-0.9f, 0f, 8.7f), 340f, 3, 0.95f);
-            var girl = Cast(take, "Granddaughter", "W_Casual", new Vector3(0.15f, 0f, 8.05f), 350f, 0, 0.6f);
+            Cast(take, "Husband", new Vector3(-0.9f, 0f, 8.7f), 340f, 3);
+            var girl = Cast(take, "Granddaughter", new Vector3(0.15f, 0f, 8.05f), 350f, 0);
             Move(girl, new Vector3(-0.9f, 0f, 6.6f), new Vector3(0.15f, 0f, 8.05f), 20f, 7f, true);
             Doves(take, new Vector3(-1.4f, 0.09f, 4.4f), 8f);
             return new[]
@@ -662,8 +622,8 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Lucas(Transform take)
         {
-            Cast(take, "Grandmother", "W_Formal", new Vector3(0.95f, 0f, 6.3f), 100f, 0, 0.95f);
-            Cast(take, "Grandfather", "M_Casual", new Vector3(-0.4f, 0f, 8.6f), 355f, 3, 0.95f);
+            Cast(take, "Grandmother", new Vector3(0.95f, 0f, 6.3f), 100f, 0);
+            Cast(take, "Grandfather", new Vector3(-0.4f, 0f, 8.6f), 355f, 3);
             Doves(take, new Vector3(-1.5f, 0.09f, 4.5f), 2f);
             return new[]
             {
@@ -685,7 +645,7 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Priya(Transform take)
         {
-            Cast(take, "Senior", "W_Casual", new Vector3(0.2f, 0f, 0.6f), 20f, 1, 1f);
+            Cast(take, "Senior", new Vector3(0.2f, 0f, 0.6f), 20f, 1);
             return new[]
             {
                 K(0f,  0.15f, 0f, -0.9f,   2f,   8f, 1.55f),  // 先輩の背中に本を差し出したところ
@@ -705,8 +665,8 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Daniel(Transform take)
         {
-            Cast(take, "Mother", "W_Casual", new Vector3(0.1f, 0f, 0.2f), 300f, 1, 1f);
-            Cast(take, "Father", "M_Casual", new Vector3(-1.05f, 0f, 2.2f), 350f, 0, 1f);
+            Cast(take, "Mother", new Vector3(0.1f, 0f, 0.2f), 300f, 1);
+            Cast(take, "Father", new Vector3(-1.05f, 0f, 2.2f), 350f, 0);
             // 通りすがり。玄関の外の踊り場で待っている同級生（記憶 13 のアイシャ）。
             // 台所から教室へ出る口はここ一つ（設計書 6 節）。
             // 設計書の「台所の窓の外」は、窓の外が朝の光を塗った板で、その先に何も無いので立たせられない。
@@ -714,7 +674,7 @@ namespace HalfAware.EditorTools
             // **外（通りの側）を向かせ、背中と鞄をダニエルに見せる。** 家の方を向かせると、
             // 戸口の脇の灯り（HallGlow、0.55 m 先）が正面から当たって顔の造りまで見えた。
             // 誰の相手もしていない人なので、向きで隠してよい（この関数群の頭の決まり）
-            var mate = Cast(take, "Classmate", "W_Casual", new Vector3(-3.15f, 0f, -1.95f), 270f, 0, 1f);
+            var mate = Cast(take, "Classmate", new Vector3(-3.15f, 0f, -1.95f), 270f, 0);
             Satchel(mate);
             return new[]
             {
@@ -737,9 +697,9 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Aisha(Transform take)
         {
-            var teacher = Cast(take, "Teacher", "M_Suit", new Vector3(0.9f, 0f, 0.75f), 220f, 0, 1f);
+            var teacher = Cast(take, "Teacher", new Vector3(0.9f, 0f, 0.75f), 220f, 0);
             Move(teacher, new Vector3(0.45f, 0.15f, 3.9f), new Vector3(0.9f, 0f, 0.75f), 6f, 9f, true);
-            Cast(take, "Neighbour", "M_Casual", new Vector3(DeskX[3], 0f, DeskZ[1] - 0.56f), 355f, 6, 1f);
+            Cast(take, "Neighbour", new Vector3(DeskX[3], 0f, DeskZ[1] - 0.56f), 355f, 6);
             var seat = new Vector3(DeskX[2], 0f, DeskZ[1] - 0.56f);
             return new[]
             {
@@ -761,8 +721,8 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Mateo(Transform take)
         {
-            Cast(take, "Neighbour", "W_Casual", new Vector3(DeskX[2], 0f, DeskZ[1] - 0.56f), 6f, 6, 1f);
-            Cast(take, "Teacher", "M_Suit", new Vector3(DeskX[3], 0f, DeskZ[1] + 1.2f), 215f, 2, 1f);
+            Cast(take, "Neighbour", new Vector3(DeskX[2], 0f, DeskZ[1] - 0.56f), 6f, 6);
+            Cast(take, "Teacher", new Vector3(DeskX[3], 0f, DeskZ[1] + 1.2f), 215f, 2);
             var seat = new Vector3(DeskX[3], 0f, DeskZ[1] - 0.56f);
             return new[]
             {
@@ -794,7 +754,7 @@ namespace HalfAware.EditorTools
             // 玄関の足拭きの西寄り（小卓の南）から、廊下の口を抜けて北の肘掛け椅子の前まで、
             // x を動かさずに結ぶ。台所との仕切りの端からも居間の戸の板からも 0.5 m 離れる
             var stood = new Vector3(10.30f, EstateTop, -20.55f);
-            var man = Cast(take, "Husband", "M_Casual", stood, 195f, 0, 0.95f);
+            var man = Cast(take, "Husband", stood, 195f, 0);
             Move(man, new Vector3(RoomWalk, EstateTop, EstateFace - 0.70f), stood, 1.5f, 5.5f, true, true, 1);
 
             // **通りすがり。買い物袋を提げた老女（記憶 9 のローザ）が、開いた玄関の外のデッキを通る。**
@@ -807,7 +767,7 @@ namespace HalfAware.EditorTools
             // 立たせると体の東半分が手すり壁に隠れるので、体の芯が帯の真ん中寄りに来る x 10.95 で止める。
             // 会話とは関わらないので記憶の時計で動く
             var shopStop = new Vector3(DoorB - 0.20f, EstateTop, EstateWalk + 0.10f);
-            var shopper = Cast(take, "Shopper", "W_Formal", shopStop, 90f, 0, 0.95f);
+            var shopper = Cast(take, "Shopper", shopStop, 90f, 0);
             ShopBags(shopper);
             Move(shopper, new Vector3(6.00f, EstateTop, EstateWalk + 0.20f), shopStop, 8f, 7f, true);
 
@@ -828,52 +788,101 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 買い物袋を二つ、両手に提げさせる。白いレジ袋。
-        /// 人の子として置くので、板の出る位置や光線の狙い（人の形の箱）には入らない
+        /// 手首の骨に付けるので、立ちの動きで手が揺れると袋も付いてくる。
+        /// 持ち手の上端を指先の高さに、袋は手首から体の背丈に比した長さだけ下げる。
+        /// 人の根の子として模型の後ろに置くので、光線の狙い（最初のレンダラーの広がり）には入らない
         /// </summary>
         static void ShopBags(Transform who)
         {
-            var bags = Piece(who, "Bags", Shape("ShopBags", 0.5f, b =>
+            var k = FigureSpan(who);
+            for (var i = 0; i < 2; i++)
             {
-                for (var i = 0; i < 2; i++)
+                var side = i == 0 ? "L" : "R";
+                var wrist = FigureAt(who, "Wrist." + side);
+                // 手首から少し外へ。手の甲と太腿に袋が埋まらないように
+                var x = wrist.x + (wrist.x < 0f ? -0.035f : 0.035f) * k;
+                var mesh = Shape("ShopBag" + side + Stamp(wrist) + Mathf.RoundToInt(k * 100f), 0.5f, b =>
                 {
-                    var x = i == 0 ? -0.27f : 0.27f;
-                    b.Box(new Vector3(x, 0.52f, 0.02f), new Vector3(0.10f, 0.30f, 0.28f));
+                    b.Box(new Vector3(x, wrist.y - 0.45f * k, wrist.z + 0.01f), new Vector3(0.10f, 0.30f, 0.28f) * k);
                     // 持ち手
-                    b.Box(new Vector3(x, 0.70f, 0.02f), new Vector3(0.02f, 0.08f, 0.12f));
-                }
-            }), AssetDatabase.LoadAssetAtPath<Material>(Materials + "EstateFrame.mat"));
-            bags.localPosition = Vector3.zero;
+                    b.Box(new Vector3(x, wrist.y - 0.26f * k, wrist.z + 0.01f), new Vector3(0.02f, 0.08f, 0.12f) * k);
+                });
+                FigureAttach(who, "Wrist." + side, "Bag" + side, mesh,
+                    AssetDatabase.LoadAssetAtPath<Material>(Materials + "EstateFrame.mat"));
+            }
         }
 
         /// <summary>
-        /// 白いイヤホンを両耳に、線を胸まで。耳の高さは体つきの形の頭から測る。
+        /// 白いイヤホンを両耳に、線を胸まで。耳の高さは頭の皮の広がりから測り、頭の骨に付ける。
         /// 遠目には点にしかならないが、近づいて見たときに「聞いている人」だと読める
         /// </summary>
         static void Earphones(Transform who)
         {
-            var filter = who.GetComponent<MeshFilter>();
-            if (filter == null || filter.sharedMesh == null) return;
-            var box = filter.sharedMesh.bounds;
-            var ear = box.max.y - 0.13f;
-            var mid = box.center.z;
-            var buds = Piece(who, "Earphones", Shape("Earphones" + Mathf.RoundToInt(ear * 100f), 0.5f, b =>
+            var head = FigureHead(who);
+            if (head.size.y < 0.05f) return;
+            var k = FigureSpan(who);
+            var ear = head.max.y - 0.13f * k;
+            var mid = head.center.z - 0.01f * k;
+            var cx = head.center.x;
+            var half = Mathf.Max(0.06f, head.extents.x * 0.72f);
+            var mesh = Shape("Earphones" + Stamp(new Vector3(cx, ear, mid)) + Mathf.RoundToInt(half * 1000f), 0.5f, b =>
             {
                 for (var i = 0; i < 2; i++)
                 {
-                    var x = i == 0 ? -0.075f : 0.075f;
-                    b.Box(new Vector3(x, ear, mid), new Vector3(0.03f, 0.03f, 0.03f));
-                    b.Box(new Vector3(x * 0.6f, ear - 0.20f, mid + 0.05f), new Vector3(0.008f, 0.40f, 0.008f));
+                    var x = cx + (i == 0 ? -half : half);
+                    b.Box(new Vector3(x, ear, mid), new Vector3(0.03f, 0.03f, 0.03f) * k);
+                    b.Box(new Vector3(cx + (x - cx) * 0.6f, ear - 0.20f * k, mid + 0.05f * k), new Vector3(0.008f, 0.40f * k, 0.008f));
                 }
-            }), AssetDatabase.LoadAssetAtPath<Material>(Materials + "EstateFrame.mat"));
-            buds.localPosition = Vector3.zero;
+            });
+            FigureAttach(who, "Head", "Earphones", mesh,
+                AssetDatabase.LoadAssetAtPath<Material>(Materials + "EstateFrame.mat"));
         }
 
-        /// <summary>学校の鞄。背中に一つ。肩紐は付けない</summary>
+        /// <summary>学校の鞄。背中に一つ。肩紐は付けない。胸の骨に付けて、背中の皮から少し離す</summary>
         static void Satchel(Transform who)
         {
-            var bag = Piece(who, "Satchel", Shape("Satchel", 0.5f, b =>
-                b.Box(new Vector3(0f, 1.22f, -0.19f), new Vector3(0.30f, 0.36f, 0.12f))), Mat("Cloth"));
-            bag.localPosition = Vector3.zero;
+            var k = FigureSpan(who);
+            var chest = FigureAt(who, "Chest");
+            var back = FigureBack(who, chest.y);
+            var at = new Vector3(chest.x, chest.y - 0.12f * k, back - 0.065f * k);
+            var mesh = Shape("Satchel" + Stamp(at) + Mathf.RoundToInt(k * 100f), 0.5f, b =>
+                b.Box(at, new Vector3(0.30f, 0.36f, 0.12f) * k));
+            FigureAttach(who, "Chest", "Satchel", mesh, Mat("Cloth"));
+        }
+
+        /// <summary>模型ごとの縮尺。持ち物の大きさを背丈に合わせる。大人の模型の背（1.80 m）に対する比</summary>
+        static float FigureSpan(Transform who)
+        {
+            var box = FigureExtent(who, who.Find("Figure") != null ? who.Find("Figure").gameObject : who.gameObject);
+            return Mathf.Clamp(box.size.y / 1.80f, 0.4f, 1.2f);
+        }
+
+        /// <summary>高さ y あたりの背中の面。胴の皮の、いちばん後ろの頂点</summary>
+        static float FigureBack(Transform who, float y)
+        {
+            var back = 0f;
+            var first = true;
+            var tmp = new Mesh();
+            foreach (var smr in who.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                if (!smr.name.EndsWith("_Body")) continue;
+                smr.BakeMesh(tmp, true);
+                var at = who.worldToLocalMatrix * smr.transform.localToWorldMatrix;
+                foreach (var v in tmp.vertices)
+                {
+                    var p = at.MultiplyPoint3x4(v);
+                    if (Mathf.Abs(p.y - y) > 0.10f || Mathf.Abs(p.x) > 0.12f) continue;
+                    if (first || p.z < back) { back = p.z; first = false; }
+                }
+            }
+            Object.DestroyImmediate(tmp);
+            return first ? -0.15f : back;
+        }
+
+        /// <summary>形の名前に位置を刻む。人ごとに寸法が違うので、同じ名前で別の形を引かないように</summary>
+        static string Stamp(Vector3 at)
+        {
+            return "_" + Mathf.RoundToInt(at.x * 100f) + "_" + Mathf.RoundToInt(at.y * 100f) + "_" + Mathf.RoundToInt(at.z * 100f);
         }
     }
 }
