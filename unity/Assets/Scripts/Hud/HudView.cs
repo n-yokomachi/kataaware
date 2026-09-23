@@ -138,7 +138,9 @@ namespace HalfAware
             subtitleBand.SetActive(text != null);
             subtitleText.text = text ?? string.Empty;
             if (text == null) return;
-            // 一行に入る幅は帯の幅で決まるので、形を先に決める
+            // 一行に入る幅は帯の幅と字の大きさで決まるので、どちらも先に決める。
+            // エディタで Awake を通さずに呼ばれると字の大きさが 0 のままで、一行に二文字ずつ割れる
+            if (baseFontSize <= 0f) baseFontSize = subtitleText.fontSize;
             Shape(passing);
             // 並びになっているものは表に組む。そうでない長い 1 行は割ってウインドウに収める
             var list = kind == SubtitleKind.Line && ListFormat.IsList(text);
@@ -165,7 +167,6 @@ namespace HalfAware
                 size.y = subtitlePadding + subtitleRowHeight * rows * scale;
                 band.sizeDelta = size;
             }
-            if (baseFontSize <= 0f) baseFontSize = subtitleText.fontSize;
             subtitleText.fontSize = baseFontSize * scale;
         }
 
