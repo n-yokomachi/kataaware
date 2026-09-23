@@ -373,6 +373,14 @@ namespace HalfAware.EditorTools.Rocketbox
             for (var i = 0; i < r.Px.Length; i++)
             {
                 var c = r.Px[i];
+                // 不透明に残る所で明るい画素（髪と肌の混ざった分け目や生え際の茶色、島の外の詰め物）は影の色へ寄せる。暗い毛筋の濃淡は残す
+                // （分け目の近くで橙の点に見えた）
+                if (alpha[i] >= 0.4f)
+                {
+                    var ink = shadow;
+                    ink.a = c.a;
+                    c = Color.Lerp(c, ink, RocketboxPaint.Smooth(0.12f, 0.30f, RocketboxPaint.Lum(c)));
+                }
                 c.a = alpha[i];
                 r.Px[i] = c;
             }

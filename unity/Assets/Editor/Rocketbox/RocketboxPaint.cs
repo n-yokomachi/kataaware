@@ -68,6 +68,9 @@ namespace HalfAware.EditorTools.Rocketbox
             public float neckFront = 0.096f, neckBack = 0.072f;
             [Tooltip("襟ぐりの丸み。前の真ん中から横へ x（m）離れると、x² × この値だけ上がる")]
             public float neckRound = 6f;
+            [Tooltip("シャツの明暗を元の肌から取らず一色にし、縦の編み目（幅 shirtRibPitch m）を shirtRib の強さで描く（まわりの服の布に揃えるとき）")]
+            public bool shirtFlat;
+            public float shirtRib, shirtRibPitch = 0.006f;
 
             [Tooltip("首から下の肌でない所（女大 14 の中のトップスとネックレス）を肌の色で塗る（胸元を見せる服の体に載せるとき）")]
             public bool chestSkin;
@@ -650,6 +653,7 @@ namespace HalfAware.EditorTools.Rocketbox
             var pants = new float[n * n];
             var shoes = new float[n * n];
             var top = new float[n * n];
+            var neckSkin = new float[n * n];
             for (var i = 0; i < px.Length; i++)
             {
                 if (!s.On[i]) { pants[i] = shoes[i] = top[i] = -1f; continue; }
@@ -669,11 +673,31 @@ namespace HalfAware.EditorTools.Rocketbox
                 top[i] = Smooth(k.topLow, k.topLow + 0.05f, y) * Smooth(k.topHigh, k.topHigh - 0.05f, y) * Smooth(k.topHalfWidth + 0.02f, k.topHalfWidth - 0.02f, ax)
                     * HueNear(H[i] * 360f, k.topHue, k.topHueWidth, 8f)
                     * Smooth(k.topSatMin - 0.05f, k.topSatMin + 0.05f, S[i]) * Smooth(k.topValMax + 0.03f, k.topValMax - 0.03f, V[i]);
-                if (k.topNeckSkin) top[i] = Mathf.Max(top[i], Smooth(1.18f, 1.23f, y) * Smooth(0.14f, 0.10f, ax) * SkinLike(px[i]));
+                // 胸の開き: 肌も、開きの縁の暗い線も布にする（縁の線が暗い点の列に見えた）
+                if (k.topNeckSkin) neckSkin[i] = Smooth(1.18f, 1.23f, y) * Smooth(0.14f, 0.10f, ax) * Smooth(-0.02f, 0.02f, s.P[i].z) * (1f - top[i]);
             }
             if (k.recolourPants) Recolour(px, V, Spread(pants, n), k.pantsShadow, k.pantsShine);
             if (k.recolourShoes) Recolour(px, V, Spread(shoes, n), k.shoeShadow, k.shoeShine);
-            if (k.recolourTop) Recolour(px, V, Spread(top, n), k.topShadow, k.topShine);
+            if (k.recolourTop)
+            {
+                var vt = V;
+                if (k.topNeckSkin)
+                {
+                    // 胸の開きの肌は、布の真ん中の明るさで塗る（肌の明るさのまま写すと、まわりの布より明るい面になった）
+                    var vs = new List<float>();
+                    for (var i = 0; i < px.Length; i++) if (top[i] > 0.5f) vs.Add(V[i]);
+                    vs.Sort();
+                    var mid = vs.Count > 0 ? vs[vs.Count / 2] : 0.3f;
+                    vt = (float[])V.Clone();
+                    for (var i = 0; i < px.Length; i++)
+                    {
+                        if (neckSkin[i] <= 0f) continue;
+                        vt[i] = Mathf.Lerp(V[i], mid, neckSkin[i]);
+                        top[i] = Mathf.Max(top[i], neckSkin[i]);
+                    }
+                }
+                Recolour(px, vt, Spread(top, n), k.topShadow, k.topShine);
+            }
         }
 
         /// <summary>縦横 (2r+1) 画素の四角の中の最大（max）か最小。絵の外は数えない</summary>
@@ -723,7 +747,9 @@ namespace HalfAware.EditorTools.Rocketbox
                 var p = s.P[i];
                 var w = Smooth(line[i] + 0.0012f, line[i] - 0.0012f, p.y);
                 if (w <= 0f) continue;
-                var shade = Mathf.Clamp(Lum(px[i]) / median, 0.80f, 1.06f);
+                var shade = k.shirtFlat
+                    ? 1f + k.shirtRib * Mathf.Sin(p.x / Mathf.Max(0.001f, k.shirtRibPitch) * Mathf.PI * 2f)
+                    : Mathf.Clamp(Lum(px[i]) / median, 0.80f, 1.06f);
                 var rib = 1f - 0.12f * Smooth(0.005f, 0.002f, line[i] - p.y);
                 var c = k.shirtColour * (shade * rib);
                 c.a = px[i].a;

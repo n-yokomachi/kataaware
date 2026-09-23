@@ -163,10 +163,14 @@ namespace HalfAware.EditorTools.Rocketbox
                 k.recolourShoes = true;
                 k.shoeShadow = new Color(0.008f, 0.008f, 0.009f);
                 k.shoeShine = new Color(0.100f, 0.098f, 0.100f);
+                // 中のトップスと胸の肌を一枚の白いシャツに: 明暗の幅を狭め、頭のテクスチャの側も同じ白の一色にする
+                // （肌の明暗を写すと、首の下の白い帯・灰色の帯・白い V の三段に見えた）
                 k.recolourTop = true;
-                k.topShadow = new Color(0.80f, 0.80f, 0.78f);
-                k.topShine = new Color(0.93f, 0.93f, 0.91f);
+                k.topShadow = new Color(0.84f, 0.84f, 0.82f);
+                k.topShine = new Color(0.92f, 0.92f, 0.90f);
                 k.shirt = true;
+                k.shirtColour = new Color(0.89f, 0.89f, 0.87f);
+                k.shirtFlat = true;
             });
 
         /// <summary>
@@ -331,7 +335,10 @@ namespace HalfAware.EditorTools.Rocketbox
             k.blackenKnit = false;
             k.shirt = true;
             // 襟ぐりは首の付け根より少し下で、肩の側へ上がる丸み（女大 11 の V の縁の上の端より上で閉じる）。色は光の当たったワンピースに揃えた生成り
-            k.shirtColour = new Color(0.78f, 0.75f, 0.69f);
+            // 布の色はワンピースを塗った後の真ん中の明るさ（絵の前身頃の中央値 (0.73, 0.70, 0.65)）に揃え、明暗は元の肌から取らず縦の編み目を薄く描く
+            k.shirtColour = new Color(0.73f, 0.70f, 0.65f);
+            k.shirtFlat = true;
+            k.shirtRib = 0.05f;
             k.neckFront = 0.098f;
             k.neckBack = 0.072f;
             k.neckRound = 14f;

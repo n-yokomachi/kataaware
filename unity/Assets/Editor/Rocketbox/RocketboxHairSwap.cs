@@ -299,7 +299,7 @@ namespace HalfAware.EditorTools.Rocketbox
             {
                 // 胸元の埋め: 体の人の肌の三角で、顔の人の肌が届かない所。0.7 mm 内側へ下げる。
                 // UV は埋めの真ん中に一番近い顔の人の肌の頂点の物を全部に使う（頂点ごとに一番近い物を使うと、UV の島をまたいで暗い点が並んだ）
-                var patch = RocketboxCompose.ChestPatch(who.BodyFrom, new RocketboxCompose.Surface(sunkPos, faceHead), eyeY, a.head.z, EdgeSegments(faceHead, fw, sunkPos));
+                var patch = RocketboxCompose.ChestPatch(who.BodyFrom, new RocketboxCompose.Surface(sunkPos, faceHead), eyeY, a.head.z, EdgeSegments(faceHead, fw, sunkPos), true);
                 // 埋めの UV: 首の前の付け根（頭の骨から 6 cm 下の、首の前の面）に一番近い顔の人の肌の頂点の物（胸元の塗りに左右されない肌の色）。
                 // 丸首の服を塗るときは、襟ぐりより下の頂点に、襟ぐりより 3 cm 下の胸の前の頂点の物（布の色）を使う
                 var look = who.Look();
