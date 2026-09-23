@@ -86,9 +86,9 @@ namespace HalfAware.EditorTools.Rocketbox
             public float moleDiameter = 0.005f;
             [Tooltip("目の玉の中心から外へ（m）と下へ（m）")]
             public float moleOut = 0.008f, moleDown = 0.0145f;
-            [Tooltip("黒子を口の下に置く（目の下の代わり）。下唇の骨から左右へ moleLipOut、下へ moleLipDown（m）。下唇の縁から 9 mm ほど下")]
+            [Tooltip("黒子を口の下に置く（目の下の代わり）。下唇の骨から左右へ moleLipOut、下へ moleLipDown（m）。口の端の少し下の外（下唇の縁から 4〜5 mm 下）")]
             public bool moleUnderLip;
-            public float moleLipOut = 0.015f, moleLipDown = 0.016f;
+            public float moleLipOut = 0.024f, moleLipDown = 0.003f;
             public Color moleColour = new Color(0.22f, 0.13f, 0.10f);
 
             [Header("手入れ（beauty 0 = 手を入れない、0.5 = 弱め、1 = 強め。下の値は強めのときの量）")]
