@@ -325,7 +325,13 @@ namespace HalfAware.EditorTools.Rocketbox
                     return p.y < line ? chestUv : neckUv;
                 };
                 var bodyToWorld = bodySmr.transform.localToWorldMatrix;
-                var patchTris = Pack(patch.ToArray(), i => toLocal.MultiplyPoint3x4(bw[i] - bodyToWorld.MultiplyVector(bn[i]).normalized * 0.0007f), i => bn[i], patchUv, i => Re(bwts[i], bodyRemap), verts, norms, uvs, weights);
+                // 埋めは 0.7 mm 内側へ下げる（顔の人の肌が勝つように）。ただし体の人の服の縁に載る頂点は下げない
+                // （服の縁と埋めの間に細い割れができ、そこから体の裏が抜けて背景が点になって見えた）
+                var clothesEdges = EdgeSegments(bodyAll, bw);
+                var patchSet = new HashSet<int>(patch);
+                var inset = new Dictionary<int, float>();
+                foreach (var i in patchSet) inset[i] = EdgeDistance(bw[i], clothesEdges) <= 0.0005f ? 0f : 0.0007f;
+                var patchTris = Pack(patch.ToArray(), i => toLocal.MultiplyPoint3x4(bw[i] - bodyToWorld.MultiplyVector(bn[i]).normalized * inset[i]), i => bn[i], patchUv, i => Re(bwts[i], bodyRemap), verts, norms, uvs, weights);
                 var all = new int[headTris.Length + patchTris.Length];
                 headTris.CopyTo(all, 0);
                 patchTris.CopyTo(all, headTris.Length);

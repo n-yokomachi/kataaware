@@ -363,8 +363,8 @@ namespace HalfAware.EditorTools.Rocketbox
                 var ink = k.flatHair ? k.hairShadow : HairRamp(V[i], k);
                 ink.a = px[i].a;
                 // 一色で塗るときは、髪と見なす度合いが半ばの所（元の明るい毛筋）も塗り切る。
-                // 別の人の髪の殻は分け目で透けて、顔の人の頭皮がそこから覗き、毛筋が明るい茶の筋に見えたため
-                px[i] = Color.Lerp(px[i], ink, k.flatHair ? Smooth(0.15f, 0.45f, hair[i]) : hair[i]);
+                // 別の人の髪の殻は分け目で透けて、顔の人の頭皮がそこから覗き、毛筋が明るい茶の筋や、生え際の先の茶色の点に見えたため
+                px[i] = Color.Lerp(px[i], ink, k.flatHair ? Smooth(0.05f, 0.22f, hair[i]) : hair[i]);
             }
 
             // 2b. 元の前髪の影で暗い額とこめかみの肌を、額の真ん中の明るさまで上げる（別の人の髪を載せるとき）

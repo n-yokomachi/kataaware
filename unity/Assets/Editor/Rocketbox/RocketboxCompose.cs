@@ -294,6 +294,8 @@ namespace HalfAware.EditorTools.Rocketbox
                 Vector3 v0 = bw[skinTris[t]], v1 = bw[skinTris[t + 1]], v2 = bw[skinTris[t + 2]];
                 var c = (v0 + v1 + v2) / 3f;
                 if (c.y > eyeY - 0.12f || c.z < neckZ + 0.03f) continue;
+                // 前を向く三角だけ（体の人の頭の面には胸元の内側を向く三角もあり、それを埋めに入れると裏向きで描かれず、背景が点になって覗いた）
+                if (Vector3.Cross(v1 - v0, v2 - v0).normalized.z < 0.2f) continue;
                 // backing: 覆われている所も全部入れて、顔の人の肌の縁の細い隙間の裏打ちにする（隙間から体の中の暗がりが点になって見えたため）
                 var open = backing;
                 foreach (var pt in new[] { v0, v1, v2, (v0 + v1) * 0.5f, (v1 + v2) * 0.5f, (v2 + v0) * 0.5f, c })
