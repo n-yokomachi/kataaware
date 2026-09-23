@@ -199,7 +199,10 @@ namespace HalfAware.EditorTools.Rocketbox
                     list.Add(bodyHead[t + 1]);
                     list.Add(bodyHead[t + 2]);
                 }
-                chestTris = Pack(list.ToArray(), i => worldToBody.MultiplyPoint3x4(bw[i] - bNormWorld(bodyToWorld, bNorm[i]) * (bw[i].y > chestCut - 0.005f ? 0.001f : 0f)),
+                // 体の面の縁に載る頂点は下げない（下げると肩の上の体の面との間に割れができ、背景が点と線で覗いた）
+                var bodyEdge = new HashSet<long>();
+                foreach (var e in BoundaryEdges(bm.GetTriangles(bodySub))) { bodyEdge.Add(PosKey(bw[e[0]])); bodyEdge.Add(PosKey(bw[e[1]])); }
+                chestTris = Pack(list.ToArray(), i => worldToBody.MultiplyPoint3x4(bw[i] - bNormWorld(bodyToWorld, bNorm[i]) * (bw[i].y > chestCut - 0.005f && !bodyEdge.Contains(PosKey(bw[i])) ? 0.001f : 0f)),
                     i => bNorm[i], i => bUv[i], i => bWeights[i], verts, norms, uvs, weights);
             }
 
@@ -269,6 +272,12 @@ namespace HalfAware.EditorTools.Rocketbox
                 who, verts.Count, (bodyTris.Length + headTris.Length + hairTris.Length) / 3, bodyTris.Length / 3, headTris.Length / 3, hairTris.Length / 3,
                 snapped, maxSnap * 1000f, pushedIn, maxIn * 1000f, hairInside, worstHair * 1000f, pushedOut, HairOver * 1000f, maxOut * 1000f,
                 seam, who.CompositeMesh, patch.Count / 3) + (legsNote != null ? "\n" + legsNote : "");
+        }
+
+        /// <summary>位置の 0.2 mm ごとの鍵（UV の継ぎ目で分かれた同じ位置の頂点を一つに見る）</summary>
+        static long PosKey(Vector3 p)
+        {
+            return ((long)Mathf.RoundToInt(p.x * 5000f) + 100000) * 10000000000L + ((long)Mathf.RoundToInt(p.y * 5000f) + 100000) * 100000L + (Mathf.RoundToInt(p.z * 5000f) + 50000);
         }
 
         /// <summary>重心が cut より上の三角だけ</summary>

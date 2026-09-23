@@ -11,7 +11,7 @@ namespace HalfAware.EditorTools.Rocketbox
     /// - 髪を黒に（頭のテクスチャの頭皮の髪と、透けの絵の髪の房。毛筋の明暗は残す）
     /// - カーディガンを黒に（ニットの目の明暗は残す）
     /// - 目は元の色のまま（虹彩は目の玉の部品で、左右の目が頭のテクスチャの同じ一枚の目の絵を使う）
-    /// - 黒子（主人公は本人の左 = −x の目の下、片割れは右 = +x の目の下）
+    /// - 黒子（主人公は本人の左 = −x の目の下か口の下、片割れは右 = +x）
     /// - 美人への控えめな手入れ（肌のむら、目元、眉、唇、頬から顎の陰り）
     ///
     /// 場所の見分けは、テクスチャの画素ごとに模型の束ねた姿勢での位置（<see cref="Surface"/>）を求め、
@@ -86,6 +86,9 @@ namespace HalfAware.EditorTools.Rocketbox
             public float moleDiameter = 0.005f;
             [Tooltip("目の玉の中心から外へ（m）と下へ（m）")]
             public float moleOut = 0.008f, moleDown = 0.0145f;
+            [Tooltip("黒子を口の下に置く（目の下の代わり）。下唇の骨から左右へ moleLipOut、下へ moleLipDown（m）。下唇の縁から 9 mm ほど下")]
+            public bool moleUnderLip;
+            public float moleLipOut = 0.015f, moleLipDown = 0.016f;
             public Color moleColour = new Color(0.22f, 0.13f, 0.10f);
 
             [Header("手入れ（beauty 0 = 手を入れない、0.5 = 弱め、1 = 強め。下の値は強めのときの量）")]
@@ -174,13 +177,15 @@ namespace HalfAware.EditorTools.Rocketbox
             [Header("ワンピース（上の服と借りたスカートを同じ布の色に。布の明暗は元のまま）")]
             public bool dress;
             public Color dressShadow = new Color(0.56f, 0.53f, 0.48f), dressShine = new Color(0.95f, 0.93f, 0.88f);
-            [Header("ネックレス（首の後ろから胸の真ん中へ斜めに下がる面が肌と交わる線に鎖、胸の真ん中に飾り）")]
+            [Header("ネックレス（首の付け根の両脇から胸の真ん中へ垂れる鎖と、丸い飾り）")]
             public bool necklace;
-            public Color necklaceColour = new Color(0.82f, 0.82f, 0.84f);
+            public Color necklaceColour = new Color(0.74f, 0.74f, 0.76f);
             [Tooltip("鎖の幅（m）と、飾りの半径（m）")]
-            public float necklaceWidth = 0.0022f, pendantRadius = 0.0065f;
-            [Tooltip("目の高さから、首の後ろの鎖までと胸の真ん中の鎖までの下がり（m）。スポーツ 02 のタンクトップの襟ぐりの真ん中は目の 22 cm 下")]
-            public float necklaceBack = 0.147f, necklaceFront = 0.205f;
+            public float necklaceWidth = 0.0016f, pendantRadius = 0.0042f;
+            [Tooltip("目の高さから、首の付け根の両脇の鎖までと胸の真ん中の鎖までの下がり（m）。スポーツ 02 のタンクトップの襟ぐりの真ん中は目の 22 cm 下")]
+            public float necklaceBack = 0.14f, necklaceFront = 0.195f;
+            [Tooltip("首の付け根の両脇の、真ん中からの左右の位置（m）と、前の鎖の下がり方（1 で V、2 で U）")]
+            public float necklaceSide = 0.058f, necklaceCurve = 1.25f;
             [Tooltip("髪を塗らずに元の色のまま。一色で塗る所（顔の人の頭皮・殻の耳まわりとこめかみ）は naturalHairInk")]
             public bool naturalHair;
             public Color naturalHairInk = new Color(0.12f, 0.08f, 0.06f);
@@ -685,15 +690,18 @@ namespace HalfAware.EditorTools.Rocketbox
             {
                 var eye = twin ? a.eyeR : a.eyeL;
                 var outward = Mathf.Sign(eye.x);
-                var target = new Vector2(eye.x + outward * k.moleOut, eye.y - k.moleDown);
-                // 目の下の肌の上で、狙った所に一番近く、一番手前の画素
+                var target = k.moleUnderLip
+                    ? new Vector2(outward * k.moleLipOut, a.lowerLip.y - k.moleLipDown)
+                    : new Vector2(eye.x + outward * k.moleOut, eye.y - k.moleDown);
+                var frontZ = k.moleUnderLip ? a.lowerLip.z - 0.03f : eye.z - 0.01f;
+                // 狙った所（目の下か口の下）の肌の上で、一番近く、一番手前の画素
                 var best = -1;
                 var bestScore = float.MaxValue;
                 for (var i = 0; i < px.Length; i++)
                 {
                     if (!s.On[i]) continue;
                     var p = s.P[i];
-                    if (p.z < eye.z - 0.01f) continue;
+                    if (p.z < frontZ) continue;
                     var d = Vector2.Distance(new Vector2(p.x, p.y), target);
                     if (d > 0.003f) continue;
                     var score = d - p.z * 0.5f;
@@ -731,7 +739,7 @@ namespace HalfAware.EditorTools.Rocketbox
             res.Spec = SpecMap(hair, s, irisUv, irisRadius, k);
             res.N = n;
             res.Px = px;
-            res.Note = string.Format("手入れ {0:0.00}、黒子 {1:0.0} mm（{2}）", b, k.moleDiameter * 1000f, twin ? "右目の下" : "左目の下");
+            res.Note = string.Format("手入れ {0:0.00}、黒子 {1:0.0} mm（{2}）", b, k.moleDiameter * 1000f, k.moleUnderLip ? (twin ? "口の右下" : "口の左下") : (twin ? "右目の下" : "左目の下"));
             return res;
         }
 
@@ -752,34 +760,29 @@ namespace HalfAware.EditorTools.Rocketbox
         }
 
         /// <summary>
-        /// ネックレスを描く（<see cref="Look.necklace"/>）。首の真ん中の縦の線のまわりで、後ろ（目の necklaceBack 下）から前（necklaceFront 下）へ U の字に下がる高さに鎖を描き、
-        /// 胸の真ん中の鎖のすぐ下を飾りにする。
-        /// 頭の面と胸元の面（別の絵）のどちらにも同じ位置で描くので、首の付け根で面が替わっても途切れない。
-        /// 320×180 で鎖は 1 画素に満たないので、飾りは少し大きく明るくし、縁を暗くして読めるようにする
+        /// ネックレスを描く（<see cref="Look.necklace"/>）。鎖は首の付け根の両脇（真ん中から necklaceSide、目の necklaceBack 下）から、
+        /// 重さで胸の真ん中（目の necklaceFront 下）へ下がる V に近い U の形（左右の位置の necklaceCurve 乗で下がる）。後ろは首の付け根に沿って同じ高さで回る。
+        /// 飾りは鎖の一番低い所に吊るした丸（半径 pendantRadius、縁を少し暗く）。
+        /// 頭の面と胸元の面（別の絵）のどちらにも同じ位置で描くので、首の付け根で面が替わっても途切れない
         /// </summary>
         public static void Necklace(Color[] px, Surface s, Anchors a, Look k)
         {
             if (!k.necklace) return;
             var eyeY = (a.eyeL.y + a.eyeR.y) * 0.5f;
             var eyeZ = (a.eyeL.z + a.eyeR.z) * 0.5f;
-            // 首の真ん中の縦の線（目の 8.7 cm 奥）のまわりの向き（前が 0）ごとの鎖の高さ。前で一番低く、後ろへ上がる（U の字）
             var zN = eyeZ - 0.087f;
-            var yBack = eyeY - k.necklaceBack;
+            var ySide = eyeY - k.necklaceBack;
             var yFront = eyeY - k.necklaceFront;
-            Func<Vector3, float> height = p =>
-            {
-                var th = Mathf.Atan2(Mathf.Abs(p.x), p.z - zN);
-                var f = Mathf.Pow((1f + Mathf.Cos(th)) * 0.5f, 1.5f);
-                return Mathf.Lerp(yBack, yFront, f);
-            };
-            // 飾りの真ん中: 胸の真ん中で、鎖の 7 mm 下の、いちばん前の点
+            var xs = k.necklaceSide;
+            // 飾りの真ん中: 胸の真ん中で、鎖の一番低い所から (0.5 mm + 半径) 下の、いちばん前の点
+            var cy = yFront - 0.0005f - k.pendantRadius;
             var centre = Vector3.zero;
             var best = float.MinValue;
             for (var i = 0; i < px.Length; i++)
             {
                 if (!s.On[i]) continue;
                 var p = s.P[i];
-                if (Mathf.Abs(p.x) > 0.004f || Mathf.Abs(p.y - (yFront - 0.007f)) > 0.002f || p.z < zN) continue;
+                if (Mathf.Abs(p.x) > 0.003f || Mathf.Abs(p.y - cy) > 0.0015f || p.z < zN) continue;
                 if (p.z > best) { best = p.z; centre = p; }
             }
             var hasPendant = best > float.MinValue;
@@ -788,21 +791,33 @@ namespace HalfAware.EditorTools.Rocketbox
             {
                 if (!s.On[i]) continue;
                 var p = s.P[i];
-                if (Mathf.Abs(p.x) > 0.085f || p.y > eyeY - 0.11f || p.y < yFront - 0.03f) continue;
-                var d = Mathf.Abs(p.y - height(p));
-                var chain = Smooth(half + 0.0004f, half - 0.0004f, d);
+                if (Mathf.Abs(p.x) > xs + 0.02f || p.y > ySide + 0.01f || p.y < yFront - 0.02f) continue;
+                float d;
+                if (p.z > zN + 0.015f && Mathf.Abs(p.x) <= xs)
+                {
+                    // 前: 左右の位置で下がる
+                    var t = Mathf.Pow(Mathf.Abs(p.x) / xs, k.necklaceCurve);
+                    d = Mathf.Abs(p.y - Mathf.Lerp(yFront, ySide, t));
+                }
+                else
+                {
+                    // 横と後ろ: 首の付け根に沿って同じ高さ（首のまわり 8 cm まで）
+                    if (new Vector2(p.x, p.z - zN).magnitude > 0.08f) continue;
+                    d = Mathf.Abs(p.y - ySide);
+                }
+                var chain = Smooth(half + 0.0003f, half - 0.0003f, d);
                 var rim = 0f;
                 if (hasPendant)
                 {
                     var dp = (p - centre).magnitude;
-                    chain = Mathf.Max(chain, Smooth(k.pendantRadius + 0.0004f, k.pendantRadius - 0.0004f, dp));
-                    rim = Smooth(k.pendantRadius + 0.0014f, k.pendantRadius + 0.0004f, dp) * (1f - chain);
+                    chain = Mathf.Max(chain, Smooth(k.pendantRadius + 0.0003f, k.pendantRadius - 0.0003f, dp));
+                    rim = Smooth(k.pendantRadius + 0.0008f, k.pendantRadius + 0.0002f, dp) * (1f - chain);
                 }
                 if (chain <= 0f && rim <= 0f) continue;
                 var c = px[i];
-                // 縁（飾りのまわり 1 mm）は暗く、鎖と飾りは銀（元の肌の明るさで少し陰を付ける）
-                if (rim > 0f) c = Color.Lerp(c, c * 0.45f, rim * 0.7f);
-                var silver = k.necklaceColour * Mathf.Lerp(0.8f, 1.05f, Mathf.Clamp01(Lum(px[i]) / 0.6f));
+                if (rim > 0f) c = Color.Lerp(c, c * 0.7f, rim * 0.6f);
+                // 銀の灰。肌の明るさで少し陰を付ける（明るすぎて襟の縁取りに見えないように）
+                var silver = k.necklaceColour * Mathf.Lerp(0.85f, 1.0f, Mathf.Clamp01(Lum(px[i]) / 0.6f));
                 silver.a = c.a;
                 px[i] = Color.Lerp(c, silver, chain);
             }

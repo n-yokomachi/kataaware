@@ -136,6 +136,8 @@ namespace HalfAware.EditorTools.Rocketbox
             k.Nose(1);
             k.noseDark = 0.7f;
             k.noseBlur = 2f;
+            // 黒子は口の下（本人の左、片割れは鏡像で右）
+            k.moleUnderLip = true;
         });
 
         /// <summary>
