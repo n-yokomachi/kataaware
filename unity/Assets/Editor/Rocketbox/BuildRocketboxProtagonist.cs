@@ -37,6 +37,9 @@ namespace HalfAware.EditorTools.Rocketbox
         /// <summary>頭のテクスチャの大きさ。256 では 0.4 m の黒子が薄れるので 512</summary>
         public const int HeadSize = 512;
 
+        /// <summary>頭の Specular の絵の大きさ（髪か肌かの区別だけなので小さくてよい）</summary>
+        public const int SpecSize = 256;
+
         // ---- 組み立て ---------------------------------------------------------
 
         /// <summary>
@@ -72,6 +75,20 @@ namespace HalfAware.EditorTools.Rocketbox
             her.transform.localPosition = Vector3.zero;
             her.transform.localRotation = Quaternion.identity;
             her.transform.localScale = twin && mode == TwinMode.MirrorWhole ? new Vector3(-1f, 1f, 1f) : Vector3.one;
+            if (who.IsComposite)
+            {
+                // 体の人の骨に、組み合わせたメッシュ（面の組は体・頭・髪）を載せる
+                var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(who.CompositeMesh);
+                if (mesh == null)
+                {
+                    Debug.Log(RocketboxCompose.BuildMesh(who));
+                    mesh = AssetDatabase.LoadAssetAtPath<Mesh>(who.CompositeMesh);
+                }
+                if (mesh == null) throw new InvalidOperationException("組み合わせたメッシュを作れない: " + who.CompositeMesh);
+                var smr = her.GetComponentInChildren<SkinnedMeshRenderer>();
+                smr.sharedMesh = mesh;
+                smr.name = who.Name;
+            }
             Dress(her, skin, twin && mode == TwinMode.MoleOnly);
             Shape(her, skin.JawScale);
             AddAnimator(her);
@@ -101,15 +118,25 @@ namespace HalfAware.EditorTools.Rocketbox
 
         static void Dress(GameObject her, Skin skin, bool twinHead)
         {
+            var head = twinHead && skin.HeadTwin != null ? skin.HeadTwin : skin.Head;
             foreach (var r in her.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
-                var ms = r.sharedMaterials;
-                for (var i = 0; i < ms.Length; i++)
+                Material[] ms;
+                if (skin.Person.IsComposite)
                 {
-                    var n = ms[i] == null ? "" : ms[i].name;
-                    if (n == skin.Person.BodySlot) ms[i] = skin.Body;
-                    else if (n == skin.Person.HeadSlot) ms[i] = twinHead && skin.HeadTwin != null ? skin.HeadTwin : skin.Head;
-                    else if (n == skin.Person.HairSlot) ms[i] = skin.Hair;
+                    // 組み合わせたメッシュはマテリアルの名前を持たない。面の組の順が体・頭・髪
+                    ms = new[] { skin.Body, head, skin.Hair };
+                }
+                else
+                {
+                    ms = r.sharedMaterials;
+                    for (var i = 0; i < ms.Length; i++)
+                    {
+                        var n = ms[i] == null ? "" : ms[i].name;
+                        if (n == skin.Person.BodySlot) ms[i] = skin.Body;
+                        else if (n == skin.Person.HeadSlot) ms[i] = head;
+                        else if (n == skin.Person.HairSlot) ms[i] = skin.Hair;
+                    }
                 }
                 r.sharedMaterials = ms;
                 // 骨が動いて頭が元の箱から出ても消えないように
@@ -144,6 +171,8 @@ namespace HalfAware.EditorTools.Rocketbox
             /// <summary>撮り比べで測るための、頭の印の絵と黒子の位置</summary>
             public Texture2D MaskHead, MaskHeadTwin;
             public RocketboxPaint.HeadResult HeadInfo, HeadTwinInfo;
+            /// <summary>体の手の肌を頭の肌に揃えたときの測り（揃えていなければ null）</summary>
+            public string SkinNote;
             /// <summary>その場で作った物（アセットでない）。使い終えたら <see cref="Destroy"/></summary>
             public readonly List<Object> Made = new List<Object>();
 
@@ -184,6 +213,7 @@ namespace HalfAware.EditorTools.Rocketbox
             var head = RocketboxTextures.ReadPng(who.HeadSrc, out n, out n);
             var self = RocketboxPaint.Head(ToColors(head), maps.Head, maps.Anchors, look, false, who.IrisUv, who.IrisRadius);
             WritePainted(self.Px, n, dir + "Head_self.png", false, HeadSize);
+            WritePainted(ToColors(self.Spec), n, dir + "Head_self_spec.png", true, SpecSize);
             sb.AppendLine("頭（主人公）: " + self.Note + "、UV " + self.MoleUv.ToString("F4"));
             if (withTwinHead)
             {
@@ -191,12 +221,13 @@ namespace HalfAware.EditorTools.Rocketbox
                 WritePainted(twin.Px, n, dir + "Head_twin.png", false, HeadSize);
                 sb.AppendLine("頭（片割れ）: " + twin.Note);
             }
+            string skinNote;
+            var bodyPx = PaintBody(who, look, maps, self, out skinNote);
+            if (skinNote != null) sb.AppendLine("肌の色: " + skinNote);
             Texture2D bodyTex;
-            if (look.blackenKnit)
+            if (bodyPx != null)
             {
-                var body = RocketboxTextures.ReadPng(who.BodySrc, out n, out n);
-                float[] knit;
-                WritePainted(RocketboxPaint.Body(ToColors(body), maps.Body, look, out knit), n, dir + "Body.png", false, 512);
+                WritePainted(bodyPx, 512, dir + "Body.png", false, 512);
                 bodyTex = Load(dir + "Body.png");
             }
             else bodyTex = Load(who.BodySrc);
@@ -204,12 +235,33 @@ namespace HalfAware.EditorTools.Rocketbox
             WritePainted(RocketboxPaint.Hair(ToColors(hair), look), n, dir + "Hair.png", true, 512);
 
             SaveMaterial(Lit("Body", bodyTex, 0.12f, false), dir + "Body.mat");
-            SaveMaterial(Lit("Head_self", Load(dir + "Head_self.png"), 0.22f, false), dir + "Head_self.mat");
-            if (withTwinHead) SaveMaterial(Lit("Head_twin", Load(dir + "Head_twin.png"), 0.22f, false), dir + "Head_twin.mat");
+            var spec = Load(dir + "Head_self_spec.png");
+            SaveMaterial(LitHead("Head_self", Load(dir + "Head_self.png"), spec), dir + "Head_self.mat");
+            if (withTwinHead) SaveMaterial(LitHead("Head_twin", Load(dir + "Head_twin.png"), spec), dir + "Head_twin.mat");
             SaveMaterial(Lit("Hair", Load(dir + "Hair.png"), 0.34f, true), dir + "Hair.mat");
             AssetDatabase.SaveAssets();
-            sb.AppendLine("書いた所: " + dir + (look.blackenKnit ? "" : "（体は " + who.BodySrc + " をそのまま）"));
+            sb.AppendLine("書いた所: " + dir + (bodyPx != null ? "" : "（体は " + who.BodySrc + " をそのまま）"));
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// 体のテクスチャに手を入れる（ニットを黒に、頭と体が別の人なら手の肌を頭の肌に揃える）。
+        /// どちらもしないなら null（縮めた写しをそのまま使う）
+        /// </summary>
+        static Color[] PaintBody(RocketboxPerson who, RocketboxPaint.Look look, Maps maps, RocketboxPaint.HeadResult head, out string skinNote)
+        {
+            skinNote = null;
+            if (!look.blackenKnit && !look.matchSkin) return null;
+            int n;
+            var px = ToColors(RocketboxTextures.ReadPng(who.BodySrc, out n, out n));
+            if (look.blackenKnit)
+            {
+                float[] knit;
+                px = RocketboxPaint.Body(px, maps.Body, look, out knit);
+            }
+            if (look.matchSkin)
+                px = RocketboxPaint.MatchSkin(px, maps.Body, head.Px, head.Hair, maps.Head, maps.Anchors, look, out skinNote);
+            return px;
         }
 
         static Skin LoadPainted(RocketboxPerson who, bool twinHead)
@@ -249,12 +301,10 @@ namespace HalfAware.EditorTools.Rocketbox
                     skin.MaskHeadTwin = mask;
                 }
                 int n;
-                if (look.blackenKnit)
-                {
-                    float[] knit;
-                    var body = RocketboxPaint.Body(ToColors(RocketboxTextures.ReadPng(who.BodySrc, out n, out n)), maps.Body, look, out knit);
-                    skin.Body = Keep(skin, Lit("Body", Keep(skin, Tex(body, n, false, 512)), 0.12f, false));
-                }
+                string skinNote;
+                var body = PaintBody(who, look, maps, skin.HeadInfo, out skinNote);
+                skin.SkinNote = skinNote;
+                if (body != null) skin.Body = Keep(skin, Lit("Body", Keep(skin, Tex(body, 512, false, 512)), 0.12f, false));
                 else skin.Body = Keep(skin, Lit("Body", Load(who.BodySrc), 0.12f, false));
                 var hair = RocketboxPaint.Hair(ToColors(RocketboxTextures.ReadPng(who.HairSrc, out n, out n)), look);
                 skin.Hair = Keep(skin, Lit("Hair", Keep(skin, Tex(hair, n, true, 512)), 0.34f, true));
@@ -276,7 +326,8 @@ namespace HalfAware.EditorTools.Rocketbox
             var head = ToColors(RocketboxTextures.ReadPng(who.HeadSrc, out n, out n));
             info = RocketboxPaint.Head(head, maps.Head, maps.Anchors, look, twin, who.IrisUv, who.IrisRadius);
             mask = Keep(into, MaskTex(info.Mask, n, headSize));
-            return Keep(into, Lit(twin ? "Head_twin" : "Head_self", Keep(into, Tex(info.Px, n, false, headSize)), 0.22f, false));
+            var spec = Keep(into, Tex(ToColors(info.Spec), n, true, SpecSize));
+            return Keep(into, LitHead(twin ? "Head_twin" : "Head_self", Keep(into, Tex(info.Px, n, false, headSize)), spec));
         }
 
         /// <summary>手を入れていない縮めたテクスチャのままの組（撮り比べの「前」）</summary>
@@ -310,6 +361,14 @@ namespace HalfAware.EditorTools.Rocketbox
                 Maps m;
                 var key = who.Name + "/" + n;
                 if (cache.TryGetValue(key, out m)) return m;
+                if (who.IsComposite)
+                {
+                    // 頭と顔の骨は頭の人、体は体の人の地図（骨の束ねた姿勢は同じ）
+                    var h = Get(who.HeadFrom, n);
+                    m = new Maps { Head = h.Head, Anchors = h.Anchors, Body = Get(who.BodyFrom, n).Body };
+                    cache[key] = m;
+                    return m;
+                }
                 var src = AssetDatabase.LoadAssetAtPath<GameObject>(who.Model);
                 var go = (GameObject)Object.Instantiate(src);
                 go.hideFlags = HideFlags.HideAndDontSave;
@@ -412,7 +471,26 @@ namespace HalfAware.EditorTools.Rocketbox
                 m.SetFloat("_Cull", (float)CullMode.Off);
                 m.SetOverrideTag("RenderType", "TransparentCutout");
                 m.renderQueue = (int)RenderQueue.AlphaTest;
+                // 黒い髪の房は拡散の光がほとんど無いので、照り返しだけが灰色に浮く。髪は照り返しを切る
+                m.SetFloat("_SpecularHighlights", 0f);
+                m.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
             }
+            return m;
+        }
+
+        /// <summary>
+        /// 頭のマテリアル。Specular の流儀で、照り返しの強さと滑らかさを絵（spec）で持つ。
+        /// 髪の所は照り返しを 0 にする（長い髪の面が横の強い光で灰色のフードのように光るため）。肌は 0.04、目の玉は滑らか
+        /// </summary>
+        public static Material LitHead(string name, Texture tex, Texture spec)
+        {
+            var m = Lit(name, tex, 1f, false);
+            m.SetFloat("_WorkflowMode", 0f);
+            m.EnableKeyword("_SPECULAR_SETUP");
+            m.SetTexture("_SpecGlossMap", spec);
+            m.EnableKeyword("_METALLICSPECGLOSSMAP");
+            m.SetFloat("_SmoothnessTextureChannel", 0f);
+            m.SetColor("_SpecColor", Color.white);
             return m;
         }
 
@@ -461,8 +539,10 @@ namespace HalfAware.EditorTools.Rocketbox
 
         static void EnsureFolder(RocketboxPerson who)
         {
+            var d = who.Dir.TrimEnd('/');
+            if (!AssetDatabase.IsValidFolder(d)) AssetDatabase.CreateFolder(RocketboxImport.Root.TrimEnd('/'), who.Name);
             var p = who.Painted.TrimEnd('/');
-            if (!AssetDatabase.IsValidFolder(p)) AssetDatabase.CreateFolder(who.Dir.TrimEnd('/'), "Painted");
+            if (!AssetDatabase.IsValidFolder(p)) AssetDatabase.CreateFolder(d, "Painted");
         }
     }
 }

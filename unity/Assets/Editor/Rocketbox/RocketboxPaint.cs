@@ -70,6 +70,20 @@ namespace HalfAware.EditorTools.Rocketbox
             /// <summary>顎の骨の左右の倍率</summary>
             public float JawScale { get { return 1f - Mathf.Clamp01(beauty) * jawSlim; } }
 
+            [Header("艶（頭のマテリアルの Specular の絵。RGB = 照り返しの強さ、A = 滑らかさ）")]
+            [Tooltip("肌の照り返しの強さ（線形の値）。髪はここを 0 にする")]
+            public float skinSpecular = 0.04f;
+            public float skinSmoothness = 0.22f;
+            [Tooltip("髪の滑らかさ。髪は照り返しを 0 にするので、ほぼ効かない")]
+            public float hairSmoothness = 0.10f;
+            [Tooltip("目の玉の滑らかさ（主光を目に映すため）")]
+            public float eyeSmoothness = 0.55f;
+
+            [Header("体の肌の色を頭に揃える（頭と体が別の人のとき）")]
+            public bool matchSkin;
+            [Tooltip("揃える強さ（0〜1）")]
+            public float skinMatch = 1f;
+
             public Look Clone() { return (Look)MemberwiseClone(); }
         }
 
@@ -182,6 +196,8 @@ namespace HalfAware.EditorTools.Rocketbox
             public Vector2 MoleUv = new Vector2(-1f, -1f);
             /// <summary>印の絵（R = 黒子、G = 虹彩、B = 他の顔の部品、地は灰）。<see cref="HalfAware.EditorTools.Study.FaceStudy"/> で測るのに使う</summary>
             public Color32[] Mask;
+            /// <summary>頭のマテリアルの Specular の絵（sRGB の RGB = 照り返しの強さ、A = 滑らかさ）</summary>
+            public Color32[] Spec;
             /// <summary>頭のテクスチャで髪と見なした重み（0〜1、N×N）。撮り比べで髪の長さを測るのに使う</summary>
             public float[] Hair;
             public int N;
@@ -413,6 +429,7 @@ namespace HalfAware.EditorTools.Rocketbox
             }
             res.Mask = mask;
             res.Hair = hair;
+            res.Spec = SpecMap(hair, s, irisUv, irisRadius, k);
             res.N = n;
             res.Px = px;
             res.Note = string.Format("手入れ {0:0.00}、黒子 {1:0.0} mm（{2}）", b, k.moleDiameter * 1000f, twin ? "右目の下" : "左目の下");
@@ -515,6 +532,121 @@ namespace HalfAware.EditorTools.Rocketbox
                 px[i] = o;
             }
             return px;
+        }
+
+        /// <summary>
+        /// 頭の Specular の絵。髪は照り返しを 0 にする（黒く塗った髪は拡散の光がほとんど無く、
+        /// 横の強い光では照り返しだけが灰色に残って、長い髪の面がフードのように光るため）。
+        /// 肌は 0.04、目の玉は滑らかにして主光を映す
+        /// </summary>
+        static Color32[] SpecMap(float[] hair, Surface s, Vector2 irisUv, float irisRadius, Look k)
+        {
+            var n = s.N;
+            var o = new Color32[n * n];
+            var skinSpec = (byte)Mathf.RoundToInt(Mathf.LinearToGammaSpace(k.skinSpecular) * 255f);
+            var ball = irisRadius * 3.2f;
+            for (var y = 0; y < n; y++)
+                for (var x = 0; x < n; x++)
+                {
+                    var i = y * n + x;
+                    var h = Mathf.Clamp01(hair[i]);
+                    var eye = Smooth(ball, ball * 0.8f, Vector2.Distance(new Vector2((x + 0.5f) / n, (y + 0.5f) / n), irisUv));
+                    var smooth = Mathf.Lerp(Mathf.Lerp(k.skinSmoothness, k.hairSmoothness, h), k.eyeSmoothness, eye);
+                    var spec = (byte)Mathf.RoundToInt(skinSpec * (1f - h * (1f - eye)));
+                    o[i] = new Color32(spec, spec, spec, (byte)Mathf.RoundToInt(Mathf.Clamp01(smooth) * 255f));
+                }
+            return o;
+        }
+
+        /// <summary>
+        /// 体のテクスチャの肌（手）の色を、頭のテクスチャの首元の肌の色に揃える（頭と体が別の人のとき）。
+        /// 首元は首の付け根から胸の上（目の高さから 11〜21 cm 下）の前側で髪でない所、手は束ねた姿勢で左右 38 cm より外の肌の色の所。
+        /// 線形の光の平均の比を、肌の色の所にだけ掛ける。揃える前と後の平均（sRGB）と色差を返す
+        /// </summary>
+        public static Color[] MatchSkin(Color[] body, Surface bodyMap, Color[] head, float[] headHair, Surface headMap, Anchors a, Look k, out string note)
+        {
+            var o = (Color[])body.Clone();
+            var eyeY = (a.eyeL.y + a.eyeR.y) * 0.5f;
+            Vector3 hs = Vector3.zero; var hn = 0;
+            for (var i = 0; i < head.Length; i++)
+            {
+                if (!headMap.On[i] || headHair[i] > 0.1f) continue;
+                var p = headMap.P[i];
+                if (p.y > eyeY - 0.11f || p.y < eyeY - 0.21f || p.z < a.head.z + 0.02f) continue;
+                if (SkinLike(head[i]) < 0.5f) continue;
+                hs += Lin(head[i]);
+                hn++;
+            }
+            Vector3 bs = Vector3.zero; var bn = 0;
+            var w = new float[body.Length];
+            for (var i = 0; i < body.Length; i++)
+            {
+                if (!bodyMap.On[i]) continue;
+                if (Mathf.Abs(bodyMap.P[i].x) < 0.38f) continue;
+                w[i] = SkinLike(body[i]);
+                if (w[i] < 0.5f) continue;
+                bs += Lin(body[i]);
+                bn++;
+            }
+            if (hn == 0 || bn == 0)
+            {
+                note = "肌の色を揃えられない（首元 " + hn + "・手 " + bn + " 画素）";
+                return o;
+            }
+            hs /= hn;
+            bs /= bn;
+            var gain = new Vector3(hs.x / bs.x, hs.y / bs.y, hs.z / bs.z);
+            gain = Vector3.Lerp(Vector3.one, gain, Mathf.Clamp01(k.skinMatch));
+            Vector3 after = Vector3.zero;
+            for (var i = 0; i < body.Length; i++)
+            {
+                if (w[i] <= 0f) continue;
+                var l = Lin(body[i]);
+                var m = new Vector3(l.x * gain.x, l.y * gain.y, l.z * gain.z);
+                var c = new Color(Mathf.LinearToGammaSpace(Mathf.Clamp01(m.x)), Mathf.LinearToGammaSpace(Mathf.Clamp01(m.y)), Mathf.LinearToGammaSpace(Mathf.Clamp01(m.z)), body[i].a);
+                o[i] = Color.Lerp(body[i], c, w[i]);
+                if (w[i] >= 0.5f) after += Lin(o[i]);
+            }
+            after /= bn;
+            note = string.Format("首元の肌 {0}、手 {1} → {2}（Lab の色差 {3:0.0} → {4:0.0}、比 R {5:0.00} G {6:0.00} B {7:0.00}）",
+                Srgb(hs), Srgb(bs), Srgb(after), DeltaE(hs, bs), DeltaE(hs, after), gain.x, gain.y, gain.z);
+            return o;
+        }
+
+        /// <summary>肌らしさ（0〜1）。色相 5〜35 度、彩度 0.2〜0.65、明度 0.3 以上</summary>
+        static float SkinLike(Color c)
+        {
+            float h, sat, v;
+            Color.RGBToHSV(c, out h, out sat, out v);
+            return HueNear(h * 360f, 20f, 15f, 6f) * Band(sat, 0.16f, 0.22f, 0.62f, 0.70f) * Smooth(0.25f, 0.35f, v);
+        }
+
+        static Vector3 Lin(Color c)
+        {
+            return new Vector3(Mathf.GammaToLinearSpace(c.r), Mathf.GammaToLinearSpace(c.g), Mathf.GammaToLinearSpace(c.b));
+        }
+
+        static string Srgb(Vector3 lin)
+        {
+            return string.Format("({0:0}, {1:0}, {2:0})", Mathf.LinearToGammaSpace(lin.x) * 255f, Mathf.LinearToGammaSpace(lin.y) * 255f, Mathf.LinearToGammaSpace(lin.z) * 255f);
+        }
+
+        /// <summary>CIE76 の色差（線形の sRGB から Lab へ、D65）</summary>
+        public static float DeltaE(Vector3 a, Vector3 b)
+        {
+            var la = Lab(a);
+            var lb = Lab(b);
+            return Vector3.Distance(la, lb);
+        }
+
+        static Vector3 Lab(Vector3 rgb)
+        {
+            var X = 0.4124f * rgb.x + 0.3576f * rgb.y + 0.1805f * rgb.z;
+            var Y = 0.2126f * rgb.x + 0.7152f * rgb.y + 0.0722f * rgb.z;
+            var Z = 0.0193f * rgb.x + 0.1192f * rgb.y + 0.9505f * rgb.z;
+            System.Func<float, float> f = t => t > 0.008856f ? Mathf.Pow(t, 1f / 3f) : 7.787f * t + 16f / 116f;
+            float fx = f(X / 0.95047f), fy = f(Y), fz = f(Z / 1.08883f);
+            return new Vector3(116f * fy - 16f, 500f * (fx - fy), 200f * (fy - fz));
         }
 
         static Color HairRamp(float v, Look k)
