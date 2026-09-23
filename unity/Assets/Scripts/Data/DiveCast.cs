@@ -269,7 +269,7 @@ namespace HalfAware
 
                 // 公園の一家。コロンビアから来た祖父母と孫二人。
                 // 祖父は鳥打帽と編んだベスト（M_Worker の安全帽と反射ベストを塗り替える）
-                Who("Albert", "アルベルト", 2, 78, false, "コロンビア", "M_Worker", 1.80f, 0.94f, 16f,
+                Who("Albert", "アルベルト", 2, 78, false, "コロンビア", "M_Worker", 1.80f, 0.94f, 20f,
                     Rgb(0xA87A59), Rgb(0xD9D6CF))
                     .Put(Part.Top, Rgb(0x3B4A36)).Put(Part.TopTrim, Rgb(0x3B4A36)).Put(Part.Under, Rgb(0xC9CCC4))
                     .Put(Part.Bottom, Rgb(0x4A4238)).Put(Part.BottomTrim, Rgb(0x40392F))
@@ -304,11 +304,11 @@ namespace HalfAware
                 // 公営住宅の B。イタリアから来た老夫婦
                 // 背広の模型を、編んだカーディガンと開襟のシャツに塗り替える（ネクタイはシャツの色で消す）。
                 // M_Casual の髪は後ろで束ねた形で、年寄りの短い白髪に見えない
-                Who("Giorgio", "ジョルジョ", 8, 66, false, "イタリア", "M_Suit", 1.73f, 1.10f, 9f,
+                Who("Giorgio", "ジョルジョ", 8, 66, false, "イタリア", "M_Suit", 1.73f, 1.10f, 12f,
                     Rgb(0xCCA17D), Rgb(0xB8B5AE))
                     .Put(Part.Top, Rgb(0x6B5A3E)).Put(Part.Under, Rgb(0xB9C0C6)).Put(Part.Tie, Rgb(0xB9C0C6))
                     .Put(Part.Bottom, Rgb(0x55585C)).Put(Part.Shoe, Rgb(0x3B281B)).Done(),
-                Who("Rosa", "ローザ", 9, 72, true, "コロンビア", "W_Formal", 1.57f, 1.08f, 13f,
+                Who("Rosa", "ローザ", 9, 72, true, "コロンビア", "W_Formal", 1.57f, 1.08f, 16f,
                     Rgb(0xB38561), Rgb(0xA8A4A0))
                     .Put(Part.Top, Rgb(0x2E6E73)).Put(Part.Bottom, Rgb(0x2E6E73)).Put(Part.TopTrim, Rgb(0xC9A45C))
                     .Put(Part.Legwear, Rgb(0x3A3236)).Put(Part.Shoe, Rgb(0x1A1818)).Done(),
@@ -339,7 +339,7 @@ namespace HalfAware
                     .Put(Part.Top, Rgb(0x5A1A26)).Put(Part.Under, Rgb(0xE6E6E2)).Put(Part.Tie, Rgb(0xC9A13A))
                     .Put(Part.Bottom, Rgb(0x2A2B30)).Put(Part.Shoe, Rgb(0x121212)).Done(),
 
-                Who("Elena", "エレナ", 15, 63, true, "イタリア", "W_Formal", 1.58f, 1.10f, 8f,
+                Who("Elena", "エレナ", 15, 63, true, "イタリア", "W_Formal", 1.58f, 1.10f, 11f,
                     Rgb(0xD6AB87), Rgb(0x5A3A2C))
                     .Put(Part.Top, Rgb(0x5E3A5A)).Put(Part.Bottom, Rgb(0x5E3A5A)).Put(Part.TopTrim, Rgb(0xC9A45C))
                     .Put(Part.Legwear, Rgb(0x8C6E5E)).Put(Part.Shoe, Rgb(0x2A1E18)).Done(),
