@@ -794,6 +794,19 @@ namespace HalfAware.EditorTools.Rocketbox
                 px[i] = Color.Lerp(px[i], c, Mathf.Clamp01(w * 1.5f));
                 if (w > 0.05f) fill.Add(i);
             }
+            // 首に掛かったネックレスの鎖（首の付け根より上の、銀色の細い線）: 彩度が低く明るい画素を、下のならしでまわりの肌で埋める
+            // （胸元だけを塗ると、首の付け根の上に白い線が残った）
+            var fillSet = new HashSet<int>(fill);
+            for (var i = 0; i < px.Length; i++)
+            {
+                if (!s.On[i] || hair[i] > 0.1f || fillSet.Contains(i)) continue;
+                var p = s.P[i];
+                if (p.y < top - 0.004f || p.y > a.head.y - 0.02f) continue;
+                float h, sat, v;
+                Color.RGBToHSV(px[i], out h, out sat, out v);
+                if (sat > 0.20f || v < 0.40f) continue;
+                fill.Add(i);
+            }
             // 塗った所を、まわりの肌からならす（となりの平均を 400 回。まわりの肌の色が中まで届く）。一色のままだと、元の肌との境が角張った前掛けの形に見えた
             var n = s.N;
             for (var it = 0; it < 400; it++)
@@ -1130,6 +1143,62 @@ namespace HalfAware.EditorTools.Rocketbox
             note = string.Format("首元の肌 {0}、手 {1} → {2}（Lab の色差 {3:0.0} → {4:0.0}、比 R {5:0.00} G {6:0.00} B {7:0.00}）",
                 Srgb(hs), Srgb(bs), Srgb(after), DeltaE(hs, bs), DeltaE(hs, after), gain.x, gain.y, gain.z);
             return o;
+        }
+
+        /// <summary>
+        /// 肌の色を、体の人の首元の肌を基に揃える。体の人の頭のテクスチャ（refHead）の首元の肌の平均を、顔の人の首元の肌の平均へ寄せる比を求め、
+        /// その一つの比を body の肌らしい画素の全部に掛ける。体の人の体と頭のテクスチャ（胸元）に同じ比を掛けるので、二枚の間に色の差ができない
+        /// （<see cref="MatchSkin"/> は絵ごとに肌の平均を取るので、体の人の胸元を頭の面で作ると、胸の上と下で色がずれた）
+        /// </summary>
+        public static Color[] MatchSkinBy(Color[] body, Surface bodyMap, Color[] head, float[] headHair, Surface headMap, Anchors a,
+            Color[] refHead, Surface refMap, Anchors refA, Look k, out string note)
+        {
+            var o = (Color[])body.Clone();
+            Vector3 hs, rs;
+            var hn = NeckSkin(head, headHair, headMap, a, out hs);
+            var rn = NeckSkin(refHead, null, refMap, refA, out rs);
+            if (hn == 0 || rn == 0)
+            {
+                note = "肌の色を揃えられない（顔の人の首元 " + hn + "・体の人の首元 " + rn + " 画素）";
+                return o;
+            }
+            var gain = new Vector3(hs.x / rs.x, hs.y / rs.y, hs.z / rs.z);
+            gain = Vector3.Lerp(Vector3.one, gain, Mathf.Clamp01(k.skinMatch));
+            var n = 0;
+            for (var i = 0; i < body.Length; i++)
+            {
+                if (!bodyMap.On[i]) continue;
+                if (!k.matchSkinAll && Mathf.Abs(bodyMap.P[i].x) < 0.38f) continue;
+                var w = SkinLike(body[i]);
+                if (w <= 0f) continue;
+                var l = Lin(body[i]);
+                var m = new Vector3(l.x * gain.x, l.y * gain.y, l.z * gain.z);
+                var c = new Color(Mathf.LinearToGammaSpace(Mathf.Clamp01(m.x)), Mathf.LinearToGammaSpace(Mathf.Clamp01(m.y)), Mathf.LinearToGammaSpace(Mathf.Clamp01(m.z)), body[i].a);
+                o[i] = Color.Lerp(body[i], c, w);
+                if (w >= 0.5f) n++;
+            }
+            note = string.Format("顔の人の首元の肌 {0}、体の人の首元の肌 {1}（Lab の色差 {2:0.0}、比 R {3:0.00} G {4:0.00} B {5:0.00}）を肌の画素 {6} に掛けた",
+                Srgb(hs), Srgb(rs), DeltaE(hs, rs), gain.x, gain.y, gain.z, n);
+            return o;
+        }
+
+        /// <summary>首元（目の 11〜21 cm 下の前）の肌の平均（線形の光）。hair が null なら髪の所を除かない。数を返す</summary>
+        static int NeckSkin(Color[] head, float[] hair, Surface map, Anchors a, out Vector3 mean)
+        {
+            var eyeY = (a.eyeL.y + a.eyeR.y) * 0.5f;
+            mean = Vector3.zero;
+            var n = 0;
+            for (var i = 0; i < head.Length; i++)
+            {
+                if (!map.On[i] || (hair != null && hair[i] > 0.1f)) continue;
+                var p = map.P[i];
+                if (p.y > eyeY - 0.11f || p.y < eyeY - 0.21f || p.z < a.head.z + 0.02f) continue;
+                if (SkinLike(head[i]) < 0.5f) continue;
+                mean += Lin(head[i]);
+                n++;
+            }
+            if (n > 0) mean /= n;
+            return n;
         }
 
         /// <summary>肌らしさ（0〜1）。色相 5〜35 度、彩度 0.2〜0.65、明度 0.3 以上</summary>

@@ -170,7 +170,7 @@ namespace HalfAware.EditorTools.Rocketbox
                 {
                     // 組み合わせたメッシュはマテリアルの名前を持たない。面の組の順が体・頭・髪
                     ms = skin.Person.IsHairSwap
-                        ? (skin.Legs != null ? new[] { body, head, skin.Shell, skin.Hair, skin.Lash, skin.Legs } : new[] { body, head, skin.Shell, skin.Hair, skin.Lash })
+                        ? HairSwapSlots(skin, body, head)
                         : new[] { body, head, skin.Hair };
                 }
                 else
@@ -188,6 +188,15 @@ namespace HalfAware.EditorTools.Rocketbox
                 // 骨が動いて頭が元の箱から出ても消えないように
                 r.updateWhenOffscreen = true;
             }
+        }
+
+        /// <summary>顔と髪が別の人の、組み合わせたメッシュの面の組: 体・頭・髪の殻・髪の房・まつ毛、借りた膝から下、体の人の頭の面で作った胸元</summary>
+        static Material[] HairSwapSlots(Skin skin, Material body, Material head)
+        {
+            var ms = new List<Material> { body, head, skin.Shell, skin.Hair, skin.Lash };
+            if (skin.Legs != null) ms.Add(skin.Legs);
+            if (skin.Chest != null) ms.Add(skin.Chest);
+            return ms.ToArray();
         }
 
         /// <summary>
@@ -216,6 +225,8 @@ namespace HalfAware.EditorTools.Rocketbox
             public Material Shell, Lash;
             /// <summary>膝から下を別の人から借りるとき: その人の体のテクスチャ（肌を頭に揃えた物）</summary>
             public Material Legs;
+            /// <summary>胸元を体の人の頭の面で作るとき: 体の人の頭のテクスチャ（肌を顔の人の肌に揃えた物）</summary>
+            public Material Chest;
             /// <summary>顎の骨の左右の倍率（<see cref="RocketboxPaint.Look.JawScale"/>）</summary>
             public float JawScale = 1f;
             /// <summary>形の手入れ（目・瞼・鼻・顎の骨）に使う見た目（<see cref="ShapeFace"/>）</summary>
@@ -303,6 +314,13 @@ namespace HalfAware.EditorTools.Rocketbox
                 WritePainted(PaintLegs(who, look, self, out legsNote), 512, dir + "Legs.png", false, 512);
                 SaveMaterial(Lit("Legs", Load(dir + "Legs.png"), 0.12f, false), dir + "Legs.mat");
                 sb.AppendLine("膝から下の肌: " + legsNote);
+            }
+            if (who.ChestFromBody)
+            {
+                string chestNote;
+                WritePainted(PaintChest(who, look, self, out chestNote), 512, dir + "Chest.png", false, 512);
+                SaveMaterial(Lit("Chest", Load(dir + "Chest.png"), look.skinSmoothness, false), dir + "Chest.mat");
+                sb.AppendLine("胸元の肌: " + chestNote);
             }
 
             SaveMaterial(Lit("Body", bodyTex, 0.12f, false), dir + "Body.mat");
@@ -399,6 +417,29 @@ namespace HalfAware.EditorTools.Rocketbox
             return RocketboxPaint.MatchSkin(px, legMaps.Body, head.Px, head.Hair, headMaps.Head, headMaps.Anchors, k, out note);
         }
 
+        /// <summary>胸元（体の人の頭のテクスチャ）の肌を、顔の人の首元の肌に揃える</summary>
+        static Color[] PaintChest(RocketboxPerson who, RocketboxPaint.Look look, RocketboxPaint.HeadResult head, out string note)
+        {
+            int n;
+            var px = ToColors(RocketboxTextures.ReadPng(who.ChestSrc, out n, out n));
+            var k = look.Clone();
+            k.matchSkinAll = true;
+            return MatchBodyPersonSkin(px, Maps.Get(who.BodyFrom, 512).Head, who, head, k, out note);
+        }
+
+        /// <summary>
+        /// 体の人の絵（体または頭のテクスチャ）の肌を、体の人の首元の肌から顔の人の首元の肌への一つの比で揃える
+        /// （<see cref="RocketboxPaint.MatchSkinBy"/>。胸元を体の人の頭の面で作るとき、体と胸元の二枚に同じ比を掛ける）
+        /// </summary>
+        static Color[] MatchBodyPersonSkin(Color[] px, RocketboxPaint.Surface map, RocketboxPerson who, RocketboxPaint.HeadResult head, RocketboxPaint.Look look, out string note)
+        {
+            int n;
+            var headMaps = Maps.Get(who, 512);
+            var own = Maps.Get(who.BodyFrom, 512);
+            var ownHead = ToColors(RocketboxTextures.ReadPng(who.BodyFrom.HeadSrc, out n, out n));
+            return RocketboxPaint.MatchSkinBy(px, map, head.Px, head.Hair, headMaps.Head, headMaps.Anchors, ownHead, own.Head, own.Anchors, look, out note);
+        }
+
         static Color[] PaintBody(RocketboxPerson who, RocketboxPaint.Look look, Maps maps, RocketboxPaint.HeadResult head, out string skinNote)
         {
             skinNote = null;
@@ -411,7 +452,9 @@ namespace HalfAware.EditorTools.Rocketbox
                 px = RocketboxPaint.Body(px, maps.Body, look, out knit);
             }
             if (look.matchSkin)
-                px = RocketboxPaint.MatchSkin(px, maps.Body, head.Px, head.Hair, maps.Head, maps.Anchors, look, out skinNote);
+                px = who.ChestFromBody
+                    ? MatchBodyPersonSkin(px, maps.Body, who, head, look, out skinNote)
+                    : RocketboxPaint.MatchSkin(px, maps.Body, head.Px, head.Hair, maps.Head, maps.Anchors, look, out skinNote);
             return px;
         }
 
@@ -427,10 +470,13 @@ namespace HalfAware.EditorTools.Rocketbox
                 Shell = AssetDatabase.LoadAssetAtPath<Material>(dir + "Shell.mat"),
                 Lash = AssetDatabase.LoadAssetAtPath<Material>(dir + "Lash.mat"),
                 Legs = AssetDatabase.LoadAssetAtPath<Material>(dir + "Legs.mat"),
+                Chest = AssetDatabase.LoadAssetAtPath<Material>(dir + "Chest.mat"),
             };
             if (s.Body == null || s.Head == null || s.Hair == null) return null;
             if (who.IsHairSwap && (s.Shell == null || s.Lash == null)) return null;
             if (who.LegsFrom != null && s.Legs == null) return null;
+            if (who.ChestFromBody && s.Chest == null) return null;
+            if (!who.ChestFromBody) s.Chest = null;
             if (twinHead && s.HeadTwin == null) return null;
             return s;
         }
@@ -476,6 +522,11 @@ namespace HalfAware.EditorTools.Rocketbox
                 {
                     string legsNote;
                     skin.Legs = Keep(skin, Lit("Legs", Keep(skin, Tex(PaintLegs(who, look, skin.HeadInfo, out legsNote), 512, false, 512)), 0.12f, false));
+                }
+                if (who.ChestFromBody)
+                {
+                    string chestNote;
+                    skin.Chest = Keep(skin, Lit("Chest", Keep(skin, Tex(PaintChest(who, look, skin.HeadInfo, out chestNote), 512, false, 512)), look.skinSmoothness, false));
                 }
                 return skin;
             }

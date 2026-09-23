@@ -40,6 +40,9 @@ namespace HalfAware.EditorTools.Rocketbox
             return false;
         }
 
+        /// <summary>胸元を体の人の頭の面で作るとき（<see cref="RocketboxPerson.ChestFromBody"/>）の継ぎ目の高さ（頭の骨から下へ、m）と、重ねる帯の幅（m）</summary>
+        const float ChestCut = 0.085f, ChestOverlap = 0.015f;
+
         public static string BuildMesh(RocketboxPerson who)
         {
             if (!who.IsHairSwap) throw new ArgumentException("顔と髪が同じ人: " + who);
@@ -67,6 +70,26 @@ namespace HalfAware.EditorTools.Rocketbox
 
             // 顔の人の頭の面を、顔の三角と髪の殻の三角に分ける（面は全部使う）
             var faceHead = fm.GetTriangles(Slot(faceSmr, who.FaceFrom.HeadSlot));
+            // 顔の人の頭の面のうち、別の人の髪を載せるときに除く三角（結んだ髪など、頭の面で作られた髪）
+            int headDropped = 0;
+            if (who.FaceFrom.DropFromHead != null)
+            {
+                var keep = new List<int>();
+                for (var t = 0; t < faceHead.Length; t += 3)
+                {
+                    var cu = (fuv[faceHead[t]] + fuv[faceHead[t + 1]] + fuv[faceHead[t + 2]]) / 3f;
+                    var cp = (fw[faceHead[t]] + fw[faceHead[t + 1]] + fw[faceHead[t + 2]]) / 3f;
+                    if (who.FaceFrom.DropFromHead(cu, cp))
+                    {
+                        headDropped++;
+                        continue;
+                    }
+                    keep.Add(faceHead[t]);
+                    keep.Add(faceHead[t + 1]);
+                    keep.Add(faceHead[t + 2]);
+                }
+                faceHead = keep.ToArray();
+            }
             var eyeY = (a.eyeL.y + a.eyeR.y) * 0.5f;
             // 体が別の人なら、首元の肌を体の人の肌と服に合わせる（頭の載せ替えと同じ直し）
             string neckNote = null;
@@ -75,6 +98,25 @@ namespace HalfAware.EditorTools.Rocketbox
                 var skinVerts = new List<int>();
                 foreach (var i in new HashSet<int>(faceHead)) if (HairAt(facePaint, fuv[i]) <= 0.5f) skinVerts.Add(i);
                 fw = RocketboxCompose.FitNeck(who.BodyFrom, fw, skinVerts, eyeY, out neckNote);
+            }
+            // 胸元を体の人の頭の面で作るときは、顔の人の頭の面のうち首の付け根より下を除く
+            var chestCut = a.head.y - ChestCut;
+            int chestDropped = 0;
+            if (who.ChestFromBody && who.BodyFrom != who.FaceFrom)
+            {
+                var keep = new List<int>();
+                for (var t = 0; t < faceHead.Length; t += 3)
+                {
+                    if ((fw[faceHead[t]].y + fw[faceHead[t + 1]].y + fw[faceHead[t + 2]].y) / 3f < chestCut)
+                    {
+                        chestDropped++;
+                        continue;
+                    }
+                    keep.Add(faceHead[t]);
+                    keep.Add(faceHead[t + 1]);
+                    keep.Add(faceHead[t + 2]);
+                }
+                faceHead = keep.ToArray();
             }
             var faceTris = new List<int>();
             var faceHairTris = new List<int>();
@@ -295,7 +337,31 @@ namespace HalfAware.EditorTools.Rocketbox
             var bodyTris = Pack(bodyAll, i => toLocal.MultiplyPoint3x4(bw[i]), i => bn[i], i => bu[i], i => Re(bwts[i], bodyRemap), verts, norms, uvs, weights);
             var headTris = Pack(faceHead, i => toLocal.MultiplyPoint3x4(sunkPos[i]), i => fn[i], i => fuv[i], i => Re(fwts[i], faceRemap), verts, norms, uvs, weights);
             var patchCount = 0;
-            if (who.BodyFrom != who.FaceFrom)
+            int[] chestOut = null;
+            string chestNote = null;
+            if (who.ChestFromBody && who.BodyFrom != who.FaceFrom)
+            {
+                // 胸元: 体の人の頭の面のうち、首の付け根（chestCut）から 1.5 cm 上より下の三角を、体の人の UV のまま使う。
+                // 重なる帯（chestCut より上）は 1 mm 内側へ下げて、顔の人の首の肌が勝つようにする
+                var bodyHead = bm.GetTriangles(Slot(bodySmr, who.BodyFrom.HeadSlot));
+                var chestTris = new List<int>();
+                for (var t = 0; t < bodyHead.Length; t += 3)
+                {
+                    var cp = (bw[bodyHead[t]] + bw[bodyHead[t + 1]] + bw[bodyHead[t + 2]]) / 3f;
+                    if (cp.y > chestCut + ChestOverlap) continue;
+                    var cu = (bu[bodyHead[t]] + bu[bodyHead[t + 1]] + bu[bodyHead[t + 2]]) / 3f;
+                    if (who.BodyFrom.DropFromHead != null && who.BodyFrom.DropFromHead(cu, cp)) continue;
+                    chestTris.Add(bodyHead[t]);
+                    chestTris.Add(bodyHead[t + 1]);
+                    chestTris.Add(bodyHead[t + 2]);
+                }
+                var toW = bodySmr.transform.localToWorldMatrix;
+                chestOut = Pack(chestTris.ToArray(), i => toLocal.MultiplyPoint3x4(bw[i] - toW.MultiplyVector(bn[i]).normalized * (bw[i].y > chestCut - 0.005f ? 0.001f : 0f)),
+                    i => bn[i], i => bu[i], i => Re(bwts[i], bodyRemap), verts, norms, uvs, weights);
+                chestNote = string.Format(CultureInfo.InvariantCulture, "胸元: 首の付け根（頭の骨から {0:0.0} cm 下）より下の顔の人の三角 {1} を除き、体の人の頭の面の三角 {2} で作る",
+                    ChestCut * 100f, chestDropped, chestTris.Count / 3);
+            }
+            else if (who.BodyFrom != who.FaceFrom)
             {
                 // 胸元の埋め: 体の人の肌の三角で、顔の人の肌が届かない所。0.7 mm 内側へ下げる。
                 // UV は埋めの真ん中に一番近い顔の人の肌の頂点の物を全部に使う（頂点ごとに一番近い物を使うと、UV の島をまたいで暗い点が並んだ）
@@ -349,13 +415,14 @@ namespace HalfAware.EditorTools.Rocketbox
             mesh.SetUVs(0, uvs);
             mesh.boneWeights = weights.ToArray();
             mesh.bindposes = bm.bindposes;
-            mesh.subMeshCount = legsOut != null ? 6 : 5;
+            mesh.subMeshCount = 5 + (legsOut != null ? 1 : 0) + (chestOut != null ? 1 : 0);
             mesh.SetTriangles(bodyTris, 0);
             mesh.SetTriangles(headTris, 1);
             mesh.SetTriangles(shellOut, 2);
             mesh.SetTriangles(cardOut, 3);
             mesh.SetTriangles(lashOut, 4);
             if (legsOut != null) mesh.SetTriangles(legsOut, 5);
+            if (chestOut != null) mesh.SetTriangles(chestOut, legsOut != null ? 6 : 5);
             mesh.RecalculateBounds();
             RocketboxCompose.Save(mesh, who.CompositeMesh);
 
@@ -398,7 +465,9 @@ namespace HalfAware.EditorTools.Rocketbox
                 gaps.Count, gaps.Count > 0 ? gsum / gaps.Count * 1000f : 0f, gaps.Count > 0 ? gaps[gaps.Count / 2] * 1000f : 0f, g5, g15,
                 bare * 10000f, who.CompositeMesh, faceUnder, outOfFront)
                 + (neckNote != null ? "\n" + neckNote + "、胸元を体の人の肌の三角で埋めた数 " + patchCount : "")
-                + (legsNote != null ? "\n" + legsNote : "");
+                + (legsNote != null ? "\n" + legsNote : "")
+                + (headDropped > 0 ? "\n顔の人の頭の面から除いた三角（結んだ髪など） " + headDropped : "")
+                + (chestNote != null ? "\n" + chestNote : "");
         }
 
         // ---- 見分け -----------------------------------------------------------
