@@ -35,6 +35,13 @@ namespace HalfAware.EditorTools.Rocketbox
         public Vector2 IrisUv = new Vector2(0.2634f, 0.0675f);
         public float IrisRadius = 0.0171f;
 
+        /// <summary>
+        /// この人の髪を別の人の顔に載せるとき、こめかみのどこまでを髪の殻に入れて黒く塗るか（本人の左・右）。
+        /// x は目の玉の中心から外へ、y は目の玉の中心から奥へ（m。目の 1 cm 上より下は、もみあげのように細らせる）。
+        /// 髪の人のこめかみの肌の窓を埋めるため（<see cref="RocketboxHairSwap.SideDepth"/>）
+        /// </summary>
+        public Vector2 TempleLeft = new Vector2(0.035f, 0.01f), TempleRight = new Vector2(0.035f, 0.01f);
+
         readonly System.Action<RocketboxPaint.Look> tune;
 
         RocketboxPerson(string name, string prefix, string label, System.Action<RocketboxPaint.Look> tune)
@@ -86,7 +93,12 @@ namespace HalfAware.EditorTools.Rocketbox
         {
             k.blackenKnit = false;
             k.hairLowest = 0.34f;
-        });
+        })
+        {
+            // 本人の右のこめかみは肌の窓が目に近く広い。左は髪が流れて窓が狭く、右と同じだけ取ると目尻の横に殻が四角くはみ出した
+            TempleRight = new Vector2(0.025f, -0.005f),
+            TempleLeft = new Vector2(0.035f, 0.01f),
+        };
 
         /// <summary>女大 08 の頭（長い髪ごと）を、女大 14 の体（黒いカーディガン）に載せた人</summary>
         public static readonly RocketboxPerson Head08Body14 = Compose("Head08_Body14", "女大 08 の頭と女大 14 の体", Adult08, Adult14);

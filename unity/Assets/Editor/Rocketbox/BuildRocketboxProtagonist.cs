@@ -240,11 +240,11 @@ namespace HalfAware.EditorTools.Rocketbox
             if (who.IsHairSwap)
             {
                 var shell = PaintShell(who);
-                WritePainted(shell.Px, 512, dir + "Shell.png", false, HeadSize);
+                WritePainted(shell.Px, 512, dir + "Shell.png", true, HeadSize);
                 WritePainted(ToColors(shell.Spec), 512, dir + "Shell_spec.png", true, SpecSize);
                 var lash = RocketboxTextures.ReadPng(who.LashSrc, out n, out n);
                 WritePainted(RocketboxPaint.Hair(ToColors(lash), look), n, dir + "Lash.png", true, 512);
-                SaveMaterial(LitHead("Shell", Load(dir + "Shell.png"), Load(dir + "Shell_spec.png")), dir + "Shell.mat");
+                SaveMaterial(LitHead("Shell", Load(dir + "Shell.png"), Load(dir + "Shell_spec.png"), true), dir + "Shell.mat");
                 SaveMaterial(Lit("Lash", Load(dir + "Lash.png"), 0.34f, true), dir + "Lash.mat");
             }
 
@@ -275,16 +275,73 @@ namespace HalfAware.EditorTools.Rocketbox
             int n;
             var tex = ToColors(RocketboxTextures.ReadPng(hair.HeadSrc, out n, out n));
             var r = RocketboxPaint.Head(tex, maps.Head, maps.Anchors, k, false, hair.IrisUv, hair.IrisRadius);
-            // 耳のまわりから後ろの肌も殻に入れるので、そこは髪の影の色で塗り、照り返しを 0 にする
+            // 透け: 髪の所と、耳のまわり・こめかみ（殻に入れた肌）だけ不透明。殻の縁は三角の辺ではなく、この絵の縁で切る。
+            // 耳まわりとこめかみの肌は髪の影の色で塗り、照り返しを 0 にする。髪の所の毛筋の濃淡は残す
+            n = r.N;
+            var alpha = new float[r.Px.Length];
+            var shadow = k.hairShadow;
             for (var i = 0; i < r.Px.Length; i++)
             {
-                if (!maps.Head.On[i] || !RocketboxHairSwap.IsSidePoint(maps.Head.P[i], maps.Anchors)) continue;
-                var c = k.hairShadow;
+                if (!maps.Head.On[i]) { alpha[i] = -1f; continue; }
+                var p = maps.Head.P[i];
+                var side = RocketboxPaint.Smooth(-RocketboxHairSwap.SideFeather, 0f, RocketboxHairSwap.SideDepth(p, maps.Anchors, hair));
+                alpha[i] = Mathf.Max(r.Hair[i] * (1f - RocketboxHairSwap.FaceFeature(p, maps.Anchors)), side);
+                var c = shadow;
                 c.a = r.Px[i].a;
-                r.Px[i] = Color.Lerp(r.Px[i], c, 1f - r.Hair[i]);
-                r.Spec[i] = new Color32(0, 0, 0, r.Spec[i].a);
+                r.Px[i] = Color.Lerp(r.Px[i], c, side * (1f - r.Hair[i]));
+                if (side > 0f) r.Spec[i] = Color32.Lerp(r.Spec[i], new Color32(0, 0, 0, r.Spec[i].a), side);
+            }
+            // UV の島の外は、となりの島の中の透けを広げる（縁で絵を拾ったとき、島の外の値が混ざらないように）。届かない所は不透明
+            for (var pass = 0; pass < 4; pass++)
+            {
+                var next = (float[])alpha.Clone();
+                for (var y = 0; y < n; y++)
+                    for (var x = 0; x < n; x++)
+                    {
+                        var i = y * n + x;
+                        if (alpha[i] >= 0f) continue;
+                        float sum = 0f;
+                        var cnt = 0;
+                        if (x > 0 && alpha[i - 1] >= 0f) { sum += alpha[i - 1]; cnt++; }
+                        if (x < n - 1 && alpha[i + 1] >= 0f) { sum += alpha[i + 1]; cnt++; }
+                        if (y > 0 && alpha[i - n] >= 0f) { sum += alpha[i - n]; cnt++; }
+                        if (y < n - 1 && alpha[i + n] >= 0f) { sum += alpha[i + n]; cnt++; }
+                        if (cnt > 0) next[i] = sum / cnt;
+                    }
+                alpha = next;
+            }
+            for (var i = 0; i < alpha.Length; i++) if (alpha[i] < 0f) alpha[i] = 1f;
+            // 髪の中の明るい毛筋で透けに開いた小さな穴（幅 4 画素まで）を閉じる（顔の人のこめかみの肌が点になって覗いたため）
+            alpha = MinMax(MinMax(alpha, n, 2, true), n, 2, false);
+            for (var i = 0; i < r.Px.Length; i++)
+            {
+                var c = r.Px[i];
+                c.a = alpha[i];
+                r.Px[i] = c;
             }
             return r;
+        }
+
+        /// <summary>縦横 (2r+1) 画素の四角の中の最大（max）か最小。絵の外は数えない</summary>
+        static float[] MinMax(float[] a, int n, int r, bool max)
+        {
+            var tmp = new float[a.Length];
+            var o = new float[a.Length];
+            for (var y = 0; y < n; y++)
+                for (var x = 0; x < n; x++)
+                {
+                    var v = a[y * n + x];
+                    for (var k = Mathf.Max(0, x - r); k <= Mathf.Min(n - 1, x + r); k++) v = max ? Mathf.Max(v, a[y * n + k]) : Mathf.Min(v, a[y * n + k]);
+                    tmp[y * n + x] = v;
+                }
+            for (var y = 0; y < n; y++)
+                for (var x = 0; x < n; x++)
+                {
+                    var v = tmp[y * n + x];
+                    for (var k = Mathf.Max(0, y - r); k <= Mathf.Min(n - 1, y + r); k++) v = max ? Mathf.Max(v, tmp[k * n + x]) : Mathf.Min(v, tmp[k * n + x]);
+                    o[y * n + x] = v;
+                }
+            return o;
         }
 
         static Color[] PaintBody(RocketboxPerson who, RocketboxPaint.Look look, Maps maps, RocketboxPaint.HeadResult head, out string skinNote)
@@ -354,7 +411,7 @@ namespace HalfAware.EditorTools.Rocketbox
                 {
                     var shell = PaintShell(who);
                     var shellSpec = Keep(skin, Tex(ToColors(shell.Spec), 512, true, SpecSize));
-                    skin.Shell = Keep(skin, LitHead("Shell", Keep(skin, Tex(shell.Px, 512, false, headSize)), shellSpec));
+                    skin.Shell = Keep(skin, LitHead("Shell", Keep(skin, Tex(shell.Px, 512, true, headSize)), shellSpec, true));
                     var lash = RocketboxPaint.Hair(ToColors(RocketboxTextures.ReadPng(who.LashSrc, out n, out n)), look);
                     skin.Lash = Keep(skin, Lit("Lash", Keep(skin, Tex(lash, n, true, 512)), 0.34f, true));
                 }
@@ -537,7 +594,7 @@ namespace HalfAware.EditorTools.Rocketbox
         /// 頭のマテリアル。Specular の流儀で、照り返しの強さと滑らかさを絵（spec）で持つ。
         /// 髪の所は照り返しを 0 にする（長い髪の面が横の強い光で灰色のフードのように光るため）。肌は 0.04、目の玉は滑らか
         /// </summary>
-        public static Material LitHead(string name, Texture tex, Texture spec)
+        public static Material LitHead(string name, Texture tex, Texture spec, bool clip = false)
         {
             var m = Lit(name, tex, 1f, false);
             m.SetFloat("_WorkflowMode", 0f);
@@ -546,6 +603,16 @@ namespace HalfAware.EditorTools.Rocketbox
             m.EnableKeyword("_METALLICSPECGLOSSMAP");
             m.SetFloat("_SmoothnessTextureChannel", 0f);
             m.SetColor("_SpecColor", Color.white);
+            if (clip)
+            {
+                // 別の人の髪の殻は、絵の透けで髪の縁を切り抜く（表だけを描く）
+                m.SetFloat("_AlphaClip", 1f);
+                m.SetFloat("_Cutoff", 0.5f);
+                m.SetFloat("_AlphaToMask", 1f);
+                m.EnableKeyword("_ALPHATEST_ON");
+                m.SetOverrideTag("RenderType", "TransparentCutout");
+                m.renderQueue = (int)RenderQueue.AlphaTest;
+            }
             return m;
         }
 

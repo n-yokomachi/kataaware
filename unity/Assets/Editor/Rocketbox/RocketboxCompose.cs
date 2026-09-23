@@ -499,8 +499,22 @@ namespace HalfAware.EditorTools.Rocketbox
             /// <summary>reach より近くに三角が無ければ正の無限大</summary>
             public float Closest(Vector3 p, float reach, out Vector3 q, out Vector3 nrm)
             {
+                int tri;
+                return Closest(p, reach, out q, out nrm, out tri);
+            }
+
+            /// <summary>tri は一番近い三角の、三角の並びの中の先頭の番号（無ければ -1）</summary>
+            public float Closest(Vector3 p, float reach, out Vector3 q, out Vector3 nrm, out int tri)
+            {
+                return Closest(p, reach, out q, out nrm, out tri, null);
+            }
+
+            /// <summary>accept が表の向きを受け入れる三角だけから探す（null なら全部）</summary>
+            public float Closest(Vector3 p, float reach, out Vector3 q, out Vector3 nrm, out int tri, Func<Vector3, bool> accept)
+            {
                 q = p;
                 nrm = Vector3.up;
+                tri = -1;
                 var best = float.PositiveInfinity;
                 var seen = new HashSet<int>();
                 int x0 = Mathf.FloorToInt((p.x - reach) / Cell), x1 = Mathf.FloorToInt((p.x + reach) / Cell);
@@ -519,9 +533,12 @@ namespace HalfAware.EditorTools.Rocketbox
                                 var cp = ClosestOnTriangle(p, a, b, c);
                                 var d = (cp - p).magnitude;
                                 if (d >= best || d > reach) continue;
+                                var fn = Vector3.Cross(b - a, c - a).normalized;
+                                if (accept != null && !accept(fn)) continue;
                                 best = d;
                                 q = cp;
-                                nrm = Vector3.Cross(b - a, c - a).normalized;
+                                nrm = fn;
+                                tri = k;
                             }
                         }
                 return best;

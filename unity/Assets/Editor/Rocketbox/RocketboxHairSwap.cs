@@ -14,13 +14,16 @@ namespace HalfAware.EditorTools.Rocketbox
     /// 頂点を入れ替えることはできない。また、顔の人の髪の殻を外して髪の人の殻とつなぐと、二人の生え際（分け目の位置、
     /// 前髪の下の額の広さ）が違うため、額とこめかみに穴が開いた（試した結果。報告を参照）。そこで次のように組む。
     /// - 顔の人の頭の面は全部残す（顔も、頭皮を兼ねた髪の殻も。穴は開かない）。顔の人の髪の殻は黒く塗ってあり、下地になる
-    /// - ただし顔の人の髪の殻（頭のテクスチャで髪と見なした頂点が三つのうち二つ以上の三角。目・眉・鼻・口のまわりは除く）の頂点で、
-    ///   顔の三角に使われていない物と、耳のまわりから後ろの顔の頂点（耳とこめかみ）が、髪の人の髪の殻の外や 3 mm 内側までにあれば、
-    ///   殻の 3 mm 内側へ沈める（顔の人のボブや耳が突き抜けないように）
-    /// - 髪の人の頭の面から、髪の三角を全部、髪の殻にする（顔の人の顔に近いこめかみやもみあげの髪も外さない。
-    ///   外すと顔の人のこめかみの肌が見えた）。耳のまわりから後ろの肌の三角も殻に入れ、殻の絵ではそこを黒く塗る
-    ///   （髪の人の耳の所で殻に穴が開き、顔の人の耳とこめかみが覗いたため）
-    /// - 髪の殻と髪の房が顔（耳・頬）の内側に入っていれば、顔の 2 mm 外へ押し出す。服の内側に入っていれば、服の 4 mm 外へ押し出す
+    /// - 髪の人の頭の面から、殻の絵で不透明な所に掛かる三角を全部、髪の殻にする（顔の人の顔に近いこめかみやもみあげの髪も外さない。
+    ///   外すと顔の人のこめかみの肌が見えた）。耳のまわりから後ろと、こめかみの肌の三角も殻に入れ、殻の絵ではそこを黒く塗る
+    ///   （髪の人の耳の所とこめかみで殻に穴が開き、顔の人の耳とこめかみの肌が覗いたため。<see cref="SideDepth"/>）
+    /// - 殻の縁は三角の辺ではなく、殻の絵の透けで切り抜く（髪の所と、耳まわり・こめかみだけ不透明）。三角で切ると、髪の人の頭の面の
+    ///   大きな三角の辺がそのまま髪の輪郭になり、頬の横でぎざぎざになった
+    /// - 髪の殻と髪の房が顔（耳・頬）の内側に入っていれば、顔の 2 mm 外へ押し出す。服の内側に入っていれば、服の 4 mm 外へ押し出す。
+    ///   押し出した量はとなりの頂点へならす（押し出した頂点とそうでない頂点が交互に並ぶと、殻が波打つため）
+    /// - 顔の人の頭の面は、押し出した後の髪の殻の外や 3 mm 内側までにあれば、殻の 3 mm 内側へ沈める。沈めるのは、顔の人の髪の殻
+    ///   （頭のテクスチャで髪と見なした頂点が三つのうち二つ以上の三角。目・眉・鼻・口のまわりは除く）の頂点と、顔の頂点のうち
+    ///   耳のまわりから後ろの物（耳とこめかみ）と殻の不透明な所の下にある物（顔の人のボブや耳、こめかみの肌が殻を突き抜けないように）
     /// - まつ毛は顔の人の物を使う（まぶたの形に合わせてあるため）。顔の人の前髪の房は外す。髪の房は髪の人の物（まつ毛を除く）。
     ///   まつ毛は目の玉の中心から 2.5 cm 以内で、目の中心より 1.2 cm 上までの房
     /// 面の組は 体・顔（顔の人の頭の面）・髪の殻・髪の房・まつ毛 の五つ
@@ -58,7 +61,8 @@ namespace HalfAware.EditorTools.Rocketbox
             var faceMaps = BuildRocketboxProtagonist.Maps.Get(who.FaceFrom, 512);
             var hairMaps = BuildRocketboxProtagonist.Maps.Get(who.HairFrom, 512);
             var facePaint = Paint(who.FaceFrom, faceMaps);
-            var hairPaint = Paint(who.HairFrom, hairMaps);
+            // 殻の絵（透けで殻の縁を切る）。殻に入れる三角もこの透けで選ぶ
+            var shellPaint = BuildRocketboxProtagonist.PaintShell(who);
             var a = faceMaps.Anchors;
 
             // 顔の人の頭の面を、顔の三角と髪の殻の三角に分ける（面は全部使う）
@@ -81,38 +85,16 @@ namespace HalfAware.EditorTools.Rocketbox
             for (var t = 0; t < hairHead.Length; t += 3)
             {
                 var tri = new[] { hairHead[t], hairHead[t + 1], hairHead[t + 2] };
-                if (!IsHair(tri, hw, huv, hairPaint, hairMaps.Anchors) && !IsSide(tri, hw, hairMaps.Anchors)) continue;
+                // 殻の絵で不透明の所に少しでも掛かる三角は入れる（頂点の髪の多数決で選ぶと、殻の縁が三角の辺でぎざぎざになった）。
+                // 縁は殻の絵の透け（髪の所と耳まわり・こめかみだけ不透明、眉・目・鼻の穴は透明）で切る
+                if (!IsSide(tri, hw, hairMaps.Anchors, who.HairFrom) && !Opaque(tri, huv, shellPaint.Px, shellPaint.N)) continue;
                 // 顔に近い髪（こめかみ・もみあげ）も外さない。顔の 2 mm 外へ押し出すので重ならない
                 var c = (hw[tri[0]] + hw[tri[1]] + hw[tri[2]]) / 3f;
                 Vector3 q, n;
                 if (faceSurf.Closest(c, ShellClear, out q, out n) <= ShellClear) shellDropped++;
                 shellTris.AddRange(tri);
             }
-            var shellSurf = new RocketboxCompose.Surface(hw, shellTris.ToArray());
-            var shellEdges = EdgeSegments(shellTris.ToArray(), hw);
-
-            // 顔の人の髪の殻を、髪の人の殻の内側へ沈める（顔の三角の頂点は動かさない）
-            var faceVerts = new HashSet<int>(faceTris);
-            var sunkPos = (Vector3[])fw.Clone();
-            int sunk = 0;
-            float maxSink = 0f;
-            // 耳のまわりから後ろの顔の頂点（耳とこめかみの肌）も沈める。髪の人の殻は耳まわりも覆う（IsSide）ので、
-            // 顔の人の耳が殻を突き抜けないようにする
-            var sinkable = new HashSet<int>(faceHairTris);
-            foreach (var i in faceVerts) if (IsSidePoint(fw[i], a)) sinkable.Add(i);
-            foreach (var i in sinkable)
-            {
-                if (faceVerts.Contains(i) && !IsSidePoint(fw[i], a)) continue;
-                Vector3 q, n;
-                var s = shellSurf.Signed(fw[i], 0.06f, out q, out n);
-                if (float.IsNaN(s) || s < -Sink || EdgeDistance(q, shellEdges) <= 0.0003f) continue;
-                // 顔の縁（生え際）の近くは沈めない量を減らし、縁の三角が裏返って穴に見えないようにする
-                var w = faceVerts.Contains(i) ? 1f : RocketboxPaint.Smooth(0.005f, 0.02f, EdgeDistance(fw[i], faceEdges));
-                if (w <= 0f) continue;
-                sunkPos[i] = fw[i] - n * ((s + Sink) * w);
-                sunk++;
-                maxSink = Mathf.Max(maxSink, (s + Sink) * w);
-            }
+            var shellArr = shellTris.ToArray();
 
             // 髪の人の房（まつ毛を除く）
             var hairCards = new List<int>();
@@ -158,6 +140,62 @@ namespace HalfAware.EditorTools.Rocketbox
                 }
                 moved[i] = p;
             }
+            // 押し出した量をとなりの頂点へならす。押し出した頂点と押し出さなかった頂点が交互に並ぶと、
+            // 殻が波打つため。押し出した量より引っ込めることはしない
+            var smoothed = Smooth(hairVerts, shellTris, hairCards, hw, moved, 6);
+
+            // 顔の人の頭の面を、髪の人の殻（押し出した後）の内側へ沈める。殻の外か 3 mm 内側までにある頂点を、殻の 3 mm 内側へ。
+            // - 顔の人の髪の殻の頂点（顔の人のボブが突き抜けないように）。殻の透明な所の下で顔の縁（生え際）に近い物は、
+            //   沈める量を減らす（縁の三角が裏返って穴に見えないように）
+            // - 顔の頂点は、耳のまわりから後ろ（耳とこめかみの肌。髪の人の殻は耳まわりも覆うので、顔の人の耳が突き抜けないように）と、
+            //   殻の不透明な所の下にある物（殻の大きな三角の中ほどを顔の人のこめかみや頬が突き抜けて、肌が細く覗いたため）
+            var faceVerts = new HashSet<int>(faceTris);
+            var sunkPos = (Vector3[])fw.Clone();
+            int sunk = 0, faceUnder = 0;
+            float maxSink = 0f;
+            var finalSurf = new RocketboxCompose.Surface(smoothed, shellArr);
+            var finalEdges = EdgeSegments(shellArr, hw, smoothed);
+            // 頭の真ん中（両目の間から 8 cm 奥、目の 1 cm 下）
+            var headCentre = new Vector3(0f, (a.eyeL.y + a.eyeR.y) * 0.5f - 0.01f, a.eyeL.z - 0.08f);
+            foreach (var i in new HashSet<int>(faceHead))
+            {
+                var isFace = faceVerts.Contains(i);
+                var side = isFace && IsSidePoint(fw[i], a, who.HairFrom);
+                Vector3 q, n;
+                int k;
+                // 殻の三角は頭の外を向いている物だけから探す（頭の真ん中から頂点への向きで見る）。内を向く三角（こめかみで重なる殻の内側の面、
+                // 首の横へ垂れる髪の内側の面）の裏へ下げると、頂点が頭の外へ動いて外側の殻を突き抜けた
+                var outward = (fw[i] - headCentre).normalized;
+                Func<Vector3, bool> facesOut = fn2 => Vector3.Dot(fn2, outward) >= 0.2f;
+                var d = finalSurf.Closest(fw[i], isFace && !side ? 0.01f : 0.06f, out q, out n, out k, facesOut);
+                if (float.IsInfinity(d)) continue;
+                var s = Vector3.Dot(fw[i] - q, n) >= 0f ? d : -d;
+                if (s < -Sink || EdgeDistance(q, finalEdges) <= 0.0003f) continue;
+                var opaque = AlphaAt(shellPaint, UvAt(q, k, shellArr, smoothed, huv)) >= 0.5f;
+                float w;
+                if (isFace)
+                {
+                    if (!side && !opaque) continue;
+                    if (!side) faceUnder++;
+                    w = 1f;
+                }
+                else w = opaque ? 1f : RocketboxPaint.Smooth(0.005f, 0.02f, EdgeDistance(fw[i], faceEdges));
+                if (w <= 0f) continue;
+                var p = fw[i] - n * ((s + Sink) * w);
+                // 殻の谷（となりの三角が折れて向き合う所）では、一つの三角の内へ下げても、となりの三角の外に残る。
+                // 深く沈めるときは、一番近い三角を引き直して三回まで下げる
+                for (var it = 0; it < 3 && w >= 1f; it++)
+                {
+                    var d2 = finalSurf.Closest(p, 0.06f, out q, out n, out k, facesOut);
+                    if (float.IsInfinity(d2)) break;
+                    var s2 = Vector3.Dot(p - q, n) >= 0f ? d2 : -d2;
+                    if (s2 <= -Sink + 0.0002f || EdgeDistance(q, finalEdges) <= 0.0003f) break;
+                    p -= n * (s2 + Sink);
+                }
+                sunkPos[i] = p;
+                sunk++;
+                maxSink = Mathf.Max(maxSink, (p - fw[i]).magnitude);
+            }
 
             // まつ毛（顔の人の透けの面のうち、まつ毛の房だけ。顔の人の前髪の房は外す）
             var faceOpacity = fm.GetTriangles(Slot(faceSmr, who.FaceFrom.HairSlot));
@@ -184,6 +222,7 @@ namespace HalfAware.EditorTools.Rocketbox
             var bu = bm.uv;
             var bodyTris = Pack(bm.GetTriangles(Slot(bodySmr, who.BodyFrom.BodySlot)), i => toLocal.MultiplyPoint3x4(bw[i]), i => bn[i], i => bu[i], i => Re(bwts[i], bodyRemap), verts, norms, uvs, weights);
             var headTris = Pack(faceHead, i => toLocal.MultiplyPoint3x4(sunkPos[i]), i => fn[i], i => fuv[i], i => Re(fwts[i], faceRemap), verts, norms, uvs, weights);
+            moved = smoothed;
             var shellOut = Pack(shellTris.ToArray(), i => toLocal.MultiplyPoint3x4(moved[i]), i => hn[i], i => huv[i], i => Re(hwts[i], hairRemap), verts, norms, uvs, weights);
             var cardOut = Pack(hairCards.ToArray(), i => toLocal.MultiplyPoint3x4(moved[i]), i => hn[i], i => huv[i], i => Re(hwts[i], hairRemap), verts, norms, uvs, weights);
             var lashOut = Pack(lashes.ToArray(), i => toLocal.MultiplyPoint3x4(fw[i]), i => fn[i], i => fuv[i], i => Re(fwts[i], faceRemap), verts, norms, uvs, weights);
@@ -229,7 +268,7 @@ namespace HalfAware.EditorTools.Rocketbox
             return string.Format(CultureInfo.InvariantCulture,
                 "{0}: 頂点 {1}・三角 {2}（体 {3}・顔の人の頭 {4}・髪の殻 {5}・髪の房 {6}・まつ毛 {7}）\n" +
                 "顔の人の頭の面 {8} 三角のうち顔 {9}、髪の殻 {10}。髪の人の髪の三角のうち顔から 3 mm 以内の物 {11}（外へ押し出す）\n" +
-                "顔の人の髪の殻を髪の人の殻の内側へ沈めた頂点 {12}（最大 {13:0.0} mm）\n" +
+                "顔の人の髪の殻を髪の人の殻の内側へ沈めた頂点 {12}（最大 {13:0.0} mm。殻の不透明な所の下にあった顔の頂点 {26} を含む）\n" +
                 "顔（耳・頬）の内側から押し出した髪の頂点 {14}（最大 {15:0.0} mm）、服から押し出した髪の頂点 {16}（服の内側にあった {17}、一番深い所 {18:0.0} mm）\n" +
                 "生え際（顔の人の生え際の辺 {19}（目より 2 cm 上） → 髪の人の殻）: 平均 {20:0.0} mm、中央 {21:0.0} mm、5 mm 超 {22}、15 mm 超 {23}\n" +
                 "顔の人の塗った髪で、髪の人の殻から 5 mm より離れた所 {24:0.0} cm²\n書いた所: {25}",
@@ -239,7 +278,7 @@ namespace HalfAware.EditorTools.Rocketbox
                 sunk, maxSink * 1000f,
                 outOfFace, maxFace * 1000f, outOfClothes, clothesInside, worstClothes * 1000f,
                 gaps.Count, gaps.Count > 0 ? gsum / gaps.Count * 1000f : 0f, gaps.Count > 0 ? gaps[gaps.Count / 2] * 1000f : 0f, g5, g15,
-                bare * 10000f, who.CompositeMesh);
+                bare * 10000f, who.CompositeMesh, faceUnder);
         }
 
         // ---- 見分け -----------------------------------------------------------
@@ -253,27 +292,133 @@ namespace HalfAware.EditorTools.Rocketbox
             var votes = 0;
             foreach (var i in tri) if (HairAt(paint, uv[i]) > 0.5f) votes++;
             if (votes < 2) return false;
+            return !IsFrontFace(tri, w, a);
+        }
+
+        /// <summary>顔の前（目の高さより 3.5 cm 奥より前）で、眉の上端より 1.2 cm 上より下の三角（眉・目・鼻の穴）</summary>
+        static bool IsFrontFace(int[] tri, Vector3[] w, RocketboxPaint.Anchors a)
+        {
             var c = (w[tri[0]] + w[tri[1]] + w[tri[2]]) / 3f;
             var browTop = Mathf.Max(Mathf.Max(a.browInL.y, a.browOutL.y), Mathf.Max(a.browInR.y, a.browOutR.y)) + 0.012f;
-            var front = c.z > a.eyeL.z - 0.035f;
-            if (front && c.y < browTop) return false;
-            return true;
+            return c.z > a.eyeL.z - 0.035f && c.y < browTop;
         }
 
         /// <summary>
-        /// 耳のまわりから後ろ（目の玉の中心より 4.5 cm 奥で、目の高さから 10 cm 下より上）。髪の人の耳とこめかみの肌の所で、
-        /// 髪の殻に穴が開いていて、そこから顔の人の耳とこめかみが覗いたので、ここも殻に入れて黒く塗る（<see cref="IsSidePoint"/>）
+        /// 殻の絵で透明にする顔の真ん中（眉・目・鼻の穴・口。暗くて髪と見なされる所）の重み。顔の前（目の高さより 3.5 cm 奥より前）で、
+        /// 眉の上端より 1.2 cm 上より下、眉尻より 5 mm 内。縁は 2 mm でぼかす。
+        /// 顔の前を横幅いっぱい外すと、頬の横へ垂れる髪の人の髪が縦の線で切れた
         /// </summary>
-        static bool IsSide(int[] tri, Vector3[] w, RocketboxPaint.Anchors a)
+        public static float FaceFeature(Vector3 p, RocketboxPaint.Anchors a)
         {
-            var c = (w[tri[0]] + w[tri[1]] + w[tri[2]]) / 3f;
-            return IsSidePoint(c, a);
+            var browTop = Mathf.Max(Mathf.Max(a.browInL.y, a.browOutL.y), Mathf.Max(a.browInR.y, a.browOutR.y)) + 0.012f;
+            var wide = Mathf.Max(Mathf.Abs(a.browOutL.x), Mathf.Abs(a.browOutR.x)) + 0.005f;
+            const float f = 0.002f;
+            return RocketboxPaint.Smooth(a.eyeL.z - 0.035f - f, a.eyeL.z - 0.035f + f, p.z)
+                * RocketboxPaint.Smooth(browTop + f, browTop - f, p.y)
+                * RocketboxPaint.Smooth(wide + f, wide - f, Mathf.Abs(p.x));
         }
 
-        public static bool IsSidePoint(Vector3 p, RocketboxPaint.Anchors a)
+        /// <summary>
+        /// 三角が絵（n×n、下の行から）の不透明（透け 0.5 以上）の所に掛かるか。UV で三角から 1 画素以内の画素を見る
+        /// </summary>
+        static bool Opaque(int[] tri, Vector2[] uv, Color[] px, int n)
         {
-            return p.z < a.eyeL.z - 0.045f && p.y > a.eyeL.y - 0.10f;
+            Vector2 p0 = uv[tri[0]] * n, p1 = uv[tri[1]] * n, p2 = uv[tri[2]] * n;
+            var x0 = Mathf.Clamp(Mathf.FloorToInt(Mathf.Min(p0.x, Mathf.Min(p1.x, p2.x))) - 1, 0, n - 1);
+            var x1 = Mathf.Clamp(Mathf.CeilToInt(Mathf.Max(p0.x, Mathf.Max(p1.x, p2.x))) + 1, 0, n - 1);
+            var y0 = Mathf.Clamp(Mathf.FloorToInt(Mathf.Min(p0.y, Mathf.Min(p1.y, p2.y))) - 1, 0, n - 1);
+            var y1 = Mathf.Clamp(Mathf.CeilToInt(Mathf.Max(p0.y, Mathf.Max(p1.y, p2.y))) + 1, 0, n - 1);
+            for (var y = y0; y <= y1; y++)
+                for (var x = x0; x <= x1; x++)
+                {
+                    if (px[y * n + x].a < 0.5f) continue;
+                    if (UvDistance(new Vector2(x + 0.5f, y + 0.5f), p0, p1, p2) <= 1f) return true;
+                }
+            return false;
         }
+
+        /// <summary>三角（tris の k 番目から三つ）の上の点 q の UV</summary>
+        static Vector2 UvAt(Vector3 q, int k, int[] tris, Vector3[] w, Vector2[] uv)
+        {
+            Vector3 a = w[tris[k]], b = w[tris[k + 1]], c = w[tris[k + 2]];
+            Vector3 v0 = b - a, v1 = c - a, v2 = q - a;
+            float d00 = Vector3.Dot(v0, v0), d01 = Vector3.Dot(v0, v1), d11 = Vector3.Dot(v1, v1);
+            float d20 = Vector3.Dot(v2, v0), d21 = Vector3.Dot(v2, v1);
+            var den = d00 * d11 - d01 * d01;
+            if (Mathf.Abs(den) < 1e-14f) return uv[tris[k]];
+            var y = (d11 * d20 - d01 * d21) / den;
+            var z = (d00 * d21 - d01 * d20) / den;
+            return uv[tris[k]] * (1f - y - z) + uv[tris[k + 1]] * y + uv[tris[k + 2]] * z;
+        }
+
+        /// <summary>絵の透け（UV で線形に拾う）</summary>
+        static float AlphaAt(RocketboxPaint.HeadResult r, Vector2 uv)
+        {
+            var n = r.N;
+            var fx = Mathf.Clamp(uv.x * n - 0.5f, 0f, n - 1.001f);
+            var fy = Mathf.Clamp(uv.y * n - 0.5f, 0f, n - 1.001f);
+            int x = (int)fx, y = (int)fy;
+            float tx = fx - x, ty = fy - y;
+            var a0 = Mathf.Lerp(r.Px[y * n + x].a, r.Px[y * n + x + 1].a, tx);
+            var a1 = Mathf.Lerp(r.Px[(y + 1) * n + x].a, r.Px[(y + 1) * n + x + 1].a, tx);
+            return Mathf.Lerp(a0, a1, ty);
+        }
+
+        /// <summary>UV の平面で、点から三角までの距離（中なら 0）</summary>
+        static float UvDistance(Vector2 p, Vector2 a, Vector2 b, Vector2 c)
+        {
+            float Cross(Vector2 u, Vector2 v) { return u.x * v.y - u.y * v.x; }
+            var s = Mathf.Sign(Cross(b - a, c - a));
+            if (s != 0f && Cross(b - a, p - a) * s >= 0f && Cross(c - b, p - b) * s >= 0f && Cross(a - c, p - c) * s >= 0f) return 0f;
+            return Mathf.Min(SegDistance(p, a, b), Mathf.Min(SegDistance(p, b, c), SegDistance(p, c, a)));
+        }
+
+        static float SegDistance(Vector2 p, Vector2 a, Vector2 b)
+        {
+            var ab = b - a;
+            var t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / Mathf.Max(1e-12f, ab.sqrMagnitude));
+            return Vector2.Distance(p, a + ab * t);
+        }
+
+        /// <summary>
+        /// 耳のまわりとこめかみの三角か（<see cref="SideDepth"/>）。頂点が一つでも内にあれば殻に入れる。
+        /// 三角のまま切ると縁が三角の辺でぎざぎざになるので、殻の絵の透けで縁を切る（殻の絵は <see cref="BuildRocketboxProtagonist.PaintShell"/>）
+        /// </summary>
+        static bool IsSide(int[] tri, Vector3[] w, RocketboxPaint.Anchors a, RocketboxPerson hair)
+        {
+            foreach (var i in tri) if (SideDepth(w[i], a, hair) > -SideFeather) return true;
+            return false;
+        }
+
+        /// <summary>殻の絵で耳のまわりとこめかみを塗る所の縁のぼかし（m）。三角もこの幅だけ外まで殻に入れる</summary>
+        public const float SideFeather = 0.002f;
+
+        public static bool IsSidePoint(Vector3 p, RocketboxPaint.Anchors a, RocketboxPerson hair)
+        {
+            return SideDepth(p, a, hair) > 0f;
+        }
+
+        /// <summary>
+        /// 耳のまわりとこめかみの内側への深さ（m、外は負）。どちらも髪の人の頭の面では肌で、髪の殻に穴が開いていて、
+        /// そこから顔の人の耳とこめかみが覗いたので、殻に入れて黒く塗る。
+        /// - 耳のまわりから後ろ: 目の玉の中心より 4.5 cm 奥で、目の高さから 10 cm 下より上
+        /// - こめかみ: 頬骨の上（目の高さから 3.5 cm 下）から額の横（8 cm 上）まで。窓の広さは髪の人と左右で違うので、
+        ///   目の玉の中心から外と奥へどこまでを入れるかは髪の人の定義（<see cref="RocketboxPerson.TempleLeft"/>）に持たせる
+        /// </summary>
+        public static float SideDepth(Vector3 p, RocketboxPaint.Anchors a, RocketboxPerson hair)
+        {
+            var ear = Mathf.Min(a.eyeL.z - 0.045f - p.z, p.y - (a.eyeL.y - 0.10f));
+            var t = p.x < 0f ? hair.TempleLeft : hair.TempleRight;
+            // 目の 1 cm 上より下は、前の縁を下るほど外と奥へ下げ、もみあげのように細らせる（四角いままだと頬骨の上で髪が直角の角になった）
+            var taper = TempleTaper * Mathf.Max(0f, a.eyeL.y + 0.01f - p.y);
+            var temple = Mathf.Min(
+                Mathf.Min(Mathf.Abs(p.x) - (Mathf.Abs(a.eyeL.x) + t.x + taper), a.eyeL.z - t.y - taper - p.z),
+                Mathf.Min(p.y - (a.eyeL.y - 0.035f), a.eyeL.y + 0.08f - p.y));
+            return Mathf.Max(ear, temple);
+        }
+
+        /// <summary>こめかみの前の縁を、目の 1 cm 上から下へ 1 cm 下るごとに外と奥へ下げる量（cm）</summary>
+        const float TempleTaper = 0.6f;
 
         static RocketboxPaint.HeadResult Paint(RocketboxPerson who, BuildRocketboxProtagonist.Maps maps)
         {
@@ -288,6 +433,90 @@ namespace HalfAware.EditorTools.Rocketbox
             var x = Mathf.Clamp((int)(uv.x * n), 0, n - 1);
             var y = Mathf.Clamp((int)(uv.y * n), 0, n - 1);
             return r.Hair[y * n + x];
+        }
+
+        /// <summary>
+        /// 押し出しの量（moved - rest）を、面のとなりの頂点の平均へ半分ずつ寄せることを iterations 回。
+        /// 各頂点の押し出した向きには、押し出した量より引っ込めない。
+        /// 同じ位置の頂点（UV の継ぎ目で分かれた物）は一つとして動かす（別々に動かすと継ぎ目が開く）
+        /// </summary>
+        static Vector3[] Smooth(HashSet<int> verts, List<int> shell, List<int> cards, Vector3[] rest, Vector3[] moved, int iterations)
+        {
+            var rep = Weld(verts, rest);
+            var nb = new Dictionary<int, HashSet<int>>();
+            foreach (var tris in new[] { shell, cards })
+                for (var t = 0; t < tris.Count; t += 3)
+                    for (var e = 0; e < 3; e++)
+                    {
+                        int a = rep[tris[t + e]], b = rep[tris[t + (e + 1) % 3]];
+                        if (a == b) continue;
+                        HashSet<int> l;
+                        if (!nb.TryGetValue(a, out l)) nb[a] = l = new HashSet<int>();
+                        l.Add(b);
+                        if (!nb.TryGetValue(b, out l)) nb[b] = l = new HashSet<int>();
+                        l.Add(a);
+                    }
+            var need = new Dictionary<int, Vector3>();
+            foreach (var i in verts)
+            {
+                // 継ぎ目で分かれた頂点のうち、一番多く押し出した物に揃える
+                var d = moved[i] - rest[i];
+                Vector3 old;
+                if (!need.TryGetValue(rep[i], out old) || d.sqrMagnitude > old.sqrMagnitude) need[rep[i]] = d;
+            }
+            var off = new Dictionary<int, Vector3>(need);
+            for (var it = 0; it < iterations; it++)
+            {
+                var next = new Dictionary<int, Vector3>();
+                foreach (var kv in need)
+                {
+                    var i = kv.Key;
+                    HashSet<int> l;
+                    var o = off[i];
+                    if (nb.TryGetValue(i, out l) && l.Count > 0)
+                    {
+                        var sum = Vector3.zero;
+                        var cnt = 0;
+                        foreach (var j in l)
+                        {
+                            Vector3 oj;
+                            if (!off.TryGetValue(j, out oj)) continue;
+                            sum += oj;
+                            cnt++;
+                        }
+                        if (cnt > 0) o = Vector3.Lerp(o, sum / cnt, 0.5f);
+                    }
+                    var nd = kv.Value;
+                    var len = nd.magnitude;
+                    if (len > 1e-6f)
+                    {
+                        var dir = nd / len;
+                        var along = Vector3.Dot(o, dir);
+                        if (along < len) o += dir * (len - along);
+                    }
+                    next[i] = o;
+                }
+                off = next;
+            }
+            var result = (Vector3[])moved.Clone();
+            foreach (var i in verts) result[i] = rest[i] + off[rep[i]];
+            return result;
+        }
+
+        /// <summary>同じ位置（0.01 mm まで）の頂点を一つの番号へ</summary>
+        static Dictionary<int, int> Weld(IEnumerable<int> verts, Vector3[] pos)
+        {
+            var weld = new Dictionary<Vector3Int, int>();
+            var id = new Dictionary<int, int>();
+            foreach (var i in verts)
+            {
+                if (id.ContainsKey(i)) continue;
+                var q = Vector3Int.RoundToInt(pos[i] * 1e5f);
+                int j;
+                if (!weld.TryGetValue(q, out j)) weld[q] = j = i;
+                id[i] = j;
+            }
+            return id;
         }
 
         // ---- 道具 -------------------------------------------------------------
@@ -381,14 +610,25 @@ namespace HalfAware.EditorTools.Rocketbox
             return new List<int>(s);
         }
 
-        /// <summary>面の縁の辺を、世界の位置の線分の組で</summary>
+        /// <summary>
+        /// 面の縁の辺を、世界の位置の線分の組で。同じ位置の頂点は一つと見る（UV の継ぎ目で頂点が分かれていても縁にしない。
+        /// 縁と見ると、髪の人の殻の後ろの継ぎ目の近くで顔の人の髪を沈めず、殻の外に筋になって出た）
+        /// </summary>
         static List<Vector3[]> EdgeSegments(int[] tris, Vector3[] w)
         {
+            return EdgeSegments(tris, w, w);
+        }
+
+        /// <summary>頂点を weldBy の位置で一つにまとめて縁を探し、線分は w の位置で返す</summary>
+        static List<Vector3[]> EdgeSegments(int[] tris, Vector3[] weldBy, Vector3[] w)
+        {
+            var id = Weld(tris, weldBy);
             var cnt = new Dictionary<long, int>();
             for (var t = 0; t < tris.Length; t += 3)
                 for (var e = 0; e < 3; e++)
                 {
-                    int a = tris[t + e], b = tris[t + (e + 1) % 3];
+                    int a = id[tris[t + e]], b = id[tris[t + (e + 1) % 3]];
+                    if (a == b) continue;
                     var k = a < b ? ((long)a << 32) | (uint)b : ((long)b << 32) | (uint)a;
                     int c;
                     cnt.TryGetValue(k, out c);
