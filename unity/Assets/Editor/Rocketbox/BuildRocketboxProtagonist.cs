@@ -300,7 +300,7 @@ namespace HalfAware.EditorTools.Rocketbox
             WritePainted(RocketboxPaint.Hair(ToColors(hair), look), n, dir + "Hair.png", true, 512);
             if (who.IsHairSwap)
             {
-                var shell = PaintShell(who);
+                var shell = PaintShell(who, look.naturalHair);
                 WritePainted(shell.Px, 512, dir + "Shell.png", true, HeadSize);
                 WritePainted(ToColors(shell.Spec), 512, dir + "Shell_spec.png", true, SpecSize);
                 var lash = RocketboxTextures.ReadPng(who.LashSrc, out n, out n);
@@ -340,13 +340,16 @@ namespace HalfAware.EditorTools.Rocketbox
         /// <summary>
         /// 髪の殻の絵: 髪の人の頭のテクスチャを、髪の人の値で黒く塗る（使うのは髪の所だけなので、黒子と手入れは描かない）
         /// </summary>
-        public static RocketboxPaint.HeadResult PaintShell(RocketboxPerson who)
+        public static RocketboxPaint.HeadResult PaintShell(RocketboxPerson who, bool natural = false)
         {
             var hair = who.HairFrom;
             var maps = Maps.Get(hair, 512);
             var k = hair.Look();
             k.moleDiameter = 0f;
             k.beauty = 0f;
+            // 元の色の髪（片割れ）: 殻の髪は塗らず、耳まわり・こめかみの肌と生え際の明るい所は元の髪の暗い色で塗る
+            k.naturalHair = natural;
+            if (natural) k.hairShadow = k.naturalHairInk;
             int n;
             var tex = ToColors(RocketboxTextures.ReadPng(hair.HeadSrc, out n, out n));
             var r = RocketboxPaint.Head(tex, maps.Head, maps.Anchors, k, false, hair.IrisUv, hair.IrisRadius);
@@ -512,7 +515,7 @@ namespace HalfAware.EditorTools.Rocketbox
                 skin.Hair = Keep(skin, Lit("Hair", Keep(skin, Tex(hair, n, true, 512)), 0.34f, true));
                 if (who.IsHairSwap)
                 {
-                    var shell = PaintShell(who);
+                    var shell = PaintShell(who, look.naturalHair);
                     var shellSpec = Keep(skin, Tex(ToColors(shell.Spec), 512, true, SpecSize));
                     skin.Shell = Keep(skin, LitHead("Shell", Keep(skin, Tex(shell.Px, 512, true, headSize)), shellSpec, true));
                     var lash = RocketboxPaint.Hair(ToColors(RocketboxTextures.ReadPng(who.LashSrc, out n, out n)), look);

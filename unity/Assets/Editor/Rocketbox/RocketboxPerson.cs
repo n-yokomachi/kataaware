@@ -63,6 +63,11 @@ namespace HalfAware.EditorTools.Rocketbox
         /// 体の人の服の襟ぐりが深くて、顔の人の頭の面の胸元では届かないとき（タンクトップなど）に使う
         /// </summary>
         public bool ChestFromBody;
+        /// <summary>
+        /// 顔の人が絵に描いた前髪（女大 14 は額の右上。形も盛り上がっている）のうち、髪の人では額の肌の所を、額の肌にする（試み。既定は切る）。
+        /// 絵は肌で埋め、形は額の球へ載せる。今は肌と髪の境が三角の辺でぎざぎざになり、額との境に折れ目が見えるので使っていない
+        /// </summary>
+        public bool BareForehead;
         /// <summary>胸元の絵（体の人の頭のテクスチャ）</summary>
         public string ChestSrc { get { return ChestFromBody ? BodyFrom.HeadSrc : null; } }
 
@@ -293,9 +298,16 @@ namespace HalfAware.EditorTools.Rocketbox
             return p;
         }
 
+        /// <summary>片割れにする。片割れの髪は女大 08 の元の茶色のまま（塗らない）。主人公の髪は黒</summary>
         static RocketboxPerson Twin(RocketboxPerson self, RocketboxPerson twin)
         {
             self.TwinPerson = twin;
+            var outfit = twin.Outfit;
+            twin.Outfit = k =>
+            {
+                if (outfit != null) outfit(k);
+                k.naturalHair = true;
+            };
             return twin;
         }
 
@@ -359,6 +371,7 @@ namespace HalfAware.EditorTools.Rocketbox
                     // 顔の人の頭皮は別の人の髪の下地になるので一色にし、元の前髪の影を額から消す
                     k.flatHair = true;
                     k.liftForehead = 1f;
+                    if (BareForehead) k.hairCover = RocketboxHairSwap.HairCover(this);
                 }
                 if (Outfit != null) Outfit(k);
                 return k;

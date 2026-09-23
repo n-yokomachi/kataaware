@@ -42,6 +42,11 @@ namespace HalfAware.EditorTools.Rocketbox
 
         /// <summary>胸元を体の人の頭の面で作るとき（<see cref="RocketboxPerson.ChestFromBody"/>）の継ぎ目の高さ（頭の骨から下へ、m）と、重ねる帯の幅（m）</summary>
         const float ChestCut = 0.085f, ChestOverlap = 0.015f;
+        /// <summary>
+        /// 顔の人の絵の前髪を額の肌にする三角の、髪の人の殻の不透明さの上限（三角の真ん中で測る）。
+        /// 絵を肌にするのは 0.5 より透ける画素だけなので、0.5〜この値の三角は殻の不透明な縁の下に入り、肌と髪の境は三角の辺でなく殻の縁になる
+        /// </summary>
+        const float BareCover = 0.9f;
 
         public static string BuildMesh(RocketboxPerson who)
         {
@@ -72,6 +77,7 @@ namespace HalfAware.EditorTools.Rocketbox
             var faceHead = fm.GetTriangles(Slot(faceSmr, who.FaceFrom.HeadSlot));
             // 顔の人の頭の面のうち、別の人の髪を載せるときに除く三角（結んだ髪など、頭の面で作られた髪）
             int headDropped = 0;
+            string domeNote = null;
             if (who.FaceFrom.DropFromHead != null)
             {
                 var keep = new List<int>();
@@ -120,10 +126,62 @@ namespace HalfAware.EditorTools.Rocketbox
             }
             var faceTris = new List<int>();
             var faceHairTris = new List<int>();
+            // 顔の人が絵に描いた前髪のうち、髪の人の殻が透ける所（髪の人では額の肌の所。眉の上端より 1.2 cm 上）は、額の肌にする（BareForehead の人だけ）。
+            // 絵は肌で埋め（RocketboxPaint.Look.hairCover）、形は額の球へ載せて顔の三角にする。
+            // 女大 14 の前髪は額の上に盛り上がった形なので、そのまま肌にすると庇に、沈めると額との段に見えた
+            var cover = who.BareForehead ? HairCover(who) : null;
+            var coverN = faceMaps.Head.N;
+            var browTopY = Mathf.Max(Mathf.Max(a.browInL.y, a.browOutL.y), Mathf.Max(a.browInR.y, a.browOutR.y));
+            var bareTris = new HashSet<int>();
+            var hairOf = new Dictionary<int, bool>();
             for (var t = 0; t < faceHead.Length; t += 3)
             {
                 var tri = new[] { faceHead[t], faceHead[t + 1], faceHead[t + 2] };
-                if (IsHair(tri, fw, fuv, facePaint, a)) faceHairTris.AddRange(tri);
+                var isHair = IsHair(tri, fw, fuv, facePaint, a);
+                hairOf[t] = isHair;
+                var cu = (fuv[tri[0]] + fuv[tri[1]] + fuv[tri[2]]) / 3f;
+                var cp = (fw[tri[0]] + fw[tri[1]] + fw[tri[2]]) / 3f;
+                if (cover != null && isHair && cp.y > browTopY + 0.012f && CoverAt(cover, coverN, cu) < BareCover) bareTris.Add(t);
+            }
+            var domeNormal = new Dictionary<int, Vector3>();
+            if (bareTris.Count > 0)
+            {
+                var pts = new List<Vector3>();
+                var fixedVerts = new HashSet<int>();
+                for (var t = 0; t < faceHead.Length; t += 3)
+                {
+                    // 動かさないのは顔の三角の頂点だけ（髪の殻の三角と分け合う頂点は、あとで殻の内側へ沈める）
+                    if (bareTris.Contains(t) || hairOf[t]) continue;
+                    for (var e = 0; e < 3; e++)
+                    {
+                        var v = faceHead[t + e];
+                        fixedVerts.Add(v);
+                        if (fw[v].y > browTopY + 0.012f && fw[v].z > a.eyeL.z) pts.Add(fw[v]);
+                    }
+                }
+                Vector3 centre;
+                float radius;
+                if (pts.Count >= 8 && FitSphere(pts, out centre, out radius))
+                {
+                    var toFaceLocal = faceSmr.transform.worldToLocalMatrix;
+                    foreach (var t in bareTris)
+                        for (var e = 0; e < 3; e++)
+                        {
+                            var v = faceHead[t + e];
+                            if (fixedVerts.Contains(v) || domeNormal.ContainsKey(v)) continue;
+                            var dir = (fw[v] - centre).normalized;
+                            fw[v] = centre + dir * radius;
+                            domeNormal[v] = toFaceLocal.MultiplyVector(dir).normalized;
+                        }
+                    domeNote = string.Format(CultureInfo.InvariantCulture, "顔の人の絵の前髪のうち、髪の人の殻が透ける所 {0} 三角を額の肌にし、頂点 {1} を額の球（半径 {2:0.0} cm）へ載せた",
+                        bareTris.Count, domeNormal.Count, radius * 100f);
+                }
+            }
+            for (var t = 0; t < faceHead.Length; t += 3)
+            {
+                var tri = new[] { faceHead[t], faceHead[t + 1], faceHead[t + 2] };
+                var hairTri = hairOf[t] && !bareTris.Contains(t);
+                if (hairTri) faceHairTris.AddRange(tri);
                 else faceTris.AddRange(tri);
             }
             var faceSurf = new RocketboxCompose.Surface(fw, faceTris.ToArray());
@@ -171,11 +229,15 @@ namespace HalfAware.EditorTools.Rocketbox
             var headSurf = new RocketboxCompose.Surface(fw, faceHead);
             var headEdges = EdgeSegments(faceHead, fw);
             int outOfFront = 0;
+            // 髪の房（斜めに流れる前髪）は、目の高さの 1 cm 下まで、こめかみ（目の玉の中心より 5 cm 奥）まで出す。
+            // 眉の上 2 cm で止めていたので、前髪の先が顔の人のこめかみの中に隠れ、元の女大 08 より短く見えた
+            var cardSet = new HashSet<int>(hairCards);
             foreach (var i in hairVerts)
             {
                 var p = moved[i];
                 Vector3 q, n;
-                if (p.z > a.eyeL.z - 0.03f && p.y > a.eyeL.y + 0.02f)
+                var card = cardSet.Contains(i);
+                if (p.z > a.eyeL.z - (card ? 0.05f : 0.03f) && p.y > a.eyeL.y + (card ? -0.01f : 0.02f))
                 {
                     var dh = headSurf.Closest(p, 0.04f, out q, out n);
                     if (!float.IsInfinity(dh) && EdgeDistance(q, headEdges) > 0.0003f)
@@ -335,7 +397,7 @@ namespace HalfAware.EditorTools.Rocketbox
                     who.LegsFrom, legTris.Count / 3, cut, tucked, maxTuck * 1000f);
             }
             var bodyTris = Pack(bodyAll, i => toLocal.MultiplyPoint3x4(bw[i]), i => bn[i], i => bu[i], i => Re(bwts[i], bodyRemap), verts, norms, uvs, weights);
-            var headTris = Pack(faceHead, i => toLocal.MultiplyPoint3x4(sunkPos[i]), i => fn[i], i => fuv[i], i => Re(fwts[i], faceRemap), verts, norms, uvs, weights);
+            var headTris = Pack(faceHead, i => toLocal.MultiplyPoint3x4(sunkPos[i]), i => { Vector3 dn; return domeNormal.TryGetValue(i, out dn) ? dn : fn[i]; }, i => fuv[i], i => Re(fwts[i], faceRemap), verts, norms, uvs, weights);
             var patchCount = 0;
             int[] chestOut = null;
             string chestNote = null;
@@ -467,7 +529,8 @@ namespace HalfAware.EditorTools.Rocketbox
                 + (neckNote != null ? "\n" + neckNote + "、胸元を体の人の肌の三角で埋めた数 " + patchCount : "")
                 + (legsNote != null ? "\n" + legsNote : "")
                 + (headDropped > 0 ? "\n顔の人の頭の面から除いた三角（結んだ髪など） " + headDropped : "")
-                + (chestNote != null ? "\n" + chestNote : "");
+                + (chestNote != null ? "\n" + chestNote : "")
+                + (domeNote != null ? "\n" + domeNote : "");
         }
 
         // ---- 見分け -----------------------------------------------------------
@@ -614,6 +677,88 @@ namespace HalfAware.EditorTools.Rocketbox
             int n;
             var tex = BuildRocketboxProtagonist.ToColors(RocketboxTextures.ReadPng(who.HeadSrc, out n, out n));
             return RocketboxPaint.Head(tex, maps.Head, maps.Anchors, who.Look(), false, who.IrisUv, who.IrisRadius);
+        }
+
+        static readonly Dictionary<string, float[]> coverCache = new Dictionary<string, float[]>();
+
+        /// <summary>
+        /// 顔の人の頭の絵の画素ごとの、髪の人の殻の不透明さ（殻の絵の α）。画素の束ねた姿勢の位置に一番近い、髪の人の頭の面の点で測る。
+        /// 額と前のこめかみ（目の高さより上で、頭の骨より前）だけを測り、ほかは 1。
+        /// 顔の人が絵に描いた前髪のうち、髪の人では額の肌の所（殻が透ける所）を、絵では肌で埋め、髪の殻として沈めた面を肌に見せるために使う
+        /// </summary>
+        public static float[] HairCover(RocketboxPerson who)
+        {
+            float[] c;
+            if (coverCache.TryGetValue(who.Name, out c)) return c;
+            var faceMaps = BuildRocketboxProtagonist.Maps.Get(who.FaceFrom, 512);
+            var s = faceMaps.Head;
+            var a = faceMaps.Anchors;
+            var hairSmr = Smr(who.HairFrom.Model);
+            var hm = hairSmr.sharedMesh;
+            var hw = World(hm.vertices, hairSmr.transform.localToWorldMatrix);
+            var huv = hm.uv;
+            var hairHead = hm.GetTriangles(Slot(hairSmr, who.HairFrom.HeadSlot));
+            var surf = new RocketboxCompose.Surface(hw, hairHead);
+            var shell = BuildRocketboxProtagonist.PaintShell(who);
+            var eyeY = (a.eyeL.y + a.eyeR.y) * 0.5f;
+            c = new float[s.N * s.N];
+            for (var i = 0; i < c.Length; i++)
+            {
+                c[i] = 1f;
+                if (!s.On[i]) continue;
+                var p = s.P[i];
+                if (p.y < eyeY || p.z < a.head.z) continue;
+                Vector3 q, nrm;
+                int k;
+                if (float.IsInfinity(surf.Closest(p, 0.03f, out q, out nrm, out k)) || k < 0) continue;
+                c[i] = AlphaAt(shell, UvAt(q, k, hairHead, hw, huv));
+            }
+            coverCache[who.Name] = c;
+            return c;
+        }
+
+        static float CoverAt(float[] cover, int n, Vector2 uv)
+        {
+            var x = Mathf.Clamp((int)(uv.x * n), 0, n - 1);
+            var y = Mathf.Clamp((int)(uv.y * n), 0, n - 1);
+            return cover[y * n + x];
+        }
+
+        /// <summary>点に球を当てはめる（x²+y²+z² = 2c·p + d の最小二乗）</summary>
+        static bool FitSphere(List<Vector3> pts, out Vector3 centre, out float radius)
+        {
+            var m = new double[4, 5];
+            foreach (var p in pts)
+            {
+                var row = new double[] { 2 * p.x, 2 * p.y, 2 * p.z, 1 };
+                var rhs = (double)p.x * p.x + (double)p.y * p.y + (double)p.z * p.z;
+                for (var r = 0; r < 4; r++)
+                {
+                    for (var c = 0; c < 4; c++) m[r, c] += row[r] * row[c];
+                    m[r, 4] += row[r] * rhs;
+                }
+            }
+            for (var col = 0; col < 4; col++)
+            {
+                var piv = col;
+                for (var r = col + 1; r < 4; r++) if (Math.Abs(m[r, col]) > Math.Abs(m[piv, col])) piv = r;
+                if (Math.Abs(m[piv, col]) < 1e-12) { centre = Vector3.zero; radius = 0f; return false; }
+                for (var c = 0; c < 5; c++) { var tmp = m[col, c]; m[col, c] = m[piv, c]; m[piv, c] = tmp; }
+                for (var r = 0; r < 4; r++)
+                {
+                    if (r == col) continue;
+                    var f = m[r, col] / m[col, col];
+                    for (var c = 0; c < 5; c++) m[r, c] -= f * m[col, c];
+                }
+            }
+            var cx = m[0, 4] / m[0, 0];
+            var cy = m[1, 4] / m[1, 1];
+            var cz = m[2, 4] / m[2, 2];
+            var d = m[3, 4] / m[3, 3];
+            centre = new Vector3((float)cx, (float)cy, (float)cz);
+            var r2 = d + cx * cx + cy * cy + cz * cz;
+            radius = r2 > 0 ? (float)Math.Sqrt(r2) : 0f;
+            return radius > 0.03f && radius < 0.5f;
         }
 
         static float HairAt(RocketboxPaint.HeadResult r, Vector2 uv)

@@ -151,6 +151,14 @@ namespace HalfAware.EditorTools.Rocketbox
             [Header("別の人の髪を載せるとき（顔の人の頭のテクスチャ）")]
             [Tooltip("頭皮を兼ねた髪の殻を、毛筋の明暗の無い影の色一色で塗る（別の人の髪の下地にし、殻の外に見えても目立たせない）")]
             public bool flatHair;
+            [Tooltip("髪を塗らずに元の色のまま。一色で塗る所（顔の人の頭皮・殻の耳まわりとこめかみ）は naturalHairInk")]
+            public bool naturalHair;
+            public Color naturalHairInk = new Color(0.12f, 0.08f, 0.06f);
+            /// <summary>
+            /// 顔の人の頭の絵の画素ごとの、髪の人の殻の不透明さ（<see cref="RocketboxHairSwap.HairCover"/>）。null なら使わない。
+            /// 顔の人が絵に描いた前髪のうち、殻が透ける所（髪の人では額の肌の所）を肌で埋めるのに使う
+            /// </summary>
+            [System.NonSerialized] public float[] hairCover;
             [Tooltip("眉より上の額とこめかみで、元の前髪の影が焼き込まれて暗い肌を、額の真ん中の明るさまで上げる量（0〜1）")]
             public float liftForehead;
             [Tooltip("揃える強さ（0〜1）")]
@@ -330,6 +338,23 @@ namespace HalfAware.EditorTools.Rocketbox
             }
             hair = Blur(hair, s.On, n, 1);
 
+            // 顔の人が絵に描いた前髪のうち、髪の人の殻が透ける所（髪の人では額の肌の所）は、髪にせず額の肌で埋める
+            // （女大 14 の前髪は額の右上に描かれていて、女大 08 の殻が透ける所で黒い塊に見えた）
+            var fringe = new List<int>();
+            var fringeTop = Mathf.Max(Mathf.Max(a.browInL.y, a.browOutL.y), Mathf.Max(a.browInR.y, a.browOutR.y));
+            if (k.hairCover != null && k.hairCover.Length == hair.Length)
+            {
+                for (var i = 0; i < px.Length; i++)
+                {
+                    if (!s.On[i] || hair[i] < 0.05f || k.hairCover[i] >= 0.5f || brow[i] > 0f) continue;
+                    var p = s.P[i];
+                    // 眉（眉の上端より 1.2 cm 上まで）は触らない
+                    if (p.y < fringeTop + 0.012f || p.z < a.head.z + 0.01f) continue;
+                    hair[i] = 0f;
+                    fringe.Add(i);
+                }
+            }
+
             var b = Mathf.Clamp01(k.beauty);
 
             // 1. 肌のむら（手入れ）。明るさの形は残し、色のむらと細かい斑だけを均す
@@ -360,11 +385,62 @@ namespace HalfAware.EditorTools.Rocketbox
             for (var i = 0; i < px.Length; i++)
             {
                 if (hair[i] <= 0f) continue;
-                var ink = k.flatHair ? k.hairShadow : HairRamp(V[i], k);
+                // 元の色の髪は塗らない（一色で塗る頭皮だけ、元の髪の暗い色で塗る）
+                if (k.naturalHair && !k.flatHair) continue;
+                var ink = k.flatHair ? (k.naturalHair ? k.naturalHairInk : k.hairShadow) : HairRamp(V[i], k);
                 ink.a = px[i].a;
                 // 一色で塗るときは、髪と見なす度合いが半ばの所（元の明るい毛筋）も塗り切る。
                 // 別の人の髪の殻は分け目で透けて、顔の人の頭皮がそこから覗き、毛筋が明るい茶の筋や、生え際の先の茶色の点に見えたため
                 px[i] = Color.Lerp(px[i], ink, k.flatHair ? Smooth(0.05f, 0.22f, hair[i]) : hair[i]);
+            }
+
+            // 2a. 肌にした前髪の所を、まわりの肌からならして埋める（縁のとなりの肌の平均の色から始めて、となりの平均を 800 回。髪の画素は混ぜない）
+            if (fringe.Count > 0)
+            {
+                var inFringe = new HashSet<int>(fringe);
+                var refs = new List<Color>();
+                foreach (var i in fringe)
+                {
+                    int x = i % n, y = i / n;
+                    foreach (var j in new[] { x > 0 ? i - 1 : -1, x < n - 1 ? i + 1 : -1, y > 0 ? i - n : -1, y < n - 1 ? i + n : -1 })
+                        if (j >= 0 && s.On[j] && !inFringe.Contains(j) && hair[j] < 0.1f) refs.Add(px[j]);
+                }
+                if (refs.Count > 0)
+                {
+                    var start = new Color(0f, 0f, 0f, 0f);
+                    foreach (var c0 in refs) start += c0;
+                    start /= refs.Count;
+                    foreach (var i in fringe)
+                    {
+                        var c = start;
+                        c.a = px[i].a;
+                        px[i] = c;
+                    }
+                    var inFill = new HashSet<int>(fringe);
+                    for (var it = 0; it < 800; it++)
+                    {
+                        var next = new Dictionary<int, Color>();
+                        foreach (var i in fringe)
+                        {
+                            int x = i % n, y = i / n;
+                            var acc = new Color(0f, 0f, 0f, 0f);
+                            var cnt = 0;
+                            foreach (var j in new[] { x > 0 ? i - 1 : -1, x < n - 1 ? i + 1 : -1, y > 0 ? i - n : -1, y < n - 1 ? i + n : -1 })
+                            {
+                                if (j < 0 || !s.On[j] || (!inFill.Contains(j) && hair[j] > 0.3f)) continue;
+                                acc += px[j];
+                                cnt++;
+                            }
+                            if (cnt > 0) next[i] = acc / cnt;
+                        }
+                        foreach (var kv in next)
+                        {
+                            var c = kv.Value;
+                            c.a = px[kv.Key].a;
+                            px[kv.Key] = c;
+                        }
+                    }
+                }
             }
 
             // 2b. 元の前髪の影で暗い額とこめかみの肌を、額の真ん中の明るさまで上げる（別の人の髪を載せるとき）
@@ -1059,7 +1135,7 @@ namespace HalfAware.EditorTools.Rocketbox
                 var c = src[i];
                 float h, sat, v;
                 Color.RGBToHSV(c, out h, out sat, out v);
-                var o = c.a < 0.02f ? k.hairShadow : HairRamp(v, k);
+                var o = k.naturalHair ? (c.a < 0.02f ? k.naturalHairInk : c) : (c.a < 0.02f ? k.hairShadow : HairRamp(v, k));
                 o.a = c.a;
                 px[i] = o;
             }
