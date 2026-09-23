@@ -34,8 +34,22 @@ namespace HalfAware
         [Tooltip("画面の角へ向かって白く溶ける膜。場面 4 だけが使う。無い場面では null")]
         [SerializeField] ScreenHaze hazeLayer;
 
+        [Header("流れる行の帯（SetPassing）")]
+        [Tooltip("送らずに消える行の帯の左右の端。画面の幅に対する割合。場面 4 の一行目だけが使う")]
+        [SerializeField] float passingInset = 0.15f;
+        [Tooltip("その帯の濃さ。E で送る帯より薄くする")]
+        [SerializeField] float passingAlpha = 0.35f;
+        [Tooltip("その帯の中の字の、左右あわせた余白。帯が狭いぶん詰める")]
+        [SerializeField] float passingPad = 96f;
+
         float baseFontSize;
         TMPro.TextAlignmentOptions listlessAlignment = TMPro.TextAlignmentOptions.Center;
+        /// <summary>帯のふだんの形を覚えたか。組み立てたままの形を、流れる行のあとで戻す</summary>
+        bool framed;
+        Vector2 bandMin;
+        Vector2 bandMax;
+        Color bandColor;
+        Vector2 textSize;
 
         void Awake()
         {
@@ -44,6 +58,7 @@ namespace HalfAware
                 baseFontSize = subtitleText.fontSize;
                 listlessAlignment = subtitleText.alignment;
             }
+            Frame();
             SetSubtitle(null);
             SetPrompt(null);
             SetCenter(null);
@@ -102,9 +117,29 @@ namespace HalfAware
         /// </summary>
         public void SetSubtitle(string text, SubtitleKind kind)
         {
+            Show(text, kind, false);
+        }
+
+        /// <summary>
+        /// 送らずに流れて消える行。帯を細く薄くして、E で送る字幕と見分ける。null で隠す。
+        ///
+        /// **場面 4 の一行目（名を呼ぶ声）だけが使う。** 記憶に入った瞬間に出て、
+        /// 決まった秒で勝手に消える。場面 1・2・3・8 と同じ帯で出すと、
+        /// 送り待ちに見えて E を押させてしまう。案内を出さないだけでは合図にならない
+        /// （E で送る字幕も、出ているあいだは案内が消えるので、絵が同じになる）
+        /// </summary>
+        public void SetPassing(string text)
+        {
+            Show(text, SubtitleKind.Line, true);
+        }
+
+        void Show(string text, SubtitleKind kind, bool passing)
+        {
             subtitleBand.SetActive(text != null);
             subtitleText.text = text ?? string.Empty;
             if (text == null) return;
+            // 一行に入る幅は帯の幅で決まるので、形を先に決める
+            Shape(passing);
             // 並びになっているものは表に組む。そうでない長い 1 行は割ってウインドウに収める
             var list = kind == SubtitleKind.Line && ListFormat.IsList(text);
             // 1 行に入る幅はウインドウの実寸から。全角 1 文字で半角 2 つぶん
@@ -132,6 +167,45 @@ namespace HalfAware
             }
             if (baseFontSize <= 0f) baseFontSize = subtitleText.fontSize;
             subtitleText.fontSize = baseFontSize * scale;
+        }
+
+        /// <summary>
+        /// 帯のふだんの形を覚える。**組み立てた形をそのまま正とする。** 場面ごとに
+        /// 帯の幅も濃さも組み立て（シーン）が決めていて、ここに写しを持つと食い違う。
+        /// エディタで Awake を通さずに呼ばれたときのために、初めて出すときにも呼ぶ
+        /// </summary>
+        void Frame()
+        {
+            if (framed || subtitleBand == null || subtitleText == null) return;
+            var band = subtitleBand.GetComponent<RectTransform>();
+            var shade = subtitleBand.GetComponent<Image>();
+            if (band != null) { bandMin = band.anchorMin; bandMax = band.anchorMax; }
+            bandColor = shade != null ? shade.color : Color.black;
+            textSize = subtitleText.rectTransform.sizeDelta;
+            framed = true;
+        }
+
+        /// <summary>帯を、流れる行の形か、ふだんの形にする</summary>
+        void Shape(bool passing)
+        {
+            Frame();
+            if (!framed) return;
+            var band = subtitleBand.GetComponent<RectTransform>();
+            if (band != null)
+            {
+                band.anchorMin = passing ? new Vector2(passingInset, bandMin.y) : bandMin;
+                band.anchorMax = passing ? new Vector2(1f - passingInset, bandMax.y) : bandMax;
+            }
+            var shade = subtitleBand.GetComponent<Image>();
+            if (shade != null)
+            {
+                var col = bandColor;
+                if (passing) col.a = passingAlpha;
+                shade.color = col;
+            }
+            var size = textSize;
+            if (passing) size.x = -passingPad;
+            subtitleText.rectTransform.sizeDelta = size;
         }
 
         /// <summary>帯に入る横幅を em で。表の列数と寄せ方をこれで決める</summary>

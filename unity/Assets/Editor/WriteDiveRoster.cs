@@ -128,32 +128,51 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 記憶 i の会話。一行目は名前を呼ばれる声なので点を持たず、記憶に入った瞬間に出る。
-        /// 二行目からは組み立て（<see cref="BuildDive.Spots"/>）の点を順に取る。
-        ///
-        /// **点の数が行より少なければ、その先の行は点を持たないまま残る。** 点を置いてあるのは
-        /// 団地の四本（記憶 0・1・8・15）だけで、残りの十二本は一行目だけ出して黙る。
-        /// 文字をここに、点を組み立てに置いて分けてあるのは、点が場所の形に付いた値で、
-        /// 場所を組み直すたびに動くため
+        /// 記憶 i の会話。一行目は名前を呼ばれる声なので相手を持たず、記憶に入った瞬間に出る。
+        /// 二行目からは <see cref="PartnerOf"/> の相手を付ける
         /// </summary>
         static Said[] Talk(int i)
         {
             var talk = i < Talks.Length ? Talks[i] : new string[0];
-            var spots = BuildDive.Spots(i);
             var said = new Said[talk.Length];
             for (var k = 0; k < talk.Length; k++)
             {
                 said[k].line = talk[k];
-                if (k == 0 || k - 1 >= spots.Length) continue;
-                said[k].where = spots[k - 1].where;
-                said[k].radius = spots[k - 1].radius;
+                said[k].partner = k == 0 ? "" : PartnerOf(i, k);
             }
             return said;
         }
 
         /// <summary>
+        /// 記憶 i の k 行目（0 始まり）を交わしている人。<c>BuildDive</c> が記憶に置く人の名前
+        /// （<c>Cast(take, "Mother", ...)</c> の一つ目の文字列）と一字も違えない。空なら相手を持たない。
+        ///
+        /// 相手が同じ行が続く所が一つの会話になり、プレイヤーはその人に目を留めて
+        /// `E　話す` で始め、一行ずつ E で送る（設計書 7 節）。
+        ///
+        /// **いまは団地の四本（記憶 0・1・8・15）だけ。** 残りの十二本は相手を持たないので、
+        /// 一行目だけ出て、板はすぐ出る。公園・電車・台所・教室は、その場所を詰めるときに付ける
+        /// </summary>
+        static string PartnerOf(int i, int k)
+        {
+            switch (i)
+            {
+                // 0. メイ。二行目から全部、戸口の母と
+                case 0: return "Mother";
+                // 1. ハンナ。二〜四行目は隣の老人（ジョルジョ）と、五〜八行目は駆け上がってくる娘と。
+                // 娘は四行目（ハンナ「ええ、午後からで」）が出たら階段を上がり始める（Mover の合図 4）
+                case 1: return k <= 3 ? "Neighbour" : "Daughter";
+                // 8. ジョルジョ。二行目から全部、硝子戸の奥の妻と
+                case 8: return "Wife";
+                // 15. エレナ。二行目から全部、新聞を持って入ってくる夫と
+                case 15: return "Husband";
+            }
+            return "";
+        }
+
+        /// <summary>
         /// 記憶ごとの会話。設計書 7 節の写し。頭の数字は設計書の秒で、
-        /// 点をどこへ置くかの目安として残してある。
+        /// どの順で出るかの目安として残してある。
         ///
         /// **独白は入れない。** 顔は見せないので、誰が喋っているかは声の向きと
         /// ここの名前でしか伝わらない。話者と鉤括弧はこの文字列に含めて、
@@ -385,15 +404,17 @@ namespace HalfAware.EditorTools
             EditorUtility.SetDirty(asset);
             AssetDatabase.SaveAssets();
             var said = 0;
-            var spots = 0;
+            var partnered = 0;
+            var talks = 0;
             foreach (var e in entries)
             {
                 if (e.said == null) continue;
                 said += e.said.Length;
-                foreach (var s in e.said) if (s.Placed) spots++;
+                foreach (var s in e.said) if (s.Partnered) partnered++;
+                talks += DiveEntry.Exchanges(e.said).Length;
             }
-            Debug.Log(string.Format("場面 4 の記憶の一覧を書き出した。{0} 人、会話 {1} 行、うち点を持つ行 {2} → {3}",
-                entries.Count, said, spots, Path));
+            Debug.Log(string.Format("場面 4 の記憶の一覧を書き出した。{0} 人、会話 {1} 行、うち相手を持つ行 {2}、会話 {3} 組 → {4}",
+                entries.Count, said, partnered, talks, Path));
         }
 
         static void Lines(SerializedProperty list, Said[] said)
@@ -404,8 +425,7 @@ namespace HalfAware.EditorTools
             {
                 var p = list.GetArrayElementAtIndex(i);
                 p.FindPropertyRelative("line").stringValue = said[i].line;
-                p.FindPropertyRelative("where").vector3Value = said[i].where;
-                p.FindPropertyRelative("radius").floatValue = said[i].radius;
+                p.FindPropertyRelative("partner").stringValue = said[i].partner ?? "";
             }
         }
 

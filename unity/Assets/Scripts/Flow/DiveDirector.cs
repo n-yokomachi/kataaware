@@ -27,7 +27,14 @@ namespace HalfAware
     /// プレイヤーが選ぶ。そのためここから <see cref="DiveChain.Next"/> は呼ばない。
     /// あちらは最初の一人を決める <see cref="DiveChain"/> の作りの一部として残してある。
     ///
-    /// **`E 次へ` は無い。** 板が出ていないときの E は何もしない
+    /// **会話は人を選んで進める。** 一行目（名を呼ぶ声）だけは記憶に入った瞬間に出て、
+    /// 送らずに消える。二行目からは、次の会話の相手に目を留めて `E　話す` で始め、
+    /// 一行ずつ E で送る。板はその人との会話が済んでから出す。決まりは
+    /// <see cref="DiveEntry.Exchanges"/> から <see cref="DiveEntry.MayDive"/> までが持っている。
+    ///
+    /// **E が効くのは三つだけ。** 次の会話の相手への `E　話す`、話しているあいだの送り、
+    /// 板の `潜る` と `切断`。一度の押下はこのうち一つにしか使わない。
+    /// `E 次へ` は無い（設計書 2 節）
     /// </summary>
     [DefaultExecutionOrder(-15)]
     public sealed class DiveDirector : MonoBehaviour
@@ -70,12 +77,8 @@ namespace HalfAware
         [SerializeField] AudioClip[] softSteps = new AudioClip[0];
 
         [Header("会話")]
-        [Tooltip("一行を出したままにしておく秒数")]
-        [SerializeField] float talkSeconds = 4f;
-        [Tooltip("一行目だけ長く出しておく秒。名を呼ぶ声なので、相手を探す間が要る")]
+        [Tooltip("一行目（名を呼ぶ声）を出しておく秒。送らずに消える。相手を探して振り向く間が要る")]
         [SerializeField] float firstSeconds = 9f;
-        [Tooltip("一行出してから、次の行を出せるようになるまでの間。秒")]
-        [SerializeField] float lineGap = 1.5f;
 
         [Header("眩暈")]
         [Tooltip("cutAfter 人まで渡ったときの眩暈の濃さ")]
@@ -106,15 +109,26 @@ namespace HalfAware
         /// <summary>記憶の頭からの秒</summary>
         float clock;
         bool called;
-        /// <summary>次に出す会話の行。entry.said での番号。この行の点だけが armed</summary>
+        /// <summary>
+        /// これまでに出した行数。entry.said での番号 + 1 の、いちばん大きいもの。
+        /// <see cref="Mover.Cue"/> はこれを見て動き出す
+        /// </summary>
         int spoken;
-        /// <summary>この秒で字幕を消す。0 以下なら出ていない</summary>
-        float silence;
-        /// <summary>この秒までは次の行を出さない。点が近いと、読む間もなく次が重なる</summary>
-        float held;
+        /// <summary>この記憶の会話。二行目から、相手が同じ行が続く所ごと</summary>
+        Exchange[] talks = new Exchange[0];
+        /// <summary>済んだ会話の数。会話は並びの順にしか進まないので、これだけで足りる</summary>
+        int done;
+        /// <summary>話している会話の中で、いま出している行。talks[done].lines での番号。話していなければ -1</summary>
+        int line = -1;
+        /// <summary>一行目を下げたか。秒が過ぎたときと、会話を始めたときに下げる</summary>
+        bool hushed;
+        /// <summary>動作確認から入れた E。次の一歩で一度だけ使う</summary>
+        bool pending;
+        /// <summary>目と相手のあいだを測る光線の当たり。毎フレーム作らない</summary>
+        readonly RaycastHit[] hits = new RaycastHit[16];
         /// <summary>いま目を留めている相手。外していれば null</summary>
         Transform aimed;
-        /// <summary>板がいま誰の脇に出ているか</summary>
+        /// <summary>板か `E　話す` を、いま誰に出しているか</summary>
         Transform shown;
         /// <summary>同じ相手を留めている（あるいは外している）秒</summary>
         float dwell;
@@ -135,6 +149,21 @@ namespace HalfAware
 
         /// <summary>これまでに出した会話の行数。動作確認から読む</summary>
         public int Spoken { get { return spoken; } }
+
+        /// <summary>済んだ会話の数。動作確認から読む</summary>
+        public int Done { get { return done; } }
+
+        /// <summary>話しているあいだ。動作確認から読む</summary>
+        public bool Talking { get { return line >= 0; } }
+
+        /// <summary>いま板か `E　話す` を出している相手。出していなければ null。動作確認から読む</summary>
+        public Transform Shown { get { return shown; } }
+
+        /// <summary>
+        /// 次の一歩で E を一度押したことにする。再生中の動作確認から呼ぶ
+        /// （<see cref="SceneFlow.PressInteract"/> と同じ口）
+        /// </summary>
+        public void PressInteract() { pending = true; }
 
         void Awake()
         {
@@ -183,15 +212,30 @@ namespace HalfAware
         void Update()
         {
             if (cutting || chain == null || take == null) return;
+            var press = player.InteractPressed || pending;
+            pending = false;
+            Step(Time.deltaTime, press);
+        }
+
+        /// <summary>
+        /// 一フレーム分。press はこのフレームで E が押されたか。
+        ///
+        /// **一度の E は一つにしか使わない。** 話しているあいだの E は送りにだけ使い、
+        /// ここで返す。会話を閉じた E がそのまま板の `潜る` まで決めてしまうと、
+        /// 最後の行を読み終えた指で他人の頭へ飛ぶことになる
+        /// </summary>
+        void Step(float dt, bool press)
+        {
             // **速さで時計を倍にしない。** entry.speed が掛かるのは歩く速さだけ。
             // この時計が運ぶのは人と鳩の動き（Mover）と、名前を呼ぶ声の頭だけで、
             // 速さを掛けると設計書の秒数で書かれたその二つが早回しになる
-            clock += Time.deltaTime;
+            clock += dt;
             Drift();
             Voice();
-            Talk();
-            Watch();
-            Choose();
+            if (Talking) { Converse(press); return; }
+            Call();
+            Watch(dt);
+            Choose(press);
             // ここで記憶を閉じない。会話を出し切っても、鍵打ちの秒を過ぎても、
             // 場所はそのまま続く。出る道は Choose の `潜る` と `切断` だけ
         }
@@ -242,9 +286,13 @@ namespace HalfAware
             shown = null;
             dwell = 0f;
             lastStep = 0;
+            // 同じ人の記憶へ戻ったら、会話も頭から（設計書 7 節）
             spoken = 0;
-            silence = 0f;
-            held = 0f;
+            talks = DiveEntry.Exchanges(entry.said);
+            done = 0;
+            line = -1;
+            hushed = false;
+            pending = false;
             if (panel != null) panel.Hide();
             if (hud != null) { hud.SetSubtitle(null); hud.SetPrompt(null); }
             // 首は溜めた向きを体へ渡して正面へ戻す。前の記憶で振り向いたままだと、
@@ -344,51 +392,74 @@ namespace HalfAware
             AudioSource.PlayClipAtPoint(take.Call, player.Eye != null ? player.Eye.position : transform.position);
         }
 
+        // ---- 会話 ------------------------------------------------------------
+        //
+        // 設計書 7 節。**独白は無い。** 顔は見せないので、誰が喋っているかは声の向きと
+        // 一行に含まれた名前でしか伝わらない。
+        // Dive.unity に SceneFlow は無いので、HudView を直に触る
+
         /// <summary>
-        /// 記憶の中のやりとりを字幕帯に出す。設計書 7 節。
+        /// 一行目。名を呼ぶ声で、記憶に入った瞬間に出て、<see cref="firstSeconds"/> で消える。送らない。
         ///
-        /// **送るのは歩くこと。** 一行目は記憶に入った瞬間（名前を呼ばれる声）に出て、
-        /// 二行目からは、場所に置いた点へ主が入るたびに一つずつ出る。秒で流していた版は、
-        /// 何をすれば進むのか読めないと差し戻された。
-        ///
-        /// 点は順に armed になるので、先の点の中を通り抜けても順番は飛ばない。
-        /// 入らなければその行は出ないまま残り、後から戻れば出る。
-        ///
-        /// **独白は無い。** 顔は見せないので、誰が喋っているかは声の向きと
-        /// 一行に含まれた名前でしか伝わらない。
-        ///
-        /// <c>Dive.unity</c> に SceneFlow は無いので、<see cref="HudView"/> を直に触る
+        /// **帯は薄く細いまま。** E で送る字幕（場面 1・2・3・8 と同じ帯）と同じ画にすると、
+        /// 勝手に消える行まで送り待ちに見える（<see cref="HudView.SetPassing"/>）
         /// </summary>
-        void Talk()
+        void Call()
         {
-            if (hud == null) return;
-            var said = entry.said;
-            if (clock >= held && DiveEntry.Due(said, spoken, Footing()) >= 0)
-            {
-                hud.SetSubtitle(said[spoken].line, SubtitleKind.Line);
-                // **一行目だけ長く置く。** 記憶に入った瞬間に出る名を呼ぶ声で、
-                // 相手を探して振り向くあいだに消えると、誰が話しかけたのか分からない
-                silence = clock + (spoken == 0 ? firstSeconds : talkSeconds);
-                spoken++;
-                held = clock + lineGap;
-                return;
-            }
-            if (silence <= 0f || clock < silence) return;
-            silence = 0f;
-            hud.SetSubtitle(null);
+            if (hushed) return;
+            var calling = DiveEntry.Calling(entry.said, clock, firstSeconds);
+            if (calling == null) { Hush(); return; }
+            if (spoken > 0) return;
+            spoken = 1;
+            if (hud != null) hud.SetPassing(calling);
+        }
+
+        /// <summary>一行目を下げる。一度下げたら、その記憶のあいだは出し直さない</summary>
+        void Hush()
+        {
+            if (hushed) return;
+            hushed = true;
+            if (hud != null) hud.SetPassing(null);
         }
 
         /// <summary>
-        /// 主の足元を場所のローカルで。会話の点は場所のローカルで置いてあるので、
-        /// 世界の座で測ると場所ごとの離し（<c>BuildDive.PlaceOrigin</c>）のぶんだけずれる。
-        ///
-        /// **高さも一緒に測る。** 団地は同じ場所に三つの階が重なっているので、
-        /// 平らに潰すと、一階の点が三階に立っているだけで開いてしまう
+        /// 次の会話を始める。話しているあいだは歩けない。見回しはできる。
+        /// 足音も止まる（<see cref="Footsteps"/> が <see cref="PlayerController.CanMove"/> を見ている）
         /// </summary>
-        Vector3 Footing()
+        void Begin()
         {
-            var at = player.transform.position;
-            return place != null ? place.InverseTransformPoint(at) : at;
+            if (DiveEntry.AllDone(talks, done)) return;
+            Hush();
+            Drop();
+            line = 0;
+            player.CanMove = false;
+            Say();
+        }
+
+        /// <summary>いまの行を帯に出す。場面 1・2・3・8 と同じ帯で、E で送るまで出しておく</summary>
+        void Say()
+        {
+            var at = talks[done].lines[line];
+            spoken = Mathf.Max(spoken, at + 1);
+            if (hud != null) hud.SetSubtitle(entry.said[at].line, SubtitleKind.Line);
+        }
+
+        /// <summary>
+        /// 話しているあいだ。E で一行ずつ送り、最後の行を送ったら会話を閉じる。
+        ///
+        /// **閉じたら目の留めを解く。** 閉じたその場で板を出すと、送りの E を重ねて押した
+        /// 指がそのまま `潜る` を決める。板は目を留め直して <see cref="watchSeconds"/> 待ってから出す
+        /// </summary>
+        void Converse(bool press)
+        {
+            if (!press) return;
+            line++;
+            if (line < talks[done].lines.Length) { Say(); return; }
+            line = -1;
+            done++;
+            if (hud != null) hud.SetSubtitle(null);
+            player.CanMove = true;
+            Drop();
         }
 
         /// <summary>渡るたびに眩暈を一段濃くする。cutAfter 人で最大に達し、以後は最大のまま</summary>
@@ -410,27 +481,59 @@ namespace HalfAware
         /// 近づくだけで消えていた（オーナーの差し戻し）。消えるのは、
         /// その人が画面から外れたときと、別の人がもっと中央へ来たときの二つだけ
         /// </summary>
-        void Watch()
+        void Watch(float dt)
         {
             if (panel == null) return;
-            if (shown != null && !OnScreen(shown)) Drop();
+            if (shown != null && (!OnScreen(shown) || !Offers(shown) || !Visible(shown))) Drop();
 
             var who = Nearest();
             // もっと中央に近い人が現れなければ、狙いは出ている人のまま
             if (who == null) who = shown;
             if (who != aimed) { aimed = who; dwell = 0f; }
-            else dwell += Time.deltaTime;
+            else dwell += dt;
 
             // 出すのも、別の人へ乗り換えるのも、同じだけ目を留めてから
             if (aimed != null && aimed != shown && dwell >= watchSeconds)
             {
                 shown = aimed;
                 lastStep = 0;
-                panel.Show(aimed, entry.row, Row(Target(aimed)));
+                // 板は潜ってよい人にだけ出す。次の会話の相手には、画面の下の `E　話す` だけ
+                if (Divable(shown)) panel.Show(shown, entry.row, Row(Target(shown)));
+                else panel.Hide();
             }
             if (shown == null) return;
+            if (!Divable(shown))
+            {
+                if (hud != null) hud.SetPrompt(Key + TalkLabel);
+                return;
+            }
             panel.Grow(chain.CutSize);
             Guide();
+        }
+
+        /// <summary>
+        /// その人の脇に板を出してよいか。会話の相手なら、その人との会話が済んだあと。
+        /// 会話を持たない人なら、この記憶の会話が全部済んだあと
+        /// </summary>
+        bool Divable(Transform who)
+        {
+            return who != null && DiveEntry.MayDive(talks, done, who.name);
+        }
+
+        /// <summary>その人と次の会話を始められるか。会話は並びの順にしか始められない</summary>
+        bool Talkable(Transform who)
+        {
+            return who != null && DiveEntry.CanTalk(talks, done, who.name);
+        }
+
+        /// <summary>
+        /// 目を留める甲斐のある人か。板が出るか、`E　話す` が出るか。
+        /// どちらでもない人（まだ順の来ない会話の相手、会話が残っているあいだの会話を持たない人）は
+        /// 狙いに入れない。入れると、その人が次の相手より中央に来ただけで何も出なくなる
+        /// </summary>
+        bool Offers(Transform who)
+        {
+            return Divable(who) || Talkable(who);
         }
 
         /// <summary>
@@ -484,7 +587,10 @@ namespace HalfAware
         /// 目の中央にいちばん近い人。誰も角の内側にいなければ null。
         ///
         /// **いま板が出ている人より中央に近い人しか返さない。** 二人が並んで立つ記憶で、
-        /// 首を少し振るたびに板が行き来すると、どちらの脇に出ているのか読めなくなる
+        /// 首を少し振るたびに板が行き来すると、どちらの脇に出ているのか読めなくなる。
+        ///
+        /// **壁の向こうの人は返さない。** 目の向きとの角度だけで拾っていた頃は、
+        /// 廊下の壁越しに隣の部屋の人まで狙えた（設計書 7 節）。<see cref="Visible"/> を見る
         /// </summary>
         Transform Nearest()
         {
@@ -502,14 +608,83 @@ namespace HalfAware
             {
                 var who = people[i];
                 if (who == null || !who.gameObject.activeInHierarchy) continue;
+                if (!Offers(who)) continue;
                 var toward = Head(who) - eye.position;
                 if (toward.sqrMagnitude < 1e-4f) continue;
                 var apart = Vector3.Angle(eye.forward, toward);
                 if (apart >= closest) continue;
+                // 光線は角の内側に入った人にだけ撃つ
+                if (!Visible(who)) continue;
                 closest = apart;
                 best = who;
             }
             return best;
+        }
+
+        /// <summary>
+        /// 目からその人が見えているか。頭と胸のどちらかへ遮る物無しに届けば見えている。
+        /// 片方だけにすると、腰の高さの手すりや、頭の高さの垂れ壁の下から覗く人を落とす
+        /// </summary>
+        bool Visible(Transform who)
+        {
+            var eye = player.Eye;
+            if (eye == null || who == null) return true;
+            Vector3 head, chest;
+            Body(who, out head, out chest);
+            return Blocking(eye.position, head, who) == null || Blocking(eye.position, chest, who) == null;
+        }
+
+        /// <summary>
+        /// from から to までを遮る物。無ければ null。
+        ///
+        /// 除くのは、相手自身・プレイヤーの <see cref="CharacterController"/>・トリガー・
+        /// 絵を持たない当たり（地面の端の見えない仕切りや、台や机の見立ての箱）。
+        /// 見えない物は目を遮らない。当たりを持たない家具も遮らないが、それでよい。
+        ///
+        /// **行きと帰りの二度撃つ。** 壁の当たりは面を焼いた mesh なので、裏から撃つと
+        /// 抜けてしまう。どちら向きに張った面でも、どちらかの向きで当たる
+        /// </summary>
+        Collider Blocking(Vector3 from, Vector3 to, Transform who)
+        {
+            var hit = Blocking1(from, to, who);
+            return hit != null ? hit : Blocking1(to, from, who);
+        }
+
+        Collider Blocking1(Vector3 from, Vector3 to, Transform who)
+        {
+            var toward = to - from;
+            var far = toward.magnitude;
+            if (far < 1e-3f) return null;
+            var n = Physics.RaycastNonAlloc(from, toward / far, hits, far,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+            for (var i = 0; i < n; i++)
+            {
+                var c = hits[i].collider;
+                if (c == null || c.isTrigger) continue;
+                if (c == hull) continue;
+                if (who != null && c.transform.IsChildOf(who)) continue;
+                if (c.GetComponent<Renderer>() == null) continue;
+                return c;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// その人の頭と胸。体の大きさで測る。背丈は模型と縮尺でまちまちで、
+        /// 高さを決め打ちにすると、子どもでは頭の上の何も無い所を狙うことになる
+        /// </summary>
+        static void Body(Transform who, out Vector3 head, out Vector3 chest)
+        {
+            var shape = who.GetComponentInChildren<Renderer>();
+            if (shape == null)
+            {
+                head = Head(who);
+                chest = who.position + Vector3.up * 0.9f;
+                return;
+            }
+            var box = shape.bounds;
+            head = new Vector3(box.center.x, box.max.y - box.size.y * 0.08f, box.center.z);
+            chest = new Vector3(box.center.x, box.min.y + box.size.y * 0.70f, box.center.z);
         }
 
         // ---- 画面の下の案内 --------------------------------------------------
@@ -519,6 +694,9 @@ namespace HalfAware
 
         /// <summary>`E` の後ろに続く、潜る先の言い方</summary>
         const string DiveLabel = "この人の記憶へ潜る";
+
+        /// <summary>次の会話の相手に目を留めたときの、`E` の後ろに続く言い方</summary>
+        const string TalkLabel = "話す";
 
         /// <summary>選んでいない方に付ける余白。<see cref="Choice.Compose"/> と同じ形に揃える</summary>
         const string Blank = "　　";
@@ -537,8 +715,8 @@ namespace HalfAware
         /// 近づくと `E ○○` が出るのは場面 1・2・3・8 で通した決まりなので、
         /// 同じ場所・同じ書式に載せる。
         ///
-        /// **ここは `潜る` 専用にする。** 会話は歩いて点へ入れば出るもので、鍵を待たせない。
-        /// 案内を出さないことが、そのまま「この行に押す鍵は無い」という合図になる
+        /// 会話の `E　話す` は <see cref="Watch"/> が出す。話しているあいだは案内を出さない。
+        /// 場面 1・2・3・8 と同じく、帯が出ていて案内が無いことが「E で送る」の合図になる
         /// </summary>
         void Guide()
         {
@@ -576,11 +754,17 @@ namespace HalfAware
         /// 横へ一歩動くたびに選びが入れ替わる。設計書 3 節の「上下（マウスの車輪、
         /// または矢印）」がそのまま <see cref="PlayerController.LogStep"/> にあるので、そちらを読む。
         ///
-        /// 板が出ていなければ E は何もしない
+        /// 板ではなく `E　話す` を出している相手なら、E で会話を始める。
+        /// どちらも出ていなければ E は何もしない
         /// </summary>
-        void Choose()
+        void Choose(bool press)
         {
             if (panel == null || shown == null) return;
+            if (!Divable(shown))
+            {
+                if (press && Talkable(shown)) Begin();
+                return;
+            }
             // 車輪を手前へ回すと 1。上が `潜る`、下が `切断` なので向きを裏返す
             var step = -player.LogStep;
             if (step != 0 && step != lastStep)
@@ -590,7 +774,7 @@ namespace HalfAware
                 Guide();
             }
             lastStep = step;
-            if (!player.InteractPressed) return;
+            if (!press) return;
             if (panel.Index == 1 && chain.CanCut) { Cut(); return; }
             var target = Target(shown);
             if (target < 0) return;

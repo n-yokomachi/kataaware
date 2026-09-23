@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace HalfAware
@@ -17,31 +18,36 @@ namespace HalfAware
     }
 
     /// <summary>
-    /// 記憶の中で交わされる一行と、それが出る場所の点。
+    /// 記憶の中で交わされる一行と、その行を交わしている相手。
     /// 顔は見せないので、誰が喋っているかは声の向きとこの文字列の名前でしか伝わらない。
     /// 話者と鉤括弧は line に含める。
     ///
-    /// **秒では出さない。** 記憶の頭からの秒で流していた版は、何をすれば進むのか
-    /// 読めないと差し戻された（設計書 2 節）。行はプレイヤーが点へ入ったときに出る
+    /// **会話は人を選んで進める。** 場所の点へ入ると出る作りは、いつ何が出るのか
+    /// 読めないと差し戻された（設計書 2・7 節）。二行目からは、相手に目を留めて E で始め、
+    /// 一行ずつ E で送る。どの行を誰と交わすかを partner が持つ
     /// </summary>
     [Serializable]
     public struct Said
     {
         [Tooltip("話者と鉤括弧つきの一行")]
         public string line;
-        [Tooltip("この行が出る点。場所のローカル。主の足元で測る")]
-        public Vector3 where;
-        [Tooltip("点の届く半径。m。0 以下なら点を置いていない")]
-        public float radius;
+        [Tooltip("この行を交わしている人。Take の下の GameObject の名前。空なら相手を持たない行で、流さない")]
+        public string partner;
 
-        /// <summary>点を置いてあるか。置いていない行は、一行目のほかは出ないまま残る</summary>
-        public bool Placed { get { return radius > 0f; } }
+        /// <summary>相手を持つか。持たない行は会話に数えず、流さない</summary>
+        public bool Partnered { get { return !string.IsNullOrEmpty(partner); } }
+    }
 
-        /// <summary>足元が at にあるとき、この点の中にいるか。at は場所のローカル</summary>
-        public bool Holds(Vector3 at)
-        {
-            return radius > 0f && (at - where).sqrMagnitude <= radius * radius;
-        }
+    /// <summary>
+    /// 会話ひとつ。二行目から、相手が同じ行が続く所。
+    /// 相手を持たない行は飛ばして数えるので、lines の番号は続いているとは限らない
+    /// </summary>
+    public struct Exchange
+    {
+        /// <summary>この会話の相手。Take の下の GameObject の名前</summary>
+        public string partner;
+        /// <summary>この会話で出す行。<see cref="DiveEntry.said"/> での番号を並びの順に</summary>
+        public int[] lines;
     }
 
     /// <summary>記憶一つ分の値。場所と人の形はシーン（Take）が持ち、ここは数と文字だけ</summary>
@@ -67,24 +73,113 @@ namespace HalfAware
         public float muffle;
         public bool heartbeat;
         public Seen[] seen;
-        [Tooltip("場所の点で出す会話。設計書 7 節")]
+        [Tooltip("記憶の中の会話。一行目は名を呼ぶ声。設計書 7 節")]
         public Said[] said;
 
+        // ---- 会話の決まり（設計書 7 節） -------------------------------------
+        //
+        // 一行目は名を呼ぶ声で、記憶に入った瞬間に出て、決まった秒で消える。送らない。
+        // 二行目からは、相手が同じ行が続く所を一つの会話とし、並びの順にしか始められない。
+        // 板は、会話の相手にはその人との会話が済んでから、会話を持たない人には
+        // その記憶の会話が全部済んでから出す。
+        //
+        // 進み具合は「済んだ会話の数」（done）一つで持つ。会話は順にしか進まないので、
+        // それだけで誰と何が済んだかが決まる
+
         /// <summary>
-        /// いま出す行の番号。spoken 行まで出した状態で、主の足元が at にあるときの答え。
-        /// 出す行が無ければ -1。at は場所のローカル。
-        ///
-        /// **点は順に armed になる。** 見るのは次の一つだけなので、先の点の中を
-        /// 通り抜けても順番は飛ばない。
-        ///
-        /// 一行目は名前を呼ばれる声で、記憶に入った瞬間に出る。二行目から先は
-        /// 点を置いていなければ出ないまま残る（団地の四本のほかはまだ置いていない）
+        /// 記憶に入ってから since 秒のときに出しておく一行目。hold 秒を過ぎたら null。
+        /// 一行も無ければ null
         /// </summary>
-        public static int Due(Said[] said, int spoken, Vector3 at)
+        public static string Calling(Said[] said, float since, float hold)
         {
-            if (said == null || spoken < 0 || spoken >= said.Length) return -1;
-            if (spoken == 0) return 0;
-            return said[spoken].Holds(at) ? spoken : -1;
+            if (said == null || said.Length == 0) return null;
+            return since < hold ? said[0].line : null;
+        }
+
+        /// <summary>
+        /// 二行目からを会話に分ける。相手が同じ行が続く所を一つとし、並びの順に返す。
+        ///
+        /// **一行目は相手を持っていても数えない。** 記憶に入った瞬間に勝手に出る声で、
+        /// 人を選んで始めるものではないから。
+        /// **相手を持たない行は飛ばす。** 会話に数えず、流さない。前後が同じ相手なら、
+        /// 飛ばした行を挟んでも一つの会話のまま続く
+        /// </summary>
+        public static Exchange[] Exchanges(Said[] said)
+        {
+            var all = new List<Exchange>();
+            if (said == null) return all.ToArray();
+            var lines = new List<int>();
+            string partner = null;
+            for (var k = 1; k < said.Length; k++)
+            {
+                if (!said[k].Partnered) continue;
+                if (partner != null && said[k].partner != partner)
+                {
+                    all.Add(new Exchange { partner = partner, lines = lines.ToArray() });
+                    lines.Clear();
+                }
+                partner = said[k].partner;
+                lines.Add(k);
+            }
+            if (partner != null) all.Add(new Exchange { partner = partner, lines = lines.ToArray() });
+            return all.ToArray();
+        }
+
+        /// <summary>done 個の会話を済ませたときに、次に始められる会話の相手。全部済んでいれば null</summary>
+        public static string Next(Exchange[] talks, int done)
+        {
+            if (talks == null || done < 0 || done >= talks.Length) return null;
+            return talks[done].partner;
+        }
+
+        /// <summary>
+        /// who と会話を始められるか。**並びの順にしか始められない。**
+        /// 先の会話の相手に目を留めても、手前の会話が済むまでは何も起きない
+        /// </summary>
+        public static bool CanTalk(Exchange[] talks, int done, string who)
+        {
+            var next = Next(talks, done);
+            return next != null && next == who;
+        }
+
+        /// <summary>who がこの記憶のどこかの会話の相手か</summary>
+        public static bool Partner(Exchange[] talks, string who)
+        {
+            if (talks == null || string.IsNullOrEmpty(who)) return false;
+            for (var i = 0; i < talks.Length; i++)
+                if (talks[i].partner == who) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// who との会話は済んだか。同じ人と二度話す記憶では、その人との最後の会話まで済んで初めて true。
+        /// 会話を持たない人は、済ませる会話が無いので false
+        /// </summary>
+        public static bool Finished(Exchange[] talks, int done, string who)
+        {
+            if (!Partner(talks, who)) return false;
+            for (var i = talks.Length - 1; i >= 0; i--)
+                if (talks[i].partner == who) return i < done;
+            return false;
+        }
+
+        /// <summary>その記憶の会話は全部済んだか。会話を持たない記憶は初めから済んでいる</summary>
+        public static bool AllDone(Exchange[] talks, int done)
+        {
+            return talks == null || done >= talks.Length;
+        }
+
+        /// <summary>
+        /// who の脇に板を出してよいか。会話の相手なら、その人との会話が済んだあと。
+        /// 会話を持たない人なら、その記憶の会話が全部済んだあと。
+        ///
+        /// **会話は一通り必ず流す。** 相手の話を聞き終える前に板を出すと、
+        /// 話の途中で他人の頭へ移れてしまう（設計書 7 節）
+        /// </summary>
+        public static bool MayDive(Exchange[] talks, int done, string who)
+        {
+            if (string.IsNullOrEmpty(who)) return false;
+            return Partner(talks, who) ? Finished(talks, done, who) : AllDone(talks, done);
         }
     }
 }

@@ -15,7 +15,7 @@ namespace HalfAware.EditorTools
     /// どの人も暗がりでは影にしか見えない。逆光・帽子の影・伏せた角度でそこを確かめる。
     /// 背を向けて隠していた頃は、話しかけてくる相手まで後ろを向いていて、
     /// 誰が喋っているのか読めなかった。**相手をしている人はプレイヤーの方を向ける。**
-    /// 目安は、その人の台詞が出る点への向きとの差が 90 度未満。
+    /// 目安は、話しかけに寄っていく主の立つ所への向きとの差が 90 度未満。
     /// 誰の相手もしていない人（記憶 8 の隣の母親は自分の娘を見ている）はこの限りではない。
     ///
     /// 秒・位置・向きはすべて仮置き。オーナーが実機で見て詰める
@@ -704,118 +704,5 @@ namespace HalfAware.EditorTools
                 K(25f, 5.10f, EstateTop, -17.02f, 171f,  26f, 1.15f),  // テレビの光が床に当たっている
             };
         }
-
-        // ---- 会話の点 ----------------------------------------------------------
-        //
-        // 設計書 7 節。一行目は名前を呼ばれる声なので点を持たず、二行目からを
-        // 歩く道筋の上、相手の近くを通るところに置く。点は順に armed になるので、
-        // 先の点の中を通り抜けても順番は飛ばない。
-        //
-        // 座は場所のローカルで、主の足元で測る。高さも一緒に測るので、団地の
-        // 三つの階が重なっていても、下の階の点が上の階で開くことはない。
-        //
-        // **いまは団地の四本（記憶 0・1・8・15）だけ。** 残りの十二本は点を持たず、
-        // 一行目だけ出して黙る。オーナーが「まずはマンションのシーンを作りこんで」と
-        // 決めたためで、公園・電車・台所・教室はその場所を詰めるときに一緒に置く。
-        //
-        // 階段の点は折り返しの踊り場（<see cref="EstateTurn"/>）に置いてある。半階ごとに
-        // 高さが違うので、上りと下りで同じ z に置いても取り違えない。井戸の幅いっぱいを
-        // 拾えるように、そこだけ半径を広く取ってある
-
-        /// <summary>会話の点ひとつ。<see cref="Said.where"/> と <see cref="Said.radius"/> の元</summary>
-        public struct TalkSpot
-        {
-            public Vector3 where;
-            public float radius;
-        }
-
-        static TalkSpot S(float x, float y, float z, float radius)
-        {
-            return new TalkSpot { where = new Vector3(x, y, z), radius = radius };
-        }
-
-        /// <summary>
-        /// 記憶 i の、二行目からの点。並びが会話の並びで、i 番の点が i+1 行目に付く。
-        /// 点を置いていない記憶は空を返す
-        /// </summary>
-        public static TalkSpot[] Spots(int entry)
-        {
-            switch (entry)
-            {
-                case 0: return MeiSpots;
-                case 1: return HannaSpots;
-                case 8: return GiorgioSpots;
-                case 15: return ElenaSpots;
-            }
-            return new TalkSpot[0];
-        }
-
-        /// <summary>
-        /// 0. メイ。階段の下から三階の戸口まで駆け上がり、抱えられて降ろされ、また降りる。
-        /// 母とのやりとりは戸口と玄関の三和土、見送りの二行は降りる途中の踊り場と階段の下
-        /// </summary>
-        static readonly TalkSpot[] MeiSpots =
-        {
-            S(0.00f, Floor * 0.5f, EstateTurn, 1.50f),                  // メイ「えー」　一つ目の折り返し
-            S(0.20f, EstateTop, EstateWalk + 0.25f, 0.95f),             // 母「はい、水筒」　三階へ上がりきったところ
-            // **戸口の手前。** 三和土の奥（PorchSill の先）に置いていた頃は、母を通り越して
-            // 家の中に立つことになり、背中側から水筒を受け取っていた。灯りの逆光も裏返っていた
-            S(DoorA, EstateTop, EstateFace + 0.50f, 0.85f),             // メイ「ありがとう」　戸口。母の正面
-            S(DoorA + 1.15f, EstateTop, EstateWalk + 0.15f, 0.85f),     // 母「もう、毎日でしょ」　廊下へ出たところ
-            // 手すりへ寄せすぎると体が通らない。廊下で立てるのは z EstateWalk + 0.40 まで
-            S(DoorA - 0.95f, EstateTop, EstateWalk + 0.30f, 0.85f),     // メイ「わっ」　向きを変えられて階段の側へ
-            S(0.00f, Floor * 1.5f, EstateTurn, 1.50f),                  // 母「気をつけてね」　降りる途中の折り返し
-            S(StairEastMid, 0f, WalkFront - 0.35f, 1.40f),              // メイ「いってきます」　階段を降り切った地面
-        };
-
-        /// <summary>
-        /// 1. ハンナ。自分の戸口から隣の老人の方へ寄り、駆け上がってきた娘のところへ戻って、
-        /// 階段を降り始める。老人の三行は廊下の東、娘の三行は階段の頭の側
-        /// </summary>
-        static readonly TalkSpot[] HannaSpots =
-        {
-            S(3.00f, EstateTop, EstateWalk - 0.15f, 0.85f),             // ハンナ「おはようございます」　老人の方へ一歩
-            // 老人の立つところ（EstateFace + 0.25）へ半歩ぶんしか離れていなかったので、廊下の側へ出す
-            S(4.20f, EstateTop, EstateWalk + 0.25f, 0.85f),             // ジョルジョ「今日は遅いんだね」　老人の脇
-            S(5.15f, EstateTop, EstateWalk + 0.20f, 0.85f),             // ハンナ「ええ、午後からで」　廊下の東
-            // 手すりの内側（z EstateWalk + 0.50）は体が通らない。前の点との間も一歩ぶん空ける
-            S(2.55f, EstateTop, EstateWalk + 0.25f, 0.85f),             // メイ「ママ！」　娘が上がってくる側へ戻る
-            S(1.45f, EstateTop, EstateWalk + 0.20f, 0.80f),             // ハンナ「どうしたの」　娘の前
-            S(-0.30f, EstateTop, EstateWalk + 0.30f, 0.80f),            // メイ「体操着、わすれた」　階段の頭
-            // 三階建てになって折り返しは y 1.4 と 4.2 の二つだけ。
-            // 最上階から降り始めた先は Floor * 1.5。Floor * 2.5（7.0）には、もう何も無い
-            S(0.00f, Floor * 1.5f, EstateTurn, 1.40f),                  // ハンナ「……もう」　降り始めた先の折り返し
-        };
-
-        /// <summary>
-        /// 8. ジョルジョ。廊下で隣を眺めてから自分の戸口へ戻り、新聞を渡して中へ入る。
-        /// 妻の声は戸の内側から来るので、後の三行は三和土・家の中の廊下・茶の間に置く
-        /// </summary>
-        static readonly TalkSpot[] GiorgioSpots =
-        {
-            S(3.10f, EstateTop, EstateWalk + 0.35f, 0.85f),             // ジョルジョ「ああ」　隣を眺めたまま西へ一歩
-            S(DoorB, EstateTop, EstateWalk + 0.30f, 0.80f),             // エレナ「新聞、来てる？」　自分の戸口の前
-            S(DoorB - 0.05f, EstateTop - EstateSunk, HallSill + 0.35f, 0.70f), // ジョルジョ「来てるよ」　三和土
-            S(4.20f, EstateTop, HallSill - 0.55f, 0.80f),               // ジョルジョ「隣、また忘れもの」　廊下の真ん中
-            // 硝子戸を抜けてすぐ。点の広さ（0.95 m）で、廊下の突き当たりに着いたところで出る
-            S(RoomWalk, EstateTop, RoomEnd - 0.42f, 0.95f),             // エレナ「あらあら」　茶の間
-        };
-
-        /// <summary>
-        /// 15. エレナ。茶の間から出ない記憶なので、点も茶の間と、そこへ開いた台所の中で回す。
-        /// 硝子戸の側・夫の座るところの脇・炬燵の奥・テレビの前・台所の前の順に一巡する。
-        ///
-        /// **隣り合う点は、後の点の広さより離す。** 近いと、先の点で台詞が出た途端に
-        /// 次の点も同じ所で出て、二行が重なる
-        /// </summary>
-        static readonly TalkSpot[] ElenaSpots =
-        {
-            // 夫が戸口から一直線に歩いてくる線（RoomWalk）から西へ外す
-            S(3.95f, EstateTop, RoomEnd - 0.34f, 0.80f),               // エレナ「なあに」　硝子戸の側
-            S(3.55f, EstateTop, -17.72f, 0.80f),                        // ジョルジョ「新聞、あったよ」　夫の座るところの脇
-            S(4.55f, EstateTop, -18.30f, 0.85f),                        // エレナ「そこ置いといて」　炬燵の奥
-            S(5.62f, EstateTop, -17.45f, 0.90f),                        // ジョルジョ「隣の子、また走ってた」　テレビの前
-            S(6.25f, EstateTop, -16.40f, 0.95f),                        // エレナ「元気ねえ」　台所の前
-        };
     }
 }

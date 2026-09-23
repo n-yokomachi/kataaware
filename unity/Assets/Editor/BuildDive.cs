@@ -409,20 +409,19 @@ namespace HalfAware.EditorTools
             hso.ApplyModifiedPropertiesWithoutUndo();
             haze.SetActive(false);
 
-            // **場面 4 の帯だけ薄く、細くする。** 場面 1・2・3・8 では、字幕が出ている
-            // あいだ画面の下の案内が消えて、E で送る。その画と見分けが付かないと、
-            // 記憶の時計で勝手に流れる会話まで送り待ちに見える。
-            // 案内を出さないだけでは合図にならない（絵が同じなので）。
-            // 場面 4 の字幕は全部が自動で流れる会話で、`Choice` は一度も出ないから、
-            // 帯の見た目を変えても二択と取り違えることは起きない
-            var band = Layer(go.transform, "SubtitleBand", new Color(0f, 0f, 0f, 0.35f), true);
-            Frame(band, new Vector2(0.15f, 0f), new Vector2(0.85f, 0f), new Vector2(0.5f, 0f),
+            // **帯は場面 1・2・3・8 と同じ形で組む。** 会話は人を選んで E で始め、
+            // 一行ずつ E で送るので、送り方も見た目も他の場面に揃える（場面 8 の BuildDrive と同じ値）。
+            //
+            // **一行目（名を呼ぶ声）だけ薄く細くする。** 記憶に入った瞬間に出て勝手に消える行で、
+            // 同じ帯で出すと送り待ちに見える。案内を出さないだけでは合図にならない
+            // （E で送る字幕も、出ているあいだは案内が消えるので、絵が同じになる）。
+            // 形の切り替えは HudView.SetPassing が持ち、ここでは細い帯の寸法だけを渡す
+            var band = Layer(go.transform, "SubtitleBand", new Color(0f, 0f, 0f, 0.75f), true);
+            Frame(band, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f),
                 new Vector2(0f, 40f), new Vector2(0f, 120f));
             var subtitle = Line(band, "Subtitle", font, 28f, Color.white, TextAlignmentOptions.Left);
-            // 帯が狭くなったぶん、左右の余白も詰める。160 のままだと
-            // 一行に入る幅が七割の帯の中でさらに七割になって、二行の文が四行に割れる
             Frame(subtitle.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f),
-                Vector2.zero, new Vector2(-96f, -24f));
+                Vector2.zero, new Vector2(-160f, -24f));
             band.gameObject.SetActive(false);
 
             var prompt = Line(go.transform, "Prompt", font, 22f, Color.white, TextAlignmentOptions.Center);
@@ -455,6 +454,11 @@ namespace HalfAware.EditorTools
             so.FindProperty("fadeLayer").objectReferenceValue = fade.GetComponent<Image>();
             so.FindProperty("curtainLayer").objectReferenceValue = curtain.GetComponent<Image>();
             so.FindProperty("hazeLayer").objectReferenceValue = hazeView;
+            // 一行目の細い帯。幅は画面の七割。帯が狭くなったぶん左右の余白も詰める。
+            // 160 のままだと、一行に入る幅が七割の帯の中でさらに七割になって、二行の文が四行に割れる
+            so.FindProperty("passingInset").floatValue = 0.15f;
+            so.FindProperty("passingAlpha").floatValue = 0.35f;
+            so.FindProperty("passingPad").floatValue = 96f;
             so.ApplyModifiedPropertiesWithoutUndo();
             return hud;
         }
