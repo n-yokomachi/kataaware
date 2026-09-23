@@ -39,3 +39,6 @@ sysinfo.txt
 
 # 映り込みの下地も組み立てのたびに焼き直す
 /Assets/Models/generated/alley/Mirror*.exr
+
+# 外から落とした素材の元（大きい）。Assets の外に置き、縮めた写しだけを Assets に入れる
+/[Rr]aw[Aa]ssets/
