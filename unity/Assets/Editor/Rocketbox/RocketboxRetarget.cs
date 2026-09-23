@@ -84,6 +84,12 @@ namespace HalfAware.EditorTools.Rocketbox
         public const float HipsOverAnkles = 0.015f;
         /// <summary>歩き: 腕の振りの真ん中で、上腕が体の横から外へ開く角度と、真下から前へ出る角度（度）</summary>
         public const float WalkArmOpen = 5f, WalkArmForward = 0f;
+        /// <summary>
+        /// 立ち・歩き: 鎖骨を束ねた姿勢の向き（体の外へ 13〜14 度下がる）から、さらに肩の先を下げる角度（度）。なで肩に見せる。
+        /// 胸の骨に付いて動く（胸の向きの中で回す）。10° で鎖骨は 13.4° から 23.4° 下がり、肩の関節の幅は 34.4 から 33.3 cm、高さは 1.6 cm 下がる。
+        /// 歩きでも 23〜24° のまま（肩が上がって見えない）
+        /// </summary>
+        public const float ClavicleDrop = 10f;
 
         [MenuItem("HalfAware/Rocketbox/Retarget the idle and walk")]
         public static void Menu()
@@ -442,6 +448,15 @@ namespace HalfAware.EditorTools.Rocketbox
                 ResetSource();
                 clip.SampleAnimation(src, t);
                 var stand = clip == standClip;
+                // 鎖骨: 束ねた姿勢の向きから ClavicleDrop だけ肩の先を下げる（胸の骨の中の向きで決めるので、胸の動きに付いて動く）
+                foreach (var side in new[] { "L", "R" })
+                {
+                    var cl = D("Bip01 " + side + " Clavicle");
+                    var parent = cl.parent;
+                    var bindLocal = Quaternion.Inverse(dstBind[parent]) * dstBind[cl];
+                    var axis = Quaternion.Inverse(dstBind[parent]) * Vector3.forward;
+                    cl.localRotation = Quaternion.AngleAxis(side == "L" ? ClavicleDrop : -ClavicleDrop, axis) * bindLocal;
+                }
                 foreach (var j in joints)
                 {
                     var r = j.Src.rotation * j.Offset;
