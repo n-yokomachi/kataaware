@@ -34,7 +34,7 @@ namespace HalfAware
         /// </summary>
         public static IReadOnlyList<string> Triggers { get { return triggers; } }
 
-        // **車内に任意の対象は置かない。** ラジオも燃料計も上着のポケットも、
+        // **車内に任意の対象は置かない。** ラジオも燃料計も、
         // 物としては車内に残っているが調べられない。走っているあいだ調べられるのは
         // その景色のきっかけひとつだけで、任意の対象はガレージの garage.button だけになる
 

@@ -73,7 +73,7 @@ namespace HalfAware.Tests
         }
 
         // NoIdIsUsedTwice は重複が無いことしか見ない。id の集合そのものを固定して、
-        // ラジオや上着のポケットのような、どの帯にも属さない対象が抜け落ちるのに気づけるようにする
+        // ラジオや燃料計のような、どの帯にも属さない対象が抜け落ちるのに気づけるようにする
         [Test]
         public void ItHoldsEveryIdOfScene8()
         {

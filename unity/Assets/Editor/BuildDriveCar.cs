@@ -89,6 +89,11 @@ namespace HalfAware.EditorTools
             leaf.Gap.Emit(slab, "DoorGap", Mat("CarGap"), false, Generated);
             leaf.Glass.Emit(slab, "DoorGlass", Mat("CarGlass"), false, Generated);
             leaf.Trim.Emit(slab, "DoorTrim", Mat("CarTrim"), false, Generated);
+            // 鍍金。**塗った鉄（0.216）では足りない所にだけ使う。** 今は窓の回し把手だけ。
+            // 運転席のドアには計器の裏の灯りが 0.62 m 先から斜めに届くだけで、
+            // 実際に撮って測ると内張りが 0、塗った鉄の把手が 14 にしかならない。
+            // 段は付いているが、夜の画面で 14 は「そこに何かある」までしか言えない。
+            // この年式の車の回し把手は鍍金なので、0.46 で置き直すと 29 になる
             leaf.Plate.Emit(slab, "DoorChrome",
                 ItemMat("CarChrome", new Color(0.455f, 0.460f, 0.470f), 0.62f), false, Generated);
 
@@ -1393,25 +1398,21 @@ namespace HalfAware.EditorTools
         /// </summary>
         static void Fittings(Transform parent, Bank trim, Bank steel, Bank gap, Bank lens, Bank tail, Leaf leaf)
         {
-            // 基板と端子と紙と布。どれも車体の素材の表（Tone）に無いので、ここで色を結ぶ
+            // 基板と端子と紙。どれも車体の素材の表（Tone）に無いので、ここで色を結ぶ
             var board = new Bank { Texel = 2.6f };
             var gold = new Bank { Texel = 2.0f };
             var paper = new Bank { Texel = 1.6f };
-            var cloth = new Bank { Texel = 1.8f };
-            // 鍍金。窓の回し把手とポケットの口の縁
-            var plate = new Bank { Texel = 2.4f };
             // 燃料計の目盛りと針。Unlit なので入れ物を分ける
             var scale = new Bank { Texel = 1f };
             var pointer = new Bank { Texel = 1f };
 
             ChipBundle(board, gold, steel);
             LogCopy(paper, gap);
-            CoatOnSeat(cloth, gap, plate, paper);
             RearMirror(trim, steel, gap, lens);
             RadioSet(steel, gap, paper, tail);
             FuelDial(trim, gap, scale, pointer);
             CigarettePack(parent);
-            WindowCrank(plate, steel, gap, leaf);
+            WindowCrank(steel, gap, leaf);
 
             // 基板。暗い緑。内装（0.125）より暗く落として、助手席の座面（0.140）から切る
             board.Emit(parent, "CarBoard", ItemMat("CarBoard", new Color(0.088f, 0.108f, 0.086f), 0.34f),
@@ -1428,18 +1429,6 @@ namespace HalfAware.EditorTools
             // 端子と同じ事情で 0.335 から上げた。実際の紙の反射率（0.7 前後）の内なので、
             // 朝の帯（実測 107 × 反射率）でも 66 までしか行かず、白く飛ばない
             paper.Emit(parent, "CarPaper", ItemMat("CarPaper", new Color(0.620f, 0.596f, 0.530f), 0.05f),
-                false, Generated);
-            // 上着。主人公の革の上着だが、袖（Sleeve 0.055）のままでは暗すぎて、
-            // 撮ってみると畳みもポケットも一切見えない黒い塊になった。
-            // 座面（0.140）より暗いところは変えずに、畳みが読める 0.078 まで持ち上げてある
-            cloth.Emit(parent, "CarCloth", ItemMat("CarCloth", new Color(0.078f, 0.072f, 0.076f), 0.16f),
-                false, Generated);
-            // 鍍金。**塗った鉄（0.216）では足りない所にだけ使う。**
-            // 運転席のドアには計器の裏の灯りが 0.62 m 先から斜めに届くだけで、
-            // 実際に撮って測ると内張りが 0、塗った鉄の把手が 14 にしかならない。
-            // 段は付いているが、夜の画面で 14 は「そこに何かある」までしか言えない。
-            // この年式の車の回し把手は鍍金なので、0.46 で置き直すと 29 になる
-            plate.Emit(parent, "CarChrome", ItemMat("CarChrome", new Color(0.455f, 0.460f, 0.470f), 0.62f),
                 false, Generated);
             scale.Emit(parent, "CarGaugeMark", ItemLamp("CarGaugeMark", new Color(0.520f, 0.470f, 0.338f)),
                 false, Generated);
@@ -1562,57 +1551,6 @@ namespace HalfAware.EditorTools
             for (var k = 0; k < 2; k++)
                 gap.Box(top + tilt * new Vector3(-0.004f, 0.0024f, 0.002f + k * 0.018f),
                     new Vector3(0.108f, 0.0010f, 0.008f), tilt);
-        }
-
-        /// <summary>
-        /// 座席に置いた上着とそのポケット。判定点 (-0.10, 1.07, -0.30)。
-        ///
-        /// **判定点の真上には物を置けない。** 運転席の目から判定点へ線を引くと、
-        /// 腕組みした左の二の腕（<see cref="Folded"/>）に当たる。実際に撮っても、
-        /// 画面の真ん中は袖の黒い塊で埋まっていた。線が通るのを一点ずつ測ると、
-        /// 抜けるのは x -0.35 から -0.21、z -0.17 から 0.05 の範囲で、
-        /// そこは助手席の座面の右半分にあたる。上着の身頃とポケットはそこへ置き、
-        /// 袖だけを判定点の方へ垂らして、上着が判定点まで届いていることにしてある。
-        ///
-        /// **チップと写しを食わない。** どちらも同じ座面の x -0.50 から -0.36 に置いてあるので、
-        /// 上着は x -0.35 より右だけを使う。**背もたれにも入らない。** 背もたれの前の面は
-        /// z -0.175 で、身頃はそれより手前に収める。
-        ///
-        /// 布は座面（0.140）より暗いので、明るい座面の上に暗い塊として抜ける。
-        /// ポケットの口は、暗いままだと布に沈んで消えるので、口の縁に塗った鉄の線を
-        /// 一本入れて段を作る。**煙草の箱は文面のもの**で、紙の面（0.62）が
-        /// 8 画素ぶん覗くと、そこがポケットだと一目で読める
-        /// </summary>
-        static void CoatOnSeat(Bank cloth, Bank gap, Bank plate, Bank paper)
-        {
-            // 身頃。座面の右半分に丸めて置く。左の縁はチップの束（x -0.355 まで）に触れさせない
-            cloth.Box(new Vector3(-0.225f, 1.088f, -0.055f), new Vector3(0.195f, 0.086f, 0.200f),
-                Quaternion.Euler(0f, -12f, 4f));
-            // 畳まれて盛り上がった襟のあたり。写し（x -0.342 まで）の右
-            cloth.Box(new Vector3(-0.232f, 1.116f, 0.085f), new Vector3(0.140f, 0.060f, 0.135f),
-                Quaternion.Euler(0f, 14f, -6f));
-            // 袖。座面の右の縁から判定点の方へ垂らす。下端は変速機の覆いの天板（0.935）に着く
-            cloth.Box(new Vector3(-0.115f, 1.020f, -0.215f), new Vector3(0.090f, 0.155f, 0.095f),
-                Quaternion.Euler(22f, 0f, 26f));
-            cloth.Box(new Vector3(-0.085f, 0.965f, -0.285f), new Vector3(0.085f, 0.075f, 0.105f),
-                Quaternion.Euler(12f, -8f, 14f));
-
-            // ポケット。身頃の上を向いた面に付ける。ここだけは線の通るところに置く
-            var lean = Quaternion.Euler(-16f, -12f, 4f);
-            var pocket = new Vector3(-0.243f, 1.100f, -0.130f);
-            cloth.Box(pocket, new Vector3(0.150f, 0.055f, 0.120f), lean);
-            // 口。暗い窪みを一本
-            gap.Box(pocket + lean * new Vector3(0f, 0.031f, 0.006f),
-                new Vector3(0.108f, 0.008f, 0.028f), lean);
-            // 口の縁。ここだけ明るくして、布のどこがポケットなのかを出す
-            plate.Box(pocket + lean * new Vector3(0f, 0.035f, 0.022f),
-                new Vector3(0.104f, 0.006f, 0.008f), lean);
-            // 蓋。口の向こうへ寝かせる
-            cloth.Box(pocket + lean * new Vector3(0f, 0.031f, -0.026f),
-                new Vector3(0.116f, 0.012f, 0.044f), lean);
-            // 煙草の箱。口から覗かせる
-            paper.Box(pocket + lean * new Vector3(-0.024f, 0.042f, 0.002f),
-                new Vector3(0.046f, 0.026f, 0.030f), lean * Quaternion.Euler(-18f, 0f, 0f));
         }
 
         /// <summary>
@@ -1893,7 +1831,7 @@ namespace HalfAware.EditorTools
         /// （<see cref="Mat"/> の CarGap 0.020）を後ろへ敷くと、明るい把手が
         /// 暗い輪に囲まれて、形が段として立つ
         /// </summary>
-        static void WindowCrank(Bank plate, Bank steel, Bank gap, Leaf leaf)
+        static void WindowCrank(Bank steel, Bank gap, Leaf leaf)
         {
             // 窓の下枠。左右とも通す。溝は暗く、笠は明るく。
             // 運転席の側は窓ごとドアに付いているので、開くドアへ載せる
@@ -1907,7 +1845,7 @@ namespace HalfAware.EditorTools
             }
 
             // 把手も運転席のドアに付いている。ここから先は開くドアの側へ置く
-            plate = leaf.Plate;
+            var plate = leaf.Plate;
             gap = leaf.Gap;
 
             // 暗い座。把手のぜんたいを後ろから囲う
