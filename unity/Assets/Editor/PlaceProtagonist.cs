@@ -55,8 +55,8 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 主人公を替える。古い体に付いていたジャックと左手の置き所は新しい体の手へ移し、
-        /// 古い体とその部品（顔の面、ライダースの部品）は捨てる。場面 1 では座った形と抜くしぐさも作る
+        /// 主人公を替える。前に置いた体に付いていたジャックと左手の置き所は新しい体の手へ移し、
+        /// 前に置いた体とその部品は捨てる。場面 1 では座った形と抜くしぐさも作る
         /// </summary>
         public static bool Place(bool room, StringBuilder note)
         {
@@ -71,10 +71,6 @@ namespace HalfAware.EditorTools
 
             var flow = Object.FindFirstObjectByType<SceneFlow>(FindObjectsInactive.Include);
             if (room && !Room(player, old, her, an, eyeLead, flow, note)) return false;
-
-            // カメラの子の前腕は止めた。見える腕は体の腕だけ
-            var forearm = player.transform.Find("Main Camera/Forearm");
-            if (forearm != null) { Object.DestroyImmediate(forearm.gameObject); note.AppendLine("カメラの子の前腕（Forearm）を消した"); }
 
             if (flow != null)
             {
@@ -374,8 +370,8 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 二つの一覧の差。Player/Protagonist の下は数えない。組み立てが変えてよい物（カメラの子の前腕、
-        /// 椅子のケーブル、SceneFlow）の差は書くが、思いがけない差には数えない
+        /// 二つの一覧の差。Player/Protagonist の下は数えない。組み立てが変えてよい物（抜いたジャックの置き場）の差は書くが、
+        /// 思いがけない差には数えない
         /// </summary>
         public static string Diff(Dictionary<string, string> a, Dictionary<string, string> b, out int unexpected)
         {
@@ -390,8 +386,8 @@ namespace HalfAware.EditorTools
                 a.TryGetValue(k, out x);
                 b.TryGetValue(k, out y);
                 if (x == y) continue;
-                // 組み立てが変えてよい物: カメラの子の前腕（消す）、抜いたジャックの置き場（座面の縁へ移す）
-                var allowed = k.StartsWith("Player/Main Camera/Forearm") || k == "Room/Chair/JackRest";
+                // 組み立てが変えてよい物: 抜いたジャックの置き場（座面の縁へ移す）
+                var allowed = k == "Room/Chair/JackRest";
                 if (!allowed) unexpected++;
                 sb.AppendFormat("  {0}{1}: {2} → {3}", allowed ? "" : "（思いがけない）", k, x ?? "無し", y ?? "無し").AppendLine();
             }

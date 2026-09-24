@@ -10,7 +10,7 @@ using Object = UnityEngine.Object;
 namespace HalfAware.EditorTools.Rocketbox
 {
     /// <summary>
-    /// 場面に置いている今の主人公（Quaternius の女性）の立ちと歩き（Quaternius の W_Suit の骨向けの Generic の動き、Assets/Animation/Idle.anim・Walk.anim）を、
+    /// 前の主人公（Quaternius の女性）の立ちと歩き（Quaternius の W_Suit の骨向けの Generic の動き、Assets/Animation/Idle.anim・Walk.anim）を、
     /// Rocketbox の Humanoid の動きへ移し替える。
     ///
     /// Quaternius の骨は足が脛の子ではなく根の子（足の IK の骨）なので、Unity の Humanoid にそのまま載らない。
@@ -35,6 +35,8 @@ namespace HalfAware.EditorTools.Rocketbox
         public const string OutDir = "Assets/Animation/Humanoid";
         public const string ControllerPath = BuildRocketboxProtagonist.Controller;
         public const string SourceModel = "Assets/Models/quaternius/W_Suit.fbx";
+        /// <summary>写す元の状態機械。前の主人公（Quaternius）の立ちと歩きのもので、写してから動きだけ Humanoid のものへ差し替える</summary>
+        public const string SourceController = "Assets/Animation/Protagonist.controller";
         public const string SourceIdle = "Assets/Animation/Idle.anim";
         public const string SourceWalk = "Assets/Animation/Walk.anim";
 
@@ -140,7 +142,7 @@ namespace HalfAware.EditorTools.Rocketbox
         {
             if (AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath) == null)
             {
-                if (!AssetDatabase.CopyAsset(BuildProtagonist.Controller, ControllerPath))
+                if (!AssetDatabase.CopyAsset(SourceController, ControllerPath))
                     throw new InvalidOperationException("状態機械を写せない");
             }
             var ctrl = AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath);

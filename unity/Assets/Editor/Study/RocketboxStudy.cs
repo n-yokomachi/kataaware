@@ -615,9 +615,9 @@ namespace HalfAware.EditorTools.Study
             return sb.ToString();
         }
 
-        // ---- 今の主人公（Quaternius）と並べる -----------------------------------
+        // ---- 前の主人公（Quaternius）と並べる -----------------------------------
 
-        /// <summary>今の主人公（段 0 のまま、つまり今のゲームの Face.mat）を同じ条件で撮る</summary>
+        /// <summary>前の主人公（段 0 のまま、つまり場面に置いていた頃の Face.mat）を同じ条件で撮る。絵の名は current_ のまま</summary>
         public static string ShootCurrent(FaceStudy.Lighting light)
         {
             var sb = new StringBuilder();
@@ -649,7 +649,7 @@ namespace HalfAware.EditorTools.Study
 
         /// <summary>
         /// 状態機械（Humanoid の写し）で立ちと歩きを動かし、横から撮る。
-        /// 比べるために、今の主人公も今の状態機械で同じこまを撮る。Animator.Update でエディタの中だけで進める
+        /// 比べるために、前の主人公も前の状態機械で同じこまを撮る。Animator.Update でエディタの中だけで進める
         /// </summary>
         public static string ShootWalk()
         {

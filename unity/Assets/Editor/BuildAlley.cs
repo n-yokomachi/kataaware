@@ -972,7 +972,7 @@ namespace HalfAware.EditorTools
 
         // ---- 人 ------------------------------------------------------------
 
-        /// <summary>仮置きの人に使うモデル。自室の主人公と同じ Quaternius の一式</summary>
+        /// <summary>仮置きの人に使うモデル。Quaternius の一式</summary>
         /// <summary>
         /// 通りとヤードに立たせる模型。Quaternius の Ultimate Modular Women と
         /// Ultimate Modular Men から、街に居そうな身なりだけを選んである。

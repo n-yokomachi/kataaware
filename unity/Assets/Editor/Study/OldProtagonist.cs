@@ -2,15 +2,18 @@ using UnityEditor;
 using UnityEngine;
 using System.Collections.Generic;
 
-namespace HalfAware.EditorTools
+namespace HalfAware.EditorTools.Study
 {
     /// <summary>
-    /// 主人公を組み立てる。素体は Quaternius の Ultimate Modular Women（Suit）で、
+    /// 前の主人公を組み立てる。素体は Quaternius の Ultimate Modular Women（Suit）で、
     /// そこに顔の絵を貼る面と、革のライダースの襟・襟返し・ジッパー・ベルトを重ねる。
     /// 素体には UV が無いので、顔は前にかぶせた面の方に UV を持たせて描く。
-    /// 手で組むと再生を抜けるたびに消えるので、ここに手順として残す。
+    ///
+    /// **場面にはもう置かない。** 場面の主人公は Rocketbox の体（PlaceProtagonist）に替わった。
+    /// 前の顔の検証（<see cref="FaceStages"/>）と、今の主人公との撮り比べ（<see cref="RocketboxStudy"/>）が、
+    /// 比べる相手として組むためだけにここに残す。メニューからは組まない
     /// </summary>
-    public static class BuildProtagonist
+    public static class OldProtagonist
     {
         public const string SourceModel = "Assets/Models/quaternius/W_Suit.fbx";
         public const string FacePlateMesh = "Assets/Models/generated/FacePlate.asset";
@@ -20,13 +23,6 @@ namespace HalfAware.EditorTools
         static readonly Color Hair = new Color(0.045f, 0.042f, 0.050f);
         static readonly Color Jacket = new Color(0.055f, 0.053f, 0.062f);
         static readonly Color Shirt = new Color(0.80f, 0.80f, 0.82f);
-
-        [MenuItem("HalfAware/Build the protagonist")]
-        public static void BuildMenu()
-        {
-            var go = Build(null);
-            Selection.activeGameObject = go;
-        }
 
         /// <summary>組み立てて返す。parent が null なら場面の根に置く</summary>
         public static GameObject Build(Transform parent)

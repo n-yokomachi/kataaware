@@ -9,7 +9,7 @@ namespace HalfAware.EditorTools.Study
 {
     /// <summary>
     /// 一つ目の道: 同じ模型（Quaternius の女性 W_Suit）に顔を描き込む段。
-    /// 主人公は <see cref="BuildProtagonist.Build"/> でそのまま組み立て、顔の面（FacePlate）の
+    /// 前の主人公を <see cref="OldProtagonist.Build"/> でそのまま組み立て、顔の面（FacePlate）の
     /// メッシュとマテリアルだけを段ごとの写しに差し替える。本番のアセットには触らない。
     ///
     /// - 段 0: 今のまま（FacePlate.asset と Face.mat）
@@ -38,7 +38,7 @@ namespace HalfAware.EditorTools.Study
             var who = new FaceSubject { Root = holder };
             try
             {
-                var her = BuildProtagonist.Build(holder.transform);
+                var her = OldProtagonist.Build(holder.transform);
                 if (her == null) throw new InvalidOperationException("主人公を組み立てられない");
                 FaceSubject.HideAll(holder);
                 who.AdoptLooseMaterials();
@@ -131,7 +131,7 @@ namespace HalfAware.EditorTools.Study
         public static string Prepare1()
         {
             var area = new Rect(-0.0775f, -0.073f, 0.155f, 0.146f);
-            return FacePaint.Write("Face1", 256, area, FacePaint.Layout.Stage1(), Load<Material>(BuildProtagonist.FaceMaterial), FacePaint.MakeTransparent);
+            return FacePaint.Write("Face1", 256, area, FacePaint.Layout.Stage1(), Load<Material>(OldProtagonist.FaceMaterial), FacePaint.MakeTransparent);
         }
 
         /// <summary>段 2。頭へ沿わせた面を作って保存し、512 で描く</summary>
@@ -265,7 +265,7 @@ namespace HalfAware.EditorTools.Study
         /// <summary>頭の Skin マテリアル（素体の FBX の中）</summary>
         public static Material SkinMaterial()
         {
-            var src = AssetDatabase.LoadAssetAtPath<GameObject>(BuildProtagonist.SourceModel);
+            var src = AssetDatabase.LoadAssetAtPath<GameObject>(OldProtagonist.SourceModel);
             foreach (var rr in src.GetComponentsInChildren<Renderer>(true))
                 foreach (var m in rr.sharedMaterials)
                     if (m != null && m.name == "Skin") return m;
@@ -281,7 +281,7 @@ namespace HalfAware.EditorTools.Study
             var loose = new List<Material>();
             try
             {
-                var her = BuildProtagonist.Build(holder.transform);
+                var her = OldProtagonist.Build(holder.transform);
                 FaceSubject.HideAll(holder);
                 Transform plate = null;
                 foreach (var t in her.GetComponentsInChildren<Transform>(true)) if (t.name == "FacePlate") plate = t;
@@ -332,7 +332,7 @@ namespace HalfAware.EditorTools.Study
             holder.transform.position = FaceStudy.Origin;
             try
             {
-                var her = BuildProtagonist.Build(holder.transform);
+                var her = OldProtagonist.Build(holder.transform);
                 FaceSubject.HideAll(holder);
                 Transform plate = null;
                 foreach (var t in her.GetComponentsInChildren<Transform>(true)) if (t.name == "FacePlate") plate = t;
@@ -432,7 +432,7 @@ namespace HalfAware.EditorTools.Study
                 SavePng(twinMask, w, h, Dir + "/Mask0_twin.png", true);
                 SavePng(selfMask, w, h, Dir + "/Mask0_self.png", true);
                 var selfTex = SavePng(moved, w, h, Dir + "/Face0_self.png", false);
-                var mat = new Material(Load<Material>(BuildProtagonist.FaceMaterial));
+                var mat = new Material(Load<Material>(OldProtagonist.FaceMaterial));
                 mat.name = "Face0_self";
                 mat.SetTexture("_BaseMap", selfTex);
                 mat.SetTexture("_MainTex", selfTex);
@@ -442,7 +442,7 @@ namespace HalfAware.EditorTools.Study
                 var bare = (Color32[])px.Clone();
                 foreach (var i in mole) bare[i] = new Color32(0, 0, 0, 0);
                 var bareTex = SavePng(bare, w, h, Dir + "/Face0_nomole.png", false);
-                var bareMat = new Material(Load<Material>(BuildProtagonist.FaceMaterial));
+                var bareMat = new Material(Load<Material>(OldProtagonist.FaceMaterial));
                 bareMat.name = "Face0_nomole";
                 bareMat.SetTexture("_BaseMap", bareTex);
                 bareMat.SetTexture("_MainTex", bareTex);
