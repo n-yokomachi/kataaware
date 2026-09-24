@@ -44,6 +44,9 @@ namespace HalfAware
             public float yaw;
             [Tooltip("映す高さの角度（度）。上から見下ろすと正、下から見上げると負")]
             public float pitch;
+            [Tooltip("この画面だけ、下の縁に来る所の目からの下がり（m）を変える。0 なら共通の値。" +
+                "見下ろす画面では胸元が入りやすいので、鎖骨のあたりまで上げる")]
+            public float bottom;
             [System.NonSerialized] public RenderTexture target;
         }
 
@@ -62,8 +65,9 @@ namespace HalfAware
         [SerializeField] Renderer head;
         [Tooltip("映り込みのカメラが撮る間だけ点ける灯り（口元を照らす灯りと、頭の後ろの壁を照らす灯り）")]
         [SerializeField] Light[] lamps = new Light[0];
-        [Tooltip("映り込みのカメラの絵の大きさ（px）。画面の幅 1 m あたり")]
-        [SerializeField] float pixelsPerMetre = 320f;
+        [Tooltip("映り込みのカメラの絵の大きさ（px）。画面の幅 1 m あたり。画面に貼る大きさの 2 倍ほどで撮り、" +
+            "ぼかして重ねる（肩の輪郭の段と、タンクトップの紐の粒をならす。URP の設定で MSAA は効かない）")]
+        [SerializeField] float pixelsPerMetre = 560f;
         [Tooltip("画面の上の縁に来る所の、目からの下がり（m）。鼻の下の方")]
         [SerializeField] float rangeTop = 0.035f;
         [Tooltip("画面の下の縁に来る所の、目からの下がり（m）。胸の上（鎖骨のあたり）")]
@@ -146,11 +150,12 @@ namespace HalfAware
         {
             if (block == null) block = new MaterialPropertyBlock();
             var facing = body != null ? Quaternion.Euler(0f, body.eulerAngles.y, 0f) : Quaternion.identity;
-            var centre = eye + Vector3.down * ((rangeTop + rangeBottom) * 0.5f);
-            var height = rangeBottom - rangeTop;
             foreach (var p in panes)
             {
                 if (p == null || p.screen == null || p.face == null || p.camera == null) continue;
+                var bottom = p.bottom > 0f ? p.bottom : rangeBottom;
+                var centre = eye + Vector3.down * ((rangeTop + bottom) * 0.5f);
+                var height = bottom - rangeTop;
                 if (p.target == null)
                 {
                     var w = Mathf.Max(16, Mathf.RoundToInt(p.size.x * pixelsPerMetre));

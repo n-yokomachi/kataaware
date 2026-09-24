@@ -24,6 +24,8 @@ namespace HalfAware.EditorTools
         /// 映り込みのいちばん濃いときの明るさ（画面の色に重ねる明るさの倍率）。ガラスの反射らしく薄く
         /// </summary>
         const float ReflectionStrength = 0.35f;
+        /// <summary>映り込みの色の残し方（0 で灰色、1 で元の色）。肌の色、髪の黒、タンクトップの灰が分かる程度</summary>
+        const float ReflectionSaturation = 0.5f;
 
         [MenuItem("HalfAware/Put the terminal reflection in the room", false, 206)]
         public static void ReflectionMenu()
@@ -85,11 +87,20 @@ namespace HalfAware.EditorTools
                 return Vector3.Dot(a.position - b.position, player.right) < 0f ? -1 : 1;
             });
 
-            var panes = new List<TerminalReflection.Pane>();
-            for (var i = 0; i < faces.Count; i++)
+            // 顔を映すのは、下の段の真ん中（座った正面）の画面だけ。ほかの画面は黒のまま
+            var lowest = float.MaxValue;
+            foreach (var f in faces) lowest = Mathf.Min(lowest, f.position.y);
+            Transform front = null;
+            foreach (var f in faces)
             {
-                var face = faces[i];
-                var pane = new GameObject("Pane" + i).transform;
+                if (f.position.y > lowest + 0.1f) continue;
+                if (front == null || Mathf.Abs(Vector3.Dot(f.position - player.position, player.right)) < Mathf.Abs(Vector3.Dot(front.position - player.position, player.right))) front = f;
+            }
+            if (front == null) { note.AppendLine("正面の画面が無い"); return false; }
+            var panes = new List<TerminalReflection.Pane>();
+            foreach (var face in new[] { front })
+            {
+                var pane = new GameObject("Pane").transform;
                 pane.SetParent(root, false);
                 pane.gameObject.AddComponent<MeshFilter>().sharedMesh = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
                 var mr = pane.gameObject.AddComponent<MeshRenderer>();
@@ -130,25 +141,8 @@ namespace HalfAware.EditorTools
                     camera = cam,
                 });
             }
-            // 画面ごとの映す向き（仮置き。オーナーが実画面で決める）。上の段は下から見上げた顎と首の線、
-            // 下の段は正面と、左右は画面のある側からの横顔寄り
-            for (var i = 0; i < panes.Count; i++)
-            {
-                var top = faces[i].position.y > faces[faces.Count - 1].position.y + 0.1f;
-                var side = Vector3.Dot(faces[i].position - player.position, player.right);
-                if (top)
-                {
-                    panes[i].yaw = side < 0f ? -15f : 15f;
-                    panes[i].pitch = -22f;
-                }
-                else
-                {
-                    panes[i].yaw = Mathf.Abs(side) < 0.2f ? 0f : side < 0f ? -38f : 38f;
-                    panes[i].pitch = 0f;
-                }
-            }
-
-            // 頭の写し。体の頭の面だけを描く（HeadShadow と同じ素材の並びで、影は落とさない）
+            // 頭の写し。体の頭の面だけを描く（HeadShadow と同じ素材の並びで、影は落とさない）。
+            // 髪はこの写しに限り、耳の上から後ろへなでつけて結んだ形にする（ボブの長さを映り込みで見せない）
             var shadow = her.transform.Find("HeadShadow");
             var bodySkin = SkinPoint.BodyOf(her.transform);
             if (shadow == null || bodySkin == null) { note.AppendLine("頭の影（HeadShadow）か体の肌が無い"); return false; }
@@ -156,7 +150,8 @@ namespace HalfAware.EditorTools
             var headGo = new GameObject("HeadMirror");
             headGo.transform.SetParent(root, false);
             var head = headGo.AddComponent<SkinnedMeshRenderer>();
-            head.sharedMesh = bodySkin.sharedMesh;
+            head.sharedMesh = SlickedHair(shadowSkin.sharedMaterials, note);
+            if (head.sharedMesh == null) return false;
             head.bones = bodySkin.bones;
             head.rootBone = bodySkin.rootBone;
             head.localBounds = bodySkin.localBounds;
@@ -177,7 +172,7 @@ namespace HalfAware.EditorTools
             // 口元の灯り: 画面の光のように前のやや上から、口元へ向けて狭く。唇の上と顎の先が明るく、頬へ向かって沈み、
             // 鼻の下は下を向くので暗い
             var mouth = eye + Vector3.down * 0.075f;
-            var lamp = Lamp(root, "MirrorLamp", eye + (middle - eye).normalized * 0.5f + Vector3.up * 0.05f, mouth, 13f, 2f, 1.2f, 0.9f);
+            var lamp = Lamp(root, "MirrorLamp", eye + (front.position - eye).normalized * 0.5f + Vector3.up * 0.05f, mouth, 13f, 2f, 1.2f, 0.9f);
             // 頭の後ろの壁の灯り: 頭と肩の影の形を、後ろの部屋から少し浮かせる。椅子の後ろの高い所から、後ろの壁へ広く
             var back = player.position - player.forward * 0.9f + Vector3.up * (seatEye + 0.35f);
             var wall = Lamp(root, "MirrorBackLamp", back, back - player.forward * 1f + Vector3.down * 0.4f, 110f, 60f, 3f, 0.6f);
@@ -199,6 +194,7 @@ namespace HalfAware.EditorTools
                 e.FindPropertyRelative("camera").objectReferenceValue = panes[i].camera;
                 e.FindPropertyRelative("yaw").floatValue = panes[i].yaw;
                 e.FindPropertyRelative("pitch").floatValue = panes[i].pitch;
+                e.FindPropertyRelative("bottom").floatValue = panes[i].bottom;
             }
             so.FindProperty("head").objectReferenceValue = head;
             so.FindProperty("body").objectReferenceValue = her.transform;
@@ -227,10 +223,142 @@ namespace HalfAware.EditorTools
             ss.FindProperty("chairBlocker").objectReferenceValue = blocker;
             ss.ApplyModifiedPropertiesWithoutUndo();
 
-            note.AppendFormat("モニターの映り込み: 画面 {0} 枚（{1}）、座った正面の見下ろし {2:0.0} 度",
-                faces.Count, string.Join("・", faces.ConvertAll(f => f.parent != null ? f.parent.name : f.name)),
-                ss.FindProperty("seatPitch").floatValue).AppendLine();
+            note.AppendFormat("モニターの映り込み: 正面の画面（{0}）だけ、座った正面の見下ろし {1:0.0} 度",
+                front.parent != null ? front.parent.name : front.name, ss.FindProperty("seatPitch").floatValue).AppendLine();
             return true;
+        }
+
+        /// <summary>映り込みの頭の写しの髪の、なでつけた形の mesh</summary>
+        public const string MirrorHeadMesh = "Assets/Models/generated/HeadMirror_Protagonist.asset";
+        /// <summary>目の高さからこの下がり（m）より下の髪を、後ろで結んだ所へ寄せる。上ほど元の形に残す</summary>
+        static readonly Vector2 SlickBand = new Vector2(0.0f, 0.03f);
+        /// <summary>頭皮から髪の外側までの厚み（m）。耳より上の髪は、この厚みまで頭に沿わせる</summary>
+        const float SlickThick = 0.006f;
+        /// <summary>頭の後ろで髪を結んだ所の、頭の真ん中からの離れ（後ろへ、下へ。m）と、そこへ寄せる髪の縮め方</summary>
+        static readonly Vector2 TieOffset = new Vector2(0.085f, 0.03f);
+        const float TieGather = 0.12f;
+        /// <summary>頭の絵のこの明るさより暗い所を髪とみなす。目尻からこの横の離れ（m）より外か、目からこの奥（m）より後ろの点だけ</summary>
+        const float SlickDark = 0.2f;
+        const float SlickSide = 0.045f;
+        const float SlickBack = 0.04f;
+
+        /// <summary>
+        /// 主人公の体の mesh の写しで、髪だけを耳の上から後ろへなでつけて結んだ形にした物（映り込みの頭の写しに使う）。
+        /// 主人公を一人、元の姿勢で組んで測る。目の高さより下の髪（耳にかかる所と顎の横に下がる房）は頭の後ろの結び目へ寄せ、
+        /// 耳より上の髪は頭の丸みに沿わせて薄くする。骨と束ねた姿勢は元の mesh のまま（場面の主人公の骨でそのまま動く）。
+        /// headMaterials は頭の影と同じ素材の並び（髪の面の組は名前に Hair を含む素材）
+        /// </summary>
+        static Mesh SlickedHair(Material[] headMaterials, StringBuilder note)
+        {
+            var hairSub = -1;
+            for (var i = 0; i < headMaterials.Length; i++)
+                if (headMaterials[i] != null && headMaterials[i].name.Contains("Hair")) hairSub = i;
+            var headSub = -1;
+            for (var i = 0; i < headMaterials.Length; i++)
+                if (headMaterials[i] != null && i != hairSub && headMaterials[i].shader != null && headMaterials[i].shader.name != "HalfAware/Hidden") headSub = i;
+            if (hairSub < 0 || headSub < 0) { note.AppendLine("頭の写しの髪か頭の面の組が見つからない"); return null; }
+            var probe = Rocketbox.BuildRocketboxProtagonist.Build(null, false);
+            try
+            {
+                var an = probe.GetComponent<Animator>();
+                var skin = SkinPoint.BodyOf(probe.transform);
+                var source = skin.sharedMesh;
+                var baked = new Mesh();
+                skin.BakeMesh(baked, true);
+                var world = baked.vertices;
+                Object.DestroyImmediate(baked);
+                for (var i = 0; i < world.Length; i++) world[i] = skin.transform.TransformPoint(world[i]);
+                var eyes = BodyPoser.Eyes(an);
+                var up = Vector3.up;
+                var forward = Vector3.ProjectOnPlane(probe.transform.forward, up).normalized;
+                // 頭の真ん中は目の 7 cm 奥、2 cm 上。頭皮の半径は、目より上の頭の面の点までの離れの中ほど
+                var centre = eyes - forward * 0.07f + up * 0.02f;
+                var radii = new List<float>();
+                foreach (var i in source.GetTriangles(headSub))
+                    if (Vector3.Dot(world[i] - eyes, up) > 0.01f) radii.Add((world[i] - centre).magnitude);
+                radii.Sort();
+                var skull = radii.Count > 0 ? radii[radii.Count / 2] : 0.085f;
+                var tie = centre - forward * TieOffset.x - up * TieOffset.y;
+
+                var hair = new HashSet<int>(source.GetTriangles(hairSub));
+                // 頭の面にも髪の殻（ボブのかたまり）がある。頭の絵で暗い所（黒い髪）の点を髪とみなす。
+                // 顔の真ん中（鼻の穴、唇、ほくろ）は拾わないよう、目尻より外か、目より奥の点だけ
+                var texture = headMaterials[headSub].mainTexture;
+                var right = Vector3.Cross(up, forward);
+                if (texture != null)
+                {
+                    var png = new Texture2D(2, 2);
+                    png.LoadImage(System.IO.File.ReadAllBytes(AssetDatabase.GetAssetPath(texture)));
+                    var uv = source.uv;
+                    foreach (var i in source.GetTriangles(headSub))
+                    {
+                        var d = world[i] - eyes;
+                        if (Mathf.Abs(Vector3.Dot(d, right)) < SlickSide && Vector3.Dot(d, forward) > -SlickBack) continue;
+                        var c = png.GetPixelBilinear(uv[i].x, uv[i].y);
+                        if (c.r * 0.299f + c.g * 0.587f + c.b * 0.114f < SlickDark) hair.Add(i);
+                    }
+                    Object.DestroyImmediate(png);
+                }
+                var moved = (Vector3[])world.Clone();
+                foreach (var i in hair)
+                {
+                    var p = world[i];
+                    var rel = p - centre;
+                    var r = rel.magnitude;
+                    // 頭に沿わせる（外へ膨らんだ所を、頭皮から SlickThick の所まで寄せる）
+                    var hug = r > skull + SlickThick ? centre + rel / r * (skull + SlickThick + (r - skull - SlickThick) * 0.3f) : p;
+                    // 目の高さより下は、後ろの結び目へ寄せる
+                    var below = -Vector3.Dot(p - eyes, up);
+                    var k = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(SlickBand.x, SlickBand.y, below));
+                    moved[i] = Vector3.Lerp(hug, tie + (p - tie) * TieGather, k);
+                }
+
+                // 束ねた姿勢へ戻す（頂点ごとの、今の骨の混ぜ方の逆）
+                var verts = source.vertices;
+                var weights = source.boneWeights;
+                var binds = source.bindposes;
+                var bones = skin.bones;
+                foreach (var i in hair)
+                {
+                    var w = weights[i];
+                    var m = new Matrix4x4();
+                    System.Action<int, float> add = (b, k) =>
+                    {
+                        if (k <= 0f) return;
+                        var bm = bones[b].localToWorldMatrix * binds[b];
+                        for (var e = 0; e < 16; e++) m[e] += bm[e] * k;
+                    };
+                    add(w.boneIndex0, w.weight0);
+                    add(w.boneIndex1, w.weight1);
+                    add(w.boneIndex2, w.weight2);
+                    add(w.boneIndex3, w.weight3);
+                    verts[i] = m.inverse.MultiplyPoint3x4(moved[i]);
+                }
+                var mesh = Object.Instantiate(source);
+                mesh.name = "HeadMirror_Protagonist";
+                mesh.vertices = verts;
+                mesh.RecalculateNormals();
+                mesh.RecalculateBounds();
+                var existing = AssetDatabase.LoadAssetAtPath<Mesh>(MirrorHeadMesh);
+                if (existing != null)
+                {
+                    // 在れば頂点と法線だけ入れ替える（場面からの参照を切らず、描く側の中身も入れ替わる）
+                    existing.vertices = mesh.vertices;
+                    existing.normals = mesh.normals;
+                    existing.RecalculateBounds();
+                    Object.DestroyImmediate(mesh);
+                    mesh = existing;
+                    EditorUtility.SetDirty(mesh);
+                }
+                else AssetDatabase.CreateAsset(mesh, MirrorHeadMesh);
+                AssetDatabase.SaveAssets();
+                note.AppendFormat("映り込みの頭の写しの髪: {0} 点を、耳の上から後ろへなでつけた（頭皮の半径 {1:0.000} m）", hair.Count, skull).AppendLine();
+                return mesh;
+            }
+            finally
+            {
+                Object.DestroyImmediate(probe);
+            }
         }
 
         /// <summary>映り込みのカメラが撮る間だけ点く灯り（影は落とさない）。at から look へ向けたスポット</summary>
@@ -264,7 +392,10 @@ namespace HalfAware.EditorTools
             m.shader = shader;
             m.SetFloat("_Strength", ReflectionStrength);
             m.SetFloat("_Compress", 1.5f);
+            m.SetFloat("_Saturation", ReflectionSaturation);
             m.SetVector("_Edge", new Vector4(0.06f, 0.10f, 0f, 0f));
+            m.SetVector("_Focus", new Vector4(0.5f, 0.72f, 0.5f, 0.55f));
+            m.SetFloat("_FocusFloor", 0.22f);
             m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
             EditorUtility.SetDirty(m);
             AssetDatabase.SaveAssets();
