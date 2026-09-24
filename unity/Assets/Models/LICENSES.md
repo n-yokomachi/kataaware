@@ -80,10 +80,11 @@ Beach・Farmer はこの街に合わないので入れていない。
 
 ## Microsoft Rocketbox について
 
-主人公と片割れの顔と主人公の体は、Microsoft Rocketbox Avatar Library の `Female_Adult_14`（一覧の番号で「女大 14」）から、髪は `Female_Adult_08`（女大 08）から作った。片割れの体は `Female_Adult_11`（女大 11）の体を、膝から下は `Female_Party_02`（一覧の女大 19）の素足とサンダルを借りた。候補として `Female_Adult_03`（女大 03）と `Female_Adult_02`（女大 02）の体も入れてある（体だけを借りる人は、頭のテクスチャを落としていない）。主人公の候補として `Sports_Female_02`（スポーツ 02）の体と顔も入れてある。今の主人公は、女大 14 の顔と髪を `Sports_Female_02` の体に載せた人（`Face14_Hair14_BodySports02`）で、片割れは女大 14 の顔と髪と体（`Face14_Hair14_Twin`、模型ごと裏返す）。
-
-- 出どころ: https://github.com/microsoft/Microsoft-Rocketbox の `Assets/Avatars/Adults/Female_Adult_14/`、`Assets/Avatars/Adults/Female_Adult_08/`、`Assets/Avatars/Adults/Female_Adult_03/`、`Assets/Avatars/Adults/Female_Adult_02/`、`Assets/Avatars/Adults/Female_Adult_11/`、`Assets/Avatars/Adults/Female_Party_02/`（ここまで 2026-09-23 に落とした）、`Assets/Avatars/Adults/Sports_Female_02/`、`Assets/Avatars/Adults/Female_Adult_10/`、`Assets/Avatars/Adults/Female_Party_01/`（2026-09-24 に落とした）
-- 許諾: MIT License（同じリポジトリの `LICENSE.md`）。配るものには下の著作権の表示と許諾の文を添える
+- 出どころ: https://github.com/microsoft/Microsoft-Rocketbox の `Assets/Avatars/Adults/` の下の人ごとのフォルダ
+  - 2026-09-23 に落とした: `Female_Adult_14`、`Female_Adult_08`、`Female_Adult_03`、`Female_Adult_02`、`Female_Adult_11`、`Female_Party_02`
+  - 2026-09-24 に落とした: `Sports_Female_02`、`Female_Adult_10`、`Female_Party_01`
+  - 2026-09-25 に落とした（場面 2 のモブの試し、未取り込み）: `Female_Adult_04`、`Male_Adult_04`、`Male_Adult_17`、`Female_Adult_01`、`Male_Adult_20`、`Male_Adult_03`。FBX と色のテクスチャ（頭・体・透け。男大 17 と男大 20 は透けが無い）が `unity/RawAssets/rocketbox/` にあるだけで、`Assets` にもリポジトリにも入れていない（`docs/superpowers/specs/2026-09-25-alley-mob-design.md` の 6 節）
+- ライセンス: MIT License（同じリポジトリの `LICENSE.md`）。配るものには下の著作権の表示とライセンスの文を添える（`docs/release/THIRD_PARTY_NOTICES.txt` に入れてある）
 
 ```
 MIT License
@@ -109,7 +110,47 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-落とした元のファイルは `unity/RawAssets/rocketbox/`（人ごとのフォルダ）に置き、リポジトリに入れていない（`Assets` の外で、`unity/.gitignore` で外してある）。
+人の呼び名は Rocketbox の一覧の番号で、`Female_Adult_14` が「女大 14」、`Female_Party_01` が「女大 18」、`Female_Party_02` が「女大 19」、`Sports_Female_02` が「スポーツ 02」。人と組み合わせの定義は `Assets/Editor/Rocketbox/RocketboxPerson.cs`。置き場はどれも `Assets/Models/rocketbox/` の下。
+
+### 今使っている物
+
+主人公と片割れの二人（`docs/superpowers/specs/2026-09-23-protagonist-model.md` の 1 節）。
+
+| 人 | 置き場 | 元の人 | 作り |
+|---|---|---|---|
+| 主人公 | `Face14_Hair14_BodySports02/` | 女大 14、スポーツ 02 | 女大 14 の頭（黒髪）をスポーツ 02 の体に載せた。服はスポーツ 02 の元のまま（灰のタンクトップ、紺のカーゴパンツ、白いスニーカー、腕時計）。胸元はスポーツ 02 の頭の面から作る。華奢は上半身だけ |
+| 片割れ | `Face14_Hair14_MadeDress/` | 女大 14、女大 18、女大 19 | 女大 14 の頭（元の茶髪）に、一から作った白いロングワンピースを着せた。骨と、袖口より先の腕と手は女大 18、膝から下は女大 19 の素足とサンダル。華奢は全身。模型ごと裏返して主人公の鏡像にする |
+
+- 置き場の中身: `*_mesh.asset` は組み合わせたメッシュ、`*_nose_mesh.asset` は鼻を低く細くした写し、`*_avatar.asset`（主人公だけ）は華奢に合わせて骨を動かした Humanoid の骨組み、`Painted/` は縮めた写しに組み立ての手順（`Assets/Editor/Rocketbox/RocketboxPaint.cs`）で手を入れたテクスチャとマテリアル
+- 主人公の `Painted/`: 髪を黒に、口元に黒子、顔に控えめな手入れ（鼻のまわりの陰影を和らげる）。腕と胸元の肌を頭の肌に揃え、胸元に銀のネックレスを描いた（`Chest.png` はスポーツ 02 の頭のテクスチャの写し）
+- 片割れの `Painted/`: 髪は女大 14 の元の茶のまま。黒子と顔の手入れは主人公と同じ（裏返すので左右が入れ替わる）。女大 18 の腕と女大 19 の脚の肌を頭の肌に揃え、サンダルを茶に塗った。`Dress.png` はワンピースの絵
+- ワンピース（`Assets/Editor/Rocketbox/RocketboxDress.cs`）、片割れの麦わら帽子（`RocketboxHat.cs`）、主人公のジャケットは、Rocketbox の素材を使わずにコードで一から作った物（本作の一部）
+
+### 候補として残している物
+
+撮り比べた人。場面には置いていない。候補だけが使う元の人は、女大 08（髪）、女大 03・02・11（体）、女大 10（長衣の下半分）。
+
+| 置き場 | 作り |
+|---|---|
+| `Female_Adult_14/Painted/`、`Female_Adult_08/Painted/` | 一人のまま手を入れた物（髪を黒に、黒子、顔の手入れ。女大 14 はカーディガンも黒に） |
+| `Face14_Hair14/` | 女大 14 の顔と髪と体。服は前の主人公の物（カーディガンと靴を黒、中は白いシャツ） |
+| `Face14_Hair14_BodySports02_Slim/` | 主人公と同じ組み合わせで、華奢を脚まで掛けた人 |
+| `Face14_Hair14_Twin/` | 前の片割れ（女大 14 の顔と髪と体を裏返した人、茶髪）。今の定義からは作り直されない |
+| `Face14_Hair14_Body18_Robe10/` | 女大 14 の顔と髪に女大 18 の上半身、腰から下は女大 10 の長衣の下半分。生成りに塗る |
+| `Face14_Hair08/` | 女大 14 の顔と体に女大 08 の髪。前の主人公 |
+| `Face14_Hair08_Body03/` | 女大 14 の顔と女大 08 の髪を女大 03 の体に。トップスとパンツを白に |
+| `Face14_Hair08_Body02/` | 同じく女大 02 の体に。スカートをベージュに |
+| `Face14_Hair08_Body11/` | 同じく女大 11 の体に。ワンピースを生成りに |
+| `Face14_Hair08_Body11_Legs22/` | 上の人の膝から下を女大 19 の素足とサンダルに。前の片割れ |
+| `Face14_Hair08_BodySports02/` | 女大 14 の顔と女大 08 の髪をスポーツ 02 の体に |
+| `FaceSports02_Hair08/` | スポーツ 02 の顔と体に女大 08 の髪 |
+| `FaceSports02_Hair08_Body14/` | スポーツ 02 の顔と女大 08 の髪を女大 14 の体に |
+| `FaceSports02_Hair14/` | スポーツ 02 の顔に女大 14 の髪をかつらとして合わせ、体は女大 14 |
+| `Head08_Body14/` | 女大 08 の頭を女大 14 の体に |
+
+### 元のファイルとリポジトリに入れた物
+
+落とした元のファイルは `unity/RawAssets/rocketbox/`（人ごとのフォルダ）に置き、リポジトリに入れていない（`Assets` の外で、`unity/.gitignore` で外してある）。表は取り込んだ 9 人の分。
 
 | 元のファイル | リポジトリに入れた物 |
 |---|---|
@@ -144,6 +185,5 @@ SOFTWARE.
 | `f010_opacity_color.tga`（2048） | `rocketbox/Female_Party_01/f010_opacity_color.png`（512 に縮めた写し） |
 
 - 縮めた写しは `Assets/Editor/Rocketbox/RocketboxTextures.cs`（メニューの HalfAware/Rocketbox/Shrink the textures。人は `RocketboxPerson.cs` に並べてある）で、元の TGA から作り直せる。線形の光で 4×4 を平均し、透けのある絵は α で重みを付けた
-- 人ごとの `Painted/` は、縮めた写しに組み立ての手順（`Assets/Editor/Rocketbox/RocketboxPaint.cs`）で手を入れた物。髪を黒に、目の下に黒子、顔に控えめな手入れ。女大 14 はカーディガンも黒にした。女大 08 の服と、どちらの目も元の色のまま。片割れの候補の女大 03（`Face14_Hair08_Body03/Painted/`）はキャミソールとパンツを白に、女大 02（`Face14_Hair08_Body02/Painted/`）はスカートをベージュにした。片割れ（`Face14_Hair08_Body11_Legs22/Painted/`）は女大 11 のワンピースを生成りにし、女大 19 の脚の肌を頭の肌に揃えた。主人公の候補のスポーツ 02 の体（`Face14_Hair08_BodySports02/Painted/`）は服を元の色のまま、腕と胸元の肌を女大 14 の頭の肌に揃えた（胸元はスポーツ 02 の頭のテクスチャの写し）。スポーツ 02 の顔（`FaceSports02_Hair08/Painted/`、`FaceSports02_Hair08_Body14/Painted/`）は顔に手を入れず、髪を黒に、黒子だけを描いた。主人公（`Face14_Hair14_BodySports02/Painted/`）は服を元の色のまま、腕と胸元の肌を頭の肌に揃え、鼻のまわりの陰影を和らげ、胸元に銀のネックレスを描いた。片割れ（`Face14_Hair14_Twin/Painted/`）の髪は女大 14 の元の色のまま
 - 法線と光沢のテクスチャ、付いてくる動き（3ds Max の形式で Unity では読めない）は落としていない
 - 取り込みの設定は `Assets/Editor/Rocketbox/RocketboxImport.cs` が `Assets/Models/rocketbox/` の下にだけ掛ける。Rocketbox に同梱の `FixRocketboxMaxImport.cs` はプロジェクトの全部の取り込みに掛かり、Quaternius の模型を取り込むたびに例外を出すので入れていない
