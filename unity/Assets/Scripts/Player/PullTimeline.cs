@@ -89,6 +89,16 @@ namespace HalfAware
             return Swell(t, PlaceAt, PlaceSeconds);
         }
 
+        /// <summary>
+        /// 置いて離した手を、ジャックの尻の側へ抜く強さ。手を戻す間の初めの 2 割 5 分で抜ききる。
+        /// 抜ききるまでは手の向きを変えない（開いた指が置いたジャックを横切らない）
+        /// </summary>
+        public static float Release(float t)
+        {
+            if (t <= LetGoAt) return 0f;
+            return Mathf.SmoothStep(0f, 1f, (t - LetGoAt) / (ReturnSeconds * 0.25f));
+        }
+
         /// <summary>左手がジャックを掴んでいる間。ここでジャックは左手に付いて動く</summary>
         public static bool Held(float t)
         {

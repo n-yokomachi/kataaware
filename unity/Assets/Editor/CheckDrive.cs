@@ -627,7 +627,7 @@ namespace HalfAware.EditorTools
                     var body = Quaternion.Euler(0f, yaw, 0f);
                     // 目は顔にあるので体より前に出る。PlayerController が毎フレーム置き直す位置
                     var eye = at + body * new Vector3(0f, PlayerController.StandingEyeHeight, BuildDrive.EyeLead);
-                    for (var tip = -PlayerController.PitchLimit; tip <= PlayerController.PitchLimit; tip += 20f)
+                    for (var tip = -PlayerController.PitchUpLimit; tip <= PlayerController.PitchDownLimit; tip += 20f)
                     {
                         var look = Quaternion.Euler(tip, yaw, 0f) * Vector3.forward;
                         var hit = InteractionPicker.Select(eye, look, all, done);

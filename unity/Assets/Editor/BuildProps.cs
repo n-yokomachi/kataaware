@@ -223,7 +223,7 @@ namespace HalfAware.EditorTools
             parts.Add(ProcMesh.Loft(new List<ProcMesh.Ring>
             {
                 new ProcMesh.Ring(new Vector3(0f, 0f, -0.002f), 0.0115f, 0.0115f),
-                new ProcMesh.Ring(new Vector3(0f, 0f, 0.0035f), 0.0118f, 0.0118f),
+                new ProcMesh.Ring(new Vector3(0f, 0f, 0.0035f), JackWasherRadius, JackWasherRadius),
                 new ProcMesh.Ring(new Vector3(0f, 0f, 0.0050f), 0.0092f, 0.0092f),
             }, 10));
             parts.Add(ProcMesh.Loft(new List<ProcMesh.Ring>
@@ -475,14 +475,20 @@ namespace HalfAware.EditorTools
         /// <summary>ケーブルが両端から軸に沿ってまっすぐ出る長さ（m）</summary>
         public const float CableStiffness = 0.05f;
 
+        /// <summary>座金（ジャックのいちばん太い所）の半径（m）。寝かせて置くときの軸の高さ</summary>
+        public const float JackWasherRadius = 0.0118f;
+
+        /// <summary>置き場に寝かせたジャックの軸（尻の向き）。椅子から見た向き。体の左後ろ</summary>
+        public static readonly Vector3 RestAxis = new Vector3(-0.71f, 0f, -0.71f).normalized;
+
         /// <summary>
-        /// 抜いた後にジャックを置く場所。右の肘掛けの上の、内の縁の後ろ寄り（右の肘より 10 cm 後ろ）に、座金を下にして立てる。
-        /// ケーブルは尻から上へ出て、差込口へ弧を描く。
+        /// 抜いた後にジャックを置く場所。右の肘掛けの上の、内の縁の後ろ寄り（右の肘より 10 cm 後ろ）に、横に寝かせて置く（<see cref="RestAxis"/>）。
+        /// ケーブルは尻から出て、差込口へ弧を描く。
         ///
         /// **左手が届く所に置く。** 左の肩から右の肘掛けの真ん中の差込口の脇までは 0.60 m あり、腕（0.49 m）と指先までの 12 cm を足しても
-        /// 手の向きによっては届かない。内の縁の後ろ寄りなら 0.58 m で、指先を肩から置き場への向きに揃えれば上体を寄せずに届く。
-        /// reachFrom（座った形の左の肩）を渡すと、指先（ジャックの上 +Y）を、そこから置き場への向き（水平に均した向き）に揃える。
-        /// 座面の縁（腿と肘掛けの間）は、肩から下へ遠く（0.64 m）、上体を寄せても届かなかった
+        /// 手の向きによっては届かない。内の縁の後ろ寄りなら 0.58 m で届く。
+        /// 座面の縁（腿と肘掛けの間）は、肩から下へ遠く（0.64 m）、上体を寄せても届かなかった。
+        /// reachFrom は使わなくなった（立てて置いていた頃に、指先の向きを揃えるのに使った）
         /// </summary>
         public static Transform JackRest(Transform chair, Vector3? reachFrom = null)
         {
@@ -492,12 +498,13 @@ namespace HalfAware.EditorTools
                 rest = new GameObject("JackRest").transform;
                 rest.SetParent(chair, false);
             }
-            // 座金の下の面（根元から 2 mm 下）を肘掛けの上面（0.676）に載せる
-            rest.localPosition = new Vector3(0.255f, 0.678f, -0.07f);
-            var forward = chair.up;
-            var reach = reachFrom.HasValue ? chair.TransformPoint(rest.localPosition) - reachFrom.Value : chair.right;
-            var up = Vector3.ProjectOnPlane(reach, forward).normalized;
-            rest.rotation = Quaternion.LookRotation(forward, up);
+            // 肘掛けの上面（0.676）に横に寝かせて置く。軸の高さは座金の半径（11.8 mm）だけ上。
+            // 尻（ケーブルの出る側）は体の左後ろへ向ける。
+            // **立てて置かない。** 立てると、置く左手は手のひらを真下へ向けて体の右後ろへ回り込むことになり、
+            // 手のひらのひねりが 180 度近く、手首の曲げが 140 度になって腕が極端に細く見えた。
+            // 寝かせると、左手は手のひらを右へ向けた楽な形（ひねり 50 度、曲げ 40 度ほど）で置ける
+            rest.localPosition = new Vector3(0.255f, 0.676f + JackWasherRadius, -0.07f);
+            rest.localRotation = Quaternion.LookRotation(RestAxis, Vector3.up);
             rest.localScale = Vector3.one;
             return rest;
         }

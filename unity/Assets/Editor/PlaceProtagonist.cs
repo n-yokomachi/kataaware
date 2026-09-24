@@ -188,11 +188,21 @@ namespace HalfAware.EditorTools
             WriteBones(pinchProp.FindProperty("open"), open);
             pinchProp.ApplyModifiedPropertiesWithoutUndo();
 
+            // 掴む手の角。左腕が人の腕の範囲に収まる角を、流れを通して試して選ぶ
+            pose.Bind();
+            JackHoldRoll.ForPull(pull, note);
+
             // 保存する姿は座った形（場面 1 は座って始まる）
             pose.Bind();
             pose.Apply();
             return true;
         }
+
+        /// <summary>右の手首を目の前へ出したとき、手のひらを目へ向けきらずに戻す角（度、前腕の軸まわり）</summary>
+        public const float LookTurnBack = 20f;
+
+        /// <summary>見せるときのジャックの軸（尻の向き）。体の根から見た向き</summary>
+        public static readonly Vector3 ShowAxis = new Vector3(-0.87f, 0.5f, 0f).normalized;
 
         /// <summary>抜くしぐさの狙い（体の根から見た値）</summary>
         public struct Aims
@@ -204,13 +214,12 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// 抜くしぐさの狙いを、座った形の体と椅子から決める。
         /// - 右の手首: 胸の前、目から 40 cm ほど下の前へ持ち上げ、手のひら（ジャック）を目へ向ける
-        /// - 見せる所: 目の前 35 cm ほど、少し左下。ジャックの向き（ケーブルの出る向き）は差込口へ向けて、ケーブルを張らせる
+        /// - 見せる所: 目の前 35 cm ほど、少し左下。ジャックの尻（ケーブルの出る側）は体の左上へ向け、先で差込口の側を指す（<see cref="ShowAxis"/>）
         /// - 肘: 右は外へ、左は下へ逃がす
         /// </summary>
         public static Aims PullAims(Animator an, Transform body, Transform chair, Vector3 eye)
         {
             System.Func<float, float, float, Vector3> P = (x, y, z) => chair.TransformPoint(new Vector3(x, y, z));
-            var port = chair.Find("PortHole");
             var a = new Aims();
             var lookWrist = P(0.08f, 0.98f, 0.38f);
             a.lookWrist = body.InverseTransformPoint(lookWrist);
@@ -218,14 +227,22 @@ namespace HalfAware.EditorTools
             var keep = BodyPoser.Capture(an);
             var rightPole = P(0.45f, 0.75f, -0.13f);
             BodyPoser.Arm(an, false, lookWrist, rightPole, chair.TransformDirection(new Vector3(-0.45f, 0.25f, 1f)), eye - lookWrist);
-            a.lookHand = Quaternion.Inverse(body.rotation) * an.GetBoneTransform(HumanBodyBones.RightHand).rotation;
+            // 手のひらを目へ向けきらず、前腕の軸まわりに 20 度戻す。向けきると、ジャックを掴みに来た左の人差し指が
+            // 右の手のひらの付け根に触れた（左手を楽な角で掴ませたとき）
+            var handR = an.GetBoneTransform(HumanBodyBones.RightHand);
+            var lowerR = an.GetBoneTransform(HumanBodyBones.RightLowerArm);
+            handR.rotation = Quaternion.AngleAxis(LookTurnBack, (handR.position - lowerR.position).normalized) * handR.rotation;
+            a.lookHand = Quaternion.Inverse(body.rotation) * handR.rotation;
             Restore(an, keep);
             a.rightPole = body.InverseTransformPoint(rightPole);
             a.leftPole = body.InverseTransformPoint(P(-0.40f, 0.70f, -0.08f));
             var show = P(-0.14f, 1.06f, 0.48f);
             a.showAt = body.InverseTransformPoint(show);
-            var toPort = port != null ? (port.position - show).normalized : -chair.up;
-            a.showRotation = Quaternion.Inverse(body.rotation) * Quaternion.LookRotation(toPort, chair.forward);
+            // 見せるときのジャックの尻（ケーブルの出る側）は、体の左上へ向ける。先は右下（差込口の側）を指す。
+            // 前は尻を差込口へ向けていたが、つまむ手のひらはジャックの先の側を向くので、左手が手首を 120 度も
+            // 反らして手のひらを差込口の逆へ向けることになり、手首の肌が潰れて腕が極端に細く見えた。
+            // 左上へ向けると、左手は手のひらを右下へ向けた楽な形（手のひらのひねり 50 度、手首の曲げ 50 度まで）で持てる
+            a.showRotation = Quaternion.LookRotation(ShowAxis, Vector3.up);
             return a;
         }
 

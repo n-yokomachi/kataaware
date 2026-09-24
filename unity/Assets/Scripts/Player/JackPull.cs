@@ -57,7 +57,23 @@ namespace HalfAware
         [SerializeField] SeatedPose.Bone[] open = new SeatedPose.Bone[0];
         [Tooltip("掴む前に、開いた手をジャックの尻の側（軸の向き）へ浮かせておく距離（m）。そこから軸に沿って下ろしてジャックを指の間に入れ、指を閉じる")]
         [SerializeField] float approach = 0.06f;
+        [Tooltip("掴む手を、ジャックの軸まわりに回しておく角（度）。ジャックは丸いので、どの角で掴んでも見た目は変わらない。" +
+            "左腕のひねりと手首の曲げが人の腕の範囲に収まる角を、組み立てが流れを通して試して選ぶ")]
+        [SerializeField] float holdRoll;
+        [Tooltip("見せる所での、掴む手の軸まわりの角（度）。掴んでから見せる所へ運ぶ間に holdRoll から移す。" +
+            "指の間でジャックを転がすのと同じで、ジャックは丸いので見た目は変わらない")]
+        [SerializeField] float showRoll;
+        [Tooltip("置き場での、掴む手の軸まわりの角（度）。置き場へ運ぶ間に showRoll から移す")]
+        [SerializeField] float placeRoll;
 
+        [Header("腕のひねり")]
+        [Tooltip("手のひらのひねりのうち、前腕の骨（肘の所）へ移す割合。残りは手首に残る。" +
+            "この体には前腕のひねりの骨が無いので、手の骨だけをひねると手首の肌が絞られて細く潰れる。半分ずつ持たせると、肘と手首の潰れがどちらも目に付かない")]
+        [Range(0f, 1f)]
+        [SerializeField] float twistShare = ArmReach.TwistShare;
+
+        [Tooltip("置いて離した後、開いた指をジャックの尻の側（軸の向き）へ抜く距離（m）。抜いてから手を戻す")]
+        [SerializeField] float releaseLift = 0.05f;
         [Tooltip("置き場へ下ろす前に、いったん運ぶ高さ（置き場の真上 m）。上げたままの右腕の下を通す")]
         [SerializeField] float placeLift = 0.10f;
         [Tooltip("そのとき置き場より後ろへ寄せる距離（m）")]
@@ -68,11 +84,13 @@ namespace HalfAware
         [SerializeField] Vector3 placeLean = new Vector3(0f, 6f, 10f);
 
         Transform upperR, lowerR, handR, upperL, lowerL, handL;
+        ArmReach.Rest restR, restL;
         Transform[] pinchBones;
         Transform[] openBones;
         Transform restParent;
         Vector3 restPosition;
         Quaternion restRotation;
+        Vector3 restScale = Vector3.one;
         float elapsed = -1f;
         float fromYaw;
         float fromPitch;
@@ -117,6 +135,9 @@ namespace HalfAware
                 upperL = an.GetBoneTransform(HumanBodyBones.LeftUpperArm);
                 lowerL = an.GetBoneTransform(HumanBodyBones.LeftLowerArm);
                 handL = an.GetBoneTransform(HumanBodyBones.LeftHand);
+                var skin = an.GetComponentInChildren<SkinnedMeshRenderer>();
+                restR = ArmReach.RestOf(skin, upperR, lowerR, handR);
+                restL = ArmReach.RestOf(skin, upperL, lowerL, handL);
                 pinchBones = new Transform[pinch.Length];
                 for (var i = 0; i < pinch.Length; i++) pinchBones[i] = an.GetBoneTransform(pinch[i].bone);
                 openBones = new Transform[open.Length];
@@ -127,6 +148,7 @@ namespace HalfAware
                 restParent = jack.parent;
                 restPosition = jack.localPosition;
                 restRotation = jack.localRotation;
+                restScale = jack.localScale;
             }
         }
 
@@ -185,11 +207,73 @@ namespace HalfAware
             Vector3 gp, hp;
             Quaternion gr, hr;
             Target(PullTimeline.LetGo(t) ? PullTimeline.LetGoAt - 1e-4f : t, out gp, out gr);
-            ArmReach.HandFor(gp, gr, HoldLocal(), HoldRotation(), out hp, out hr);
+            // 離した後は、まず開いた指をジャックの尻の側へ抜いてから戻る
+            if (PullTimeline.LetGo(t)) gp += gr * Vector3.forward * (releaseLift * PullTimeline.Release(t));
+            ArmReach.HandFor(gp, gr * Roll(PullTimeline.LetGo(t) ? PullTimeline.LetGoAt - 1e-4f : t), HoldLocal(), HoldRotation(), out hp, out hr);
             var w = PullTimeline.Reach(t);
-            ArmReach.Move(upperL, lowerL, handL, hp, hr, body.TransformPoint(leftElbowPole), w);
+            var leftPole = body.TransformPoint(leftElbowPole);
+            float k;
+            Vector3 ap, bp;
+            Quaternion ar, br;
+            if (Carrying(t, out k, out ap, out ar, out bp, out br))
+                ArmReach.Carry(upperL, lowerL, handL, hp, ap, ar, bp, br, leftPole, k);
+            else
+                ArmReach.Move(upperL, lowerL, handL, hp, hr, leftPole, w);
             Shape(open, openBones, Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.3f, 0.8f, w)));
             Shape(pinch, pinchBones, Closing(w));
+
+            // 手のひらのひねりを前腕と手首に分ける（手の向きと位置は変えない）
+            ArmReach.Untwist(lowerR, handR, restR, twistShare);
+            ArmReach.Untwist(lowerL, handL, restL, twistShare);
+        }
+
+        /// <summary>
+        /// 掴んだジャックを運んでいる途中か。見せる所へ運ぶ間（抜けた所 → 見せる所）と、置き場へ運ぶ間（見せる所 → 置き場）。
+        /// 運んでいる間は、両端の手の置き方（手の骨の位置と向き）と、運んだ割合 k を返す
+        /// </summary>
+        bool Carrying(float t, out float k, out Vector3 positionA, out Quaternion rotationA, out Vector3 positionB, out Quaternion rotationB)
+        {
+            k = 0f;
+            positionA = positionB = Vector3.zero;
+            rotationA = rotationB = Quaternion.identity;
+            if (!held || PullTimeline.LetGo(t) || pose == null) return false;
+            var body = pose.transform;
+            var parent = restParent != null ? restParent : handR;
+            var restRot = parent.rotation * restRotation;
+            var pulled = parent.TransformPoint(restPosition) + restRot * Vector3.forward * pullDistance;
+            var show = body.TransformPoint(showAt);
+            var showRot = body.rotation * showRotation;
+            var place = PullTimeline.Place(t);
+            var s = PullTimeline.Show(t);
+            if (place > 0f && place < 1f && parked != null)
+            {
+                k = place;
+                Hand(show, showRot, showRoll, out positionA, out rotationA);
+                Hand(parked.position, parked.rotation, placeRoll, out positionB, out rotationB);
+                return true;
+            }
+            if (place <= 0f && s > 0f && s < 1f)
+            {
+                k = s;
+                Hand(pulled, restRot, holdRoll, out positionA, out rotationA);
+                Hand(show, showRot, showRoll, out positionB, out rotationB);
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>ジャックを position・rotation に、軸まわりに roll 度回して掴んでいる手の骨の位置と向き</summary>
+        void Hand(Vector3 position, Quaternion rotation, float roll, out Vector3 handPosition, out Quaternion handRotation)
+        {
+            ArmReach.HandFor(position, rotation * Quaternion.AngleAxis(roll, Vector3.forward), HoldLocal(), HoldRotation(), out handPosition, out handRotation);
+        }
+
+        /// <summary>t 秒目に、掴む手をジャックの軸まわりに回しておく回し。掴む・見せる・置くの角を、運ぶ間に移していく</summary>
+        Quaternion Roll(float t)
+        {
+            var a = Mathf.LerpAngle(holdRoll, showRoll, PullTimeline.Show(t));
+            a = Mathf.LerpAngle(a, placeRoll, PullTimeline.Place(t));
+            return Quaternion.AngleAxis(a, Vector3.forward);
         }
 
         /// <summary>指を閉じる強さ。手が掴む所に着いてから（伸ばす強さの終わりの 3 %）閉じる</summary>
@@ -275,7 +359,8 @@ namespace HalfAware
                 {
                     to.Normalize();
                     aimYaw = Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg;
-                    aimPitch = -Mathf.Asin(Mathf.Clamp(to.y, -1f, 1f)) * Mathf.Rad2Deg;
+                    // 下は向けられる限り（PlayerController.PitchDownLimit）まで。越える所は画面の下へ外れる
+                    aimPitch = PlayerController.ClampPitch(-Mathf.Asin(Mathf.Clamp(to.y, -1f, 1f)) * Mathf.Rad2Deg);
                     aimed = true;
                 }
             }
@@ -293,7 +378,8 @@ namespace HalfAware
             if (jack == null || grip == null) return;
             jack.SetParent(grip, false);
             jack.localPosition = Vector3.zero;
-            jack.localRotation = Quaternion.identity;
+            // 手は軸まわりに holdRoll だけ回して掴んでいるので、ジャックはその分を戻して置く（掴む瞬間に回らない）
+            jack.localRotation = Quaternion.Inverse(Quaternion.AngleAxis(holdRoll, Vector3.forward));
             var s = grip.lossyScale.x;
             jack.localScale = Vector3.one / (Mathf.Approximately(s, 0f) ? 1f : s);
         }
@@ -325,6 +411,19 @@ namespace HalfAware
             tookLook = false;
             var player = flow != null ? flow.Player : null;
             if (player != null) player.CanLook = true;
+        }
+
+        /// <summary>エディタで流れを頭からやり直すための戻し。ジャックを手首へ戻し、掴む・置くの印を消す。再生中は使わない</summary>
+        public void ResetForStudy()
+        {
+            held = false;
+            letGo = false;
+            sounded = false;
+            if (jack == null || restParent == null) return;
+            jack.SetParent(restParent, false);
+            jack.localPosition = restPosition;
+            jack.localRotation = restRotation;
+            jack.localScale = restScale;
         }
 
         /// <summary>エディタで一こまずつ撮るための、掴む・置くの切り替え。再生中は使わない</summary>

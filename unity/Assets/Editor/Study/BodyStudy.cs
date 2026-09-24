@@ -276,7 +276,9 @@ namespace HalfAware.EditorTools.Study
             if (cable == null) return list;
             var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
             var mf = cable.GetComponent<MeshFilter>();
-            if (mf.sharedMesh == null || mf.sharedMesh.name != "Cable") typeof(Cable).GetMethod("Awake", bf).Invoke(cable, null);
+            // 道筋の配列がまだ無い（Awake が走っていない）ときも作らせる。場面を組み直した直後は、メッシュだけが前の場面から残っている
+            var path = typeof(Cable).GetField("path", bf).GetValue(cable);
+            if (path == null || mf.sharedMesh == null || mf.sharedMesh.name != "Cable") typeof(Cable).GetMethod("Awake", bf).Invoke(cable, null);
             typeof(Cable).GetMethod("LateUpdate", bf).Invoke(cable, null);
             foreach (var v in mf.sharedMesh.vertices) list.Add(cable.transform.TransformPoint(v));
             return list;
@@ -353,7 +355,7 @@ namespace HalfAware.EditorTools.Study
                     {
                         var to = (jack.position - eye).normalized;
                         aimYaw = Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg;
-                        aimPitch = -Mathf.Asin(Mathf.Clamp(to.y, -1f, 1f)) * Mathf.Rad2Deg;
+                        aimPitch = PlayerController.ClampPitch(-Mathf.Asin(Mathf.Clamp(to.y, -1f, 1f)) * Mathf.Rad2Deg);
                     }
                     var k = PullTimeline.Aim(t);
                     cam.fieldOfView = GameObject.Find("Player/Main Camera").GetComponent<Camera>().fieldOfView;
@@ -441,7 +443,7 @@ namespace HalfAware.EditorTools.Study
                     {
                         var to = ((socket != null ? socket.position : jack.position) - eye).normalized;
                         aimYaw = Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg;
-                        aimPitch = -Mathf.Asin(Mathf.Clamp(to.y, -1f, 1f)) * Mathf.Rad2Deg;
+                        aimPitch = PlayerController.ClampPitch(-Mathf.Asin(Mathf.Clamp(to.y, -1f, 1f)) * Mathf.Rad2Deg);
                     }
                     var k = PlugTimeline.Aim(t);
                     cam.fieldOfView = main.fieldOfView;
@@ -568,6 +570,313 @@ namespace HalfAware.EditorTools.Study
                 if (new Vector2(local.x, local.y).magnitude < radius) count++;
             }
             return count;
+        }
+
+        // ---- 下を向ける限りで狙えるか ------------------------------------------------------
+
+        /// <summary>
+        /// 開いている場面の調べる対象（Interactable、伏せてある物も）ごとに、真ん中へ捉えるのに下へ何度向く要るかを測る。
+        /// 座って調べる場面は seatEye（世界の目の位置）から。立って調べる場合は、対象の届く距離の内で体が入る所
+        /// （足元の床を下へ探し、胴の太さの筒がぶつからない所。10 cm 刻み）のうち、いちばん浅く向ける所から。
+        /// 下を向ける限り（<see cref="PlayerController.PitchDownLimit"/>）で向いたとき、選ぶ錐（<see cref="InteractionPicker.MaxAngle"/>）と
+        /// 画面の下の縁（縦の画角の半分）のどこに入るかで分ける
+        /// </summary>
+        public static string Reach(Vector3? seatEye, float eyeLead)
+        {
+            var main = GameObject.Find("Player/Main Camera");
+            var half = main != null ? main.GetComponent<Camera>().fieldOfView * 0.5f : 35f;
+            var cone = InteractionPicker.MaxAngle * Mathf.Rad2Deg;
+            var limit = PlayerController.PitchDownLimit;
+            var sb = new StringBuilder();
+            sb.AppendFormat("下の限り {0:0} 度、選ぶ錐 {1:0.0} 度、画面の下の縁まで {2:0.0} 度", limit, cone, half).AppendLine();
+            Func<float, string> Grade = d =>
+                d <= limit ? "真ん中で狙える"
+                : d <= limit + Mathf.Min(half, cone) ? "選べる（画面の下寄り）"
+                : d <= limit + cone ? "選べるが画面の外"
+                : "狙えない";
+            foreach (var item in Object.FindObjectsByType<Interactable>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                var p = item.Position;
+                var line = new StringBuilder();
+                line.AppendFormat("{0}（{1}、高さ {2:0.00}）:", item.Id, item.transform.parent != null ? item.transform.parent.name : "-", p.y);
+                if (seatEye.HasValue)
+                {
+                    var e = seatEye.Value;
+                    var dist = Vector3.Distance(e, p);
+                    var d = Depression(e, p);
+                    line.AppendFormat(" 座って {0:0} 度 {1}{2}", d, Grade(d), dist > item.Radius ? "（届く距離の外）" : "");
+                }
+                float best = float.MaxValue;
+                var r = item.Radius;
+                for (var x = -r; x <= r; x += 0.1f)
+                    for (var z = -r; z <= r; z += 0.1f)
+                    {
+                        var at = new Vector3(p.x + x, p.y + 3f, p.z + z);
+                        RaycastHit hit;
+                        if (!Physics.Raycast(at, Vector3.down, out hit, 6f, ~0, QueryTriggerInteraction.Ignore)) continue;
+                        var foot = hit.point;
+                        if (Physics.CheckCapsule(foot + Vector3.up * 0.35f, foot + Vector3.up * 1.40f, 0.25f, ~0, QueryTriggerInteraction.Ignore)) continue;
+                        var flat = new Vector3(p.x - foot.x, 0f, p.z - foot.z);
+                        if (flat.sqrMagnitude < 1e-4f) continue;
+                        var eye = foot + Vector3.up * PlayerController.StandingEyeHeight + flat.normalized * eyeLead;
+                        if (Vector3.Distance(eye, p) > r) continue;
+                        best = Mathf.Min(best, Depression(eye, p));
+                    }
+                if (best < float.MaxValue && best <= 0f) line.Append(" 立って 目より上（下の限りに掛からない）");
+                else if (best < float.MaxValue) line.AppendFormat(" 立って {0:0} 度 {1}", best, Grade(best));
+                else line.Append(" 立って届く所が無い");
+                sb.AppendLine(line.ToString());
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>目から見て、点が水平から下へ何度にあるか（上なら負）</summary>
+        static float Depression(Vector3 eye, Vector3 p)
+        {
+            var d = p - eye;
+            return Mathf.Atan2(-d.y, new Vector2(d.x, d.z).magnitude) * Mathf.Rad2Deg;
+        }
+
+        // ---- 腕の太さ ----------------------------------------------------------------
+
+        /// <summary>
+        /// 前腕と手首の肌の断面の太さを、立った形に比べた割合で測る。
+        /// 立った形で、肘（前腕の骨）から手首（手の骨）への軸の上の決まった所（<see cref="Sections"/>）にある肌の頂点を選んでおき、
+        /// こまごとに今の軸から測り直す。太さは二つ: 軸から肌までの距離の平均（半径）と、断面を 10 度ごとの向きに投げた幅のいちばん狭いもの（幅）。
+        /// 手首をひねりすぎると、肌が手首で絞られて（包み紙の潰れ）どちらも細くなる。
+        /// **立った形で作ること**（<see cref="BodyPoser.Stand"/> の後）
+        /// </summary>
+        public sealed class ArmGauge
+        {
+            /// <summary>断面の場所。肘から手首までを 1 とした割合（1 を越える所は手のひらの付け根）</summary>
+            public static readonly float[] Sections = { 0.12f, 0.30f, 0.50f, 0.70f, 0.85f, 0.95f, 1.03f };
+            /// <summary>断面の厚みの半分。同じ割合で</summary>
+            const float Half = 0.035f;
+
+            readonly SkinnedMeshRenderer smr;
+            readonly Transform[] elbow = new Transform[2];
+            readonly Transform[] wrist = new Transform[2];
+            readonly Transform[] knuckle = new Transform[2];
+            readonly List<int>[,] sets = new List<int>[2, Sections.Length];
+            readonly float[,] radius0 = new float[2, Sections.Length];
+            readonly float[,] width0 = new float[2, Sections.Length];
+            readonly Mesh baked = new Mesh { hideFlags = HideFlags.HideAndDontSave };
+
+            public ArmGauge(GameObject body)
+            {
+                var an = body.GetComponent<Animator>();
+                foreach (var s in body.GetComponentsInChildren<SkinnedMeshRenderer>())
+                    if (s.shadowCastingMode != UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly) smr = s;
+                var bones = smr.bones;
+                var w = smr.sharedMesh.boneWeights;
+                var v = Bake();
+                for (var side = 0; side < 2; side++)
+                {
+                    var left = side == 0;
+                    elbow[side] = an.GetBoneTransform(left ? HumanBodyBones.LeftLowerArm : HumanBodyBones.RightLowerArm);
+                    wrist[side] = an.GetBoneTransform(left ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand);
+                    knuckle[side] = an.GetBoneTransform(left ? HumanBodyBones.LeftMiddleProximal : HumanBodyBones.RightMiddleProximal);
+                    var keep = new HashSet<Transform> { elbow[side], wrist[side] };
+                    for (var k = 0; k < Sections.Length; k++) sets[side, k] = new List<int>();
+                    for (var i = 0; i < v.Length; i++)
+                    {
+                        if (!keep.Contains(bones[w[i].boneIndex0])) continue;
+                        var t = Along(side, v[i]);
+                        for (var k = 0; k < Sections.Length; k++)
+                            if (Mathf.Abs(t - Sections[k]) <= Half) sets[side, k].Add(i);
+                    }
+                    for (var k = 0; k < Sections.Length; k++)
+                    {
+                        float r, wd;
+                        Cut(side, k, sets[side, k], v, out r, out wd);
+                        radius0[side, k] = r;
+                        width0[side, k] = wd;
+                    }
+                }
+            }
+
+            Vector3[] Bake()
+            {
+                smr.BakeMesh(baked, true);
+                var v = baked.vertices;
+                for (var i = 0; i < v.Length; i++) v[i] = smr.transform.TransformPoint(v[i]);
+                return v;
+            }
+
+            float Along(int side, Vector3 p)
+            {
+                var a = elbow[side].position;
+                var ax = wrist[side].position - a;
+                return Vector3.Dot(p - a, ax) / Mathf.Max(1e-8f, ax.sqrMagnitude);
+            }
+
+            /// <summary>断面を測る。手首より先（手のひらの付け根）は手の軸（手首から中指の付け根へ）に直交する面で、手前は前腕の軸で</summary>
+            void Cut(int side, int k, List<int> set, Vector3[] v, out float radius, out float width)
+            {
+                radius = 0f;
+                width = float.MaxValue;
+                if (set.Count == 0) { width = 0f; return; }
+                var hand = Sections[k] > 1f;
+                var a = hand ? wrist[side].position : elbow[side].position;
+                var ax = hand ? (knuckle[side].position - a).normalized : (wrist[side].position - a).normalized;
+                var u = Vector3.Cross(ax, Mathf.Abs(ax.y) < 0.9f ? Vector3.up : Vector3.right).normalized;
+                var w2 = Vector3.Cross(ax, u);
+                var perp = new List<Vector2>(set.Count);
+                foreach (var i in set)
+                {
+                    var d = Vector3.ProjectOnPlane(v[i] - a, ax);
+                    perp.Add(new Vector2(Vector3.Dot(d, u), Vector3.Dot(d, w2)));
+                }
+                // 断面の芯は頂点の真ん中（骨は肌の真ん中を通らない）
+                var c = Vector2.zero;
+                foreach (var p in perp) c += p;
+                c /= perp.Count;
+                foreach (var p in perp) radius += (p - c).magnitude;
+                radius /= perp.Count;
+                for (var deg = 0; deg < 180; deg += 10)
+                {
+                    var dir = new Vector2(Mathf.Cos(deg * Mathf.Deg2Rad), Mathf.Sin(deg * Mathf.Deg2Rad));
+                    float lo = float.MaxValue, hi = float.MinValue;
+                    foreach (var p in perp)
+                    {
+                        var x = Vector2.Dot(p, dir);
+                        lo = Mathf.Min(lo, x);
+                        hi = Mathf.Max(hi, x);
+                    }
+                    width = Mathf.Min(width, hi - lo);
+                }
+            }
+
+            /// <summary>今の姿勢の、左右それぞれの断面ごとの割合（半径、幅）。[左右, 断面]</summary>
+            public void Measure(out float[,] radius, out float[,] width)
+            {
+                radius = new float[2, Sections.Length];
+                width = new float[2, Sections.Length];
+                var v = Bake();
+                for (var side = 0; side < 2; side++)
+                    for (var k = 0; k < Sections.Length; k++)
+                    {
+                        float r, wd;
+                        Cut(side, k, sets[side, k], v, out r, out wd);
+                        radius[side, k] = radius0[side, k] > 0f ? r / radius0[side, k] : 1f;
+                        width[side, k] = width0[side, k] > 0f ? wd / width0[side, k] : 1f;
+                    }
+            }
+
+            /// <summary>いちばん細い断面を一行で（「右 0.95 半径 0.82 幅 0.71」の形）</summary>
+            public string Thinnest(out float worstRadius, out float worstWidth)
+            {
+                float[,] r, w;
+                Measure(out r, out w);
+                worstRadius = 9f;
+                worstWidth = 9f;
+                string at = "", atW = "";
+                for (var side = 0; side < 2; side++)
+                    for (var k = 0; k < Sections.Length; k++)
+                    {
+                        if (r[side, k] < worstRadius) { worstRadius = r[side, k]; at = (side == 0 ? "左 " : "右 ") + Sections[k].ToString("0.00"); }
+                        if (w[side, k] < worstWidth) { worstWidth = w[side, k]; atW = (side == 0 ? "左 " : "右 ") + Sections[k].ToString("0.00"); }
+                    }
+                return string.Format("半径 {0:0.00}（{1}）、幅 {2:0.00}（{3}）", worstRadius, at, worstWidth, atW);
+            }
+
+            public void Dispose()
+            {
+                Object.DestroyImmediate(baked);
+            }
+        }
+
+        /// <summary>
+        /// 抜く（pull）か挿す（plug）流れを t 秒ごとに止め、腕の太さを測る。shoot ならゲームの見え方と、
+        /// 右と左の前腕の寄り（確認用、大きめ）を撮る。絵の名は {tag}_{秒}.png と {tag}_{秒}_arm.png。
+        /// **ジャックの親を付け替えるので、測った後は場面を開き直して捨てること**
+        /// </summary>
+        /// <summary>0 より大きければ、<see cref="ArmFrames"/> がこまごとに手のひねりのこの割合を前腕へ移してから測る（直し方を試す用）</summary>
+        public static float TwistShare;
+
+        public static string ArmFrames(string tag, bool plug, float[] times, float startPitch, float seatEye, float eyeLead, bool shoot)
+        {
+            var player = GameObject.Find("Player");
+            var her = GameObject.Find("Player/Protagonist");
+            var an = her.GetComponent<Animator>();
+            var pose = her.GetComponent<SeatedPose>();
+            var pull = her.GetComponent<JackPull>();
+            var put = her.GetComponent<JackPlug>();
+            var jack = (Transform)new SerializedObject(plug ? (Object)put : pull).FindProperty("jack").objectReferenceValue;
+            var socket = plug ? (Transform)new SerializedObject(put).FindProperty("socket").objectReferenceValue : null;
+            foreach (var smr in her.GetComponentsInChildren<SkinnedMeshRenderer>()) smr.forceMatrixRecalculationPerRender = true;
+            BodyPoser.Stand(an);
+            var gauge = new ArmGauge(her);
+            var skin = her.GetComponentInChildren<SkinnedMeshRenderer>();
+            var lowers = new[] { an.GetBoneTransform(HumanBodyBones.LeftLowerArm), an.GetBoneTransform(HumanBodyBones.RightLowerArm) };
+            var hands = new[] { an.GetBoneTransform(HumanBodyBones.LeftHand), an.GetBoneTransform(HumanBodyBones.RightHand) };
+            var rests = new[]
+            {
+                ArmReach.RestOf(skin, an.GetBoneTransform(HumanBodyBones.LeftUpperArm), lowers[0], hands[0]),
+                ArmReach.RestOf(skin, an.GetBoneTransform(HumanBodyBones.RightUpperArm), lowers[1], hands[1]),
+            };
+            pose.Seated = true;
+            pose.Bind();
+            if (plug) put.Bind(); else pull.Bind();
+            var main = GameObject.Find("Player/Main Camera").GetComponent<Camera>();
+            var cam = MakeCamera(main);
+            var sb = new StringBuilder();
+            var yaw0 = player.transform.eulerAngles.y;
+            float aimYaw = yaw0, aimPitch = startPitch;
+            float worst = 9f, worstAt = -1f;
+            try
+            {
+                foreach (var t in times)
+                {
+                    pose.Apply();
+                    if (plug) { put.Step(t); put.Apply(t); }
+                    else { pull.StepForStudy(t); pull.Apply(t); }
+                    if (TwistShare > 0f)
+                        for (var i = 0; i < 2; i++) ArmReach.Untwist(lowers[i], hands[i], rests[i], TwistShare);
+                    float r, w;
+                    var line = gauge.Thinnest(out r, out w);
+                    if (r < worst) { worst = r; worstAt = t; }
+                    var twist = new StringBuilder();
+                    for (var i = 0; i < 2; i++)
+                    {
+                        float fa, wr;
+                        ArmReach.Twists(lowers[i], hands[i], rests[i], out fa, out wr);
+                        twist.AppendFormat(" {0} ひねり 前腕 {1:0} 手首 {2:0} 曲げ {3:0}", i == 0 ? "左" : "右", fa, wr, ArmReach.WristBend(lowers[i], hands[i], rests[i]));
+                    }
+                    sb.AppendFormat("{0:0.00} 秒: {1}{2} /{3}", t, line, r < 0.85f ? "  ← 細い" : "", twist).AppendLine();
+                    if (!shoot) continue;
+                    var eye = player.transform.TransformPoint(new Vector3(0f, seatEye, eyeLead));
+                    var follows = plug ? PlugTimeline.Follows(t) : PullTimeline.Follows(t);
+                    if (follows)
+                    {
+                        var to = ((socket != null ? socket.position : jack.position) - eye).normalized;
+                        aimYaw = Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg;
+                        aimPitch = PlayerController.ClampPitch(-Mathf.Asin(Mathf.Clamp(to.y, -1f, 1f)) * Mathf.Rad2Deg);
+                    }
+                    var k = plug ? PlugTimeline.Aim(t) : PullTimeline.Aim(t);
+                    cam.fieldOfView = main.fieldOfView;
+                    cam.transform.position = eye;
+                    cam.transform.rotation = Quaternion.Euler(Mathf.Lerp(startPitch, aimPitch, k), Mathf.LerpAngle(yaw0, aimYaw, k), 0f);
+                    var name = string.Format("{0}_{1:0.00}", tag, t);
+                    var shot = FaceStudy.Grab(cam, FaceStudy.GameW, FaceStudy.GameH);
+                    FaceStudy.Save(shot, Path.Combine(OutDir, name + ".png"));
+                    Object.DestroyImmediate(shot);
+                    // 確認用: 両方の前腕が入るよう、二つの手首の間を少し外から
+                    var handL = an.GetBoneTransform(HumanBodyBones.LeftHand).position;
+                    var handR = an.GetBoneTransform(HumanBodyBones.RightHand).position;
+                    var elbowR = an.GetBoneTransform(HumanBodyBones.RightLowerArm).position;
+                    var mid = (handL + handR + elbowR) / 3f;
+                    var from = mid + player.transform.TransformDirection(new Vector3(0.10f, 0.25f, 0.55f));
+                    Isolated(cam, new[] { her }, from, mid, 40f, Path.Combine(OutDir, name + "_arm.png"));
+                }
+            }
+            finally
+            {
+                Object.DestroyImmediate(cam.gameObject);
+                gauge.Dispose();
+            }
+            sb.AppendFormat("いちばん細いこま: {0:0.00} 秒（半径 {1:0.00}）", worstAt, worst).AppendLine();
+            return sb.ToString();
         }
 
         /// <summary>320×180 の絵を横に並べ、画素のまま scale 倍にした一枚を書く</summary>

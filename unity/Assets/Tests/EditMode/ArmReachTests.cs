@@ -85,6 +85,96 @@ namespace HalfAware.Tests
         }
 
         [Test]
+        public void TwistAngleReadsTheTurnAboutTheAxis()
+        {
+            var axis = new Vector3(0.2f, 1f, 0.1f).normalized;
+            Assert.AreEqual(40f, ArmReach.TwistAngle(Quaternion.AngleAxis(40f, axis), axis), 1e-3f);
+            Assert.AreEqual(-70f, ArmReach.TwistAngle(Quaternion.AngleAxis(-70f, axis), axis), 1e-3f);
+            var across = Vector3.Cross(axis, Vector3.right).normalized;
+            Assert.AreEqual(0f, ArmReach.TwistAngle(Quaternion.AngleAxis(50f, across), axis), 1e-3f, "軸に直交する回しはひねりに数えない");
+        }
+
+        /// <summary>肩・前腕・手の三本。前腕の軸は y の負の向き。束ねた姿勢は今の向き（ひねり 0）</summary>
+        static Transform[] Chain(out ArmReach.Rest rest)
+        {
+            var root = new GameObject("shoulder").transform;
+            var elbow = new GameObject("elbow").transform;
+            var hand = new GameObject("hand").transform;
+            elbow.SetParent(root, false);
+            elbow.localPosition = new Vector3(0f, -Upper, 0f);
+            hand.SetParent(elbow, false);
+            hand.localPosition = new Vector3(0f, -Lower, 0f);
+            rest = new ArmReach.Rest { lower = elbow.localRotation, hand = hand.localRotation, valid = true };
+            return new[] { root, elbow, hand };
+        }
+
+        [Test]
+        public void UntwistMovesHalfTheTurnIntoTheForearmAndKeepsTheHand()
+        {
+            ArmReach.Rest rest;
+            var c = Chain(out rest);
+            try
+            {
+                c[2].localRotation = Quaternion.AngleAxis(80f, Vector3.down);
+                var keep = c[2].rotation;
+                ArmReach.Untwist(c[1], c[2], rest, 0.5f);
+                float forearm, wrist;
+                ArmReach.Twists(c[1], c[2], rest, out forearm, out wrist);
+                Assert.AreEqual(40f, forearm, 0.5f, "前腕が半分持つ");
+                Assert.AreEqual(40f, wrist, 0.5f, "手首に半分残る");
+                Assert.Less(Quaternion.Angle(keep, c[2].rotation), 0.01f, "手の世界の向きは変わらない");
+            }
+            finally
+            {
+                Object.DestroyImmediate(c[0].gameObject);
+            }
+        }
+
+        [Test]
+        public void CarryReachesEachEndWithItsOwnWrist()
+        {
+            ArmReach.Rest rest;
+            var c = Chain(out rest);
+            try
+            {
+                var pole = new Vector3(0.5f, -0.2f, -0.5f);
+                var a = new Vector3(0.10f, -0.30f, 0.20f);
+                var b = new Vector3(-0.05f, -0.25f, 0.30f);
+                var ra = Quaternion.Euler(20f, 30f, 10f);
+                var rb = Quaternion.Euler(-30f, 60f, 40f);
+                ArmReach.Carry(c[0], c[1], c[2], b, a, ra, b, rb, pole, 1f);
+                Assert.AreEqual(0f, Vector3.Distance(c[2].position, b), 1e-4f, "運び終わりで B に届く");
+                Assert.Less(Quaternion.Angle(c[2].rotation, rb), 0.5f, "運び終わりで B の向き");
+                ArmReach.Carry(c[0], c[1], c[2], a, a, ra, b, rb, pole, 0f);
+                Assert.AreEqual(0f, Vector3.Distance(c[2].position, a), 1e-4f, "運び始めは A");
+                Assert.Less(Quaternion.Angle(c[2].rotation, ra), 0.5f, "運び始めは A の向き");
+            }
+            finally
+            {
+                Object.DestroyImmediate(c[0].gameObject);
+            }
+        }
+
+        [Test]
+        public void MoveAtFullWeightLandsOnTheTarget()
+        {
+            ArmReach.Rest rest;
+            var c = Chain(out rest);
+            try
+            {
+                var target = new Vector3(0.12f, -0.28f, 0.22f);
+                var turn = Quaternion.Euler(10f, -40f, 25f);
+                ArmReach.Move(c[0], c[1], c[2], target, turn, new Vector3(0.5f, -0.2f, -0.5f), 1f);
+                Assert.AreEqual(0f, Vector3.Distance(c[2].position, target), 1e-4f);
+                Assert.Less(Quaternion.Angle(c[2].rotation, turn), 0.01f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(c[0].gameObject);
+            }
+        }
+
+        [Test]
         public void HandForPutsTheHoldOnTheWorldPose()
         {
             var holdLocal = new Vector3(0.02f, -0.1f, 0.03f);

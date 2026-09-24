@@ -117,6 +117,8 @@ namespace HalfAware.EditorTools
             var hand = an.GetBoneTransform(left ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand);
             ArmReach.Solve(upper, lower, hand, wrist, pole, 1f);
             if (fingers.sqrMagnitude > 1e-6f) Aim(an, left, fingers, palm);
+            // 手のひらのひねりを前腕と手首に分ける。手の骨だけをひねると手首の肌が絞られて細く潰れる
+            ArmReach.Untwist(lower, hand, ArmReach.RestOf(an.GetComponentInChildren<SkinnedMeshRenderer>(), upper, lower, hand), ArmReach.TwistShare);
         }
 
         /// <summary>

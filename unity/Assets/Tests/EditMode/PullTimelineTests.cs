@@ -90,6 +90,14 @@ namespace HalfAware.Tests
         }
 
         [Test]
+        public void TheFingersComeOffTheJackFirstWhenItIsLeft()
+        {
+            Assert.AreEqual(0f, PullTimeline.Release(PullTimeline.LetGoAt), 1e-4f, "離すまでは抜かない");
+            Assert.AreEqual(1f, PullTimeline.Release(PullTimeline.LetGoAt + PullTimeline.ReturnSeconds * 0.25f), 1e-3f, "戻す間の初めの 2 割 5 分で抜ききる");
+            Assert.Greater(PullTimeline.Reach(PullTimeline.LetGoAt + PullTimeline.ReturnSeconds * 0.25f), 0.8f, "抜ききった時、手はまだ置き場のそば");
+        }
+
+        [Test]
         public void TheRightHandStaysUpUntilTheJackIsSetDown()
         {
             Assert.AreEqual(1f, PullTimeline.RightHand(PullTimeline.GripAt), 1e-4f, "掴む時には手首が目の前にある");

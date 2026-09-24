@@ -15,7 +15,14 @@ namespace HalfAware
         public const float WalkSpeed = 1.4f;         // m/s。歩きの一巡とほぼ同じ速さ
         public const float RunSpeed = 3.0f;          // m/s。Shift を押している間
         public const float StandingEyeHeight = 1.6f;
-        public const float PitchLimit = 80f;         // 度
+        /// <summary>上を向ける限り。度</summary>
+        public const float PitchUpLimit = 80f;
+        /// <summary>
+        /// 下を向ける限り。度。**主人公の性別は対面まで見せない**（シナリオ設計 1 節）。
+        /// 体の胸が画面の下の縁に入り始めるのは、立って 47 度・座って 56 度なので、その手前で止める。
+        /// 演出が視線を寄せるとき（JackPull・JackPlug など）も、この範囲に収める
+        /// </summary>
+        public const float PitchDownLimit = 40f;
         // 度 / ピクセル。試作は 0.0022 rad/px（＝ 0.126）だったが、実画面で速すぎたので半分にした。
         // **場面をまたいで効く。** 自室も路地裏も車内も同じ速さで振れる
         public const float LookSensitivity = 0.063f;
@@ -128,7 +135,13 @@ namespace HalfAware
         public float Pitch
         {
             get { return pitch; }
-            set { pitch = Mathf.Clamp(value, -PitchLimit, PitchLimit); }
+            set { pitch = ClampPitch(value); }
+        }
+
+        /// <summary>上下の向きを、向けられる範囲（上 <see cref="PitchUpLimit"/>・下 <see cref="PitchDownLimit"/>）に収める。正が下向き</summary>
+        public static float ClampPitch(float pitch)
+        {
+            return Mathf.Clamp(pitch, -PitchUpLimit, PitchDownLimit);
         }
 
         /// <summary>目の位置に上乗せするずれ。眩暈の漂いが毎フレーム入れる</summary>

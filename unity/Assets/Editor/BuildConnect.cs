@@ -583,6 +583,32 @@ namespace HalfAware.EditorTools
             }
             var plug = Plug(flow, socket);
             Director(flow, screen, plug, items);
+            HoldRoll(plug);
+        }
+
+        /// <summary>
+        /// 挿すしぐさの、掴む手の角（<see cref="JackHoldRoll"/>）を選ぶ。座った所（ConnectDirector が座らせる所）で流れを試すので、
+        /// その間だけ Player を椅子へ移し、終わったら戸口の内側へ戻す
+        /// </summary>
+        static void HoldRoll(JackPlug plug)
+        {
+            var player = Object.FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
+            if (plug == null || player == null) return;
+            var keepAt = player.transform.position;
+            var keepTurn = player.transform.rotation;
+            var note = new System.Text.StringBuilder();
+            try
+            {
+                player.transform.SetPositionAndRotation(SeatAt, Quaternion.identity);
+                plug.Bind();
+                JackHoldRoll.ForPlug(plug, note);
+            }
+            finally
+            {
+                player.transform.SetPositionAndRotation(keepAt, keepTurn);
+            }
+            EditorUtility.SetDirty(plug);
+            Debug.Log("挿すしぐさの掴む手の角を選んだ。" + note.ToString().TrimEnd().Replace("\r", "").Replace("\n", " / "));
         }
 
         /// <summary>
