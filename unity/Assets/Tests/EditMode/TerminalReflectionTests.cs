@@ -37,25 +37,26 @@ namespace HalfAware.Tests
         }
 
         [Test]
-        public void MouthIsBelowWhereTheEyeIsReflected()
+        public void MirrorFoldsAPointAcrossTheScreen()
         {
-            var spot = TerminalReflection.Spot(new Vector2(0.05f, 0.10f), 0.11f, new Vector2(0.81f, 0.48f), new Vector2(0.15f, 0.09f));
-            Assert.AreEqual(0.05f, spot.x, 1e-5f);
-            Assert.AreEqual(-0.01f, spot.y, 1e-5f);
+            var p = TerminalReflection.Mirror(new Vector3(0.2f, 1.2f, -1.0f), new Vector3(0f, 1f, 0.5f), new Vector3(0f, 0f, -1f));
+            Assert.AreEqual(0.2f, p.x, 1e-5f);
+            Assert.AreEqual(1.2f, p.y, 1e-5f);
+            Assert.AreEqual(2.0f, p.z, 1e-5f, "画面の手前 1.5 m の目は、画面の奥 1.5 m に映る");
         }
 
         [Test]
-        public void StaysInsideTheScreen()
+        public void WindowIsTheScreenSeenFromTheMirroredEye()
         {
-            var screen = new Vector2(0.81f, 0.48f);
-            var size = new Vector2(0.15f, 0.09f);
-            // 立って見下ろすと、口元の映る所は画面の上の外になる。画面の上の縁の内へ寄せる
-            var high = TerminalReflection.Spot(new Vector2(0.9f, 0.6f), 0.11f, screen, size);
-            Assert.AreEqual((0.81f - 0.15f) * 0.5f, high.x, 1e-5f);
-            Assert.AreEqual((0.48f - 0.09f) * 0.5f, high.y, 1e-5f);
-            var low = TerminalReflection.Spot(new Vector2(-0.9f, -0.6f), 0.11f, screen, size);
-            Assert.AreEqual(-(0.81f - 0.15f) * 0.5f, low.x, 1e-5f);
-            Assert.AreEqual(-(0.48f - 0.09f) * 0.5f, low.y, 1e-5f);
+            // 画面の奥 1.5 m から、画面（真ん中は右へ 0.1 m、上へ 0.05 m）を見る
+            var at = new Vector3(0f, 1f, 2f);
+            var rotation = Quaternion.LookRotation(Vector3.back, Vector3.up);
+            var w = TerminalReflection.Window(at, rotation, new Vector3(-0.1f, 1.05f, 0.5f), new Vector2(0.8f, 0.4f));
+            // カメラは -z を向くので、カメラの右は世界の -x
+            Assert.AreEqual(0.1f - 0.4f, w.x, 1e-5f);
+            Assert.AreEqual(0.1f + 0.4f, w.y, 1e-5f);
+            Assert.AreEqual(0.05f - 0.2f, w.z, 1e-5f);
+            Assert.AreEqual(0.05f + 0.2f, w.w, 1e-5f);
         }
     }
 }

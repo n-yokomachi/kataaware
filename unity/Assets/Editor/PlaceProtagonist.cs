@@ -80,6 +80,8 @@ namespace HalfAware.EditorTools
             }
             Remap(old != null ? old.gameObject : null, her, note);
             if (old != null) Object.DestroyImmediate(old.gameObject);
+            // モニターの映り込みの頭の写しは体の骨を使うので、体を置き直したら組み直す
+            if (room && !Reflection(note)) return false;
             return true;
         }
 
@@ -396,7 +398,7 @@ namespace HalfAware.EditorTools
                 b.TryGetValue(k, out y);
                 if (x == y) continue;
                 // 組み立てが変えてよい物: 抜いたジャックの置き場（座面の縁へ移す）、ケーブル（被膜の色を BuildProps.Tune が決める）、端末の画面に映る口元
-                var allowed = k == "Room/Chair/JackRest" || k == "Room/Chair/Cable" || k.EndsWith("/" + ReflectionName);
+                var allowed = k == "Room/Chair/JackRest" || k == "Room/Chair/Cable" || k.EndsWith("/" + ReflectionName) || k.Contains("/" + ReflectionName + "/");
                 if (!allowed) unexpected++;
                 sb.AppendFormat("  {0}{1}: {2} → {3}", allowed ? "" : "（思いがけない）", k, x ?? "無し", y ?? "無し").AppendLine();
             }
