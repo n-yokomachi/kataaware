@@ -43,8 +43,16 @@ namespace HalfAware.EditorTools
         /// <summary>モニター。monitor / list / dive は順に開くので同じ点でよい</summary>
         public static readonly Vector3 ScreenAt = new Vector3(1.50f, 1.10f, 2.42f);
 
-        /// <summary>座ったときの目線の高さ。ConnectDirector へ渡す</summary>
-        public const float SeatEyeHeight = 1.1f;
+        /// <summary>
+        /// 座ったときの目線の高さ。ConnectDirector へ渡す。
+        /// 体の座った目の高さで、場面 1 の SceneFlow に PlaceProtagonist が書いた値を読む（場面 3 と 5 は場面 1 から写して組む）
+        /// </summary>
+        public static float SeatEyeHeight()
+        {
+            var flow = Object.FindFirstObjectByType<SceneFlow>(FindObjectsInactive.Include);
+            if (flow == null) { Debug.LogWarning("SceneFlow が無い。座った目の高さを読めない"); return PlayerController.StandingEyeHeight; }
+            return new SerializedObject(flow).FindProperty("seatEyeHeight").floatValue;
+        }
         public const float ItemRadius = 2f;
         /// <summary>ジャックだけ近い。腕の上のものを部屋の向こうから拾わせない</summary>
         public const float JackRadius = 1.2f;
@@ -68,7 +76,7 @@ namespace HalfAware.EditorTools
             Flow();
             Stand();
             var socket = Park();
-            var items = Items();
+            var items = Items(socket);
             var sheet = Screens();
             Wire(socket, sheet, items);
             Register();
@@ -279,7 +287,7 @@ namespace HalfAware.EditorTools
         /// 次が拾えてしまう。演出の終わりで ConnectDirector が開けば、
         /// 開く時刻が演出の終わりと一致する
         /// </summary>
-        static Dictionary<string, GameObject> Items()
+        static Dictionary<string, GameObject> Items(Transform socket)
         {
             var made = new Dictionary<string, GameObject>();
             var parent = Look("Interactables");
@@ -296,10 +304,11 @@ namespace HalfAware.EditorTools
 
             // ジャックの対象はジャックに付いて回る。肘掛けに置いてある間はそこで拾い、
             // 挿した後は手首に付いていく
-            var jack = Look("Room/Chair/JackRest/Jack");
-            if (jack != null)
+            // ジャックを挿す対象は、置いたジャックではなく右の手首の差込口に立てる。
+            // 置き場（右の肘掛けの後ろ寄り）は目より後ろにあり、そこを見ると、首より上を映さない体の襟ぐりの中が見える
+            if (socket != null)
             {
-                var item = Put(jack, "Jack", jack.position, script, ConnectIds.Jack, JackRadius, null, false);
+                var item = Put(socket, "Jack", socket.position, script, ConnectIds.Jack, JackRadius, null, false);
                 item.transform.localPosition = Vector3.zero;
                 made[ConnectIds.Jack] = item;
             }
@@ -598,7 +607,7 @@ namespace HalfAware.EditorTools
             so.FindProperty("monitorItem").objectReferenceValue = items.TryGetValue(ConnectIds.Monitor, out item) ? item : null;
             so.FindProperty("script").objectReferenceValue = AssetDatabase.LoadAssetAtPath<RoomScript>(ScriptPath);
             so.FindProperty("seatSpot").vector3Value = SeatAt;
-            so.FindProperty("seatEyeHeight").floatValue = SeatEyeHeight;
+            so.FindProperty("seatEyeHeight").floatValue = SeatEyeHeight();
             // モニターの方。部屋は z の正の向きに机が並んでいる
             so.FindProperty("seatYaw").floatValue = 0f;
             so.ApplyModifiedPropertiesWithoutUndo();

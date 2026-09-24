@@ -193,7 +193,8 @@ namespace HalfAware.EditorTools.Rocketbox
             var persist = skin.Head != null && AssetDatabase.Contains(skin.Head);
             var mesh = Object.Instantiate(smr.sharedMesh);
             if (!persist) Keep(skin, mesh);
-            mesh.name = smr.sharedMesh.name + "_nose";
+            // アセットにするときはファイルの名前と揃える（揃えないと、読み込みのたびに Unity が名前を直してファイルが変わる）
+            mesh.name = persist ? skin.Person.Name + "_nose_mesh" : smr.sharedMesh.name + "_nose";
             var v = mesh.vertices;
             var nrm = mesh.normals;
             var tris = mesh.GetTriangles(headSlot);

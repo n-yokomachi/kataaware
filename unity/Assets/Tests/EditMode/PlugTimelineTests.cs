@@ -88,5 +88,21 @@ namespace HalfAware.Tests
             Assert.IsFalse(PlugTimeline.Done(PlugTimeline.Total - 0.01f));
             Assert.IsTrue(PlugTimeline.Done(PlugTimeline.Total));
         }
+
+        [Test]
+        public void TheRightWristIsUpBeforeTheLeftHandReaches()
+        {
+            Assert.AreEqual(1f, PlugTimeline.RightHand(PlugTimeline.LookSeconds), 1e-4f, "視線を落とし終える時には、右の手首が上がって肘掛けが空いている");
+            Assert.AreEqual(1f, PlugTimeline.RightHand(PlugTimeline.InAt), 1e-4f, "挿す間は上げたまま");
+            Assert.AreEqual(0f, PlugTimeline.RightHand(PlugTimeline.Total), 1e-4f, "手を戻す間に下ろす");
+        }
+
+        [Test]
+        public void TheFingersComeOffTheJackFirst()
+        {
+            Assert.AreEqual(0f, PlugTimeline.Release(PlugTimeline.LetGoAt), 1e-4f, "離すまでは抜かない");
+            Assert.AreEqual(1f, PlugTimeline.Release(PlugTimeline.LetGoAt + PlugTimeline.ReturnSeconds * 0.25f), 1e-4f, "戻しの初めに指を抜ききる");
+            Assert.Greater(PlugTimeline.Reach(PlugTimeline.LetGoAt + PlugTimeline.ReturnSeconds * 0.25f), 0.8f, "抜ききる時、手はまだ挿した所の近く");
+        }
     }
 }

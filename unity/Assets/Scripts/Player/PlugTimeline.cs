@@ -62,6 +62,21 @@ namespace HalfAware
             return Mathf.SmoothStep(0f, 1f, t / LookSeconds);
         }
 
+        /// <summary>
+        /// 右の手首を持ち上げて差込口を出す強さ。視線を落とす間に上げ（肘掛けを空け、左手が置き場へ届くように）、
+        /// 手を戻す間に下ろす
+        /// </summary>
+        public static float RightHand(float t) { return Swell(t, 0f, LookSeconds); }
+
+        /// <summary>
+        /// 挿し終えて離した手を、ジャックの尻の側へ抜く強さ。手を戻す間の初めの 2 割 5 分で抜ききる
+        /// </summary>
+        public static float Release(float t)
+        {
+            if (t <= LetGoAt) return 0f;
+            return Mathf.SmoothStep(0f, 1f, (t - LetGoAt) / (ReturnSeconds * 0.25f));
+        }
+
         /// <summary>左手を肘掛けへ伸ばす姿勢の強さ</summary>
         public static float Reach(float t) { return Swell(t, LookSeconds, ReachSeconds); }
 

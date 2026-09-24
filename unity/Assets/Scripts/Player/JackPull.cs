@@ -56,7 +56,7 @@ namespace HalfAware
         [Tooltip("掴む前に開いておく手の形（親指と人差し指の間を広く）。伸ばす間に寄せる")]
         [SerializeField] SeatedPose.Bone[] open = new SeatedPose.Bone[0];
         [Tooltip("掴む前に、開いた手をジャックの尻の側（軸の向き）へ浮かせておく距離（m）。そこから軸に沿って下ろしてジャックを指の間に入れ、指を閉じる")]
-        [SerializeField] float approach = 0.04f;
+        [SerializeField] float approach = 0.06f;
 
         [Tooltip("置き場へ下ろす前に、いったん運ぶ高さ（置き場の真上 m）。上げたままの右腕の下を通す")]
         [SerializeField] float placeLift = 0.10f;
@@ -192,19 +192,19 @@ namespace HalfAware
             Shape(pinch, pinchBones, Closing(w));
         }
 
-        /// <summary>指を閉じる強さ。手が掴む所に着いてから（伸ばす強さの終わりの 5 %）閉じる</summary>
+        /// <summary>指を閉じる強さ。手が掴む所に着いてから（伸ばす強さの終わりの 3 %）閉じる</summary>
         static float Closing(float reach)
         {
-            return Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.95f, 1f, reach));
+            return Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.97f, 1f, reach));
         }
 
         /// <summary>
-        /// 掴む所の手前からの寄せ。伸ばす強さの 80〜95 % で、ジャックの尻の側（手のひらの側）へ浮かせておいた開いた手を、
+        /// 掴む所の手前からの寄せ。伸ばす強さの 85〜97 % で、ジャックの尻の側（手のひらの側）へ浮かせておいた開いた手を、
         /// ジャックの軸に沿って掴む所まで下ろす。ジャックは開いた親指と人差し指の間へ入る。寄せ終わってから指を閉じる
         /// </summary>
         static Vector3 Approach(float reach, Quaternion rotation, float distance)
         {
-            var k = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.80f, 0.95f, reach));
+            var k = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.85f, 0.97f, reach));
             return rotation * (Vector3.forward * (distance * k));
         }
 

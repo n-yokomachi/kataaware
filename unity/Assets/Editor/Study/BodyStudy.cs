@@ -391,6 +391,82 @@ namespace HalfAware.EditorTools.Study
             return sb.ToString();
         }
 
+        /// <summary>
+        /// 挿す流れ（JackPlug）を t 秒ごとに止めて撮り、数える。<see cref="PullFrames"/> の挿す側。
+        /// 座った形で始める（ConnectDirector が座らせ終えたところ）。
+        /// **ジャックの親を付け替えるので、撮った後は場面を開き直して捨てること**
+        /// </summary>
+        public static string PlugFrames(string tag, float[] times, float startPitch, float seatEye, float eyeLead, Vector3 sideAt, Vector3 sideLook, bool shoot = true)
+        {
+            var player = GameObject.Find("Player");
+            var her = GameObject.Find("Player/Protagonist");
+            var pose = her.GetComponent<SeatedPose>();
+            var plug = her.GetComponent<JackPlug>();
+            var cable = Object.FindFirstObjectByType<Cable>();
+            var chair = GameObject.Find("Room/Chair");
+            var so = new SerializedObject(plug);
+            var jack = (Transform)so.FindProperty("jack").objectReferenceValue;
+            var grip = (Transform)so.FindProperty("grip").objectReferenceValue;
+            var socket = (Transform)so.FindProperty("socket").objectReferenceValue;
+            pose.Seated = true;
+            pose.Bind();
+            plug.Bind();
+            foreach (var smr in her.GetComponentsInChildren<SkinnedMeshRenderer>()) smr.forceMatrixRecalculationPerRender = true;
+            var main = GameObject.Find("Player/Main Camera").GetComponent<Camera>();
+            var cam = MakeCamera(main);
+            var sb = new StringBuilder();
+            var yaw0 = player.transform.eulerAngles.y;
+            float aimYaw = yaw0, aimPitch = startPitch;
+            var an = her.GetComponent<Animator>();
+            try
+            {
+                foreach (var t in times)
+                {
+                    pose.Apply();
+                    plug.Step(t);
+                    plug.Apply(t);
+                    var pts = CablePoints(cable);
+                    var surf = new List<Vector3>();
+                    var norms = new List<Vector3>();
+                    Surface(her, surf, norms);
+                    var inside = Inside(pts, surf, norms, 0f);
+                    var fingers = FingersInJack(her, jack, true);
+                    // 挿さってからは座金が皮膚に埋まるので、胴（根元から 6 mm より上）だけ数える
+                    var touch = BodyInJack(her, jack, PlugTimeline.Push(t) > 0.8f || PlugTimeline.In(t) ? 0.006f : -0.002f);
+                    var hands = PartInPart(her, Hand(an, true, false), Hand(an, false, true));
+                    var gap = Vector3.Distance(grip.position, jack.position) * 1000f;
+                    var seat = socket != null ? Vector3.Distance(jack.position, socket.position) * 1000f : -1f;
+                    var eye = player.transform.TransformPoint(new Vector3(0f, seatEye, eyeLead));
+                    if (PlugTimeline.Follows(t))
+                    {
+                        var to = ((socket != null ? socket.position : jack.position) - eye).normalized;
+                        aimYaw = Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg;
+                        aimPitch = -Mathf.Asin(Mathf.Clamp(to.y, -1f, 1f)) * Mathf.Rad2Deg;
+                    }
+                    var k = PlugTimeline.Aim(t);
+                    cam.fieldOfView = main.fieldOfView;
+                    cam.transform.position = eye;
+                    cam.transform.rotation = Quaternion.Euler(Mathf.Lerp(startPitch, aimPitch, k), Mathf.LerpAngle(yaw0, aimYaw, k), 0f);
+                    if (shoot)
+                    {
+                        var name = string.Format("{0}_{1:0.00}", tag, t);
+                        var shot = FaceStudy.Grab(cam, FaceStudy.GameW, FaceStudy.GameH);
+                        FaceStudy.Save(shot, Path.Combine(OutDir, name + ".png"));
+                        Object.DestroyImmediate(shot);
+                        Isolated(cam, new[] { her, chair }, sideAt, sideLook, 30f, Path.Combine(OutDir, name + "_side.png"));
+                    }
+                    sb.AppendFormat("{0:0.00} 秒: ケーブルが体に入った頂点 {1}（全 {2}）、左手がジャックに入った頂点 {3}、ジャックに入った体の頂点 {4}、左手が右の前腕と手に入った頂点 {5}、置き所とジャックの差 {6:0.0} mm、ジャックと受け口の差 {7:0.0} mm",
+                        t, inside, pts.Count, fingers, touch, hands, gap, seat).AppendLine();
+                    if (inside > 0 && Detail) sb.Append(InsideReport(pts, her, 6));
+                }
+            }
+            finally
+            {
+                Object.DestroyImmediate(cam.gameObject);
+            }
+            return sb.ToString();
+        }
+
         /// <summary>見せたい物だけを使っていない層へ移して撮り、層を戻す。背景は灰の地</summary>
         public static void Isolated(Camera cam, GameObject[] show, Vector3 at, Vector3 look, float fov, string path)
         {

@@ -253,7 +253,7 @@ namespace HalfAware.EditorTools
             so.FindProperty("pose").objectReferenceValue =
                 Object.FindFirstObjectByType<SeatedPose>(FindObjectsInactive.Include);
             so.FindProperty("diveItem").objectReferenceValue = item;
-            so.FindProperty("seatEyeHeight").floatValue = BuildConnect.SeatEyeHeight;
+            so.FindProperty("seatEyeHeight").floatValue = BuildConnect.SeatEyeHeight();
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(director);
         }

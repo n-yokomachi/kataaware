@@ -5,8 +5,8 @@ namespace HalfAware
     /// <summary>
     /// 肘掛けに置いたジャックを左手で取り、右手首へ挿す。座った形（<see cref="SeatedPose"/>）の上で、
     /// 腕を二関節の IK（<see cref="ArmReach"/>）で動かす。
-    /// まず肘掛けへ視線を落として置いてあるところを見せ、左手で掴み、右の手首を持ち上げて差込口を出し、
-    /// ジャックをその前へ運んで挿す。視線はジャックを追うので、挿さる瞬間も画面から外れない。
+    /// まず右の手首を持ち上げて差込口を出し（肘掛けを空ける）、左手で置き場のジャックを掴み、置き場の上へ持ち上げてから
+    /// 差込口の前へ運んで挿す。視線は差込口を追うので、挿さる瞬間は画面に入る。置き場（目より後ろ）は見ない。
     /// 挿している間は調べる操作も見回しも止める。
     ///
     /// <see cref="JackPull"/>（場面 1 で抜く側）の裏返し。掴む瞬間と挿さる瞬間は、置き所と行き先が重なってから
@@ -48,7 +48,13 @@ namespace HalfAware
         [Tooltip("掴む前に開いておく手の形（親指と人差し指の間を広く）。伸ばす間に寄せる")]
         [SerializeField] SeatedPose.Bone[] open = new SeatedPose.Bone[0];
         [Tooltip("掴む前に、開いた手をジャックの尻の側（軸の向き）へ浮かせておく距離（m）。そこから軸に沿って下ろしてジャックを指の間に入れ、指を閉じる")]
-        [SerializeField] float approach = 0.04f;
+        [SerializeField] float approach = 0.06f;
+
+        [Tooltip("運ぶ途中に通す所。置き場から見た、体の根の向きの枠でのずれ（m）。置き場の上へ持ち上げてから差込口へ回す")]
+        [SerializeField] Vector3 carryVia = new Vector3(-0.10f, 0.18f, 0.06f);
+
+        [Tooltip("挿し終えて離した指を、ジャックの尻の側へ抜く距離（m）")]
+        [SerializeField] float releaseLift = 0.07f;
 
         [Header("上体（置き場へ手を届かせる）")]
         [Tooltip("置き場（右の肘掛けの内の縁）は左肩から遠いので、取る間は上体を少し寄せる。右へ倒す角・前へ倒す角・左肩を前へ出すひねり（度）")]
@@ -159,9 +165,9 @@ namespace HalfAware
             // 上体。取る間だけ右の肘掛けへ寄せ、運ぶ間に起こす
             ArmReach.Lean(pose.Animator, body, reachLean.x, reachLean.y, reachLean.z, Lean(t));
 
-            // 右手。差込口を出す。運び始めから持ち上げ、手を戻すときに下ろす
+            // 右手。差込口を出す。視線を落とす間に持ち上げ（肘掛けを空けて、左手が取りに行けるように）、手を戻すときに下ろす
             ArmReach.Move(upperR, lowerR, handR, body.TransformPoint(liftWrist), body.rotation * liftHand,
-                body.TransformPoint(rightElbowPole), PlugTimeline.Carry(t));
+                body.TransformPoint(rightElbowPole), PlugTimeline.RightHand(t));
 
             // 左手
             // 離した後は、離した瞬間の所（離す直前の狙い）から座った形の手へ戻る。
@@ -169,6 +175,8 @@ namespace HalfAware
             Vector3 gp, hp;
             Quaternion gr, hr;
             Target(PlugTimeline.LetGo(t) ? PlugTimeline.LetGoAt - 1e-4f : t, out gp, out gr);
+            // 離した後は、まず開いた指をジャックの尻の側へ抜いてから戻る。そのまま戻すと、開く指が挿さったジャックを横切った
+            if (PlugTimeline.LetGo(t)) gp += gr * Vector3.forward * (releaseLift * PlugTimeline.Release(t));
             ArmReach.HandFor(gp, gr, HoldLocal(), HoldRotation(), out hp, out hr);
             var w = PlugTimeline.Reach(t);
             ArmReach.Move(upperL, lowerL, handL, hp, hr, body.TransformPoint(leftElbowPole), w);
@@ -176,19 +184,19 @@ namespace HalfAware
             Shape(pinch, pinchBones, Closing(w));
         }
 
-        /// <summary>指を閉じる強さ。手が掴む所に着いてから（伸ばす強さの終わりの 5 %）閉じる</summary>
+        /// <summary>指を閉じる強さ。手が掴む所に着いてから（伸ばす強さの終わりの 3 %）閉じる</summary>
         static float Closing(float reach)
         {
-            return Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.95f, 1f, reach));
+            return Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.97f, 1f, reach));
         }
 
         /// <summary>
-        /// 掴む所の手前からの寄せ。伸ばす強さの 80〜95 % で、ジャックの尻の側（手のひらの側）へ浮かせておいた開いた手を、
+        /// 掴む所の手前からの寄せ。伸ばす強さの 85〜97 % で、ジャックの尻の側（手のひらの側）へ浮かせておいた開いた手を、
         /// ジャックの軸に沿って掴む所まで下ろす。ジャックは開いた親指と人差し指の間へ入る。寄せ終わってから指を閉じる
         /// </summary>
         static Vector3 Approach(float reach, Quaternion rotation, float distance)
         {
-            var k = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.80f, 0.95f, reach));
+            var k = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.85f, 0.97f, reach));
             return rotation * (Vector3.forward * (distance * k));
         }
 
@@ -213,10 +221,14 @@ namespace HalfAware
             position = picked;
             rotation = pickedRotation;
             if (socket == null) return;
-            // 差込口の手前へ運ぶ。差込口は右手について動くので毎こま求める
+            // 置き場から、上の通り道（carryVia）を通して差込口の手前へ運ぶ。差込口は右手について動くので毎こま求める。
+            // 置き場から差込口へまっすぐ運ぶと、上げてある右の上腕を突き抜けた。肘の下をくぐらせると、左手が右の前腕に当たった
+            var above = picked + pose.transform.rotation * carryVia;
             var front = socket.position + socket.rotation * Vector3.forward * pushDistance;
             var k = PlugTimeline.Carry(t);
-            position = Vector3.Lerp(position, front, k);
+            position = k < 0.5f
+                ? Vector3.Lerp(picked, above, Mathf.SmoothStep(0f, 1f, k * 2f))
+                : Vector3.Lerp(above, front, Mathf.SmoothStep(0f, 1f, k * 2f - 1f));
             rotation = Quaternion.Slerp(rotation, socket.rotation, k);
             // 挿し込む
             k = PlugTimeline.Push(t);
@@ -245,14 +257,19 @@ namespace HalfAware
             }
         }
 
-        /// <summary>視線をジャックへ寄せる。掴めば左手について動くので、挿さる瞬間も画面に入る</summary>
+        /// <summary>
+        /// 視線を右の手首の差込口へ寄せる。差込口は右手について上がり、挿さる瞬間も画面に入る。
+        /// 置いてあるジャックは追わない。置き場（右の肘掛けの後ろ寄り）は目より後ろにあり、そこを見ると、
+        /// 首より上を映さない体の襟ぐりの中が見える。左手は画面の外で取って、差込口の前へ運んでくる
+        /// </summary>
         void Aim(float t)
         {
             var player = flow != null ? flow.Player : null;
             if (player == null || player.Eye == null) return;
-            if (PlugTimeline.Follows(t) && jack != null)
+            var follow = socket != null ? socket : jack;
+            if (PlugTimeline.Follows(t) && follow != null)
             {
-                var to = jack.position - player.Eye.position;
+                var to = follow.position - player.Eye.position;
                 if (to.sqrMagnitude > 1e-6f)
                 {
                     to.Normalize();
