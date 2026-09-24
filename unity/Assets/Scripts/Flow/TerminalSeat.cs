@@ -85,7 +85,12 @@ namespace HalfAware
             if (chair != null) fromChair = chair.position;
             blockerWasOn = chairBlocker != null && chairBlocker.activeSelf;
             if (chairBlocker != null) chairBlocker.SetActive(false);
-            if (pose != null) pose.Seated = true;
+            if (pose != null)
+            {
+                pose.Seated = true;
+                // 端末の前では両手を腿に置いて肩を落とした形（二つ目の形）
+                pose.UseAlternate = true;
+            }
             visit.Start();
             Place();
         }
@@ -122,7 +127,11 @@ namespace HalfAware
             player.Yaw = fromYaw;
             player.Pitch = fromPitch;
             if (chair != null) chair.position = fromChair;
-            if (pose != null) pose.Seated = false;
+            if (pose != null)
+            {
+                pose.Seated = false;
+                pose.UseAlternate = false;
+            }
             if (chairBlocker != null) chairBlocker.SetActive(blockerWasOn);
             player.CanMove = true;
             player.CanLook = true;

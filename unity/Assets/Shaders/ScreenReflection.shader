@@ -14,8 +14,8 @@ Shader "HalfAware/ScreenReflection"
         _Strength ("濃さ", Range(0, 1)) = 0.14
         _Saturation ("色の残し方", Range(0, 1)) = 0.08
         _Edge ("上の縁と下の縁から沈める幅（uv）", Vector) = (0.12, 0.10, 0, 0)
-        _Focus ("顎と首を真ん中に、まわりを沈める（真ん中の uv と半径）", Vector) = (0.5, 0.72, 0.5, 0.55)
-        _FocusFloor ("まわりの沈め方（いちばん外の明るさ）", Range(0, 1)) = 0.22
+        _Focus ("顎と首を真ん中に、まわりを沈める（真ん中の uv と半径）", Vector) = (0.5, 0.65, 0.7, 0.8)
+        _FocusFloor ("まわりの沈め方（いちばん外の明るさ）", Range(0, 1)) = 0.65
         _Compress ("明るい所を寝かせる強さ", Range(0, 8)) = 2.5
         _Texel ("映り込みの絵の 1 px（uv）", Vector) = (0.006, 0.01, 0, 0)
     }

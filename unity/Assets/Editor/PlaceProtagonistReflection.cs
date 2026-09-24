@@ -175,6 +175,8 @@ namespace HalfAware.EditorTools
             var lamp = Lamp(root, "MirrorLamp", eye + (front.position - eye).normalized * 0.5f + Vector3.up * 0.05f, mouth, 13f, 2f, 1.2f, 0.9f);
             // 頭の後ろの壁の灯り: 頭と肩の影の形を、後ろの部屋から少し浮かせる。椅子の後ろの高い所から、後ろの壁へ広く
             var back = player.position - player.forward * 0.9f + Vector3.up * (seatEye + 0.35f);
+            // 首から下の灯り: 画面の光のように前から、首と肩と胸の上へ広く弱く。服の形（肩の線、襟）が読める明るさに
+            var fill = Lamp(root, "MirrorFillLamp", eye + (front.position - eye).normalized * 0.6f, eye + Vector3.down * 0.22f, 50f, 20f, 1.5f, 0.7f);
             var wall = Lamp(root, "MirrorBackLamp", back, back - player.forward * 1f + Vector3.down * 0.4f, 110f, 60f, 3f, 0.6f);
 
             var reflection = root.gameObject.AddComponent<TerminalReflection>();
@@ -199,9 +201,10 @@ namespace HalfAware.EditorTools
             so.FindProperty("head").objectReferenceValue = head;
             so.FindProperty("body").objectReferenceValue = her.transform;
             var lamps = so.FindProperty("lamps");
-            lamps.arraySize = 2;
+            lamps.arraySize = 3;
             lamps.GetArrayElementAtIndex(0).objectReferenceValue = lamp;
             lamps.GetArrayElementAtIndex(1).objectReferenceValue = wall;
+            lamps.GetArrayElementAtIndex(2).objectReferenceValue = fill;
             so.ApplyModifiedPropertiesWithoutUndo();
 
             // 座った正面へ移す仕掛け。座った所は、場面の頭の座った所（Player の今の置き場）
@@ -393,9 +396,9 @@ namespace HalfAware.EditorTools
             m.SetFloat("_Strength", ReflectionStrength);
             m.SetFloat("_Compress", 1.5f);
             m.SetFloat("_Saturation", ReflectionSaturation);
-            m.SetVector("_Edge", new Vector4(0.06f, 0.10f, 0f, 0f));
-            m.SetVector("_Focus", new Vector4(0.5f, 0.72f, 0.5f, 0.55f));
-            m.SetFloat("_FocusFloor", 0.22f);
+            m.SetVector("_Edge", new Vector4(0.06f, 0.05f, 0f, 0f));
+            m.SetVector("_Focus", new Vector4(0.5f, 0.65f, 0.7f, 0.8f));
+            m.SetFloat("_FocusFloor", 0.65f);
             m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
             EditorUtility.SetDirty(m);
             AssetDatabase.SaveAssets();

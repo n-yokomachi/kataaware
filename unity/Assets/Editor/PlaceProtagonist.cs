@@ -152,6 +152,12 @@ namespace HalfAware.EditorTools
             pso.FindProperty("animator").objectReferenceValue = an;
             pso.ApplyModifiedPropertiesWithoutUndo();
             BodyPoser.Write(pose, "seated", seated);
+            // 端末の映り込みを見る間の座った形（SeatedPose の二つ目の形。TerminalSeat が座らせる間だけ掛ける）。
+            // 両手を腿に置いて肩を落とす。肘掛けに前腕を置いた形では、肩がすくんで盛り上がって映った。
+            // 抜く・挿すのしぐさは一つ目の形のまま
+            BodyPoser.Pose(an, TerminalSit(chair.transform));
+            BodyPoser.Write(pose, "alternate", BodyPoser.Capture(an));
+            BodyPoser.Pose(an, RoomSit(chair.transform));
 
             if (flow != null)
             {
@@ -479,6 +485,23 @@ namespace HalfAware.EditorTools
         ///   右は手のひらを上へ返し（手首のジャックが目に入る）、差込口（肘掛けの前寄り）を前腕で塞がないよう内へ寄せる。
         ///   左は手のひらを下へ
         /// </summary>
+        /// <summary>端末の映り込みを見る間の座った形。<see cref="RoomSit"/> と同じ腰と脚で、両手を腿の上に置き、肘を体の脇へ下ろす</summary>
+        public static BodyPoser.Sit TerminalSit(Transform chair)
+        {
+            System.Func<float, float, float, Vector3> P = (x, y, z) => chair.TransformPoint(new Vector3(x, y, z));
+            System.Func<float, float, float, Vector3> D = (x, y, z) => chair.TransformDirection(new Vector3(x, y, z));
+            var sit = RoomSit(chair);
+            sit.wristL = P(-0.13f, 0.70f, 0.30f);
+            sit.wristR = P(0.13f, 0.70f, 0.30f);
+            sit.elbowPoleL = P(-0.30f, 0.55f, -0.25f);
+            sit.elbowPoleR = P(0.30f, 0.55f, -0.25f);
+            sit.fingersL = D(0.1f, -0.25f, 1f);
+            sit.palmL = D(0f, -1f, 0f);
+            sit.fingersR = D(-0.1f, -0.25f, 1f);
+            sit.palmR = D(0f, -1f, 0f);
+            return sit;
+        }
+
         public static BodyPoser.Sit RoomSit(Transform chair)
         {
             System.Func<float, float, float, Vector3> P = (x, y, z) => chair.TransformPoint(new Vector3(x, y, z));
