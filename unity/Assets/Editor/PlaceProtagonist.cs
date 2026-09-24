@@ -18,7 +18,7 @@ namespace HalfAware.EditorTools
     /// 保存の前に、場面の中の物の一覧（名前・位置・有効かどうか）を組み立ての前と比べ、
     /// Player/Protagonist の下と、組み立てが繋ぎ直す物のほかに差が無いことを確かめてから保存する
     /// </summary>
-    public static class PlaceProtagonist
+    public static partial class PlaceProtagonist
     {
         public const string RoomPath = "Assets/Scenes/Room.unity";
         public const string AlleyPath = "Assets/Scenes/Alley.unity";
@@ -379,8 +379,8 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 二つの一覧の差。Player/Protagonist の下は数えない。組み立てが変えてよい物（抜いたジャックの置き場、ケーブル）の差は書くが、
-        /// 思いがけない差には数えない
+        /// 二つの一覧の差。Player/Protagonist の下は数えない。組み立てが変えてよい物（抜いたジャックの置き場、ケーブル、
+        /// 端末の画面に映る口元）の差は書くが、思いがけない差には数えない
         /// </summary>
         public static string Diff(Dictionary<string, string> a, Dictionary<string, string> b, out int unexpected)
         {
@@ -395,8 +395,8 @@ namespace HalfAware.EditorTools
                 a.TryGetValue(k, out x);
                 b.TryGetValue(k, out y);
                 if (x == y) continue;
-                // 組み立てが変えてよい物: 抜いたジャックの置き場（座面の縁へ移す）、ケーブル（被膜の色を BuildProps.Tune が決める）
-                var allowed = k == "Room/Chair/JackRest" || k == "Room/Chair/Cable";
+                // 組み立てが変えてよい物: 抜いたジャックの置き場（座面の縁へ移す）、ケーブル（被膜の色を BuildProps.Tune が決める）、端末の画面に映る口元
+                var allowed = k == "Room/Chair/JackRest" || k == "Room/Chair/Cable" || k.EndsWith("/" + ReflectionName);
                 if (!allowed) unexpected++;
                 sb.AppendFormat("  {0}{1}: {2} → {3}", allowed ? "" : "（思いがけない）", k, x ?? "無し", y ?? "無し").AppendLine();
             }
