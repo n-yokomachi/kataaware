@@ -32,12 +32,16 @@ namespace HalfAware.EditorTools.Study
             /// <summary>四本の指先の、輪の断面の中での角（phi と同じ測り方、度）</summary>
             public float[] tipAngle;
             public float gap, bend, flex, deviate, depression, radius, spread, thumbAngle;
+            /// <summary>四本の指の付け根・中・先の曲げ（まっすぐな指から、度）の平均</summary>
+            public Vector3 curl;
+            /// <summary>指の関節ごとの曲げ/ひねり（立った形から、度）と、指の肌の伸び・縮み・裏返り（撮るときだけ測る）</summary>
+            public string joints, skinNote;
 
             public override string ToString()
             {
                 var tips = tipAngle == null ? "" : string.Join("/", System.Array.ConvertAll(tipAngle, t => t.ToString("0")));
-                return string.Format("a{0} b{1} phi{2} sf{3} dp{4} px{5} py{6} close{7}: 手が入った頂点 {8} 腕 {9} 隙間 {10:0.0}mm 指先の角 {11}（計器盤の側 {12}・目から隠れた {13}）親指の角 {14:0} 指の開き {15:0} 手首の曲げ {16:0}（掌屈 {17:0} 橈尺 {18:0}）下へ {19:0} 度 断面 {20:0.00}",
-                    grip.alpha, grip.beta, grip.phi, grip.sf, grip.dp, grip.px, grip.py, grip.close, inside, body, gap * 1000f, tips, far, hidden, thumbAngle, spread, bend, flex, deviate, depression, radius);
+                return string.Format("a{0} b{1} phi{2} sf{3} dp{4} px{5} py{6} close{7}: 手が入った頂点 {8} 腕 {9} 隙間 {10:0.0}mm 指先の角 {11}（計器盤の側 {12}・目から隠れた {13}）親指の角 {14:0} 指の開き {15:0} 指の曲げ {21:0}/{22:0}/{23:0} 手首の曲げ {16:0}（掌屈 {17:0} 橈尺 {18:0}）下へ {19:0} 度 断面 {20:0.00}",
+                    grip.alpha, grip.beta, grip.phi, grip.sf, grip.dp, grip.px, grip.py, grip.close, inside, body, gap * 1000f, tips, far, hidden, thumbAngle, spread, bend, flex, deviate, depression, radius, curl.x, curl.y, curl.z);
             }
         }
 
@@ -52,11 +56,13 @@ namespace HalfAware.EditorTools.Study
         public static float Lean = BuildDrive.WheelLean;
         public static Vector3 Center = BuildDrive.WheelAt;
         public static readonly float Ring = BuildDrive.WheelRing;
-        public const float Tube = BuildDrive.WheelThick * 0.5f;
+        public static readonly float Tube = BuildDrive.WheelThick * 0.5f;
         static List<BuildDrive.WheelPart> parts;
         /// <summary>指を輪に沿わせて曲げる（BodyPoser.Wrap）。触れない指はこの角で止める</summary>
         public static Vector3 Relaxed = new Vector3(70f, 75f, 40f);
         public static float ThumbRelaxed = 30f;
+        /// <summary>握る前に四本の指をまっすぐへ戻すか（BodyPoser.Wrap の straighten）。戻すときの限りはまっすぐからの角</summary>
+        public static bool Straighten = false;
         /// <summary>null でなければ、指の関節ごとの曲げ（度、* は物に触れて止まった）を書く</summary>
         public static StringBuilder Log;
 
@@ -131,7 +137,7 @@ namespace HalfAware.EditorTools.Study
                 if (kv.Key.IsChildOf(hand)) kv.Key.localRotation = kv.Value;
             BodyPoser.Arm(an, left, wrist, pole, f, palm);
             if (g.close > 0f) BodyPoser.Close(an, left, g.close);
-            BodyPoser.Wrap(an, skin, left, Wheel, Relaxed, ThumbRelaxed, Log);
+            BodyPoser.Wrap(an, skin, left, Wheel, Relaxed, ThumbRelaxed, Log, Straighten);
 
             var res = new Result { grip = g };
             var bones = skin.bones;
@@ -169,6 +175,19 @@ namespace HalfAware.EditorTools.Study
             }
             var thumb = Tip(an.GetBoneTransform(left ? HumanBodyBones.LeftThumbDistal : HumanBodyBones.RightThumbDistal), bones, bw, v, hand.position);
             res.thumbAngle = AroundTube(thumb, c, n);
+            var sum = Vector3.zero;
+            foreach (var chain in HandStudy.Fingers(left))
+            {
+                if (chain[0].ToString().Contains("Thumb")) continue;
+                for (var j = 0; j < 3; j++)
+                {
+                    var bone = an.GetBoneTransform(chain[j]);
+                    var straight = BodyPoser.Straight(an, chain[j]);
+                    var b0 = straight.HasValue ? BodyPoser.BendAbout(Quaternion.Inverse(straight.Value) * bone.localRotation, BodyPoser.FlexAxis(an, chain[j])) : 0f;
+                    sum[j] += b0 / 4f;
+                }
+            }
+            res.curl = sum;
             res.spread = Spread(left);
 
             var armRest = ArmReach.RestOf(skin, upperArm, lower, hand);
@@ -182,6 +201,13 @@ namespace HalfAware.EditorTools.Study
                 float rr, ww;
                 gauge.Thinnest(out rr, out ww);
                 res.radius = rr;
+                var axes = new Dictionary<HumanBodyBones, Vector3>();
+                foreach (var chain in HandStudy.Fingers(left)) foreach (var hb in chain) axes[hb] = BodyPoser.FlexAxis(an, hb);
+                float worst;
+                res.joints = HandStudy.Joints(an, left, axes, rest, out worst) + "ひねり最大 " + worst.ToString("0");
+                var all = HandStudy.Measure(skin, an, left);
+                var fingers = HandStudy.Measure(skin, an, left, true);
+                res.skinNote = "手 " + all + " / 指 " + fingers;
             }
             return res;
         }
@@ -291,6 +317,9 @@ namespace HalfAware.EditorTools.Study
             {
                 if (u.inside + u.body != w.inside + w.body) return (u.inside + u.body).CompareTo(w.inside + w.body);
                 if (u.far + u.hidden != w.far + w.hidden) return (w.far + w.hidden).CompareTo(u.far + u.hidden);
+                var cu = u.curl.x + u.curl.y + u.curl.z;
+                var cw = w.curl.x + w.curl.y + w.curl.z;
+                if (Mathf.Abs(cu - cw) > 10f) return cw.CompareTo(cu);
                 return Mathf.Max(Mathf.Abs(u.flex), Mathf.Abs(u.deviate)).CompareTo(Mathf.Max(Mathf.Abs(w.flex), Mathf.Abs(w.deviate)));
             });
             var sb = new StringBuilder();
@@ -312,7 +341,8 @@ namespace HalfAware.EditorTools.Study
                 var r = Try(false, right, gauge);
                 var l = Try(true, leftGrip, gauge);
                 var sb = new StringBuilder();
-                sb.AppendLine("右 " + r).AppendLine("左 " + l);
+                sb.AppendLine("右 " + r).AppendLine("   " + r.joints).AppendLine("   " + r.skinNote);
+                sb.AppendLine("左 " + l).AppendLine("   " + l.joints).AppendLine("   " + l.skinNote);
                 sb.AppendLine(Cameras(tag, pitches));
                 return sb.ToString();
             }
@@ -379,12 +409,96 @@ namespace HalfAware.EditorTools.Study
                     cam.transform.LookAt(grip);
                     Grab(cam, tag + v.name + ".png", 480, 360);
                 }
+                Clean(cam, tag, grip);
             }
             finally
             {
                 Object.DestroyImmediate(cam.gameObject);
             }
             return result;
+        }
+
+        /// <summary>
+        /// 車を伏せ、輪だけを明るい色の箱で置いて、右手を五つの向きから撮る（{tag}_c_eye・_c_top・_c_out・_c_front・_c_below）。
+        /// 計器盤や座席と重なって手の形が読めないのを避ける
+        /// </summary>
+        static void Clean(Camera cam, string tag, Vector3 grip)
+        {
+            var hidden = new List<Renderer>();
+            foreach (var r in car.GetComponentsInChildren<Renderer>())
+                if (r.enabled) { r.enabled = false; hidden.Add(r); }
+            var garage = GameObject.Find("Drive/Garage");
+            if (garage != null)
+                foreach (var r in garage.GetComponentsInChildren<Renderer>())
+                    if (r.enabled) { r.enabled = false; hidden.Add(r); }
+            var holder = new GameObject("StudyWheel") { hideFlags = HideFlags.HideAndDontSave };
+            var mat = new Material(Shader.Find("Universal Render Pipeline/Lit")) { hideFlags = HideFlags.HideAndDontSave };
+            mat.SetColor("_BaseColor", new Color(0.85f, 0.45f, 0.15f));
+            try
+            {
+                if (parts == null) Reset();
+                foreach (var part in parts)
+                {
+                    if (part.torus)
+                    {
+                        var verts = new List<Vector3>();
+                        var tris = new List<int>();
+                        for (var i = 0; i < BuildDrive.RimSegments; i++)
+                            for (var j = 0; j < BuildDrive.TubeSegments; j++)
+                            {
+                                var k = verts.Count;
+                                verts.Add(BuildDrive.TorusPoint(part, i, j));
+                                verts.Add(BuildDrive.TorusPoint(part, i + 1, j));
+                                verts.Add(BuildDrive.TorusPoint(part, i + 1, j + 1));
+                                verts.Add(BuildDrive.TorusPoint(part, i, j + 1));
+                                tris.AddRange(new[] { k, k + 3, k + 2, k, k + 2, k + 1 });
+                            }
+                        var mesh = new Mesh { hideFlags = HideFlags.HideAndDontSave };
+                        mesh.SetVertices(verts);
+                        mesh.SetTriangles(tris, 0);
+                        mesh.RecalculateNormals();
+                        var ringGo = new GameObject("Ring") { hideFlags = HideFlags.HideAndDontSave };
+                        ringGo.transform.SetParent(holder.transform, false);
+                        ringGo.transform.SetPositionAndRotation(car.position, car.rotation);
+                        ringGo.AddComponent<MeshFilter>().sharedMesh = mesh;
+                        ringGo.AddComponent<MeshRenderer>().sharedMaterial = mat;
+                        continue;
+                    }
+                    var box = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    box.hideFlags = HideFlags.HideAndDontSave;
+                    box.transform.SetParent(holder.transform, false);
+                    box.transform.position = car.TransformPoint(part.centre);
+                    box.transform.rotation = car.rotation * part.rotation;
+                    box.transform.localScale = part.size;
+                    box.GetComponent<Renderer>().sharedMaterial = mat;
+                }
+                var tilt = car.rotation * Quaternion.Euler(Lean, 0f, 0f);
+                var n = tilt * Vector3.back;
+                var up = tilt * Vector3.up;
+                var r0 = car.right;
+                var eye = player.TransformPoint(new Vector3(0f, 0f, BuildDrive.EyeLead));
+                var views = new[]
+                {
+                    new { name = "_c_eye", at = grip + (eye - grip).normalized * 0.35f },
+                    new { name = "_c_top", at = grip + up * 0.30f + n * 0.08f },
+                    new { name = "_c_out", at = grip + r0 * 0.30f + n * 0.05f },
+                    new { name = "_c_front", at = grip - n * 0.30f + up * 0.05f },
+                    new { name = "_c_below", at = grip - up * 0.30f + n * 0.05f },
+                };
+                cam.fieldOfView = 35f;
+                foreach (var v in views)
+                {
+                    cam.transform.position = v.at;
+                    cam.transform.LookAt(grip, up);
+                    Grab(cam, tag + v.name + ".png", 400, 300);
+                }
+            }
+            finally
+            {
+                Object.DestroyImmediate(holder);
+                Object.DestroyImmediate(mat);
+                foreach (var r in hidden) if (r != null) r.enabled = true;
+            }
         }
 
         static void Grab(Camera cam, string name, int w, int h)

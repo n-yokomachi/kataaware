@@ -2272,33 +2272,60 @@ namespace HalfAware.EditorTools
         static void Wheel(Bank rim, Bank spoke, Vector3 centre, float outer, float thick, float lean)
         {
             foreach (var part in WheelParts(centre, outer, thick, lean))
-                (part.rim ? rim : spoke).Box(part.centre, part.size, part.rotation);
+            {
+                if (part.torus) Torus(part.rim ? rim : spoke, part);
+                else (part.rim ? rim : spoke).Box(part.centre, part.size, part.rotation);
+            }
         }
 
-        /// <summary>ハンドルの箱一つ。rim は黒い樹脂（輪と警笛の押し）、でなければ塗った鉄（芯と輻）。値は車から見た位置・大きさ・向き</summary>
+        /// <summary>輪の周りの割り数と、管の周りの割り数</summary>
+        public const int RimSegments = 32, TubeSegments = 10;
+
+        /// <summary>輪（管を円に曲げた形）を面で張る。管の断面は丸い</summary>
+        static void Torus(Bank bank, WheelPart part)
+        {
+            for (var i = 0; i < RimSegments; i++)
+                for (var j = 0; j < TubeSegments; j++)
+                {
+                    var a = TorusPoint(part, i, j);
+                    var b = TorusPoint(part, i + 1, j);
+                    var c = TorusPoint(part, i + 1, j + 1);
+                    var d = TorusPoint(part, i, j + 1);
+                    bank.Quad(a, d, c, b);
+                }
+        }
+
+        /// <summary>輪の上の点。i は輪の周り、j は管の周り（0 が輪の外周の側）</summary>
+        public static Vector3 TorusPoint(WheelPart part, int i, int j)
+        {
+            var t = i * Mathf.PI * 2f / RimSegments;
+            var p = j * Mathf.PI * 2f / TubeSegments;
+            var r = part.ring + part.tube * Mathf.Cos(p);
+            return part.centre + part.rotation * new Vector3(Mathf.Cos(t) * r, Mathf.Sin(t) * r, part.tube * Mathf.Sin(p));
+        }
+
+        /// <summary>
+        /// ハンドルの形一つ。rim は黒い樹脂（輪と警笛の押し）、でなければ塗った鉄（芯と輻と柱）。値は車から見た位置・大きさ・向き。
+        /// torus なら輪（ring は輪の芯の半径、tube は管の半径、rotation は輪の面の向き）、でなければ箱（size）
+        /// </summary>
         public struct WheelPart
         {
-            public bool rim;
+            public bool rim, torus;
             public Vector3 centre, size;
             public Quaternion rotation;
+            public float ring, tube;
         }
 
-        /// <summary>ハンドルを組む箱。組むのにも、手が輪に触れたかを測るのにも使う</summary>
+        /// <summary>
+        /// ハンドルを組む形。組むのにも、手が輪に触れたかを測るのにも使う。
+        /// **輪は丸い管にする。** 前は四角い箱を 20 個並べていて、握った指が箱の角で折れ、手が不自然に見えた
+        /// </summary>
         public static List<WheelPart> WheelParts(Vector3 centre, float outer, float thick, float lean)
         {
             var parts = new List<WheelPart>();
-            const int seg = 20;
             var tilt = Quaternion.Euler(lean, 0f, 0f);
             var ring = outer * 0.5f - thick * 0.5f;
-            // 継ぎ目を少し重ねる。ぴったりだと角と角のあいだに隙間が見える
-            var chord = 2f * Mathf.PI * ring / seg * 1.08f;
-            for (var i = 0; i < seg; i++)
-            {
-                var a = (i + 0.5f) / seg * Mathf.PI * 2f;
-                var at = new Vector3(Mathf.Cos(a) * ring, Mathf.Sin(a) * ring, 0f);
-                var rot = tilt * Quaternion.Euler(0f, 0f, a * Mathf.Rad2Deg + 90f);
-                parts.Add(new WheelPart { rim = true, centre = centre + tilt * at, size = new Vector3(chord, thick, thick), rotation = rot });
-            }
+            parts.Add(new WheelPart { rim = true, torus = true, centre = centre, rotation = tilt, ring = ring, tube = thick * 0.5f });
             parts.Add(new WheelPart { rim = false, centre = centre, size = new Vector3(0.11f, 0.11f, 0.045f), rotation = tilt });
             // 警笛の押し。芯の面から運転席の側へ出す。
             // ここだけ輪と同じ黒い樹脂にする。芯まで鉄で塗ると、昼の帯で
@@ -2324,15 +2351,24 @@ namespace HalfAware.EditorTools
             return WheelGap(local, wheelParts);
         }
 
-        /// <summary>車から見た点 local から、箱の組 parts の面までの距離。中なら負</summary>
+        /// <summary>車から見た点 local から、形の組 parts の面までの距離。中なら負</summary>
         public static float WheelGap(Vector3 local, List<WheelPart> parts)
         {
             var best = float.MaxValue;
             foreach (var part in parts)
             {
                 var q = Quaternion.Inverse(part.rotation) * (local - part.centre);
-                var d = new Vector3(Mathf.Abs(q.x) - part.size.x * 0.5f, Mathf.Abs(q.y) - part.size.y * 0.5f, Mathf.Abs(q.z) - part.size.z * 0.5f);
-                var gap = Vector3.Max(d, Vector3.zero).magnitude + Mathf.Min(Mathf.Max(d.x, Mathf.Max(d.y, d.z)), 0f);
+                float gap;
+                if (part.torus)
+                {
+                    var radial = new Vector2(q.x, q.y).magnitude - part.ring;
+                    gap = new Vector2(radial, q.z).magnitude - part.tube;
+                }
+                else
+                {
+                    var d = new Vector3(Mathf.Abs(q.x) - part.size.x * 0.5f, Mathf.Abs(q.y) - part.size.y * 0.5f, Mathf.Abs(q.z) - part.size.z * 0.5f);
+                    gap = Vector3.Max(d, Vector3.zero).magnitude + Mathf.Min(Mathf.Max(d.x, Mathf.Max(d.y, d.z)), 0f);
+                }
                 if (gap < best) best = gap;
             }
             return best;

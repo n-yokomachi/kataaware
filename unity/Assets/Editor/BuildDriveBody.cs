@@ -42,18 +42,21 @@ namespace HalfAware.EditorTools
         /// <summary>手の向き（手首から中指の付け根へ）と、輪に沿って 12 時へ向かう向きのなす角。度。90 で輪に直に交わる</summary>
         const float GripCross = 60f;
         /// <summary>手のひらが輪の断面のどこに当たるか。度。輪の面から運転席の側を 0、輪の外周の側を 90 として、外周から少し計器盤の側</summary>
-        const float GripAround = 120f;
-        /// <summary>輪の芯を、手の骨（手首）から手の向きへ離す量。指の付け根（手首から 9.4 cm）の少し手前に輪が来る</summary>
-        const float GripReach = 0.09f;
-        /// <summary>輪の芯を、手の骨から手のひらの側へ離す量。手のひらの厚みと輪の太さの半分</summary>
-        const float GripDepth = 0.055f;
+        const float GripAround = 105f;
+        /// <summary>輪の芯を、手の骨（手首）から手の向きへ離す量。指の付け根（手首から 8.7 cm）の手前、手のひらの指寄りに輪が来る</summary>
+        const float GripReach = 0.07f;
+        /// <summary>輪の芯を、手の骨から手のひらの側へ離す量。手の骨から手のひらの面まで（2.5 cm）と輪の太さの半分</summary>
+        const float GripDepth = 0.042f;
         /// <summary>肘を寄せる所。運転席の真ん中から横へ、と高さ。肘は軽く曲げて体の横へ下ろす</summary>
         const float GripElbow = 0.35f;
         const float GripElbowY = 0.95f;
         /// <summary>握る前に指をそろえる割合（<see cref="BodyPoser.Close"/>）。立ちの形の指は開いている</summary>
-        const float GripClose = 0.7f;
-        /// <summary>握りの指が輪に触れないまま曲がるときの限り（付け根・中・先、度）。輪の太さを握るくらいで止め、鉤爪にしない</summary>
-        static readonly Vector3 GripFingerMost = new Vector3(70f, 75f, 40f);
+        const float GripClose = 0.35f;
+        /// <summary>
+        /// 握りの指の曲げの限り（付け根・中・先、まっすぐな指からの度）。握る前に指をまっすぐへ戻し、輪に触れるまで曲げる。
+        /// 触れないまま曲がる関節もここで止め、関節の限り（85・100・70）まで曲げた鉤爪にしない
+        /// </summary>
+        static readonly Vector3 GripFingerMost = new Vector3(70f, 85f, 40f);
         /// <summary>握りの親指の、関節ごとの曲げの限り。度</summary>
         const float GripThumbMost = 30f;
 
@@ -112,7 +115,7 @@ namespace HalfAware.EditorTools
                 for (var k = 0; k < 2; k++)
                 {
                     BodyPoser.Close(an, k == 0, GripClose);
-                    BodyPoser.Wrap(an, skin, k == 0, gap, GripFingerMost, GripThumbMost);
+                    BodyPoser.Wrap(an, skin, k == 0, gap, GripFingerMost, GripThumbMost, null, true);
                 }
                 BodyPoser.Write(pose, "alternate", BodyPoser.Capture(an));
                 note.AppendFormat("ハンドルの形: ハンドルの中へ入った体の頂点 {0} 個", InWheel(her, car)).AppendLine();

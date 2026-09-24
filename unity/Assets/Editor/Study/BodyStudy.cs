@@ -277,8 +277,9 @@ namespace HalfAware.EditorTools.Study
             var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
             var mf = cable.GetComponent<MeshFilter>();
             // 道筋の配列がまだ無い（Awake が走っていない）ときも作らせる。場面を組み直した直後は、メッシュだけが前の場面から残っている
-            var path = typeof(Cable).GetField("path", bf).GetValue(cable);
-            if (path == null || mf.sharedMesh == null || mf.sharedMesh.name != "Cable") typeof(Cable).GetMethod("Awake", bf).Invoke(cable, null);
+            // エディタでスクリプトを組み直すと、非公開の配列は空の配列で戻る（null ではない）。空のときも作り直させる
+            var path = typeof(Cable).GetField("path", bf).GetValue(cable) as System.Array;
+            if (path == null || path.Length == 0 || mf.sharedMesh == null || mf.sharedMesh.name != "Cable") typeof(Cable).GetMethod("Awake", bf).Invoke(cable, null);
             typeof(Cable).GetMethod("LateUpdate", bf).Invoke(cable, null);
             foreach (var v in mf.sharedMesh.vertices) list.Add(cable.transform.TransformPoint(v));
             return list;

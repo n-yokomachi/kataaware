@@ -293,7 +293,9 @@ namespace HalfAware.EditorTools.Rocketbox
             mesh.SetNormals(norms);
             mesh.SetUVs(0, uvs);
             mesh.boneWeights = weights.ToArray();
-            mesh.bindposes = bm.bindposes;
+            // 華奢で頂点を動かした所へ、骨も同じだけ動かす（束ねた姿勢を骨の動いた先で取り直す）
+            var slimBones = who.Slim ? SlimBones(who, bodySmr) : new Dictionary<string, Vector3>();
+            mesh.bindposes = ShiftBind(bm.bindposes, bodySmr, slimBones);
             mesh.subMeshCount = 3 + (chestTris != null ? 1 : 0) + (legsOut != null ? 1 : 0) + (dressOut != null ? 1 : 0);
             mesh.SetTriangles(bodyTris, 0);
             mesh.SetTriangles(headTris, 1);
@@ -304,6 +306,7 @@ namespace HalfAware.EditorTools.Rocketbox
             if (dressOut != null) mesh.SetTriangles(dressOut, nextSub++);
             mesh.RecalculateBounds();
             Save(mesh, who.CompositeMesh);
+            var avatarNote = who.Slim ? BuildAvatar(who, slimBones) : null;
 
             var finalWorld = World(verts.ToArray(), bodyToWorld);
             var seam = SeamGap(bw, bm.GetTriangles(bodySub), bodySkin, new Surface(finalWorld, headTris));
@@ -315,7 +318,173 @@ namespace HalfAware.EditorTools.Rocketbox
                 who, verts.Count, (bodyTris.Length + headTris.Length + hairTris.Length) / 3, bodyTris.Length / 3, headTris.Length / 3, hairTris.Length / 3,
                 snapped, maxSnap * 1000f, pushedIn, maxIn * 1000f, hairInside, worstHair * 1000f, pushedOut, HairOver * 1000f, maxOut * 1000f,
                 seam, who.CompositeMesh, patch.Count / 3) + (legsNote != null ? "\n" + legsNote : "") + (dressNote != null ? "\n" + dressNote : "")
-                + (slimNote != null ? "\n" + slimNote : "");
+                + (slimNote != null ? "\n" + slimNote : "") + (avatarNote != null ? "\n" + avatarNote : "");
+        }
+
+        /// <summary>
+        /// 華奢で頂点を動かした所に合わせて、骨も同じだけ動かす量（束ねた姿勢の世界のずれ。骨の名前ごと）。
+        /// 手と指の頂点は手の骨のまわりに HandScale 倍へ縮め、鎖骨と腕と手は ShoulderIn だけ体の側へ寄せている（<see cref="Slim"/>）。
+        /// 骨を動かさないと、指の関節が肌の折れ目から 1 cm 余りずれ（手のひらの向きにも 1 cm 余り）、指や肘を曲げると
+        /// 肌が関節の外で折れて、尖ったり潰れたりする。骨の軸へ寄せるだけの手入れ（腕・脚・首の細め）は、骨の上の点を動かさない。
+        /// 胴の細め（前後の真ん中へ寄せる）は背骨を 1〜2 mm 動かすだけなので、骨は動かさない
+        /// </summary>
+        public static Dictionary<string, Vector3> SlimBones(RocketboxPerson who, SkinnedMeshRenderer smr)
+        {
+            var moves = new Dictionary<string, Vector3>();
+            var byName = new Dictionary<string, Transform>();
+            foreach (var t in smr.transform.root.GetComponentsInChildren<Transform>(true)) byName[t.name] = t;
+            foreach (var t in byName.Values)
+            {
+                var n = t.name;
+                var sideSign = n.Contains(" L ") ? -1f : n.Contains(" R ") ? 1f : 0f;
+                if (sideSign == 0f) continue;
+                var side = sideSign < 0f ? "L" : "R";
+                var p = t.position;
+                var q = p;
+                if (n.EndsWith(" Hand") || n.Contains(" Finger"))
+                {
+                    Transform hand;
+                    if (byName.TryGetValue("Bip01 " + side + " Hand", out hand)) q = hand.position + (p - hand.position) * who.HandScale;
+                }
+                else if (who.SlimLegs && (n.EndsWith(" Foot") || n.Contains(" Toe")))
+                {
+                    Transform foot;
+                    if (byName.TryGetValue("Bip01 " + side + " Foot", out foot)) q = new Vector3(foot.position.x + (p.x - foot.position.x) * who.SlimWrist, p.y, p.z);
+                }
+                if (n.Contains("Clavicle") || n.Contains("Arm") || n.EndsWith(" Forearm") || n.EndsWith(" Hand") || n.Contains(" Finger"))
+                    q.x -= sideSign * who.ShoulderIn * (n.Contains("Clavicle") ? 0.6f : 1f);
+                if ((q - p).sqrMagnitude > 1e-12f) moves[n] = q - p;
+            }
+            return moves;
+        }
+
+        /// <summary>骨を束ねた姿勢の世界で moves だけ動かしたときの、束ねた姿勢（mesh の中から骨の中への行列）</summary>
+        static Matrix4x4[] ShiftBind(Matrix4x4[] bind, SkinnedMeshRenderer smr, Dictionary<string, Vector3> moves)
+        {
+            var o = (Matrix4x4[])bind.Clone();
+            var l2w = smr.transform.localToWorldMatrix;
+            var w2l = smr.transform.worldToLocalMatrix;
+            var bones = smr.bones;
+            for (var i = 0; i < bones.Length && i < o.Length; i++)
+            {
+                Vector3 d;
+                if (bones[i] != null && moves.TryGetValue(bones[i].name, out d))
+                    o[i] = bind[i] * w2l * Matrix4x4.Translate(-d) * l2w;
+            }
+            return o;
+        }
+
+        /// <summary>
+        /// 骨を moves だけ動かした Humanoid の骨組みを作って who.SlimAvatar に書く。
+        /// Humanoid の動きは骨の位置を骨組みの値へ戻すので、動かした骨の位置は骨組みの側に持たせる
+        /// （組み立てで骨を動かすだけだと、立ちの動きを当てた途端に元の位置へ戻る）
+        /// </summary>
+        public static string BuildAvatar(RocketboxPerson who, Dictionary<string, Vector3> moves)
+        {
+            var src = AssetDatabase.LoadAssetAtPath<GameObject>(who.Model);
+            var baseAnimator = src != null ? src.GetComponent<Animator>() : null;
+            if (baseAnimator == null || baseAnimator.avatar == null) return "骨組みを作れない（模型に Humanoid の骨組みが無い）: " + who.Model;
+            // 動かす量を、親から見た位置のずれへ直す（束ねた姿勢の世界のずれを、親の向きで読む）。
+            // 骨組みの基の姿勢（取り込みで決めた T の字）は束ねた姿勢と腕の向きが違うので、世界のずれのままでは足せない
+            var byName = new Dictionary<string, Transform>();
+            foreach (var t in src.GetComponentsInChildren<Transform>(true)) byName[t.name] = t;
+            var local = new Dictionary<string, Vector3>();
+            foreach (var kv in moves)
+            {
+                Transform t;
+                if (!byName.TryGetValue(kv.Key, out t) || t.parent == null) continue;
+                Vector3 parentMove;
+                if (!moves.TryGetValue(t.parent.name, out parentMove)) parentMove = Vector3.zero;
+                local[kv.Key] = t.parent.InverseTransformVector(kv.Value - parentMove);
+            }
+            var hd = baseAnimator.avatar.humanDescription;
+            var sk = hd.skeleton;
+            // 指の骨の基の向きから、束ねた姿勢（メッシュを作った姿勢）に対するひねり（骨の長さの軸まわり）を除く。
+            // 取り込みの骨組みでは指の基の向きが束ねた姿勢からひねれていて（中指 16°、薬指 17°、小指 34°、親指 92°）、
+            // 筋肉の値 0 の指がひねれた形になり、指の付け根の肌がねじれて伸びた。曲げと開きは元の骨組みのまま残す
+            var bindLocal = BindLocalRotations(src.GetComponentInChildren<SkinnedMeshRenderer>());
+            var names = new Dictionary<string, Transform>();
+            foreach (var t in src.GetComponentsInChildren<Transform>(true)) names[t.name] = t;
+            var turned = 0;
+            for (var k = 0; k < sk.Length; k++)
+            {
+                Vector3 d;
+                if (local.TryGetValue(sk[k].name, out d)) sk[k].position += d;
+                Quaternion q;
+                Transform bone;
+                if (!sk[k].name.Contains(" Finger") || !bindLocal.TryGetValue(sk[k].name, out q) || !names.TryGetValue(sk[k].name, out bone)) continue;
+                // 骨の長さの軸（骨の枠で見た向き）。子が無い末節は、親から自分への向きと同じ軸
+                var along = bone.childCount > 0 ? bone.GetChild(0).localPosition.normalized : bone.localPosition.normalized;
+                var rel = Quaternion.Inverse(q) * sk[k].rotation;
+                var p = Vector3.Project(new Vector3(rel.x, rel.y, rel.z), along);
+                var twist = new Quaternion(p.x, p.y, p.z, rel.w);
+                var m = Mathf.Sqrt(twist.x * twist.x + twist.y * twist.y + twist.z * twist.z + twist.w * twist.w);
+                if (m < 1e-9f) continue;
+                twist = new Quaternion(twist.x / m, twist.y / m, twist.z / m, twist.w / m);
+                sk[k].rotation = q * (rel * Quaternion.Inverse(twist));
+                turned++;
+            }
+            hd.skeleton = sk;
+            var go = (GameObject)Object.Instantiate(src);
+            try
+            {
+                // 写しの骨を、骨組みの基の姿勢（動かした位置）に揃えてから組む
+                var inst = new Dictionary<string, Transform>();
+                foreach (var t in go.GetComponentsInChildren<Transform>(true)) inst[t.name] = t;
+                foreach (var bone in sk)
+                {
+                    Transform t;
+                    if (!inst.TryGetValue(bone.name, out t) || t == go.transform) continue;
+                    t.localPosition = bone.position;
+                    t.localRotation = bone.rotation;
+                    t.localScale = bone.scale;
+                }
+                var avatar = AvatarBuilder.BuildHumanAvatar(go, hd);
+                if (avatar == null || !avatar.isValid || !avatar.isHuman) return "骨組みを作れない（AvatarBuilder が失敗した）: " + who.Name;
+                avatar.name = System.IO.Path.GetFileNameWithoutExtension(who.SlimAvatar);
+                var old = AssetDatabase.LoadAssetAtPath<Avatar>(who.SlimAvatar);
+                if (old != null)
+                {
+                    // 同じ GUID のまま中身を差し替える。場面の Animator が指したままになる
+                    EditorUtility.CopySerialized(avatar, old);
+                    Object.DestroyImmediate(avatar);
+                    EditorUtility.SetDirty(old);
+                }
+                else AssetDatabase.CreateAsset(avatar, who.SlimAvatar);
+                AssetDatabase.SaveAssets();
+                return string.Format(CultureInfo.InvariantCulture, "骨組み: 華奢に合わせて {0} 本の骨を動かし、指の骨 {2} 本の基の向きからひねりを除いた Humanoid の骨組みを書いた: {1}", local.Count, who.SlimAvatar, turned);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        /// <summary>骨ごとの、束ねた姿勢での親から見た向き（bindposes から読む）</summary>
+        static Dictionary<string, Quaternion> BindLocalRotations(SkinnedMeshRenderer smr)
+        {
+            var map = new Dictionary<string, Quaternion>();
+            if (smr == null) return map;
+            var bones = smr.bones;
+            var bind = smr.sharedMesh.bindposes;
+            var world = new Dictionary<Transform, Quaternion>();
+            var l2w = smr.transform.localToWorldMatrix;
+            for (var i = 0; i < bones.Length && i < bind.Length; i++)
+                if (bones[i] != null) world[bones[i]] = (l2w * bind[i].inverse).rotation;
+            foreach (var kv in world)
+            {
+                Quaternion parent;
+                if (kv.Key.parent == null || !world.TryGetValue(kv.Key.parent, out parent)) continue;
+                map[kv.Key.name] = Quaternion.Inverse(parent) * kv.Value;
+            }
+            return map;
+        }
+
+        static int Depth(Transform t)
+        {
+            var d = 0;
+            while (t.parent != null) { t = t.parent; d++; }
+            return d;
         }
 
         /// <summary>位置の 0.2 mm ごとの鍵（UV の継ぎ目で分かれた同じ位置の頂点を一つに見る）</summary>
@@ -418,8 +587,8 @@ namespace HalfAware.EditorTools.Rocketbox
                             : Mathf.Lerp(1f, who.SlimTorso, Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(hipY, waistY, p.y)));
                         q = new Vector3(p.x * st, p.y, z0 + (p.z - z0) * Mathf.Lerp(1f, st, 0.5f));
                     }
-                    // 肩幅: 鎖骨・腕・手を体の側へ
-                    if (!neckOnly && sideSign != 0f && (n.Contains("Clavicle") || n.Contains("Arm") || n.EndsWith(" Hand") || n.Contains(" Finger")))
+                    // 肩幅: 鎖骨・腕・手を体の側へ（前腕の骨の名前は Forearm で、Arm を含まない。前は前腕だけ寄せ忘れて、肘と手首で腕が横にずれていた）
+                    if (!neckOnly && sideSign != 0f && (n.Contains("Clavicle") || n.Contains("Arm") || n.EndsWith(" Forearm") || n.EndsWith(" Hand") || n.Contains(" Finger")))
                         q.x -= sideSign * who.ShoulderIn * (n.Contains("Clavicle") ? 0.6f : 1f);
                     sum += q * wts[e];
                     ws += wts[e];

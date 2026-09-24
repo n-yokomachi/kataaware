@@ -96,6 +96,10 @@ namespace HalfAware.EditorTools.Rocketbox
                 var smr = her.GetComponentInChildren<SkinnedMeshRenderer>();
                 smr.sharedMesh = mesh;
                 smr.name = who.Name;
+                // 華奢に合わせて骨を動かした骨組み（RocketboxCompose.BuildAvatar）があれば、骨をその位置へ置き、骨組みを差し替える
+                var avatar = AssetDatabase.LoadAssetAtPath<Avatar>(who.SlimAvatar);
+                var an = her.GetComponent<Animator>();
+                if (avatar != null && an != null) an.avatar = avatar;
             }
             Dress(her, skin, twin && mode == TwinMode.MoleOnly);
             Shape(her, skin.JawScale, skin.JawClose);
@@ -108,7 +112,29 @@ namespace HalfAware.EditorTools.Rocketbox
                 skin.HatNote = RocketboxHat.Put(her, hatSmr, Maps.Get(skin.Person, 512).Anchors, skin.Look, persist ? skin.Person.Dir : null, skin.Made);
             }
             AddAnimator(her);
+            // 骨組みを差し替えた人は、骨もその骨組みの位置へ置く。Animator を繋ぎ直すと模型の元の位置へ戻るので、最後に置く
+            PlaceSkeleton(her);
             return her;
+        }
+
+        /// <summary>
+        /// Humanoid に当てた骨を、Animator の骨組みが持つ位置（親から見た位置）へ置く。
+        /// Humanoid に当てていない骨（瞼・顎など、ShapeFace が動かした骨）には触らない
+        /// </summary>
+        static void PlaceSkeleton(GameObject her)
+        {
+            var an = her.GetComponent<Animator>();
+            if (an == null || an.avatar == null || !an.avatar.isHuman) return;
+            var hd = an.avatar.humanDescription;
+            var human = new HashSet<string>();
+            foreach (var h in hd.human) human.Add(h.boneName);
+            var byName = new Dictionary<string, Transform>();
+            foreach (var t in her.GetComponentsInChildren<Transform>(true)) byName[t.name] = t;
+            foreach (var bone in hd.skeleton)
+            {
+                Transform t;
+                if (human.Contains(bone.name) && byName.TryGetValue(bone.name, out t) && t != her.transform) t.localPosition = bone.position;
+            }
         }
 
         /// <summary>

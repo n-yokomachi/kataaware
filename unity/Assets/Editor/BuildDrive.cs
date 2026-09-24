@@ -650,8 +650,8 @@ namespace HalfAware.EditorTools
         public static readonly Vector3 WheelAt = new Vector3(0.38f, 1.18f, 0.40f);
         /// <summary>輪の外径</summary>
         public const float WheelOuter = 0.36f;
-        /// <summary>輪の太さ</summary>
-        public const float WheelThick = 0.035f;
+        /// <summary>輪の太さ（丸い管の径）。握った指が回り込める太さ</summary>
+        public const float WheelThick = 0.032f;
         /// <summary>
         /// 輪を x 軸まわりに倒す角。度。0 で輪が鉛直に立ち、上の縁が計器盤の側へ倒れる。
         /// 前は 68° 倒してバスのように寝かせていたが、それでは手を上から載せる形にしかならず、

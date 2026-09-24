@@ -487,6 +487,9 @@ namespace HalfAware.EditorTools.Rocketbox
         public string Model { get { return IsComposite ? BodyFrom.Model : Dir + Name + ".fbx"; } }
         /// <summary>組み合わせたメッシュ（組み合わせのときだけ）</summary>
         public string CompositeMesh { get { return Dir + Name + "_mesh.asset"; } }
+
+        /// <summary>華奢に合わせて骨を動かした Humanoid の骨組み（<see cref="RocketboxCompose.BuildAvatar"/>）。無ければ体の人の模型の骨組みのまま</summary>
+        public string SlimAvatar { get { return Dir + Name + "_avatar.asset"; } }
         /// <summary>顔（と頭）のテクスチャ</summary>
         public string HeadSrc { get { return IsComposite ? FaceFrom.HeadSrc : Dir + Prefix + "_head_color.png"; } }
         public string BodySrc { get { return IsComposite ? BodyFrom.BodySrc : Dir + Prefix + "_body_color.png"; } }

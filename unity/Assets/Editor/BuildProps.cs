@@ -405,7 +405,13 @@ namespace HalfAware.EditorTools
             so.FindProperty("fromAxis").vector3Value = new Vector3(0.35f, 1f, 0f).normalized;
             so.FindProperty("toAxis").vector3Value = Vector3.forward;
             so.ApplyModifiedPropertiesWithoutUndo();
+            // 被膜は明るい灰の樹脂にする。前は机の墨（Ink）と同じ黒で、暗い部屋と机に溶けて、抜いたジャックから伸びる線が見えなかった
+            var r = cable.GetComponent<Renderer>();
+            if (r != null) r.sharedMaterial = Tinted("Cable", CableColour, 0f, 0.35f);
         }
+
+        /// <summary>ケーブルの被膜の色。暗い部屋でも机と床から分かれる明るさの灰</summary>
+        public static readonly Color CableColour = new Color(0.36f, 0.37f, 0.39f);
 
         /// <summary>巻き取りを切ったときのケーブルの長さ（m）。抜いて目の前へ出したとき、差込口から張って見える長さ</summary>
         public const float CableLength = 0.55f;
