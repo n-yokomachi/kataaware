@@ -39,6 +39,17 @@ namespace HalfAware
             return Mathf.Clamp(groundSpeed / NominalWalk, SlowestCycle, FastestCycle);
         }
 
+        /// <summary>
+        /// 止めたら立ち止まる。CharacterController の速さは Move を呼ばない限り最後の値のまま残るので、
+        /// 歩いている途中で演出が歩きを止めると、止めた後も足踏みを続ける
+        /// </summary>
+        void OnDisable()
+        {
+            if (animator == null || !animator.isActiveAndEnabled) return;
+            animator.SetFloat(SpeedId, 0f);
+            animator.SetFloat(CycleId, Cycle(0f));
+        }
+
         void Update()
         {
             if (animator == null || !animator.enabled || body == null) return;

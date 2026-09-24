@@ -63,27 +63,11 @@ namespace HalfAware.EditorTools
             var player = GameObject.Find("Player");
             if (player == null) { note.AppendLine("Player が無い"); return false; }
             var old = player.transform.Find("Protagonist");
-            var pc = player.GetComponent<PlayerController>();
-            var eyeLead = pc != null ? new SerializedObject(pc).FindProperty("eyeLead").floatValue : 0.22f;
+            var eyeLead = EyeLead(player.transform);
 
-            var her = BuildRocketboxProtagonist.Build(player.transform, false);
-            her.name = "Protagonist";
+            var her = Body(player.transform, eyeLead, note);
             if (old != null) her.transform.SetSiblingIndex(old.GetSiblingIndex());
-            SplitHead(her);
             var an = her.GetComponent<Animator>();
-
-            // 立った形で目を測り、カメラの目（Player から見た (0, 目の高さ, eyeLead)）に重なる所へ体を置く
-            BodyPoser.Stand(an);
-            her.transform.localPosition = Vector3.zero;
-            var eye = player.transform.InverseTransformPoint(BodyPoser.Eyes(an));
-            her.transform.localPosition = new Vector3(-eye.x, 0f, eyeLead - eye.z);
-            note.AppendFormat("立った目: 足元から {0:0.000} m（カメラは {1:0.000} m）。体を前へ {2:0.000} m 置いた", eye.y, PlayerController.StandingEyeHeight, eyeLead - eye.z).AppendLine();
-
-            var motion = her.AddComponent<BodyMotion>();
-            var mso = new SerializedObject(motion);
-            mso.FindProperty("body").objectReferenceValue = player.GetComponent<CharacterController>();
-            mso.FindProperty("animator").objectReferenceValue = an;
-            mso.ApplyModifiedPropertiesWithoutUndo();
 
             var flow = Object.FindFirstObjectByType<SceneFlow>(FindObjectsInactive.Include);
             if (room && !Room(player, old, her, an, eyeLead, flow, note)) return false;
@@ -101,6 +85,55 @@ namespace HalfAware.EditorTools
             Remap(old != null ? old.gameObject : null, her, note);
             if (old != null) Object.DestroyImmediate(old.gameObject);
             return true;
+        }
+
+        /// <summary>カメラを体の前へ出す量。PlayerController の eyeLead</summary>
+        public static float EyeLead(Transform player)
+        {
+            var pc = player.GetComponent<PlayerController>();
+            return pc != null ? new SerializedObject(pc).FindProperty("eyeLead").floatValue : 0.22f;
+        }
+
+        /// <summary>
+        /// 主人公の体を Player の下に作り、立った形で置く。頭は一人称のカメラに映さない形に分け、歩きの動きを繋ぐ。
+        /// 体の根は、立った目がカメラの目（Player から見た (0, 目の高さ, eyeLead)）に重なる所
+        /// </summary>
+        public static GameObject Body(Transform player, float eyeLead, StringBuilder note)
+        {
+            var her = BuildRocketboxProtagonist.Build(player, false);
+            her.name = "Protagonist";
+            SplitHead(her);
+            var an = her.GetComponent<Animator>();
+
+            BodyPoser.Stand(an);
+            her.transform.localPosition = Vector3.zero;
+            var eye = player.InverseTransformPoint(BodyPoser.Eyes(an));
+            her.transform.localPosition = new Vector3(-eye.x, 0f, eyeLead - eye.z);
+            note.AppendFormat("立った目: 足元から {0:0.000} m（カメラは {1:0.000} m）。体を前へ {2:0.000} m 置いた", eye.y, PlayerController.StandingEyeHeight, eyeLead - eye.z).AppendLine();
+
+            var motion = her.AddComponent<BodyMotion>();
+            var mso = new SerializedObject(motion);
+            mso.FindProperty("body").objectReferenceValue = player.GetComponent<CharacterController>();
+            mso.FindProperty("animator").objectReferenceValue = an;
+            mso.ApplyModifiedPropertiesWithoutUndo();
+            return her;
+        }
+
+        /// <summary>
+        /// 座った目が狙いの位置に来るよう、腰を動かしながら座った形を解き直す（腰の位置は s.hips から始める）。
+        /// 背と頭の向きは腰の位置に寄らないので、三回で 1 mm を切る。解いた後の腰の位置を返す
+        /// </summary>
+        public static Vector3 SeatAtEye(Animator an, BodyPoser.Sit s, Vector3 eye)
+        {
+            for (var i = 0; i < 3; i++)
+            {
+                BodyPoser.Stand(an);
+                BodyPoser.Pose(an, s);
+                s.hips += eye - BodyPoser.Eyes(an);
+            }
+            BodyPoser.Stand(an);
+            BodyPoser.Pose(an, s);
+            return s.hips;
         }
 
         /// <summary>場面 1: 座った形、ジャック、左手の置き所、抜くしぐさ、ケーブル、座った目の高さ</summary>

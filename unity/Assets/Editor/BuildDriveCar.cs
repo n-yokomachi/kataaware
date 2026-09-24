@@ -246,7 +246,6 @@ namespace HalfAware.EditorTools
             eye.localPosition = SeatAt;
             eye.localRotation = Quaternion.identity;
 
-            Arms(parent);
             Rain(parent);
         }
 
@@ -1068,7 +1067,7 @@ namespace HalfAware.EditorTools
         /// **運転席の背もたれだけは作らない。** 目は座席の (0.38, 1.55, 0) にあって、
         /// 後ろを向くと <see cref="EyeLead"/> のぶん z -0.22 へ下がる。背もたれは
         /// z -0.24 に立つので、作れば振り返った目の 2 cm 前に板が立って画面を塞ぐ。
-        /// 座面と枠だけ置いて、背は座っている本人ということにしてある。
+        /// 座面だけ置いて、背は座っている本人（主人公の体）が受け持つ。
         ///
         /// 寸法はどれも既にある車体から割り出す。内張りの外面は外板の内面
         /// （<see cref="SkinIn"/> 0.93）、天井は荷室の蓋の下面（1.88）、
@@ -1124,12 +1123,14 @@ namespace HalfAware.EditorTools
                 Quaternion.Euler(22f, 0f, 0f));
 
             // 運転席の座面。背もたれは作らない（<see cref="Hold"/> の但し書き）。
-            // 助手席と同じ作りで、下を向いたときに座っているものが見える
-            seat.Box(new Vector3(SeatAt.x, 0.985f, 0.06f), new Vector3(0.54f, 0.13f, 0.50f));
+            // 主人公の体を目（SeatAt）に合わせて座らせるので、座面は助手席より低く、
+            // 床にじかに据える（<see cref="DriverSeatTop"/>）。下の枠は床に埋まるので作らない。
+            // 下の面は床より 1 cm 沈めて、床と同じ面に重ねない
+            var cushion = DriverSeatTop - (HoldFloorY - 0.01f);
+            seat.Box(new Vector3(SeatAt.x, DriverSeatTop - cushion * 0.5f, 0.06f), new Vector3(0.54f, cushion, 0.50f));
             for (var i = 0; i < 2; i++)
-                seat.Box(new Vector3(SeatAt.x + (i == 0 ? -0.235f : 0.235f), 1.025f, 0.06f),
+                seat.Box(new Vector3(SeatAt.x + (i == 0 ? -0.235f : 0.235f), DriverSeatTop - 0.025f, 0.06f),
                     new Vector3(0.07f, 0.11f, 0.46f));
-            steel.Box(new Vector3(SeatAt.x, 0.905f, 0.06f), new Vector3(0.46f, 0.055f, 0.44f));
         }
 
         /// <summary>
@@ -2249,80 +2250,6 @@ namespace HalfAware.EditorTools
                 bank.Box(centre + radial * radius, new Vector3(wide, thick, chord),
                     Quaternion.LookRotation(along, radial));
             }
-        }
-
-        /// <summary>
-        /// 運転席の前腕。帯 0〜3 は腕組み、帯 4 だけハンドルに手を乗せる。
-        /// 原作「自動運転に任せて私は腕組みをしながら考える」で、手動で運転するのは最後だけ。
-        /// どちらも見た目だけで、操作には繋がらない。出し分けるのは <see cref="DriveDirector"/>。
-        ///
-        /// **カメラの子にはしない。** 座ったまま首だけ振るので、カメラに付けると
-        /// 見回すたびに腕が画面に貼り付いたまま一緒に回る。車の持ち物として車内に置けば、
-        /// 首を振っても腕は据わったまま残る。場面 1 の前腕（<see cref="Forearm"/>）が
-        /// カメラの子なのは、あちらが下を向いたときだけ出す作りだから
-        /// </summary>
-        static void Arms(Transform parent)
-        {
-            Folded(Child(parent, "ArmsFolded"));
-            var grip = Child(parent, "ArmsOnWheel");
-            OnWheel(grip);
-            // 組み立てた直後はエディタで腕組みの当たり具合を見られるよう、そちらだけ出しておく。
-            // 再生すれば DriveDirector.Awake がどちらも伏せ、乗り込んでから帯に合わせて出す
-            grip.gameObject.SetActive(false);
-        }
-
-        /// <summary>
-        /// 腕組み。胸の前で前腕を上下に重ね、手は反対側の肘の下へ入れる。
-        /// 二の腕は肩へ向けて後ろへ抜けさせる。上半身は作っていないので、
-        /// 目（z 0.22）より後ろまで下がったところで視界から外れる
-        /// </summary>
-        static void Folded(Transform parent)
-        {
-            Clear(parent);
-            var sleeve = new Bank { Texel = 1.6f };
-            var skin = new Bank { Texel = 2.0f };
-            for (var s = 0; s < 2; s++)
-            {
-                var side = s == 0 ? -1f : 1f;
-                var shoulder = new Vector3(FoldedAt.x + side * ShoulderHalf, ShoulderY, ShoulderZ);
-                var elbow = new Vector3(FoldedAt.x + side * 0.21f, FoldedAt.y, FoldedAt.z - 0.02f);
-                Limb(sleeve, shoulder, elbow, 0.095f);
-                // 右腕を上、左腕を下に重ねる。前後にも少しずらして、二本が同じ面に潰れないようにする
-                var y = FoldedAt.y + side * 0.034f;
-                var z = FoldedAt.z + side * 0.012f;
-                var wrist = new Vector3(FoldedAt.x - side * 0.15f, y, z);
-                Limb(sleeve, new Vector3(elbow.x, y, z), wrist, 0.085f);
-                // 手は反対側の肘の下。腕組みの形はここで決まる
-                skin.Box(wrist - new Vector3(side * 0.055f, 0f, 0f), new Vector3(0.10f, 0.075f, 0.09f));
-            }
-            sleeve.Emit(parent, "FoldedSleeves", Mat("Sleeve"), false, Generated);
-            skin.Emit(parent, "FoldedHands", Mat("Skin"), false, Generated);
-        }
-
-        /// <summary>
-        /// ハンドルに乗せた手。輪の左右（三時と九時）を握る。
-        /// 握りの位置は <see cref="WheelRing"/> から出すので、輪の寸法を変えても手が離れない
-        /// </summary>
-        static void OnWheel(Transform parent)
-        {
-            Clear(parent);
-            var sleeve = new Bank { Texel = 1.6f };
-            var skin = new Bank { Texel = 2.0f };
-            var tilt = Quaternion.Euler(WheelLean, 0f, 0f);
-            for (var s = 0; s < 2; s++)
-            {
-                var side = s == 0 ? -1f : 1f;
-                var grip = WheelAt + new Vector3(side * WheelRing, 0f, 0f);
-                // 肘は輪から引く。手で書いた高さのままだと、車高を上げたときに腕だけ床に取り残される
-                var elbow = new Vector3(WheelAt.x + side * 0.21f, WheelAt.y - 0.14f, 0.10f);
-                var shoulder = new Vector3(WheelAt.x + side * ShoulderHalf, ShoulderY, ShoulderZ);
-                Limb(sleeve, shoulder, elbow, 0.095f);
-                Limb(sleeve, elbow, grip, 0.085f);
-                // 手は輪に沿わせて倒す。長い辺が輪の接線に乗る
-                skin.Box(grip, new Vector3(0.055f, 0.125f, 0.085f), tilt);
-            }
-            sleeve.Emit(parent, "WheelSleeves", Mat("Sleeve"), false, Generated);
-            skin.Emit(parent, "WheelHands", Mat("Skin"), false, Generated);
         }
 
         /// <summary>a から c へ伸びる 1 本。thick は断面の一辺</summary>

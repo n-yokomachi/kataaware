@@ -128,13 +128,12 @@ namespace HalfAware
             "景色どうしの切り替えがフェード無しなので、場面の頭もそれに揃えてある")]
         [SerializeField] float pullFade = 0f;
 
-        [Header("腕")]
-        [Tooltip("腕組みの腕。手動運転の帯だけ伏せる")]
-        [SerializeField] GameObject folded;
-        [Tooltip("ハンドルに乗せた手。手動運転の帯だけ出す")]
-        [SerializeField] GameObject onWheel;
+        [Header("体")]
+        [Tooltip("主人公の体。ガレージでは立って歩き、運転席に着いたら座った形になる。" +
+            "座った形は腕組み、手動運転の帯だけ二つ目の形（ハンドルに手を乗せる）")]
+        [SerializeField] SeatedPose body;
         [Tooltip("手動で運転する帯。0 から数える")]
-        [SerializeField] int drivenBand = 4;
+        [SerializeField] int drivenBand = 2;
 
         [Header("空と灯り")]
         [Tooltip("日射し。帯ごとに色と強さと向きを差し替える")]
@@ -195,6 +194,8 @@ namespace HalfAware
             world.Rolling = false;
             world.Dress(-1);
             ShowTrigger(-1);
+            // ガレージでは立って歩く。座った形は運転席に着いてから
+            if (body != null) body.Seated = false;
             Arms(-1);
             // 走り出す前はガレージの中。ここへ帯の空を入れると、天井の灯りが二つある
             // 室内に朝日が差して壁も床も白く飛ぶ。空の物も出さない
@@ -410,6 +411,9 @@ namespace HalfAware
             // 走行中ずっとコンクリートの足音が鳴る。伏せる先がガレージではなく
             // プレイヤーの下にあるので、garage.SetActive(false) では消えない
             if (feet != null) feet.enabled = false;
+            // 体の歩きも同じ理由で止める。止めないと、ドアが開くのを待つあいだ足踏みを続ける
+            var motion = body != null ? body.GetComponent<BodyMotion>() : null;
+            if (motion != null) motion.enabled = false;
             player.CanMove = false;
 
             // 板は閉じた姿から始める
@@ -426,6 +430,9 @@ namespace HalfAware
             //
             // 写さずに EyeHeight だけ 0 にすると、その 1 フレームで目が 1.6 m 落ちてしまう
             var eye = player.transform.position + Vector3.up * player.EyeHeight;
+            // 体は Player の子なので、根を目へ上げた分だけ体の根を下げて地に残す。
+            // 運転席の形（BuildDrive.Protagonist）も、この下げた根で解いてある
+            if (body != null) body.transform.localPosition += Vector3.down * player.EyeHeight;
             player.EyeHeight = 0f;
             player.transform.position = eye;
 
@@ -524,8 +531,14 @@ namespace HalfAware
                 yield return null;
             }
             player.transform.position = sit;
+            // **座ったら体は運転席の向きに据え、ここからは首だけで振り向く。**
+            // 体は Player の子なので、根を回したままドアを見ると、座った脚ごとドアの方を向く。
+            // 根を座席の正面へ戻してから首を制限し、見ている向き（inYaw）は首の側へ移す
+            player.transform.rotation = Quaternion.Euler(0f, seatYaw, 0f);
+            player.HeadYawLimit = seatedYawLimit;
             player.Yaw = inYaw;
             player.Pitch = inPitch;
+            if (body != null) body.Seated = true;
             yield return Wait(sitHold);
 
             // ---- 四。板の方へ向き直り、引いて閉める -------------------------------
@@ -547,11 +560,10 @@ namespace HalfAware
             Aim(sit, DoorAt(), out yaw, out pitch);
 
             // ---- 五。前を向く ----------------------------------------------------
+            // 首の制限は、運転席に着いて体を正面へ据えたとき（三の終わり）に掛けてある。
+            // **体の向きを決める前に掛けてはいけない。** PlayerController.Yaw は首が制限されていると
+            // 体ではなく首を回すので、振り向いた先が体の正面のまま残る
             yield return Slew(sit, sit, yaw, seatYaw, pitch, 0f, faceFront);
-            // **首の制限は体の向きを決めたあとで掛ける。** PlayerController.Yaw は
-            // 首が制限されていると体ではなく首を回すので、先に掛けると
-            // 運転席の正面ではなく振り向いた先が体の正面のまま残る
-            player.HeadYawLimit = seatedYawLimit;
             yield return Wait(shutHold);
             if (sound != null) sound.Ignition();
 
@@ -828,17 +840,15 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// which 番目の帯の腕を出す。-1 でどちらも伏せる。
+        /// which 番目の帯の腕の形にする。手動で運転する帯だけハンドルに手を乗せ、ほかは腕組み。
+        /// -1（走り出す前）も腕組み。
         ///
         /// 最後の帯だけは原作どおり手動運転なので、ハンドルに手を乗せる。
-        /// ただし見た目だけで、入力は受け付けない。帯と一緒に黒のあいだに入れ替わる。
-        /// 乗り込む前に伏せるのは、ガレージを歩いているあいだ運転席に腕だけが浮いて見えるため
+        /// ただし見た目だけで、入力は受け付けない。帯と一緒に黒のあいだに入れ替わる
         /// </summary>
         void Arms(int which)
         {
-            var driving = which == drivenBand;
-            if (folded != null) folded.SetActive(which >= 0 && !driving);
-            if (onWheel != null) onWheel.SetActive(which >= 0 && driving);
+            if (body != null) body.UseAlternate = which >= 0 && which == drivenBand;
         }
     }
 }

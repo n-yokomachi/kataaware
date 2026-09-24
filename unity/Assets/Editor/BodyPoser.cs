@@ -277,6 +277,43 @@ namespace HalfAware.EditorTools
             Flex(an, left, F(HumanBodyBones.LeftIndexIntermediate, HumanBodyBones.RightIndexIntermediate), F(HumanBodyBones.LeftIndexDistal, HumanBodyBones.RightIndexDistal), -indexOpen * 0.5f);
         }
 
+        /// <summary>
+        /// 四本の指と親指を、手のひらの側へそろえて曲げる。curl は下の角の割合で、0.3 ほどで力の抜けた手、
+        /// 2 を越えると四本の指は関節の限りまで曲がり切った握り（細い輪を握る手）になる。
+        /// 場面 8 の腕組みとハンドルに使う
+        /// </summary>
+        public static void Grip(Animator an, bool left, float curl)
+        {
+            HumanBodyBones F(HumanBodyBones l, HumanBodyBones r) { return left ? l : r; }
+            var fingers = new[]
+            {
+                new[] { F(HumanBodyBones.LeftIndexProximal, HumanBodyBones.RightIndexProximal), F(HumanBodyBones.LeftIndexIntermediate, HumanBodyBones.RightIndexIntermediate), F(HumanBodyBones.LeftIndexDistal, HumanBodyBones.RightIndexDistal) },
+                new[] { F(HumanBodyBones.LeftMiddleProximal, HumanBodyBones.RightMiddleProximal), F(HumanBodyBones.LeftMiddleIntermediate, HumanBodyBones.RightMiddleIntermediate), F(HumanBodyBones.LeftMiddleDistal, HumanBodyBones.RightMiddleDistal) },
+                new[] { F(HumanBodyBones.LeftRingProximal, HumanBodyBones.RightRingProximal), F(HumanBodyBones.LeftRingIntermediate, HumanBodyBones.RightRingIntermediate), F(HumanBodyBones.LeftRingDistal, HumanBodyBones.RightRingDistal) },
+                new[] { F(HumanBodyBones.LeftLittleProximal, HumanBodyBones.RightLittleProximal), F(HumanBodyBones.LeftLittleIntermediate, HumanBodyBones.RightLittleIntermediate), F(HumanBodyBones.LeftLittleDistal, HumanBodyBones.RightLittleDistal) },
+                new[] { F(HumanBodyBones.LeftThumbProximal, HumanBodyBones.RightThumbProximal), F(HumanBodyBones.LeftThumbIntermediate, HumanBodyBones.RightThumbIntermediate), F(HumanBodyBones.LeftThumbDistal, HumanBodyBones.RightThumbDistal) },
+            };
+            // 付け根・中・先の曲げ（度）。小指の側ほど深く、親指は浅く
+            var bend = new[]
+            {
+                new[] { 45f, 55f, 30f },
+                new[] { 50f, 60f, 35f },
+                new[] { 55f, 65f, 35f },
+                new[] { 60f, 65f, 35f },
+                new[] { 10f, 20f, 20f },
+            };
+            // 人の関節が曲がる所まで（付け根・中・先）。握り込んでもこれより深くは曲げない。
+            // 越えると指の肌が関節で潰れて、拳が崩れて見える
+            var most = new[] { 85f, 100f, 70f };
+            for (var i = 0; i < fingers.Length; i++)
+            {
+                var f = fingers[i];
+                Flex(an, left, f[0], f[1], Mathf.Min(bend[i][0] * curl, most[0]));
+                Flex(an, left, f[1], f[2], Mathf.Min(bend[i][1] * curl, most[1]));
+                Flex(an, left, f[2], HumanBodyBones.LastBone, Mathf.Min(bend[i][2] * curl, most[2]));
+            }
+        }
+
         /// <summary>手の指の骨の、親から見た向き（つまむ形などを読み出す）</summary>
         public static SeatedPose.Bone[] Fingers(Animator an, bool left)
         {

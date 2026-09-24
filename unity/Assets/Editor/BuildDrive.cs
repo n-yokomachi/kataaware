@@ -749,24 +749,6 @@ namespace HalfAware.EditorTools
         /// </summary>
         public const float DialGain = 0.62f;
 
-        /// <summary>
-        /// 腕組みの前腕の中心。胸の前。
-        ///
-        /// 計画は z 0.28 と置いていたが、その位置だと前腕が輪の下端（y 1.189 / z 0.239）を
-        /// 貫く。輪は 68 度寝ていて下端がこちらへ張り出しているので、胸に引き寄せて
-        /// 輪の手前へ収める。腕組みは元より胸に付く姿勢なので、寄せても不自然にはならない。
-        ///
-        /// **高さは <see cref="WheelAt"/> と揃えて上げ下げする。** 車高を上げたときも
-        /// 輪と腕を一緒に 0.23 持ち上げたので、袖と輪の 34 mm の隙間はそのまま残っている。
-        /// 片方だけ動かすと、この隙間が黙って詰まる
-        /// </summary>
-        public static readonly Vector3 FoldedAt = new Vector3(0.38f, 1.25f, 0.15f);
-        /// <summary>肩。腕の付け根。上半身は作っていないので、視界の外の後ろへ逃がす</summary>
-        public const float ShoulderY = 1.37f;
-        public const float ShoulderZ = -0.06f;
-        /// <summary>肩の左右の開き。体の中心から</summary>
-        public const float ShoulderHalf = 0.19f;
-
         // ---- 調べる対象と繋ぎ先 ----------------------------------------------
 
         public const string ScriptPath = "Assets/Data/DriveScript.asset";
@@ -854,6 +836,8 @@ namespace HalfAware.EditorTools
             Rig();
             Stage();
             Car(Child(root, "Car"));
+            // 車の後に呼ぶ。運転席の形は車の座席（Car/Seat）とハンドルから解く
+            Protagonist(root);
             Road(Child(root, "Road"));
             Roadsides(Child(root, "Roadsides"));
             Traffic(Child(root, "Oncoming"));
@@ -1575,10 +1559,8 @@ namespace HalfAware.EditorTools
             // DriveDirector は null を見て何もしないので、無いまま走っても止まらない
             var rain = root.Find("Car/Rain");
             dso.FindProperty("rainRig").objectReferenceValue = rain != null ? rain.gameObject : null;
-            var folded = Look(root, "Car/ArmsFolded");
-            var onWheel = Look(root, "Car/ArmsOnWheel");
-            dso.FindProperty("folded").objectReferenceValue = folded != null ? folded.gameObject : null;
-            dso.FindProperty("onWheel").objectReferenceValue = onWheel != null ? onWheel.gameObject : null;
+            // 主人公の体。乗り込むと座った形になり、手動で運転する帯だけハンドルに手を乗せる
+            dso.FindProperty("body").objectReferenceValue = Object.FindFirstObjectByType<SeatedPose>(FindObjectsInactive.Include);
             // 手動で運転するのは最後の帯だけ
             dso.FindProperty("drivenBand").intValue = Bands - 1;
             // 空と灯り。帯ごとの値は bands が持ち、差し替える先をここで渡す。
@@ -2090,10 +2072,6 @@ namespace HalfAware.EditorTools
                 // 尾灯。**外装で唯一の彩り。** 暗い車体の尻に赤が二つあるだけで、
                 // どちらが前でどちらが後ろかが一目で読める
                 case "CarTail": col = new Color(0.300f, 0.042f, 0.036f); smooth = 0.66f; break;
-                // 前腕。革のライダースの袖。BuildProtagonist の上着と同じ色にしてある
-                case "Sleeve": col = new Color(0.055f, 0.053f, 0.062f); smooth = 0.22f; break;
-                // 手。夜の車内なので、肌も袖よりわずかに明るい程度に留める
-                case "Skin": col = new Color(0.235f, 0.190f, 0.165f); smooth = 0.12f; break;
                 case "Asphalt": col = new Color(0.115f, 0.118f, 0.132f); smooth = 0.16f; break;
                 // 塗り直されていない白線。真っ白だと夜の道で浮く
                 case "RoadLine": col = new Color(0.520f, 0.510f, 0.470f); smooth = 0.10f; break;
