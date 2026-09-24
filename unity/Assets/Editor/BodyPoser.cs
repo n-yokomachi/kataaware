@@ -279,8 +279,7 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 四本の指と親指を、手のひらの側へそろえて曲げる。curl は下の角の割合で、0.3 ほどで力の抜けた手、
-        /// 2 を越えると四本の指は関節の限りまで曲がり切った握り（細い輪を握る手）になる。
-        /// 場面 8 の腕組みとハンドルに使う
+        /// 2 を越えると四本の指は関節の限りまで曲がり切る。場面 8 の腕組みに使う（物を握る手は <see cref="Wrap"/>）
         /// </summary>
         public static void Grip(Animator an, bool left, float curl)
         {
@@ -312,6 +311,113 @@ namespace HalfAware.EditorTools
                 Flex(an, left, f[1], f[2], Mathf.Min(bend[i][1] * curl, most[1]));
                 Flex(an, left, f[2], HumanBodyBones.LastBone, Mathf.Min(bend[i][2] * curl, most[2]));
             }
+        }
+
+        /// <summary>指が物に触れたとみなす、肌から物の面までの隙間（m）</summary>
+        public const float TouchGap = 0.001f;
+
+        /// <summary>
+        /// 四本の指と親指を、物の面に沿わせて曲げる。指ごとに、付け根・中・先の関節を 3 度ずつ順に曲げていき、
+        /// 曲げるとその関節から先の節の肌が物の面に触れる（隙間が <see cref="TouchGap"/> を切る）関節はそこで待つ。
+        /// ほかの関節が動いて空きができればまた曲げ、どの関節も動けなくなったら止める。手前の節が物に乗り、
+        /// 先の節が物の向こう側へ回り込む。物に触れないまま曲がる関節は most（付け根・中・先、度。親指は thumbMost）で止め、
+        /// 関節の限りまで曲げた鉤爪にしない。置いただけで肌が物に食い込んでいる節は、先に離れるまで伸ばす。
+        /// clearance は点から物の面までの距離（中なら負）。log を渡すと関節ごとの曲げ（度、* は物に触れて止まった）を書く。
+        ///
+        /// 触れたかは骨の芯ではなく肌の頂点で測る。Rocketbox の指の骨は肌の芯から指先の側へ 1〜2 cm ずれているので、
+        /// 骨の芯で測ると肌が物に食い込む。頂点は、いちばん重みの大きい骨にだけ付いているとみなして動かす
+        /// </summary>
+        public static void Wrap(Animator an, SkinnedMeshRenderer skin, bool left, System.Func<Vector3, float> clearance, Vector3 most, float thumbMost, System.Text.StringBuilder log = null)
+        {
+            HumanBodyBones F(HumanBodyBones l, HumanBodyBones r) { return left ? l : r; }
+            var fingers = new[]
+            {
+                new[] { F(HumanBodyBones.LeftIndexProximal, HumanBodyBones.RightIndexProximal), F(HumanBodyBones.LeftIndexIntermediate, HumanBodyBones.RightIndexIntermediate), F(HumanBodyBones.LeftIndexDistal, HumanBodyBones.RightIndexDistal) },
+                new[] { F(HumanBodyBones.LeftMiddleProximal, HumanBodyBones.RightMiddleProximal), F(HumanBodyBones.LeftMiddleIntermediate, HumanBodyBones.RightMiddleIntermediate), F(HumanBodyBones.LeftMiddleDistal, HumanBodyBones.RightMiddleDistal) },
+                new[] { F(HumanBodyBones.LeftRingProximal, HumanBodyBones.RightRingProximal), F(HumanBodyBones.LeftRingIntermediate, HumanBodyBones.RightRingIntermediate), F(HumanBodyBones.LeftRingDistal, HumanBodyBones.RightRingDistal) },
+                new[] { F(HumanBodyBones.LeftLittleProximal, HumanBodyBones.RightLittleProximal), F(HumanBodyBones.LeftLittleIntermediate, HumanBodyBones.RightLittleIntermediate), F(HumanBodyBones.LeftLittleDistal, HumanBodyBones.RightLittleDistal) },
+                new[] { F(HumanBodyBones.LeftThumbProximal, HumanBodyBones.RightThumbProximal), F(HumanBodyBones.LeftThumbIntermediate, HumanBodyBones.RightThumbIntermediate), F(HumanBodyBones.LeftThumbDistal, HumanBodyBones.RightThumbDistal) },
+            };
+            var points = SkinOf(skin, fingers, an);
+            const float step = 3f;
+            for (var i = 0; i < fingers.Length; i++)
+            {
+                var f = fingers[i];
+                var chain = new Transform[3];
+                for (var k = 0; k < 3; k++) chain[k] = an.GetBoneTransform(f[k]);
+                var thumb = i == 4;
+                var cap = thumb ? new Vector3(thumbMost, thumbMost, thumbMost) : most;
+                var turned = new float[3];
+                // 初めから物に食い込んでいる節は、離れるまで伸ばす（立ちの形の指は少し曲がっているので、置いただけで先が食い込むことがある）
+                for (var j = 0; j < 3; j++)
+                    for (var opened = 0f; opened < 60f && Touches(points, chain, j, j, clearance, 0f); opened += step)
+                    {
+                        Flex(an, left, f[j], Next(f, j), -step);
+                        turned[j] -= step;
+                    }
+                // 三つの関節を 3 度ずつ順に曲げる。曲げると先の節が物に触れる関節はそこで待ち、ほかの関節が動いて空きができればまた曲げる。
+                // どの関節も動けなくなるまで回すと、手前の節が物に乗り、先の節が物の向こう側へ回り込む
+                var moved = true;
+                while (moved)
+                {
+                    moved = false;
+                    for (var j = 0; j < 3; j++)
+                    {
+                        if (turned[j] + step > cap[j]) continue;
+                        Flex(an, left, f[j], Next(f, j), step);
+                        if (Touches(points, chain, j, 2, clearance, TouchGap)) { Flex(an, left, f[j], Next(f, j), -step); continue; }
+                        turned[j] += step;
+                        moved = true;
+                    }
+                }
+                if (log == null) continue;
+                for (var j = 0; j < 3; j++)
+                    log.AppendFormat("{0}:{1}{2} ", f[j].ToString().Replace("Right", "").Replace("Left", ""), turned[j], turned[j] + step > cap[j] ? "" : "*");
+            }
+        }
+
+        static HumanBodyBones Next(HumanBodyBones[] finger, int j)
+        {
+            return j < 2 ? finger[j + 1] : HumanBodyBones.LastBone;
+        }
+
+        /// <summary>指の骨ごとの、肌の頂点（骨の枠で見た位置）</summary>
+        static Dictionary<Transform, List<Vector3>> SkinOf(SkinnedMeshRenderer skin, HumanBodyBones[][] fingers, Animator an)
+        {
+            var points = new Dictionary<Transform, List<Vector3>>();
+            foreach (var f in fingers)
+                foreach (var b in f)
+                {
+                    var t = an.GetBoneTransform(b);
+                    if (t != null && !points.ContainsKey(t)) points[t] = new List<Vector3>();
+                }
+            var mesh = skin.sharedMesh;
+            var bones = skin.bones;
+            var bind = mesh.bindposes;
+            var verts = mesh.vertices;
+            var weights = mesh.boneWeights;
+            for (var i = 0; i < verts.Length; i++)
+            {
+                var bi = weights[i].boneIndex0;
+                List<Vector3> list;
+                if (bi < bones.Length && bones[bi] != null && points.TryGetValue(bones[bi], out list))
+                    list.Add(bind[bi].MultiplyPoint3x4(verts[i]));
+            }
+            return points;
+        }
+
+        /// <summary>指の節 from から to までの肌のどこかが、物の面まで gap を切っているか</summary>
+        static bool Touches(Dictionary<Transform, List<Vector3>> skin, Transform[] chain, int from, int to, System.Func<Vector3, float> clearance, float gap)
+        {
+            for (var k = from; k <= to; k++)
+            {
+                List<Vector3> list;
+                if (chain[k] == null || !skin.TryGetValue(chain[k], out list)) continue;
+                var m = chain[k].localToWorldMatrix;
+                foreach (var p in list)
+                    if (clearance(m.MultiplyPoint3x4(p)) < gap) return true;
+            }
+            return false;
         }
 
         /// <summary>手の指の骨の、親から見た向き（つまむ形などを読み出す）</summary>

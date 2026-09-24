@@ -31,18 +31,29 @@ namespace HalfAware.EditorTools
         /// <summary>腕組みの手の、指の曲げの割合（<see cref="BodyPoser.Grip"/>）。力の抜けた手</summary>
         const float FoldCurl = 0.35f;
 
-        // ハンドルに乗せた手の置き方。輪の三時と九時で、指の一節目を輪の上に載せ、
-        // 指を関節の限りまで曲げて輪の内側へ回す。値は手の頂点が輪の中へ入らない所を探して決めた
-        // （両手とも 0 個、輪の面との隙間 0.7 mm）
+        // ハンドルを握る手の置き方。輪の 10 時と 2 時あたりを上から握る。手のひらを輪の上に載せ、
+        // 輪を手のひらに斜めに渡し（人差し指の付け根から小指の側の手首へ）、親指は輪の内側、ほかの指は輪の外側へ回す。
+        // 指は輪に触れるまで曲げ（BodyPoser.Wrap）、関節の限りまでは曲げない。
+        // 輪が 22° しか起きていないので、輪に沿う向きは前腕とほとんど平行になる。指を輪に直に交えると手首が 70° を越えて曲がり、
+        // 前腕が細く潰れる。斜めに渡すと手首の曲げは 47°。値は、手と腕の頂点がハンドルへ入らず、
+        // 指先が輪に乗り（四本のうち三本）、手首の曲げが小さい所を探して決めた（Study/GripStudy）
 
-        /// <summary>手の骨（手首）を輪の芯から輪の面の向きへ上げる量</summary>
-        const float GripAbove = 0.045f;
-        /// <summary>手首を輪の芯から指の向きの逆へ下げる量。指の付け根の関節（手首から 9.4 cm）の少し先に輪が来る</summary>
-        const float GripBack = 0.12f;
-        /// <summary>指の向きを、輪に沿った向きから内側へ寄せる割合。大きいほど輪の中心を指す</summary>
-        const float GripInward = 4f;
-        /// <summary>握りの指の曲げの割合（<see cref="BodyPoser.Grip"/>）。四本の指は関節の限りまで曲がる</summary>
-        const float WheelCurl = 2.6f;
+        /// <summary>握る所の、輪の 12 時からの角。度。右手は 3 時の側、左手は 9 時の側へ</summary>
+        const float GripClock = 50f;
+        /// <summary>指の向き（手首から中指の付け根へ）と、輪に沿って 12 時へ向かう向きのなす角。度。指は輪の外へ開く</summary>
+        const float GripCross = 44f;
+        /// <summary>手のひらを、輪の面に向かって真下から輪の内側へ向ける角。度。手が輪の外寄りに載る</summary>
+        const float GripRoll = 15f;
+        /// <summary>輪の芯を、手の骨（手首）から指の向きへ離す量。指の付け根（手首から 9.4 cm）の少し先に輪が来る</summary>
+        const float GripReach = 0.115f;
+        /// <summary>輪の芯を、手の骨から手のひらの側へ離す量。手のひらの厚み 4 cm と輪の太さの半分</summary>
+        const float GripDepth = 0.066f;
+        /// <summary>肘を寄せる所の、運転席の真ん中からの横の開き。狭めると前腕が輪の 4 時・8 時の所を上からくぐれずに刺さる</summary>
+        const float GripElbow = 0.45f;
+        /// <summary>握りの指が輪に触れないまま曲がるときの限り（付け根・中・先、度）。輪の太さを握るくらいで止め、鉤爪にしない</summary>
+        static readonly Vector3 GripFingerMost = new Vector3(70f, 75f, 40f);
+        /// <summary>握りの親指の、関節ごとの曲げの限り。度</summary>
+        const float GripThumbMost = 30f;
 
         /// <summary>
         /// 主人公の体を Player の下に作る。組み上がった場面では立った形（ガレージに立っている）。
@@ -93,10 +104,12 @@ namespace HalfAware.EditorTools
                 var wheel = Sit(car, true);
                 wheel.hips = folded.hips;
                 PlaceProtagonist.SeatAtEye(an, wheel, eye);
-                BodyPoser.Grip(an, true, WheelCurl);
-                BodyPoser.Grip(an, false, WheelCurl);
+                var skin = Skin(her);
+                System.Func<Vector3, float> gap = w => WheelGap(car.InverseTransformPoint(w));
+                BodyPoser.Wrap(an, skin, true, gap, GripFingerMost, GripThumbMost);
+                BodyPoser.Wrap(an, skin, false, gap, GripFingerMost, GripThumbMost);
                 BodyPoser.Write(pose, "alternate", BodyPoser.Capture(an));
-                note.AppendFormat("ハンドルの形: 輪の中へ入った体の頂点 {0} 個", InRim(her, car)).AppendLine();
+                note.AppendFormat("ハンドルの形: ハンドルの中へ入った体の頂点 {0} 個", InWheel(her, car)).AppendLine();
             }
             finally
             {
@@ -114,7 +127,7 @@ namespace HalfAware.EditorTools
         ///   膝を立てると、脛の上が計器盤の下の面（0.98）に 3 cm 刺さる。伸ばすと脚の上は 0.92 に収まる
         /// - 腕組み: 右の前腕を上、左を下に重ね、手は反対の肘の手前。組んだ腕は輪の下（輪の面まで 7 mm）をくぐる。
         ///   左右の腕が互いに潜らず、前腕と手が胴へ潜らない所を探して決めた
-        /// - ハンドル: 輪の三時と九時を握る
+        /// - ハンドル: 輪の 10 時と 2 時あたりを上から握る（置き方は GripClock ほか）
         /// </summary>
         static BodyPoser.Sit Sit(Transform car, bool wheel)
         {
@@ -147,17 +160,24 @@ namespace HalfAware.EditorTools
                 return s;
             }
             var tilt = Quaternion.Euler(WheelLean, 0f, 0f);
-            var up = tilt * Vector3.back;
-            var along = tilt * Vector3.up;
+            var face = tilt * Vector3.back;
+            var twelve = tilt * Vector3.up;
+            var clock = GripClock * Mathf.Deg2Rad;
+            var cross = GripCross * Mathf.Deg2Rad;
+            var roll = GripRoll * Mathf.Deg2Rad;
             for (var k = 0; k < 2; k++)
             {
                 var side = k == 0 ? 1f : -1f;
-                var rim = WheelAt + Vector3.right * side * WheelRing;
-                var fingers = (along - Vector3.right * side * GripInward).normalized;
-                var wrist = car.TransformPoint(rim + up * GripAbove - fingers * GripBack);
-                var pole = P(x0 + side * 0.67f, 0.95f, 0.10f);
-                if (side > 0f) { s.wristR = wrist; s.elbowPoleR = pole; s.fingersR = D(fingers); s.palmR = D(-up); }
-                else { s.wristL = wrist; s.elbowPoleL = pole; s.fingersL = D(fingers); s.palmL = D(-up); }
+                // 輪の芯の上の握る所と、そこから外への向き・12 時へ輪に沿う向き
+                var rim = WheelAt + WheelRing * (side * Mathf.Sin(clock) * Vector3.right + Mathf.Cos(clock) * twelve);
+                var outward = (rim - WheelAt).normalized;
+                var along = (-side * Mathf.Cos(clock) * Vector3.right + Mathf.Sin(clock) * twelve).normalized;
+                var fingers = (Mathf.Cos(cross) * along + Mathf.Sin(cross) * outward).normalized;
+                var palm = Vector3.ProjectOnPlane(-(Mathf.Cos(roll) * face + Mathf.Sin(roll) * outward), fingers).normalized;
+                var wrist = car.TransformPoint(rim - fingers * GripReach - palm * GripDepth);
+                var pole = P(x0 + side * GripElbow, 0.95f, 0.10f);
+                if (side > 0f) { s.wristR = wrist; s.elbowPoleR = pole; s.fingersR = D(fingers); s.palmR = D(palm); }
+                else { s.wristL = wrist; s.elbowPoleL = pole; s.fingersL = D(fingers); s.palmL = D(palm); }
             }
             return s;
         }
@@ -175,20 +195,21 @@ namespace HalfAware.EditorTools
             return low;
         }
 
-        /// <summary>体の頂点で、ハンドルの輪（芯から太さの半分より内）に入っているものの数</summary>
-        static int InRim(GameObject her, Transform car)
+        /// <summary>体の頂点で、ハンドル（輪・芯・警笛の押し・輻）の中に入っているものの数</summary>
+        static int InWheel(GameObject her, Transform car)
         {
-            var tilt = Quaternion.Euler(WheelLean, 0f, 0f);
-            var up = tilt * Vector3.back;
             var count = 0;
             foreach (var p in Baked(her))
-            {
-                var d = car.InverseTransformPoint(p) - WheelAt;
-                var flat = d - up * Vector3.Dot(d, up);
-                if (flat.sqrMagnitude < 1e-8f) continue;
-                if (Vector3.Distance(d, flat.normalized * WheelRing) < WheelThick * 0.5f) count++;
-            }
+                if (WheelGap(car.InverseTransformPoint(p)) < 0f) count++;
             return count;
+        }
+
+        /// <summary>体の肌（頭の影でない方）</summary>
+        static SkinnedMeshRenderer Skin(GameObject her)
+        {
+            foreach (var smr in her.GetComponentsInChildren<SkinnedMeshRenderer>())
+                if (smr.shadowCastingMode != UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly) return smr;
+            return null;
         }
 
         /// <summary>体（頭の影を除く）の今の姿勢の頂点を、世界の位置で</summary>

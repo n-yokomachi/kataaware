@@ -2272,6 +2272,22 @@ namespace HalfAware.EditorTools
         /// </summary>
         static void Wheel(Bank rim, Bank spoke, Vector3 centre, float outer, float thick, float lean)
         {
+            foreach (var part in WheelParts(centre, outer, thick, lean))
+                (part.rim ? rim : spoke).Box(part.centre, part.size, part.rotation);
+        }
+
+        /// <summary>ハンドルの箱一つ。rim は黒い樹脂（輪と警笛の押し）、でなければ塗った鉄（芯と輻）。値は車から見た位置・大きさ・向き</summary>
+        public struct WheelPart
+        {
+            public bool rim;
+            public Vector3 centre, size;
+            public Quaternion rotation;
+        }
+
+        /// <summary>ハンドルを組む箱。組むのにも、手が輪に触れたかを測るのにも使う</summary>
+        public static List<WheelPart> WheelParts(Vector3 centre, float outer, float thick, float lean)
+        {
+            var parts = new List<WheelPart>();
             const int seg = 20;
             var tilt = Quaternion.Euler(lean, 0f, 0f);
             var ring = outer * 0.5f - thick * 0.5f;
@@ -2282,22 +2298,39 @@ namespace HalfAware.EditorTools
                 var a = (i + 0.5f) / seg * Mathf.PI * 2f;
                 var at = new Vector3(Mathf.Cos(a) * ring, Mathf.Sin(a) * ring, 0f);
                 var rot = tilt * Quaternion.Euler(0f, 0f, a * Mathf.Rad2Deg + 90f);
-                rim.Box(centre + tilt * at, new Vector3(chord, thick, thick), rot);
+                parts.Add(new WheelPart { rim = true, centre = centre + tilt * at, size = new Vector3(chord, thick, thick), rotation = rot });
             }
-            spoke.Box(centre, new Vector3(0.11f, 0.11f, 0.045f), tilt);
+            parts.Add(new WheelPart { rim = false, centre = centre, size = new Vector3(0.11f, 0.11f, 0.045f), rotation = tilt });
             // 警笛の押し。芯の面から手前へ出す。輪が寝ているので「手前」は上になる。
             // ここだけ輪と同じ黒い樹脂にする。芯まで鉄で塗ると、昼の帯で
             // 白い塊が手前に立っているようにしか見えない
-            rim.Box(centre + tilt * new Vector3(0f, 0f, -0.028f),
-                new Vector3(0.075f, 0.075f, 0.016f), tilt);
+            parts.Add(new WheelPart { rim = true, centre = centre + tilt * new Vector3(0f, 0f, -0.028f), size = new Vector3(0.075f, 0.075f, 0.016f), rotation = tilt });
             // 輪だけだと宙に浮いた環にしか見えない
             for (var i = 0; i < 3; i++)
             {
                 var a = (90f + i * 120f) * Mathf.Deg2Rad;
                 var at = new Vector3(Mathf.Cos(a), Mathf.Sin(a), 0f) * ring * 0.5f;
                 var rot = tilt * Quaternion.Euler(0f, 0f, a * Mathf.Rad2Deg);
-                spoke.Box(centre + tilt * at, new Vector3(ring, 0.022f, 0.018f), rot);
+                parts.Add(new WheelPart { rim = false, centre = centre + tilt * at, size = new Vector3(ring, 0.022f, 0.018f), rotation = rot });
             }
+            return parts;
         }
+
+        /// <summary>車から見た点 local から、ハンドル（輪・芯・警笛の押し・輻）の面までの距離。中なら負</summary>
+        public static float WheelGap(Vector3 local)
+        {
+            if (wheelParts == null) wheelParts = WheelParts(WheelAt, WheelOuter, WheelThick, WheelLean);
+            var best = float.MaxValue;
+            foreach (var part in wheelParts)
+            {
+                var q = Quaternion.Inverse(part.rotation) * (local - part.centre);
+                var d = new Vector3(Mathf.Abs(q.x) - part.size.x * 0.5f, Mathf.Abs(q.y) - part.size.y * 0.5f, Mathf.Abs(q.z) - part.size.z * 0.5f);
+                var gap = Vector3.Max(d, Vector3.zero).magnitude + Mathf.Min(Mathf.Max(d.x, Mathf.Max(d.y, d.z)), 0f);
+                if (gap < best) best = gap;
+            }
+            return best;
+        }
+
+        static List<WheelPart> wheelParts;
     }
 }
