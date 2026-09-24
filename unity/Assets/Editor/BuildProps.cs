@@ -362,17 +362,41 @@ namespace HalfAware.EditorTools
         const float PortLip = 0.0038f;
         /// <summary>輪の平らな上の面の外の半径。ここから外の縁へ、肌へ向けて面取りする</summary>
         const float PortTop = 0.0055f;
-        /// <summary>輪が肌から立つ高さ（m）</summary>
-        const float PortRise = 0.0004f;
+        /// <summary>
+        /// 輪が肌から立つ高さ（m）。輪は肌の丸みに沿って曲げてあるので、腕の輪郭に来る向きから見ると、この高さだけ輪郭の外へ出る。
+        /// 0.4 mm では寄りで輪郭の外へ 0.4〜0.5 mm 浮き出して見えた
+        /// </summary>
+        const float PortRise = 0.00015f;
         /// <summary>輪の外の縁を、肌の下へ沈める深さ（m）。姿勢で肌が少し動いても、縁の下に隙間を見せない</summary>
         const float PortSkirt = 0.0015f;
         /// <summary>
         /// 穴の暗い面を肌から浮かせる高さ（m）。体の肌は穴の所で切れていないので、穴は肌の上に置いた暗い面で見せ、
         /// 輪の内の壁が口の縁からそこへ下る
         /// </summary>
-        const float PortFloor = 0.00012f;
-        /// <summary>輪と穴の周りの分け方</summary>
-        const int PortSegments = 28;
+        const float PortFloor = 0.00008f;
+        /// <summary>輪と穴の周りの分け方。外の縁の辺の長さは 0.85 mm で、辺の間の肌の丸みから離れない</summary>
+        const int PortSegments = 48;
+        /// <summary>
+        /// 輪と穴の断面を、半径の向きにこの幅（m）ごとに刻む。面は刻んだ頂点の間で平らなので、刻みが粗いと、面の下の肌の折れ目が
+        /// 面より上に出る（輪の上の面を 1.7 mm の一枚にしたとき、斜めの寄りで輪の中に肌の筋が見えた）
+        /// </summary>
+        const float PortStep = 0.0006f;
+        /// <summary>骨ごとの枠のずらし（<see cref="PortMesh"/>）を揃える刻み（m）。近い枠を一つにまとめ、枠の数を減らす</summary>
+        const float PortShiftGrid = 0.00005f;
+
+        /// <summary>断面の点の間を、半径の向きに <see cref="PortStep"/> ごとに刻み直す（同じ半径の上下の辺はそのまま）</summary>
+        static Vector2[] Dense(Vector2[] profile)
+        {
+            var list = new List<Vector2> { profile[0] };
+            for (var i = 1; i < profile.Length; i++)
+            {
+                var a = profile[i - 1];
+                var b = profile[i];
+                var n = Mathf.Max(1, Mathf.CeilToInt(Mathf.Abs(b.x - a.x) / PortStep - 1e-4f));
+                for (var k = 1; k <= n; k++) list.Add(Vector2.Lerp(a, b, (float)k / n));
+            }
+            return list.ToArray();
+        }
 
         /// <summary>
         /// 右の手首の差込口（インプラント）。ジャックが刺さる所（<see cref="PortPose"/>）の皮膚に埋まった小さな金属の輪と、真ん中の暗い穴。
@@ -411,22 +435,22 @@ namespace HalfAware.EditorTools
                 return hit > 0f ? hit - 0.02f : 0f;
             };
             // 輪の断面（中心からの半径、肌からの高さ）。穴の口の内の壁 → 口の縁 → 平らな上の面 → 外の縁の面取り → 肌の下の裾
-            var ring = new[]
+            var ring = Dense(new[]
             {
                 new Vector2(PortHole, PortFloor),
                 new Vector2(PortLip, PortRise * 0.8f),
                 new Vector2(PortTop, PortRise),
                 new Vector2(PortRadius, 0f),
                 new Vector2(PortRadius, -PortSkirt),
-            };
+            });
             Transform[] ringBones;
             var ringMesh = PortMesh(ring, skin, float.NaN, frame, flat * Vector3.forward, patch, out ringBones);
             // 穴の暗い面。肌に沿わせ、真ん中は平らに塞ぐ
-            var hole = new[]
+            var hole = Dense(new[]
             {
-                new Vector2(PortHole * 0.5f, PortFloor),
+                new Vector2(PortHole * 0.25f, PortFloor),
                 new Vector2(PortHole, PortFloor),
-            };
+            });
             Transform[] holeBones;
             var holeMesh = PortMesh(hole, skin, skin(0f, 0f) + PortFloor, frame, flat * Vector3.forward, patch, out holeBones);
             // 肌に貼り付かせる。差込口の真ん中の肌と同じ重みで骨を混ぜて置く
@@ -595,7 +619,7 @@ namespace HalfAware.EditorTools
         /// 断面は内から外へ並べる。高さは頂点ごとに skin（その所の肌の高さ）へ重ねる。floor が数なら、最初の（いちばん内の）輪をその高さの平らな面で塞ぐ。
         /// 頂点は輪の枠 frame（肌の面、m）で作って世界へ置き、その真下の肌の三角（patch）の動きをそのまま混ぜて付ける。
         /// 肌の三角の中の点は、三つの頂点がそれぞれの重みで骨に付いて動いた後の、三つの頂点の間の点になる。これは骨ごとに違う点
-        /// （骨 i の重みで三つの頂点を混ぜた所）を骨ごとに動かして合わせた所なので、頂点ごとに骨ごとの枠を一つずつ作り、
+        /// （骨 i の重みで三つの頂点を混ぜた所）を骨ごとに動かして合わせた所なので、頂点ごとに骨ごとの枠を持たせ（ずらしの近い枠はまとめる）、
         /// その枠の束ねた置き方を、骨 i の点の所へずらす。こうすると輪の頂点は、どの姿勢でもその下の肌の点から同じだけ離れる
         /// （一つの重みで一つの点を動かすと、手首を曲げたときに三角の中で重みの違う分だけ肌と離れる）。
         /// bones は mesh の骨の枠ごとの骨（同じ骨が何度も出る）。
@@ -630,6 +654,7 @@ namespace HalfAware.EditorTools
             var rest = patch.smr.sharedMesh.vertices;
             var slotBones = new List<Transform>();
             var slotBind = new List<Matrix4x4>();
+            var slots = new Dictionary<string, int>();
             var weights = new BoneWeight[verts.Count];
             var corner = new int[3];
             var share = new float[3];
@@ -687,20 +712,31 @@ namespace HalfAware.EditorTools
                     for (var e = 0; e < 16; e++) blend[e] += b[e] * (order[k].Value / total);
                 }
                 if (i == 0) flip = blend.determinant < 0f;
-                // 肌の点から頂点までの離れ（世界）を、束ねた姿勢の離れへ戻して、肌の点（束ねた姿勢）へ重ねる
-                var at = hit ? under + blend.inverse.MultiplyVector(world - skinWorld) : blend.inverse.MultiplyPoint3x4(world);
                 var idx = new int[4];
                 var wt = new float[4];
+                // 骨ごとの枠のずらしで動く分（今の姿勢の世界）。頂点はこの分を除いた所へ置く
+                var moved = Vector3.zero;
                 for (var k = 0; k < n; k++)
                 {
                     var bone = order[k].Key;
-                    // 骨 i の点（三つの頂点を骨 i の重みで混ぜた所）へ、束ねた置き方をずらす
+                    // 骨 i の点（三つの頂点を骨 i の重みで混ぜた所）へ、束ねた置き方をずらす。ずらしは PortShiftGrid に揃え、同じ枠は使い回す
                     var shift = hit ? sum[bone] / order[k].Value - under : Vector3.zero;
-                    idx[k] = slotBones.Count;
+                    shift = new Vector3(Mathf.Round(shift.x / PortShiftGrid), Mathf.Round(shift.y / PortShiftGrid), Mathf.Round(shift.z / PortShiftGrid)) * PortShiftGrid;
+                    var key = bone + ":" + shift.x.ToString("R") + ":" + shift.y.ToString("R") + ":" + shift.z.ToString("R");
+                    int slot;
+                    if (!slots.TryGetValue(key, out slot))
+                    {
+                        slot = slotBones.Count;
+                        slots[key] = slot;
+                        slotBones.Add(patch.smr.bones[bone]);
+                        slotBind.Add(patch.bind[bone] * Matrix4x4.Translate(shift));
+                    }
+                    idx[k] = slot;
                     wt[k] = order[k].Value / total;
-                    slotBones.Add(patch.smr.bones[bone]);
-                    slotBind.Add(patch.bind[bone] * Matrix4x4.Translate(shift));
+                    moved += BoneMatrix(patch, bone).MultiplyVector(shift) * wt[k];
                 }
+                // 頂点の束ねた姿勢の位置。どの骨の枠で動かしても、今の姿勢でちょうど world に来る所
+                var at = blend.inverse.MultiplyPoint3x4(world - moved);
                 weights[i] = new BoneWeight
                 {
                     boneIndex0 = idx[0], weight0 = wt[0],

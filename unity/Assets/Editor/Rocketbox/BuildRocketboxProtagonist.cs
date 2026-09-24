@@ -117,8 +117,33 @@ namespace HalfAware.EditorTools.Rocketbox
             // 右の手首の差込口（インプラント）。主人公にも片割れにも付ける。片割れは裏返した模型なので、本人の左の手首に来る。
             // 骨を置いた後の、模型の元の姿勢（手首がまっすぐ）の肌に合わせる
             var animator = her.GetComponent<Animator>();
-            if (animator != null && animator.isHuman) BuildProps.WristPort(animator);
+            if (animator != null && animator.isHuman) PortAtOrigin(her, animator);
             return her;
+        }
+
+        /// <summary>
+        /// 差込口を、体の根を原点に置いた形で組む。輪と穴の mesh は人ごとに一つで、どの場面の体もそれを使う。
+        /// 場面ごとの体の置き場で計算の端数が変わると、骨ごとの枠の数と並びが場面ごとに違ってしまい、
+        /// 前に組んだ場面の輪が、後から組み直した mesh と合わなくなって映らなかった
+        /// </summary>
+        static void PortAtOrigin(GameObject her, Animator animator)
+        {
+            var t = her.transform;
+            var parent = t.parent;
+            var position = t.localPosition;
+            var rotation = t.localRotation;
+            t.SetParent(null, false);
+            t.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+            try
+            {
+                BuildProps.WristPort(animator);
+            }
+            finally
+            {
+                t.SetParent(parent, false);
+                t.localPosition = position;
+                t.localRotation = rotation;
+            }
         }
 
         /// <summary>
