@@ -8,7 +8,7 @@ namespace HalfAware.EditorTools
 {
     /// <summary>
     /// 左手がジャックを掴む角（JackPull の holdRoll・showRoll・placeRoll、JackPlug の holdRoll・seatRoll）と、
-    /// 指の間のジャックの傾き（左手の JackHold の向き）を選ぶ。
+    /// 指の間のジャックの傾き（JackPull の holdTilt・showTilt・placeTilt、JackPlug の holdTilt・seatTilt）を、流れの段ごとに選ぶ。
     ///
     /// ジャックは丸いので、軸まわりのどの角で掴んでも見た目は同じ。ところが掴む手の向きはこの角で決まり、
     /// 悪い角では指が肩の方を向き、手が前腕に対して裏返る（手のひらのひねりが 180 度近く）。
@@ -16,7 +16,9 @@ namespace HalfAware.EditorTools
     /// 運ぶ間に角を移すのは、指の間でジャックを転がすのと同じで、これも見た目は変わらない。
     ///
     /// 傾きは、親指の腹と人差し指の腹を結ぶ線（JackHold の X）まわりにジャックを倒す角。二つの腹はジャックに接したまま、
-    /// 手がジャックに対して起きたり伏せたりする。角だけでは腕の範囲に収まらないときに、傾きも試す。
+    /// 手がジャックに対して起きたり伏せたりする。運ぶ間に傾きを移すのは、指の間でジャックを起こすのと同じ。
+    /// 手首のジャックを掴むには指が右の手首に潜らない傾きが要り、置き場に置くには左手首を曲げすぎない傾きが要って、
+    /// 一つの傾きでは両方を満たせなかったので、段ごとに選ぶ。
     /// 角と傾きは、掴むのに使う所（手の骨・親指・人差し指）が右の前腕と手に潜らないように選ぶ。
     /// 中指・薬指・小指は、選んだ後で潜らないところまで曲げを深める（<see cref="Tuck"/>）。
     ///
@@ -25,7 +27,7 @@ namespace HalfAware.EditorTools
     /// 掴むのに使う所が右の前腕と手に潜らず、ケーブルが体に潜らない最初の角を選ぶ:
     /// - 手のひらのひねり（前腕と手首の和、腕を下ろして手のひらが腿を向く形から）: <see cref="TwistRange"/> 度まで
     /// - 手首の曲げ（手が前腕に対して倒れる角）: <see cref="BendRange"/> 度まで
-    /// 傾きは <see cref="Tilts"/> をすべて試し、どの段も目安に収まって潜りの無い傾きのうち、中指・薬指・小指を深める曲げが浅く済む傾きを選ぶ
+    /// 段ごとに <see cref="Tilts"/> の傾きをすべて試し、潜りが無く目安に収まる中で、中指・薬指・小指を深める曲げが浅く済む傾きを選ぶ
     /// </summary>
     public static class JackHoldRoll
     {
@@ -43,24 +45,23 @@ namespace HalfAware.EditorTools
         const float CableClear = 0.001f;
 
         /// <summary>試す傾き（度）。倒さない所から、小さい順に</summary>
-        public static readonly float[] Tilts = { 0f, 15f, -15f, 30f, -30f, 45f, -45f };
+        public static readonly float[] Tilts = { 0f, 15f, -15f, 30f, -30f };
 
         /// <summary>抜く流れ。傾きと、掴む・見せる・置くの角を選んで書く</summary>
         public static void ForPull(JackPull pull, StringBuilder note)
         {
             var so = new SerializedObject(pull);
             var pose = (SeatedPose)so.FindProperty("pose").objectReferenceValue;
-            var grip = (Transform)so.FindProperty("grip").objectReferenceValue;
             Action reset = () => { pull.ResetForStudy(); pull.Bind(); };
             Action<float> step = t => { pull.StepForStudy(t); pull.Apply(t); };
             Func<float, bool> busy = t => PullTimeline.Reach(t) > 0f;
             var phases = new[]
             {
-                new Phase("holdRoll", t => busy(t) && PullTimeline.Show(t) <= 0f && PullTimeline.Place(t) <= 0f, "抜く 掴む"),
-                new Phase("showRoll", t => busy(t) && PullTimeline.Show(t) > 0f && PullTimeline.Place(t) <= 0f, "抜く 見せる"),
-                new Phase("placeRoll", t => busy(t) && PullTimeline.Place(t) > 0f, "抜く 置く"),
+                new Phase("holdRoll", "holdTilt", t => busy(t) && PullTimeline.Show(t) <= 0f && PullTimeline.Place(t) <= 0f, "抜く 掴む"),
+                new Phase("showRoll", "showTilt", t => busy(t) && PullTimeline.Show(t) > 0f && PullTimeline.Place(t) <= 0f, "抜く 見せる"),
+                new Phase("placeRoll", "placeTilt", t => busy(t) && PullTimeline.Place(t) > 0f, "抜く 置く"),
             };
-            Choose(so, grip, pose, PullTimeline.Total, reset, step, phases, note);
+            Choose(so, pose, PullTimeline.Total, reset, step, phases, note);
             Tuck(so, pose, PullTimeline.Total, reset, step, busy, note);
             Worst(pose, PullTimeline.Total, reset, step, busy, "抜く 流れ全体", note);
             Clear(so, pose, PullTimeline.Total, reset, step, busy, "抜く 流れ全体", note);
@@ -71,16 +72,15 @@ namespace HalfAware.EditorTools
         {
             var so = new SerializedObject(plug);
             var pose = (SeatedPose)so.FindProperty("pose").objectReferenceValue;
-            var grip = (Transform)so.FindProperty("grip").objectReferenceValue;
             Action reset = () => { plug.ResetForStudy(); plug.Bind(); };
             Action<float> step = t => { plug.Step(t); plug.Apply(t); };
             Func<float, bool> busy = t => PlugTimeline.Reach(t) > 0f;
             var phases = new[]
             {
-                new Phase("holdRoll", t => busy(t) && PlugTimeline.Carry(t) <= 0f, "挿す 取る"),
-                new Phase("seatRoll", t => busy(t) && PlugTimeline.Carry(t) > 0f, "挿す 運んで挿す"),
+                new Phase("holdRoll", "holdTilt", t => busy(t) && PlugTimeline.Carry(t) <= 0f, "挿す 取る"),
+                new Phase("seatRoll", "seatTilt", t => busy(t) && PlugTimeline.Carry(t) > 0f, "挿す 運んで挿す"),
             };
-            Choose(so, grip, pose, PlugTimeline.Total, reset, step, phases, note);
+            Choose(so, pose, PlugTimeline.Total, reset, step, phases, note);
             Tuck(so, pose, PlugTimeline.Total, reset, step, busy, note);
             Worst(pose, PlugTimeline.Total, reset, step, busy, "挿す 流れ全体", note);
             Clear(so, pose, PlugTimeline.Total, reset, step, busy, "挿す 流れ全体", note);
@@ -98,129 +98,84 @@ namespace HalfAware.EditorTools
             return Mathf.Max(twist / TwistRange, bend / BendRange);
         }
 
-        /// <summary>
-        /// 掴む手の置き所 grip を、挟む所の芯を保ったまま、X（二つの指の腹を結ぶ線）まわりに tilt 度倒す。
-        /// baseRotation・basePosition は倒す前の向きと位置（手の骨から見た値）
-        /// </summary>
-        public static void Tilt(Transform grip, Vector3 basePosition, Quaternion baseRotation, float tilt)
-        {
-            var centre = basePosition + baseRotation * Vector3.forward * BodyPoser.GripAlong;
-            grip.localRotation = baseRotation * Quaternion.AngleAxis(tilt, Vector3.right);
-            grip.localPosition = centre - grip.localRotation * Vector3.forward * BodyPoser.GripAlong;
-        }
-
         static ArmReach.Rest RestOfLeft(Animator an)
         {
-            return ArmReach.RestOf(an.GetComponentInChildren<SkinnedMeshRenderer>(),
+            return ArmReach.RestOf(SkinPoint.BodyOf(an),
                 an.GetBoneTransform(HumanBodyBones.LeftUpperArm), an.GetBoneTransform(HumanBodyBones.LeftLowerArm),
                 an.GetBoneTransform(HumanBodyBones.LeftHand));
         }
 
-        /// <summary>流れの段。角を書く欄の名と、段に入るこま</summary>
+        /// <summary>流れの段。角と傾きを書く欄の名と、段に入るこま</summary>
         sealed class Phase
         {
             public readonly string prop;
+            public readonly string tilt;
             public readonly Func<float, bool> frames;
             public readonly string what;
 
-            public Phase(string prop, Func<float, bool> frames, string what)
+            public Phase(string prop, string tilt, Func<float, bool> frames, string what)
             {
                 this.prop = prop;
+                this.tilt = tilt;
                 this.frames = frames;
                 this.what = what;
             }
         }
 
         /// <summary>
-        /// 傾きを <see cref="Tilts"/> の順に試し、傾きごとに段の順に角を選ぶ。どの段も目安に収まって潜りの無い傾きのうち、
-        /// 中指・薬指・小指を深めきれば右の前腕と手から離せる傾きで、そのままの指が入る頂点のいちばん少ない傾き（後で深める曲げが浅く済む）を選ぶ。
-        /// 掴む段でもう前の候補より多い傾きは、残りの段を試さない。
-        /// どの傾きでも潜りが残るなら、潜りのいちばん少ない傾き（同じならはみ出しの小さい方）にする
+        /// 段の順に、傾き（<see cref="Tilts"/>）と角を選ぶ。傾きごとに角を選び（<see cref="Pick"/>）、いちばんよい傾きをその段の傾きにする。
+        /// よさの順は、潜りが少ない、腕の範囲の目安に収まる、掴むのに使わない指を深めきれば右の前腕と手から離せる、
+        /// そのままの指が入る頂点が少ない（後で深める曲げが浅く済む）、はみ出しが小さい、の順
         /// </summary>
-        static void Choose(SerializedObject so, Transform grip, SeatedPose pose, float total, Action reset, Action<float> step,
-            Phase[] phases, StringBuilder note)
+        static void Choose(SerializedObject so, SeatedPose pose, float total, Action reset, Action<float> step, Phase[] phases, StringBuilder note)
         {
-            var basePosition = grip != null ? grip.localPosition : Vector3.zero;
-            var baseRotation = grip != null ? grip.localRotation : Quaternion.identity;
-            float bestTilt = 0f;
-            Candidate[] best = null;
-            foreach (var tilt in grip != null ? Tilts : new[] { 0f })
-            {
-                if (grip != null) Tilt(grip, basePosition, baseRotation, tilt);
-                var picked = new Candidate[phases.Length];
-                for (var i = 0; i < phases.Length; i++)
-                {
-                    picked[i] = Pick(so, phases[i].prop, pose, total, reset, step, phases[i].frames);
-                    if (i == 0 && best != null && Good(best) && StuckSum(best) == 0 && picked[0] != null && (picked[0].stuck > 0 || picked[0].loose >= LooseSum(best))) break;
-                }
-                if (Array.IndexOf(picked, null) >= 0) continue;
-                if (best == null || Better(picked, best)) { best = picked; bestTilt = tilt; }
-            }
-            if (grip != null)
-            {
-                Tilt(grip, basePosition, baseRotation, bestTilt);
-                EditorUtility.SetDirty(grip);
-            }
+            var best = new Candidate[phases.Length];
+            var bestTilt = new float[phases.Length];
             for (var i = 0; i < phases.Length; i++)
             {
+                var tried = new StringBuilder();
+                tried.AppendFormat("  {0}:", phases[i].what);
+                foreach (var tilt in Tilts)
+                {
+                    // 後の段の傾きも同じにしておく（まだ選んでいない段の傾きへ移る間を、この段のこまに混ぜない）
+                    for (var j = i; j < phases.Length; j++) so.FindProperty(phases[j].tilt).floatValue = tilt;
+                    so.ApplyModifiedPropertiesWithoutUndo();
+                    var c = Pick(so, phases[i].prop, pose, total, reset, step, phases[i].frames);
+                    if (c == null) continue;
+                    tried.AppendFormat(" 傾き {0:0} 角 {1:0}・{2:0.00}（{3:0}/{4:0}）・潜り {5}+{6}・指 {7}/{8}", tilt, c.roll, c.worst,
+                        c.twist, c.bend, c.clash, c.cable, c.loose, c.stuck);
+                    if (best[i] == null || Better(c, best[i])) { best[i] = c; bestTilt[i] = tilt; }
+                }
+                note.AppendLine(tried.ToString());
                 if (best[i] == null) continue;
+                so.FindProperty(phases[i].tilt).floatValue = bestTilt[i];
+                for (var j = i + 1; j < phases.Length; j++) so.FindProperty(phases[j].tilt).floatValue = bestTilt[i];
                 so.FindProperty(phases[i].prop).floatValue = best[i].roll;
+                so.ApplyModifiedPropertiesWithoutUndo();
             }
-            so.ApplyModifiedPropertiesWithoutUndo();
             reset();
             pose.Apply();
-            note.AppendFormat("掴む手の傾き: {0:0} 度（二つの指の腹を結ぶ線まわり）", bestTilt).AppendLine();
             for (var i = 0; i < phases.Length; i++)
             {
                 var c = best[i];
                 if (c == null) continue;
-                note.AppendFormat("{0}: 角 {1:0} 度（左の手のひらのひねり いちばん大きいこまで {2:0} 度、手首の曲げ {3:0} 度。{4} 秒ごとに数えて、掴むのに使う所が右の前腕と手に入った頂点 {5}、ケーブルが体の肌から {7:0} mm の内に来た頂点 {6}）",
-                    phases[i].what, c.roll, c.twist, c.bend, FineTick, c.clash, c.cable, CableClear * 1000f).AppendLine();
+                note.AppendFormat("{0}: 傾き {1:0} 度・角 {2:0} 度（左の手のひらのひねり いちばん大きいこまで {3:0} 度、手首の曲げ {4:0} 度。{5} 秒ごとに数えて、掴むのに使う所が右の前腕と手に入った頂点 {6}、ケーブルが体の肌から {8:0} mm の内に来た頂点 {7}）",
+                    phases[i].what, bestTilt[i], c.roll, c.twist, c.bend, FineTick, c.clash, c.cable, CableClear * 1000f).AppendLine();
             }
         }
 
-        static int Bad(Candidate[] picked)
+        /// <summary>角ひとつの成績どうしを比べる。a の方がよいか</summary>
+        static bool Better(Candidate a, Candidate b)
         {
-            var n = 0;
-            foreach (var c in picked) n += c == null ? 9999 : c.clash + c.cable;
-            return n;
-        }
-
-        static float Worst(Candidate[] picked)
-        {
-            var w = 0f;
-            foreach (var c in picked) w = Mathf.Max(w, c == null ? 99f : c.worst);
-            return w;
-        }
-
-        static bool Good(Candidate[] picked)
-        {
-            return Bad(picked) == 0 && Worst(picked) <= 1f;
-        }
-
-        static int StuckSum(Candidate[] picked)
-        {
-            var n = 0;
-            foreach (var c in picked) n += c == null ? 9999 : c.stuck;
-            return n;
-        }
-
-        static int LooseSum(Candidate[] picked)
-        {
-            var n = 0;
-            foreach (var c in picked) n += c == null ? 9999 : c.loose;
-            return n;
-        }
-
-        static bool Better(Candidate[] a, Candidate[] b)
-        {
-            var bad = Bad(a).CompareTo(Bad(b));
+            var bad = (a.clash + a.cable).CompareTo(b.clash + b.cable);
             if (bad != 0) return bad < 0;
-            if (Good(a) != Good(b)) return Good(a);
-            if (!Good(a)) return Worst(a) < Worst(b) - 1e-3f;
-            if ((StuckSum(a) == 0) != (StuckSum(b) == 0)) return StuckSum(a) == 0;
-            var loose = LooseSum(a).CompareTo(LooseSum(b));
-            return loose != 0 ? loose < 0 : Worst(a) < Worst(b) - 1e-3f;
+            var inA = a.worst <= 1f;
+            var inB = b.worst <= 1f;
+            if (inA != inB) return inA;
+            if (!inA) return a.worst < b.worst - 1e-3f;
+            if ((a.stuck == 0) != (b.stuck == 0)) return a.stuck == 0;
+            if (a.loose != b.loose) return a.loose < b.loose;
+            return a.worst < b.worst - 1e-3f;
         }
 
         /// <summary>
@@ -293,8 +248,12 @@ namespace HalfAware.EditorTools
                     if (inA && a.loose != b.loose) return a.loose.CompareTo(b.loose);
                     return Mathf.Abs(a.worst - b.worst) > 1e-3f ? a.worst.CompareTo(b.worst) : a.mean.CompareTo(b.mean);
                 });
-                // 上から順に潜りを数える。重いので、形の良い方から 10 まで
-                for (var i = 0; i < ranked.Count && i < 10; i++)
+                // 上から順に潜りを数える。目安に収まる角はすべて、越える角は上から 5 まで（重いので）
+                var inLimit = ranked.FindAll(x => x.worst <= 1f).Count;
+                // 潜りは、掴むのに使わない指を深めきった形で数える（その指は後で要るだけ深める。ゆるいままの指がケーブルを横切るのは数えない）
+                for (var s = 0; s < shapes.Length; s++) Write(shapes[s], Tucked(an, start[s], TuckMost));
+                so.ApplyModifiedPropertiesWithoutUndo();
+                for (var i = 0; i < ranked.Count && i < inLimit + 5; i++)
                 {
                     var c = ranked[i];
                     roll.floatValue = c.roll;
@@ -307,6 +266,7 @@ namespace HalfAware.EditorTools
             }
             finally
             {
+                for (var s = 0; s < shapes.Length; s++) Write(shapes[s], start[s]);
                 if (chosen != null) roll.floatValue = chosen.roll;
                 so.ApplyModifiedPropertiesWithoutUndo();
                 reset();
@@ -374,6 +334,7 @@ namespace HalfAware.EditorTools
         {
             var an = pose.Animator;
             var rightArm = Study.BodyStudy.Hand(an, false, true);
+            var cable = UnityEngine.Object.FindFirstObjectByType<Cable>();
             var shapes = new[] { so.FindProperty("pinch"), so.FindProperty("open") };
             var line = new StringBuilder("掴むのに使わない指を深めた曲げ:");
             pose.Seated = true;
@@ -391,8 +352,8 @@ namespace HalfAware.EditorTools
                     {
                         for (var s = 0; s < shapes.Length; s++) Write(shapes[s], Curl(an, start[s], finger, extra));
                         so.ApplyModifiedPropertiesWithoutUndo();
-                        if (Clash(pose, total, Tick, reset, step, busy, bones, rightArm) == 0
-                            && Clash(pose, total, FineTick, reset, step, busy, bones, rightArm) == 0) break;
+                        if (Clash(pose, total, Tick, reset, step, busy, bones, rightArm, cable) == 0
+                            && Clash(pose, total, FineTick, reset, step, busy, bones, rightArm, cable) == 0) break;
                     }
                     extra = Mathf.Min(extra, TuckMost);
                     for (var s = 0; s < shapes.Length; s++) Write(shapes[s], Curl(an, start[s], finger, extra));
@@ -408,9 +369,12 @@ namespace HalfAware.EditorTools
             note.AppendLine(line.ToString());
         }
 
-        /// <summary>tick 秒ごとのこま（busy のこま）で、骨の組 bones に付いた頂点が右の前腕と手 rightArm に入った数。一つ見つけたら止める</summary>
+        /// <summary>
+        /// tick 秒ごとのこま（busy のこま）で、骨の組 bones に付いた頂点が右の前腕と手 rightArm に入った数と、
+        /// ケーブルの点が bones に付いた肌の中に入った数の和。一つ見つけたら止める
+        /// </summary>
         static int Clash(SeatedPose pose, float total, float tick, Action reset, Action<float> step, Func<float, bool> busy,
-            HashSet<Transform> bones, HashSet<Transform> rightArm)
+            HashSet<Transform> bones, HashSet<Transform> rightArm, Cable cable)
         {
             var an = pose.Animator;
             var clash = 0;
@@ -419,9 +383,36 @@ namespace HalfAware.EditorTools
             {
                 pose.Apply();
                 step(t);
-                if (busy(t)) clash += Study.BodyStudy.PartInPart(an.gameObject, bones, rightArm);
+                if (!busy(t)) continue;
+                clash += Study.BodyStudy.PartInPart(an.gameObject, bones, rightArm);
+                if (cable != null) clash += CableIn(an.gameObject, cable, bones);
             }
             return clash;
+        }
+
+        /// <summary>ケーブルの点のうち、体の骨の組 part に付いた肌の中に入った数</summary>
+        static int CableIn(GameObject body, Cable cable, HashSet<Transform> part)
+        {
+            var points = new List<Vector3>();
+            var normals = new List<Vector3>();
+            foreach (var smr in body.GetComponentsInChildren<SkinnedMeshRenderer>())
+            {
+                if (smr.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly || SkinPoint.Rides(smr)) continue;
+                var baked = new Mesh();
+                smr.BakeMesh(baked, true);
+                var v = baked.vertices;
+                var n = baked.normals;
+                var w = smr.sharedMesh.boneWeights;
+                var bones = smr.bones;
+                for (var i = 0; i < v.Length; i++)
+                {
+                    if (!part.Contains(bones[w[i].boneIndex0])) continue;
+                    points.Add(smr.transform.TransformPoint(v[i]));
+                    normals.Add(smr.transform.TransformDirection(n[i]).normalized);
+                }
+                UnityEngine.Object.DestroyImmediate(baked);
+            }
+            return Study.BodyStudy.Inside(Study.BodyStudy.CablePoints(cable), points, normals, 0f);
         }
 
         /// <summary>0.05 秒ごとのこま（frames のこま）で、骨の組 bones に付いた頂点が右の前腕と手 rightArm に入った数の和</summary>

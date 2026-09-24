@@ -127,7 +127,7 @@ namespace HalfAware.EditorTools.Study
             foreach (var smr in body.GetComponentsInChildren<SkinnedMeshRenderer>())
             {
                 if (!smr.enabled || !smr.gameObject.activeInHierarchy || smr.sharedMesh == null) continue;
-                if (smr.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly) continue;
+                if (smr.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly || SkinPoint.Rides(smr)) continue;
                 var baked = new Mesh();
                 smr.BakeMesh(baked, true);
                 var weights = smr.sharedMesh.boneWeights;
@@ -197,7 +197,7 @@ namespace HalfAware.EditorTools.Study
         {
             foreach (var smr in body.GetComponentsInChildren<SkinnedMeshRenderer>())
             {
-                if (smr.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly) continue;
+                if (smr.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly || SkinPoint.Rides(smr)) continue;
                 var baked = new Mesh();
                 smr.BakeMesh(baked, true);
                 var v = baked.vertices;
@@ -241,7 +241,7 @@ namespace HalfAware.EditorTools.Study
             var sb = new StringBuilder();
             foreach (var smr in body.GetComponentsInChildren<SkinnedMeshRenderer>())
             {
-                if (smr.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly) continue;
+                if (smr.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly || SkinPoint.Rides(smr)) continue;
                 var baked = new Mesh();
                 smr.BakeMesh(baked, true);
                 var v = baked.vertices;
@@ -517,7 +517,7 @@ namespace HalfAware.EditorTools.Study
             var nrm = new List<Vector3>();
             foreach (var smr in body.GetComponentsInChildren<SkinnedMeshRenderer>())
             {
-                if (smr.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly) continue;
+                if (smr.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly || SkinPoint.Rides(smr)) continue;
                 var baked = new Mesh();
                 smr.BakeMesh(baked, true);
                 var v = baked.vertices;
@@ -667,7 +667,7 @@ namespace HalfAware.EditorTools.Study
             {
                 var an = body.GetComponent<Animator>();
                 foreach (var s in body.GetComponentsInChildren<SkinnedMeshRenderer>())
-                    if (s.shadowCastingMode != UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly) smr = s;
+                    if (s.shadowCastingMode != UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly && !SkinPoint.Rides(s)) smr = s;
                 var bones = smr.bones;
                 var w = smr.sharedMesh.boneWeights;
                 var v = Bake();
@@ -808,7 +808,7 @@ namespace HalfAware.EditorTools.Study
             foreach (var smr in her.GetComponentsInChildren<SkinnedMeshRenderer>()) smr.forceMatrixRecalculationPerRender = true;
             BodyPoser.Stand(an);
             var gauge = new ArmGauge(her);
-            var skin = her.GetComponentInChildren<SkinnedMeshRenderer>();
+            var skin = SkinPoint.BodyOf(her.transform);
             var lowers = new[] { an.GetBoneTransform(HumanBodyBones.LeftLowerArm), an.GetBoneTransform(HumanBodyBones.RightLowerArm) };
             var hands = new[] { an.GetBoneTransform(HumanBodyBones.LeftHand), an.GetBoneTransform(HumanBodyBones.RightHand) };
             var rests = new[]

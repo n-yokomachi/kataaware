@@ -65,6 +65,18 @@ namespace HalfAware
         [SerializeField] float showRoll;
         [Tooltip("置き場での、掴む手の軸まわりの角（度）。置き場へ運ぶ間に showRoll から移す")]
         [SerializeField] float placeRoll;
+        [Tooltip("掴む間の、指の間のジャックの傾き（度、親指の腹と人差し指の腹を結ぶ線まわり）。二つの腹はジャックに接したまま、" +
+            "手がジャックに対して起きたり伏せたりする。左腕の形と、指が右の手首に潜らない向きを、組み立てが流れを通して試して選ぶ")]
+        [SerializeField] float holdTilt;
+        [Tooltip("見せる所での傾き（度）。見せる所へ運ぶ間に holdTilt から移す（指の間でジャックを起こす）")]
+        [SerializeField] float showTilt;
+        [Tooltip("置き場での傾き（度）。置き場へ運ぶ間に showTilt から移す")]
+        [SerializeField] float placeTilt;
+        [Tooltip("掴む手の置き所（grip）の、傾けない形。手の骨から見た位置と向き。組み立てが書く（零なら置き所を動かさない）")]
+        [SerializeField] Vector3 gripPosition;
+        [SerializeField] Quaternion gripRotation = Quaternion.identity;
+        [Tooltip("指の腹が挟む所の、ジャックの根元からの高さ（m）。傾けるときの中心")]
+        [SerializeField] float pinchAlong = 0.015f;
 
         [Header("腕のひねり")]
         [Tooltip("手のひらのひねりのうち、前腕の骨（肘の所）へ移す割合。残りは手首に残る。" +
@@ -88,6 +100,7 @@ namespace HalfAware
         Transform[] pinchBones;
         Transform[] openBones;
         Transform restParent;
+        SkinPoint port;
         Vector3 restPosition;
         Quaternion restRotation;
         Vector3 restScale = Vector3.one;
@@ -135,7 +148,7 @@ namespace HalfAware
                 upperL = an.GetBoneTransform(HumanBodyBones.LeftUpperArm);
                 lowerL = an.GetBoneTransform(HumanBodyBones.LeftLowerArm);
                 handL = an.GetBoneTransform(HumanBodyBones.LeftHand);
-                var skin = an.GetComponentInChildren<SkinnedMeshRenderer>();
+                var skin = SkinPoint.BodyOf(an);
                 restR = ArmReach.RestOf(skin, upperR, lowerR, handR);
                 restL = ArmReach.RestOf(skin, upperL, lowerL, handL);
                 pinchBones = new Transform[pinch.Length];
@@ -146,6 +159,7 @@ namespace HalfAware
             if (jack != null && restParent == null)
             {
                 restParent = jack.parent;
+                port = restParent != null ? restParent.GetComponentInParent<SkinPoint>() : null;
                 restPosition = jack.localPosition;
                 restRotation = jack.localRotation;
                 restScale = jack.localScale;
@@ -197,9 +211,12 @@ namespace HalfAware
             // 上体。置く間だけ右の肘掛けへ寄せる
             ArmReach.Lean(pose.Animator, body, placeLean.x, placeLean.y, placeLean.z, PullTimeline.Place(t));
 
-            // 右手。手首を目の前へ出し、ジャックを目へ向ける
+            // 右手。手首を目の前へ出し、ジャックを目へ向ける。手のひらのひねりを前腕と手首に分けてから（手の向きと位置は変えない）、
+            // 手首の差込口を肌の上へ置き直す。刺さっているジャックはその子なので、左手の狙いはここで決まった所を掴む
             ArmReach.Move(upperR, lowerR, handR, body.TransformPoint(lookWrist), body.rotation * lookHand,
                 body.TransformPoint(rightElbowPole), PullTimeline.RightHand(t));
+            ArmReach.Untwist(lowerR, handR, restR, twistShare);
+            if (port != null) port.Follow();
 
             // 左手
             // 離した後は、離した瞬間の所（離す直前の狙い）から座った形の手へ戻る。
@@ -209,7 +226,9 @@ namespace HalfAware
             Target(PullTimeline.LetGo(t) ? PullTimeline.LetGoAt - 1e-4f : t, out gp, out gr);
             // 離した後は、まず開いた指をジャックの尻の側へ抜いてから戻る
             if (PullTimeline.LetGo(t)) gp += gr * Vector3.forward * (releaseLift * PullTimeline.Release(t));
-            ArmReach.HandFor(gp, gr * Roll(PullTimeline.LetGo(t) ? PullTimeline.LetGoAt - 1e-4f : t), HoldLocal(), HoldRotation(), out hp, out hr);
+            var when = PullTimeline.LetGo(t) ? PullTimeline.LetGoAt - 1e-4f : t;
+            TiltGrip(TiltAt(when));
+            ArmReach.HandFor(gp, gr * Roll(when), HoldLocal(), HoldRotation(), out hp, out hr);
             var w = PullTimeline.Reach(t);
             var leftPole = body.TransformPoint(leftElbowPole);
             float k;
@@ -222,8 +241,7 @@ namespace HalfAware
             Shape(open, openBones, Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.3f, 0.8f, w)));
             Shape(pinch, pinchBones, Closing(w));
 
-            // 手のひらのひねりを前腕と手首に分ける（手の向きと位置は変えない）
-            ArmReach.Untwist(lowerR, handR, restR, twistShare);
+            // 左手も、手のひらのひねりを前腕と手首に分ける
             ArmReach.Untwist(lowerL, handL, restL, twistShare);
         }
 
@@ -248,24 +266,61 @@ namespace HalfAware
             if (place > 0f && place < 1f && parked != null)
             {
                 k = place;
-                Hand(show, showRot, showRoll, out positionA, out rotationA);
-                Hand(parked.position, parked.rotation, placeRoll, out positionB, out rotationB);
+                Hand(show, showRot, showRoll, showTilt, out positionA, out rotationA);
+                Hand(parked.position, parked.rotation, placeRoll, placeTilt, out positionB, out rotationB);
                 return true;
             }
             if (place <= 0f && s > 0f && s < 1f)
             {
                 k = s;
-                Hand(pulled, restRot, holdRoll, out positionA, out rotationA);
-                Hand(show, showRot, showRoll, out positionB, out rotationB);
+                Hand(pulled, restRot, holdRoll, holdTilt, out positionA, out rotationA);
+                Hand(show, showRot, showRoll, showTilt, out positionB, out rotationB);
                 return true;
             }
             return false;
         }
 
         /// <summary>ジャックを position・rotation に、軸まわりに roll 度回して掴んでいる手の骨の位置と向き</summary>
-        void Hand(Vector3 position, Quaternion rotation, float roll, out Vector3 handPosition, out Quaternion handRotation)
+        void Hand(Vector3 position, Quaternion rotation, float roll, float tilt, out Vector3 handPosition, out Quaternion handRotation)
         {
-            ArmReach.HandFor(position, rotation * Quaternion.AngleAxis(roll, Vector3.forward), HoldLocal(), HoldRotation(), out handPosition, out handRotation);
+            if (!Tilts)
+            {
+                ArmReach.HandFor(position, rotation * Quaternion.AngleAxis(roll, Vector3.forward), HoldLocal(), HoldRotation(), out handPosition, out handRotation);
+                return;
+            }
+            ArmReach.HandFor(position, rotation * Quaternion.AngleAxis(roll, Vector3.forward),
+                GripPosition(tilt) * handL.lossyScale.x, GripRotation(tilt), out handPosition, out handRotation);
+        }
+
+        /// <summary>置き所の傾けない形が書いてあるか（前の組み立ての場面では書いていない）</summary>
+        bool Tilts { get { return grip != null && gripPosition.sqrMagnitude > 0f; } }
+
+        /// <summary>t 秒目の、指の間のジャックの傾き（度）。掴む・見せる・置くの傾きを、運ぶ間に移していく</summary>
+        float TiltAt(float t)
+        {
+            var a = Mathf.LerpAngle(holdTilt, showTilt, PullTimeline.Show(t));
+            return Mathf.LerpAngle(a, placeTilt, PullTimeline.Place(t));
+        }
+
+        /// <summary>傾き tilt の置き所の向き（手の骨から見た向き）。親指の腹と人差し指の腹を結ぶ線（置き所の X）まわりに倒す</summary>
+        Quaternion GripRotation(float tilt)
+        {
+            return gripRotation * Quaternion.AngleAxis(tilt, Vector3.right);
+        }
+
+        /// <summary>傾き tilt の置き所の位置（手の骨から見た位置）。挟む所（根元から pinchAlong）を中心に倒す</summary>
+        Vector3 GripPosition(float tilt)
+        {
+            var centre = gripPosition + gripRotation * Vector3.forward * pinchAlong;
+            return centre - GripRotation(tilt) * Vector3.forward * pinchAlong;
+        }
+
+        /// <summary>置き所を傾き tilt へ置く。掴んでいるジャックは置き所の子なので、指の間で一緒に傾く</summary>
+        void TiltGrip(float tilt)
+        {
+            if (!Tilts) return;
+            grip.localRotation = GripRotation(tilt);
+            grip.localPosition = GripPosition(tilt);
         }
 
         /// <summary>t 秒目に、掴む手をジャックの軸まわりに回しておく回し。掴む・見せる・置くの角を、運ぶ間に移していく</summary>
@@ -419,6 +474,7 @@ namespace HalfAware
             held = false;
             letGo = false;
             sounded = false;
+            TiltGrip(holdTilt);
             if (jack == null || restParent == null) return;
             jack.SetParent(restParent, false);
             jack.localPosition = restPosition;

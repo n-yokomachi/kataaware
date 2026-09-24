@@ -32,9 +32,9 @@ namespace HalfAware.EditorTools
         [MenuItem("HalfAware/Build the implant jack")]
         public static void BuildJackMenu()
         {
-            var wrist = FindBone(HumanBodyBones.RightHand);
-            if (wrist == null) { Debug.LogError("右手首の骨が見つからない"); return; }
-            var jack = BuildJack(wrist);
+            var arm = FindBone(HumanBodyBones.RightLowerArm);
+            if (arm == null) { Debug.LogError("右の前腕の骨が見つからない"); return; }
+            var jack = BuildJack(arm);
             Selection.activeGameObject = jack;
             Mark(jack);
         }
@@ -213,13 +213,23 @@ namespace HalfAware.EditorTools
         // ---- 手首のジャックとケーブル -------------------------------------
 
         /// <summary>
-        /// 手首に刺さっているジャック。骨の大きさは入れ物で打ち消す。
-        /// 手のひらの側の、肘寄りに刺す。座った形では右の手のひらが上を向くので、下を見ると目に入る
+        /// 手首に刺さっているジャック。右の前腕（arm）の手首の差込口（<see cref="WristPort"/>）の子にして、差込口の軸に揃えて挿す。
+        /// 骨の大きさは入れ物で打ち消す。手のひらの側の、肘寄りに刺す。座った形では右の手のひらが上を向くので、下を見ると目に入る。
+        ///
+        /// 前は手の骨の子にしていた。刺す所は手首より 3 cm 肘寄りで、肌は前腕の骨に 8 割で付いているので、
+        /// 手首をひねるとジャックだけが手と一緒に回り、肌の上を滑った
         /// </summary>
-        public static GameObject BuildJack(Transform wrist)
+        public static GameObject BuildJack(Transform arm)
         {
             var parts = new List<Mesh>();
-            // 差し込み口の座金 → 胴 → ケーブルの根元、と +Z へ伸ばす
+            // 先のピン → 差し込み口の座金 → 胴 → ケーブルの根元、と +Z へ伸ばす。
+            // ピンは座金の下から手首の差込口の穴へ入る。抜くとき、穴から抜けてくるのが見える
+            parts.Add(ProcMesh.Loft(new List<ProcMesh.Ring>
+            {
+                new ProcMesh.Ring(new Vector3(0f, 0f, JackPinTip), JackPinRadius * 0.6f, JackPinRadius * 0.6f),
+                new ProcMesh.Ring(new Vector3(0f, 0f, JackPinTip + 0.001f), JackPinRadius, JackPinRadius),
+                new ProcMesh.Ring(new Vector3(0f, 0f, -0.002f), JackPinRadius, JackPinRadius),
+            }, 10));
             parts.Add(ProcMesh.Loft(new List<ProcMesh.Ring>
             {
                 new ProcMesh.Ring(new Vector3(0f, 0f, -0.002f), 0.0115f, 0.0115f),
@@ -237,27 +247,37 @@ namespace HalfAware.EditorTools
                 new ProcMesh.Ring(new Vector3(0f, 0f, 0.0185f), 0.0058f, 0.0058f),
                 new ProcMesh.Ring(new Vector3(0f, 0f, 0.0300f), 0.0040f, 0.0040f),
             }, 8));
+            for (var i = 0; i < parts.Count; i++) parts[i] = Outward(parts[i]);
             var mesh = ProcMesh.Save(ProcMesh.Combine(parts, null), Generated + "Jack.asset");
 
+            // 差込口は体を組み立てたときに付けてある（BuildRocketboxProtagonist）。無い体（前の組み立て）にだけ、今の姿勢で付ける。
+            // ジャックは差込口の子にする。差込口は肌に貼り付いて動く（SkinPoint）ので、挿さったジャックも肌から離れない
+            var port = arm.Find(PortName);
+            var an = arm.GetComponentInParent<Animator>();
+            if (port == null && an != null) port = WristPort(an);
+            var parent = port != null ? port : arm;
             // 作り直しても子は残す。調べる対象もケーブルの端もここにぶら下がっているので、
             // 消して作り直すと参照が切れる
-            var found = wrist.Find("Jack");
+            var found = parent.Find("Jack");
+            if (found == null) found = arm.Find("Jack");
             var go = found != null ? found.gameObject : new GameObject("Jack");
-            go.transform.SetParent(wrist, false);
-            go.transform.localScale = Vector3.one / wrist.lossyScale.x;
-            Seat(go.transform, wrist);
+            go.transform.SetParent(parent, false);
+            go.transform.localScale = Vector3.one / parent.lossyScale.x;
+            // 差込口の軸に揃え、座金の下の面を差込口の輪の上に乗せる（ピンは穴の奥へ入る）
+            go.transform.localRotation = Quaternion.identity;
+            go.transform.position = parent.position + parent.forward * JackSeat;
             Need<MeshFilter>(go).sharedMesh = mesh;
             Need<MeshRenderer>(go).sharedMaterial = Mat("SteelDark");
 
             // 光る帯。部屋が暗いので、鋼のままだと手首の影に沈んで刺さっているのが分からない。
             // 抜くところを見せるあいだ、目はこの帯を追う
-            var band = ProcMesh.Save(ProcMesh.Loft(new List<ProcMesh.Ring>
+            var band = ProcMesh.Save(Outward(ProcMesh.Loft(new List<ProcMesh.Ring>
             {
                 new ProcMesh.Ring(new Vector3(0f, 0f, 0.0072f), 0.0094f, 0.0094f),
                 new ProcMesh.Ring(new Vector3(0f, 0f, 0.0090f), 0.0098f, 0.0098f),
                 new ProcMesh.Ring(new Vector3(0f, 0f, 0.0122f), 0.0098f, 0.0098f),
                 new ProcMesh.Ring(new Vector3(0f, 0f, 0.0140f), 0.0094f, 0.0094f),
-            }, 10), Generated + "JackBand.asset");
+            }, 10)), Generated + "JackBand.asset");
             var litT = go.transform.Find("Band");
             var lit = litT != null ? litT.gameObject : new GameObject("Band");
             lit.transform.SetParent(go.transform, false);
@@ -277,35 +297,545 @@ namespace HalfAware.EditorTools
             return go;
         }
 
-        /// <summary>手首の肘寄りから手のひらの側へ、皮膚の上に座金が乗るところ（手の骨の付け根から肘の側へ m）</summary>
-        public const float JackFromWrist = 0.030f;
-
-        /// <summary>ジャックを手のひらの向きから親指の側へ倒す角（度）</summary>
-        public const float JackTilt = 40f;
+        /// <summary>
+        /// ProcMesh.Loft の筒の側の面は内へ向いている（両端の蓋だけが外を向く）。ジャックは抜くときに座金の下まで見え、
+        /// 手前の側の面が消えて奥の内の面が見えた。z の軸から外へ向いていない側の三角の巡りを返して、外へ向け直す
+        /// </summary>
+        static Mesh Outward(Mesh loft)
+        {
+            var v = loft.vertices;
+            var t = loft.triangles;
+            for (var i = 0; i < t.Length; i += 3)
+            {
+                var a = v[t[i]];
+                var n = Vector3.Cross(v[t[i + 1]] - a, v[t[i + 2]] - a);
+                var mid = (a + v[t[i + 1]] + v[t[i + 2]]) / 3f;
+                if (n.sqrMagnitude < 1e-16f || Mathf.Abs(n.normalized.z) > 0.9f || Vector3.Dot(n, new Vector3(mid.x, mid.y, 0f)) >= 0f) continue;
+                var s = t[i + 1];
+                t[i + 1] = t[i + 2];
+                t[i + 2] = s;
+            }
+            loft.triangles = t;
+            loft.RecalculateNormals();
+            return loft;
+        }
 
         /// <summary>
-        /// ジャックを手首へ刺す。手のひらの向きは、手の骨と指の付け根の骨から求める（<see cref="BodyPoser.PalmDir"/>）。
-        /// 刺す点は、手の骨の付け根から肘の側へ <see cref="JackFromWrist"/> 戻った所の、手のひらの側で親指へ寄った皮膚
-        /// （脈を取る所）。向きは手のひらから親指の側へ <see cref="JackTilt"/> 度倒す。
-        /// 手のひらの真ん中へまっすぐ立てると、ケーブルが前腕を越えて差込口（肘掛けの外寄り）へ向かうときに前腕へ潜った。
-        /// 皮膚の高さは体の面を今の姿勢で焼いて測る。ジャックの前（+Z）は皮膚から外へ、上（+Y）は手の先へ向ける
+        /// 手首の肘寄りから手のひらの側へ、手首の差込口とジャックの座金が乗るところ（手の骨の付け根から肘の側へ m）。
+        /// ここの肌は手の骨にも 2 割ほど付いていて、前腕の骨にも手の骨にも固く付けられない（手首をひねると肌から 6 mm ずれた）。
+        /// 差込口は肌に貼り付かせる（<see cref="SkinPoint"/>）。前腕の骨だけに付いた肌（手首から 6.5 cm より肘寄り）まで離すと、
+        /// 左手の掴み方もケーブルの通り道も合わなくなった
         /// </summary>
-        static void Seat(Transform jack, Transform wrist)
+        public const float JackFromWrist = 0.030f;
+
+        /// <summary>
+        /// 差込口を置く向き。腕の芯から、手のひらの向きを親指の側へこの角（度）だけ倒した向きの肌に置く。
+        /// ジャックの軸と同じ 40 度では、手のひらの側の平らな面の縁（前腕の横へ落ちる所）に掛かり、輪の外の縁の下の肌が 3 mm 落ちて輪が折れた
+        /// </summary>
+        public const float PortAround = 20f;
+
+        /// <summary>
+        /// 挿さったジャックの根元（座金の下の面から 2 mm 上）の、差込口の置き所（肌の面）からの高さ（m）。
+        /// 座金の下の面を差込口の輪の上（<see cref="PortRise"/>）から 0.3 mm 上に乗せる。ピンは輪の穴から肌の下へ入る
+        /// </summary>
+        public const float JackSeat = PortRise + 0.0003f + 0.002f;
+
+        /// <summary>ジャックの先のピンの半径（m）。手首の差込口の穴（<see cref="PortHole"/>）へ入る</summary>
+        public const float JackPinRadius = 0.0028f;
+
+        /// <summary>ジャックの先のピンの先端の高さ（ジャックの根元から m、負は根元の下）</summary>
+        public const float JackPinTip = -0.009f;
+
+        // ---- 手首の差込口（インプラント） ---------------------------------
+
+        /// <summary>手首の差込口の名前。右の前腕の骨の子で、子に穴（<see cref="PortHoleName"/>）を持つ</summary>
+        public const string PortName = "WristPort";
+        public const string PortHoleName = "Hole";
+
+        /// <summary>
+        /// 差込口の金属の輪の外の半径（m）。径 13 mm。ジャックの座金（径 23.6 mm）より小さく、挿さっている間は座金の下に隠れる
+        /// </summary>
+        public const float PortRadius = 0.0065f;
+        /// <summary>差込口の穴の半径（m）。ジャックのピン（<see cref="JackPinRadius"/>）が入る</summary>
+        public const float PortHole = 0.0034f;
+        /// <summary>輪の内の縁（穴の口）の半径</summary>
+        const float PortLip = 0.0038f;
+        /// <summary>輪の平らな上の面の外の半径。ここから外の縁へ、肌へ向けて面取りする</summary>
+        const float PortTop = 0.0055f;
+        /// <summary>輪が肌から立つ高さ（m）</summary>
+        const float PortRise = 0.0004f;
+        /// <summary>輪の外の縁を、肌の下へ沈める深さ（m）。姿勢で肌が少し動いても、縁の下に隙間を見せない</summary>
+        const float PortSkirt = 0.0015f;
+        /// <summary>
+        /// 穴の暗い面を肌から浮かせる高さ（m）。体の肌は穴の所で切れていないので、穴は肌の上に置いた暗い面で見せ、
+        /// 輪の内の壁が口の縁からそこへ下る
+        /// </summary>
+        const float PortFloor = 0.00012f;
+        /// <summary>輪と穴の周りの分け方</summary>
+        const int PortSegments = 28;
+
+        /// <summary>
+        /// 右の手首の差込口（インプラント）。ジャックが刺さる所（<see cref="PortPose"/>）の皮膚に埋まった小さな金属の輪と、真ん中の暗い穴。
+        /// 輪は肌の面に沿った円。この物の向きはジャックの軸（差込口の穴の向き）で、ジャックはこの向きに揃えて挿す（<see cref="BuildJack"/>）。
+        /// 右の前腕の骨の子に置き、その所の肌と同じ重みで前腕と手の骨の動きを混ぜて貼り付かせる（<see cref="SkinPoint"/>）。
+        /// 手首を曲げてもひねっても、肌から沈まず浮かない。
+        /// 輪の頂点は、今の姿勢の肌の面へ一つずつ合わせて置く（前腕の丸みに沿わせ、面一に近く、縁だけ <see cref="PortRise"/> 立つ）。
+        /// 主人公にも片割れにも付ける。片割れは模型ごと裏返した鏡像なので、片割れ本人の左の手首に来る
+        /// </summary>
+        public static Transform WristPort(Animator an, float fromWrist = JackFromWrist)
         {
-            var an = wrist.GetComponentInParent<Animator>();
-            if (an == null) return;
+            var arm = an.GetBoneTransform(HumanBodyBones.RightLowerArm);
+            if (arm == null) return null;
+            Vector3 position;
+            Quaternion rotation;
+            var surface = BodySurface(an);
+            Quaternion flat;
+            PortPose(an, fromWrist, surface, out position, out rotation, out flat);
+            var t = arm.Find(PortName);
+            var go = t != null ? t.gameObject : new GameObject(PortName);
+            go.transform.SetParent(arm, false);
+            go.transform.localScale = Vector3.one / Mathf.Abs(arm.lossyScale.x);
+            go.transform.SetPositionAndRotation(position, rotation);
+            // 輪と穴は体の骨で肌と一緒に曲がる（SkinnedMeshRenderer）。頂点ごとに、その下の肌の三角の三つの頂点の動きをそのまま混ぜる（PortMesh）。
+            // 輪を差込口の真ん中の一つの置き方で動かすと、13 mm の幅の中で肌の動きが揃わず、縁が肌から 0.5 mm 沈んだり 1 mm 立ったりした。
+            // 三角の中の一点の重みだけを使っても、手首を曲げて肘掛けに置いた座り姿で、穴の上へ肌が 0.4 mm 出た
+            var frame = Matrix4x4.TRS(position, flat, Vector3.one);
+            var patch = Patch(an, position, 0.05f);
+
+            // 輪と穴の頂点の、差込口の面からの肌の高さ（m）。今の姿勢の体の面へ、差込口の軸に沿って線を投げて測る
+            System.Func<float, float, float> skin = (x, y) =>
+            {
+                var from = position + flat * new Vector3(x, y, -0.02f);
+                Vector3 normal;
+                var hit = Hit(surface, from, flat * Vector3.forward, 0.04f, out normal);
+                return hit > 0f ? hit - 0.02f : 0f;
+            };
+            // 輪の断面（中心からの半径、肌からの高さ）。穴の口の内の壁 → 口の縁 → 平らな上の面 → 外の縁の面取り → 肌の下の裾
+            var ring = new[]
+            {
+                new Vector2(PortHole, PortFloor),
+                new Vector2(PortLip, PortRise * 0.8f),
+                new Vector2(PortTop, PortRise),
+                new Vector2(PortRadius, 0f),
+                new Vector2(PortRadius, -PortSkirt),
+            };
+            Transform[] ringBones;
+            var ringMesh = PortMesh(ring, skin, float.NaN, frame, flat * Vector3.forward, patch, out ringBones);
+            // 穴の暗い面。肌に沿わせ、真ん中は平らに塞ぐ
+            var hole = new[]
+            {
+                new Vector2(PortHole * 0.5f, PortFloor),
+                new Vector2(PortHole, PortFloor),
+            };
+            Transform[] holeBones;
+            var holeMesh = PortMesh(hole, skin, skin(0f, 0f) + PortFloor, frame, flat * Vector3.forward, patch, out holeBones);
+            // 肌に貼り付かせる。差込口の真ん中の肌と同じ重みで骨を混ぜて置く
+            Transform[] bones;
+            float[] weights;
+            Matrix4x4[] offsets;
+            if (SkinBinding(an, position - flat * Vector3.forward * 0.02f, flat * Vector3.forward, go.transform.localToWorldMatrix, out bones, out weights, out offsets))
+                Need<SkinPoint>(go).Set(bones, weights, offsets);
+            // mesh は人ごとに残す（主人公と片割れは前腕の形が違う）
+            PortPart(go.transform, PortRingName, SaveSkinned(ringMesh, Generated + "WristPort_" + an.gameObject.name + ".asset"),
+                Tinted("PortMetal", PortColour, 0.85f, 0.55f), patch, ringBones);
+            PortPart(go.transform, PortHoleName, SaveSkinned(holeMesh, Generated + "WristPortHole_" + an.gameObject.name + ".asset"),
+                Mat("Ink"), patch, holeBones);
+            return go.transform;
+        }
+
+        public const string PortRingName = "Ring";
+
+        /// <summary>差込口の輪か穴を、体の骨で曲がる形として parent の子 name に置く。bones は mesh の骨の枠ごとの骨（<see cref="PortMesh"/>）</summary>
+        static void PortPart(Transform parent, string name, Mesh mesh, Material material, SkinPatch patch, Transform[] bones)
+        {
+            var t = parent.Find(name);
+            var go = t != null ? t.gameObject : new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = Vector3.zero;
+            go.transform.localRotation = Quaternion.identity;
+            go.transform.localScale = Vector3.one;
+            var r = Need<SkinnedMeshRenderer>(go);
+            r.sharedMesh = mesh;
+            r.bones = bones;
+            r.rootBone = patch.smr.rootBone;
+            r.sharedMaterial = material;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            // 小さいので、画面の外でも曲げ続けて境の箱を気にしない
+            r.updateWhenOffscreen = true;
+        }
+
+        /// <summary>体の肌の、差込口のまわりの三角と、頂点の骨の重み（今の姿勢）</summary>
+        sealed class SkinPatch
+        {
+            public SkinnedMeshRenderer smr;
+            public Vector3[] world;
+            public List<int> tris = new List<int>();
+            public BoneWeight[] weights;
+            public Matrix4x4[] bind;
+        }
+
+        /// <summary>体の肌（頭の影だけを落とすものを除いた、いちばん大きな肌）の、centre から reach までの三角を集める</summary>
+        static SkinPatch Patch(Animator an, Vector3 centre, float reach)
+        {
+            SkinnedMeshRenderer body = null;
+            foreach (var smr in an.GetComponentsInChildren<SkinnedMeshRenderer>())
+                if (smr.shadowCastingMode != UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly && !SkinPoint.Rides(smr) && smr.sharedMesh != null
+                    && (body == null || smr.sharedMesh.vertexCount > body.sharedMesh.vertexCount))
+                    body = smr;
+            var patch = new SkinPatch { smr = body, weights = body.sharedMesh.boneWeights, bind = body.sharedMesh.bindposes };
+            var baked = new Mesh();
+            body.BakeMesh(baked, true);
+            var v = baked.vertices;
+            patch.world = new Vector3[v.Length];
+            for (var i = 0; i < v.Length; i++) patch.world[i] = body.transform.TransformPoint(v[i]);
+            var tris = baked.triangles;
+            var r2 = reach * reach;
+            for (var i = 0; i < tris.Length; i += 3)
+            {
+                if ((patch.world[tris[i]] - centre).sqrMagnitude > r2 && (patch.world[tris[i + 1]] - centre).sqrMagnitude > r2
+                    && (patch.world[tris[i + 2]] - centre).sqrMagnitude > r2) continue;
+                patch.tris.Add(tris[i]);
+                patch.tris.Add(tris[i + 1]);
+                patch.tris.Add(tris[i + 2]);
+            }
+            Object.DestroyImmediate(baked);
+            return patch;
+        }
+
+        /// <summary>
+        /// from から dir へ伸ばした線が抜ける patch の肌の三角（いちばん遠い所）。corner はその三角の三つの頂点の番号、
+        /// share はその点での三つの頂点の分け前（和が 1）。当たらなければ false
+        /// </summary>
+        static bool SkinAt(SkinPatch patch, Vector3 from, Vector3 dir, int[] corner, float[] share)
+        {
+            float best = 0f, bu = 0f, bv = 0f;
+            var at = -1;
+            for (var i = 0; i + 2 < patch.tris.Count; i += 3)
+            {
+                float t, u, w;
+                if (!Ray(from, dir, patch.world[patch.tris[i]], patch.world[patch.tris[i + 1]], patch.world[patch.tris[i + 2]], out t, out u, out w)) continue;
+                if (t <= 0f || t <= best) continue;
+                best = t;
+                at = i;
+                bu = u;
+                bv = w;
+            }
+            if (at < 0) return false;
+            corner[0] = patch.tris[at];
+            corner[1] = patch.tris[at + 1];
+            corner[2] = patch.tris[at + 2];
+            share[0] = 1f - bu - bv;
+            share[1] = bu;
+            share[2] = bv;
+            return true;
+        }
+
+        /// <summary>骨の枠 i の、束ねた姿勢の点を今の姿勢の世界へ移す置き方（骨の今の置き方 × 束ねた置き方）</summary>
+        static Matrix4x4 BoneMatrix(SkinPatch patch, int i)
+        {
+            return patch.smr.bones[i].localToWorldMatrix * patch.bind[i];
+        }
+
+        /// <summary>骨で曲がる mesh を path に残す。在れば中身だけ入れ替えて、場面からの参照を切らない</summary>
+        static Mesh SaveSkinned(Mesh mesh, string path)
+        {
+            var existing = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            if (existing == null)
+            {
+                AssetDatabase.CreateAsset(mesh, path);
+                return mesh;
+            }
+            existing.Clear();
+            existing.SetVertices(new List<Vector3>(mesh.vertices));
+            existing.SetNormals(new List<Vector3>(mesh.normals));
+            existing.boneWeights = mesh.boneWeights;
+            existing.bindposes = mesh.bindposes;
+            existing.SetTriangles(mesh.triangles, 0);
+            existing.RecalculateBounds();
+            EditorUtility.SetDirty(existing);
+            Object.DestroyImmediate(mesh);
+            return existing;
+        }
+
+        /// <summary>差込口の輪の色。肌の上で分かる、少し明るい鋼</summary>
+        public static readonly Color PortColour = new Color(0.62f, 0.64f, 0.67f);
+
+        /// <summary>
+        /// 手首の差込口の置き方（世界の位置と向き）。手の骨の付け根から肘の側へ fromWrist（ふつうは <see cref="JackFromWrist"/>）戻った所の、
+        /// 手のひらの側で親指へ寄った皮膚の上（脈を取る所）。腕の芯から、手のひらの向きを親指の側へ <see cref="PortAround"/> 度倒した向きに伸ばした所。
+        /// flat は輪の枠（前 +Z をそこの肌の面に直交させる。上 +Y は手の先の側）。rotation はジャックの軸で、輪の枠と同じ
+        /// （ジャックを肌から 40 度倒して挿すと、径 23.6 mm の座金の半分が肌に埋まり、埋まり残りの縁が肌から欠片のように突き出た）。
+        /// 手のひらの向きは、手の骨と指の付け根の骨から求める（<see cref="BodyPoser.PalmDir"/>）。surface は今の姿勢の体の面（<see cref="BodySurface"/>）。
+        /// 片割れ（模型ごと裏返した鏡像）では、片割れ本人の左の手首に来る
+        /// </summary>
+        public static void PortPose(Animator an, float fromWrist, List<Vector3> surface, out Vector3 position, out Quaternion rotation, out Quaternion flat)
+        {
+            var wrist = an.GetBoneTransform(HumanBodyBones.RightHand);
             var lower = an.GetBoneTransform(HumanBodyBones.RightLowerArm);
             var along = (wrist.position - lower.position).normalized;
-            var palm = BodyPoser.PalmDir(an, false);
+            // 裏返した模型（片割れ）の右の手は、形の上では左の手なので、手のひらの向きの求め方も左右を入れ替える
+            var palm = BodyPoser.PalmDir(an, false) * (an.transform.localToWorldMatrix.determinant < 0f ? -1f : 1f);
             palm = Vector3.ProjectOnPlane(palm, along).normalized;
             var thumb = Vector3.ProjectOnPlane(an.GetBoneTransform(HumanBodyBones.RightThumbProximal).position - wrist.position, along);
             thumb = Vector3.ProjectOnPlane(thumb, palm).normalized;
-            palm = Quaternion.AngleAxis(JackTilt, Vector3.Cross(palm, thumb)) * palm;
-            var at = wrist.position - along * JackFromWrist;
-            var skin = Skin(an, at, palm, 0.012f);
-            // 座金の厚みの半分だけ皮膚へ沈める
-            jack.position = at + palm * (skin - 0.002f);
-            jack.rotation = Quaternion.LookRotation(palm, along);
+            var side = Vector3.Cross(palm, thumb);
+            var put = Quaternion.AngleAxis(PortAround, side) * palm;
+            var at = wrist.position - along * fromWrist;
+            Vector3 normal;
+            var reach = Hit(surface, at, put, 0.08f, out normal);
+            position = at + put * reach;
+            // 肌が見つからなければ、置く向きのまま
+            if (reach <= 0f || normal.sqrMagnitude < 1e-8f) normal = put;
+            flat = Quaternion.LookRotation(normal, Vector3.ProjectOnPlane(along, normal));
+            rotation = flat;
+        }
+
+        /// <summary>
+        /// 差込口の輪か穴の mesh（体の骨で曲がる形）。profile は断面（中心からの半径、肌からの高さ）の並びで、隣どうしを帯で結ぶ。
+        /// 断面は内から外へ並べる。高さは頂点ごとに skin（その所の肌の高さ）へ重ねる。floor が数なら、最初の（いちばん内の）輪をその高さの平らな面で塞ぐ。
+        /// 頂点は輪の枠 frame（肌の面、m）で作って世界へ置き、その真下の肌の三角（patch）の動きをそのまま混ぜて付ける。
+        /// 肌の三角の中の点は、三つの頂点がそれぞれの重みで骨に付いて動いた後の、三つの頂点の間の点になる。これは骨ごとに違う点
+        /// （骨 i の重みで三つの頂点を混ぜた所）を骨ごとに動かして合わせた所なので、頂点ごとに骨ごとの枠を一つずつ作り、
+        /// その枠の束ねた置き方を、骨 i の点の所へずらす。こうすると輪の頂点は、どの姿勢でもその下の肌の点から同じだけ離れる
+        /// （一つの重みで一つの点を動かすと、手首を曲げたときに三角の中で重みの違う分だけ肌と離れる）。
+        /// bones は mesh の骨の枠ごとの骨（同じ骨が何度も出る）。
+        /// 片割れ（裏返した模型）では束ねた枠が裏返るので、面の向き（三角の巡り）も戻す
+        /// </summary>
+        static Mesh PortMesh(Vector2[] profile, System.Func<float, float, float> skin, float floor, Matrix4x4 frame, Vector3 normal, SkinPatch patch,
+            out Transform[] bones)
+        {
+            var verts = new List<Vector3>();
+            var tris = new List<int>();
+            for (var p = 0; p < profile.Length; p++)
+                for (var k = 0; k < PortSegments; k++)
+                {
+                    var a = k * Mathf.PI * 2f / PortSegments;
+                    var x = Mathf.Cos(a) * profile[p].x;
+                    var y = Mathf.Sin(a) * profile[p].x;
+                    verts.Add(new Vector3(x, y, skin(x, y) + profile[p].y));
+                }
+            for (var p = 0; p + 1 < profile.Length; p++)
+                for (var k = 0; k < PortSegments; k++)
+                {
+                    var k1 = (k + 1) % PortSegments;
+                    int a = p * PortSegments + k, b = p * PortSegments + k1, c = (p + 1) * PortSegments + k, d = (p + 1) * PortSegments + k1;
+                    tris.AddRange(new[] { a, c, b, b, c, d });
+                }
+            if (!float.IsNaN(floor))
+            {
+                var mid = verts.Count;
+                verts.Add(new Vector3(0f, 0f, floor));
+                for (var k = 0; k < PortSegments; k++) tris.AddRange(new[] { mid, k, (k + 1) % PortSegments });
+            }
+            var rest = patch.smr.sharedMesh.vertices;
+            var slotBones = new List<Transform>();
+            var slotBind = new List<Matrix4x4>();
+            var weights = new BoneWeight[verts.Count];
+            var corner = new int[3];
+            var share = new float[3];
+            var flip = false;
+            // 当たらなかった頂点は、一つ前の頂点の骨の混ぜ方で、ずらさずに付ける
+            Dictionary<int, float> last = null;
+            for (var i = 0; i < verts.Count; i++)
+            {
+                var world = frame.MultiplyPoint3x4(verts[i]);
+                // 骨ごとの、三つの頂点を骨の重みで混ぜた量（重みの和と、束ねた姿勢の位置の和）
+                var mass = new Dictionary<int, float>();
+                var sum = new Dictionary<int, Vector3>();
+                var hit = SkinAt(patch, world - normal * 0.02f, normal, corner, share);
+                var under = Vector3.zero;
+                var skinWorld = Vector3.zero;
+                if (hit)
+                {
+                    for (var c = 0; c < 3; c++)
+                    {
+                        var j = corner[c];
+                        var part = share[c];
+                        under += rest[j] * part;
+                        skinWorld += patch.world[j] * part;
+                        var bw = patch.weights[j];
+                        System.Action<int, float> add = (b, k) =>
+                        {
+                            if (k <= 0f) return;
+                            float m;
+                            Vector3 s;
+                            mass.TryGetValue(b, out m);
+                            sum.TryGetValue(b, out s);
+                            mass[b] = m + k * part;
+                            sum[b] = s + rest[j] * (k * part);
+                        };
+                        add(bw.boneIndex0, bw.weight0);
+                        add(bw.boneIndex1, bw.weight1);
+                        add(bw.boneIndex2, bw.weight2);
+                        add(bw.boneIndex3, bw.weight3);
+                    }
+                    last = mass;
+                }
+                else if (last != null) mass = new Dictionary<int, float>(last);
+                else mass[0] = 1f;
+                // 重い方から四つの骨。和を 1 にする
+                var order = new List<KeyValuePair<int, float>>(mass);
+                order.Sort((x, y) => y.Value.CompareTo(x.Value));
+                var n = Mathf.Min(4, order.Count);
+                var total = 0f;
+                for (var k = 0; k < n; k++) total += order[k].Value;
+                // 今の姿勢の、混ぜた置き方（向きの分で、肌から頂点までの離れを束ねた姿勢へ戻す）
+                var blend = new Matrix4x4();
+                for (var k = 0; k < n; k++)
+                {
+                    var b = BoneMatrix(patch, order[k].Key);
+                    for (var e = 0; e < 16; e++) blend[e] += b[e] * (order[k].Value / total);
+                }
+                if (i == 0) flip = blend.determinant < 0f;
+                // 肌の点から頂点までの離れ（世界）を、束ねた姿勢の離れへ戻して、肌の点（束ねた姿勢）へ重ねる
+                var at = hit ? under + blend.inverse.MultiplyVector(world - skinWorld) : blend.inverse.MultiplyPoint3x4(world);
+                var idx = new int[4];
+                var wt = new float[4];
+                for (var k = 0; k < n; k++)
+                {
+                    var bone = order[k].Key;
+                    // 骨 i の点（三つの頂点を骨 i の重みで混ぜた所）へ、束ねた置き方をずらす
+                    var shift = hit ? sum[bone] / order[k].Value - under : Vector3.zero;
+                    idx[k] = slotBones.Count;
+                    wt[k] = order[k].Value / total;
+                    slotBones.Add(patch.smr.bones[bone]);
+                    slotBind.Add(patch.bind[bone] * Matrix4x4.Translate(shift));
+                }
+                weights[i] = new BoneWeight
+                {
+                    boneIndex0 = idx[0], weight0 = wt[0],
+                    boneIndex1 = idx[1], weight1 = wt[1],
+                    boneIndex2 = idx[2], weight2 = wt[2],
+                    boneIndex3 = idx[3], weight3 = wt[3],
+                };
+                verts[i] = at;
+            }
+            if (flip)
+                for (var i = 0; i < tris.Count; i += 3) { var s = tris[i + 1]; tris[i + 1] = tris[i + 2]; tris[i + 2] = s; }
+            var mesh = new Mesh();
+            mesh.SetVertices(verts);
+            mesh.SetTriangles(tris, 0);
+            mesh.boneWeights = weights;
+            mesh.bindposes = slotBind.ToArray();
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            bones = slotBones.ToArray();
+            return mesh;
+        }
+
+        /// <summary>体の面の三角（今の姿勢、世界の位置）。頭の影だけを落とすものは除く</summary>
+        static List<Vector3> BodySurface(Animator an)
+        {
+            var list = new List<Vector3>();
+            foreach (var smr in an.GetComponentsInChildren<SkinnedMeshRenderer>())
+            {
+                if (smr.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly || SkinPoint.Rides(smr)) continue;
+                var baked = new Mesh();
+                smr.BakeMesh(baked, true);
+                var v = baked.vertices;
+                for (var s = 0; s < baked.subMeshCount; s++)
+                    foreach (var i in baked.GetTriangles(s)) list.Add(smr.transform.TransformPoint(v[i]));
+                Object.DestroyImmediate(baked);
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// from から dir へ伸ばした線が、三角の並び surface を抜けるいちばん遠い所までの距離（reach まで。無ければ 0）と、
+        /// そこの三角の面の向き（dir の側へ向けたもの）
+        /// </summary>
+        static float Hit(List<Vector3> surface, Vector3 from, Vector3 dir, float reach, out Vector3 normal)
+        {
+            var best = 0f;
+            normal = Vector3.zero;
+            for (var i = 0; i + 2 < surface.Count; i += 3)
+            {
+                float t;
+                if (!Ray(from, dir, surface[i], surface[i + 1], surface[i + 2], out t)) continue;
+                if (t <= 0f || t > reach || t <= best) continue;
+                best = t;
+                normal = Vector3.Cross(surface[i + 1] - surface[i], surface[i + 2] - surface[i]).normalized;
+                if (Vector3.Dot(normal, dir) < 0f) normal = -normal;
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// from から dir へ伸ばした線が抜ける肌の三角（いちばん遠い所、8 cm まで）の、その点の骨の重み（三つの頂点の重みを点の場所で混ぜ、
+        /// 大きい方から四つ）と、骨ごとの frame（世界の置き方）の置き方を求める。<see cref="SkinPoint"/> がこれで肌に貼り付く。
+        /// 置き方は、肌の頂点と同じ骨の混ぜ方（骨の今の置き方と束ねた置き方）で frame を表したもの。今の姿勢で混ぜると frame に戻る
+        /// </summary>
+        static bool SkinBinding(Animator an, Vector3 from, Vector3 dir, Matrix4x4 frame, out Transform[] bones, out float[] weights, out Matrix4x4[] offsets)
+        {
+            bones = null;
+            weights = null;
+            offsets = null;
+            dir = dir.normalized;
+            SkinnedMeshRenderer at = null;
+            int ia = 0, ib = 0, ic = 0;
+            float best = 0f, bu = 0f, bv = 0f;
+            foreach (var smr in an.GetComponentsInChildren<SkinnedMeshRenderer>())
+            {
+                if (smr.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly || SkinPoint.Rides(smr)) continue;
+                var baked = new Mesh();
+                smr.BakeMesh(baked, true);
+                var v = baked.vertices;
+                for (var k = 0; k < v.Length; k++) v[k] = smr.transform.TransformPoint(v[k]);
+                var tris = baked.triangles;
+                for (var i = 0; i < tris.Length; i += 3)
+                {
+                    float t, u, w;
+                    if (!Ray(from, dir, v[tris[i]], v[tris[i + 1]], v[tris[i + 2]], out t, out u, out w)) continue;
+                    if (t <= 0f || t > 0.08f || t <= best) continue;
+                    best = t;
+                    at = smr;
+                    ia = tris[i];
+                    ib = tris[i + 1];
+                    ic = tris[i + 2];
+                    bu = u;
+                    bv = w;
+                }
+                Object.DestroyImmediate(baked);
+            }
+            if (at == null) return false;
+            var bw = at.sharedMesh.boneWeights;
+            var bind = at.sharedMesh.bindposes;
+            var all = at.bones;
+            // 点の場所での三つの頂点の割合（a + u(b - a) + w(c - a)）
+            var mix = new Dictionary<int, float>();
+            System.Action<BoneWeight, float> add = (b, k) =>
+            {
+                float s;
+                if (b.weight0 > 0f) { mix.TryGetValue(b.boneIndex0, out s); mix[b.boneIndex0] = s + b.weight0 * k; }
+                if (b.weight1 > 0f) { mix.TryGetValue(b.boneIndex1, out s); mix[b.boneIndex1] = s + b.weight1 * k; }
+                if (b.weight2 > 0f) { mix.TryGetValue(b.boneIndex2, out s); mix[b.boneIndex2] = s + b.weight2 * k; }
+                if (b.weight3 > 0f) { mix.TryGetValue(b.boneIndex3, out s); mix[b.boneIndex3] = s + b.weight3 * k; }
+            };
+            add(bw[ia], 1f - bu - bv);
+            add(bw[ib], bu);
+            add(bw[ic], bv);
+            var order = new List<KeyValuePair<int, float>>(mix);
+            order.Sort((x, y) => y.Value.CompareTo(x.Value));
+            var n = Mathf.Min(4, order.Count);
+            var total = 0f;
+            for (var i = 0; i < n; i++) total += order[i].Value;
+            if (total <= 0f) return false;
+            bones = new Transform[n];
+            weights = new float[n];
+            offsets = new Matrix4x4[n];
+            // 今の姿勢で肌の頂点を置く混ぜ方（骨の今の置き方 × 束ねた置き方の重みつきの和）
+            var skin = new Matrix4x4();
+            for (var i = 0; i < n; i++)
+            {
+                var j = order[i].Key;
+                bones[i] = all[j];
+                weights[i] = order[i].Value / total;
+                var m = all[j].localToWorldMatrix * bind[j];
+                for (var k = 0; k < 16; k++) skin[k] += m[k] * weights[i];
+            }
+            var local = skin.inverse * frame;
+            for (var i = 0; i < n; i++) offsets[i] = bind[order[i].Key] * local;
+            return true;
         }
 
         /// <summary>
@@ -319,7 +849,7 @@ namespace HalfAware.EditorTools
             dir = dir.normalized;
             foreach (var smr in an.GetComponentsInChildren<SkinnedMeshRenderer>())
             {
-                if (smr.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly) continue;
+                if (smr.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly || SkinPoint.Rides(smr)) continue;
                 var baked = new Mesh();
                 smr.BakeMesh(baked, true);
                 var v = baked.vertices;
@@ -342,7 +872,16 @@ namespace HalfAware.EditorTools
         /// <summary>線と三角の交わり（Möller–Trumbore）。裏表は問わない</summary>
         static bool Ray(Vector3 o, Vector3 d, Vector3 a, Vector3 b, Vector3 c, out float t)
         {
+            float u, w;
+            return Ray(o, d, a, b, c, out t, out u, out w);
+        }
+
+        /// <summary>線と三角の交わり。交わる点は a + u(b - a) + w(c - a)</summary>
+        static bool Ray(Vector3 o, Vector3 d, Vector3 a, Vector3 b, Vector3 c, out float t, out float u, out float w)
+        {
             t = 0f;
+            u = 0f;
+            w = 0f;
             var e1 = b - a;
             var e2 = c - a;
             var p = Vector3.Cross(d, e2);
@@ -350,10 +889,10 @@ namespace HalfAware.EditorTools
             if (Mathf.Abs(det) < 1e-10f) return false;
             var inv = 1f / det;
             var s = o - a;
-            var u = Vector3.Dot(s, p) * inv;
+            u = Vector3.Dot(s, p) * inv;
             if (u < 0f || u > 1f) return false;
             var q = Vector3.Cross(s, e1);
-            var w = Vector3.Dot(d, q) * inv;
+            w = Vector3.Dot(d, q) * inv;
             if (w < 0f || u + w > 1f) return false;
             t = Vector3.Dot(e2, q) * inv;
             return true;
@@ -441,7 +980,7 @@ namespace HalfAware.EditorTools
             add(HumanBodyBones.Spine, HumanBodyBones.UpperChest, new[] { HumanBodyBones.Spine, HumanBodyBones.Chest, HumanBodyBones.UpperChest });
 
             // 体の面を焼き、頂点ごとの一番重い骨をその場で調べて数える
-            var smr = an.GetComponentInChildren<SkinnedMeshRenderer>();
+            var smr = SkinPoint.BodyOf(an);
             var baked = new Mesh();
             smr.BakeMesh(baked, true);
             var verts = baked.vertices;

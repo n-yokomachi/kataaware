@@ -158,13 +158,13 @@ namespace HalfAware.EditorTools
                 so.ApplyModifiedPropertiesWithoutUndo();
             }
 
-            // ジャック。古い手首から新しい右手へ移し、手のひらの側の皮膚へ刺し直す（子の調べる対象とケーブルの端はそのまま）
-            var handR = an.GetBoneTransform(HumanBodyBones.RightHand);
+            // ジャック。古い体から新しい右の前腕へ移し、手首の差込口へ刺し直す（子の調べる対象とケーブルの端はそのまま）
+            var armR = an.GetBoneTransform(HumanBodyBones.RightLowerArm);
             var handL = an.GetBoneTransform(HumanBodyBones.LeftHand);
             var jack = old != null ? FindDeep(old, "Jack") : null;
             if (jack == null) { note.AppendLine("古い体にジャックが無い"); return false; }
-            jack.SetParent(handR, true);
-            BuildProps.BuildJack(handR);
+            jack.SetParent(armR, true);
+            BuildProps.BuildJack(armR);
             var item = jack.Find("Interactable_jack");
             if (item != null) item.gameObject.SetActive(true);
 
@@ -204,6 +204,10 @@ namespace HalfAware.EditorTools
             jso.FindProperty("pose").objectReferenceValue = pose;
             jso.FindProperty("jack").objectReferenceValue = jack;
             jso.FindProperty("grip").objectReferenceValue = hold;
+            // 置き所の傾けない形と、傾けるときの中心（指の腹が挟む所）。段ごとの傾きは JackHoldRoll が選ぶ
+            jso.FindProperty("gripPosition").vector3Value = hold.localPosition;
+            jso.FindProperty("gripRotation").quaternionValue = hold.localRotation;
+            jso.FindProperty("pinchAlong").floatValue = BodyPoser.GripAlong;
             var aims = PullAims(an, body, chair.transform, player.transform.TransformPoint(new Vector3(0f, eye.y, eyeLead)));
             jso.FindProperty("lookWrist").vector3Value = aims.lookWrist;
             jso.FindProperty("lookHand").quaternionValue = aims.lookHand;
@@ -227,8 +231,14 @@ namespace HalfAware.EditorTools
             return true;
         }
 
-        /// <summary>右の手首を目の前へ出したとき、手のひらを目へ向けきらずに戻す角（度、前腕の軸まわり）</summary>
-        public const float LookTurnBack = 20f;
+        /// <summary>
+        /// 右の手首を目の前へ出したとき、手のひらを目へ向けた形から前腕の軸まわりに回す角（度）。
+        /// 前は 20 度（目へ向けきらずに戻す）だった。そのころジャックは手の骨に付いていて、手首をひねったこの形では肌から 3 cm 浮いていた。
+        /// ジャックを肌に貼り付かせる（手首の差込口）と、20 度では左手が手のひらを 100 度ひねり手首を 80 度曲げないと上から摘まめなかった。
+        /// ジャックを差込口の軸に揃えて肌から立てると、逆へ 20 度回してひねり 85 度・曲げ 57 度、35 度回してひねり 79 度・曲げ 54 度で摘まめた
+        /// （指の間の傾きと角は JackHoldRoll が選ぶ）
+        /// </summary>
+        public const float LookTurnBack = -35f;
 
         /// <summary>見せるときのジャックの軸（尻の向き）。体の根から見た向き</summary>
         public static readonly Vector3 ShowAxis = new Vector3(-0.87f, 0.5f, 0f).normalized;
@@ -256,8 +266,7 @@ namespace HalfAware.EditorTools
             var keep = BodyPoser.Capture(an);
             var rightPole = P(0.45f, 0.75f, -0.13f);
             BodyPoser.Arm(an, false, lookWrist, rightPole, chair.TransformDirection(new Vector3(-0.45f, 0.25f, 1f)), eye - lookWrist);
-            // 手のひらを目へ向けきらず、前腕の軸まわりに 20 度戻す。向けきると、ジャックを掴みに来た左の人差し指が
-            // 右の手のひらの付け根に触れた（左手を楽な角で掴ませたとき）
+            // 手のひらを目へ向けた形から、前腕の軸まわりに回す（LookTurnBack）
             var handR = an.GetBoneTransform(HumanBodyBones.RightHand);
             var lowerR = an.GetBoneTransform(HumanBodyBones.RightLowerArm);
             handR.rotation = Quaternion.AngleAxis(LookTurnBack, (handR.position - lowerR.position).normalized) * handR.rotation;
@@ -425,7 +434,7 @@ namespace HalfAware.EditorTools
         public static void SplitHead(GameObject her)
         {
             var hidden = Hidden();
-            var smr = her.GetComponentInChildren<SkinnedMeshRenderer>();
+            var smr = SkinPoint.BodyOf(her.transform);
             if (smr == null || hidden == null) return;
             var old = her.transform.Find("HeadShadow");
             if (old != null) Object.DestroyImmediate(old.gameObject);

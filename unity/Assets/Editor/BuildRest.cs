@@ -154,8 +154,10 @@ namespace HalfAware.EditorTools
         /// </summary>
         static void Plugged()
         {
-            var wrist = BuildConnect.Bone(HumanBodyBones.RightHand);
-            var socket = wrist != null ? wrist.Find(BuildConnect.SocketName) : null;
+            var arm = BuildConnect.Bone(HumanBodyBones.RightLowerArm);
+            var port = arm != null ? arm.Find(BuildProps.PortName) : null;
+            var holder = port != null ? port : arm;
+            var socket = holder != null ? holder.Find(BuildConnect.SocketName) : null;
             var jack = Look("Room/Chair/JackRest/Jack");
             if (socket == null) { Debug.LogWarning("手首に受け口が無い。ジャックを戻せない"); return; }
             if (jack == null)

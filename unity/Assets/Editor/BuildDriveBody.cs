@@ -221,7 +221,7 @@ namespace HalfAware.EditorTools
         static SkinnedMeshRenderer Skin(GameObject her)
         {
             foreach (var smr in her.GetComponentsInChildren<SkinnedMeshRenderer>())
-                if (smr.shadowCastingMode != UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly) return smr;
+                if (smr.shadowCastingMode != UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly && !SkinPoint.Rides(smr)) return smr;
             return null;
         }
 
@@ -230,7 +230,7 @@ namespace HalfAware.EditorTools
         {
             foreach (var smr in her.GetComponentsInChildren<SkinnedMeshRenderer>())
             {
-                if (smr.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly) continue;
+                if (smr.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly || SkinPoint.Rides(smr)) continue;
                 var mesh = new Mesh();
                 try
                 {

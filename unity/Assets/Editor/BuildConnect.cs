@@ -238,7 +238,7 @@ namespace HalfAware.EditorTools
             if (blocker != null) blocker.gameObject.SetActive(true);
         }
 
-        /// <summary>主人公の体の骨（Humanoid）。右の手首はジャックの受け口、左の手は掴む置き所を持つ</summary>
+        /// <summary>主人公の体の骨（Humanoid）。右の前腕は手首の差込口とジャックの受け口、左の手は掴む置き所を持つ</summary>
         public static Transform Bone(HumanBodyBones bone)
         {
             var pro = Look("Player/Protagonist");
@@ -249,7 +249,7 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// ジャックは肘掛けに置いてある。場面 1 の終わりに置いたままの形。
-        /// 手首には受け口だけを残す。
+        /// 手首には受け口だけを残す（ジャックと同じく、右の前腕の手首の差込口の子）。
         ///
         /// **受け口を空の GameObject で残すのは、ジャックの置き方と大きさを覚えさせるため。**
         /// JackPlug は挿さったところでジャックを受け口の原点へ等倍で置く。
@@ -257,16 +257,19 @@ namespace HalfAware.EditorTools
         /// </summary>
         static Transform Park()
         {
-            var wrist = Bone(HumanBodyBones.RightHand);
+            var arm = Bone(HumanBodyBones.RightLowerArm);
             var rest = Look("Room/Chair/JackRest");
-            if (wrist == null || rest == null) return null;
-            var jack = wrist.Find("Jack");
+            if (arm == null || rest == null) return null;
+            // ジャックと受け口は手首の差込口（肌に貼り付いて動く）の子
+            var port = arm.Find(BuildProps.PortName);
+            var holder = port != null ? port : arm;
+            var jack = holder.Find("Jack");
             if (jack == null) { Debug.LogWarning("手首にジャックが無い"); return null; }
-            var socket = wrist.Find(SocketName);
+            var socket = holder.Find(SocketName);
             if (socket == null)
             {
                 var go = new GameObject(SocketName);
-                go.transform.SetParent(wrist, false);
+                go.transform.SetParent(holder, false);
                 socket = go.transform;
             }
             socket.localPosition = jack.localPosition;
@@ -681,6 +684,10 @@ namespace HalfAware.EditorTools
                 so.FindProperty("pushDistance").floatValue = from.FindProperty("pullDistance").floatValue;
                 Copy(from, "pinch", so, "pinch");
                 Copy(from, "open", so, "open");
+                // 掴む手の置き所の傾けない形と、傾けるときの中心
+                so.FindProperty("gripPosition").vector3Value = from.FindProperty("gripPosition").vector3Value;
+                so.FindProperty("gripRotation").quaternionValue = from.FindProperty("gripRotation").quaternionValue;
+                so.FindProperty("pinchAlong").floatValue = from.FindProperty("pinchAlong").floatValue;
                 so.FindProperty("approach").floatValue = from.FindProperty("approach").floatValue;
             }
             so.ApplyModifiedPropertiesWithoutUndo();

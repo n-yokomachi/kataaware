@@ -114,6 +114,10 @@ namespace HalfAware.EditorTools.Rocketbox
             AddAnimator(her);
             // 骨組みを差し替えた人は、骨もその骨組みの位置へ置く。Animator を繋ぎ直すと模型の元の位置へ戻るので、最後に置く
             PlaceSkeleton(her);
+            // 右の手首の差込口（インプラント）。主人公にも片割れにも付ける。片割れは裏返した模型なので、本人の左の手首に来る。
+            // 骨を置いた後の、模型の元の姿勢（手首がまっすぐ）の肌に合わせる
+            var animator = her.GetComponent<Animator>();
+            if (animator != null && animator.isHuman) BuildProps.WristPort(animator);
             return her;
         }
 

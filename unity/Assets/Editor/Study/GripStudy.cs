@@ -85,7 +85,7 @@ namespace HalfAware.EditorTools.Study
             foreach (var s in her.GetComponentsInChildren<SkinnedMeshRenderer>())
             {
                 s.forceMatrixRecalculationPerRender = true;
-                if (s.shadowCastingMode != UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly) skin = s;
+                if (s.shadowCastingMode != UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly && !SkinPoint.Rides(s)) skin = s;
             }
             player.SetPositionAndRotation(seat.position, Quaternion.Euler(0f, seat.eulerAngles.y, 0f));
             her.localPosition += Vector3.down * PlayerController.StandingEyeHeight;

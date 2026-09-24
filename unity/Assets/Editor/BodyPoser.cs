@@ -118,7 +118,7 @@ namespace HalfAware.EditorTools
             ArmReach.Solve(upper, lower, hand, wrist, pole, 1f);
             if (fingers.sqrMagnitude > 1e-6f) Aim(an, left, fingers, palm);
             // 手のひらのひねりを前腕と手首に分ける。手の骨だけをひねると手首の肌が絞られて細く潰れる
-            ArmReach.Untwist(lower, hand, ArmReach.RestOf(an.GetComponentInChildren<SkinnedMeshRenderer>(), upper, lower, hand), ArmReach.TwistShare);
+            ArmReach.Untwist(lower, hand, ArmReach.RestOf(SkinPoint.BodyOf(an), upper, lower, hand), ArmReach.TwistShare);
         }
 
         /// <summary>
@@ -262,9 +262,11 @@ namespace HalfAware.EditorTools
             spreadAxes[an.avatar] = spread;
         }
 
-        /// <summary>ジャックの形（<see cref="BuildProps.BuildJack"/>）。根元からの高さ（m）と、そこでの半径（m）。座金・胴・細る尻の順</summary>
+        /// <summary>ジャックの形（<see cref="BuildProps.BuildJack"/>）。根元からの高さ（m）と、そこでの半径（m）。先のピン・座金・胴・細る尻の順</summary>
         static readonly Vector2[] JackProfile =
         {
+            new Vector2(BuildProps.JackPinTip, BuildProps.JackPinRadius * 0.6f), new Vector2(BuildProps.JackPinTip + 0.001f, BuildProps.JackPinRadius),
+            new Vector2(-0.002f, BuildProps.JackPinRadius),
             new Vector2(-0.002f, 0.0115f), new Vector2(0.0035f, BuildProps.JackWasherRadius), new Vector2(0.0050f, 0.0092f),
             new Vector2(0.0050f, 0.0088f), new Vector2(0.0165f, 0.0086f), new Vector2(0.0185f, 0.0062f),
             new Vector2(0.0185f, 0.0058f), new Vector2(0.0300f, 0.0040f),
@@ -312,9 +314,10 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// つまむ所の、ジャックの根元からの高さ（m）。胴のまっすぐな所（根元から 5〜16.5 mm）の尻寄り。
-        /// 前は 20 mm（胴と細る尻の境）で、指の腹が細る所に掛かって浮いた
+        /// 前は 20 mm（胴と細る尻の境）で、指の腹が細る所に掛かって浮いた。12 mm では、手首の肌に刺さったジャックを摘まむと
+        /// 人差し指の先が右の手首の肌へ潜った
         /// </summary>
-        public const float GripAlong = 0.012f;
+        public const float GripAlong = 0.015f;
 
         /// <summary>
         /// 指の腹の肌とジャックの胴の面の隙間（m、片側）。0.2 mm の内で合わせるので、肌は面から 0〜0.4 mm に来る。
@@ -582,7 +585,7 @@ namespace HalfAware.EditorTools
         static SkinnedMeshRenderer FirstSkin(Animator an)
         {
             foreach (var smr in an.GetComponentsInChildren<SkinnedMeshRenderer>())
-                if (smr.shadowCastingMode != UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly) return smr;
+                if (smr.shadowCastingMode != UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly && !SkinPoint.Rides(smr)) return smr;
             return null;
         }
 
