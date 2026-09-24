@@ -210,17 +210,19 @@ namespace HalfAware.EditorTools
             // 届く範囲は 1.10 m。座席から先へは届かないので、道にも沿道にも掛からない。
             // 影は落とさせない。WebGL で影を持つ灯りを増やすと重くなる。
             //
-            // **強さが極端に小さいのは書き間違いではない。** 灯りから輪までが 0.27 m しか
-            // 離れておらず、距離の二乗で効くので 14 倍に増える。0.06 でも輪が白く飛んで、
-            // 画面ぜんたいが滲んだ。実際に測って決めた値がこれで、
-            // 帯 1 の輪の上側が 17 から 45 へ、内張り（19）と分かれるところ
+            // **強さが極端に小さいのは書き間違いではない。** 灯りは輪の上の縁のすぐ前にあり、
+            // 明るさは距離の二乗で増える。0.06 でも輪が白く飛んで、画面ぜんたいが滲んだ。
+            // 輪が寝ていた頃に実際に測って決めた値は、輪まで 43 mm で 0.0025
+            // （帯 1 の輪の上側が 17 から 45 へ、内張り（19）と分かれるところ）。
+            // 輪を起こしてからは計器の面の 4 cm 手前に置き、輪まで 66 mm になったので、
+            // 輪の上での明るさが同じになるよう距離の二乗の比（2.4 倍）で強めた
             var backlight = Child(parent, "DialLamp");
-            backlight.localPosition = new Vector3(WheelAt.x, 1.36f, 0.50f);
+            backlight.localPosition = new Vector3(WheelAt.x, 1.36f, 0.555f);
             var lit = backlight.GetComponent<Light>();
             if (lit == null) lit = backlight.gameObject.AddComponent<Light>();
             lit.type = LightType.Point;
             lit.color = new Color(1f, 0.74f, 0.42f);
-            lit.intensity = 0.0025f;
+            lit.intensity = 0.0059f;
             lit.range = 1.10f;
             lit.shadows = LightShadows.None;
 
@@ -935,19 +937,16 @@ namespace HalfAware.EditorTools
         /// メーターの塊の中心と傾き。**ここと <see cref="FuelDial"/> の二箇所で使うので
         /// 数を二重に持たない。** 片方だけ動かすと、立体の燃料計が絵の中の燃料計から外れる。
         ///
-        /// **z 0.615 から 0.675 へ引いた。** 手前に置いていた頃は、ハンドルの輪の上側
-        /// （68 度寝ているので上の縁がいちばん前へ出る。y 1.301 / z 0.564）が
-        /// 計器の面（同じ高さで z 0.525）を 39 mm 貫いていて、輪の角が盤の絵の中から
-        /// 生えていた。塊を 60 mm 奥へ引くと輪の上側との隙間が 22 mm 開く。
+        /// **z 0.615 から 0.675 へ奥へずらした。** 手前に置いていた頃は、寝かせていたハンドルの輪の上側が
+        /// 計器の面を 39 mm 貫いていて、輪の角が盤の絵の中から生えていた。
+        /// 輪を起こした今は、輪の上の縁と塊の間は 31 mm（<see cref="WheelAt"/>）。
         ///
         /// **引けるのはここまで。** 塊の上端（y 1.4073 / z 0.6143）と道の見える縁
         /// （<see cref="SightY"/>）の隙間が、奥へ引くほど詰まる（縁は 1 m につき 0.15 下がる）。
         /// 0.675 で残りは 84 mm。庇を載せていた頃はここが 21 mm しか無かった。
         /// 見直し 14 が組むたびに測る。
         ///
-        /// 読みやすさはむしろ良くなる。目から輪の上の縁を掠めた線が盤と交わる高さが
-        /// 1.343（盤の真ん中、二つの計器の只中）から 1.310（計器の丸の下端）へ下がり、
-        /// 輪が計器を横切らなくなる
+        /// 目から盤への視線は、盤のどこを見ても輪の上の縁の上を通り、輪は計器を横切らない
         /// </summary>
         static readonly Vector3 PodAt = new Vector3(WheelAt.x, 1.320f, 0.675f);
         static readonly Quaternion PodLean = Quaternion.Euler(14f, 0f, 0f);
@@ -2301,27 +2300,35 @@ namespace HalfAware.EditorTools
                 parts.Add(new WheelPart { rim = true, centre = centre + tilt * at, size = new Vector3(chord, thick, thick), rotation = rot });
             }
             parts.Add(new WheelPart { rim = false, centre = centre, size = new Vector3(0.11f, 0.11f, 0.045f), rotation = tilt });
-            // 警笛の押し。芯の面から手前へ出す。輪が寝ているので「手前」は上になる。
+            // 警笛の押し。芯の面から運転席の側へ出す。
             // ここだけ輪と同じ黒い樹脂にする。芯まで鉄で塗ると、昼の帯で
             // 白い塊が手前に立っているようにしか見えない
             parts.Add(new WheelPart { rim = true, centre = centre + tilt * new Vector3(0f, 0f, -0.028f), size = new Vector3(0.075f, 0.075f, 0.016f), rotation = tilt });
             // 輪だけだと宙に浮いた環にしか見えない
-            for (var i = 0; i < 3; i++)
+            foreach (var clock in WheelSpokes)
             {
-                var a = (90f + i * 120f) * Mathf.Deg2Rad;
+                var a = clock * Mathf.Deg2Rad;
                 var at = new Vector3(Mathf.Cos(a), Mathf.Sin(a), 0f) * ring * 0.5f;
-                var rot = tilt * Quaternion.Euler(0f, 0f, a * Mathf.Rad2Deg);
+                var rot = tilt * Quaternion.Euler(0f, 0f, clock);
                 parts.Add(new WheelPart { rim = false, centre = centre + tilt * at, size = new Vector3(ring, 0.022f, 0.018f), rotation = rot });
             }
+            // 柱。芯から計器盤の面の中へ差し込む。輪が起きて計器盤から離れたので、柱が無いと輪が宙に浮く
+            parts.Add(new WheelPart { rim = false, centre = centre + tilt * new Vector3(0f, 0f, WheelColumn * 0.5f), size = new Vector3(0.050f, 0.050f, WheelColumn), rotation = tilt });
             return parts;
         }
 
-        /// <summary>車から見た点 local から、ハンドル（輪・芯・警笛の押し・輻）の面までの距離。中なら負</summary>
+        /// <summary>車から見た点 local から、ハンドル（輪・芯・警笛の押し・輻・柱）の面までの距離。中なら負</summary>
         public static float WheelGap(Vector3 local)
         {
             if (wheelParts == null) wheelParts = WheelParts(WheelAt, WheelOuter, WheelThick, WheelLean);
+            return WheelGap(local, wheelParts);
+        }
+
+        /// <summary>車から見た点 local から、箱の組 parts の面までの距離。中なら負</summary>
+        public static float WheelGap(Vector3 local, List<WheelPart> parts)
+        {
             var best = float.MaxValue;
-            foreach (var part in wheelParts)
+            foreach (var part in parts)
             {
                 var q = Quaternion.Inverse(part.rotation) * (local - part.centre);
                 var d = new Vector3(Mathf.Abs(q.x) - part.size.x * 0.5f, Mathf.Abs(q.y) - part.size.y * 0.5f, Mathf.Abs(q.z) - part.size.z * 0.5f);

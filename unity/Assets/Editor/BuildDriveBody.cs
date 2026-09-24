@@ -31,25 +31,27 @@ namespace HalfAware.EditorTools
         /// <summary>腕組みの手の、指の曲げの割合（<see cref="BodyPoser.Grip"/>）。力の抜けた手</summary>
         const float FoldCurl = 0.35f;
 
-        // ハンドルを握る手の置き方。輪の 10 時と 2 時あたりを上から握る。手のひらを輪の上に載せ、
-        // 輪を手のひらに斜めに渡し（人差し指の付け根から小指の側の手首へ）、親指は輪の内側、ほかの指は輪の外側へ回す。
-        // 指は輪に触れるまで曲げ（BodyPoser.Wrap）、関節の限りまでは曲げない。
-        // 輪が 22° しか起きていないので、輪に沿う向きは前腕とほとんど平行になる。指を輪に直に交えると手首が 70° を越えて曲がり、
-        // 前腕が細く潰れる。斜めに渡すと手首の曲げは 47°。値は、手と腕の頂点がハンドルへ入らず、
-        // 指先が輪に乗り（四本のうち三本）、手首の曲げが小さい所を探して決めた（Study/GripStudy）
+        // ハンドルを握る手の置き方。輪の 9 時と 3 時を、ふつうの車と同じく横から握る。
+        // 輪は手のひらを斜めに渡り（人差し指の付け根から小指の側の手首へ）、四本の指はそろえて輪の外周から計器盤の側へ回り込み、
+        // 指先は輪の向こうに隠れる。親指は輪の運転席の側の面に沿う。指は輪に触れるまで曲げ（BodyPoser.Wrap）、関節の限りまでは曲げない。
+        // 値は、手と腕の頂点がハンドルへ入らず、四本の指先が計器盤の側へ回って目から隠れ、
+        // 手首の曲げが小さい所を探して決めた（Study/GripStudy）
 
         /// <summary>握る所の、輪の 12 時からの角。度。右手は 3 時の側、左手は 9 時の側へ</summary>
-        const float GripClock = 50f;
-        /// <summary>指の向き（手首から中指の付け根へ）と、輪に沿って 12 時へ向かう向きのなす角。度。指は輪の外へ開く</summary>
-        const float GripCross = 44f;
-        /// <summary>手のひらを、輪の面に向かって真下から輪の内側へ向ける角。度。手が輪の外寄りに載る</summary>
-        const float GripRoll = 15f;
-        /// <summary>輪の芯を、手の骨（手首）から指の向きへ離す量。指の付け根（手首から 9.4 cm）の少し先に輪が来る</summary>
-        const float GripReach = 0.115f;
-        /// <summary>輪の芯を、手の骨から手のひらの側へ離す量。手のひらの厚み 4 cm と輪の太さの半分</summary>
-        const float GripDepth = 0.066f;
-        /// <summary>肘を寄せる所の、運転席の真ん中からの横の開き。狭めると前腕が輪の 4 時・8 時の所を上からくぐれずに刺さる</summary>
-        const float GripElbow = 0.45f;
+        const float GripClock = 90f;
+        /// <summary>手の向き（手首から中指の付け根へ）と、輪に沿って 12 時へ向かう向きのなす角。度。90 で輪に直に交わる</summary>
+        const float GripCross = 60f;
+        /// <summary>手のひらが輪の断面のどこに当たるか。度。輪の面から運転席の側を 0、輪の外周の側を 90 として、外周から少し計器盤の側</summary>
+        const float GripAround = 120f;
+        /// <summary>輪の芯を、手の骨（手首）から手の向きへ離す量。指の付け根（手首から 9.4 cm）の少し手前に輪が来る</summary>
+        const float GripReach = 0.09f;
+        /// <summary>輪の芯を、手の骨から手のひらの側へ離す量。手のひらの厚みと輪の太さの半分</summary>
+        const float GripDepth = 0.055f;
+        /// <summary>肘を寄せる所。運転席の真ん中から横へ、と高さ。肘は軽く曲げて体の横へ下ろす</summary>
+        const float GripElbow = 0.35f;
+        const float GripElbowY = 0.95f;
+        /// <summary>握る前に指をそろえる割合（<see cref="BodyPoser.Close"/>）。立ちの形の指は開いている</summary>
+        const float GripClose = 0.7f;
         /// <summary>握りの指が輪に触れないまま曲がるときの限り（付け根・中・先、度）。輪の太さを握るくらいで止め、鉤爪にしない</summary>
         static readonly Vector3 GripFingerMost = new Vector3(70f, 75f, 40f);
         /// <summary>握りの親指の、関節ごとの曲げの限り。度</summary>
@@ -97,6 +99,7 @@ namespace HalfAware.EditorTools
                 BodyPoser.Grip(an, true, FoldCurl);
                 BodyPoser.Grip(an, false, FoldCurl);
                 BodyPoser.Write(pose, "seated", BodyPoser.Capture(an));
+                note.AppendFormat("腕組みの形: ハンドルの中へ入った体の頂点 {0} 個", InWheel(her, car)).AppendLine();
                 var hips = car.InverseTransformPoint(folded.hips);
                 note.AppendFormat("運転席: 腰の骨 ({0:0.000}, {1:0.000}, {2:0.000})、目のずれ {3:0.0} mm、尻の下 {4:0.000}（座面 {5:0.000}）",
                     hips.x, hips.y, hips.z, Vector3.Distance(BodyPoser.Eyes(an), eye) * 1000f, Lowest(her, car), DriverSeatTop).AppendLine();
@@ -106,8 +109,11 @@ namespace HalfAware.EditorTools
                 PlaceProtagonist.SeatAtEye(an, wheel, eye);
                 var skin = Skin(her);
                 System.Func<Vector3, float> gap = w => WheelGap(car.InverseTransformPoint(w));
-                BodyPoser.Wrap(an, skin, true, gap, GripFingerMost, GripThumbMost);
-                BodyPoser.Wrap(an, skin, false, gap, GripFingerMost, GripThumbMost);
+                for (var k = 0; k < 2; k++)
+                {
+                    BodyPoser.Close(an, k == 0, GripClose);
+                    BodyPoser.Wrap(an, skin, k == 0, gap, GripFingerMost, GripThumbMost);
+                }
                 BodyPoser.Write(pose, "alternate", BodyPoser.Capture(an));
                 note.AppendFormat("ハンドルの形: ハンドルの中へ入った体の頂点 {0} 個", InWheel(her, car)).AppendLine();
             }
@@ -125,9 +131,9 @@ namespace HalfAware.EditorTools
         /// - 腰: 目が運転席の目（SeatAt + EyeLead）に来る所を解く（<see cref="PlaceProtagonist.SeatAtEye"/>）。ここの値は探し始め
         /// - 脚: 座面が低いので足を前へ投げ出し、ほとんど伸ばして踵を床に着ける。
         ///   膝を立てると、脛の上が計器盤の下の面（0.98）に 3 cm 刺さる。伸ばすと脚の上は 0.92 に収まる
-        /// - 腕組み: 右の前腕を上、左を下に重ね、手は反対の肘の手前。組んだ腕は輪の下（輪の面まで 7 mm）をくぐる。
+        /// - 腕組み: 右の前腕を上、左を下に重ね、手は反対の肘の手前。組んだ腕は輪の下をくぐる（ハンドルまで 5 mm）。
         ///   左右の腕が互いに潜らず、前腕と手が胴へ潜らない所を探して決めた
-        /// - ハンドル: 輪の 10 時と 2 時あたりを上から握る（置き方は GripClock ほか）
+        /// - ハンドル: 輪の 9 時と 3 時を横から握る（置き方は GripClock ほか）
         /// </summary>
         static BodyPoser.Sit Sit(Transform car, bool wheel)
         {
@@ -160,22 +166,26 @@ namespace HalfAware.EditorTools
                 return s;
             }
             var tilt = Quaternion.Euler(WheelLean, 0f, 0f);
+            // 輪の面から運転席の側へ向く向きと、12 時の向き
             var face = tilt * Vector3.back;
             var twelve = tilt * Vector3.up;
             var clock = GripClock * Mathf.Deg2Rad;
             var cross = GripCross * Mathf.Deg2Rad;
-            var roll = GripRoll * Mathf.Deg2Rad;
+            var around = GripAround * Mathf.Deg2Rad;
             for (var k = 0; k < 2; k++)
             {
                 var side = k == 0 ? 1f : -1f;
-                // 輪の芯の上の握る所と、そこから外への向き・12 時へ輪に沿う向き
+                // 輪の芯の上の握る所と、そこから外周への向き・12 時へ輪に沿う向き
                 var rim = WheelAt + WheelRing * (side * Mathf.Sin(clock) * Vector3.right + Mathf.Cos(clock) * twelve);
                 var outward = (rim - WheelAt).normalized;
                 var along = (-side * Mathf.Cos(clock) * Vector3.right + Mathf.Sin(clock) * twelve).normalized;
-                var fingers = (Mathf.Cos(cross) * along + Mathf.Sin(cross) * outward).normalized;
-                var palm = Vector3.ProjectOnPlane(-(Mathf.Cos(roll) * face + Mathf.Sin(roll) * outward), fingers).normalized;
+                // 手のひらが当たる向き（輪の芯から見て）と、そこから指が輪に巻き付いていく向き
+                var contact = Mathf.Cos(around) * face + Mathf.Sin(around) * outward;
+                var wrap = -Mathf.Sin(around) * face + Mathf.Cos(around) * outward;
+                var fingers = (Mathf.Cos(cross) * along + Mathf.Sin(cross) * wrap).normalized;
+                var palm = Vector3.ProjectOnPlane(-contact, fingers).normalized;
                 var wrist = car.TransformPoint(rim - fingers * GripReach - palm * GripDepth);
-                var pole = P(x0 + side * GripElbow, 0.95f, 0.10f);
+                var pole = P(x0 + side * GripElbow, GripElbowY, 0.10f);
                 if (side > 0f) { s.wristR = wrist; s.elbowPoleR = pole; s.fingersR = D(fingers); s.palmR = D(palm); }
                 else { s.wristL = wrist; s.elbowPoleL = pole; s.fingersL = D(fingers); s.palmL = D(palm); }
             }

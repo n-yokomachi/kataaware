@@ -313,6 +313,31 @@ namespace HalfAware.EditorTools
             }
         }
 
+        /// <summary>
+        /// 人差し指・薬指・小指を、中指の向きへ寄せてそろえる（付け根の関節を手のひらの面の中で回す）。
+        /// amount は寄せる割合で、1 で中指と同じ向き。立ちの形の指は開いているので、握る前にそろえる
+        /// </summary>
+        public static void Close(Animator an, bool left, float amount)
+        {
+            HumanBodyBones F(HumanBodyBones l, HumanBodyBones r) { return left ? l : r; }
+            var palm = PalmDir(an, left);
+            System.Func<HumanBodyBones, HumanBodyBones, Vector3> dir = (a, b) =>
+                Vector3.ProjectOnPlane(an.GetBoneTransform(b).position - an.GetBoneTransform(a).position, palm).normalized;
+            var mid = dir(F(HumanBodyBones.LeftMiddleProximal, HumanBodyBones.RightMiddleProximal), F(HumanBodyBones.LeftMiddleIntermediate, HumanBodyBones.RightMiddleIntermediate));
+            var others = new[]
+            {
+                new[] { F(HumanBodyBones.LeftIndexProximal, HumanBodyBones.RightIndexProximal), F(HumanBodyBones.LeftIndexIntermediate, HumanBodyBones.RightIndexIntermediate) },
+                new[] { F(HumanBodyBones.LeftRingProximal, HumanBodyBones.RightRingProximal), F(HumanBodyBones.LeftRingIntermediate, HumanBodyBones.RightRingIntermediate) },
+                new[] { F(HumanBodyBones.LeftLittleProximal, HumanBodyBones.RightLittleProximal), F(HumanBodyBones.LeftLittleIntermediate, HumanBodyBones.RightLittleIntermediate) },
+            };
+            foreach (var o in others)
+            {
+                var angle = Vector3.SignedAngle(dir(o[0], o[1]), mid, palm);
+                var bone = an.GetBoneTransform(o[0]);
+                bone.rotation = Quaternion.AngleAxis(angle * amount, palm) * bone.rotation;
+            }
+        }
+
         /// <summary>指が物に触れたとみなす、肌から物の面までの隙間（m）</summary>
         public const float TouchGap = 0.001f;
 

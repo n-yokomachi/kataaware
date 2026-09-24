@@ -640,20 +640,33 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// ハンドルの中心。右ハンドルなので運転席と同じ x に来る。
         ///
-        /// 高さは目線ではなく計器盤の天板から決める。輪の下の縁が天板より 0.09 沈んでいると、
-        /// 輪が宙に浮かず柱から生えて見える。天板 1.28 に対してここは 1.25。
-        /// 目線（1.55）との差は 0.30 で、乗用車だったときの 0.16 より開いた。
-        /// 高い席から低い輪を見下ろす構えそのものが、オフロード車の座り方にあたる
+        /// 輪はふつうの車と同じく起こしてある（<see cref="WheelLean"/>）。高さと前後は計器が読める所から決めた:
+        /// 目から計器の盤への視線は、盤のどこを見ても輪の上の縁の上を通る（輪が計器を横切らない）。
+        /// 輪の上の縁と計器の塊・天板の玉縁の間は 31 mm。前へ出すとここが詰まり、上げると輪が計器を隠す。
+        /// 輪のいちばん低い所は 1.008 で、伸ばした脚の上（0.92）とは 9 cm 空く。
+        /// 9 時・3 時を握った手は目から下へ 53°（下を向ける限り 40° で、画面の下の縁 75° の内に入る）。
+        /// 芯から計器盤の面へは柱（<see cref="WheelColumn"/>）で繋ぐ
         /// </summary>
-        public static readonly Vector3 WheelAt = new Vector3(0.38f, 1.25f, 0.39f);
+        public static readonly Vector3 WheelAt = new Vector3(0.38f, 1.18f, 0.40f);
         /// <summary>輪の外径</summary>
         public const float WheelOuter = 0.36f;
         /// <summary>輪の太さ</summary>
         public const float WheelThick = 0.035f;
-        /// <summary>輪を x 軸まわりに倒す角。度。オフロード車なのでバスに近いところまで寝ている</summary>
-        public const float WheelLean = 68f;
+        /// <summary>
+        /// 輪を x 軸まわりに倒す角。度。0 で輪が鉛直に立ち、上の縁が計器盤の側へ倒れる。
+        /// 前は 68° 倒してバスのように寝かせていたが、それでは手を上から載せる形にしかならず、
+        /// 握っているように見えなかった。古いオフロード車の乗用車らしい立ち方に起こし、9 時・3 時を横から握れるようにした
+        /// </summary>
+        public const float WheelLean = 25f;
         /// <summary>輪の芯までの半径。手を乗せる位置はここから出す</summary>
         public static float WheelRing { get { return WheelOuter * 0.5f - WheelThick * 0.5f; } }
+        /// <summary>
+        /// 輻の向き。度。輪の面の中で 3 時から反時計回り（0 が 3 時、90 が 12 時）。
+        /// 3 時・9 時・6 時に置く。輪を起こすと 12 時の輻は計器の真ん中を縦に隠し、9 時・3 時を握る手の親指を掛ける所も無くなる
+        /// </summary>
+        public static readonly float[] WheelSpokes = { 0f, 180f, 270f };
+        /// <summary>柱の長さ。芯から計器盤の面の 35 mm 奥まで差し込む</summary>
+        public const float WheelColumn = 0.16f;
 
         // ---- 車内の面。メートル ----------------------------------------------
         //
