@@ -1,10 +1,9 @@
 // 机のモニターの黒い画面に映る、主人公の映り込み（TerminalReflection）。
 //
 // 映り込みのカメラが撮った絵を、画面の面に貼った板へ、明るい所だけを重ねる（加算）。暗い所は画面の黒に溶ける。
-// 鏡なので左右を返して貼る。色はほぼ抜く（唇の赤みを残さない）。
-//
-// **性別を見せない。** 目の映る所（_Eye.xy）のまわりを沈め、口元と顎だけを少し明るくし、
-// 胸元の高さ（_Chest.x）から下を消す（_Chest.y で消し終える）。顔の大きさは _Eye.zw（顔の幅の半分と、目から顎までの下がり。uv）。
+// 鏡に見えるよう左右を返して貼る。色はほぼ抜く（唇の赤みを残さない）。
+// 撮った絵は粗いので少しぼかし、明るい所は寝かせる（腕の照り返しが点の列にならず、灯りの照り返しで白く飛ばない）。
+// 画面の上の縁（鼻から上）と下の縁（胸から下）のきわは、少しずつ暗く沈める。
 // 灯りも影も受けない。霧も掛けない（画面の上の映り込みは、画面と同じ近さにある）
 Shader "HalfAware/ScreenReflection"
 {
@@ -14,10 +13,9 @@ Shader "HalfAware/ScreenReflection"
         _BaseColor ("色（α で濃さ）", Color) = (1, 1, 1, 1)
         _Strength ("濃さ", Range(0, 1)) = 0.14
         _Saturation ("色の残し方", Range(0, 1)) = 0.08
-        _Eye ("目の映る所（uv）と顔の幅の半分・目から顎まで（uv）", Vector) = (0.5, 0.6, 0.05, 0.12)
-        _Chest ("胸元を消し始める高さと消し終える高さ（uv の v）", Vector) = (0.3, 0.2, 0, 0)
-        _EyeShade ("目のあたりを沈める強さ", Range(0, 1)) = 0.9
-        _Lift ("口元と顎を明るくする強さ", Range(0, 4)) = 1.2
+        _Edge ("上の縁と下の縁から沈める幅（uv）", Vector) = (0.12, 0.10, 0, 0)
+        _Compress ("明るい所を寝かせる強さ", Range(0, 8)) = 2.5
+        _Texel ("映り込みの絵の 1 px（uv）", Vector) = (0.006, 0.01, 0, 0)
     }
 
     SubShader
@@ -46,10 +44,9 @@ Shader "HalfAware/ScreenReflection"
                 half4 _BaseColor;
                 half _Strength;
                 half _Saturation;
-                float4 _Eye;
-                float4 _Chest;
-                half _EyeShade;
-                half _Lift;
+                float4 _Edge;
+                half _Compress;
+                float4 _Texel;
             CBUFFER_END
 
             struct Attributes
@@ -74,23 +71,28 @@ Shader "HalfAware/ScreenReflection"
 
             half4 Frag(Varyings i) : SV_Target
             {
-                // 鏡なので左右を返す
-                half3 c = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, float2(1.0 - i.uv.x, i.uv.y)).rgb;
+                // 鏡なので左右を返す。映り込みの絵は粗いので、1.2 px の幅でぼかしてから重ねる
+                // （腕の肌の照り返しが、ところどころの明るい点になって並ばないように）
+                float2 uv = float2(1.0 - i.uv.x, i.uv.y);
+                float2 e = _Texel.xy * 1.2;
+                half3 c = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv).rgb * 0.25h;
+                c += SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv + float2(e.x, 0)).rgb * 0.125h;
+                c += SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv - float2(e.x, 0)).rgb * 0.125h;
+                c += SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv + float2(0, e.y)).rgb * 0.125h;
+                c += SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv - float2(0, e.y)).rgb * 0.125h;
+                c += SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv + e).rgb * 0.0625h;
+                c += SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv - e).rgb * 0.0625h;
+                c += SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv + float2(e.x, -e.y)).rgb * 0.0625h;
+                c += SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv + float2(-e.x, e.y)).rgb * 0.0625h;
+                // 明るい所を寝かせる（部屋の灯りの照り返しで、画面が白く飛ばないように）
+                c = c / (1.0h + c * _Compress);
                 half l = dot(c, half3(0.299h, 0.587h, 0.114h));
                 c = lerp(l.xxx, c, _Saturation);
 
-                // 顔の大きさで測った、目の映る所からの離れ（右が +x、上が +y。顎の先で y = -1）
-                float2 d = (i.uv - _Eye.xy) / max(_Eye.zw, 1e-4);
-                // 目のあたり（目の少し上から鼻の上まで）を沈める
-                half eye = exp(-(d.x * d.x * 0.45 + (d.y - 0.05) * (d.y - 0.05) * 7.0));
-                half shade = 1.0h - _EyeShade * eye;
-                // 口元と顎を少し明るくする（映り込みの中で、顔の下半分だけがうっすら照らされる）
-                half low = exp(-(d.x * d.x * 0.8 + (d.y + 0.7) * (d.y + 0.7) * 5.0));
-                half lift = 1.0h + _Lift * low;
-                // 胸元の高さから下を消す
-                half chest = smoothstep(_Chest.y, _Chest.x, i.uv.y);
+                // 上の縁（鼻から上の見切れ）と下の縁（胸から下の見切れ）のきわを沈める
+                half edge = smoothstep(0.0, _Edge.y, i.uv.y) * (1.0h - smoothstep(1.0 - _Edge.x, 1.0, i.uv.y));
 
-                half3 o = c * shade * lift * chest * _Strength * _BaseColor.rgb * _BaseColor.a;
+                half3 o = c * edge * _Strength * _BaseColor.rgb * _BaseColor.a;
                 return half4(o, 1.0h);
             }
             ENDHLSL

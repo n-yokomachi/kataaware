@@ -37,26 +37,26 @@ namespace HalfAware.Tests
         }
 
         [Test]
-        public void MirrorFoldsAPointAcrossTheScreen()
+        public void FramingLooksAtTheRangeFromTheFront()
         {
-            var p = TerminalReflection.Mirror(new Vector3(0.2f, 1.2f, -1.0f), new Vector3(0f, 1f, 0.5f), new Vector3(0f, 0f, -1f));
-            Assert.AreEqual(0.2f, p.x, 1e-5f);
-            Assert.AreEqual(1.2f, p.y, 1e-5f);
-            Assert.AreEqual(2.0f, p.z, 1e-5f, "画面の手前 1.5 m の目は、画面の奥 1.5 m に映る");
+            var centre = new Vector3(1f, 1.2f, 2f);
+            var pose = TerminalReflection.Framing(centre, Quaternion.identity, 0f, 0f, 0.6f);
+            Assert.AreEqual(1f, pose.position.x, 1e-5f);
+            Assert.AreEqual(1.2f, pose.position.y, 1e-5f);
+            Assert.AreEqual(2.6f, pose.position.z, 1e-5f, "体の正面（+z）に 0.6 m 離れる");
+            Assert.AreEqual(-1f, (pose.rotation * Vector3.forward).z, 1e-5f, "体の方を向く");
         }
 
         [Test]
-        public void WindowIsTheScreenSeenFromTheMirroredEye()
+        public void FramingTurnsToTheRightAndLooksUpFromBelow()
         {
-            // 画面の奥 1.5 m から、画面（真ん中は右へ 0.1 m、上へ 0.05 m）を見る
-            var at = new Vector3(0f, 1f, 2f);
-            var rotation = Quaternion.LookRotation(Vector3.back, Vector3.up);
-            var w = TerminalReflection.Window(at, rotation, new Vector3(-0.1f, 1.05f, 0.5f), new Vector2(0.8f, 0.4f));
-            // カメラは -z を向くので、カメラの右は世界の -x
-            Assert.AreEqual(0.1f - 0.4f, w.x, 1e-5f);
-            Assert.AreEqual(0.1f + 0.4f, w.y, 1e-5f);
-            Assert.AreEqual(0.05f - 0.2f, w.z, 1e-5f);
-            Assert.AreEqual(0.05f + 0.2f, w.w, 1e-5f);
+            var centre = Vector3.zero;
+            var right = TerminalReflection.Framing(centre, Quaternion.identity, 90f, 0f, 1f);
+            Assert.AreEqual(1f, right.position.x, 1e-5f, "yaw が正なら体の右から");
+            var below = TerminalReflection.Framing(centre, Quaternion.identity, 0f, -30f, 1f);
+            Assert.Less(below.position.y, 0f, "pitch が負なら下から");
+            Assert.Greater((below.rotation * Vector3.forward).y, 0f, "見上げる");
+            Assert.AreEqual(1f, (below.position - centre).magnitude, 1e-5f);
         }
     }
 }

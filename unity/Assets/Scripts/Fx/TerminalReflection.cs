@@ -7,15 +7,18 @@ namespace HalfAware
     /// <summary>
     /// 場面 1 の机のモニターの黒い画面に映る、主人公の映り込み。
     ///
-    /// モニターの画面を一枚ずつ鏡として、目をその画面の面で折り返した所に置いた映り込みのカメラ（<see cref="Pane.camera"/>）で
-    /// 部屋と主人公の体を撮り、画面の面に貼った板（<see cref="Pane.face"/>）へ、明るい所だけを薄く重ねる（加算）。
-    /// 画面ごとに向きが違うので、正面の画面には正面の、横や上の画面には斜めの頭と肩が映り、端の画面では見切れる。
+    /// 鏡の物理どおりには撮らない。画面ごとに決めた向き（<see cref="Pane.yaw"/>・<see cref="Pane.pitch"/>）から、
+    /// 主人公の「鼻の頭から胸の上まで」（<see cref="rangeTop"/>〜<see cref="rangeBottom"/>）が画面いっぱいに収まるように、
+    /// 映り込みのカメラ（<see cref="Pane.camera"/>）で撮り、画面の面に貼った板（<see cref="Pane.face"/>）へ、
+    /// 左右を返して、明るい所だけを薄く重ねる（加算。HalfAware/ScreenReflection）。
+    /// 正面の画面には正面の、左右の画面には横顔寄りの、上の段には見上げた顎と首の線が映り、どの画面にも自分がいるように見える。
     ///
-    /// 主人公の性別は対面まで見せない（シナリオ設計 1 節）。目のあたりは影に沈め、口元と顎だけをうっすら明るくし、
-    /// 胸元の高さから下は消す（板の色の出し方で決める。HalfAware/ScreenReflection）。
+    /// 主人公の性別は対面まで見せない（シナリオ設計 1 節）。鼻から上と胸から下は画面の縁の外に置き、
+    /// 縁のきわも少し暗く沈める。唇の色はほぼ抜く。
     ///
     /// 一人称のカメラは頭を映さない（体のレンダラーの頭の面は何も描かない素材）。映り込みのカメラが撮る間だけ、
-    /// 頭を描く写し（<see cref="head"/>）を点け、撮り終えたら消す。映り込みの板は、ほかの映り込みのカメラに撮られないよう、その間は伏せる。
+    /// 頭を描く写し（<see cref="head"/>）と灯り（<see cref="lamps"/>）を点け、撮り終えたら消す。
+    /// 映り込みの板は、ほかの映り込みのカメラに撮られないよう、その間は伏せる。
     ///
     /// 端末を調べた独白の 3 行目（「こうして反射で自分の顔が見られるからだ」）から、独白を読み終えるまでだけ浮かべる。
     /// ほかの時は映り込みのカメラを止め、画面は黒のまま
@@ -23,7 +26,7 @@ namespace HalfAware
     [DefaultExecutionOrder(20)]
     public sealed class TerminalReflection : MonoBehaviour
     {
-        /// <summary>鏡にする画面一枚</summary>
+        /// <summary>映り込みを出す画面一枚</summary>
         [System.Serializable]
         public sealed class Pane
         {
@@ -37,6 +40,10 @@ namespace HalfAware
             public Renderer face;
             [Tooltip("映り込みのカメラ。出している間だけ動かす")]
             public Camera camera;
+            [Tooltip("映す向き（度）。体の正面から、体の右へ回すと正。左右の画面の横顔寄りの角度")]
+            public float yaw;
+            [Tooltip("映す高さの角度（度）。上から見下ろすと正、下から見上げると負")]
+            public float pitch;
             [System.NonSerialized] public RenderTexture target;
         }
 
@@ -47,35 +54,33 @@ namespace HalfAware
         [SerializeField] int fromLine = 2;
         [Tooltip("浮かべるのと消すのにかける秒数")]
         [SerializeField] float fadeSeconds = 0.8f;
-        [Tooltip("鏡にする画面")]
+        [Tooltip("映り込みを出す画面")]
         [SerializeField] Pane[] panes = new Pane[0];
+        [Tooltip("主人公の体。向きの基準")]
+        [SerializeField] Transform body;
         [Tooltip("映り込みのカメラが撮る間だけ点ける、頭の写し")]
         [SerializeField] Renderer head;
-        [Tooltip("映り込みのカメラが撮る間だけ点ける灯り（顔の下半分を照らす）。無くてもよい")]
-        [SerializeField] Light lamp;
-        [Tooltip("映り込みのカメラの絵の大きさ（px）。画面の幅 1 m あたり。320×180 の画面の上で要る分だけ")]
-        [SerializeField] float pixelsPerMetre = 200f;
-        [Tooltip("目から顎の先までの下がり（m）")]
-        [SerializeField] float chinDrop = 0.12f;
-        [Tooltip("顔の幅の半分（m）")]
-        [SerializeField] float faceHalf = 0.075f;
-        [Tooltip("目から、胸元を消し始める高さと消し終える高さまでの下がり（m）")]
-        [SerializeField] Vector2 chestDrop = new Vector2(0.27f, 0.34f);
-        [Tooltip("映り込みを撮るときだけ目を下げる量（m）。座った目は下の段と上の段の画面の境の高さにあり、" +
-            "そのままでは顔が下の段の画面の上の縁で切れる。下げると、下の段の画面に顔と肩が収まる")]
-        [SerializeField] float eyeDrop = 0.18f;
+        [Tooltip("映り込みのカメラが撮る間だけ点ける灯り（口元を照らす灯りと、頭の後ろの壁を照らす灯り）")]
+        [SerializeField] Light[] lamps = new Light[0];
+        [Tooltip("映り込みのカメラの絵の大きさ（px）。画面の幅 1 m あたり")]
+        [SerializeField] float pixelsPerMetre = 320f;
+        [Tooltip("画面の上の縁に来る所の、目からの下がり（m）。鼻の下の方")]
+        [SerializeField] float rangeTop = 0.035f;
+        [Tooltip("画面の下の縁に来る所の、目からの下がり（m）。胸の上（鎖骨のあたり）")]
+        [SerializeField] float rangeBottom = 0.23f;
+        [Tooltip("映り込みのカメラの、映す範囲の真ん中からの離れ（m）")]
+        [SerializeField] float distance = 0.6f;
 
         static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
         static readonly int BaseMap = Shader.PropertyToID("_BaseMap");
-        static readonly int EyeId = Shader.PropertyToID("_Eye");
-        static readonly int ChestId = Shader.PropertyToID("_Chest");
+        static readonly int TexelId = Shader.PropertyToID("_Texel");
         MaterialPropertyBlock block;
         float level;
 
         /// <summary>今の濃さ（0〜1）。動作確認から読む</summary>
         public float Level => level;
 
-        /// <summary>鏡にする画面（動作確認から読む）</summary>
+        /// <summary>映り込みを出す画面（動作確認から読む）</summary>
         public IReadOnlyList<Pane> Panes => panes;
 
         void Awake()
@@ -83,7 +88,13 @@ namespace HalfAware
             block = new MaterialPropertyBlock();
             Show(false);
             if (head != null) head.enabled = false;
-            if (lamp != null) lamp.enabled = false;
+            Lamps(false);
+        }
+
+        void Lamps(bool on)
+        {
+            foreach (var l in lamps)
+                if (l != null) l.enabled = on;
         }
 
         void OnEnable()
@@ -128,13 +139,15 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// 目 eye から見た映り込みに合わせて、画面ごとに映り込みのカメラと板を置き、板の色の出し方を決める。濃さは alpha（0〜1）。
+        /// 目 eye の主人公を、画面ごとの向きから撮るように映り込みのカメラを置き、板を画面に貼る。濃さは alpha（0〜1）。
         /// 再生中は毎こま呼ぶ。エディタで撮るときは、これを呼んでから <see cref="RenderNow"/> で撮る
         /// </summary>
         public void Aim(Vector3 eye, float alpha)
         {
             if (block == null) block = new MaterialPropertyBlock();
-            eye += Vector3.down * eyeDrop;
+            var facing = body != null ? Quaternion.Euler(0f, body.eulerAngles.y, 0f) : Quaternion.identity;
+            var centre = eye + Vector3.down * ((rangeTop + rangeBottom) * 0.5f);
+            var height = rangeBottom - rangeTop;
             foreach (var p in panes)
             {
                 if (p == null || p.screen == null || p.face == null || p.camera == null) continue;
@@ -147,31 +160,25 @@ namespace HalfAware
                 }
                 p.camera.targetTexture = p.target;
 
-                // 画面の表の面（部屋の側）。外向きの向きは画面の手前（-z）
-                var outward = -p.screen.forward;
-                var front = p.screen.position + outward * (p.thick * 0.5f);
-                var from = Mirror(eye, front, outward);
-                var rotation = Quaternion.LookRotation(outward, p.screen.up);
-                p.camera.transform.SetPositionAndRotation(from, rotation);
-                var near = Mathf.Max(0.01f, Vector3.Dot(front - from, outward));
-                var window = Window(from, rotation, front, p.size);
-                p.camera.nearClipPlane = near;
-                p.camera.projectionMatrix = Matrix4x4.Frustum(window.x, window.y, window.z, window.w, near, p.camera.farClipPlane);
+                // 映す範囲の真ん中を、画面ごとの向きから見る。範囲の高さが画面の高さいっぱいに収まる視野
+                var pose = Framing(centre, facing, p.yaw, p.pitch, distance);
+                p.camera.transform.SetPositionAndRotation(pose.position, pose.rotation);
+                p.camera.ResetProjectionMatrix();
+                p.camera.nearClipPlane = 0.05f;
+                p.camera.fieldOfView = 2f * Mathf.Atan(height * 0.5f / distance) * Mathf.Rad2Deg;
+                p.camera.aspect = p.size.x / p.size.y;
 
                 // 板は画面の表の 2 mm 手前に、画面と同じ大きさで貼る
-                p.face.transform.SetPositionAndRotation(front + outward * 0.002f, p.screen.rotation);
+                var outward = -p.screen.forward;
+                var front = p.screen.position + outward * (p.thick * 0.5f + 0.002f);
+                p.face.transform.SetPositionAndRotation(front, p.screen.rotation);
                 var parent = p.face.transform.parent != null ? p.face.transform.parent.lossyScale : Vector3.one;
                 p.face.transform.localScale = new Vector3(p.size.x / parent.x, p.size.y / parent.y, 1f);
 
-                // 目の映る所は、目からこの画面の面へ下ろした点。映り込みの顔は本物の半分の大きさで画面に載る
-                var foot = eye - outward * Vector3.Dot(eye - front, outward);
-                var u = Vector3.Dot(foot - front, p.screen.right) / p.size.x + 0.5f;
-                var v = Vector3.Dot(foot - front, p.screen.up) / p.size.y + 0.5f;
                 p.face.GetPropertyBlock(block);
                 block.SetTexture(BaseMap, p.target);
                 block.SetColor(BaseColor, new Color(1f, 1f, 1f, Mathf.SmoothStep(0f, 1f, alpha)));
-                block.SetVector(EyeId, new Vector4(u, v, faceHalf * 0.5f / p.size.x, chinDrop * 0.5f / p.size.y));
-                block.SetVector(ChestId, new Vector4(v - chestDrop.x * 0.5f / p.size.y, v - chestDrop.y * 0.5f / p.size.y, 0f, 0f));
+                block.SetVector(TexelId, new Vector4(1f / p.target.width, 1f / p.target.height, 0f, 0f));
                 p.face.SetPropertyBlock(block);
             }
         }
@@ -200,7 +207,7 @@ namespace HalfAware
         void Shoot(bool on)
         {
             if (head != null) head.enabled = on;
-            if (lamp != null) lamp.enabled = on;
+            Lamps(on);
             foreach (var p in panes)
                 if (p != null && p.face != null) p.face.enabled = !on && level > 0f;
         }
@@ -235,23 +242,17 @@ namespace HalfAware
             return false;
         }
 
-        /// <summary>点 p を、点 planePoint を通り normal に直交する面で折り返した点</summary>
-        public static Vector3 Mirror(Vector3 p, Vector3 planePoint, Vector3 normal)
-        {
-            normal = normal.normalized;
-            return p - 2f * Vector3.Dot(p - planePoint, normal) * normal;
-        }
-
         /// <summary>
-        /// 位置 at・向き rotation のカメラから見た、真ん中 centre・大きさ size の四角（カメラの前の向きに直交する面の上）の、
-        /// 左・右・下・上の縁（その面までの距離の所での、カメラの右と上の向きの m）。Matrix4x4.Frustum にそのまま渡す
+        /// 点 centre を、体の向き facing から yaw 度（体の右へ回すと正）・pitch 度（上から見下ろすと正）回した向きの、
+        /// distance 離れた所から見るカメラの置き方。上はいつも世界の上
         /// </summary>
-        public static Vector4 Window(Vector3 at, Quaternion rotation, Vector3 centre, Vector2 size)
+        public static Pose Framing(Vector3 centre, Quaternion facing, float yaw, float pitch, float distance)
         {
-            var d = centre - at;
-            var x = Vector3.Dot(d, rotation * Vector3.right);
-            var y = Vector3.Dot(d, rotation * Vector3.up);
-            return new Vector4(x - size.x * 0.5f, x + size.x * 0.5f, y - size.y * 0.5f, y + size.y * 0.5f);
+            var y = yaw * Mathf.Deg2Rad;
+            var x = pitch * Mathf.Deg2Rad;
+            var local = new Vector3(Mathf.Sin(y) * Mathf.Cos(x), Mathf.Sin(x), Mathf.Cos(y) * Mathf.Cos(x));
+            var at = centre + facing * local * distance;
+            return new Pose(at, Quaternion.LookRotation(centre - at, Vector3.up));
         }
     }
 }

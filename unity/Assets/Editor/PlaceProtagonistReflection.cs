@@ -23,7 +23,7 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// 映り込みのいちばん濃いときの明るさ（画面の色に重ねる明るさの倍率）。ガラスの反射らしく薄く
         /// </summary>
-        const float ReflectionStrength = 0.22f;
+        const float ReflectionStrength = 0.35f;
 
         [MenuItem("HalfAware/Put the terminal reflection in the room", false, 206)]
         public static void ReflectionMenu()
@@ -130,6 +130,23 @@ namespace HalfAware.EditorTools
                     camera = cam,
                 });
             }
+            // 画面ごとの映す向き（仮置き。オーナーが実画面で決める）。上の段は下から見上げた顎と首の線、
+            // 下の段は正面と、左右は画面のある側からの横顔寄り
+            for (var i = 0; i < panes.Count; i++)
+            {
+                var top = faces[i].position.y > faces[faces.Count - 1].position.y + 0.1f;
+                var side = Vector3.Dot(faces[i].position - player.position, player.right);
+                if (top)
+                {
+                    panes[i].yaw = side < 0f ? -15f : 15f;
+                    panes[i].pitch = -22f;
+                }
+                else
+                {
+                    panes[i].yaw = Mathf.Abs(side) < 0.2f ? 0f : side < 0f ? -38f : 38f;
+                    panes[i].pitch = 0f;
+                }
+            }
 
             // 頭の写し。体の頭の面だけを描く（HeadShadow と同じ素材の並びで、影は落とさない）
             var shadow = her.transform.Find("HeadShadow");
@@ -156,21 +173,14 @@ namespace HalfAware.EditorTools
             foreach (var f in faces) middle += f.position;
             if (faces.Count > 0) middle /= faces.Count;
 
-            // 顔の下半分を照らす灯り。映り込みのカメラが撮る間だけ点く。画面の下の縁のあたりから、顎へ向けて狭く
-            var lampGo = new GameObject("MirrorLamp");
-            lampGo.transform.SetParent(root, false);
-            var chin = eye + Vector3.down * 0.11f;
-            lampGo.transform.position = eye + (middle - eye).normalized * 0.55f + Vector3.down * 0.12f;
-            lampGo.transform.rotation = Quaternion.LookRotation(chin - lampGo.transform.position, Vector3.up);
-            var lamp = lampGo.AddComponent<Light>();
-            lamp.type = LightType.Spot;
-            lamp.spotAngle = 18f;
-            lamp.innerSpotAngle = 6f;
-            lamp.range = 1.5f;
-            lamp.intensity = 1.0f;
-            lamp.color = new Color(0.78f, 0.82f, 0.95f);
-            lamp.shadows = LightShadows.None;
-            lamp.enabled = false;
+            // 映り込みのカメラが撮る間だけ点く灯り。
+            // 口元の灯り: 画面の光のように前のやや上から、口元へ向けて狭く。唇の上と顎の先が明るく、頬へ向かって沈み、
+            // 鼻の下は下を向くので暗い
+            var mouth = eye + Vector3.down * 0.075f;
+            var lamp = Lamp(root, "MirrorLamp", eye + (middle - eye).normalized * 0.5f + Vector3.up * 0.05f, mouth, 13f, 2f, 1.2f, 0.9f);
+            // 頭の後ろの壁の灯り: 頭と肩の影の形を、後ろの部屋から少し浮かせる。椅子の後ろの高い所から、後ろの壁へ広く
+            var back = player.position - player.forward * 0.9f + Vector3.up * (seatEye + 0.35f);
+            var wall = Lamp(root, "MirrorBackLamp", back, back - player.forward * 1f + Vector3.down * 0.4f, 110f, 60f, 3f, 0.6f);
 
             var reflection = root.gameObject.AddComponent<TerminalReflection>();
             var so = new SerializedObject(reflection);
@@ -187,9 +197,15 @@ namespace HalfAware.EditorTools
                 e.FindPropertyRelative("thick").floatValue = panes[i].thick;
                 e.FindPropertyRelative("face").objectReferenceValue = panes[i].face;
                 e.FindPropertyRelative("camera").objectReferenceValue = panes[i].camera;
+                e.FindPropertyRelative("yaw").floatValue = panes[i].yaw;
+                e.FindPropertyRelative("pitch").floatValue = panes[i].pitch;
             }
             so.FindProperty("head").objectReferenceValue = head;
-            so.FindProperty("lamp").objectReferenceValue = lamp;
+            so.FindProperty("body").objectReferenceValue = her.transform;
+            var lamps = so.FindProperty("lamps");
+            lamps.arraySize = 2;
+            lamps.GetArrayElementAtIndex(0).objectReferenceValue = lamp;
+            lamps.GetArrayElementAtIndex(1).objectReferenceValue = wall;
             so.ApplyModifiedPropertiesWithoutUndo();
 
             // 座った正面へ移す仕掛け。座った所は、場面の頭の座った所（Player の今の置き場）
@@ -217,6 +233,24 @@ namespace HalfAware.EditorTools
             return true;
         }
 
+        /// <summary>映り込みのカメラが撮る間だけ点く灯り（影は落とさない）。at から look へ向けたスポット</summary>
+        static Light Lamp(Transform parent, string name, Vector3 at, Vector3 look, float angle, float inner, float range, float intensity)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.SetPositionAndRotation(at, Quaternion.LookRotation(look - at, Vector3.up));
+            var l = go.AddComponent<Light>();
+            l.type = LightType.Spot;
+            l.spotAngle = angle;
+            l.innerSpotAngle = inner;
+            l.range = range;
+            l.intensity = intensity;
+            l.color = new Color(0.78f, 0.82f, 0.95f);
+            l.shadows = LightShadows.None;
+            l.enabled = false;
+            return l;
+        }
+
         /// <summary>映り込みの板のマテリアル。明るい所だけを画面に重ねる（HalfAware/ScreenReflection）</summary>
         static Material ReflectionMat()
         {
@@ -229,8 +263,8 @@ namespace HalfAware.EditorTools
             }
             m.shader = shader;
             m.SetFloat("_Strength", ReflectionStrength);
-            m.SetFloat("_Lift", 0.8f);
-            m.SetFloat("_EyeShade", 0.92f);
+            m.SetFloat("_Compress", 1.5f);
+            m.SetVector("_Edge", new Vector4(0.06f, 0.10f, 0f, 0f));
             m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
             EditorUtility.SetDirty(m);
             AssetDatabase.SaveAssets();
