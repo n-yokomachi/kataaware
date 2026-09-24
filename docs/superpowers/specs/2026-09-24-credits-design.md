@@ -46,5 +46,6 @@
 - 音楽の表記（「Music: yoko」「Music generated with Suno」など、どう書くか）
 - 開発に使った道具（AI の道具を含む）を載せるか
 - 煙草の 3 つの音（`Drag`・`Blow`・`LighterFlame`）は、Pixabay のどの作品か辿れていない。表示の義務は無いが、載せるなら作品名と作者を探す（`Audio/LICENSES.md` の注記）
-- `Models/LICENSES.md` の Rocketbox の節は、主人公と片割れの今の組み合わせ（主人公は女大 14 の頭とスポーツ 02 の体、片割れは作ったワンピース）に合わせて書き直す
+- 許諾の全文の束の下書きは `docs/release/THIRD_PARTY_NOTICES.txt`、クレジットの短い表記の案は `docs/release/credits-lines.md`（2026-09-25）。書き出しの段で zip へ写す
+- TextMesh Pro の既定の素材（`LiberationSans SDF`、OFL 1.1 と、既定の絵文字のスプライト `EmojiOne`、許諾が不確か）は、場面が使っていなくても書き出しに入る。TMP の既定の書体と絵文字を外して書き出しから除くのを基本にする（除けない物は束に足す）。書き出しの段で決める
 - クリアモード（BGM のメモ 3 節）にも、クレジットを読み返せる物を置くか
