@@ -71,6 +71,12 @@ namespace HalfAware.EditorTools.Rocketbox
         public bool Slim;
         /// <summary>華奢の値。オーナーが見比べて「強」に決めた（腕と脚 0.85、手首と足首さらに 0.92、胴 左右 0.91・前後 0.955、手 0.92、肩幅 片側 1.2 cm、首の付け根 0.95）</summary>
         public float SlimLimb = 0.85f, SlimWrist = 0.92f, SlimTorso = 0.91f, HandScale = 0.92f, ShoulderIn = 0.012f, SlimNeck = 0.95f;
+        /// <summary>
+        /// 華奢を下半身（腿・脛・足）にも掛けるか。掛けないときは、胴の華奢も腰（背骨の骨の高さ）から
+        /// 腿の付け根（骨盤の骨の高さ）へ向けてなめらかに 1 倍へ戻し、腰と腿の付け根で太さが段にならないようにする。
+        /// 主人公は掛けない（オーナーの決め: 上半身は華奢「強」、下半身は元の太さ）。片割れは掛ける
+        /// </summary>
+        public bool SlimLegs = true;
 
         /// <summary>一から作るワンピースを着せる（<see cref="RocketboxDress"/>）。体の人の面は袖口より先の腕と手だけを残す</summary>
         public bool MadeDress;
@@ -366,6 +372,14 @@ namespace HalfAware.EditorTools.Rocketbox
             return p;
         }
 
+        /// <summary>華奢を上半身だけに掛ける（<see cref="SlimLegs"/>）</summary>
+        static RocketboxPerson UpperSlimOn(RocketboxPerson p)
+        {
+            p.Slim = true;
+            p.SlimLegs = false;
+            return p;
+        }
+
         /// <summary>片割れ（U）の服: 胸元（女大 14 の頭の面の中のトップスとネックレス）は肌で塗り、腕と脚の肌を頭の肌に揃える。髪は 14 の元の茶。サンダルは茶</summary>
         static void OutfitMadeDress(RocketboxPaint.Look k)
         {
@@ -384,10 +398,10 @@ namespace HalfAware.EditorTools.Rocketbox
         /// <summary>
         /// 主人公（オーナーが決めた）: 女大 14 の頭（14 の顔と 14 の髪、黒）を、スポーツ 02 の体（灰のタンクトップ、紺のカーゴパンツ、白いスニーカー、腕時計）に載せた人。
         /// 服は元の色のまま（白い丸首のシャツは塗らない）。首の付け根より下の胸元はスポーツ 02 の頭の面で作り、肌は一つの比で揃える。
-        /// 胸元にネックレス（細い銀の鎖と丸い飾り）を描く。黒子は口の左下。華奢「強」
+        /// 胸元にネックレス（細い銀の鎖と丸い飾り）を描く。黒子は口の左下。華奢「強」は上半身だけ（下半身は元の太さ）
         /// </summary>
         public static readonly RocketboxPerson Face14Hair14BodySports02 =
-            SlimOn(BodyChest(Dress(Compose("Face14_Hair14_BodySports02", "女大 14 の顔と髪をスポーツ 02 の体に（主人公）", Adult14, Sports02), OutfitProtagonistSports02)));
+            UpperSlimOn(BodyChest(Dress(Compose("Face14_Hair14_BodySports02", "女大 14 の顔と髪をスポーツ 02 の体に（主人公）", Adult14, Sports02), OutfitProtagonistSports02)));
 
         /// <summary>主人公（スポーツ 02 の体）の服: 元の色のまま。腕の肌を頭の肌に揃え、首の付け根の上の 14 のネックレスの鎖は消し、胸元に描き直す</summary>
         static void OutfitProtagonistSports02(RocketboxPaint.Look k)
