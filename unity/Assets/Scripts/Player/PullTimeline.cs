@@ -4,8 +4,9 @@ namespace HalfAware
 {
     /// <summary>
     /// ジャックを抜く一連の間。手首へ視線を落として刺さっているところを見せ、
-    /// 左手を伸ばし、掴み、引き抜き、ケーブルが張るところまで前へ出して見せ、最後に手を戻す。
-    /// 骨そのものは触らず、どの段でどれだけ曲げるかだけを持つ
+    /// 左手を伸ばし、掴み、抜き、ケーブルが張るところまで前へ出して見せ、
+    /// 置き場（右の肘掛けの内の縁）まで運んで置き、最後に手を戻す。
+    /// 骨そのものは触らず、どの段でどれだけ寄せるかだけを持つ
     /// </summary>
     public struct PullTimeline
     {
@@ -23,6 +24,8 @@ namespace HalfAware
         public const float ShowSeconds = 0.70f;
         /// <summary>ケーブルごと見せたまま止める</summary>
         public const float CableSeconds = 1.40f;
+        /// <summary>置き場まで運ぶ</summary>
+        public const float PlaceSeconds = 0.80f;
         /// <summary>手を戻す</summary>
         public const float ReturnSeconds = 0.75f;
 
@@ -30,7 +33,8 @@ namespace HalfAware
         public static float GripAt { get { return ReachAt + ReachSeconds; } }
         public static float PullAt { get { return GripAt + GripSeconds; } }
         public static float ShowAt { get { return PullAt + PullSeconds; } }
-        public static float LetGoAt { get { return ShowAt + ShowSeconds + CableSeconds; } }
+        public static float PlaceAt { get { return ShowAt + ShowSeconds + CableSeconds; } }
+        public static float LetGoAt { get { return PlaceAt + PlaceSeconds; } }
         public static float Total { get { return LetGoAt + ReturnSeconds; } }
 
         /// <summary>
@@ -52,22 +56,37 @@ namespace HalfAware
             return Swell(t, 0f, LookSeconds);
         }
 
+        /// <summary>
+        /// 右の手首を目の前へ出す強さ。視線と一緒に上げ、ジャックを置き場に置くまで上げたままにし、手を戻す間に肘掛けへ下ろす。
+        /// 先に下ろすと、右の前腕が肘掛けを塞ぎ、置き場（右の肘掛けの後ろ寄り）へ運ぶ左手と重なった
+        /// </summary>
+        public static float RightHand(float t)
+        {
+            return Aim(t);
+        }
+
         /// <summary>右手首へ伸ばす姿勢の強さ</summary>
         public static float Reach(float t)
         {
             return Swell(t, ReachAt, ReachSeconds);
         }
 
-        /// <summary>引き抜いて手を退ける姿勢の強さ</summary>
+        /// <summary>抜く強さ</summary>
         public static float Lift(float t)
         {
             return Swell(t, PullAt, PullSeconds);
         }
 
-        /// <summary>抜いたジャックを前へ出す姿勢の強さ</summary>
+        /// <summary>抜いたジャックを前へ出す強さ</summary>
         public static float Show(float t)
         {
             return Swell(t, ShowAt, ShowSeconds);
+        }
+
+        /// <summary>置き場へ運ぶ強さ</summary>
+        public static float Place(float t)
+        {
+            return Swell(t, PlaceAt, PlaceSeconds);
         }
 
         /// <summary>左手がジャックを掴んでいる間。ここでジャックは左手に付いて動く</summary>
@@ -82,19 +101,20 @@ namespace HalfAware
             return t >= PullAt;
         }
 
-        /// <summary>見せ終わって置いた後</summary>
+        /// <summary>置き場に置いた後</summary>
         public static bool LetGo(float t)
         {
             return t >= LetGoAt;
         }
 
         /// <summary>
-        /// 視線がまだジャックを追ってよいか。手を離すとジャックは肘掛けへ移るので、
-        /// そのまま追うと視線が右下へ飛ぶ。離した後は最後に見ていた先を保つ
+        /// 視線がまだジャックを追ってよいか。前へ出して見せている間までは追い、置き場へ運び始めたら追わない。
+        /// 置き場（右の肘掛け）まで追うと、視線が右の真下へ落ちて、首より上を映さない体の襟ぐりの中が見える。
+        /// 追うのをやめた後は最後に見ていた先を保ち、手を離したら元の向きへ帰る
         /// </summary>
         public static bool Follows(float t)
         {
-            return !LetGo(t);
+            return t < PlaceAt;
         }
 
         public static bool Done(float t)

@@ -22,7 +22,7 @@ namespace HalfAware
 
         public string Id => id;
         public Vector3 Position => transform.position;
-        /// <summary>切って隠している間は選ばせない。前腕のジャックがこれを使う</summary>
+        /// <summary>切って隠している間は選ばせない。場面 3 の座り終えるまでのジャックがこれを使う</summary>
         public bool Active => isActiveAndEnabled;
         public float Radius => radius;
         public bool Required => required;

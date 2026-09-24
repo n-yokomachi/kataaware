@@ -62,5 +62,45 @@ namespace HalfAware.Tests
             var p = Run(new Vector3(2f, 1f, 0f), Vector3.zero, 5f, 1);
             Assert.AreEqual(new Vector3(2f, 1f, 0f), p[0]);
         }
+
+        [Test]
+        public void TheCurveKeepsItsEnds()
+        {
+            var into = new Vector3[12];
+            var a = new Vector3(0f, 0f, 0f);
+            var b = new Vector3(0.3f, 0.2f, 0.1f);
+            CablePath.Curve(a, Vector3.up, b, Vector3.forward, 0.6f, 0.05f, into);
+            Assert.AreEqual(0f, Vector3.Distance(a, into[0]), 1e-5f);
+            Assert.AreEqual(0f, Vector3.Distance(b, into[11]), 1e-5f);
+        }
+
+        [Test]
+        public void TheCurveLeavesEachEndAlongItsAxis()
+        {
+            var into = new Vector3[40];
+            var a = Vector3.zero;
+            var b = new Vector3(0.4f, 0f, 0f);
+            // 張りきった長さにして、垂れを掛けずに向きだけを見る
+            CablePath.Curve(a, Vector3.up, b, Vector3.up, 0.1f, 0.08f, into);
+            var first = (into[1] - into[0]).normalized;
+            var last = (into[38] - into[39]).normalized;
+            Assert.Greater(Vector3.Dot(first, Vector3.up), 0.7f, "差込口からは軸の向きへ出る");
+            Assert.Greater(Vector3.Dot(last, Vector3.up), 0.7f, "ジャックの尻からも軸の向きへ出る");
+        }
+
+        [Test]
+        public void TheReelAlwaysLeavesTheSameSlack()
+        {
+            var near = new Vector3[17];
+            var far = new Vector3[17];
+            // 端から互いの向きへ出すと、垂れる前の道筋は両端を結ぶまっすぐな線になる
+            var b1 = new Vector3(0.12f, 0f, 0f);
+            var b2 = new Vector3(0.6f, 0f, 0f);
+            CablePath.Reel(Vector3.zero, Vector3.right, b1, Vector3.left, 0.03f, 0.03f, near);
+            CablePath.Reel(Vector3.zero, Vector3.right, b2, Vector3.left, 0.03f, 0.03f, far);
+            var want = 0.03f * CablePath.SagShare;
+            Assert.AreEqual(want, -near[8].y, 1e-4f, "端が近くても余りのぶんだけ垂れる");
+            Assert.AreEqual(want, -far[8].y, 1e-4f, "端が遠くても同じだけ垂れる");
+        }
     }
 }

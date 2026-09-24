@@ -142,7 +142,7 @@ namespace HalfAware
                 enabled = false;
                 return;
             }
-            // 切ってある対象も拾う。前腕のジャックは伏せた状態で始まるので、
+            // 切ってある対象も拾う。場面 3 のジャックやモニターのように伏せた状態で始まる対象があるので、
             // ここで漏らすと必須の数え上げが狂って場面が早く終わってしまう
             items = new List<IInteractable>(FindObjectsByType<Interactable>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID));
             if (items.Count == 0) Debug.LogWarning("SceneFlow: 調べる対象が 1 つも見つからない", this);

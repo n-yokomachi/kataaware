@@ -58,7 +58,7 @@ namespace HalfAware.Tests
         public void TheCableStaysInSightForAWhile()
         {
             var out_ = PullTimeline.ShowAt + PullTimeline.ShowSeconds;
-            Assert.AreEqual(PullTimeline.CableSeconds, PullTimeline.LetGoAt - out_, 1e-4f);
+            Assert.AreEqual(PullTimeline.CableSeconds, PullTimeline.PlaceAt - out_, 1e-4f);
             Assert.AreEqual(1f, PullTimeline.Show(PullTimeline.LetGoAt - 1e-4f), 1e-3f, "置くまで出したまま");
             Assert.AreEqual(1f, PullTimeline.Aim(PullTimeline.LetGoAt - 1e-4f), 1e-3f, "視線もジャックを追ったまま");
         }
@@ -73,12 +73,29 @@ namespace HalfAware.Tests
         }
 
         [Test]
-        public void TheEyeLetsGoOfTheJackWhenTheHandDoes()
+        public void TheEyeLetsGoOfTheJackWhenItIsCarriedDown()
         {
             Assert.IsTrue(PullTimeline.Follows(0f), "初めから追う");
-            Assert.IsTrue(PullTimeline.Follows(PullTimeline.LetGoAt - 1e-4f));
-            Assert.IsFalse(PullTimeline.Follows(PullTimeline.LetGoAt), "肘掛けへ置いた先は追わない");
+            Assert.IsTrue(PullTimeline.Follows(PullTimeline.PlaceAt - 1e-4f), "見せている間は追う");
+            Assert.IsFalse(PullTimeline.Follows(PullTimeline.PlaceAt), "置き場へ運ぶ先は追わない");
             Assert.IsFalse(PullTimeline.Follows(PullTimeline.Total));
+        }
+
+        [Test]
+        public void ItIsSetDownBeforeTheHandLetsGo()
+        {
+            Assert.AreEqual(0f, PullTimeline.Place(PullTimeline.PlaceAt), 1e-4f, "見せ終わるまで運ばない");
+            Assert.AreEqual(1f, PullTimeline.Place(PullTimeline.LetGoAt - 1e-4f), 1e-3f, "離す時には置き場に届いている");
+            Assert.IsTrue(PullTimeline.Held(PullTimeline.LetGoAt - 1e-4f), "置き場に届くまで持っている");
+        }
+
+        [Test]
+        public void TheRightHandStaysUpUntilTheJackIsSetDown()
+        {
+            Assert.AreEqual(1f, PullTimeline.RightHand(PullTimeline.GripAt), 1e-4f, "掴む時には手首が目の前にある");
+            Assert.AreEqual(1f, PullTimeline.RightHand(PullTimeline.LetGoAt - 1e-4f), 1e-3f, "置くまで肘掛けを空けておく");
+            Assert.Less(PullTimeline.RightHand(PullTimeline.LetGoAt + PullTimeline.ReturnSeconds * 0.5f), 1f, "手を戻す間に下ろす");
+            Assert.AreEqual(0f, PullTimeline.RightHand(PullTimeline.Total), 1e-4f);
         }
 
         [Test]

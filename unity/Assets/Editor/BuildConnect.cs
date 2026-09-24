@@ -29,14 +29,8 @@ namespace HalfAware.EditorTools
         public const string RowsPath = "Assets/Textures/TerminalRows.png";
         public const string PlugPath = "Assets/Audio/JackPlug.wav";
 
-        /// <summary>手首の骨。ジャックはここから肘掛けへ移り、挿すと帰ってくる</summary>
-        const string WristPath = "Player/Protagonist/CharacterArmature/Root/Body/Hips/Abdomen"
-            + "/Torso/Chest/Shoulder.R/UpperArm.R/LowerArm.R/Wrist.R";
-        /// <summary>左の手のひら。掴んでいる間ジャックを預ける</summary>
-        const string HoldPath = "Player/Protagonist/CharacterArmature/Root/Body/Hips/Abdomen"
-            + "/Torso/Chest/Shoulder.L/UpperArm.L/LowerArm.L/Wrist.L/JackHold";
         /// <summary>手首に残す受け口の名前</summary>
-        const string SocketName = "JackSocket";
+        public const string SocketName = "JackSocket";
 
         /// <summary>戸口の内側。場面 2 の暗転から、ここで部屋の奥を向いて明ける</summary>
         static readonly Vector3 StartAt = new Vector3(0.80f, 0.05f, -2.45f);
@@ -234,29 +228,28 @@ namespace HalfAware.EditorTools
             if (pose != null) { pose.Seated = false; EditorUtility.SetDirty(pose); }
             var blocker = Look("Room/Chair/Blocker");
             if (blocker != null) blocker.gameObject.SetActive(true);
-            // 場面 1 の前腕は、下を向いたときだけジャックの対象を出し入れする。
-            // 場面 3 の jack は座り終えるまで伏せておくものなので、繋いだままだと
-            // 前腕が毎フレーム開け閉めして ConnectDirector と取り合う
-            var arm = Object.FindFirstObjectByType<Forearm>(FindObjectsInactive.Include);
-            if (arm == null) return;
-            var so = new SerializedObject(arm);
-            so.FindProperty("jackItem").objectReferenceValue = null;
-            so.ApplyModifiedPropertiesWithoutUndo();
-            EditorUtility.SetDirty(arm);
+        }
+
+        /// <summary>主人公の体の骨（Humanoid）。右の手首はジャックの受け口、左の手は掴む置き所を持つ</summary>
+        public static Transform Bone(HumanBodyBones bone)
+        {
+            var pro = Look("Player/Protagonist");
+            var an = pro != null ? pro.GetComponent<Animator>() : null;
+            if (an == null) { Debug.LogWarning("主人公の Animator が無い"); return null; }
+            return an.GetBoneTransform(bone);
         }
 
         /// <summary>
         /// ジャックは肘掛けに置いてある。場面 1 の終わりに置いたままの形。
         /// 手首には受け口だけを残す。
         ///
-        /// **受け口を空の GameObject で残すのは、手首の骨が 100 倍に伸びているため。**
+        /// **受け口を空の GameObject で残すのは、ジャックの置き方と大きさを覚えさせるため。**
         /// JackPlug は挿さったところでジャックを受け口の原点へ等倍で置く。
-        /// 骨へ直に返すと 100 倍の大きさで生える。受け口が元の置き方と大きさを覚えていれば、
-        /// 挿した後の見え方は場面 1 の頭とそのまま同じになる
+        /// 受け口が元の置き方と大きさを覚えていれば、挿した後の見え方は場面 1 の頭とそのまま同じになる
         /// </summary>
         static Transform Park()
         {
-            var wrist = Look(WristPath);
+            var wrist = Bone(HumanBodyBones.RightHand);
             var rest = Look("Room/Chair/JackRest");
             if (wrist == null || rest == null) return null;
             var jack = wrist.Find("Jack");
@@ -632,23 +625,28 @@ namespace HalfAware.EditorTools
             so.FindProperty("pose").objectReferenceValue = pro.GetComponent<SeatedPose>();
             so.FindProperty("id").stringValue = ConnectIds.Jack;
             so.FindProperty("jack").objectReferenceValue = Look("Room/Chair/JackRest/Jack");
-            so.FindProperty("grip").objectReferenceValue = Look(HoldPath);
+            var left = Bone(HumanBodyBones.LeftHand);
+            so.FindProperty("grip").objectReferenceValue = left != null ? left.Find("JackHold") : null;
             so.FindProperty("socket").objectReferenceValue = socket;
             var voice = Look("Player/Main Camera/Voice");
             so.FindProperty("source").objectReferenceValue = voice != null ? voice.GetComponent<AudioSource>() : null;
             var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(PlugPath);
             if (clip == null) Debug.LogWarning("挿さる音が無い: " + PlugPath);
             so.FindProperty("plug").objectReferenceValue = clip;
-            if (pull == null) Debug.LogWarning("JackPull が無い。曲げを写せないので挿すしぐさは棒立ちになる");
+            if (pull == null) Debug.LogWarning("JackPull が無い。狙いの値を写せないので挿すしぐさは既定の値になる");
             else
             {
                 var from = new SerializedObject(pull);
-                Copy(from, "look", so, "look");
-                Copy(from, "reach", so, "reach");
-                // 抜く側の「前へ出す」が、挿す側では「手首の前へ運ぶ」にあたる
-                Copy(from, "show", so, "carry");
-                // 抜く側の「引き抜いて退ける」が、挿す側では「挿し込む」にあたる
-                Copy(from, "lift", so, "push");
+                // 抜く側の「右の手首を目の前へ出す」が、挿す側では「差込口を出す」にあたる
+                so.FindProperty("liftWrist").vector3Value = from.FindProperty("lookWrist").vector3Value;
+                so.FindProperty("liftHand").quaternionValue = from.FindProperty("lookHand").quaternionValue;
+                so.FindProperty("rightElbowPole").vector3Value = from.FindProperty("rightElbowPole").vector3Value;
+                so.FindProperty("leftElbowPole").vector3Value = from.FindProperty("leftElbowPole").vector3Value;
+                // 抜く長さが、挿す前に差込口の手前で止める距離にあたる
+                so.FindProperty("pushDistance").floatValue = from.FindProperty("pullDistance").floatValue;
+                Copy(from, "pinch", so, "pinch");
+                Copy(from, "open", so, "open");
+                so.FindProperty("approach").floatValue = from.FindProperty("approach").floatValue;
             }
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(plug);
@@ -656,7 +654,7 @@ namespace HalfAware.EditorTools
             return plug;
         }
 
-        /// <summary>曲げの配列を写す。BoneTurn は struct なので、要素ごとに並べ直す</summary>
+        /// <summary>骨の向きの配列を写す。SeatedPose.Bone は struct なので、要素ごとに並べ直す</summary>
         static void Copy(SerializedObject from, string source, SerializedObject to, string target)
         {
             var a = from.FindProperty(source);
@@ -666,9 +664,9 @@ namespace HalfAware.EditorTools
             {
                 var x = a.GetArrayElementAtIndex(i);
                 var y = b.GetArrayElementAtIndex(i);
-                y.FindPropertyRelative("bone").stringValue = x.FindPropertyRelative("bone").stringValue;
-                y.FindPropertyRelative("axis").enumValueIndex = x.FindPropertyRelative("axis").enumValueIndex;
-                y.FindPropertyRelative("degrees").floatValue = x.FindPropertyRelative("degrees").floatValue;
+                y.FindPropertyRelative("bone").intValue = x.FindPropertyRelative("bone").intValue;
+                y.FindPropertyRelative("position").vector3Value = x.FindPropertyRelative("position").vector3Value;
+                y.FindPropertyRelative("rotation").quaternionValue = x.FindPropertyRelative("rotation").quaternionValue;
             }
         }
 

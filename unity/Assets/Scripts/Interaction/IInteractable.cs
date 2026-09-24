@@ -8,7 +8,7 @@ namespace HalfAware
     {
         string Id { get; }
         Vector3 Position { get; }
-        /// <summary>今この対象が場に在るか。false の間は選べない。前腕のように出たり消えたりする物に使う</summary>
+        /// <summary>今この対象が場に在るか。false の間は選べない。演出の間だけ伏せる物（場面 3 の座り終えるまでのジャックなど）に使う</summary>
         bool Active { get; }
         /// <summary>この距離以内で選べる。既定は InteractionPicker.DefaultRadius</summary>
         float Radius { get; }

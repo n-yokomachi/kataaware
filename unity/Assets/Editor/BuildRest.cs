@@ -154,8 +154,8 @@ namespace HalfAware.EditorTools
         /// </summary>
         static void Plugged()
         {
-            var socket = Look("Player/Protagonist/CharacterArmature/Root/Body/Hips/Abdomen"
-                + "/Torso/Chest/Shoulder.R/UpperArm.R/LowerArm.R/Wrist.R/JackSocket");
+            var wrist = BuildConnect.Bone(HumanBodyBones.RightHand);
+            var socket = wrist != null ? wrist.Find(BuildConnect.SocketName) : null;
             var jack = Look("Room/Chair/JackRest/Jack");
             if (socket == null) { Debug.LogWarning("手首に受け口が無い。ジャックを戻せない"); return; }
             if (jack == null)

@@ -32,7 +32,7 @@ namespace HalfAware.EditorTools
         [MenuItem("HalfAware/Build the implant jack")]
         public static void BuildJackMenu()
         {
-            var wrist = FindBone("Wrist.R");
+            var wrist = FindBone(HumanBodyBones.RightHand);
             if (wrist == null) { Debug.LogError("右手首の骨が見つからない"); return; }
             var jack = BuildJack(wrist);
             Selection.activeGameObject = jack;
@@ -213,8 +213,8 @@ namespace HalfAware.EditorTools
         // ---- 手首のジャックとケーブル -------------------------------------
 
         /// <summary>
-        /// 手首に刺さっているジャック。骨は 100 倍なので入れ物で打ち消す。
-        /// 掌側の、肘寄りに刺す。座位では掌が上を向くので、下を見ると目に入る
+        /// 手首に刺さっているジャック。骨の大きさは入れ物で打ち消す。
+        /// 手のひらの側の、肘寄りに刺す。座った形では右の手のひらが上を向くので、下を見ると目に入る
         /// </summary>
         public static GameObject BuildJack(Transform wrist)
         {
@@ -245,11 +245,7 @@ namespace HalfAware.EditorTools
             var go = found != null ? found.gameObject : new GameObject("Jack");
             go.transform.SetParent(wrist, false);
             go.transform.localScale = Vector3.one / wrist.lossyScale.x;
-            // 掌の側へ、肘寄り（骨の -up）に寄せて刺す。
-            // 掌の向きは骨の -forward（親指の位置から求めた）。座位では右腕だけ掌を上に返すので、
-            // 差し込み口はそのまま目に入る
-            go.transform.position = wrist.position - wrist.forward * 0.019f - wrist.up * 0.014f;
-            go.transform.rotation = Quaternion.LookRotation(-wrist.forward, -wrist.up);
+            Seat(go.transform, wrist);
             Need<MeshFilter>(go).sharedMesh = mesh;
             Need<MeshRenderer>(go).sharedMaterial = Mat("SteelDark");
 
@@ -276,58 +272,242 @@ namespace HalfAware.EditorTools
             var endT = go.transform.Find("CableEnd");
             var end = endT != null ? endT.gameObject : new GameObject("CableEnd");
             end.transform.SetParent(go.transform, false);
-            end.transform.localPosition = new Vector3(0f, 0f, 0.030f);
+            // ケーブルの端は、細る尻（根元から 30 mm）の少し内側から出す。ケーブルの切り口が尻の外へはみ出さない
+            end.transform.localPosition = new Vector3(0f, 0f, 0.026f);
             return go;
         }
 
+        /// <summary>手首の肘寄りから手のひらの側へ、皮膚の上に座金が乗るところ（手の骨の付け根から肘の側へ m）</summary>
+        public const float JackFromWrist = 0.030f;
+
+        /// <summary>ジャックを手のひらの向きから親指の側へ倒す角（度）</summary>
+        public const float JackTilt = 40f;
+
         /// <summary>
-        /// 椅子の差込口と手首のジャックを結ぶケーブル。毎フレーム張り直すので、
-        /// 抜いて手が離れても繋がったまま垂れる
+        /// ジャックを手首へ刺す。手のひらの向きは、手の骨と指の付け根の骨から求める（<see cref="BodyPoser.PalmDir"/>）。
+        /// 刺す点は、手の骨の付け根から肘の側へ <see cref="JackFromWrist"/> 戻った所の、手のひらの側で親指へ寄った皮膚
+        /// （脈を取る所）。向きは手のひらから親指の側へ <see cref="JackTilt"/> 度倒す。
+        /// 手のひらの真ん中へまっすぐ立てると、ケーブルが前腕を越えて差込口（肘掛けの外寄り）へ向かうときに前腕へ潜った。
+        /// 皮膚の高さは体の面を今の姿勢で焼いて測る。ジャックの前（+Z）は皮膚から外へ、上（+Y）は手の先へ向ける
         /// </summary>
-        [MenuItem("HalfAware/Wire the jack to the chair")]
-        public static void WireCableMenu()
+        static void Seat(Transform jack, Transform wrist)
         {
-            var chair = GameObject.Find("Room/Chair");
-            var port = chair == null ? null : chair.transform.Find("PortHole");
-            var jack = FindBone("Wrist.R");
-            var end = jack == null ? null : jack.Find("Jack/CableEnd");
-            if (port == null || end == null) { Debug.LogError("差込口かジャックが見つからない"); return; }
+            var an = wrist.GetComponentInParent<Animator>();
+            if (an == null) return;
+            var lower = an.GetBoneTransform(HumanBodyBones.RightLowerArm);
+            var along = (wrist.position - lower.position).normalized;
+            var palm = BodyPoser.PalmDir(an, false);
+            palm = Vector3.ProjectOnPlane(palm, along).normalized;
+            var thumb = Vector3.ProjectOnPlane(an.GetBoneTransform(HumanBodyBones.RightThumbProximal).position - wrist.position, along);
+            thumb = Vector3.ProjectOnPlane(thumb, palm).normalized;
+            palm = Quaternion.AngleAxis(JackTilt, Vector3.Cross(palm, thumb)) * palm;
+            var at = wrist.position - along * JackFromWrist;
+            var skin = Skin(an, at, palm, 0.012f);
+            // 座金の厚みの半分だけ皮膚へ沈める
+            jack.position = at + palm * (skin - 0.002f);
+            jack.rotation = Quaternion.LookRotation(palm, along);
+        }
 
-            var old = chair.transform.Find("Cable");
-            if (old != null) Object.DestroyImmediate(old.gameObject);
-            var go = new GameObject("Cable");
-            go.transform.SetParent(chair.transform, false);
-            go.transform.localPosition = Vector3.zero;
-            go.AddComponent<MeshFilter>();
-            go.AddComponent<MeshRenderer>().sharedMaterial = Mat("Ink");
-            var cable = go.AddComponent<Cable>();
+        /// <summary>
+        /// from（腕の芯）から dir の向きに、体の面の皮膚までの距離。体の面を今の姿勢で焼き、dir へ伸ばした線が面の三角を抜ける所のうち
+        /// いちばん遠い所（8 cm まで）で測る。体の面は粗い（前腕の頂点の間が 2 cm ほどある）ので、頂点ではなく三角で測る。
+        /// within は使わない（互換のため残す）
+        /// </summary>
+        public static float Skin(Animator an, Vector3 from, Vector3 dir, float within)
+        {
+            var best = 0f;
+            dir = dir.normalized;
+            foreach (var smr in an.GetComponentsInChildren<SkinnedMeshRenderer>())
+            {
+                if (smr.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly) continue;
+                var baked = new Mesh();
+                smr.BakeMesh(baked, true);
+                var v = baked.vertices;
+                for (var k = 0; k < v.Length; k++) v[k] = smr.transform.TransformPoint(v[k]);
+                for (var s = 0; s < baked.subMeshCount; s++)
+                {
+                    var tris = baked.GetTriangles(s);
+                    for (var i = 0; i < tris.Length; i += 3)
+                    {
+                        float t;
+                        if (!Ray(from, dir, v[tris[i]], v[tris[i + 1]], v[tris[i + 2]], out t)) continue;
+                        if (t > 0f && t <= 0.08f) best = Mathf.Max(best, t);
+                    }
+                }
+                Object.DestroyImmediate(baked);
+            }
+            return best;
+        }
+
+        /// <summary>線と三角の交わり（Möller–Trumbore）。裏表は問わない</summary>
+        static bool Ray(Vector3 o, Vector3 d, Vector3 a, Vector3 b, Vector3 c, out float t)
+        {
+            t = 0f;
+            var e1 = b - a;
+            var e2 = c - a;
+            var p = Vector3.Cross(d, e2);
+            var det = Vector3.Dot(e1, p);
+            if (Mathf.Abs(det) < 1e-10f) return false;
+            var inv = 1f / det;
+            var s = o - a;
+            var u = Vector3.Dot(s, p) * inv;
+            if (u < 0f || u > 1f) return false;
+            var q = Vector3.Cross(s, e1);
+            var w = Vector3.Dot(d, q) * inv;
+            if (w < 0f || u + w > 1f) return false;
+            t = Vector3.Dot(e2, q) * inv;
+            return true;
+        }
+
+        /// <summary>
+        /// ケーブルの出方。肘掛けの中に巻き取られていて、端の間に合わせて出し入れされる（<see cref="CableSlack"/> だけ余る）。
+        /// 両端は、差込口からは上へ、ジャックからは尻の向きへまっすぐ出す（<see cref="CableStiffness"/>）。
+        ///
+        /// **長さを決めたままにしない。** 抜いて目の前へ出すには 0.55 m 要るが、刺さっている間は端の間が 12 cm しかない。
+        /// 余った 40 cm の輪が手首の下へ垂れて、手と前腕に潜った。
+        /// 端をまっすぐ出さずに両端を結ぶだけだと、ケーブルが前腕に沿って寄り、やはり皮膚に潜った
+        /// </summary>
+        public static void Tune(Cable cable)
+        {
+            if (cable == null) return;
+            var pro = GameObject.Find("Player/Protagonist");
+            Tune(cable, pro != null ? pro.GetComponent<Animator>() : null);
+        }
+
+        /// <summary>
+        /// <see cref="Tune(Cable)"/> に加えて、ケーブルが避ける体の一部を体から測って書く。
+        /// 腕（上腕・前腕・手のひら・指・親指）の左右、腿の左右、胴。太さは、その骨に一番重く付いた頂点の、芯からのいちばん遠い距離
+        /// </summary>
+        public static void Tune(Cable cable, Animator an)
+        {
+            if (cable == null) return;
             var so = new SerializedObject(cable);
-            so.FindProperty("from").objectReferenceValue = port;
-            so.FindProperty("to").objectReferenceValue = end;
-            // 座位で差込口とジャックは 12 cm ほどしか離れない。少し輪になって垂れるぶんを足す。
-            // 組み立て時の腕は下ろした姿勢なので、そこからは測れない
-            so.FindProperty("length").floatValue = 0.38f;
+            if (an != null)
+            {
+                var parts = Avoids(an);
+                var list = so.FindProperty("avoid");
+                list.arraySize = parts.Count;
+                for (var i = 0; i < parts.Count; i++)
+                {
+                    var e = list.GetArrayElementAtIndex(i);
+                    e.FindPropertyRelative("from").objectReferenceValue = parts[i].from;
+                    e.FindPropertyRelative("to").objectReferenceValue = parts[i].to;
+                    e.FindPropertyRelative("radius").floatValue = parts[i].radius;
+                }
+            }
+            so.FindProperty("length").floatValue = CableLength;
+            so.FindProperty("radius").floatValue = CableRadius;
+            so.FindProperty("clearance").floatValue = CableClearance;
+            so.FindProperty("reel").boolValue = true;
+            so.FindProperty("reelSlack").floatValue = CableSlack;
+            so.FindProperty("stiffness").floatValue = CableStiffness;
+            // 差込口からは、上へ、少し外（肘掛けの外）へ向けて出す。前腕の外の側を上って越える
+            so.FindProperty("fromAxis").vector3Value = new Vector3(0.35f, 1f, 0f).normalized;
+            so.FindProperty("toAxis").vector3Value = Vector3.forward;
             so.ApplyModifiedPropertiesWithoutUndo();
+        }
 
-            // 抜いた後にジャックを置く場所。差込口の脇
-            var rest = chair.transform.Find("JackRest");
+        /// <summary>巻き取りを切ったときのケーブルの長さ（m）。抜いて目の前へ出したとき、差込口から張って見える長さ</summary>
+        public const float CableLength = 0.55f;
+
+        /// <summary>ケーブルが避ける体の一部を、今の姿勢の体の面から測る</summary>
+        public static List<Cable.Avoid> Avoids(Animator an)
+        {
+            System.Func<HumanBodyBones, Transform> B = an.GetBoneTransform;
+            var spec = new List<KeyValuePair<HumanBodyBones[], HumanBodyBones[]>>();
+            System.Action<HumanBodyBones, HumanBodyBones, HumanBodyBones[]> add = (a, b, own) =>
+                spec.Add(new KeyValuePair<HumanBodyBones[], HumanBodyBones[]>(new[] { a, b }, own));
+            foreach (var left in new[] { true, false })
+            {
+                HumanBodyBones F(HumanBodyBones l, HumanBodyBones r) { return left ? l : r; }
+                add(F(HumanBodyBones.LeftUpperArm, HumanBodyBones.RightUpperArm), F(HumanBodyBones.LeftLowerArm, HumanBodyBones.RightLowerArm), new[] { F(HumanBodyBones.LeftUpperArm, HumanBodyBones.RightUpperArm) });
+                add(F(HumanBodyBones.LeftLowerArm, HumanBodyBones.RightLowerArm), F(HumanBodyBones.LeftHand, HumanBodyBones.RightHand), new[] { F(HumanBodyBones.LeftLowerArm, HumanBodyBones.RightLowerArm) });
+                add(F(HumanBodyBones.LeftHand, HumanBodyBones.RightHand), F(HumanBodyBones.LeftMiddleProximal, HumanBodyBones.RightMiddleProximal), new[] { F(HumanBodyBones.LeftHand, HumanBodyBones.RightHand) });
+                add(F(HumanBodyBones.LeftMiddleProximal, HumanBodyBones.RightMiddleProximal), F(HumanBodyBones.LeftMiddleDistal, HumanBodyBones.RightMiddleDistal),
+                    new[] { F(HumanBodyBones.LeftIndexProximal, HumanBodyBones.RightIndexProximal), F(HumanBodyBones.LeftIndexIntermediate, HumanBodyBones.RightIndexIntermediate), F(HumanBodyBones.LeftIndexDistal, HumanBodyBones.RightIndexDistal),
+                        F(HumanBodyBones.LeftMiddleProximal, HumanBodyBones.RightMiddleProximal), F(HumanBodyBones.LeftMiddleIntermediate, HumanBodyBones.RightMiddleIntermediate), F(HumanBodyBones.LeftMiddleDistal, HumanBodyBones.RightMiddleDistal),
+                        F(HumanBodyBones.LeftRingProximal, HumanBodyBones.RightRingProximal), F(HumanBodyBones.LeftRingIntermediate, HumanBodyBones.RightRingIntermediate), F(HumanBodyBones.LeftRingDistal, HumanBodyBones.RightRingDistal),
+                        F(HumanBodyBones.LeftLittleProximal, HumanBodyBones.RightLittleProximal), F(HumanBodyBones.LeftLittleIntermediate, HumanBodyBones.RightLittleIntermediate), F(HumanBodyBones.LeftLittleDistal, HumanBodyBones.RightLittleDistal) });
+                add(F(HumanBodyBones.LeftThumbProximal, HumanBodyBones.RightThumbProximal), F(HumanBodyBones.LeftThumbDistal, HumanBodyBones.RightThumbDistal),
+                    new[] { F(HumanBodyBones.LeftThumbProximal, HumanBodyBones.RightThumbProximal), F(HumanBodyBones.LeftThumbIntermediate, HumanBodyBones.RightThumbIntermediate), F(HumanBodyBones.LeftThumbDistal, HumanBodyBones.RightThumbDistal) });
+                add(F(HumanBodyBones.LeftUpperLeg, HumanBodyBones.RightUpperLeg), F(HumanBodyBones.LeftLowerLeg, HumanBodyBones.RightLowerLeg), new[] { F(HumanBodyBones.LeftUpperLeg, HumanBodyBones.RightUpperLeg) });
+            }
+            add(HumanBodyBones.Spine, HumanBodyBones.UpperChest, new[] { HumanBodyBones.Spine, HumanBodyBones.Chest, HumanBodyBones.UpperChest });
+
+            // 体の面を焼き、頂点ごとの一番重い骨をその場で調べて数える
+            var smr = an.GetComponentInChildren<SkinnedMeshRenderer>();
+            var baked = new Mesh();
+            smr.BakeMesh(baked, true);
+            var verts = baked.vertices;
+            var weights = smr.sharedMesh.boneWeights;
+            var bones = smr.bones;
+            var list = new List<Cable.Avoid>();
+            foreach (var part in spec)
+            {
+                var a = B(part.Key[0]);
+                var b = B(part.Key[1]);
+                if (a == null || b == null) continue;
+                var own = new HashSet<Transform>();
+                foreach (var o in part.Value) { var t = B(o); if (t != null) own.Add(t); }
+                var r = 0f;
+                for (var i = 0; i < verts.Length && i < weights.Length; i++)
+                {
+                    var bone = bones[weights[i].boneIndex0];
+                    if (!own.Contains(bone)) continue;
+                    var p = smr.transform.TransformPoint(verts[i]);
+                    r = Mathf.Max(r, Vector3.Distance(p, Cable.Closest(a.position, b.position, p)));
+                }
+                list.Add(new Cable.Avoid { from = a, to = b, radius = r });
+            }
+            Object.DestroyImmediate(baked);
+            return list;
+        }
+
+        /// <summary>ケーブルが体から取るゆとり（m）。体を芯と太さの円柱で見積もるので、親指の付け根のように円柱からはみ出す所のぶん</summary>
+        public const float CableClearance = 0.008f;
+
+        /// <summary>ケーブルの太さ（半径 m）。ジャックの尻（半径 4〜6 mm）に揃える</summary>
+        public const float CableRadius = 0.006f;
+
+        /// <summary>巻き取り式のケーブルが、端の間の道筋より余る長さ（m）</summary>
+        public const float CableSlack = 0.03f;
+
+        /// <summary>ケーブルが両端から軸に沿ってまっすぐ出る長さ（m）</summary>
+        public const float CableStiffness = 0.05f;
+
+        /// <summary>
+        /// 抜いた後にジャックを置く場所。右の肘掛けの上の、内の縁の後ろ寄り（右の肘より 10 cm 後ろ）に、座金を下にして立てる。
+        /// ケーブルは尻から上へ出て、差込口へ弧を描く。
+        ///
+        /// **左手が届く所に置く。** 左の肩から右の肘掛けの真ん中の差込口の脇までは 0.60 m あり、腕（0.49 m）と指先までの 12 cm を足しても
+        /// 手の向きによっては届かない。内の縁の後ろ寄りなら 0.58 m で、指先を肩から置き場への向きに揃えれば上体を寄せずに届く。
+        /// reachFrom（座った形の左の肩）を渡すと、指先（ジャックの上 +Y）を、そこから置き場への向き（水平に均した向き）に揃える。
+        /// 座面の縁（腿と肘掛けの間）は、肩から下へ遠く（0.64 m）、上体を寄せても届かなかった
+        /// </summary>
+        public static Transform JackRest(Transform chair, Vector3? reachFrom = null)
+        {
+            var rest = chair.Find("JackRest");
             if (rest == null)
             {
                 rest = new GameObject("JackRest").transform;
-                rest.SetParent(chair.transform, false);
+                rest.SetParent(chair, false);
             }
-            rest.position = port.position + new Vector3(0f, 0.006f, -0.075f);
-            rest.rotation = Quaternion.Euler(90f, 18f, 0f);
-            Mark(go);
+            // 座金の下の面（根元から 2 mm 下）を肘掛けの上面（0.676）に載せる
+            rest.localPosition = new Vector3(0.255f, 0.678f, -0.07f);
+            var forward = chair.up;
+            var reach = reachFrom.HasValue ? chair.TransformPoint(rest.localPosition) - reachFrom.Value : chair.right;
+            var up = Vector3.ProjectOnPlane(reach, forward).normalized;
+            rest.rotation = Quaternion.LookRotation(forward, up);
+            rest.localScale = Vector3.one;
+            return rest;
         }
 
-        static Transform FindBone(string name)
+        /// <summary>主人公の体の骨（Humanoid）</summary>
+        static Transform FindBone(HumanBodyBones bone)
         {
             var pro = GameObject.Find("Player/Protagonist");
-            if (pro == null) return null;
-            foreach (var t in pro.GetComponentsInChildren<Transform>(true))
-                if (t.name == name) return t;
-            return null;
+            var an = pro != null ? pro.GetComponent<Animator>() : null;
+            return an != null ? an.GetBoneTransform(bone) : null;
         }
 
         // ---- 調べられる物のピン --------------------------------------------
