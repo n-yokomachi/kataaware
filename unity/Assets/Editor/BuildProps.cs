@@ -466,10 +466,245 @@ namespace HalfAware.EditorTools
                 Tinted("PortMetal", PortColour, 0.85f, 0.55f), patch, ringBones);
             PortPart(go.transform, PortHoleName, SaveSkinned(holeMesh, Generated + "WristPortHole_" + an.gameObject.name + ".asset"),
                 Mat("Ink"), patch, holeBones);
+            // 差込口から肘の方へ伸びる銀の回路の意匠。差込口と一つの部品で、同じ肌に沿わせ方で付ける（4.6 cm 先まで届くので、肌は広めに集める）
+            var reach = Patch(an, position, CircuitReach);
+            Transform[] circuitBones;
+            var circuitMesh = CircuitMesh(skin, frame, flat * Vector3.forward, reach, out circuitBones);
+            PortPart(go.transform, CircuitName, SaveSkinned(circuitMesh, Generated + "WristCircuit_" + an.gameObject.name + ".asset"),
+                Tinted("PortMetal", PortColour, 0.85f, 0.55f), reach, circuitBones);
             return go.transform;
         }
 
         public const string PortRingName = "Ring";
+        /// <summary>回路の意匠の名前。差込口（<see cref="PortName"/>）の子</summary>
+        public const string CircuitName = "Circuit";
+
+        // ---- 差込口から肘へ伸びる銀の回路の意匠（「幹線と分岐」） --------------------------
+        //
+        // 差込口の枠（<see cref="PortPose"/> の flat。x は腕のまわり、y は手の先の側が正で、肘の側は負。mm で書く）の上に置く。
+        // - 幹線は三本並んで差込口の輪の肘の側から伸びる。真ん中はいちばん長く伸びて四角い端子で終わる。
+        //   外の二本は途中で 45 度の折れで外へずれ、一本はビア（小さな輪）、もう一本は小さな四角い端子で終わる
+        // - 枝は三本。幹線の途中から 45 度で外へ分かれ、先はビアで終わる
+        // - 線は肌から少しだけ立つ銀の帯（肌の曲がりに沿わせる）。縁は肌の下へ沈めて、姿勢で肌が動いても隙間を見せない。
+        //   端子とビアは線より少し高くし、線の端をその下へ潜らせる
+
+        /// <summary>幹線の道筋（mm）。始まりは差込口の輪の外の縁の下</summary>
+        static readonly Vector2[][] CircuitTrunks =
+        {
+            new[] { new Vector2(0f, -5.8f), new Vector2(0f, -44.0f) },
+            new[] { new Vector2(2.3f, -5.9f), new Vector2(2.3f, -15.0f), new Vector2(5.3f, -18.0f), new Vector2(5.3f, -35.6f) },
+            new[] { new Vector2(-2.3f, -5.9f), new Vector2(-2.3f, -21.0f), new Vector2(-5.3f, -24.0f), new Vector2(-5.3f, -39.3f) },
+        };
+        /// <summary>枝の道筋（mm）。始まりは幹線の上</summary>
+        static readonly Vector2[][] CircuitBranches =
+        {
+            new[] { new Vector2(5.3f, -24.0f), new Vector2(8.1f, -26.8f), new Vector2(8.1f, -29.1f) },
+            new[] { new Vector2(0f, -27.0f), new Vector2(2.6f, -29.6f), new Vector2(2.6f, -31.6f) },
+            new[] { new Vector2(-5.3f, -30.0f), new Vector2(-8.1f, -32.8f), new Vector2(-8.1f, -35.1f) },
+        };
+        /// <summary>ビア（mm）: 真ん中、外の半径、内の半径。幹線の先に一つ、枝の先に三つ</summary>
+        static readonly Vector4[] CircuitVias =
+        {
+            new Vector4(5.3f, -36.75f, 1.15f, 0.55f),
+            new Vector4(8.1f, -30.1f, 1.0f, 0.48f),
+            new Vector4(2.6f, -32.6f, 1.0f, 0.48f),
+            new Vector4(-8.1f, -36.1f, 1.0f, 0.48f),
+        };
+        /// <summary>四角い端子（mm）: 真ん中と、一辺の長さ。真ん中の幹線の先と、外の一本の先</summary>
+        static readonly Vector3[] CircuitPads =
+        {
+            new Vector3(0f, -45.2f, 2.4f),
+            new Vector3(-5.3f, -40.2f, 1.8f),
+        };
+        /// <summary>幹線と枝の太さ（m）</summary>
+        const float TrunkWidth = 0.0010f, BranchWidth = 0.0008f;
+        /// <summary>線が肌から立つ高さと、端子とビアの高さ（m）。差込口の輪（<see cref="PortRise"/>）より低い</summary>
+        const float CircuitRise = 0.00008f, CircuitPadRise = 0.0001f;
+        /// <summary>線と端子とビアの縁を、肌の下へ沈める深さ（m）</summary>
+        const float CircuitSkirt = 0.0004f;
+        /// <summary>線の長さの向きを刻む間（m）。肌の網の折れ目が線の面より上に出ないよう、差込口の輪（<see cref="PortStep"/>）より細かく</summary>
+        const float CircuitStep = 0.0005f;
+        /// <summary>回路の下の肌を集める半径（m）。差込口の真ん中から端子の先まで 4.6 cm</summary>
+        const float CircuitReach = 0.07f;
+
+        /// <summary>
+        /// 回路の意匠の mesh（体の骨で曲がる形）。線・ビア・端子を差込口の枠で組み、頂点ごとに skin（その所の肌の高さ）へ重ねてから、
+        /// その下の肌の三角の動きで付ける（<see cref="SkinMesh"/>）
+        /// </summary>
+        static Mesh CircuitMesh(System.Func<float, float, float> skin, Matrix4x4 frame, Vector3 normal, SkinPatch patch, out Transform[] bones)
+        {
+            var verts = new List<Vector3>();
+            var tris = new List<int>();
+            System.Func<float, float, float, int> add = (x, y, h) =>
+            {
+                verts.Add(new Vector3(x, y, skin(x, y) + h));
+                return verts.Count - 1;
+            };
+            // 三角を、want（枠の向き）の側を表にして加える
+            System.Action<int, int, int, Vector3> tri = (a, b, c, want) =>
+            {
+                var n = Vector3.Cross(verts[b] - verts[a], verts[c] - verts[a]);
+                if (Vector3.Dot(n, want) < 0f) tris.AddRange(new[] { a, c, b });
+                else tris.AddRange(new[] { a, b, c });
+            };
+            foreach (var line in CircuitTrunks) CircuitLine(line, TrunkWidth, add, tri);
+            foreach (var line in CircuitBranches) CircuitLine(line, BranchWidth, add, tri);
+            foreach (var v in CircuitVias) CircuitVia(new Vector2(v.x, v.y) * 0.001f, v.z * 0.001f, v.w * 0.001f, add, tri);
+            foreach (var pad in CircuitPads) CircuitPad(new Vector2(pad.x, pad.y) * 0.001f, pad.z * 0.001f, add, tri);
+            return SkinMesh(verts, tris, frame, normal, patch, out bones);
+        }
+
+        /// <summary>
+        /// 一本の線（mm の折れ線、太さ width m）。長さの向きに刻み、断面は上の面（縁・真ん中・縁）と、両の縁から肌の下へ下る壁。
+        /// 折れの所は、両の辺の向きの間の向きへ、太さが保たれる分だけ張り出す
+        /// </summary>
+        static void CircuitLine(Vector2[] mm, float width, System.Func<float, float, float, int> add, System.Action<int, int, int, Vector3> tri)
+        {
+            var pts = new List<Vector2>();
+            foreach (var q in mm) pts.Add(q * 0.001f);
+            // 刻んだ点と、そこの横の向き（左へ。長さは張り出しの分を含む）
+            var at = new List<Vector2>();
+            var side = new List<Vector2>();
+            for (var i = 0; i + 1 < pts.Count; i++)
+            {
+                var a = pts[i];
+                var b = pts[i + 1];
+                var n = Mathf.Max(1, Mathf.CeilToInt((b - a).magnitude / CircuitStep));
+                for (var k = i == 0 ? 0 : 1; k <= n; k++)
+                {
+                    var p = Vector2.Lerp(a, b, (float)k / n);
+                    var dir = (b - a).normalized;
+                    var left = new Vector2(-dir.y, dir.x);
+                    if (k == n && i + 2 < pts.Count)
+                    {
+                        var next = (pts[i + 2] - b).normalized;
+                        var mid = (left + new Vector2(-next.y, next.x)).normalized;
+                        left = mid / Mathf.Max(0.5f, Vector2.Dot(mid, left));
+                    }
+                    at.Add(p);
+                    side.Add(left);
+                }
+            }
+            var half = width * 0.5f;
+            var up = Vector3.forward;
+            int pl = -1, pc = -1, pr = -1, wlt = -1, wlb = -1, wrt = -1, wrb = -1;
+            for (var i = 0; i < at.Count; i++)
+            {
+                var l = at[i] + side[i] * half;
+                var r = at[i] - side[i] * half;
+                var cl = add(l.x, l.y, CircuitRise);
+                var cc = add(at[i].x, at[i].y, CircuitRise);
+                var cr = add(r.x, r.y, CircuitRise);
+                var lt = add(l.x, l.y, CircuitRise);
+                var lb = add(l.x, l.y, -CircuitSkirt);
+                var rt = add(r.x, r.y, CircuitRise);
+                var rb = add(r.x, r.y, -CircuitSkirt);
+                var outL = new Vector3(side[i].x, side[i].y, 0f);
+                if (i > 0)
+                {
+                    tri(pl, pc, cc, up);
+                    tri(pl, cc, cl, up);
+                    tri(pc, pr, cr, up);
+                    tri(pc, cr, cc, up);
+                    tri(wlt, wlb, lb, outL);
+                    tri(wlt, lb, lt, outL);
+                    tri(wrt, wrb, rb, -outL);
+                    tri(wrt, rb, rt, -outL);
+                }
+                if (i == 0 || i == at.Count - 1)
+                {
+                    // 端のふた
+                    var along = i == 0 ? at[0] - at[1] : at[i] - at[i - 1];
+                    var o = new Vector3(along.x, along.y, 0f).normalized;
+                    var a = add(l.x, l.y, CircuitRise);
+                    var b = add(r.x, r.y, CircuitRise);
+                    var c = add(r.x, r.y, -CircuitSkirt);
+                    var d = add(l.x, l.y, -CircuitSkirt);
+                    tri(a, b, c, o);
+                    tri(a, c, d, o);
+                }
+                pl = cl; pc = cc; pr = cr; wlt = lt; wlb = lb; wrt = rt; wrb = rb;
+            }
+        }
+
+        /// <summary>ビア（小さな輪）。真ん中 c、外の半径 outer、内の半径 inner（m）。上の面と、外と内の壁。穴の中は肌が見える</summary>
+        static void CircuitVia(Vector2 c, float outer, float inner, System.Func<float, float, float, int> add, System.Action<int, int, int, Vector3> tri)
+        {
+            const int seg = 24;
+            var mid = (outer + inner) * 0.5f;
+            var radii = new[] { inner, mid, outer };
+            var top = new int[3, seg];
+            var wallOut = new int[2, seg];
+            var wallIn = new int[2, seg];
+            for (var k = 0; k < seg; k++)
+            {
+                var a = k * Mathf.PI * 2f / seg;
+                var d = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
+                for (var j = 0; j < 3; j++)
+                {
+                    var p = c + d * radii[j];
+                    top[j, k] = add(p.x, p.y, CircuitPadRise);
+                }
+                var po = c + d * outer;
+                var pi = c + d * inner;
+                wallOut[0, k] = add(po.x, po.y, CircuitPadRise);
+                wallOut[1, k] = add(po.x, po.y, -CircuitSkirt);
+                wallIn[0, k] = add(pi.x, pi.y, CircuitPadRise);
+                wallIn[1, k] = add(pi.x, pi.y, -CircuitSkirt);
+            }
+            for (var k = 0; k < seg; k++)
+            {
+                var k1 = (k + 1) % seg;
+                var a = k * Mathf.PI * 2f / seg;
+                var o = new Vector3(Mathf.Cos(a), Mathf.Sin(a), 0f);
+                for (var j = 0; j < 2; j++)
+                {
+                    tri(top[j, k], top[j + 1, k], top[j + 1, k1], Vector3.forward);
+                    tri(top[j, k], top[j + 1, k1], top[j, k1], Vector3.forward);
+                }
+                tri(wallOut[0, k], wallOut[1, k], wallOut[1, k1], o);
+                tri(wallOut[0, k], wallOut[1, k1], wallOut[0, k1], o);
+                tri(wallIn[0, k], wallIn[1, k], wallIn[1, k1], -o);
+                tri(wallIn[0, k], wallIn[1, k1], wallIn[0, k1], -o);
+            }
+        }
+
+        /// <summary>四角い端子。真ん中 c、一辺 size（m）。上の面は升目に刻み（肌の曲がりに沿わせる）、四辺に壁</summary>
+        static void CircuitPad(Vector2 c, float size, System.Func<float, float, float, int> add, System.Action<int, int, int, Vector3> tri)
+        {
+            var n = Mathf.Max(2, Mathf.CeilToInt(size / CircuitStep));
+            var grid = new int[n + 1, n + 1];
+            var h = size * 0.5f;
+            for (var i = 0; i <= n; i++)
+                for (var j = 0; j <= n; j++)
+                    grid[i, j] = add(c.x - h + size * i / n, c.y - h + size * j / n, CircuitPadRise);
+            for (var i = 0; i < n; i++)
+                for (var j = 0; j < n; j++)
+                {
+                    tri(grid[i, j], grid[i + 1, j], grid[i + 1, j + 1], Vector3.forward);
+                    tri(grid[i, j], grid[i + 1, j + 1], grid[i, j + 1], Vector3.forward);
+                }
+            // 四辺の壁（辺ごとに刻む）
+            var corners = new[] { new Vector2(-h, -h), new Vector2(h, -h), new Vector2(h, h), new Vector2(-h, h) };
+            for (var e = 0; e < 4; e++)
+            {
+                var a = corners[e];
+                var b = corners[(e + 1) % 4];
+                var o2 = (a + b).normalized;
+                var o = new Vector3(o2.x, o2.y, 0f);
+                for (var k = 0; k < n; k++)
+                {
+                    var p0 = c + Vector2.Lerp(a, b, (float)k / n);
+                    var p1 = c + Vector2.Lerp(a, b, (float)(k + 1) / n);
+                    var t0 = add(p0.x, p0.y, CircuitPadRise);
+                    var t1 = add(p1.x, p1.y, CircuitPadRise);
+                    var b0 = add(p0.x, p0.y, -CircuitSkirt);
+                    var b1 = add(p1.x, p1.y, -CircuitSkirt);
+                    tri(t0, b0, b1, o);
+                    tri(t0, b1, t1, o);
+                }
+            }
+        }
 
         /// <summary>差込口の輪か穴を、体の骨で曲がる形として parent の子 name に置く。bones は mesh の骨の枠ごとの骨（<see cref="PortMesh"/>）</summary>
         static void PortPart(Transform parent, string name, Mesh mesh, Material material, SkinPatch patch, Transform[] bones)
@@ -653,6 +888,16 @@ namespace HalfAware.EditorTools
                 verts.Add(new Vector3(0f, 0f, floor));
                 for (var k = 0; k < PortSegments; k++) tris.AddRange(new[] { mid, k, (k + 1) % PortSegments });
             }
+            return SkinMesh(verts, tris, frame, normal, patch, out bones);
+        }
+
+        /// <summary>
+        /// 輪の枠 frame（肌の面、m）で作った頂点と三角を、その真下の肌の三角（patch）の動きをそのまま混ぜて付けた、体の骨で曲がる mesh にする。
+        /// 付け方は <see cref="PortMesh"/> の説明のとおり（頂点ごとに骨ごとの枠を持たせ、枠の束ねた置き方を骨 i の点の所へずらす）。
+        /// 三角は、今の姿勢の世界で外（肌から離れる側）を向く巡りで渡す
+        /// </summary>
+        static Mesh SkinMesh(List<Vector3> verts, List<int> tris, Matrix4x4 frame, Vector3 normal, SkinPatch patch, out Transform[] bones)
+        {
             var rest = patch.smr.sharedMesh.vertices;
             var slotBones = new List<Transform>();
             var slotBind = new List<Matrix4x4>();
