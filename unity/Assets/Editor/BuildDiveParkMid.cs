@@ -201,29 +201,32 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// テラスハウスの列。四辺の向こうの歩道の奥と、門の正面の横丁の両側と突き当たり。
         /// 二階建てと三階建てを辺ごとに振り分け、屋根の線の高さに段を付ける。
-        /// 四辺の列は角で通りへ口を開ける。門の側の通りは両端を家並みで塞ぎ、ほかの三辺の角の先は書き割りの屋根の海へ抜けて見える
+        /// 四辺の列は角で通りへ口を開ける。門の側の通りは両端を家並みで塞ぎ、ほかの三辺の角の先は書き割りの屋根の海へ抜けて見える。
+        ///
+        /// **窓に灯りは入れない**（<see cref="MidTerrace"/> の lamps）。公営住宅の朝七時の作りのままだと、
+        /// 午後 3 時台なのに窓がいくつか灯っていて、夕方に見えた
         /// </summary>
         static void ParkHouseRows(YardBanks y)
         {
             var nz = GateZ + StreetFront;                                                  // 24.1
             // 門の側。横丁の西と東
-            MidTerrace(y, new Vector3(ParkLanePaveWest - 1.4f - HouseWide * 5f, 0f, nz), 180f, 5, 2, 61);
-            MidTerrace(y, new Vector3(ParkLanePaveEast + 1.4f, 0f, nz), 180f, 5, 3, 67);
+            MidTerrace(y, new Vector3(ParkLanePaveWest - 1.4f - HouseWide * 5f, 0f, nz), 180f, 5, 2, 61, false);
+            MidTerrace(y, new Vector3(ParkLanePaveEast + 1.4f, 0f, nz), 180f, 5, 3, 67, false);
             // 横丁の両側。門の側の列の裏から突き当たりまで
-            MidTerrace(y, new Vector3(ParkLanePaveWest - 1.4f, 0f, nz + 9.2f), 90f, 4, 2, 71);
-            MidTerrace(y, new Vector3(ParkLanePaveEast + 1.4f, 0f, ParkLaneEnd), 270f, 4, 2, 73);
+            MidTerrace(y, new Vector3(ParkLanePaveWest - 1.4f, 0f, nz + 9.2f), 90f, 4, 2, 71, false);
+            MidTerrace(y, new Vector3(ParkLanePaveEast + 1.4f, 0f, ParkLaneEnd), 270f, 4, 2, 73, false);
             // 横丁の突き当たり。東西の通りの向こうで、横丁を塞ぐ
-            MidTerrace(y, new Vector3(-11.3f, 0f, ParkLaneEnd + 4.6f + 1.4f), 180f, 5, 3, 101);
+            MidTerrace(y, new Vector3(-11.3f, 0f, ParkLaneEnd + 4.6f + 1.4f), 180f, 5, 3, 101, false);
             // 門の側の通りの西と東の突き当たり。塞がないと、門の脇から通りの先の何も無い地面が霞の奥まで見通せた
-            MidTerrace(y, new Vector3(-StreetReach - 1.5f, 0f, GateZ - 1.7f), 90f, 3, 2, 103);
-            MidTerrace(y, new Vector3(StreetReach + 1.5f, 0f, GateZ - 1.7f + HouseWide * 3f), 270f, 3, 2, 107);
+            MidTerrace(y, new Vector3(-StreetReach - 1.5f, 0f, GateZ - 1.7f), 90f, 3, 2, 103, false);
+            MidTerrace(y, new Vector3(StreetReach + 1.5f, 0f, GateZ - 1.7f + HouseWide * 3f), 270f, 3, 2, 107, false);
             // 東と西。東西の通りの間だけ
-            MidTerrace(y, new Vector3(ParkEast + StreetFront, 0f, GateZ + 1.8f), 270f, 5, 3, 79);
-            MidTerrace(y, new Vector3(ParkWest - StreetFront, 0f, GateZ + 1.8f - HouseWide * 5f), 90f, 5, 2, 83);
+            MidTerrace(y, new Vector3(ParkEast + StreetFront, 0f, GateZ + 1.8f), 270f, 5, 3, 79, false);
+            MidTerrace(y, new Vector3(ParkWest - StreetFront, 0f, GateZ + 1.8f - HouseWide * 5f), 90f, 5, 2, 83, false);
             // 南。三階建てと二階建て
             var sz = ParkSouth - StreetFront;                                              // -26.8
-            MidTerrace(y, new Vector3(28f, 0f, sz), 0f, 5, 3, 89);
-            MidTerrace(y, new Vector3(3f, 0f, sz), 0f, 6, 2, 97);
+            MidTerrace(y, new Vector3(28f, 0f, sz), 0f, 5, 3, 89, false);
+            MidTerrace(y, new Vector3(3f, 0f, sz), 0f, 6, 2, 97, false);
         }
 
         /// <summary>

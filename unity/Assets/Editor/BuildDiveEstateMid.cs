@@ -380,9 +380,13 @@ namespace HalfAware.EditorTools
         /// 黄色い煉瓦（ロンドンのストック煉瓦）の箱にスレートの切妻屋根を一本通し、
         /// 戸境ごとに煙突の束を棟の上へ突き出す。**煙突は等間隔に並べる。** 屋根の上の煙突の列が、
         /// 遠目にはいちばんロンドンの長屋らしい輪郭になる。
-        /// 表は一階に張り出し窓と色の付いた戸、上の階に白い枠の上げ下げ窓、階の境に白い帯
+        /// 表は一階に張り出し窓と色の付いた戸、上の階に白い枠の上げ下げ窓、階の境に白い帯。
+        ///
+        /// <paramref name="lamps"/> が偽なら、上の階の窓に灯りを入れない。**灯りは朝の七時の見え方。**
+        /// 公園の午後 3 時台に灯った窓が並ぶと、夕方に見える。
+        /// 偽でも乱数は同じだけ引くので、戸の色と生垣の並びは灯りの有無で変わらない
         /// </summary>
-        static void MidTerrace(YardBanks y, Vector3 start, float yaw, int houses, int storeys, int seed)
+        static void MidTerrace(YardBanks y, Vector3 start, float yaw, int houses, int storeys, int seed, bool lamps = true)
         {
             var rot = Quaternion.Euler(0f, yaw, 0f);
             // 表から見て右が +x、奥が -z
@@ -440,7 +444,7 @@ namespace HalfAware.EditorTools
                     {
                         var wx = x0 + HouseWide * (0.3f + i * 0.42f);
                         var sill = s * 3.0f + 0.7f;
-                        var lit = rnd.NextDouble() < 0.12;
+                        var lit = rnd.NextDouble() < 0.12 && lamps;
                         y.Line.Box(p(wx, sill + 0.85f, 0.02f), new Vector3(1.05f, 1.8f, 0.05f), rot);
                         (lit ? y.Lit : y.Pane).Box(p(wx, sill + 0.85f, 0.05f), new Vector3(0.85f, 1.6f, 0.03f), rot);
                         y.Line.Box(p(wx, sill + 0.85f, 0.07f), new Vector3(0.85f, 0.06f, 0.02f), rot);
