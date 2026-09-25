@@ -508,6 +508,13 @@ namespace HalfAware.EditorTools
             public RocketboxMobPaint.Skin cloud;
             public readonly Dictionary<int, RocketboxPaint.Surface> head = new Dictionary<int, RocketboxPaint.Surface>();
             public readonly Dictionary<int, RocketboxPaint.Surface> body = new Dictionary<int, RocketboxPaint.Surface>();
+            /// <summary>頭と体の面の画素の法線（位置の地図と同じ並び）</summary>
+            public readonly Dictionary<int, RocketboxPaint.Surface> headN = new Dictionary<int, RocketboxPaint.Surface>();
+            public readonly Dictionary<int, RocketboxPaint.Surface> bodyN = new Dictionary<int, RocketboxPaint.Surface>();
+            /// <summary>肌を覆う物（髪の塊・髪の房・襟）。肌の出ている画素を見分ける</summary>
+            public RocketboxMobPaint.Shelter shelter;
+            public readonly Dictionary<int, bool[]> headBare = new Dictionary<int, bool[]>();
+            public readonly Dictionary<int, bool[]> bodyBare = new Dictionary<int, bool[]>();
             public readonly Dictionary<int, Color[]> headPx = new Dictionary<int, Color[]>();
             public readonly Dictionary<int, Color[]> bodyPx = new Dictionary<int, Color[]>();
             public readonly List<RocketboxMobPaint.Implant> bold = new List<RocketboxMobPaint.Implant>();
@@ -556,8 +563,10 @@ namespace HalfAware.EditorTools
                     var strokes = RocketboxMobPaint.Strokes(im, per.frame);
                     RocketboxMobPaint.Prepare(strokes, per.cloud);
                     float on = 0f, total = 0f;
-                    RocketboxMobPaint.Coverage(strokes, per.head[256], Pixels(per, 256, true), skin, ref on, ref total);
-                    RocketboxMobPaint.Coverage(strokes, per.body[256], Pixels(per, 256, false), skin, ref on, ref total);
+                    // 選ぶときは色だけで肌を見分ける（覆われた画素を外さない）。覆いで選びを変えると、乱数を引く数が人によって変わり、
+                    // 群衆の全員のインプラントの場所と色が入れ替わる。覆われた所へは塗らないだけにする（Materials）
+                    RocketboxMobPaint.Coverage(strokes, per.head[256], Pixels(per, 256, true), skin, null, ref on, ref total);
+                    RocketboxMobPaint.Coverage(strokes, per.body[256], Pixels(per, 256, false), skin, null, ref on, ref total);
                     var need = !bold && im.kind == RocketboxMobPaint.Kind.TempleLines ? MinOnSkinSmallTemple : MinOnSkin;
                     if (total > 0f && on / total >= need) (bold ? per.bold : per.small).Add(im);
                 }
@@ -568,6 +577,22 @@ namespace HalfAware.EditorTools
         static Color SkinOf(Person per, int n)
         {
             return RocketboxMobPaint.SkinOf(per.head[n], Pixels(per, n, true), per.frame);
+        }
+
+        /// <summary>
+        /// 頭か体の、肌の出ている画素（n×n）。髪の塊や髪の房、襟に覆われた画素は false（<see cref="RocketboxMobPaint.Shelter"/>）。
+        /// インプラントはここにだけ描く。ポニーテールの髪が明るい人は、髪の画素が肌の色に近く、色だけでは避けられなかった
+        /// </summary>
+        static bool[] Bare(Person per, int n, bool head)
+        {
+            var cache = head ? per.headBare : per.bodyBare;
+            bool[] bare;
+            if (cache.TryGetValue(n, out bare)) return bare;
+            Surfaces(per, n);
+            bare = RocketboxMobPaint.Bare(head ? per.head[n] : per.body[n], head ? per.headN[n] : per.bodyN[n],
+                per.shelter, Pixels(per, n, head), SkinOf(per, n));
+            cache[n] = bare;
+            return bare;
         }
 
         /// <summary>頭か体の元の色（n×n）。取り込んだ PNG を n へ縮める</summary>
@@ -605,13 +630,37 @@ namespace HalfAware.EditorTools
                 var smr = go.GetComponentInChildren<SkinnedMeshRenderer>();
                 smr.BakeMesh(baked, true);
                 var v = baked.vertices;
-                for (var i = 0; i < v.Length; i++) v[i] = go.transform.InverseTransformPoint(smr.transform.TransformPoint(v[i]));
+                var nv = baked.normals;
+                for (var i = 0; i < v.Length; i++)
+                {
+                    v[i] = go.transform.InverseTransformPoint(smr.transform.TransformPoint(v[i]));
+                    nv[i] = go.transform.InverseTransformDirection(smr.transform.TransformDirection(nv[i]));
+                }
                 var uv = smr.sharedMesh.uv;
                 int hi = Slot(smr, who.HeadSlot), bi = Slot(smr, who.BodySlot);
                 if (hi < 0 || bi < 0) throw new System.InvalidOperationException("頭か体の面の組が無い: " + who.Name);
-                per.head[n] = RocketboxPaint.Surface.Of(v, uv, smr.sharedMesh.GetTriangles(hi), n);
-                per.body[n] = RocketboxPaint.Surface.Of(v, uv, smr.sharedMesh.GetTriangles(bi), n);
+                var headTris = smr.sharedMesh.GetTriangles(hi);
+                var bodyTris = smr.sharedMesh.GetTriangles(bi);
+                per.head[n] = RocketboxPaint.Surface.Of(v, uv, headTris, n);
+                per.body[n] = RocketboxPaint.Surface.Of(v, uv, bodyTris, n);
+                // 法線も位置と同じ地図に並べる（頂点の代わりに法線を渡すと、画素ごとの法線が重心の座標で埋まる）
+                per.headN[n] = RocketboxPaint.Surface.Of(nv, uv, headTris, n);
+                per.bodyN[n] = RocketboxPaint.Surface.Of(nv, uv, bodyTris, n);
                 if (per.frame == null) per.frame = RocketboxMobPaint.Frame.Of(go.GetComponent<Animator>());
+                if (per.shelter == null)
+                {
+                    var ri = Slot(smr, who.HairSlot);
+                    int[] hairTris = null;
+                    Color32[] hairPx = null;
+                    int aw = 0, ah = 0;
+                    if (ri >= 0 && who.HasOpacity)
+                    {
+                        hairTris = smr.sharedMesh.GetTriangles(ri);
+                        hairPx = RocketboxTextures.ReadPng(who.HairSrc, out aw, out ah);
+                    }
+                    per.shelter = new RocketboxMobPaint.Shelter(v, uv, new List<int[]> { headTris, bodyTris }, hairTris, hairPx, aw, ah,
+                        new[] { per.frame.eyeL, per.frame.eyeR });
+                }
                 if (per.slots == null)
                 {
                     var mats = smr.sharedMaterials;
@@ -1024,8 +1073,8 @@ namespace HalfAware.EditorTools
             var head = (Color[])head0.Clone();
             var body = (Color[])body0.Clone();
             int ph, pb;
-            var headGlow = RocketboxMobPaint.Paint(strokes, per.head[n], head, head0, skin, out ph);
-            var bodyGlow = RocketboxMobPaint.Paint(strokes, per.body[n], body, body0, skin, out pb);
+            var headGlow = RocketboxMobPaint.Paint(strokes, per.head[n], head, head0, skin, Bare(per, n, true), out ph);
+            var bodyGlow = RocketboxMobPaint.Paint(strokes, per.body[n], body, body0, skin, Bare(per, n, false), out pb);
             var key = who.Name + "_" + tag;
             var headTex = Write(head, n, Folder + key + "_Head.png");
             var bodyTex = Write(body, n, Folder + key + "_Body.png");

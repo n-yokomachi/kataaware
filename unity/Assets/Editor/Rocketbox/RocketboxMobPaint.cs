@@ -10,7 +10,7 @@ namespace HalfAware.EditorTools.Rocketbox
     /// 銀の地に、光る線と端子。光は自己発光のテクスチャで持たせ、灯りは置かない。
     /// 形は、模型の束ねた姿勢の上に描いた線（<see cref="Stroke"/>）で決める。線の案内の点は骨と顔の骨から置き、
     /// いちばん近い肌の画素の位置へ吸い付けてから、テクスチャの画素ごとに、その画素が載る模型の上の位置から線までの距離で塗る（<see cref="RocketboxPaint.Surface"/>）。
-    /// 肌の色から離れた画素（髪・眉・襟・袖）には塗らない。
+    /// 肌の色から離れた画素（髪・眉・襟・袖）には塗らない。髪の塊や髪の房に覆われた画素（色が肌に近い明るい髪）にも塗らない（<see cref="Shelter"/>）。
     ///
     /// 大胆な形（<see cref="Implant.bold"/>）は、ゲームの見え方（320×180）の 2〜3 m で「光る物が付いている」と一目で読め、5 m でも光の点や線として拾える大きさにしてある。
     /// その距離では画素一つが体の上の 2〜4 cm に当たるので、線は太く、光は強い
@@ -566,11 +566,258 @@ namespace HalfAware.EditorTools.Rocketbox
             return c;
         }
 
+        // ---- 肌の出ている所 -----------------------------------------------------------
+
+        /// <summary>画素の外向きへ伸ばして覆いを探す筋の長さ（m）。ポニーテールの塊は、うなじの肌から 5〜15 cm 後ろに垂れている</summary>
+        public const float BareReach = 0.10f;
+        /// <summary>筋を面から浮かせて始める距離（m）。自分の面に当たらないように</summary>
+        const float BareLift = 0.003f;
+        /// <summary>
+        /// 髪の房の不透明な所からこの距離（m）より近い画素は、覆われているとみなす。
+        /// ポニーテールの塊の面は房に包まれているが、房の隙間を抜ける筋では覆いに当たらない所が残る（女大 01 の塊の面は房から 2 cm 以内）
+        /// </summary>
+        public const float HairNear = 0.02f;
+
+        /// <summary>
+        /// 肌を覆う物。頭と体の面（髪の塊・襟・フード）と、髪の房（透けの絵の α が半分より上の所）。
+        ///
+        /// 明るい茶や赤の髪は色みが肌に近く、肌らしさ（<see cref="Skinness"/>）だけでは見分けられない。
+        /// 女大 01 のポニーテールの塊は頭の面の一部（頭のテクスチャで塗られている）で、肌らしさが 0.5〜0.7 あった。
+        /// 首の帯とうなじの差込口の線は、外から見て最初に当たる面へ落とすので、その塊の上に載り、髪がネオンの色に光った。
+        /// 髪の塊は髪の房に包まれていて、塊の下のうなじは塊に覆われている。
+        /// どちらも、画素の面の外向き（法線）へ筋を伸ばせば何かに当たる（<see cref="Covered"/>）
+        /// </summary>
+        public sealed class Shelter
+        {
+            const float Cell = 0.02f;
+            readonly Vector3[] v;
+            readonly Vector2[] uv;
+            /// <summary>三角の頂点の番号（3 つずつ）と、髪の房か</summary>
+            readonly List<int> tri = new List<int>();
+            readonly List<bool> hair = new List<bool>();
+            readonly Color32[] alpha;
+            readonly int aw, ah;
+            readonly Dictionary<Vector3Int, List<int>> grid = new Dictionary<Vector3Int, List<int>>();
+            /// <summary>髪の房の不透明な所に散らした点（升目ごと）</summary>
+            readonly Dictionary<Vector3Int, List<Vector3>> strands = new Dictionary<Vector3Int, List<Vector3>>();
+            int[] stamp;
+            int ray;
+
+            /// <summary>髪の房の不透明な所からこの距離（m）より近い画素は、覆われているとみなす。0 なら見ない</summary>
+            public float near = HairNear;
+
+            /// <summary>
+            /// verts・uv は模型の根の中の頂点（束ねた姿勢）。solid は頭と体の面の三角、hairTris は髪の房の三角、
+            /// hairPx（w×h）は透けの絵。eyes のそばの小さい房（まつ毛）は覆いにしない（目のまわりの輪が削れる）
+            /// </summary>
+            public Shelter(Vector3[] verts, Vector2[] uvs, List<int[]> solid, int[] hairTris, Color32[] hairPx, int w, int h, Vector3[] eyes)
+            {
+                v = verts;
+                uv = uvs;
+                alpha = hairPx;
+                aw = w;
+                ah = h;
+                foreach (var s in solid) Add(s, false, null);
+                if (hairTris != null && hairPx != null)
+                {
+                    var lashes = Lashes(hairTris, eyes);
+                    Add(hairTris, true, lashes);
+                    Sample(hairTris, lashes);
+                }
+                stamp = new int[tri.Count / 3];
+            }
+
+            /// <summary>髪の房の三角に 4 mm おきに点を打ち、透けの絵の不透明な所だけを残す</summary>
+            void Sample(int[] tris, HashSet<int> skip)
+            {
+                const float step = 0.004f;
+                for (var t = 0; t < tris.Length; t += 3)
+                {
+                    if (skip.Contains(t)) continue;
+                    int ia = tris[t], ib = tris[t + 1], ic = tris[t + 2];
+                    var n = Mathf.Max(1, Mathf.CeilToInt(Mathf.Max((v[ib] - v[ia]).magnitude, (v[ic] - v[ia]).magnitude) / step));
+                    for (var i = 0; i <= n; i++)
+                        for (var j = 0; i + j <= n; j++)
+                        {
+                            float bu = i / (float)n, bv = j / (float)n;
+                            if (!Opaque(ia, ib, ic, bu, bv)) continue;
+                            var p = v[ia] * (1f - bu - bv) + v[ib] * bu + v[ic] * bv;
+                            List<Vector3> cell;
+                            var k = Key(p);
+                            if (!strands.TryGetValue(k, out cell)) strands[k] = cell = new List<Vector3>();
+                            cell.Add(p);
+                        }
+                }
+            }
+
+            /// <summary>髪の房の三角 (a, b, c) の重心の座標 (bu, bv) が、透けの絵で塗ってある所か</summary>
+            bool Opaque(int ia, int ib, int ic, float bu, float bv)
+            {
+                var st = uv[ia] * (1f - bu - bv) + uv[ib] * bu + uv[ic] * bv;
+                var x = Mathf.Clamp(Mathf.FloorToInt(Mathf.Repeat(st.x, 1f) * aw), 0, aw - 1);
+                var y = Mathf.Clamp(Mathf.FloorToInt(Mathf.Repeat(st.y, 1f) * ah), 0, ah - 1);
+                return alpha[y * aw + x].a >= 128;
+            }
+
+            /// <summary>p から <see cref="near"/> 以内に髪の房の不透明な所があるか</summary>
+            bool NearStrand(Vector3 p)
+            {
+                if (near <= 0f || strands.Count == 0) return false;
+                var c = Key(p);
+                var r2 = near * near;
+                for (var x = -1; x <= 1; x++)
+                    for (var y = -1; y <= 1; y++)
+                        for (var z = -1; z <= 1; z++)
+                        {
+                            List<Vector3> cell;
+                            if (!strands.TryGetValue(new Vector3Int(c.x + x, c.y + y, c.z + z), out cell)) continue;
+                            foreach (var q in cell) if ((q - p).sqrMagnitude < r2) return true;
+                        }
+                return false;
+            }
+
+            void Add(int[] tris, bool isHair, HashSet<int> skip)
+            {
+                for (var t = 0; t < tris.Length; t += 3)
+                {
+                    if (skip != null && skip.Contains(t)) continue;
+                    var id = tri.Count / 3;
+                    tri.Add(tris[t]);
+                    tri.Add(tris[t + 1]);
+                    tri.Add(tris[t + 2]);
+                    hair.Add(isHair);
+                    Vector3 a = v[tris[t]], b = v[tris[t + 1]], c = v[tris[t + 2]];
+                    var lo = Key(Vector3.Min(a, Vector3.Min(b, c)));
+                    var hi = Key(Vector3.Max(a, Vector3.Max(b, c)));
+                    for (var x = lo.x; x <= hi.x; x++)
+                        for (var y = lo.y; y <= hi.y; y++)
+                            for (var z = lo.z; z <= hi.z; z++)
+                            {
+                                List<int> cell;
+                                var k = new Vector3Int(x, y, z);
+                                if (!grid.TryGetValue(k, out cell)) grid[k] = cell = new List<int>();
+                                cell.Add(id);
+                            }
+                }
+            }
+
+            /// <summary>
+            /// まつ毛の房の三角（先頭の番号）。房の塊（頂点で繋がった三角）のうち、差し渡し 5 cm に満たず、目から 3 cm 以内にある物。
+            /// 前髪のような大きな房は残す
+            /// </summary>
+            HashSet<int> Lashes(int[] tris, Vector3[] eyes)
+            {
+                var parent = new Dictionary<int, int>();
+                System.Func<int, int> find = null;
+                find = x =>
+                {
+                    int p;
+                    if (!parent.TryGetValue(x, out p)) { parent[x] = x; return x; }
+                    if (p == x) return x;
+                    var r = find(p);
+                    parent[x] = r;
+                    return r;
+                };
+                for (var t = 0; t < tris.Length; t += 3)
+                {
+                    int a = find(tris[t]), b = find(tris[t + 1]), c = find(tris[t + 2]);
+                    parent[b] = a;
+                    parent[find(c)] = a;
+                }
+                var bounds = new Dictionary<int, Bounds>();
+                for (var t = 0; t < tris.Length; t += 3)
+                {
+                    var r = find(tris[t]);
+                    Bounds bb;
+                    if (!bounds.TryGetValue(r, out bb)) bb = new Bounds(v[tris[t]], Vector3.zero);
+                    bb.Encapsulate(v[tris[t]]);
+                    bb.Encapsulate(v[tris[t + 1]]);
+                    bb.Encapsulate(v[tris[t + 2]]);
+                    bounds[r] = bb;
+                }
+                var skip = new HashSet<int>();
+                for (var t = 0; t < tris.Length; t += 3)
+                {
+                    var bb = bounds[find(tris[t])];
+                    if (bb.size.magnitude >= 0.05f) continue;
+                    foreach (var e in eyes)
+                        if ((bb.center - e).magnitude < 0.03f) { skip.Add(t); break; }
+                }
+                return skip;
+            }
+
+            static Vector3Int Key(Vector3 p)
+            {
+                return new Vector3Int(Mathf.FloorToInt(p.x / Cell), Mathf.FloorToInt(p.y / Cell), Mathf.FloorToInt(p.z / Cell));
+            }
+
+            /// <summary>
+            /// p が覆われているか。髪の房の不透明な所のすぐそば（<see cref="near"/> 以内）か、
+            /// 面から外向き n へ筋を伸ばして <see cref="BareReach"/> までに覆いに当たるか
+            /// </summary>
+            public bool Covered(Vector3 p, Vector3 n)
+            {
+                if (NearStrand(p)) return true;
+                n = n.normalized;
+                if (n == Vector3.zero) return false;
+                var o = p + n * BareLift;
+                ray++;
+                for (var s = 0f; s <= BareReach + Cell * 0.5f; s += Cell * 0.5f)
+                {
+                    List<int> cell;
+                    if (!grid.TryGetValue(Key(o + n * s), out cell)) continue;
+                    foreach (var id in cell)
+                    {
+                        if (stamp[id] == ray) continue;
+                        stamp[id] = ray;
+                        if (Hit(id, o, n)) return true;
+                    }
+                }
+                return false;
+            }
+
+            bool Hit(int id, Vector3 o, Vector3 d)
+            {
+                int ia = tri[id * 3], ib = tri[id * 3 + 1], ic = tri[id * 3 + 2];
+                Vector3 a = v[ia], e1 = v[ib] - a, e2 = v[ic] - a;
+                var q = Vector3.Cross(d, e2);
+                var det = Vector3.Dot(e1, q);
+                if (Mathf.Abs(det) < 1e-12f) return false;
+                var inv = 1f / det;
+                var sv = o - a;
+                var bu = Vector3.Dot(sv, q) * inv;
+                if (bu < 0f || bu > 1f) return false;
+                var r = Vector3.Cross(sv, e1);
+                var bv = Vector3.Dot(d, r) * inv;
+                if (bv < 0f || bu + bv > 1f) return false;
+                var t = Vector3.Dot(e2, r) * inv;
+                if (t < 0f || t > BareReach) return false;
+                // 髪の房は、透けの絵で塗ってある所だけが覆う
+                return !hair[id] || Opaque(ia, ib, ic, bu, bv);
+            }
+        }
+
+        /// <summary>
+        /// 面の画素ごとの、肌が出ているか。pos は画素の位置、nrm は同じ並びの法線（<see cref="RocketboxPaint.Surface.Of"/> へ頂点の代わりに法線を渡した物）。
+        /// 肌らしさが 0 の画素はどうせ塗らないので、見ずに false にする
+        /// </summary>
+        public static bool[] Bare(RocketboxPaint.Surface pos, RocketboxPaint.Surface nrm, Shelter shelter, Color[] skinPx, Color skin)
+        {
+            var o = new bool[pos.P.Length];
+            for (var k = 0; k < o.Length; k++)
+            {
+                if (!pos.On[k] || Skinness(skinPx[k], skin) <= 0f) continue;
+                o[k] = !shelter.Covered(pos.P[k], nrm.P[k]);
+            }
+            return o;
+        }
+
         /// <summary>
         /// 一枚のテクスチャ（頭か体）へ線の組を塗る。px は塗る地の色で、書き換える。skinPx は肌の見分けに使う元の色。
+        /// bare は肌の出ている画素（<see cref="Bare"/>）。覆われた画素には塗らない。null なら色だけで見分ける。
         /// 戻り値は自己発光のテクスチャ（ネオン管のように、芯は白っぽく明るく、まわりへ色がにじむ。地は黒）
         /// </summary>
-        public static Color[] Paint(List<Stroke> strokes, RocketboxPaint.Surface s, Color[] px, Color[] skinPx, Color skin, out int painted)
+        public static Color[] Paint(List<Stroke> strokes, RocketboxPaint.Surface s, Color[] px, Color[] skinPx, Color skin, bool[] bare, out int painted)
         {
             var glow = new Color[px.Length];
             for (var i = 0; i < glow.Length; i++) glow[i] = Color.black;
@@ -583,6 +830,7 @@ namespace HalfAware.EditorTools.Rocketbox
                 var c = CoverAt(strokes, s.P[k], Mathf.Max(size[k], 0.0006f));
                 var lit = Mathf.Max(c.core.maxColorComponent, c.halo.maxColorComponent);
                 if (c.silver <= 0f && c.socket <= 0f && c.edge <= 0f && lit <= 0.002f) continue;
+                if (bare != null && !bare[k]) continue;
                 var w = Skinness(skinPx[k], skin);
                 if (w <= 0f) continue;
                 var col = px[k];
@@ -606,9 +854,10 @@ namespace HalfAware.EditorTools.Rocketbox
 
         /// <summary>
         /// 線の組のうち、肌の上に載る分を onSkin と total へ加える（onSkin は肌らしさで重みを付けた覆い、total は覆いの全部）。
-        /// 襟や袖や髪に隠れる所は塗らないので、肌に載る比が小さい形はその人には選ばない
+        /// 襟や袖や髪に隠れる所は塗らないので、肌に載る比が小さい形はその人には選ばない。
+        /// bare は肌の出ている画素（<see cref="Bare"/>）。覆われた画素は肌に数えない。null なら色だけで見分ける
         /// </summary>
-        public static void Coverage(List<Stroke> strokes, RocketboxPaint.Surface s, Color[] skinPx, Color skin, ref float onSkin, ref float total)
+        public static void Coverage(List<Stroke> strokes, RocketboxPaint.Surface s, Color[] skinPx, Color skin, bool[] bare, ref float onSkin, ref float total)
         {
             if (strokes.Count == 0) return;
             var bounds = strokes[0].bounds;
@@ -620,6 +869,7 @@ namespace HalfAware.EditorTools.Rocketbox
                 var a = Mathf.Max(c.silver, c.core.maxColorComponent > 0f ? 1f : 0f);
                 if (a <= 0f) continue;
                 total += a;
+                if (bare != null && !bare[k]) continue;
                 onSkin += a * Skinness(skinPx[k], skin);
             }
         }
