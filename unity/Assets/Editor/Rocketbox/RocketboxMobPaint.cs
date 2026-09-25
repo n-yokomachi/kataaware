@@ -1,65 +1,96 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace HalfAware.EditorTools.Rocketbox
 {
     /// <summary>
-    /// 路地裏の人の肌に描くインプラント（設計メモ 5 節）と、服の色を暗く・彩度を落とす塗り替え。
+    /// 路地裏の人の肌に描くインプラント（設計メモ 5 節）。
     ///
-    /// インプラントは銀の地に、細い線と端子だけがうっすら光る（ジャックの帯と同じ系統の色）。光は自己発光のテクスチャで持たせ、灯りは置かない。
-    /// 形は模型の束ねた姿勢の上で決め（骨と顔の骨からの位置、m）、テクスチャの画素ごとに、その画素が載る模型の上の位置（<see cref="RocketboxPaint.Surface"/>）で塗る。
-    /// 肌の色から離れた画素（髪・眉・襟・袖）には塗らない
+    /// 銀の地に、光る線と端子。光は自己発光のテクスチャで持たせ、灯りは置かない。
+    /// 形は、模型の束ねた姿勢の上に描いた線（<see cref="Stroke"/>）で決める。線の案内の点は骨と顔の骨から置き、
+    /// いちばん近い肌の画素の位置へ吸い付けてから、テクスチャの画素ごとに、その画素が載る模型の上の位置から線までの距離で塗る（<see cref="RocketboxPaint.Surface"/>）。
+    /// 肌の色から離れた画素（髪・眉・襟・袖）には塗らない。
+    ///
+    /// 大胆な形（<see cref="Implant.bold"/>）は、ゲームの見え方（320×180）の 2〜3 m で「光る物が付いている」と一目で読め、5 m でも光の点や線として拾える大きさにしてある。
+    /// その距離では画素一つが体の上の 2〜4 cm に当たるので、線は太く、光は強い
     /// </summary>
     public static class RocketboxMobPaint
     {
         /// <summary>インプラントの形。その人の肌の出ている所に合わせて選ぶ</summary>
         public enum Kind
         {
-            /// <summary>うなじの差込口</summary>
+            /// <summary>うなじの差込口。大胆な形は、差込口から首の両脇を回って首の付け根の前へ下りる二本の線を伴う</summary>
             NapePort,
-            /// <summary>こめかみの線</summary>
+            /// <summary>こめかみの線。大胆な形は、こめかみから頬骨を通って顎の角まで</summary>
             TempleLines,
-            /// <summary>前腕の板</summary>
+            /// <summary>前腕の板。大胆な形は、手首から肘まで、光る線が三本</summary>
             ForearmPlate,
-            /// <summary>手の甲の光</summary>
+            /// <summary>手の甲の光。大胆な形は、甲の真ん中の端子から指の付け根四つと手首へ伸びる線</summary>
             HandGlow,
-            /// <summary>首を巻く輪</summary>
+            /// <summary>首を巻く輪。大胆な形は、うなじの高さから前へ下がって首の付け根（鎖骨の間）を回る太い帯</summary>
             NeckRing,
-            /// <summary>目のまわりの輪</summary>
+            /// <summary>目のまわりの輪。大胆な形は、片目を囲む輪と、耳の前へ伸びる線</summary>
             EyeRing,
         }
 
-        /// <summary>一つのインプラント。left は本人の左（左右のあるものだけ）</summary>
+        /// <summary>
+        /// 光の色。この通りの看板のネオンの色（BuildAlley.NeonTint）から拾った。人ごと・部位ごとに色を変え、並んだ人どうしで被らないよう散らす
+        /// </summary>
+        public static readonly Color
+            Pink = new Color(1.00f, 0.18f, 0.66f),      // NeonNerve
+            Cyan = new Color(0.22f, 0.93f, 1.00f),      // NeonOpen
+            Purple = new Color(0.69f, 0.45f, 1.00f),    // NeonBar
+            Red = new Color(1.00f, 0.24f, 0.24f),       // NeonHotel
+            Orange = new Color(1.00f, 0.62f, 0.12f),    // NeonArrow
+            Teal = new Color(0.22f, 0.89f, 0.84f),      // NeonEye
+            Yellow = new Color(1.00f, 0.89f, 0.25f),    // NeonLive
+            Green = new Color(0.34f, 1.00f, 0.54f),     // NeonCross
+            Rose = new Color(1.00f, 0.29f, 0.54f),      // NeonClub
+            Blue = new Color(0.36f, 0.66f, 1.00f),      // NeonRings
+            Blush = new Color(1.00f, 0.47f, 0.82f),     // NeonSleep
+            Amber = new Color(1.00f, 0.78f, 0.28f);     // NeonNoodle
+
+        /// <summary>ネオン管の芯で、光の色へ混ぜる白の量（0〜1）。芯は白っぽく明るく、縁へ向かって色が濃くなる</summary>
+        const float CoreWhite = 0.35f;
+        /// <summary>光のにじみの広がり（光る芯の半幅に掛ける）</summary>
+        const float Halo = 2.8f;
+
+        /// <summary>一つのインプラント。left は本人の左（左右のあるものだけ）。bold は大きく光る形（通りの人）、そうでなければ小さく目立たない形（売り手）</summary>
         public struct Implant
         {
             public Kind kind;
             public bool left;
+            public bool bold;
+            public Color color;
 
-            public Implant(Kind kind, bool left)
+            public Implant(Kind kind, bool left, Color color, bool bold = true)
             {
                 this.kind = kind;
                 this.left = left;
+                this.color = color;
+                this.bold = bold;
             }
 
             public override string ToString()
             {
                 var side = kind == Kind.NapePort || kind == Kind.NeckRing ? "" : left ? "（左）" : "（右）";
+                string name;
                 switch (kind)
                 {
-                    case Kind.NapePort: return "うなじの差込口";
-                    case Kind.TempleLines: return "こめかみの線" + side;
-                    case Kind.ForearmPlate: return "前腕の板" + side;
-                    case Kind.HandGlow: return "手の甲の光" + side;
-                    case Kind.NeckRing: return "首を巻く輪";
-                    default: return "目のまわりの輪" + side;
+                    case Kind.NapePort: name = "うなじの差込口"; break;
+                    case Kind.TempleLines: name = "こめかみの線"; break;
+                    case Kind.ForearmPlate: name = "前腕の板"; break;
+                    case Kind.HandGlow: name = "手の甲の光"; break;
+                    case Kind.NeckRing: name = "首を巻く帯"; break;
+                    default: name = "目のまわりの輪"; break;
                 }
+                return name + side + (bold ? "" : "（小さめ）");
             }
         }
 
-        /// <summary>光の色。ジャックの帯（BuildProps の JackLight）と同じ</summary>
-        public static readonly Color GlowColor = new Color(0.36f, 0.82f, 0.86f);
         /// <summary>銀の地（sRGB）と、縁の暗い線</summary>
-        static readonly Color Silver = new Color(0.60f, 0.63f, 0.67f), SilverEdge = new Color(0.30f, 0.32f, 0.35f);
+        static readonly Color Silver = new Color(0.62f, 0.65f, 0.69f), SilverEdge = new Color(0.28f, 0.30f, 0.33f);
         /// <summary>差込口の穴</summary>
         static readonly Color Socket = new Color(0.05f, 0.05f, 0.06f);
 
@@ -67,7 +98,9 @@ namespace HalfAware.EditorTools.Rocketbox
         public sealed class Frame
         {
             public Vector3 neck, head, eyeL, eyeR, cheekL, cheekR;
-            public Vector3 elbowL, elbowR, wristL, wristR, knuckleL, knuckleR;
+            public Vector3 elbowL, elbowR, wristL, wristR;
+            /// <summary>指の付け根（人差し指・中指・薬指・小指）</summary>
+            public Vector3[] knucklesL, knucklesR;
             /// <summary>手の甲の向き（手のひらの逆）</summary>
             public Vector3 backL, backR;
 
@@ -82,25 +115,218 @@ namespace HalfAware.EditorTools.Rocketbox
                     eyeL = a.eyeL, eyeR = a.eyeR, cheekL = a.cheekL, cheekR = a.cheekR,
                     elbowL = B(HumanBodyBones.LeftLowerArm), elbowR = B(HumanBodyBones.RightLowerArm),
                     wristL = B(HumanBodyBones.LeftHand), wristR = B(HumanBodyBones.RightHand),
-                    knuckleL = B(HumanBodyBones.LeftMiddleProximal), knuckleR = B(HumanBodyBones.RightMiddleProximal),
+                    knucklesL = new[] { B(HumanBodyBones.LeftIndexProximal), B(HumanBodyBones.LeftMiddleProximal), B(HumanBodyBones.LeftRingProximal), B(HumanBodyBones.LeftLittleProximal) },
+                    knucklesR = new[] { B(HumanBodyBones.RightIndexProximal), B(HumanBodyBones.RightMiddleProximal), B(HumanBodyBones.RightRingProximal), B(HumanBodyBones.RightLittleProximal) },
                     backL = -root.InverseTransformDirection(BodyPoser.PalmDir(an, true)),
                     backR = -root.InverseTransformDirection(BodyPoser.PalmDir(an, false)),
                 };
             }
         }
 
-        /// <summary>一つの画素の塗り: 銀の地・縁・穴・光（どれも 0〜1）</summary>
-        struct Cover
+        /// <summary>
+        /// 肌の上に描く一本の線。案内の点（guide）を細かく刻んで肌へ吸い付けた点の並びにし、そこからの距離で塗る。
+        /// silver は銀の地の半幅、glow は光る芯の半幅、node は案内の点に置く端子の半径（0 なら置かない）、socket は端子の奥の暗い穴の半径（m）
+        /// </summary>
+        public sealed class Stroke
         {
-            public float silver, edge, socket, glow;
+            public readonly List<Vector3> guide = new List<Vector3>();
+            public bool closed;
+            public float silver, glow, node, socket;
+            /// <summary>端子の光る輪の半径（0 なら端子は光る点）</summary>
+            public float nodeRing;
+            public Color color;
+            /// <summary>端子を両端だけに置く（途中の案内の点には置かない）</summary>
+            public bool nodeOnlyEnds;
+            /// <summary>差込口（案内の点一つに、座金・縁・光る輪・穴）</summary>
+            public bool isPort;
+            /// <summary>端子だけ（線は無い）</summary>
+            public bool nodesOnly;
+            /// <summary>
+            /// 案内の点から体の外へ向かう向き。案内の点を肌へ落とすとき、この向きの外から体へ向けて見て、最初に当たる面の点へ落とす
+            /// （いちばん近い点へ吸い付けると、目のくぼみや顎の下の陰で線が眉や襟へ逃げた）。null なら、いちばん近い点
+            /// </summary>
+            public Func<Vector3, Vector3> outward;
+            /// <summary>吸い付けた点の並び</summary>
+            internal Vector3[] path;
+            internal Vector3[] nodes;
+            internal Bounds bounds;
+        }
 
-            public void Max(Cover o)
+        // ---- 形 ---------------------------------------------------------------------
+
+        /// <summary>インプラント一つを線の組にする</summary>
+        public static List<Stroke> Strokes(Implant im, Frame f)
+        {
+            var o = new List<Stroke>();
+            var side = im.left ? -1f : 1f;
+            var eye = im.left ? f.eyeL : f.eyeR;
+            Func<float, float, float, Vector3> E = (x, y, z) => eye + new Vector3(x * side, y, z);
+            // 頭の横の面は横から、顔の前の面は前から見て落とす
+            var sideways = new Vector3(side, 0f, 0.35f).normalized;
+            Func<Vector3, Vector3> fromSide = g => sideways;
+            Func<Vector3, Vector3> fromFront = g => new Vector3(0.15f * side, 0f, 1f);
+            Func<Vector3, Vector3> fromNeck = g => Vector3.ProjectOnPlane(g - f.neck, (f.head - f.neck).normalized);
+            switch (im.kind)
             {
-                silver = Mathf.Max(silver, o.silver);
-                edge = Mathf.Max(edge, o.edge);
-                socket = Mathf.Max(socket, o.socket);
-                glow = Mathf.Max(glow, o.glow);
+                case Kind.TempleLines:
+                    if (im.bold)
+                    {
+                        // こめかみ → 頬骨 → 頬の下 → 顎の角。もう一本、こめかみから頬骨の上へ
+                        o.Add(Line(im.color, 0.0065f, 0.0036f, 0.0072f, fromSide,
+                            E(0.050f, 0.030f, -0.045f), E(0.052f, 0.012f, -0.022f), E(0.047f, -0.018f, -0.004f),
+                            E(0.045f, -0.052f, -0.018f), E(0.044f, -0.082f, -0.048f)));
+                        o.Add(Line(im.color, 0.0048f, 0.0028f, 0.0058f, fromSide, E(0.056f, 0.004f, -0.045f), E(0.040f, -0.010f, 0.004f)));
+                    }
+                    else o.Add(Line(im.color, 0.0030f, 0.0016f, 0.0038f, fromSide, E(0.044f, 0.012f, -0.028f), E(0.046f, 0.004f, -0.070f)));
+                    break;
+                case Kind.EyeRing:
+                    {
+                        // 片目を囲む輪（横 2.4 cm・縦 2.2 cm）と、輪の外の端から耳の前へ伸びる線。輪は前から見て顔に落とす
+                        var ring = new Stroke { color = im.color, silver = 0.0055f, glow = 0.0032f, closed = true, outward = fromFront };
+                        var dots = new Stroke { color = im.color, node = 0.0068f, outward = fromFront };
+                        for (var i = 0; i < 24; i++)
+                        {
+                            var a = i * Mathf.PI * 2f / 24f;
+                            var q = E(0.024f * Mathf.Cos(a), 0.022f * Mathf.Sin(a), 0f);
+                            ring.guide.Add(q);
+                            if (i % 6 == 3) dots.guide.Add(q);
+                        }
+                        o.Add(ring);
+                        o.Add(dots.Nodes());
+                        o.Add(Line(im.color, 0.0055f, 0.0032f, 0.0068f, fromSide, E(0.024f, 0f, -0.004f), E(0.050f, -0.004f, -0.025f), E(0.066f, -0.010f, -0.058f)));
+                        break;
+                    }
+                case Kind.NapePort:
+                    {
+                        // うなじの差込口（半径 1.5 cm）。差込口から首の両脇を回って首の付け根の前へ下りる二本の線
+                        var port = Neck(f, 0.62f, 0f, 0.07f);
+                        o.Add(new Stroke { color = im.color, silver = 0.015f, socket = 0.0055f, nodeRing = 0.0095f, outward = fromNeck, guide = { port } }.Port());
+                        if (im.bold)
+                            foreach (var s in new[] { 1f, -1f })
+                            {
+                                var line = new Stroke { color = im.color, silver = 0.0060f, glow = 0.0036f, node = 0.0070f, outward = fromNeck };
+                                for (var k = 1; k <= 8; k++)
+                                {
+                                    var u = k / 8f;
+                                    line.guide.Add(Neck(f, Mathf.Lerp(0.60f, 0.30f, u * u), s * Mathf.Lerp(0.35f, 2.5f, u), 0.07f));
+                                }
+                                o.Add(line);
+                            }
+                        break;
+                    }
+                case Kind.NeckRing:
+                    {
+                        // うなじの高さから前へ下がって喉の下を回る帯（銀の半幅 1 cm）に、上下二本の光る線と 60 度ごとの端子。襟に隠れない高さ
+                        Func<float, float> height = a => Mathf.Lerp(0.66f, 0.40f, (1f - Mathf.Cos(a)) * 0.5f);
+                        if (im.bold)
+                        {
+                            foreach (var dh in new[] { 0f, -0.11f, 0.11f })
+                            {
+                                var band = new Stroke { color = im.color, closed = true, outward = fromNeck };
+                                if (dh == 0f) band.silver = 0.011f;
+                                else { band.glow = 0.0036f; band.silver = 0.0045f; }
+                                for (var i = 0; i < 32; i++)
+                                {
+                                    var a = i * Mathf.PI * 2f / 32f;
+                                    band.guide.Add(Neck(f, height(a) + dh * 0.5f, a, 0.075f));
+                                }
+                                o.Add(band);
+                            }
+                            var nodes = new Stroke { color = im.color, node = 0.0072f, outward = fromNeck };
+                            for (var i = 0; i < 6; i++)
+                            {
+                                var a = i * Mathf.PI * 2f / 6f;
+                                nodes.guide.Add(Neck(f, height(a), a, 0.075f));
+                            }
+                            o.Add(nodes.Nodes());
+                        }
+                        else
+                        {
+                            var band = new Stroke { color = im.color, closed = true, silver = 0.0040f, glow = 0.0016f, outward = fromNeck };
+                            for (var i = 0; i < 32; i++) band.guide.Add(Neck(f, 0.5f, i * Mathf.PI * 2f / 32f, 0.075f));
+                            o.Add(band);
+                        }
+                        break;
+                    }
+                case Kind.ForearmPlate:
+                    {
+                        // 手首から肘まで、前腕の外（手の甲の側）の銀の板（半幅 1.8 cm）に、三本の光る線と両端の端子
+                        var elbow = im.left ? f.elbowL : f.elbowR;
+                        var wrist = im.left ? f.wristL : f.wristR;
+                        var back = im.left ? f.backL : f.backR;
+                        var t0 = im.bold ? 0.10f : 0.30f;
+                        var t1 = im.bold ? 0.90f : 0.78f;
+                        o.Add(Along(im.color, elbow, wrist, back, 0f, t0, t1, im.bold ? 0.018f : 0.012f, 0f, 0f));
+                        foreach (var ang in im.bold ? new[] { -26f, 0f, 26f } : new[] { 0f })
+                            o.Add(Along(im.color, elbow, wrist, back, ang, t0 + 0.04f, t1 - 0.04f, 0.0055f, 0.0042f, 0.0080f));
+                        break;
+                    }
+                case Kind.HandGlow:
+                    {
+                        // 甲の真ん中の端子（半径 1.1 cm）から、指の付け根四つと手首へ線。
+                        // 甲は狭いので、にじみを顔の線より細くする（太いと線が溶け合って甲がまるごと光る）
+                        var wrist = im.left ? f.wristL : f.wristR;
+                        var knuckles = im.left ? f.knucklesL : f.knucklesR;
+                        var back = (im.left ? f.backL : f.backR).normalized;
+                        Func<Vector3, Vector3> fromBack = g => back;
+                        var mid = Vector3.Lerp(wrist, knuckles[1], 0.45f);
+                        o.Add(new Stroke { color = im.color, silver = im.bold ? 0.011f : 0.006f, nodeRing = im.bold ? 0.0068f : 0.004f, outward = fromBack, guide = { mid } }.Port());
+                        if (im.bold)
+                        {
+                            foreach (var k in knuckles)
+                                o.Add(Line(im.color, 0.0045f, 0.0026f, 0.0058f, fromBack, mid, k));
+                            o.Add(Line(im.color, 0.0045f, 0.0026f, 0.0058f, fromBack, mid, wrist + (knuckles[1] - wrist) * 0.02f));
+                        }
+                        break;
+                    }
             }
+            return o;
+        }
+
+        static Stroke Line(Color color, float silver, float glow, float node, Func<Vector3, Vector3> outward, params Vector3[] points)
+        {
+            var s = new Stroke { color = color, silver = silver, glow = glow, node = node, outward = outward };
+            s.guide.AddRange(points);
+            return s;
+        }
+
+        /// <summary>首の筒の上の点。t は首の骨から頭の骨へ進んだ比（0〜1）、a はうなじから本人の右へ回る角（ラジアン）、r は軸からの離れの見込み</summary>
+        static Vector3 Neck(Frame f, float t, float a, float r)
+        {
+            var axis = (f.head - f.neck).normalized;
+            var back = Vector3.ProjectOnPlane(Vector3.back, axis).normalized;
+            var right = Vector3.Cross(axis, back).normalized;
+            // うなじ（back）から本人の右（+x）へ回る
+            if (Vector3.Dot(right, Vector3.right) < 0f) right = -right;
+            var dir = back * Mathf.Cos(a) + right * Mathf.Sin(a);
+            return Vector3.Lerp(f.neck, f.head, t) + dir * r;
+        }
+
+        /// <summary>骨の間（a から b）を、ref の向きから ang 度回った筋に沿って t0 から t1 までの線（その向きの外から見て腕に落とす）</summary>
+        static Stroke Along(Color color, Vector3 a, Vector3 b, Vector3 refDir, float ang, float t0, float t1, float silver, float glow, float node)
+        {
+            var axis = (b - a).normalized;
+            var dir = Quaternion.AngleAxis(ang, axis) * Vector3.ProjectOnPlane(refDir, axis).normalized;
+            var s = new Stroke { color = color, silver = silver, glow = glow, outward = g => dir };
+            for (var i = 0; i <= 8; i++) s.guide.Add(Vector3.Lerp(a, b, Mathf.Lerp(t0, t1, i / 8f)));
+            if (node > 0f)
+            {
+                s.node = node;
+                s.nodeOnlyEnds = true;
+            }
+            return s;
+        }
+
+        static Stroke Port(this Stroke s)
+        {
+            s.isPort = true;
+            return s;
+        }
+
+        static Stroke Nodes(this Stroke s)
+        {
+            s.nodesOnly = true;
+            return s;
         }
 
         // ---- 肌の色 --------------------------------------------------------------
@@ -125,10 +351,10 @@ namespace HalfAware.EditorTools.Rocketbox
         }
 
         /// <summary>
-        /// 画素が肌らしいか（0〜1）。色み（明るさで割った色）が見本に近く、明るさが見本の 0.45〜2 倍の所。
+        /// 画素が肌らしいか（0〜1）。色み（明るさを 1 に揃えた色）が見本に近く、明るさが見本の 0.36〜2 倍の所。
         /// 髪・眉・服の画素に描かないため
         /// </summary>
-        static float Skinness(Color c, Color skin)
+        public static float Skinness(Color c, Color skin)
         {
             var a = c.linear;
             var s = skin.linear;
@@ -138,23 +364,134 @@ namespace HalfAware.EditorTools.Rocketbox
             var d = Mathf.Abs(a.r / la - s.r / ls) + Mathf.Abs(a.g / la - s.g / ls) + Mathf.Abs(a.b / la - s.b / ls);
             var ratio = la / ls;
             var tone = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.22f, 0.45f, d));
-            var light = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.30f, 0.45f, ratio)) * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(2.0f, 2.6f, ratio)));
+            // 目のくぼみや顎の下の陰（見本の頬より暗い肌）も肌に入れる。髪と眉は色みで外れる
+            var light = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.22f, 0.36f, ratio)) * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(2.0f, 2.6f, ratio)));
             return tone * light;
         }
 
-        // ---- 塗る -------------------------------------------------------------------
+        // ---- 吸い付けと塗り -----------------------------------------------------------
+
+        /// <summary>模型の面の画素の位置（頭と体の二枚）。線の案内の点をここへ落とす（塗るのは肌の画素だけ）</summary>
+        public sealed class Skin
+        {
+            readonly List<Vector3> points = new List<Vector3>();
+
+            public void Add(RocketboxPaint.Surface s)
+            {
+                for (var k = 0; k < s.P.Length; k++)
+                    if (s.On[k]) points.Add(s.P[k]);
+            }
+
+            /// <summary>いちばん近い面の点</summary>
+            public Vector3 Nearest(Vector3 p)
+            {
+                var best = p;
+                var bd = float.MaxValue;
+                foreach (var q in points)
+                {
+                    var d = (q - p).sqrMagnitude;
+                    if (d < bd) { bd = d; best = q; }
+                }
+                return best;
+            }
+
+            /// <summary>
+            /// out の向きの外（15 cm）から体へ向けて、案内の点を通る筋を見て、筋から 3 mm 以内でいちばん外にある面の点。
+            /// 見つからなければいちばん近い点
+            /// </summary>
+            public Vector3 Drop(Vector3 p, Vector3 dir)
+            {
+                dir = dir.normalized;
+                var best = Vector3.zero;
+                var bestT = float.MinValue;
+                const float r2 = 0.003f * 0.003f;
+                foreach (var q in points)
+                {
+                    var d = q - p;
+                    var t = Vector3.Dot(d, dir);
+                    if (t > 0.15f || t < -0.15f) continue;
+                    if ((d - dir * t).sqrMagnitude > r2) continue;
+                    if (t > bestT) { bestT = t; best = q; }
+                }
+                return bestT > float.MinValue ? best : Nearest(p);
+            }
+        }
+
+        /// <summary>案内の点を 4 mm ごとに刻んで肌へ吸い付け、線の点の並びを作る</summary>
+        public static void Prepare(List<Stroke> strokes, Skin skin)
+        {
+            foreach (var s in strokes)
+            {
+                var st = s;
+                Func<Vector3, Vector3> snap = g => st.outward != null ? skin.Drop(g, st.outward(g)) : skin.Nearest(g);
+                var path = new List<Vector3>();
+                var count = s.guide.Count;
+                var segs = s.closed ? count : count - 1;
+                if (count == 1) path.Add(snap(s.guide[0]));
+                for (var i = 0; i < segs; i++)
+                {
+                    var a = s.guide[i];
+                    var b = s.guide[(i + 1) % count];
+                    var steps = Mathf.Max(1, Mathf.CeilToInt((b - a).magnitude / 0.004f));
+                    for (var k = 0; k < steps; k++) path.Add(snap(Vector3.Lerp(a, b, k / (float)steps)));
+                    if (!s.closed && i == segs - 1) path.Add(snap(b));
+                }
+                s.path = path.ToArray();
+                var nodes = new List<Vector3>();
+                if (s.node > 0f || s.isPort)
+                {
+                    if (s.nodeOnlyEnds && count > 1) { nodes.Add(snap(s.guide[0])); nodes.Add(snap(s.guide[count - 1])); }
+                    else foreach (var g in s.guide) nodes.Add(snap(g));
+                }
+                s.nodes = nodes.ToArray();
+                var b0 = new Bounds(s.path[0], Vector3.zero);
+                foreach (var p in s.path) b0.Encapsulate(p);
+                foreach (var p in s.nodes) b0.Encapsulate(p);
+                b0.Expand(2f * Mathf.Max(Mathf.Max(s.silver, s.node), Mathf.Max(s.glow * Halo, 0.004f)) + 0.01f);
+                s.bounds = b0;
+            }
+        }
+
+        /// <summary>一つの画素の塗り: 銀の地・縁・穴（0〜1）と、ネオン管の芯と、にじみ（色つきの光）</summary>
+        struct Cover
+        {
+            public float silver, edge, socket;
+            public Color core, halo;
+
+            public void Max(float si, float ed, float so)
+            {
+                silver = Mathf.Max(silver, si);
+                edge = Mathf.Max(edge, ed);
+                socket = Mathf.Max(socket, so);
+            }
+
+            /// <summary>芯（覆い c）とにじみ（覆い h）を、色 col で重ねる。明るい方を残す</summary>
+            public void Light(float c, float h, Color col)
+            {
+                var coreCol = Color.Lerp(col, Color.white, CoreWhite) * c;
+                if (coreCol.maxColorComponent > core.maxColorComponent) core = coreCol;
+                var haloCol = col * h;
+                if (haloCol.maxColorComponent > halo.maxColorComponent) halo = haloCol;
+            }
+        }
+
+        /// <summary>中心からの距離 d のにじみ（0〜1）。芯の半幅 half の Halo 倍まで、なだらかに消える</summary>
+        static float Glow(float d, float half)
+        {
+            var x = Mathf.Clamp01(d / (half * Halo));
+            return Mathf.Pow(1f - x, 1.4f);
+        }
 
         /// <summary>
-        /// 一枚のテクスチャ（頭か体）へインプラントを塗る。px は塗る地の色（塗り替えた後でもよい）で、書き換える。
-        /// skinPx は肌の見分けに使う元の色。戻り値は自己発光のテクスチャ（光の色 × 強さ、地は黒）
+        /// 一枚のテクスチャ（頭か体）へ線の組を塗る。px は塗る地の色で、書き換える。skinPx は肌の見分けに使う元の色。
+        /// 戻り値は自己発光のテクスチャ（ネオン管のように、芯は白っぽく明るく、まわりへ色がにじむ。地は黒）
         /// </summary>
-        public static Color[] Paint(RocketboxMob who, Frame f, RocketboxPaint.Surface s, Color[] px, Color[] skinPx, Color skin, out int painted)
+        public static Color[] Paint(List<Stroke> strokes, RocketboxPaint.Surface s, Color[] px, Color[] skinPx, Color skin, out int painted)
         {
-            var n = s.N;
             var glow = new Color[px.Length];
             for (var i = 0; i < glow.Length; i++) glow[i] = Color.black;
             painted = 0;
-            if (who.Implants == null || who.Implants.Length == 0) return glow;
+            if (strokes.Count == 0) return glow;
             var size = TexelSize(s);
             for (var k = 0; k < px.Length; k++)
             {
@@ -162,24 +499,67 @@ namespace HalfAware.EditorTools.Rocketbox
                 var p = s.P[k];
                 var ts = Mathf.Max(size[k], 0.0006f);
                 var c = new Cover();
-                foreach (var im in who.Implants) c.Max(Shape(im, f, p, ts));
-                if (c.silver <= 0f && c.glow <= 0f && c.socket <= 0f && c.edge <= 0f) continue;
+                foreach (var st in strokes)
+                {
+                    if (!st.bounds.Contains(p)) continue;
+                    var d = st.isPort || st.nodesOnly ? float.MaxValue : Distance(st.path, st.closed, p);
+                    var dn = float.MaxValue;
+                    foreach (var q in st.nodes) dn = Mathf.Min(dn, (q - p).magnitude);
+                    if (st.isPort)
+                    {
+                        // 丸い座金、縁の暗い線、奥の穴、光る輪（穴の無い差込口は、真ん中が光る点）
+                        c.Max(In(dn - st.silver, ts), Line(Mathf.Abs(dn - st.silver * 0.93f), 0.0007f, ts), st.socket > 0f ? In(dn - st.socket, ts) : 0f);
+                        var ring = Mathf.Abs(dn - st.nodeRing);
+                        c.Light(Line(ring, 0.0015f, ts), Glow(ring, 0.0026f), st.color);
+                        if (st.socket <= 0f) c.Light(In(dn - st.nodeRing * 0.35f, ts), Glow(dn, st.nodeRing * 0.35f), st.color);
+                        continue;
+                    }
+                    c.Max(st.silver > 0f ? In(d - st.silver, ts) : 0f, st.silver > 0.005f ? Line(Mathf.Abs(d - st.silver * 0.92f), 0.0007f, ts) : 0f, 0f);
+                    if (st.glow > 0f) c.Light(Line(d, st.glow * 0.6f, ts), Glow(d, st.glow), st.color);
+                    if (st.node > 0f)
+                    {
+                        c.Max(In(dn - st.node, ts), 0f, 0f);
+                        c.Light(In(dn - st.node * 0.45f, ts), Glow(dn, st.node * 0.5f), st.color);
+                    }
+                }
+                var lit = Mathf.Max(c.core.maxColorComponent, c.halo.maxColorComponent);
+                if (c.silver <= 0f && c.socket <= 0f && c.edge <= 0f && lit <= 0.002f) continue;
                 var w = Skinness(skinPx[k], skin);
                 if (w <= 0f) continue;
                 var col = px[k];
                 col = Color.Lerp(col, Silver, c.silver * w);
                 col = Color.Lerp(col, SilverEdge, c.edge * w);
                 col = Color.Lerp(col, Socket, c.socket * w);
-                // 光る所は地の色も明るい光の色へ寄せる（ブルームが無くても線が読めるように）
-                col = Color.Lerp(col, Color.Lerp(GlowColor, Color.white, 0.25f), c.glow * w * 0.7f);
+                // 地の色も光の色へ寄せる（ブルームが無くても線が読めるように）。にじみは弱く、芯は強く
+                var haloW = c.halo.maxColorComponent;
+                if (haloW > 0f) col = Color.Lerp(col, c.halo / haloW, haloW * w * 0.5f);
+                var coreW = c.core.maxColorComponent;
+                if (coreW > 0f) col = Color.Lerp(col, c.core / coreW, coreW * w * 0.85f);
                 col.a = px[k].a;
                 px[k] = col;
-                var g = GlowColor * (c.glow * w);
-                g.a = 1f;
-                glow[k] = g;
+                var e = new Color(Mathf.Max(c.core.r, c.halo.r), Mathf.Max(c.core.g, c.halo.g), Mathf.Max(c.core.b, c.halo.b)) * w;
+                e.a = 1f;
+                glow[k] = e;
                 painted++;
             }
             return glow;
+        }
+
+        static float Distance(Vector3[] path, bool closed, Vector3 p)
+        {
+            var best = float.MaxValue;
+            var n = path.Length;
+            if (n == 1) return (path[0] - p).magnitude;
+            var segs = closed ? n : n - 1;
+            for (var i = 0; i < segs; i++)
+            {
+                var a = path[i];
+                var b = path[(i + 1) % n];
+                var ab = b - a;
+                var t = Mathf.Clamp01(Vector3.Dot(p - a, ab) / Mathf.Max(ab.sqrMagnitude, 1e-10f));
+                best = Mathf.Min(best, (p - (a + ab * t)).sqrMagnitude);
+            }
+            return Mathf.Sqrt(best);
         }
 
         /// <summary>画素一つが模型の上で占める幅（m）。となりの画素との距離（UV の継ぎ目をまたぐ所は除く）</summary>
@@ -220,212 +600,6 @@ namespace HalfAware.EditorTools.Rocketbox
         {
             var h = Mathf.Max(half, ts * 0.5f);
             return In(d - h, ts) * Mathf.Min(1f, half / h);
-        }
-
-        /// <summary>
-        /// 骨の間の筒の上の位置。t は a から b へ進んだ比（0〜1）、s は ref の向きからの周の長さ（m、軸のまわりに右手で正）、r は軸からの離れ
-        /// </summary>
-        static void Cyl(Vector3 a, Vector3 b, Vector3 refDir, Vector3 p, out float t, out float s, out float r, out float along)
-        {
-            var axis = b - a;
-            var len = axis.magnitude;
-            axis /= len;
-            var d = p - a;
-            along = Vector3.Dot(d, axis);
-            t = along / len;
-            var radial = d - axis * along;
-            r = radial.magnitude;
-            var refp = (refDir - axis * Vector3.Dot(refDir, axis)).normalized;
-            var ang = Vector3.SignedAngle(refp, radial, axis) * Mathf.Deg2Rad;
-            s = ang * r;
-        }
-
-        static float Segment(Vector2 p, Vector2 a, Vector2 b)
-        {
-            var ab = b - a;
-            var t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / ab.sqrMagnitude);
-            return (p - (a + ab * t)).magnitude;
-        }
-
-        /// <summary>角を丸めた長方形（中心 0、半幅 hx・hy、角の半径 rc）までの符号付きの距離</summary>
-        static float RoundRect(Vector2 p, float hx, float hy, float rc)
-        {
-            var q = new Vector2(Mathf.Abs(p.x) - (hx - rc), Mathf.Abs(p.y) - (hy - rc));
-            var outside = new Vector2(Mathf.Max(q.x, 0f), Mathf.Max(q.y, 0f)).magnitude;
-            return outside + Mathf.Min(Mathf.Max(q.x, q.y), 0f) - rc;
-        }
-
-        static Cover Shape(Implant im, Frame f, Vector3 p, float ts)
-        {
-            var c = new Cover();
-            switch (im.kind)
-            {
-                case Kind.NapePort:
-                    {
-                        // 首の筒の後ろ。首の骨から頭の骨までの 6 割の高さ
-                        float t, s, r, along;
-                        Cyl(f.neck, f.head, Vector3.back, p, out t, out s, out r, out along);
-                        if (t < 0.2f || t > 1.0f || Mathf.Abs(s) > 0.03f) break;
-                        var len = (f.head - f.neck).magnitude;
-                        var q = new Vector2(s, along - 0.6f * len);
-                        var d = q.magnitude;
-                        // 丸い座金 8 mm、縁の暗い線、光る輪（4.2〜5.4 mm）、奥の穴 3 mm、左右に小さな端子
-                        c.silver = In(d - 0.008f, ts);
-                        c.edge = Line(Mathf.Abs(d - 0.0075f), 0.0006f, ts);
-                        c.glow = Line(Mathf.Abs(d - 0.0048f), 0.0006f, ts);
-                        c.socket = In(d - 0.003f, ts);
-                        var pin = Mathf.Min((q - new Vector2(0.0125f, 0f)).magnitude, (q - new Vector2(-0.0125f, 0f)).magnitude);
-                        c.silver = Mathf.Max(c.silver, In(pin - 0.0028f, ts));
-                        c.glow = Mathf.Max(c.glow, In(pin - 0.0012f, ts));
-                        break;
-                    }
-                case Kind.NeckRing:
-                    {
-                        // 首を一周する輪。首の骨から頭の骨までの 4 割 5 分の高さ。幅 7 mm の銀に、光る線と 1.8 cm ごとの端子
-                        float t, s, r, along;
-                        Cyl(f.neck, f.head, Vector3.back, p, out t, out s, out r, out along);
-                        if (t < 0.1f || t > 0.9f || r > 0.09f) break;
-                        var len = (f.head - f.neck).magnitude;
-                        var h = along - 0.45f * len;
-                        c.silver = In(Mathf.Abs(h) - 0.0035f, ts);
-                        c.edge = Line(Mathf.Abs(Mathf.Abs(h) - 0.0032f), 0.0005f, ts);
-                        c.glow = Line(Mathf.Abs(h), 0.0006f, ts);
-                        var arc = s - Mathf.Round(s / 0.018f) * 0.018f;
-                        c.glow = Mathf.Max(c.glow, In(new Vector2(arc, h).magnitude - 0.0016f, ts));
-                        break;
-                    }
-                case Kind.TempleLines:
-                    {
-                        // 目の横から耳の上へ、二本の細い線。目の骨より外の頭の横の面だけ
-                        var eye = im.left ? f.eyeL : f.eyeR;
-                        var side = im.left ? -1f : 1f;
-                        if ((p.x - eye.x) * side < 0.022f || Mathf.Abs(p.y - eye.y) > 0.05f) break;
-                        var q = new Vector2(eye.z - p.z, p.y - eye.y);
-                        if (q.x < 0.01f || q.x > 0.095f) break;
-                        // もみあげと髪の生え際を避け、目の高さのすぐ上を耳の前まで
-                        var a1 = new Vector2(0.022f, 0.006f);
-                        var b1 = new Vector2(0.066f, 0.012f);
-                        var a2 = new Vector2(0.028f, -0.002f);
-                        var b2 = new Vector2(0.058f, 0.002f);
-                        var d1 = Segment(q, a1, b1);
-                        var d2 = Segment(q, a2, b2);
-                        var d = Mathf.Min(d1, d2);
-                        c.silver = In(d - 0.0018f, ts);
-                        c.glow = Line(d, 0.0006f, ts);
-                        var node = Mathf.Min(Mathf.Min((q - a1).magnitude, (q - b1).magnitude), Mathf.Min((q - a2).magnitude, (q - b2).magnitude));
-                        c.silver = Mathf.Max(c.silver, In(node - 0.0028f, ts));
-                        c.glow = Mathf.Max(c.glow, In(node - 0.0014f, ts));
-                        break;
-                    }
-                case Kind.EyeRing:
-                    {
-                        // 目の下から外を回って斜め上へ抜ける弧（眉にはかけない）と、弧の上の三つの端子。顔の前の面だけ
-                        var eye = im.left ? f.eyeL : f.eyeR;
-                        var side = im.left ? -1f : 1f;
-                        if (p.z < eye.z - 0.025f) break;
-                        var q = new Vector2((p.x - eye.x) * side, p.y - eye.y);
-                        var rr = q.magnitude;
-                        if (rr > 0.035f) break;
-                        // 角度は外（こめかみの側）を 0、上を正
-                        var ang = Mathf.Atan2(q.y, q.x) * Mathf.Rad2Deg;
-                        var inArc = ang > -150f && ang < 40f;
-                        const float R = 0.021f;
-                        if (inArc)
-                        {
-                            c.silver = In(Mathf.Abs(rr - R) - 0.0016f, ts);
-                            c.edge = Line(Mathf.Abs(Mathf.Abs(rr - R) - 0.0015f), 0.0004f, ts);
-                            c.glow = Line(Mathf.Abs(rr - R), 0.0006f, ts);
-                        }
-                        foreach (var a in new[] { -110f, -35f, 25f })
-                        {
-                            var nodeAt = new Vector2(Mathf.Cos(a * Mathf.Deg2Rad), Mathf.Sin(a * Mathf.Deg2Rad)) * R;
-                            var dn = (q - nodeAt).magnitude;
-                            c.silver = Mathf.Max(c.silver, In(dn - 0.0026f, ts));
-                            c.glow = Mathf.Max(c.glow, In(dn - 0.0013f, ts));
-                        }
-                        break;
-                    }
-                case Kind.ForearmPlate:
-                    {
-                        // 前腕の外（手の甲の側）の角を丸めた板。肘から手首までの 3 割から 7 割 8 分、幅 2.6 cm。板に沿う二本の光る線と三つの端子
-                        var elbow = im.left ? f.elbowL : f.elbowR;
-                        var wrist = im.left ? f.wristL : f.wristR;
-                        var back = im.left ? f.backL : f.backR;
-                        float t, s, r, along;
-                        Cyl(elbow, wrist, back, p, out t, out s, out r, out along);
-                        if (t < 0.2f || t > 0.9f || r > 0.06f) break;
-                        var len = (wrist - elbow).magnitude;
-                        var q = new Vector2(s, along - 0.54f * len);
-                        var hy = 0.24f * len;
-                        var d = RoundRect(q, 0.013f, hy, 0.003f);
-                        c.silver = In(d, ts);
-                        c.edge = Line(Mathf.Abs(d + 0.0008f), 0.0006f, ts);
-                        var lines = Mathf.Min(Mathf.Abs(q.x - 0.0055f), Mathf.Abs(q.x + 0.0055f));
-                        if (Mathf.Abs(q.y) < hy - 0.006f) c.glow = Line(lines, 0.0006f, ts);
-                        foreach (var y in new[] { -0.12f, 0f, 0.12f })
-                        {
-                            var dn = (q - new Vector2(0f, y * len)).magnitude;
-                            c.glow = Mathf.Max(c.glow, In(dn - 0.0016f, ts));
-                        }
-                        break;
-                    }
-                case Kind.HandGlow:
-                    {
-                        // 手の甲の真ん中の小さな輪と光る点、手首へ向かう短い線
-                        var wrist = im.left ? f.wristL : f.wristR;
-                        var knuckle = im.left ? f.knuckleL : f.knuckleR;
-                        var back = im.left ? f.backL : f.backR;
-                        float t, s, r, along;
-                        Cyl(wrist, knuckle, back, p, out t, out s, out r, out along);
-                        if (t < 0f || t > 1.1f || Mathf.Abs(s) > 0.02f) break;
-                        var len = (knuckle - wrist).magnitude;
-                        var q = new Vector2(s, along - 0.55f * len);
-                        var d = q.magnitude;
-                        // 手の甲の画素は粗い（512 で 2〜3 mm）ので、輪は 9 mm、光る点は 3.5 mm
-                        c.silver = In(d - 0.009f, ts);
-                        c.edge = Line(Mathf.Abs(d - 0.0086f), 0.0006f, ts);
-                        c.glow = Mathf.Max(In(d - 0.0035f, ts), Line(Mathf.Abs(d - 0.0065f), 0.0007f, ts));
-                        if (q.y < 0f && q.y > -0.45f * len)
-                        {
-                            c.silver = Mathf.Max(c.silver, In(Mathf.Abs(q.x) - 0.002f, ts));
-                            c.glow = Mathf.Max(c.glow, Line(Mathf.Abs(q.x), 0.0007f, ts));
-                        }
-                        break;
-                    }
-            }
-            return c;
-        }
-
-        // ---- 暗く・彩度を落とす -------------------------------------------------------
-
-        /// <summary>暗く・彩度を落とす強さ（HSV の S と V に掛ける値。体＝服、頭＝顔と髪の殻、髪の房）</summary>
-        public struct Dim
-        {
-            public float saturation, value;
-
-            public Dim(float saturation, float value)
-            {
-                this.saturation = saturation;
-                this.value = value;
-            }
-        }
-
-        /// <summary>服は彩度を 4 割 5 分、明るさを 6 割 2 分に。顔は血の気が抜けないよう弱く</summary>
-        public static readonly Dim DimBody = new Dim(0.45f, 0.62f), DimHead = new Dim(0.80f, 0.85f), DimHair = new Dim(0.75f, 0.80f);
-
-        /// <summary>色を暗く・彩度を落とす（HSV の S と V に掛ける）。透けはそのまま</summary>
-        public static Color[] Dimmed(Color[] px, Dim dim)
-        {
-            var o = new Color[px.Length];
-            for (var i = 0; i < px.Length; i++)
-            {
-                float h, s, v;
-                Color.RGBToHSV(px[i], out h, out s, out v);
-                var c = Color.HSVToRGB(h, s * dim.saturation, v * dim.value);
-                c.a = px[i].a;
-                o[i] = c;
-            }
-            return o;
         }
     }
 }

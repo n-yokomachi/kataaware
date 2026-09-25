@@ -20,7 +20,7 @@ namespace HalfAware.EditorTools.Rocketbox
         public readonly string Label;
         /// <summary>髪の房の透けのテクスチャを持つか（男大 17 と 20 は持たない。髪は頭の面に描かれている）</summary>
         public readonly bool HasOpacity;
-        /// <summary>肌に描くインプラント（一つか二つ）。売り手は試しの撮影を見てから決めるので空</summary>
+        /// <summary>肌に描くインプラント。通りの人は大胆な形を二つか三つ、売り手は小さく目立たない形を一つ</summary>
         public readonly RocketboxMobPaint.Implant[] Implants;
 
         RocketboxMob(string name, string prefix, string label, bool opacity, params RocketboxMobPaint.Implant[] implants)
@@ -54,23 +54,47 @@ namespace HalfAware.EditorTools.Rocketbox
 
         // ---- 色の試しの 6 人 ------------------------------------------------------
 
-        /// <summary>女大 04。通りの人（サイバーパンカー寄り）。茶の革のフード付きの上着、カーキのパンツ、長靴。髪は結い上げて、うなじとこめかみが出ている</summary>
+        /// <summary>
+        /// 女大 04。通りの人（サイバーパンカー寄り）。茶の革のフード付きの上着、カーキのパンツ、長靴。髪は結い上げて、うなじとこめかみが出ている。
+        /// 紫のうなじの差込口から首の両脇を回って首の付け根へ下りる線と、水色の左のこめかみから顎まで。
+        /// 光の色は、顔の物を人ごとに違う色（水色・桃色・緑・橙・紫、売り手は山吹）にし、首と手は隣の人と被らない色にした
+        /// </summary>
         public static readonly RocketboxMob Adult04F = new RocketboxMob("Female_Adult_04", "f004", "女大 04", true,
-            new RocketboxMobPaint.Implant(RocketboxMobPaint.Kind.NapePort, false), new RocketboxMobPaint.Implant(RocketboxMobPaint.Kind.TempleLines, true));
-        /// <summary>男大 04。通りの人（サイバーパンカー寄り）。黒い上着に灰のフード、水色の T シャツ。顔と手が出ている</summary>
+            new RocketboxMobPaint.Implant(RocketboxMobPaint.Kind.NapePort, false, RocketboxMobPaint.Purple),
+            new RocketboxMobPaint.Implant(RocketboxMobPaint.Kind.TempleLines, true, RocketboxMobPaint.Cyan));
+        /// <summary>
+        /// 男大 04。通りの人（サイバーパンカー寄り）。黒い上着に灰のフード、水色の T シャツ。顔と手が出ている。
+        /// 桃色の、右目を囲む輪から耳へ伸びる線と、黄の左の手の甲
+        /// </summary>
         public static readonly RocketboxMob Adult04M = new RocketboxMob("Male_Adult_04", "m006", "男大 04", true,
-            new RocketboxMobPaint.Implant(RocketboxMobPaint.Kind.EyeRing, false), new RocketboxMobPaint.Implant(RocketboxMobPaint.Kind.HandGlow, true));
-        /// <summary>男大 17。通りの人（サイバーパンカー寄り）。帽子、青と白のジャージの上着。透けのテクスチャが無い</summary>
+            new RocketboxMobPaint.Implant(RocketboxMobPaint.Kind.EyeRing, false, RocketboxMobPaint.Pink),
+            new RocketboxMobPaint.Implant(RocketboxMobPaint.Kind.HandGlow, true, RocketboxMobPaint.Yellow));
+        /// <summary>
+        /// 男大 17。通りの人（サイバーパンカー寄り）。帽子、青と白のジャージの上着（襟が高い）。透けのテクスチャが無い。
+        /// 赤の首を巻く太い帯と、青の右の手の甲、緑の左のこめかみから顎まで
+        /// </summary>
         public static readonly RocketboxMob Adult17M = new RocketboxMob("Male_Adult_17", "m022", "男大 17", false,
-            new RocketboxMobPaint.Implant(RocketboxMobPaint.Kind.NeckRing, false), new RocketboxMobPaint.Implant(RocketboxMobPaint.Kind.HandGlow, false));
-        /// <summary>女大 01。通りの人（ふつうの身なり）。袖をまくった桃色のシャツとジーンズ。前腕が出ている</summary>
+            new RocketboxMobPaint.Implant(RocketboxMobPaint.Kind.NeckRing, false, RocketboxMobPaint.Red),
+            new RocketboxMobPaint.Implant(RocketboxMobPaint.Kind.HandGlow, false, RocketboxMobPaint.Blue),
+            new RocketboxMobPaint.Implant(RocketboxMobPaint.Kind.TempleLines, true, RocketboxMobPaint.Green));
+        /// <summary>
+        /// 女大 01。通りの人（ふつうの身なり）。袖をまくった桃色のシャツとジーンズ。前腕が出ている。
+        /// 青緑の左の手首から肘までの板と、橙の右のこめかみから顎まで
+        /// </summary>
         public static readonly RocketboxMob Adult01F = new RocketboxMob("Female_Adult_01", "f001", "女大 01", true,
-            new RocketboxMobPaint.Implant(RocketboxMobPaint.Kind.ForearmPlate, true));
-        /// <summary>男大 20。通りの人（ふつうの身なり）。茶のパーカーとジーンズ。透けのテクスチャが無い</summary>
+            new RocketboxMobPaint.Implant(RocketboxMobPaint.Kind.ForearmPlate, true, RocketboxMobPaint.Teal),
+            new RocketboxMobPaint.Implant(RocketboxMobPaint.Kind.TempleLines, false, RocketboxMobPaint.Orange));
+        /// <summary>
+        /// 男大 20。通りの人（ふつうの身なり）。茶のパーカーとジーンズ。透けのテクスチャが無い。
+        /// 紫の右のこめかみから顎までと、薔薇色の左の手の甲、水色の首を巻く帯
+        /// </summary>
         public static readonly RocketboxMob Adult20M = new RocketboxMob("Male_Adult_20", "m027", "男大 20", false,
-            new RocketboxMobPaint.Implant(RocketboxMobPaint.Kind.TempleLines, false), new RocketboxMobPaint.Implant(RocketboxMobPaint.Kind.HandGlow, true));
-        /// <summary>男大 03。ヤードの売り手。ツイードの上着に臙脂のシャツ。インプラントは試しの撮影を見てから決める</summary>
-        public static readonly RocketboxMob Adult03M = new RocketboxMob("Male_Adult_03", "m004", "男大 03", true);
+            new RocketboxMobPaint.Implant(RocketboxMobPaint.Kind.TempleLines, false, RocketboxMobPaint.Purple),
+            new RocketboxMobPaint.Implant(RocketboxMobPaint.Kind.HandGlow, true, RocketboxMobPaint.Rose),
+            new RocketboxMobPaint.Implant(RocketboxMobPaint.Kind.NeckRing, false, RocketboxMobPaint.Cyan));
+        /// <summary>男大 03。ヤードの売り手。ツイードの上着に臙脂のシャツ。通りの人ほど派手でない、右のこめかみの短い山吹の線を一つ</summary>
+        public static readonly RocketboxMob Adult03M = new RocketboxMob("Male_Adult_03", "m004", "男大 03", true,
+            new RocketboxMobPaint.Implant(RocketboxMobPaint.Kind.TempleLines, false, RocketboxMobPaint.Amber, false));
 
         /// <summary>色の試しの 6 人（通りの 5 人、最後が売り手）</summary>
         public static readonly RocketboxMob[] Trial = { Adult04F, Adult04M, Adult17M, Adult01F, Adult20M, Adult03M };

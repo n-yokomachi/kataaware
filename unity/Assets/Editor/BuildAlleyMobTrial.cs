@@ -8,14 +8,12 @@ using HalfAware.EditorTools.Rocketbox;
 namespace HalfAware.EditorTools
 {
     /// <summary>
-    /// 場面 2 のモブを Rocketbox に替える前の、色の試し（<c>docs/superpowers/specs/2026-09-25-alley-mob-design.md</c> の 4 節）。
+    /// 場面 2 のモブを Rocketbox に替える前の、色とインプラントの試し（<c>docs/superpowers/specs/2026-09-25-alley-mob-design.md</c> の 4・5 節）。
     ///
     /// 試しの 6 人（<see cref="RocketboxMob.Trial"/>）を、今の群衆と同じく姿勢を曲げて焼いた静止した形で置く。
     /// 通りの 5 人は通りの入口の西の歩道（ネオンの看板の下）に、売り手はヤードの空いた出店の奥に座らせる。
-    /// 色は三通りを同じ場所に重ねて作り、一つだけを出す（<see cref="Show"/>）:
-    /// - Original: 元の服の色のまま
-    /// - Dim: 服を暗く・彩度を落とした色（<see cref="RocketboxMobPaint.DimBody"/>）
-    /// - Grey: 今の群衆と同じ灰色の半透明（見比べ用。マテリアルは今の群衆の物をそのまま使う）
+    /// 服の色は元のまま（オーナーが決めた。暗く・彩度を落とした色と、今の群衆の灰色の半透明は、見比べて外した）。
+    /// 肌にはインプラント（<see cref="RocketboxMobPaint"/>）を描く。メニューで試しを出し入れできる（<see cref="Show"/>）。
     ///
     /// 試しの物は場面の根の MobTrial の下に置く。路地裏の根（Alley）の下に置くと、<c>HalfAware/Build the alley</c> が知らない子として落とす。
     /// 今の群衆（Alley/Crowd）には触らない。焼いた mesh とテクスチャとマテリアルは <see cref="Folder"/>（リポジトリに入れない）に置く
@@ -24,10 +22,8 @@ namespace HalfAware.EditorTools
     {
         public const string RootName = "MobTrial";
         public const string Folder = BuildAlley.Generated + "MobTrial/";
-        public const string CrowdMatPath = BuildAlley.Materials + "Crowd.mat";
-
-        /// <summary>色の三通り</summary>
-        public enum Look { Original, Dim, Grey }
+        /// <summary>人を並べる組の名前（MobTrial の子）</summary>
+        public const string GroupName = "People";
 
         /// <summary>姿勢。立ちは Humanoid の立ちの動き（<see cref="BodyPoser.Stand"/>）の初めのこまから曲げる</summary>
         public enum Pose
@@ -100,31 +96,18 @@ namespace HalfAware.EditorTools
             Debug.Log(sb.ToString());
         }
 
-        [MenuItem("HalfAware/Alley mob trial/Show the original colours", false, 310)]
-        public static void ShowOriginal() { Show(Look.Original, true); }
-        [MenuItem("HalfAware/Alley mob trial/Show the dim colours", false, 311)]
-        public static void ShowDim() { Show(Look.Dim, true); }
-        [MenuItem("HalfAware/Alley mob trial/Show the grey crowd look", false, 312)]
-        public static void ShowGrey() { Show(Look.Grey, true); }
-        [MenuItem("HalfAware/Alley mob trial/Hide the trial", false, 313)]
-        public static void HideAll()
-        {
-            var root = FindRoot();
-            if (root == null) return;
-            foreach (Transform c in root) if (c.name != "Stool") c.gameObject.SetActive(false);
-            EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
-        }
+        [MenuItem("HalfAware/Alley mob trial/Show the trial", false, 310)]
+        public static void ShowMenu() { Show(true, true); }
+        [MenuItem("HalfAware/Alley mob trial/Hide the trial", false, 311)]
+        public static void HideMenu() { Show(false, true); }
 
-        /// <summary>三通りのうち一つだけを出す。save なら場面を汚れた印にする（保存はしない）</summary>
-        public static void Show(Look look, bool mark)
+        /// <summary>試しの人を出すか伏せるか。mark なら場面を汚れた印にする（保存はしない）</summary>
+        public static void Show(bool show, bool mark)
         {
             var root = FindRoot();
             if (root == null) { Debug.LogWarning("試しが組まれていない（HalfAware/Alley mob trial/Build）"); return; }
-            foreach (Look l in System.Enum.GetValues(typeof(Look)))
-            {
-                var t = root.Find(l.ToString());
-                if (t != null) t.gameObject.SetActive(l == look);
-            }
+            var t = root.Find(GroupName);
+            if (t != null) t.gameObject.SetActive(show);
             if (mark) EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
         }
 
@@ -157,9 +140,7 @@ namespace HalfAware.EditorTools
         {
             var people = RocketboxMob.Trial;
             var mats = new Dictionary<string, Material[]>();
-            foreach (var who in people)
-                foreach (Look look in System.Enum.GetValues(typeof(Look)))
-                    mats[who.Name + "/" + look] = Materials(who, look, sb);
+            foreach (var who in people) mats[who.Name] = Materials(who, sb);
 
             var root = FindRoot();
             if (root == null) root = new GameObject(RootName).transform;
@@ -181,18 +162,14 @@ namespace HalfAware.EditorTools
                 Stool(root, sit, yaw);
             }
 
-            foreach (Look look in System.Enum.GetValues(typeof(Look)))
+            var group = new GameObject(GroupName).transform;
+            group.SetParent(root, false);
+            Lineup(group, mats, StreetAt, StreetWall);
+            if (stall != null)
             {
-                var group = new GameObject(look.ToString()).transform;
-                group.SetParent(root, false);
-                Lineup(group, look, mats, StreetAt, StreetWall, sb);
-                if (stall != null)
-                {
-                    var seller = people[people.Length - 1];
-                    Person(group, "Seller_" + seller.Name, seller, Pose.Sit, sit, sitYaw, mats[seller.Name + "/" + look]);
-                }
+                var seller = people[people.Length - 1];
+                Person(group, "Seller_" + seller.Name, seller, Pose.Sit, sit, sitYaw, mats[seller.Name]);
             }
-            Show(Look.Original, false);
             sb.AppendFormat("通りの 5 人: 西の歩道 {0}、売り手: {1} の奥 {2}（向き {3:F0} 度）", StreetAt.ToString("F2"), SellerStall, sit.ToString("F2"), sitYaw).AppendLine();
         }
 
@@ -200,7 +177,7 @@ namespace HalfAware.EditorTools
         /// 通りの 5 人を並べる。center は並びの中心（歩道の上）、wall は壁の側（東は +1、西は -1）。
         /// 撮り比べで距離と明るさを変えて並べ直すのにも使う
         /// </summary>
-        public static void Lineup(Transform parent, Look look, Dictionary<string, Material[]> mats, Vector3 center, float wall, StringBuilder sb)
+        public static void Lineup(Transform parent, Dictionary<string, Material[]> mats, Vector3 center, float wall)
         {
             var people = RocketboxMob.Trial;
             foreach (var s in Street)
@@ -209,7 +186,7 @@ namespace HalfAware.EditorTools
                 var at = center + new Vector3(s.at.x * wall, 0f, s.at.y);
                 var yaw = wall > 0f ? s.yaw : -s.yaw;
                 Material[] m;
-                if (mats == null || !mats.TryGetValue(who.Name + "/" + look, out m)) m = LoadMaterials(who, look);
+                if (mats == null || !mats.TryGetValue(who.Name, out m)) m = LoadMaterials(who);
                 Person(parent, who.Name, who, s.pose, at, yaw, m);
             }
         }
@@ -418,21 +395,23 @@ namespace HalfAware.EditorTools
         {
             var dir = Folder.TrimEnd('/');
             if (!AssetDatabase.IsValidFolder(dir)) AssetDatabase.CreateFolder(BuildAlley.Generated.TrimEnd('/'), "MobTrial");
+            // 前の試しの残り（暗くした色と今の群衆の色の組、平均で縮めた自己発光の PNG）
+            foreach (var guid in AssetDatabase.FindAssets("", new[] { dir }))
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guid);
+                var name = System.IO.Path.GetFileNameWithoutExtension(path);
+                if (name.Contains("_Dim") || name.Contains("_Grey") || name.Contains("_Original") || path.EndsWith("_Glow.png")) AssetDatabase.DeleteAsset(path);
+            }
         }
 
-        static string MatPath(RocketboxMob who, Look look, string part) { return Folder + who.Name + "_" + look + "_" + part + ".mat"; }
+        static string MatPath(RocketboxMob who, string part) { return Folder + who.Name + "_" + part + ".mat"; }
 
-        /// <summary>面の組の順（体・頭・髪の房）に並べたマテリアル。Grey は今の群衆のマテリアルをそのまま使う</summary>
-        static Material[] LoadMaterials(RocketboxMob who, Look look)
+        /// <summary>面の組の順（体・頭・髪の房）に並べたマテリアル</summary>
+        static Material[] LoadMaterials(RocketboxMob who)
         {
-            if (look == Look.Grey)
-            {
-                var crowd = AssetDatabase.LoadAssetAtPath<Material>(CrowdMatPath);
-                return who.HasOpacity ? new[] { crowd, crowd, crowd } : new[] { crowd, crowd };
-            }
             return who.HasOpacity
-                ? new[] { Load(MatPath(who, look, "Body")), Load(MatPath(who, look, "Head")), Load(MatPath(who, look, "Hair")) }
-                : new[] { Load(MatPath(who, look, "Body")), Load(MatPath(who, look, "Head")) };
+                ? new[] { Load(MatPath(who, "Body")), Load(MatPath(who, "Head")), Load(MatPath(who, "Hair")) }
+                : new[] { Load(MatPath(who, "Body")), Load(MatPath(who, "Head")) };
         }
 
         static Material Load(string path)
@@ -442,16 +421,18 @@ namespace HalfAware.EditorTools
             return m;
         }
 
-        /// <summary>光の強さ（自己発光のテクスチャに掛ける）。「うっすら」光る程度</summary>
-        public const float GlowStrength = 1.2f;
+        /// <summary>
+        /// 光の強さ（自己発光のテクスチャに掛ける）。最初の試しの 1.2（うっすら）では、ゲームの見え方の 2〜3 m で 1〜2 画素にしかならなかった。
+        /// ブルーム（しきい 0.85）に掛かって光の点や線として拾える強さ
+        /// </summary>
+        public const float GlowStrength = 3.0f;
 
         /// <summary>
-        /// 一人・一通りのテクスチャとマテリアルを作る。元の色でも暗くした色でも、インプラントは同じに描く。
+        /// 一人のテクスチャとマテリアルを作る（服の色は元のまま、肌にインプラントを描く）。
         /// 面の組の順は FBX のマテリアルの順（体・頭・髪の房）
         /// </summary>
-        static Material[] Materials(RocketboxMob who, Look look, StringBuilder sb)
+        static Material[] Materials(RocketboxMob who, StringBuilder sb)
         {
-            if (look == Look.Grey) return LoadMaterials(who, look);
             const int n = RocketboxMob.TextureSize;
             int w, h;
             var head0 = BuildRocketboxProtagonist.ToColors(RocketboxTextures.ReadPng(who.HeadSrc, out w, out h));
@@ -460,39 +441,32 @@ namespace HalfAware.EditorTools
             RocketboxMobPaint.Frame frame;
             Surfaces(who, n, out headS, out bodyS, out frame);
             var skin = RocketboxMobPaint.SkinOf(headS, head0, frame);
-            var head = look == Look.Dim ? RocketboxMobPaint.Dimmed(head0, RocketboxMobPaint.DimHead) : (Color[])head0.Clone();
-            var body = look == Look.Dim ? RocketboxMobPaint.Dimmed(body0, RocketboxMobPaint.DimBody) : (Color[])body0.Clone();
+            var strokes = new List<RocketboxMobPaint.Stroke>();
+            foreach (var im in who.Implants) strokes.AddRange(RocketboxMobPaint.Strokes(im, frame));
+            var skinCloud = new RocketboxMobPaint.Skin();
+            skinCloud.Add(headS);
+            skinCloud.Add(bodyS);
+            RocketboxMobPaint.Prepare(strokes, skinCloud);
+            var head = (Color[])head0.Clone();
+            var body = (Color[])body0.Clone();
             int ph, pb;
-            var headGlow = RocketboxMobPaint.Paint(who, frame, headS, head, head0, skin, out ph);
-            var bodyGlow = RocketboxMobPaint.Paint(who, frame, bodyS, body, body0, skin, out pb);
-            var headTex = Write(head, n, n, Folder + who.Name + "_Head_" + look + ".png", false);
-            var bodyTex = Write(body, n, n, Folder + who.Name + "_Body_" + look + ".png", false);
-            var headGlowTex = ph > 0 ? Write(headGlow, n, n, Folder + who.Name + "_Head_Glow.png", false) : null;
-            var bodyGlowTex = pb > 0 ? Write(bodyGlow, n, n, Folder + who.Name + "_Body_Glow.png", false) : null;
+            var headGlow = RocketboxMobPaint.Paint(strokes, headS, head, head0, skin, out ph);
+            var bodyGlow = RocketboxMobPaint.Paint(strokes, bodyS, body, body0, skin, out pb);
+            var headTex = Write(head, n, n, Folder + who.Name + "_Head.png", false);
+            var bodyTex = Write(body, n, n, Folder + who.Name + "_Body.png", false);
+            var headGlowTex = ph > 0 ? WriteGlow(headGlow, n, Folder + who.Name + "_Head_Glow.asset") : null;
+            var bodyGlowTex = pb > 0 ? WriteGlow(bodyGlow, n, Folder + who.Name + "_Body_Glow.asset") : null;
             var list = new List<Material>
             {
-                Save(Mat(who.Name + "_" + look + "_Body", bodyTex, bodyGlowTex, 0.12f, false), MatPath(who, look, "Body")),
-                Save(Mat(who.Name + "_" + look + "_Head", headTex, headGlowTex, 0.22f, false), MatPath(who, look, "Head")),
+                Save(Mat(who.Name + "_Body", bodyTex, bodyGlowTex, 0.12f, false), MatPath(who, "Body")),
+                Save(Mat(who.Name + "_Head", headTex, headGlowTex, 0.22f, false), MatPath(who, "Head")),
             };
             if (who.HasOpacity)
-            {
-                Texture2D hairTex;
-                if (look == Look.Dim)
-                {
-                    int hw, hh;
-                    var hair0 = BuildRocketboxProtagonist.ToColors(RocketboxTextures.ReadPng(who.HairSrc, out hw, out hh));
-                    hairTex = Write(RocketboxMobPaint.Dimmed(hair0, RocketboxMobPaint.DimHair), hw, hh, Folder + who.Name + "_Hair_" + look + ".png", true);
-                }
-                else hairTex = AssetDatabase.LoadAssetAtPath<Texture2D>(who.HairSrc);
-                list.Add(Save(Mat(who.Name + "_" + look + "_Hair", hairTex, null, 0.34f, true), MatPath(who, look, "Hair")));
-            }
-            if (look == Look.Original)
-            {
-                var names = new List<string>();
-                foreach (var im in who.Implants) names.Add(im.ToString());
-                sb.AppendFormat("{0}: 肌の見本 {1}、インプラント {2}（頭のテクスチャ {3} 画素、体のテクスチャ {4} 画素）", who.Label, ColorUtility.ToHtmlStringRGB(skin),
-                    names.Count > 0 ? string.Join("・", names.ToArray()) : "無し", ph, pb).AppendLine();
-            }
+                list.Add(Save(Mat(who.Name + "_Hair", AssetDatabase.LoadAssetAtPath<Texture2D>(who.HairSrc), null, 0.34f, true), MatPath(who, "Hair")));
+            var names = new List<string>();
+            foreach (var im in who.Implants) names.Add(im.ToString());
+            sb.AppendFormat("{0}: 肌の見本 {1}、インプラント {2}（頭のテクスチャ {3} 画素、体のテクスチャ {4} 画素）", who.Label, ColorUtility.ToHtmlStringRGB(skin),
+                names.Count > 0 ? string.Join("・", names.ToArray()) : "無し", ph, pb).AppendLine();
             return list.ToArray();
         }
 
@@ -531,6 +505,48 @@ namespace HalfAware.EditorTools
             }
         }
 
+        /// <summary>
+        /// 自己発光のテクスチャを書く。ミップマップは平均ではなく、2×2 のいちばん明るい画素を残して縮める。
+        /// 平均で縮めると、細い光る線は遠くで地の黒に薄まって消える（ゲームの見え方の 2.5 m で、頭のテクスチャは 1/16 まで縮んで使われる）。
+        /// 明るい画素を残すと、遠くでも線が画面の一画素の光として残り、ブルームでにじむ
+        /// </summary>
+        static Texture2D WriteGlow(Color[] px, int n, string path)
+        {
+            var t = new Texture2D(n, n, TextureFormat.RGBA32, true, false) { name = System.IO.Path.GetFileNameWithoutExtension(path) };
+            t.wrapMode = TextureWrapMode.Clamp;
+            t.filterMode = FilterMode.Bilinear;
+            var level = px;
+            var size = n;
+            for (var mip = 0; mip < t.mipmapCount; mip++)
+            {
+                t.SetPixels(level, mip);
+                if (size == 1) break;
+                var half = size / 2;
+                var next = new Color[half * half];
+                for (var y = 0; y < half; y++)
+                    for (var x = 0; x < half; x++)
+                    {
+                        Color a = level[(2 * y) * size + 2 * x], b = level[(2 * y) * size + 2 * x + 1];
+                        Color c = level[(2 * y + 1) * size + 2 * x], d = level[(2 * y + 1) * size + 2 * x + 1];
+                        next[y * half + x] = new Color(Mathf.Max(Mathf.Max(a.r, b.r), Mathf.Max(c.r, d.r)), Mathf.Max(Mathf.Max(a.g, b.g), Mathf.Max(c.g, d.g)),
+                            Mathf.Max(Mathf.Max(a.b, b.b), Mathf.Max(c.b, d.b)), 1f);
+                    }
+                level = next;
+                size = half;
+            }
+            t.Apply(false, false);
+            var old = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            if (old != null)
+            {
+                EditorUtility.CopySerialized(t, old);
+                Object.DestroyImmediate(t);
+                EditorUtility.SetDirty(old);
+                return old;
+            }
+            AssetDatabase.CreateAsset(t, path);
+            return t;
+        }
+
         static Texture2D Write(Color[] px, int w, int h, string path, bool alpha)
         {
             var c32 = new Color32[px.Length];
@@ -565,7 +581,8 @@ namespace HalfAware.EditorTools
                 m.EnableKeyword("_EMISSION");
                 m.SetTexture("_EmissionMap", glow);
                 m.SetColor("_EmissionColor", Color.white * GlowStrength);
-                m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+                // None にすると、URP のマテリアルの見直し（取り込みのたびに走る）が _EMISSION を落とし、光らなくなった
+                m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
             }
             return m;
         }
