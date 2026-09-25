@@ -8,7 +8,7 @@ namespace HalfAware.EditorTools.Rocketbox
 {
     /// <summary>
     /// 脱いだジャケット。着ているジャケットのメッシュ（<see cref="RocketboxJacket"/>）をそのまま形を変えて作る、動かないメッシュ（テクスチャとマテリアルも同じ）。
-    /// - 卓に置いた形（場面 1。椅子の右の卓の、明かりを置いていた所。前を上にして寝かせ、天板の手前の縁から下の半分と両の袖を垂らす）: <see cref="MakeFolded"/>
+    /// - 卓に置いた形（場面 1。椅子の右の卓の、明かりを置いていた所。無造作に脱ぎ置いた形で、天板の手前の縁から下の半分と左の袖を垂らす）: <see cref="MakeFolded"/>
     /// - コートハンガーに襟で吊った形（場面 3 で掛け、場面 5 も掛けたまま）: <see cref="MakeHung"/>
     ///
     /// どちらも、立った形の主人公に着せたジャケットを焼き付けた形（袖は脇に下りる。主人公の根から見た位置）から作る
@@ -18,22 +18,77 @@ namespace HalfAware.EditorTools.Rocketbox
         // ---- 卓に置いた形 ----
         /// <summary>寝かせた服の厚みにする、前後の縮め（1 が着た形）。身頃の前後の二枚で 9 mm ほど（革と裏地の厚みと、ふくらみ）</summary>
         public const float FoldedFlatten = 0.035f;
+        /// <summary>襟（首の骨の 2〜5 cm 下から上の輪）の前後の縮め。寝かせきらず、襟が 3〜4 cm 立ち上がる</summary>
+        public const float CollarKeep = 0.15f;
+        /// <summary>襟返し（首の骨の 12〜18 cm 下から首まで、前の打ち合わせの側）の前の面を浮かせる量（m）。寝かせきらず、縁が少し立つ</summary>
+        public const float LapelLift = 0.012f;
         /// <summary>脇の下から下の袖を、身頃の前へ浮かせる量（m）。脇の下から 4〜14 cm で浮かせきる。袖と脇の身頃が重なるので</summary>
         public const float SleeveLift = 0.006f;
         /// <summary>脇の下から下の袖を、身頃の真ん中へ寄せる縮め（首の骨からの左右の離れに掛ける）。袖が脇の身頃に少しかぶり、幅が卓に収まる</summary>
         public const float SleeveIn = 0.9f;
+        /// <summary>
+        /// 身頃の上に折り返す袖（本人の右）の、肘から先を回す角（度）。下を向いた前腕を、胸を斜めに横切って反対の肩の方へ向ける。
+        /// もう片方の袖（本人の左）は、肘から先が天板の縁から垂れる
+        /// </summary>
+        public const float ForearmTurn = 120f;
+        /// <summary>肘で曲がりきるまでの長さ（m）。この間で角が 0 から <see cref="ForearmTurn"/> へ移り、内の側が詰まる</summary>
+        public const float ElbowBend = 0.07f;
+        /// <summary>両の袖の肘の寄り皺: 高さ（m）、肘から上下への広がり（m）、間隔（m）</summary>
+        public const float ElbowRipple = 0.005f, ElbowSpan = 0.07f, ElbowWave = 0.025f;
         /// <summary>天板の手前の縁の角を回る、いちばん内の重なりの曲がりの半径（m）</summary>
-        public const float EdgeRadius = 0.008f;
+        public const float EdgeRadius = 0.02f;
+        /// <summary>垂れた所の、下へ行くほどの広がり（いちばん下で幅が 1 + HangFlare 倍）と、外への振れ（下がった長さあたり）</summary>
+        public const float HangFlare = 0.15f, HangTilt = 0.12f;
+        /// <summary>垂れた所の縦の襞の深さ（いちばん下で、m）と間隔（m）</summary>
+        public const float FluteDepth = 0.012f, FluteWave = 0.085f;
         /// <summary>卓の面との隙間（m）</summary>
         public const float Gap = 0.0015f;
         /// <summary>重なりの下の面を探す升目の大きさ（m）</summary>
         const float Cell = 0.004f;
 
+        /// <summary>天板に載せた身頃の、盛り上がった折れ目とたるみ（重なりごと持ち上げ、下は浮く）</summary>
+        struct Ridge
+        {
+            /// <summary>両端。首の骨から左右（x、本人の右が +）と、襟の上の縁から下へ（y）、m</summary>
+            public Vector2 a, b;
+            /// <summary>高さと、山の幅（m）</summary>
+            public float height, width;
+
+            public Ridge(float ax, float ay, float bx, float by, float height, float width)
+            {
+                a = new Vector2(ax, ay);
+                b = new Vector2(bx, by);
+                this.height = height;
+                this.width = width;
+            }
+        }
+
+        /// <summary>
+        /// 天板の上の折れ目とたるみ。
+        /// - 左の胸から右の裾へ斜めに下りる大きな折れ目。本人の左の裾の側（卓では椅子の側でメモリハブの側）を向いた斜面が、座った目へ窓の光を返す
+        /// - 縁の手前の横のたるみと、胸の中ほどの横の折れ目。椅子の側を向いた斜面が、座った目へ天井の灯りを返す
+        /// - 右の脇の短い折れ目と、左の胸の小さな折れ目
+        /// </summary>
+        static readonly Ridge[] Ridges =
+        {
+            new Ridge(-0.16f, 0.16f, 0.04f, 0.34f, 0.040f, 0.022f),
+            new Ridge(-0.19f, 0.40f, 0.03f, 0.38f, 0.030f, 0.020f),
+            new Ridge(-0.02f, 0.25f, 0.15f, 0.29f, 0.025f, 0.018f),
+            new Ridge(0.08f, 0.14f, 0.18f, 0.26f, 0.022f, 0.018f),
+            new Ridge(-0.12f, 0.10f, -0.02f, 0.15f, 0.015f, 0.012f),
+        };
+
         // ---- コートハンガーに掛けた形 ----
-        /// <summary>吊った服の前後の縮め。体が抜けて胸と背がしぼむ</summary>
-        public const float HungFlatten = 0.45f;
-        /// <summary>吊った服の、肩から下の幅の縮め（肩は少し張ったまま、身頃が寄る）</summary>
+        /// <summary>吊った服の前後の縮め。体が抜けて胸と背がぺたんと平たくなる</summary>
+        public const float HungFlatten = 0.2f;
+        /// <summary>吊った服の、肩から下の幅の縮め（身頃が寄る）</summary>
         public const float HungNarrow = 0.9f;
+        /// <summary>肩を落とす量（m）。首の骨から 4 cm より外ほど下げ、18 cm より外は同じだけ下げる（袖も一緒に下がる）。着た肩の丸みが落ちる</summary>
+        public const float ShoulderDrop = 0.035f;
+        /// <summary>裾と袖口を内へ寄せる縮め（脇の下から下へ行くほど強め、いちばん下で 1 - HemIn 倍）</summary>
+        public const float HemIn = 0.08f;
+        /// <summary>身頃と袖の縦の垂れ皺: 深さ（m、肩の 30 cm 下で出きる）と間隔（m）</summary>
+        public const float HangCrease = 0.007f, CreaseWave = 0.07f;
 
         public static string FoldedPath(RocketboxPerson who) { return RocketboxJacket.Folder(who) + "JacketFolded_mesh.asset"; }
         public static string HungPath(RocketboxPerson who) { return RocketboxJacket.Folder(who) + "JacketHung_mesh.asset"; }
@@ -43,7 +98,7 @@ namespace HalfAware.EditorTools.Rocketbox
         {
             public Vector3[] v, n;
             public Mesh source;
-            public Vector3 neck;
+            public Vector3 neck, elbowR, elbowL;
             public float[] arm;
         }
 
@@ -67,6 +122,8 @@ namespace HalfAware.EditorTools.Rocketbox
                     b.n[i] = her.transform.InverseTransformDirection(js.transform.TransformDirection(b.n[i])).normalized;
                 }
                 b.neck = her.transform.InverseTransformPoint(an.GetBoneTransform(HumanBodyBones.Neck).position);
+                b.elbowR = her.transform.InverseTransformPoint(an.GetBoneTransform(HumanBodyBones.RightLowerArm).position);
+                b.elbowL = her.transform.InverseTransformPoint(an.GetBoneTransform(HumanBodyBones.LeftLowerArm).position);
                 var bones = js.bones;
                 var isArm = new bool[bones.Length];
                 for (var k = 0; k < bones.Length; k++)
@@ -89,18 +146,22 @@ namespace HalfAware.EditorTools.Rocketbox
         }
 
         /// <summary>
-        /// 卓に置いた形。前を上にして寝かせ、身頃の上の半分を天板に載せて、天板の手前の縁から下の半分と両の袖を垂らす。
-        /// 1. 前後に平たく潰す（袖は脇の下から下を身頃の前へ少し浮かせ、真ん中へ少し寄せる。袖と脇の身頃が重なるので）
+        /// 卓に置いた形。無造作に脱ぎ置いた形で、前を上にして寝かせ、身頃の上の半分を天板に載せて、天板の手前の縁から下の半分と左の袖を垂らす。
+        /// 1. 前後に平たく潰す。襟は寝かせきらず立ち上がり（<see cref="CollarKeep"/>）、襟返しの縁は少し浮く（<see cref="LapelLift"/>）。
+        ///    袖は脇の下から下を身頃の前へ少し浮かせ、真ん中へ少し寄せる
         /// 2. 重なりの下の面を平らにならす（袖の所と身頃だけの所の段を天板に寝かせる）
-        /// 3. 襟を卓の奥へ向けて、襟から onTop だけを天板に載せ、そこから先を天板の手前の縁に沿って下へ垂らす（<see cref="EdgeRadius"/> で回る）
+        /// 3. 両の袖の肘に寄り皺を付ける
+        /// 4. 右の袖の肘から先を、胸を斜めに横切るように回して身頃の上へ載せる（下の面の高さに沿わせる）
+        /// 5. 天板の上の身頃に、盛り上がった折れ目とたるみ（<see cref="Ridges"/>、高さ 1.5〜4 cm）を付ける
+        /// 6. 襟を卓の奥へ向けて、襟から onTop だけを天板に載せ、そこから先を天板の手前の縁で丸く折り曲げて垂らす（<see cref="EdgeRadius"/>）。
+        ///    垂れた所は下へ行くほど広がり、少し外へ振れ、縦の襞が付く（板のように真下へ落ちない）
         ///
-        /// 座って右の卓を見下ろすと、天板に襟と襟返し・胸のジッパー・肩、手前の縁に垂れた身頃の下の半分（斜めのジッパー・腰のポケット・裾）と、
-        /// その両脇に垂れた袖と袖口が見える。垂れた所は椅子の方を向くので、座った目にまっすぐ映る。
+        /// 座って右の卓を見下ろすと、天板に襟と襟返し・折れ目・身頃に載せた右の袖と袖口、手前の縁に垂れた身頃の下の半分と左の袖が見える。
         /// 天板の上に畳んで載せきる形（袖を背中へ回し、丈の真ん中で裾を下へ折り込む）も作ったが、座った目から天板を浅い角（20 度ほど）で見るので
-        /// 薄い帯にしか映らず、上着に読めなかった。袖を背中へ回して縁から垂らした形も、垂れた所が黒い板に見えた
+        /// 薄い帯にしか映らず、上着に読めなかった。平らに寝かせて縁から垂らしただけの形は、卓に黒い布を掛けたように見えた
         ///
         /// メッシュは縁の枠（原点は天板の手前の縁の上の、幅の真ん中。上 +y、幅 x、縁から外（垂らす側）が +z、襟は -z）で書く。
-        /// size に、幅・天板から垂れた袖口までの深さ・縁から襟までの長さを返す
+        /// size に、幅・天板から垂れた裾と袖口までの深さ・縁から襟までの長さを返す
         /// </summary>
         public static Mesh MakeFolded(RocketboxPerson who, float onTop, out Vector3 size, out string note)
         {
@@ -116,6 +177,8 @@ namespace HalfAware.EditorTools.Rocketbox
                 if (b.arm[i] > 0.5f) armTop = Mathf.Max(armTop, v[i].y);
             }
             var zMid = (zLo + zHi) * 0.5f;
+            var neck = b.neck;
+            var sleeve = new float[v.Length];
 
             // 1. 前後に潰す。法線は縮めの逆で傾ける
             var p = new Vector3[v.Length];
@@ -123,10 +186,18 @@ namespace HalfAware.EditorTools.Rocketbox
             for (var i = 0; i < v.Length; i++)
             {
                 var down = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.04f, 0.14f, armTop - v[i].y));
-                var lift = SleeveLift * down * Mathf.Clamp01((b.arm[i] - 0.3f) / 0.4f);
-                var inward = Mathf.Lerp(1f, SleeveIn, down * Mathf.Clamp01((b.arm[i] - 0.3f) / 0.4f));
-                p[i] = new Vector3(b.neck.x + (v[i].x - b.neck.x) * inward, v[i].y, zMid + (v[i].z - zMid) * FoldedFlatten + lift);
-                q[i] = new Vector3(b.n[i].x / inward, b.n[i].y, b.n[i].z / FoldedFlatten).normalized;
+                sleeve[i] = Mathf.Clamp01((b.arm[i] - 0.3f) / 0.4f);
+                var lift = SleeveLift * down * sleeve[i];
+                var inward = Mathf.Lerp(1f, SleeveIn, down * sleeve[i]);
+                var dx = v[i].x - neck.x;
+                var collar = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(neck.y - 0.05f, neck.y - 0.02f, v[i].y)) * (1f - sleeve[i]);
+                var flat = Mathf.Lerp(FoldedFlatten, CollarKeep, collar);
+                var lapel = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(zMid - 0.02f, zMid + 0.04f, v[i].z))
+                    * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(neck.y - 0.18f, neck.y - 0.12f, v[i].y))
+                    * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(neck.y - 0.02f, neck.y + 0.01f, v[i].y)))
+                    * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.10f, 0.14f, Mathf.Abs(dx)))) * (1f - sleeve[i]);
+                p[i] = new Vector3(neck.x + dx * inward, v[i].y, zMid + (v[i].z - zMid) * flat + lift + LapelLift * lapel);
+                q[i] = new Vector3(b.n[i].x / inward, b.n[i].y, b.n[i].z / flat).normalized;
             }
 
             // 2. 下の面を平らにならす。升目ごとのいちばん下を 0 に
@@ -139,76 +210,191 @@ namespace HalfAware.EditorTools.Rocketbox
             var floor = Under(p, xLo, xHi, yLo, yTop);
             for (var i = 0; i < p.Length; i++) p[i].z = Mathf.Max(0f, p[i].z - floor.At(p[i].x, p[i].y)) + Gap;
 
-            // 3. 天板の手前の縁から先を垂らす。軸は縁の角の、EdgeRadius だけ下（いちばん内の重なりが角を EdgeRadius で回る）
+            // 3. 両の袖の肘の寄り皺
+            var sideR = Mathf.Sign(b.elbowR.x - neck.x);
+            for (var i = 0; i < p.Length; i++)
+            {
+                if (sleeve[i] < 0.5f) continue;
+                var elbow = Mathf.Sign(p[i].x - neck.x) == sideR ? b.elbowR : b.elbowL;
+                var t = p[i].y - elbow.y;
+                var env = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Abs(t) / ElbowSpan);
+                var wave = 2f * Mathf.PI / ElbowWave;
+                p[i].z += ElbowRipple * env * (0.5f - 0.5f * Mathf.Cos(wave * t));
+                var gy = ElbowRipple * env * 0.5f * wave * Mathf.Sin(wave * t);
+                q[i] = new Vector3(q[i].x, q[i].y - gy * q[i].z, q[i].z).normalized;
+            }
+
+            // 4. 右の袖の肘から先を、胸を斜めに横切るように回して身頃の上へ載せる
+            var ex = neck.x + (b.elbowR.x - neck.x) * SleeveIn;
+            var ey = b.elbowR.y;
+            var forearm = new bool[p.Length];
+            var rest = new System.Collections.Generic.List<Vector3>();
+            for (var i = 0; i < p.Length; i++)
+            {
+                forearm[i] = sleeve[i] >= 0.5f && Mathf.Sign(p[i].x - neck.x) == sideR && p[i].y < ey + 0.01f;
+                if (!forearm[i]) rest.Add(new Vector3(p[i].x, p[i].y, -p[i].z));
+            }
+            // 下にある物のいちばん上の面（ならした上で、下の面を探すのと同じ升目で、向きを返して探す）
+            var over = Under(rest.ToArray(), xLo - 0.1f, xHi + 0.1f, yLo - 0.1f, yTop + 0.1f);
+            var turn = -sideR * ForearmTurn;
+            for (var i = 0; i < p.Length; i++)
+            {
+                if (!forearm[i]) continue;
+                var k = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-0.01f, ElbowBend, ey - p[i].y));
+                var r = Quaternion.AngleAxis(turn * k, Vector3.forward);
+                var d = r * new Vector3(p[i].x - ex, p[i].y - ey, 0f);
+                var x2 = ex + d.x;
+                var y2 = ey + d.y;
+                var n2 = r * new Vector3(q[i].x, q[i].y, 0f);
+                // 下にある物の上へ。袖の中の高さ（ならした後の z）はそのまま重ねる
+                var top = -over.At(x2, y2);
+                var z2 = Mathf.Lerp(p[i].z, Mathf.Max(p[i].z, top + p[i].z + Gap), k);
+                const float e = 0.004f;
+                var gx = (-over.At(x2 + e, y2) + over.At(x2 - e, y2)) / (2f * e) * k;
+                var gy = (-over.At(x2, y2 + e) + over.At(x2, y2 - e)) / (2f * e) * k;
+                p[i] = new Vector3(x2, y2, z2);
+                q[i] = new Vector3(n2.x - gx * q[i].z, n2.y - gy * q[i].z, q[i].z).normalized;
+            }
+
+            // 5. 天板の上の身頃の折れ目とたるみ。重なりごと持ち上げる
+            for (var i = 0; i < p.Length; i++)
+            {
+                float h0 = RidgeAt(p[i].x - neck.x, yTop - p[i].y);
+                if (h0 <= 0f) continue;
+                const float e = 0.002f;
+                var gx = (RidgeAt(p[i].x - neck.x + e, yTop - p[i].y) - RidgeAt(p[i].x - neck.x - e, yTop - p[i].y)) / (2f * e);
+                var gy = (RidgeAt(p[i].x - neck.x, yTop - p[i].y - e) - RidgeAt(p[i].x - neck.x, yTop - p[i].y + e)) / (2f * e);
+                p[i].z += h0;
+                q[i] = new Vector3(q[i].x - gx * q[i].z, q[i].y - gy * q[i].z, q[i].z).normalized;
+            }
+
+            // 6. 天板の手前の縁から先を垂らす。軸は縁の角の、EdgeRadius だけ下（いちばん内の重なりが角を EdgeRadius で回る）
             var edge = yTop - onTop;
+            var reach = Mathf.Max(0.01f, edge - yLo);
             float cx = (xLo + xHi) * 0.5f, depth = 0f;
             var outV = new Vector3[p.Length];
             var outN = new Vector3[p.Length];
             for (var i = 0; i < p.Length; i++)
             {
                 // 縁の枠: 縁から外が +z、上が +y。天板の上は z = -(襟の側へ離れた量)
-                float z = edge - p[i].y, y = p[i].z;
-                float nz = -q[i].y, ny = q[i].z;
+                float x = p[i].x - cx, z = edge - p[i].y, y = p[i].z;
+                float nx = q[i].x, nz = -q[i].y, ny = q[i].z;
                 if (z > 0f)
                 {
                     var h = y + EdgeRadius;
                     var phi = Mathf.Min(z / h, Mathf.PI * 0.5f);
                     float s0 = Mathf.Sin(phi), c0 = Mathf.Cos(phi);
-                    // 角を回る間は円、回りきった先はまっすぐ下へ
+                    // 角を回る間は円、回りきった先は下へ
                     var down = Mathf.Max(0f, z - h * Mathf.PI * 0.5f);
-                    var zz = h * s0;
-                    var yy = -EdgeRadius + h * c0 - down;
                     var nz2 = nz * c0 + ny * s0;
                     var ny2 = -nz * s0 + ny * c0;
-                    z = zz;
-                    y = yy;
+                    z = h * s0;
+                    y = -EdgeRadius + h * c0 - down;
                     nz = nz2;
                     ny = ny2;
+                    // 下へ行くほど広がり、外へ振れ、縦の襞が付く
+                    var f = Mathf.Clamp01(down / reach);
+                    var spread = 1f + HangFlare * f;
+                    var wave = 2f * Mathf.PI / FluteWave;
+                    var flute = FluteDepth * f * (0.5f - 0.5f * Mathf.Cos(wave * x));
+                    var gx = FluteDepth * f * 0.5f * wave * Mathf.Sin(wave * x);
+                    // 外への振れは下がるほど（y が下がるほど）増える
+                    var gy = down > 0f ? -HangTilt : 0f;
+                    z += HangTilt * down + flute;
+                    x *= spread;
+                    nx = nx / spread - gx * nz;
+                    ny = ny - gy * nz;
                 }
-                outV[i] = new Vector3(p[i].x - cx, y, z);
-                outN[i] = new Vector3(q[i].x, ny, nz).normalized;
+                outV[i] = new Vector3(x, y, z);
+                outN[i] = new Vector3(nx, ny, nz).normalized;
                 depth = Mathf.Max(depth, -y);
             }
             size = new Vector3(xHi - xLo, depth, onTop);
             var mesh = Write(outV, outN, b.source, "JacketFolded_mesh", false);
             RocketboxJacket.SaveMesh(mesh, FoldedPath(who));
-            note = string.Format(CultureInfo.InvariantCulture, "卓に置いたジャケット: 幅 {0:0.000} m、天板に載せた丈 {1:0.000} m、縁から垂れた深さ {2:0.000} m", size.x, size.z, size.y);
+            note = string.Format(CultureInfo.InvariantCulture, "卓に置いたジャケット: 幅 {0:0.000} m、天板に載せた丈 {1:0.000} m、縁から垂れた深さ {2:0.000} m、天板からいちばん高い所 {3:0.000} m",
+                size.x, size.z, size.y, Highest(outV));
             return AssetDatabase.LoadAssetAtPath<Mesh>(FoldedPath(who));
         }
 
+        /// <summary>天板の上（縁の枠で z が 0 以下）の、いちばん高い所</summary>
+        static float Highest(Vector3[] v)
+        {
+            var top = 0f;
+            foreach (var x in v)
+                if (x.z <= 0f) top = Mathf.Max(top, x.y);
+            return top;
+        }
+
+        /// <summary>折れ目とたるみの高さ。x は首の骨から左右、y は襟の上の縁から下へ（m）</summary>
+        static float RidgeAt(float x, float y)
+        {
+            var h = 0f;
+            var at = new Vector2(x, y);
+            foreach (var r in Ridges)
+            {
+                var ab = r.b - r.a;
+                var t = Mathf.Clamp01(Vector2.Dot(at - r.a, ab) / ab.sqrMagnitude);
+                var d = (at - (r.a + ab * t)).magnitude / r.width;
+                // 両端へ向かって低くなる
+                var taper = Mathf.Sin(Mathf.PI * Mathf.Lerp(0.1f, 0.9f, t));
+                h = Mathf.Max(h, r.height * taper * Mathf.Exp(-d * d));
+            }
+            return h;
+        }
+
         /// <summary>
-        /// コートハンガーのフックに襟で吊った形。体が抜けた分、前後にしぼませ（<see cref="HungFlatten"/>）、肩から下の身頃と袖を少し寄せる（<see cref="HungNarrow"/>）。
+        /// コートハンガーのフックに襟で吊った形。体が抜けた分、前後にぺたんと平たくし（<see cref="HungFlatten"/>）、肩を落とし（<see cref="ShoulderDrop"/>）、
+        /// 肩から下の身頃と袖を寄せ（<see cref="HungNarrow"/>）、裾と袖口を内へ寄せ（<see cref="HemIn"/>）、身頃と袖の中ほどに縦の垂れ皺を付ける（<see cref="HangCrease"/>）。
         /// 襟の後ろの上の縁（フックが通る所）を原点にした、主人公の根と同じ向きの枠で書く（上 +y、前 +z）
         /// </summary>
         public static Mesh MakeHung(RocketboxPerson who, out string note)
         {
             var b = Bake(who);
             var v = b.v;
-            float zLo = float.MaxValue, zHi = float.MinValue, yTop = float.MinValue, yLo = float.MaxValue;
+            float zLo = float.MaxValue, zHi = float.MinValue, yLo = float.MaxValue;
             foreach (var x in v)
             {
                 zLo = Mathf.Min(zLo, x.z);
                 zHi = Mathf.Max(zHi, x.z);
-                yTop = Mathf.Max(yTop, x.y);
                 yLo = Mathf.Min(yLo, x.y);
             }
             var zMid = (zLo + zHi) * 0.5f;
-            var shoulder = b.neck.y - 0.05f;
+            var neck = b.neck;
+            var shoulder = neck.y - 0.05f;
+            var armpit = shoulder - 0.12f;
             var p = new Vector3[v.Length];
             var q = new Vector3[v.Length];
             for (var i = 0; i < v.Length; i++)
             {
-                // 肩から下ほど寄せる（首まわりはそのまま）
-                var k = Mathf.Lerp(1f, HungNarrow, Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(shoulder, shoulder - 0.15f, v[i].y)));
-                p[i] = new Vector3(b.neck.x + (v[i].x - b.neck.x) * k, v[i].y, zMid + (v[i].z - zMid) * HungFlatten);
-                q[i] = new Vector3(b.n[i].x / k, b.n[i].y, b.n[i].z / HungFlatten).normalized;
+                var dx = v[i].x - neck.x;
+                // 肩から下ほど寄せ（首まわりはそのまま）、裾と袖口ほど内へ
+                var k = Mathf.Lerp(1f, HungNarrow, Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(shoulder, shoulder - 0.15f, v[i].y)))
+                    * (1f - HemIn * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(armpit, yLo, v[i].y)));
+                // 首から外ほど肩を落とす。落とす量の左右の傾きで法線も傾ける
+                var a = Mathf.InverseLerp(0.04f, 0.18f, Mathf.Abs(dx));
+                var drop = ShoulderDrop * Mathf.SmoothStep(0f, 1f, a);
+                var slope = a > 0f && a < 1f ? ShoulderDrop * 6f * a * (1f - a) / 0.14f * Mathf.Sign(dx) : 0f;
+                var x = neck.x + dx * k;
+                var z = zMid + (v[i].z - zMid) * HungFlatten;
+                // 縦の垂れ皺。肩の 5 cm 下から出はじめ、30 cm 下で出きる
+                var amp = HangCrease * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(shoulder - 0.05f, shoulder - 0.30f, v[i].y));
+                var wave = 2f * Mathf.PI / CreaseWave;
+                z += amp * Mathf.Sin(wave * (x - neck.x));
+                var gx = amp * wave * Mathf.Cos(wave * (x - neck.x));
+                p[i] = new Vector3(x, v[i].y - drop, z);
+                var n = new Vector3(b.n[i].x / k, b.n[i].y, b.n[i].z / HungFlatten);
+                n = new Vector3(n.x + slope * n.y - gx * n.z, n.y, n.z);
+                q[i] = n.normalized;
             }
-            // フックが通る所: 襟の後ろの上の縁
-            var hook = new Vector3(b.neck.x, float.MinValue, float.MaxValue);
+            // フックが通る所: 襟の後ろの上の縁（首の骨より後ろ。首の骨の前後の位置も同じだけしぼませて比べる）
+            var neckZ = zMid + (neck.z - zMid) * HungFlatten;
+            var hook = new Vector3(neck.x, float.MinValue, float.MaxValue);
             foreach (var x in p)
-                if (Mathf.Abs(x.x - b.neck.x) < 0.02f && x.z < b.neck.z) hook.y = Mathf.Max(hook.y, x.y);
+                if (Mathf.Abs(x.x - neck.x) < 0.02f && x.z < neckZ) hook.y = Mathf.Max(hook.y, x.y);
+            if (hook.y == float.MinValue) throw new InvalidOperationException("吊ったジャケットの襟の後ろが見つからない");
             foreach (var x in p)
-                if (Mathf.Abs(x.x - b.neck.x) < 0.02f && x.y > hook.y - 0.01f) hook.z = Mathf.Min(hook.z, x.z);
+                if (Mathf.Abs(x.x - neck.x) < 0.02f && x.y > hook.y - 0.01f) hook.z = Mathf.Min(hook.z, x.z);
             var outV = new Vector3[p.Length];
             for (var i = 0; i < p.Length; i++) outV[i] = p[i] - hook;
             var mesh = Write(outV, q, b.source, "JacketHung_mesh", false);

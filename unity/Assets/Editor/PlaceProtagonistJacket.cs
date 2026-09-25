@@ -43,7 +43,7 @@ namespace HalfAware.EditorTools
         /// </summary>
         const float FoldedYaw = -90f;
         /// <summary>天板に載せる丈の上限（m）。襟から天板の椅子の側の縁まで。残り（裾と袖口の側）は縁から垂れる</summary>
-        const float OnTopMax = 0.40f;
+        const float OnTopMax = 0.43f;
         /// <summary>卓の縁とメモリハブから空ける幅（m）</summary>
         const float Margin = 0.01f;
 
