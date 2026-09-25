@@ -64,15 +64,15 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// c が肌に貼り付いた物（この置き所の下にある物。差込口の輪と穴）の一部か。
-        /// 輪と穴は体の骨で動く SkinnedMeshRenderer なので、体の肌を集めるところ（肌の頂点・骨の曲がりの基準など）ではこれで除く
+        /// c が肌に貼り付いた物（この置き所の下にある物。差込口の輪と穴）か、体に着せた服（<see cref="Garment"/>。ジャケット）の一部か。
+        /// どれも体の骨で動く SkinnedMeshRenderer なので、体の肌を集めるところ（肌の頂点・骨の曲がりの基準など）ではこれで除く
         /// </summary>
         public static bool Rides(Component c)
         {
-            return c != null && c.GetComponentInParent<SkinPoint>(true) != null;
+            return c != null && (c.GetComponentInParent<SkinPoint>(true) != null || c.GetComponentInParent<Garment>(true) != null);
         }
 
-        /// <summary>root の下の体の肌のレンダラー。頭の影だけを落とす物（HeadShadow）と、肌に貼り付いた物（<see cref="Rides"/>）を除いた最初のもの</summary>
+        /// <summary>root の下の体の肌のレンダラー。頭の影だけを落とす物（HeadShadow）と、肌に貼り付いた物・着せた服（<see cref="Rides"/>）を除いた最初のもの</summary>
         public static SkinnedMeshRenderer BodyOf(Component root)
         {
             if (root == null) return null;

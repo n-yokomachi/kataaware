@@ -91,5 +91,45 @@ namespace HalfAware.Tests
             Assert.IsTrue(SkinPoint.Rides(ringSkin));
             Assert.IsFalse(SkinPoint.Rides(bodySkin));
         }
+
+        /// <summary>体に着せた服（Garment の下）も体の肌として拾わない。服が体のメッシュより先に並んでいても</summary>
+        [Test]
+        public void BodyOfSkipsTheGarment()
+        {
+            root = new GameObject("root");
+            var jacket = new GameObject("Jacket");
+            jacket.transform.SetParent(root.transform, false);
+            var jacketSkin = jacket.AddComponent<SkinnedMeshRenderer>();
+            jacket.AddComponent<Garment>().Set(new Renderer[] { jacketSkin }, true);
+            var body = new GameObject("body");
+            body.transform.SetParent(root.transform, false);
+            var bodySkin = body.AddComponent<SkinnedMeshRenderer>();
+
+            Assert.AreSame(bodySkin, SkinPoint.BodyOf(root.transform));
+            Assert.IsTrue(SkinPoint.Rides(jacketSkin));
+        }
+
+        /// <summary>着る・脱ぐで、服のレンダラーだけが点く・消える</summary>
+        [Test]
+        public void GarmentShowsItsRenderersOnlyWhileWorn()
+        {
+            root = new GameObject("root");
+            var jacket = new GameObject("Jacket");
+            jacket.transform.SetParent(root.transform, false);
+            var jacketSkin = jacket.AddComponent<SkinnedMeshRenderer>();
+            var body = new GameObject("body");
+            body.transform.SetParent(root.transform, false);
+            var bodySkin = body.AddComponent<SkinnedMeshRenderer>();
+            var garment = jacket.AddComponent<Garment>();
+            garment.Set(new Renderer[] { jacketSkin }, false);
+
+            Assert.IsFalse(jacketSkin.enabled, "脱いだ形");
+            garment.Worn = true;
+            Assert.IsTrue(jacketSkin.enabled, "着た形");
+            Assert.IsTrue(bodySkin.enabled, "体はそのまま");
+            garment.Worn = false;
+            Assert.IsFalse(jacketSkin.enabled);
+            Assert.IsTrue(bodySkin.enabled);
+        }
     }
 }

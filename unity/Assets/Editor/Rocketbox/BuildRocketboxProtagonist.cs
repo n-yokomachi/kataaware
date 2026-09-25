@@ -118,6 +118,8 @@ namespace HalfAware.EditorTools.Rocketbox
             // 骨を置いた後の、模型の元の姿勢（手首がまっすぐ）の肌に合わせる
             var animator = her.GetComponent<Animator>();
             if (animator != null && animator.isHuman) PortAtOrigin(her, animator);
+            // 革のライダースジャケット（主人公だけ）。着た形で付ける。脱いだ形にするのは場面の組み立て
+            if (who.Jacket && !twin) RocketboxJacket.Put(her, who, true);
             return her;
         }
 

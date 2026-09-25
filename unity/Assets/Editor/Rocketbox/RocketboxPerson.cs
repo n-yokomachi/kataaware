@@ -80,6 +80,11 @@ namespace HalfAware.EditorTools.Rocketbox
 
         /// <summary>一から作るワンピースを着せる（<see cref="RocketboxDress"/>）。体の人の面は袖口より先の腕と手だけを残す</summary>
         public bool MadeDress;
+        /// <summary>
+        /// 一から作る革のライダースジャケット（<see cref="RocketboxJacket"/>）を着せる。組み立てで体の根の子の Jacket に付け、
+        /// 着る・脱ぐは <see cref="HalfAware.Garment"/> で切り替える（体の面はそのまま残す）
+        /// </summary>
+        public bool Jacket;
         /// <summary>この人の腰から下を借りるとき、左右の脚に分かれて付いた布を、真ん中（左右 SkirtJoin m 以内）で両方の脚に半分ずつ付け直す（スカートが歩きで二つに割れないように）</summary>
         public float SkirtJoin;
 
@@ -366,6 +371,12 @@ namespace HalfAware.EditorTools.Rocketbox
             return p;
         }
 
+        static RocketboxPerson JacketOn(RocketboxPerson p)
+        {
+            p.Jacket = true;
+            return p;
+        }
+
         static RocketboxPerson SlimOn(RocketboxPerson p)
         {
             p.Slim = true;
@@ -401,7 +412,7 @@ namespace HalfAware.EditorTools.Rocketbox
         /// 胸元にネックレス（細い銀の鎖と丸い飾り）を描く。黒子は口の左下。華奢「強」は上半身だけ（下半身は元の太さ）
         /// </summary>
         public static readonly RocketboxPerson Face14Hair14BodySports02 =
-            UpperSlimOn(BodyChest(Dress(Compose("Face14_Hair14_BodySports02", "女大 14 の顔と髪をスポーツ 02 の体に（主人公）", Adult14, Sports02), OutfitProtagonistSports02)));
+            JacketOn(UpperSlimOn(BodyChest(Dress(Compose("Face14_Hair14_BodySports02", "女大 14 の顔と髪をスポーツ 02 の体に（主人公）", Adult14, Sports02), OutfitProtagonistSports02))));
 
         /// <summary>主人公（スポーツ 02 の体）の服: 元の色のまま。腕の肌を頭の肌に揃え、首の付け根の上の 14 のネックレスの鎖は消し、胸元に描き直す</summary>
         static void OutfitProtagonistSports02(RocketboxPaint.Look k)
