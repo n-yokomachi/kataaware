@@ -289,6 +289,13 @@ namespace HalfAware.EditorTools.Rocketbox
             {
                 var d = new Dictionary<string, Transform>();
                 foreach (var t in root.GetComponentsInChildren<Transform>(true)) d[t.name] = t;
+                // 子どもの模型は骨の名前の頭が Bip02（大人は Bip01）。Bip01 の名前でも引けるようにする
+                foreach (var t in root.GetComponentsInChildren<Transform>(true))
+                {
+                    var n = t.name;
+                    if (n.Length > 6 && n.StartsWith("Bip") && n[5] == ' ' && !n.StartsWith("Bip01") && !d.ContainsKey("Bip01" + n.Substring(5)))
+                        d["Bip01" + n.Substring(5)] = t;
+                }
                 Func<string, Vector3> at = n =>
                 {
                     Transform t;

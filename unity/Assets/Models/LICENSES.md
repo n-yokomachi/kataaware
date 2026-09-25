@@ -82,11 +82,12 @@ Beach・Farmer はこの街に合わないので入れていない。
 
 ## Microsoft Rocketbox について
 
-- 出どころ: https://github.com/microsoft/Microsoft-Rocketbox の `Assets/Avatars/Adults/` の下の人ごとのフォルダ
+- 出どころ: https://github.com/microsoft/Microsoft-Rocketbox の `Assets/Avatars/` の下（`Adults/`・`Children/`・`Professions/`）の人ごとのフォルダ
   - 2026-09-23 に落とした: `Female_Adult_14`、`Female_Adult_08`、`Female_Adult_03`、`Female_Adult_02`、`Female_Adult_11`、`Female_Party_02`
   - 2026-09-24 に落とした: `Sports_Female_02`、`Female_Adult_10`、`Female_Party_01`
   - 2026-09-25 に落とした（場面 2 のモブの色の試し）: `Female_Adult_04`、`Male_Adult_04`、`Male_Adult_17`、`Female_Adult_01`、`Male_Adult_20`、`Male_Adult_03`。FBX と色のテクスチャ（頭・体・透け。男大 17 と男大 20 は透けが無い）
   - 2026-09-25 に落とした（場面 2 の群衆・売り手・買い手）: 下の表の 34 人の残り。FBX と色のテクスチャ（頭・体、あれば透け）。同じ日に取り込んだ（下の「場面 2 の群衆・売り手・買い手」）
+  - 2026-09-26 に落とした（場面 4 の記憶の人）: `Female_Child_01`、`Male_Child_01`（`Children/`）、`Business_Female_01`、`Business_Female_02`、`Business_Male_02`、`Business_Male_04`、`Business_Male_06`（`Professions/`）の FBX と色のテクスチャ（頭・体、あれば透け。会社員の女 02 は眼鏡の透けも）と、`Female_Adult_11` の頭のテクスチャ。26 ファイル、243,393,284 バイト。同じ日に取り込んだ（下の「場面 4 の記憶の人」）
 - ライセンス: MIT License（同じリポジトリの `LICENSE.md`）。配るものには下の著作権の表示とライセンスの文を添える（`docs/release/THIRD_PARTY_NOTICES.txt` に入れてある）
 
 ```
@@ -182,10 +183,10 @@ SOFTWARE.
 | 配達の男 | `Delivery_Male_01/` | m112 | 通りの人（サイバーパンカー寄り） | 256 | 無し |
 | 女大 01 | `Female_Adult_01/` | f001 | 通りの人（ふつうの身なり） | 256 | 有り |
 | 女大 05 | `Female_Adult_05/` | f005 | 通りの人（ふつうの身なり） | 256 | 有り |
-| 女大 09 | `Female_Adult_09/` | f009 | 通りの人（ふつうの身なり） | 256 | 有り |
+| 女大 09 | `Female_Adult_09/` | f009 | 通りの人（ふつうの身なり）。場面 4 のエレナ | 256（頭と透けは 512） | 有り |
 | 女大 15 | `Female_Adult_15/` | f018 | 買い手 C。通りの人（ふつうの身なり）としては通りにだけ出す | 512 | 有り |
 | 男大 01 | `Male_Adult_01/` | m002 | 通りの人（ふつうの身なり） | 256 | 有り |
-| 男大 06 | `Male_Adult_06/` | m011 | 通りの人（ふつうの身なり） | 256 | 有り |
+| 男大 06 | `Male_Adult_06/` | m011 | 通りの人（ふつうの身なり）。場面 4 のダニエル | 256（頭と透けは 512） | 有り |
 | 男大 08 | `Male_Adult_08/` | m014 | 通りの人（ふつうの身なり） | 256 | 有り |
 | 男大 16 | `Male_Adult_16/` | m019 | 通りの人（ふつうの身なり） | 256 | 無し |
 | 男大 20 | `Male_Adult_20/` | m027 | 通りの人（ふつうの身なり） | 256 | 無し |
@@ -200,6 +201,33 @@ SOFTWARE.
 | 男大 02 | `Male_Adult_02/` | m003 | 買い手 B | 512 | 有り |
 
 男大 03 と男大 09 の透けのテクスチャは元が 2048×1024 で、縦も同じ比で縮めた。女大 17 と男大 10 の透けのテクスチャは元が 1024。
+
+### 場面 4 の記憶の人
+
+潜った記憶の中の人 16 人（`docs/superpowers/specs/2026-09-26-dive-people-design.md`）。
+人の定義は `Assets/Editor/Rocketbox/RocketboxMemory.cs`（模型は `RocketboxMob.cs` の `Dive`、取り込みはメニューの HalfAware/Dive people/Import the people）、塗り替えは `RocketboxMemoryPaint.cs`、組み立ては `Assets/Editor/BuildDiveCast.cs`（HalfAware/Dive people/Build the people）。
+FBX は手を加えずに写し、頭・透け（と眼鏡）は 512、体は 256 の PNG の写しを置いた。場面 2 と同じ人は同じ写しを使い、女大 09・男大 06 の頭と透けを 512 に取り込み直した（場面 2 の群衆は組み立てで 256 へ縮めて使う）。
+服と肌の色は元のまま。年寄りの白髪・灰髪、メイ（黒）とソフィア（焦げ茶）の髪、メイの上の服（黄）は、組み立てのときに写しへ描き込み、骨の縮尺と背の丸みと一緒に、人ごとのテクスチャ・マテリアル・プレハブとして `Assets/Models/generated/dive/People/` へ作り直す。
+
+| 模型 | 置き場 | 接頭辞 | 当てた人 | テクスチャ | 透け |
+|---|---|---|---|---|---|
+| 女大 11 | `Female_Adult_11/` | f011 | ハンナ | 512（主人公の組み立ての写し。頭だけ足した） | 有り |
+| 女子 01 | `Female_Child_01/` | cf001 | メイ、ソフィア | 頭 512・体 256 | 無し（髪は頭の面） |
+| 男大 03 | `Male_Adult_03/` | m004 | ジョルジョ | 512（場面 2 の売り手の写し） | 有り |
+| 女大 09 | `Female_Adult_09/` | f009 | エレナ | 頭・透け 512、体 256 | 有り |
+| 男大 05 | `Male_Adult_05/` | m009 | アルベルト | 512（場面 2 の売り手の写し） | 有り |
+| 女大 02 | `Female_Adult_02/` | f002 | ローザ | 512（主人公の組み立ての写し） | 有り |
+| 男子 01 | `Male_Child_01/` | cm001 | ルーカス | 頭 512・体 256 | 無し（髪は頭の面） |
+| 女大 19 | `Female_Party_02/` | f022 | プリヤ | 512（主人公の組み立ての写し） | 有り |
+| 女大 08 | `Female_Adult_08/` | f008 | エミリー | 512（主人公の組み立ての写し） | 有り |
+| 会社員の男 04 | `Business_Male_04/` | m015 | マーク | 頭 512・体 256 | 無し |
+| 会社員の女 02 | `Business_Female_02/` | f015 | リンダ | 頭・透け・眼鏡 512、体 256 | 有り（眼鏡の透けは元が 512×256） |
+| 男大 06 | `Male_Adult_06/` | m011 | ダニエル | 頭・透け 512、体 256 | 有り |
+| 会社員の女 01 | `Business_Female_01/` | f014 | アイシャ | 頭・透け 512、体 256 | 有り |
+| 会社員の男 06 | `Business_Male_06/` | m025 | マテオ | 頭 512・体 256 | 無し |
+| 会社員の男 02 | `Business_Male_02/` | m008 | リー | 頭・透け 512、体 256 | 有り |
+
+子どもの模型は骨の名前の頭が `Bip02`（大人は `Bip01`）。
 
 ### 元のファイルとリポジトリに入れた物
 
