@@ -139,7 +139,7 @@ namespace HalfAware.EditorTools
         // ---- シーンの地 ----------------------------------------------------
 
         /// <summary>
-        /// 環境光の三色。空の絵を持たない場所（公園・電車・台所・教室）は、実行時もこの値のまま。
+        /// 環境光の三色。空の絵を持たない場所（電車・台所・教室）は、実行時もこの値のまま。
         /// シーンにもこの値を置くので、エディタで開いたときの見え方もこれになる
         /// </summary>
         static readonly Color StageAmbientSky = new Color(0.135f, 0.145f, 0.170f);
@@ -150,8 +150,8 @@ namespace HalfAware.EditorTools
         /// カメラの設定と、場所の外側の暗さ。
         ///
         /// **シーンに置くのは空を持たない場所の値。** 記憶はどれも屋内か暗がりで、
-        /// 空が映るのは団地の階段と公園だけ。団地は空・霞・環境光を一揃いで持ち
-        /// （<see cref="EstatePlaceSky"/>）、記憶を切り替えるたびに <see cref="DiveDirector"/> が
+        /// 空が映るのは団地の階段と公園だけ。団地と公園は空・霞・環境光を一揃いで持ち
+        /// （<see cref="EstatePlaceSky"/>・<see cref="ParkPlaceSky"/>）、記憶を切り替えるたびに <see cref="DiveDirector"/> が
         /// 場所の分へ差し替える。ここに置くのは、それ以外の場所と同じ、霞なし・一色の空・暗い環境光。
         /// 環境光を切ると屋内が真っ黒になるので、灯りの届かないところの下限としてだけ置く
         /// </summary>
@@ -643,9 +643,12 @@ namespace HalfAware.EditorTools
             sky.arraySize = Skies.Length;
             for (var i = 0; i < Skies.Length; i++)
             {
-                // 団地だけ空・霞・環境光・日を一揃いで持つ。他の四つは一色の空のまま
+                // 団地と公園は空・霞・環境光・日を一揃いで持つ。他の三つは一色の空のまま
                 var id = DiveIds.Places[i];
-                var each = id == DiveIds.Estate ? EstatePlaceSky(places.Find(id)) : PlainSky(Skies[i]);
+                PlaceSky each;
+                if (id == DiveIds.Estate) each = EstatePlaceSky(places.Find(id));
+                else if (id == DiveIds.Park) each = ParkPlaceSky(places.Find(id));
+                else each = PlainSky(Skies[i]);
                 WriteSky(sky.GetArrayElementAtIndex(i), each);
             }
             Fill(dso.FindProperty("takes"), Numbered(takes, roster.Count));
@@ -660,8 +663,8 @@ namespace HalfAware.EditorTools
         /// 台所が朝の七時前、教室が昼前。**真っ黒のままにしない。**
         /// 公園で見上げる記憶と、団地の廊下から外を向いたときに画面の上が抜ける。
         ///
-        /// 団地の行はもう使わない。団地は <see cref="EstatePlaceSky"/> の空の絵と霞の色で塗る。
-        /// 並びを <see cref="DiveIds.Places"/> と揃えておくために、行だけ残してある
+        /// 団地と公園の行はもう使わない。団地は <see cref="EstatePlaceSky"/>、公園は <see cref="ParkPlaceSky"/> の
+        /// 空の絵と霞の色で塗る。並びを <see cref="DiveIds.Places"/> と揃えておくために、行だけ残してある
         /// </summary>
         static readonly Color[] Skies =
         {
@@ -1046,7 +1049,8 @@ namespace HalfAware.EditorTools
                 case "Board": col = new Color(0.082f, 0.112f, 0.092f); smooth = 0.10f; break;
                 case "Bird": col = new Color(0.235f, 0.238f, 0.248f); smooth = 0.06f; break;
                 case "Door": col = new Color(0.108f, 0.092f, 0.082f); smooth = 0.10f; break;
-                case "Water": col = new Color(0.092f, 0.108f, 0.124f); smooth = 0.30f; break;
+                // 公園の池。空を映して、地面より一段明るい灰青に見える。艶を上げて、低い日の照り返しを拾わせる
+                case "Water": col = new Color(0.170f, 0.195f, 0.215f); smooth = 0.72f; break;
                 default: col = new Color(0.150f, 0.150f, 0.155f); smooth = 0.06f; break;
             }
         }
