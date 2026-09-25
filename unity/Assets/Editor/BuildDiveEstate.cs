@@ -388,7 +388,7 @@ namespace HalfAware.EditorTools
                 EstateMorningAim, new Color(1f, 0.95f, 0.86f), 2.0f, 10f);
             sun.shadows = LightShadows.Soft;
             // 日の当たらない側の下限。日と反対の空（南南西の低い所）から来る青い光の代わり。
-            // 環境光も空から取った青にしてあるが（EstateAmbient）、部屋の中まで同じだけ明るくなるので弱く置いている。
+            // 環境光も空から取った青にしてあるが（SkyAmbient）、部屋の中まで同じだけ明るくなるので弱く置いている。
             // これが無いと、日陰へ入った途端に人の輪郭しか見えなくなる
             Lamp(place, "Fill", LightType.Directional, new Vector3(0f, 12f, 0f),
                 new Vector3(20f, 22f, 0f), new Color(0.66f, 0.72f, 0.86f), 0.55f, 10f);

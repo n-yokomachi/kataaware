@@ -70,7 +70,10 @@ namespace HalfAware.EditorTools
         /// 敷地の素材ごとの入れ物。溜めてから <see cref="Emit"/> で一枚ずつ焼く。
         ///
         /// 灯りを受ける Lit の地の色。**どれも実物より暗く置く**（<see cref="Tone"/> と同じ考え）。
-        /// 記憶ごとの色味は Volume が寄せるので、地を明るく置くと白く飛ぶ
+        /// 記憶ごとの色味は Volume が寄せるので、地を明るく置くと白く飛ぶ。
+        ///
+        /// 公園も同じ入れ物とマテリアルを使う（柵の外の通りと長屋）。**マテリアルは分け合い、mesh の名前だけ場所ごとに変える。**
+        /// 焼いた mesh は名前でアセットになるので、同じ名前で出すと先に組んだ場所の mesh が上書きされる
         /// </summary>
         sealed class YardBanks
         {
@@ -97,42 +100,42 @@ namespace HalfAware.EditorTools
             public readonly Bank Pane = new Bank { Texel = 0.5f };
             public readonly Bank Lit = new Bank { Texel = 0.5f };
 
-            public void Emit(Transform place)
+            public void Emit(Transform place, string prefix, Material crown = null)
             {
                 // 煉瓦はロンドンの公営住宅の赤茶。縁石と笠石は明るいコンクリート
-                EstateEmit(place, "EstateYardBrick", Brick, EstatePaint("EstateYardBrick", new Color(0.36f, 0.19f, 0.13f), 0.05f), false);
+                EstateEmit(place, prefix + "YardBrick", Brick, EstatePaint("EstateYardBrick", new Color(0.36f, 0.19f, 0.13f), 0.05f), false);
                 // 三月の頭の芝。まだ色が浅い
-                EstateEmit(place, "EstateYardGrass", Grass, EstatePaint("EstateYardGrass", new Color(0.20f, 0.26f, 0.11f), 0.03f), false);
-                EstateEmit(place, "EstateYardTarmac", Tarmac, EstatePaint("EstateYardTarmac", new Color(0.12f, 0.12f, 0.125f), 0.10f), false);
-                EstateEmit(place, "EstateYardKerb", Kerb, EstatePaint("EstateYardKerb", new Color(0.50f, 0.49f, 0.46f), 0.06f), false);
-                EstateEmit(place, "EstateYardLine", Line, EstatePaint("EstateYardLine", new Color(0.78f, 0.78f, 0.75f), 0.10f), false);
-                EstateEmit(place, "EstateYardYellow", Yellow, EstatePaint("EstateYardYellow", new Color(0.72f, 0.55f, 0.08f), 0.10f), false);
+                EstateEmit(place, prefix + "YardGrass", Grass, EstatePaint("EstateYardGrass", new Color(0.20f, 0.26f, 0.11f), 0.03f), false);
+                EstateEmit(place, prefix + "YardTarmac", Tarmac, EstatePaint("EstateYardTarmac", new Color(0.12f, 0.12f, 0.125f), 0.10f), false);
+                EstateEmit(place, prefix + "YardKerb", Kerb, EstatePaint("EstateYardKerb", new Color(0.50f, 0.49f, 0.46f), 0.06f), false);
+                EstateEmit(place, prefix + "YardLine", Line, EstatePaint("EstateYardLine", new Color(0.78f, 0.78f, 0.75f), 0.10f), false);
+                EstateEmit(place, prefix + "YardYellow", Yellow, EstatePaint("EstateYardYellow", new Color(0.72f, 0.55f, 0.08f), 0.10f), false);
                 // 郵便ポストの赤。艶を持たせて、日の側で縁が光るように
-                EstateEmit(place, "EstateYardRed", Red, EstatePaint("EstateYardRed", new Color(0.55f, 0.05f, 0.04f), 0.45f), false);
-                EstateEmit(place, "EstateYardIron", Iron, EstatePaint("EstateYardIron", new Color(0.05f, 0.052f, 0.055f), 0.35f), false);
-                EstateEmit(place, "EstateYardPole", Pole, EstatePaint("EstateYardPole", new Color(0.42f, 0.43f, 0.44f), 0.35f), false);
-                EstateEmit(place, "EstateYardGlass", Glass, EstatePaint("EstateYardGlass", new Color(0.16f, 0.19f, 0.21f), 0.85f), false);
+                EstateEmit(place, prefix + "YardRed", Red, EstatePaint("EstateYardRed", new Color(0.55f, 0.05f, 0.04f), 0.45f), false);
+                EstateEmit(place, prefix + "YardIron", Iron, EstatePaint("EstateYardIron", new Color(0.05f, 0.052f, 0.055f), 0.35f), false);
+                EstateEmit(place, prefix + "YardPole", Pole, EstatePaint("EstateYardPole", new Color(0.42f, 0.43f, 0.44f), 0.35f), false);
+                EstateEmit(place, prefix + "YardGlass", Glass, EstatePaint("EstateYardGlass", new Color(0.16f, 0.19f, 0.21f), 0.85f), false);
                 // 植え込みの常緑。名前は前からの EstateLeaf のまま
-                EstateEmit(place, "EstateLeaf", Leaf, EstatePaint("EstateLeaf", new Color(0.118f, 0.152f, 0.098f), 0.05f), false);
+                EstateEmit(place, prefix + "Leaf", Leaf, EstatePaint("EstateLeaf", new Color(0.118f, 0.152f, 0.098f), 0.05f), false);
                 // プラタナスの幹は皮が剥げて白っぽい斑になる。遠目には明るい灰色の柱
-                EstateEmit(place, "EstateYardBark", Bark, EstatePaint("EstateYardBark", new Color(0.46f, 0.44f, 0.37f), 0.04f), false);
+                EstateEmit(place, prefix + "YardBark", Bark, EstatePaint("EstateYardBark", new Color(0.46f, 0.44f, 0.37f), 0.04f), false);
                 // 三月の頭はまだ葉が無い。樹冠は枝を描いた絵を札に貼り、枝の隙間から向こうを透かす
-                NoShadow(EstateEmit(place, "EstateYardCrown", Crown, YardCrownMat(), false));
+                NoShadow(EstateEmit(place, prefix + "YardCrown", Crown, crown != null ? crown : YardCrownMat(), false));
                 // 遊び場の下の柔らかい舗装。煉瓦より明るい赤土色
-                EstateEmit(place, "EstateYardRubber", Rubber, EstatePaint("EstateYardRubber", new Color(0.36f, 0.14f, 0.09f), 0.04f), false);
-                EstateEmit(place, "EstateYardTimber", Timber, Mat("Timber"), false);
+                EstateEmit(place, prefix + "YardRubber", Rubber, EstatePaint("EstateYardRubber", new Color(0.36f, 0.14f, 0.09f), 0.04f), false);
+                EstateEmit(place, prefix + "YardTimber", Timber, Mat("Timber"), false);
 
                 // 中の層の棟と長屋。**影を落とさない。** 日は棟の向こう（北北東）の低い所にあるので、
                 // 落とすと隣の棟の影が道路を越えて敷地の半分まで伸び、朝の庭が日陰に沈む。
                 // 前の隣の棟（灯りを受けない書き割り）も影を落としていなかったので、庭の明るさはそれに揃える
-                NoShadow(EstateEmit(place, "EstateNextBrick", NextBrick, MidPaint("EstateNextBrick", new Color(0.36f, 0.22f, 0.17f), 0.35f, 0.05f), false));
-                NoShadow(EstateEmit(place, "EstateNextCrete", NextCrete, MidPaint("EstateNextCrete", new Color(0.56f, 0.55f, 0.52f), 0.35f, 0.05f), false));
+                NoShadow(EstateEmit(place, prefix + "NextBrick", NextBrick, MidPaint("EstateNextBrick", new Color(0.36f, 0.22f, 0.17f), 0.35f, 0.05f), false));
+                NoShadow(EstateEmit(place, prefix + "NextCrete", NextCrete, MidPaint("EstateNextCrete", new Color(0.56f, 0.55f, 0.52f), 0.35f, 0.05f), false));
                 // 長屋のストック煉瓦。黄色がかった灰茶
-                NoShadow(EstateEmit(place, "EstateMidStock", Stock, MidPaint("EstateMidStock", new Color(0.46f, 0.37f, 0.25f), 0.35f, 0.05f), false));
-                NoShadow(EstateEmit(place, "EstateMidSlate", Slate, MidPaint("EstateMidSlate", new Color(0.21f, 0.22f, 0.25f), 0.30f, 0.30f), false));
-                NoShadow(EstateEmit(place, "EstateMidPane", Pane, MidPaint("EstateMidPane", new Color(0.07f, 0.08f, 0.09f), 0.30f, 0.70f), false));
+                NoShadow(EstateEmit(place, prefix + "MidStock", Stock, MidPaint("EstateMidStock", new Color(0.46f, 0.37f, 0.25f), 0.35f, 0.05f), false));
+                NoShadow(EstateEmit(place, prefix + "MidSlate", Slate, MidPaint("EstateMidSlate", new Color(0.21f, 0.22f, 0.25f), 0.30f, 0.30f), false));
+                NoShadow(EstateEmit(place, prefix + "MidPane", Pane, MidPaint("EstateMidPane", new Color(0.07f, 0.08f, 0.09f), 0.30f, 0.70f), false));
                 // 朝の七時。灯りの入った窓が少し
-                NoShadow(EstateEmit(place, "EstateMidLit", Lit, Glow("EstateMidLit", new Color(1f, 0.86f, 0.62f), 0.90f), false));
+                NoShadow(EstateEmit(place, prefix + "MidLit", Lit, Glow("EstateMidLit", new Color(1f, 0.86f, 0.62f), 0.90f), false));
             }
         }
 
@@ -912,19 +915,16 @@ namespace HalfAware.EditorTools
             var y = new YardBanks();
             EstateGrounds(y);
             EstateMid(y);
-            y.Emit(place);
+            y.Emit(place, "Estate");
 
             // 遠い地面。敷地の地面は隣の棟の足元（BlockFace）で切れているので、その先を一枚で塞ぐ。
             // 塞がないと棟の脇に空の色がそのまま抜けて、棟が虚空に立って見える。
             // 敷地の地面より少し下へ置くので、手前では地面に隠れる。
             //
-            // **縁は書き割りの輪と同じ中心・同じ向きの正多角形にする**（BuildDiveEstateFar.cs）。
+            // **縁は書き割りの輪と同じ中心・同じ向きの正多角形にする**（BuildDiveFar.cs の FarLand）。
             // そうすると撮った絵の中の地面の始まりが、どの板でも同じ高さの一本の線になり、
-            // 中心から見て本物の地面の縁とちょうど繋がる
-            var land = new Bank { Texel = 0.35f };
-            land.FanY(new Vector3(EstateFarCentre.x, -0.05f, EstateFarCentre.z), EstateFarRim());
-            // 書き割りの地面も同じマテリアルで撮る
-            NoShadow(EstateEmit(place, "EstateLand", land, EstateLandMat(), false));
+            // 中心から見て本物の地面の縁とちょうど繋がる。書き割りの地面も同じマテリアルで撮る
+            FarLand(place, EstateRing, "EstateLand", EstateLandMat());
 
             // 60 m より先は組まない。撮った絵を板の輪に貼る
             EstateBackdrop(place);
