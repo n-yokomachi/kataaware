@@ -262,27 +262,22 @@ namespace HalfAware.EditorTools
         const string RackName = "CoatRack";
         /// <summary>コートハンガーに掛けたジャケット（Room の子）の名前</summary>
         public const string HungName = "CoatJacket";
-        /// <summary>襟の後ろの上の縁を、腕の先から柱の側へ入れる量（m）。腕の先が首の穴の中へ入り、襟の後ろが腕に載る</summary>
+        /// <summary>襟の後ろの上の縁を、腕の先から柱の側へ入れる量（m）。腕の先が首の穴の中へ入る</summary>
         const float HookIn = 0.03f;
-        /// <summary>下の段の腕の先と、吊ったジャケットの背の間に空ける幅（m）</summary>
-        const float LowerArmClear = 0.01f;
 
         /// <summary>コートハンガーの、ジャケットを掛ける腕</summary>
         struct Hook
         {
-            /// <summary>襟の後ろの上の縁が載る所</summary>
+            /// <summary>襟の後ろの上の縁が来る所（腕の下の面）</summary>
             public Vector3 at;
             /// <summary>柱から腕の先への向き（水平）。ジャケットの前はこちらを向く</summary>
             public Vector3 outward;
-            /// <summary>柱の中心（床の高さ）</summary>
-            public Vector3 pole;
-            /// <summary>同じ向きの下の段の腕の、柱からの長さと高さの幅</summary>
-            public float lowerReach, lowerBottom, lowerTop;
         }
 
         /// <summary>
-        /// ジャケットを掛ける腕を、コートハンガーのメッシュから読む。上の段の 4 本の腕のうち、戸口の内側（立って始める所）を向いた 1 本に掛ける。
-        /// 真下に同じ向きの下の段の腕がある
+        /// ジャケットを掛ける腕を、コートハンガーのメッシュから読む。腕は柱から ±x・±z の 4 方向へ、上下 2 段に伸びる。
+        /// 戸口の内側（立って始める所）を向いた 1 本の、下の段（高さの 7〜8 割の所）に掛ける。
+        /// 上の段に掛けると、真下の同じ向きの下の段の腕（上の段より 3 cm 長い）が背に刺さる。避けるには裾を 16 度外へ振ることになり、板のように傾いて見えた
         /// </summary>
         static bool FindHook(out Hook hook)
         {
@@ -293,50 +288,36 @@ namespace HalfAware.EditorTools
             var pole = new Vector3(rack.position.x, 0f, rack.position.z);
             var toStart = StartAt - pole;
             toStart.y = 0f;
-            // 腕は柱から ±x・±z へ伸びる。立って始める所に近い向き
             var outward = Mathf.Abs(toStart.x) >= Mathf.Abs(toStart.z)
                 ? new Vector3(Mathf.Sign(toStart.x), 0f, 0f) : new Vector3(0f, 0f, Mathf.Sign(toStart.z));
             var side = Vector3.Cross(Vector3.up, outward);
-            float topReach = 0f, topBottom = float.MaxValue, lowReach = 0f, lowBottom = float.MaxValue, lowTop = float.MinValue, height = 0f;
             var world = new List<Vector3>();
             foreach (var v in mf.sharedMesh.vertices) world.Add(mf.transform.TransformPoint(v));
+            var height = 0f;
             foreach (var w in world) height = Mathf.Max(height, w.y);
-            // 上の段は高さの上の 1 割、下の段は上から 1 割 5 分〜3 割 5 分の所に探す
+            // 下の段の腕の先
+            var reach = 0f;
             foreach (var w in world)
             {
                 var d = w - pole;
-                var reach = Vector3.Dot(d, outward);
-                if (reach < 0.06f || Mathf.Abs(Vector3.Dot(d, side)) > 0.04f) continue;
-                if (w.y > height * 0.9f) topReach = Mathf.Max(topReach, reach);
-                else if (w.y > height * 0.65f && w.y < height * 0.85f)
-                {
-                    lowReach = Mathf.Max(lowReach, reach);
-                    lowBottom = Mathf.Min(lowBottom, w.y);
-                    lowTop = Mathf.Max(lowTop, w.y);
-                }
+                if (w.y < height * 0.65f || w.y > height * 0.85f || Mathf.Abs(Vector3.Dot(d, side)) > 0.04f) continue;
+                reach = Mathf.Max(reach, Vector3.Dot(d, outward));
             }
-            if (topReach <= 0f) { Debug.LogWarning("コートハンガーの上の段の腕が見つからない"); return false; }
-            // 襟が載る所の、腕の下の面
+            if (reach <= 0.06f) { Debug.LogWarning("コートハンガーの下の段の腕が見つからない"); return false; }
+            // 襟が来る所の、腕の下の面
+            var bottom = float.MaxValue;
             foreach (var w in world)
             {
                 var d = w - pole;
-                var reach = Vector3.Dot(d, outward);
-                if (w.y > height * 0.9f && reach > topReach - HookIn - 0.01f && Mathf.Abs(Vector3.Dot(d, side)) < 0.04f)
-                    topBottom = Mathf.Min(topBottom, w.y);
+                if (w.y < height * 0.65f || w.y > height * 0.85f || Mathf.Abs(Vector3.Dot(d, side)) > 0.04f) continue;
+                if (Vector3.Dot(d, outward) > reach - HookIn - 0.01f) bottom = Mathf.Min(bottom, w.y);
             }
-            hook.pole = pole;
             hook.outward = outward;
-            hook.at = pole + outward * (topReach - HookIn) + Vector3.up * topBottom;
-            hook.lowerReach = lowReach;
-            hook.lowerBottom = lowBottom;
-            hook.lowerTop = lowTop;
+            hook.at = pole + outward * (reach - HookIn) + Vector3.up * bottom;
             return true;
         }
 
-        /// <summary>
-        /// コートハンガーに掛けたジャケット（<see cref="RocketboxJacketOff.MakeHung"/>）を置く。前は腕の先の向き。
-        /// 下の段の腕が背に刺さらないよう、裾を外へ振る角を、刺さらなくなるまで 1 度ずつ増やして選ぶ
-        /// </summary>
+        /// <summary>コートハンガーに掛けたジャケット（<see cref="RocketboxJacketOff.MakeHung"/>）を置く。前は腕の先の向き</summary>
         static GameObject HangJacket()
         {
             Hook hook;
@@ -346,25 +327,6 @@ namespace HalfAware.EditorTools
             var who = BuildRocketboxProtagonist.Chosen;
             string note;
             var mesh = RocketboxJacketOff.MakeHung(who, out note);
-            var face = Quaternion.LookRotation(hook.outward, Vector3.up);
-            var tiltAxis = Vector3.Cross(hook.outward, Vector3.up);
-            var side = Vector3.Cross(Vector3.up, hook.outward);
-            var verts = mesh.vertices;
-            var swing = 0;
-            for (; swing <= 30; swing++)
-            {
-                var rot = Quaternion.AngleAxis(swing, tiltAxis) * face;
-                var clear = true;
-                foreach (var v in verts)
-                {
-                    var w = hook.at + rot * v;
-                    if (w.y < hook.lowerBottom - 0.01f || w.y > hook.lowerTop + 0.01f) continue;
-                    var d = w - hook.pole;
-                    if (Mathf.Abs(Vector3.Dot(d, side)) > 0.03f) continue;
-                    if (Vector3.Dot(d, hook.outward) < hook.lowerReach + LowerArmClear) { clear = false; break; }
-                }
-                if (clear) break;
-            }
             var t = room.Find(HungName);
             if (t == null)
             {
@@ -372,7 +334,7 @@ namespace HalfAware.EditorTools
                 t.SetParent(room, false);
             }
             t.position = hook.at;
-            t.rotation = Quaternion.AngleAxis(swing, tiltAxis) * face;
+            t.rotation = Quaternion.LookRotation(hook.outward, Vector3.up);
             t.localScale = Vector3.one;
             var mf = t.GetComponent<MeshFilter>();
             if (mf == null) mf = t.gameObject.AddComponent<MeshFilter>();
@@ -380,8 +342,9 @@ namespace HalfAware.EditorTools
             var mr = t.GetComponent<MeshRenderer>();
             if (mr == null) mr = t.gameObject.AddComponent<MeshRenderer>();
             mr.sharedMaterials = PlaceProtagonist.JacketMaterials(who);
-            Debug.Log(string.Format("{0}。フック {1}、前の向き {2}、裾を外へ {3} 度振る（下の段の腕の先 {4:F3} m、高さ {5:F3}〜{6:F3}）",
-                note, hook.at.ToString("F3"), hook.outward.ToString("F0"), swing, hook.lowerReach, hook.lowerBottom, hook.lowerTop));
+            var b = mr.bounds;
+            Debug.Log(string.Format("{0}。フック {1}、前の向き {2}、裾の下の縁 y {3:F3}",
+                note, hook.at.ToString("F3"), hook.outward.ToString("F0"), b.min.y));
             return t.gameObject;
         }
 
@@ -389,7 +352,7 @@ namespace HalfAware.EditorTools
         static Vector3 CoatAt()
         {
             Hook hook;
-            if (!FindHook(out hook)) return new Vector3(1.68f, 1.35f, -2.55f);
+            if (!FindHook(out hook)) return new Vector3(1.68f, 1.05f, -2.55f);
             return hook.at + Vector3.down * 0.15f;
         }
 
