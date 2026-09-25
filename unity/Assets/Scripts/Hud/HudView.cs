@@ -231,6 +231,9 @@ namespace HalfAware
             centerText.text = Ruby.Expand(text ?? string.Empty);
         }
 
+        /// <summary>いまの黒い層の濃さ。層が繋がっていなければ 0。暗転に合わせて音を絞る演出が読む</summary>
+        public float Fade => fadeLayer != null ? fadeLayer.color.a : 0f;
+
         /// <summary>黒い層の濃さ。0 で透明、1 で真っ黒</summary>
         public void SetFade(float alpha)
         {

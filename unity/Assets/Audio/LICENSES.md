@@ -41,6 +41,7 @@ https://pixabay.com/service/license-summary/
 | `Idle.wav` | Pixabay `freesound_community-car-keys-in-ignition-starting-stopping-engine-31102` | Pixabay Content License | 28 秒地点から 8.6 秒。モノラル 44.1kHz へ。頭 0.6 秒を尻へ被せて輪にした。8.00 秒。イグニッションのあと走り出すまでの間を埋める |
 | `WindowDown.wav` | Pixabay `freesound_community-car-window-down-103833` | Pixabay Content License | 1.85 秒地点から 4.45 秒、+20dB。モノラル 44.1kHz へ。素材は 8.94 秒あるが、窓が動いているのは 2〜6 秒だけ。素のままだと実効 −41.9dB で、持ち上げた走行の輪（−19dB）に埋もれて聞こえなかった |
 | `JacketOn.wav` | Pixabay `freesound_community-jacket-rustling-35100`（オーナーが 0.844〜5.596 秒で切り出したもの） | Pixabay Content License | モノラル 44.1kHz へ、頭 20ms と尻 50ms をなだらかにし、+11.8dB で頂点を −6dB に揃えた。4.78 秒。場面 1 で椅子の左の肘掛けのジャケットを着る音 |
+| `RoomTone.wav` | Pixabay `xomxomski-ambient-empty-room-noise-sound-effect-429845` | Pixabay Content License | 3.0〜33.5 秒を切り出し（冒頭の録音の立ち上がりと、33.75 秒・53.5 秒の小さな高い音を避けた）、モノラル 22.05kHz へ。末尾 1.5 秒を頭に重ねて輪にし、実効値を −24dBFS に揃えた。29.0 秒。自室の場面の空気の音 |
 | `CrowdLoop.wav` | Pixabay `freesound_community-crowd_talking-6762` | Pixabay Content License | 7.0〜57.0 秒の 50 秒を切り出し（6.6 秒のいちばん大きな声と、86 秒からのフェードアウトを避けた）、モノラル 22.05kHz へ。末尾 2 秒を頭に重ねて輪にし、実効値を −22dBFS に揃えた。48.0 秒。場面 2 の通りとヤードの雑踏 |
 
 ## 曲
@@ -69,6 +70,7 @@ https://pixabay.com/service/license-summary/
 - 場面 2（小道）と場面 1（自室）は `Step1`〜`Step5`、場面 8（共用ガレージ）は `Concrete1`〜`Concrete4`。
   同じ足音を裸のコンクリートの上で鳴らすと床が土に聞こえるので、場面 8 だけ作り直してある。
   ガレージの反響は素材に焼かず、足元の `AudioReverbFilter` に持たせる
+- 自室の空気の音は `RoomTone`。自室が舞台の場面 1・3・5 で、プレイヤーの頭上で 2D の輪にして小さく流す（`RoomTone`。大きさはインスペクターで変える）。場面を終えて暗転するときは、その暗転に合わせて絞る
 
 ## 車の音
 

@@ -41,6 +41,7 @@ namespace HalfAware.EditorTools
             var cigarette = Smoke();
             var item = Item();
             Director(cigarette, item);
+            Tone();
             Register();
 
             var scene = EditorSceneManager.GetActiveScene();
@@ -275,6 +276,15 @@ namespace HalfAware.EditorTools
             so.FindProperty("seatEyeHeight").floatValue = BuildConnect.SeatEyeHeight();
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(director);
+        }
+
+        /// <summary>
+        /// 自室の空気の音。場面 3 から（場面 3 は Room.unity から）写してくるが、念のため繋ぎ直す（大きさは書き戻さないので、写した値が残る）
+        /// </summary>
+        static void Tone()
+        {
+            var note = new System.Text.StringBuilder();
+            if (!PlaceRoomTone.Put(note)) Debug.LogWarning("自室の空気の音を繋げない: " + note);
         }
 
         /// <summary>

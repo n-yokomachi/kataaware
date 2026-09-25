@@ -81,6 +81,7 @@ namespace HalfAware.EditorTools
             var items = Items(socket);
             var sheet = Screens();
             Wire(socket, sheet, items);
+            Tone();
             Register();
 
             var scene = EditorSceneManager.GetActiveScene();
@@ -93,6 +94,15 @@ namespace HalfAware.EditorTools
                 items.Count, Open(items), sheet.backs.Length, StartAt.ToString("F2"), SeatAt.ToString("F2"),
                 Vector3.Distance(new Vector3(StartAt.x, 0f, StartAt.z), new Vector3(SeatAt.x, 0f, SeatAt.z)),
                 sheet.panes.Length));
+        }
+
+        /// <summary>
+        /// 自室の空気の音。Room.unity から写してくるが、念のため繋ぎ直す（大きさは書き戻さないので、写した値が残る）
+        /// </summary>
+        static void Tone()
+        {
+            var note = new System.Text.StringBuilder();
+            if (!PlaceRoomTone.Put(note)) Debug.LogWarning("自室の空気の音を繋げない: " + note);
         }
 
         /// <summary>
