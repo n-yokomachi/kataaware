@@ -100,6 +100,12 @@ namespace HalfAware
         IInteractable asking;
         int lastStep;
 
+        /// <summary>
+        /// 対象を調べたその時。前提が揃っていて、その対象の文を出し始めたときに呼ぶ。
+        /// 二択を持つ対象でも、文を読む前（二択に答える前）に来る。前提が未達で文だけ出たときは呼ばない
+        /// </summary>
+        public event Action<IInteractable> Examining;
+
         /// <summary>対象を調べて済んだ直後。前提が未達で文だけ出たときは呼ばない</summary>
         public event Action<IInteractable> Examined;
 
@@ -120,6 +126,9 @@ namespace HalfAware
 
         /// <summary>字幕を出している最中か</summary>
         public bool Talking => subtitles.IsTalking;
+
+        /// <summary>二択を出している最中か</summary>
+        public bool Choosing => choice != null;
 
         /// <summary>
         /// いま出している行。出していなければ null。
@@ -282,9 +291,12 @@ namespace HalfAware
             hud.SetPrompt(selected != null ? "E  " + selected.Label : null);
             if (selected != null && interact)
             {
+                // 前提が揃っているかは、済んだことにする前に見る
+                var ready = InteractionPicker.UnmetPrerequisite(selected, progress.Done) == null;
                 var said = progress.Examine(selected);
                 subtitles.Enqueue(said);
                 log.AddRange(said);
+                if (ready && Examining != null) Examining(selected);
                 // 二択を持つ対象は、文を読み終えてから問う
                 asking = selected.Asks ? selected : null;
                 if (asking != null && !subtitles.IsTalking) OpenChoice();

@@ -7,7 +7,8 @@ namespace HalfAware
     /// 置き方の計算は持たない。寄った度合い（<see cref="Seat"/>）を、呼ぶ側が元の所と座った所の間に当てる。
     ///
     /// 段は 離れている → 移している（goSeconds）→ 読んでいる → 戻している（backSeconds）→ 離れている。
-    /// 読んでいる段は、字幕を出している間と、映り込みが消えきるまで続く（消えてから戻る）。
+    /// 読んでいる段は、字幕を出している間と二択を出している間、それに映り込みが消えきるまで続く（消えてから戻る）。
+    /// 端末の独白の後の二択に「はい」と答えれば、続けて出る解除の文も座ったまま読み、「いいえ」なら二択を閉じたところで戻る。
     /// 移す・戻すは両端をなだらかにする（酔わないよう、動き出しと止まり際を遅く）
     /// </summary>
     public sealed class SeatVisit
@@ -34,12 +35,13 @@ namespace HalfAware
         public bool Locked => Now != Phase.Away;
 
         /// <summary>
-        /// 調べる操作と字幕送りを止める間。移す・戻す間と、読んでいる段で字幕が切れた後（映り込みが消えるまで）。
-        /// talking は字幕を出しているか
+        /// 調べる操作と字幕送りを止める間。移す・戻す間と、読んでいる段で字幕も二択も切れた後（映り込みが消えるまで）。
+        /// talking は字幕を出しているか、choosing は二択を出しているか。
+        /// 二択を出している間は止めない。止めると二択に答えられない
         /// </summary>
-        public bool Frozen(bool talking)
+        public bool Frozen(bool talking, bool choosing)
         {
-            return Now == Phase.Going || Now == Phase.Leaving || (Now == Phase.Reading && !talking);
+            return Now == Phase.Going || Now == Phase.Leaving || (Now == Phase.Reading && !talking && !choosing);
         }
 
         /// <summary>座った所の側へ寄った度合い。0 が元の所、1 が座った正面</summary>
@@ -65,8 +67,8 @@ namespace HalfAware
             elapsed = 0f;
         }
 
-        /// <summary>dt 秒進める。talking は字幕を出しているか、shown は映り込みがまだ見えているか</summary>
-        public void Tick(float dt, bool talking, bool shown)
+        /// <summary>dt 秒進める。talking は字幕を出しているか、choosing は二択を出しているか、shown は映り込みがまだ見えているか</summary>
+        public void Tick(float dt, bool talking, bool choosing, bool shown)
         {
             switch (Now)
             {
@@ -75,7 +77,7 @@ namespace HalfAware
                     if (elapsed >= goSeconds) { Now = Phase.Reading; elapsed = 0f; }
                     break;
                 case Phase.Reading:
-                    if (!talking && !shown) { Now = Phase.Leaving; elapsed = 0f; }
+                    if (!talking && !choosing && !shown) { Now = Phase.Leaving; elapsed = 0f; }
                     break;
                 case Phase.Leaving:
                     elapsed += dt;

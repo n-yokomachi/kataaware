@@ -3,12 +3,13 @@ using UnityEngine;
 namespace HalfAware
 {
     /// <summary>
-    /// 場面 1 の端末を調べたら、椅子に座った目の高さの正面（モニターの方）へ視点を移し、体も椅子に座らせて、
-    /// モニターの映り込み（<see cref="TerminalReflection"/>）を見せる。独白を読み終え、映り込みが消えてから、
-    /// 体を立たせて元の所と向きへ戻す（流れは <see cref="SeatVisit"/>）。
+    /// 場面 1 の端末を調べたら、その時（<see cref="SceneFlow.Examining"/>）に、椅子に座った目の高さの正面（モニターの方）へ
+    /// 視点を移し始め、体も椅子に座らせる。座ったまま、独白とモニターの映り込み（<see cref="TerminalReflection"/>）、
+    /// 「スリープを解除する」の二択と、「はい」の後の解除の文までを読ませ、どれも終わって映り込みが消えてから、
+    /// 体を立たせて元の所と向きへ戻す。「いいえ」なら二択を閉じたところで戻る（流れは <see cref="SeatVisit"/>）。
     ///
     /// 移す・読む・戻す間は、見回しと歩きを止める。移す・戻す間は調べる操作と字幕送りも止める
-    /// （着く前に 3 行目へ送られて、映り込みが動いている途中で出ないように）。
+    /// （着く前に 3 行目へ送られて、映り込みが動いている途中で出ないように）。二択を出している間は止めない。
     /// 立って調べたときだけ移す。座ったまま（場面の頭）調べたときは何もしない
     /// </summary>
     [DefaultExecutionOrder(-5)]
@@ -64,15 +65,15 @@ namespace HalfAware
 
         void OnEnable()
         {
-            if (flow != null) flow.Examined += OnExamined;
+            if (flow != null) flow.Examining += OnExamining;
         }
 
         void OnDisable()
         {
-            if (flow != null) flow.Examined -= OnExamined;
+            if (flow != null) flow.Examining -= OnExamining;
         }
 
-        void OnExamined(IInteractable item)
+        void OnExamining(IInteractable item)
         {
             if (item == null || item.Id != terminalId || visit == null || visit.Busy) return;
             var player = flow.Player;
@@ -98,10 +99,21 @@ namespace HalfAware
         void Update()
         {
             if (visit == null || !visit.Busy || flow == null || flow.Player == null) return;
-            visit.Tick(Time.deltaTime, flow.Talking, reflection != null && reflection.Level > 0f);
-            if (visit.Frozen(flow.Talking)) flow.Freeze(ConnectDirector.FreezeMargin);
+            visit.Tick(Time.deltaTime, flow.Talking, flow.Choosing, reflection != null && reflection.Level > 0f);
+            if (visit.Frozen(flow.Talking, flow.Choosing)) flow.Freeze(ConnectDirector.FreezeMargin);
             Place();
             if (!visit.Busy) Finish();
+        }
+
+        /// <summary>
+        /// 座っている間は歩かせない。SceneFlow は二択を閉じるときに player.CanMove を立てるので、
+        /// 「はい」「いいえ」のどちらでも座ったまま歩き出せてしまう。伏せ直す。
+        /// PlayerController は実行順が前なので、次のフレームに間に合う LateUpdate で書く
+        /// </summary>
+        void LateUpdate()
+        {
+            if (visit == null || !visit.Busy || flow == null || flow.Player == null) return;
+            flow.Player.CanMove = false;
         }
 
         /// <summary>寄った度合いのとおりに、目と体と椅子を置く</summary>
