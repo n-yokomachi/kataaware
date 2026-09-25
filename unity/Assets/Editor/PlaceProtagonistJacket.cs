@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using UnityEditor;
 using UnityEngine;
@@ -7,61 +8,59 @@ namespace HalfAware.EditorTools
 {
     public static partial class PlaceProtagonist
     {
-        // ---- 場面 1 の、左の肘掛けに掛けたジャケット ------------------------------
+        // ---- 場面 1 の、椅子の右の卓に置いたジャケット ------------------------------
         //
-        // 場面 1 は着ていない形で始まり、煙草を吸い終えた後、座ったまま左の肘掛けのジャケットを調べて着る（RoomIntroDirector）。
-        // 着ると立ち上がれる（SceneFlow の standAfter）。メモリハブ・端末・メモ・ドアは着た後
+        // 場面 1 は着ていない形で始まり、煙草を吸い終えた後、座ったまま右の卓のジャケットを調べて着る（RoomIntroDirector）。
+        // 着ると立ち上がれる（SceneFlow の standAfter）。メモリハブ・端末・メモ・ドアは着た後。
+        // 卓の、メモリハブより手前（机の側）には明かり（Room/Lamp）が置いてあった。そこをジャケットの置き場にするので、明かりは切る
+        // （Light を持たない置物なので、部屋の明るさは変わらない）。
+        // ジャケットは前を上にして寝かせ、襟を卓の奥へ向けて身頃の上の半分を天板に載せ、下の半分と両の袖を天板の椅子の側の縁から垂らす（RocketboxJacketOff.MakeFolded）
         //
-        // 場面 3 と 5 は場面 1 から写して組むので、掛けたジャケットと体のジャケットもそのまま渡る（着る・脱ぐの頭の形は、それぞれの組み立てが決める）
+        // 場面 3 と 5 は場面 1 から写して組む。卓のジャケットは場面 3 の組み立てが消し、玄関先のコートハンガーに掛けたジャケットを置く
 
-        /// <summary>掛けたジャケットの置き場（椅子の子）の名前</summary>
-        public const string DrapedName = "Jacket";
+        /// <summary>卓に置いたジャケット（Room の子）の名前</summary>
+        public const string FoldedName = "Jacket";
+        /// <summary>卓の明かり（Room の子）。ジャケットに場所を譲って切る</summary>
+        public const string LampName = "Lamp";
+        /// <summary>卓（Room の子）</summary>
+        const string TableName = "SideTable";
+        /// <summary>卓のメモリハブ（Room の子）。ジャケットはこれに重ねない</summary>
+        const string HubName = "MemoryHub";
+        /// <summary>前の置き場（左の肘掛け）に掛けていたジャケット（椅子の子）の名前。残っていたら消す</summary>
+        public const string OldDrapedName = "Jacket";
         /// <summary>ジャケットの調べる対象の名前（Interactables の子）</summary>
         public const string JacketItemName = "Interactable_" + RoomIds.Jacket;
         /// <summary>着る音</summary>
         public const string JacketOnPath = "Assets/Audio/JacketOn.wav";
         /// <summary>
-        /// 調べる対象の半径。座った目から肘掛けまで 0.7 m ほど。
+        /// 調べる対象の半径。座った目から卓の椅子の側の縁まで 1.0 m ほど。
         /// 立ち上がる前にしか用が無いので、部屋の向こうから拾わせない
         /// </summary>
-        const float JacketRadius = 1.2f;
+        const float JacketRadius = 1.5f;
         /// <summary>
-        /// 掛けたジャケットの後ろの端（折り目）を置く z（椅子から見た位置）。幅は前へ 22 cm ほど並び、前寄りの袖の上に左の手が載る。
-        /// 肘掛けの後ろ寄りは座った目から肩に隠れるので、手の下まで前へ出してある
+        /// 置く向き（度、y まわり）。-90 で、垂らす側を椅子の側（-x）へ、襟を卓の奥（壁の側、+x）へ向ける。
+        /// 座って右を見下ろすと、垂れた身頃の前が椅子の方を向き、天板の上の襟は奥に見える
         /// </summary>
-        const float DrapedBack = 0.0f;
+        const float FoldedYaw = -90f;
+        /// <summary>天板に載せる丈の上限（m）。襟から天板の椅子の側の縁まで。残り（裾と袖口の側）は縁から垂れる</summary>
+        const float OnTopMax = 0.40f;
+        /// <summary>卓の縁とメモリハブから空ける幅（m）</summary>
+        const float Margin = 0.01f;
 
-        /// <summary>椅子の左の肘掛けの形を、肘掛けと座面の見た目の大きさ（椅子から見た位置）から読む</summary>
-        public static RocketboxJacketDrape.Armrest LeftArmrest(Transform chair)
+        static bool WorldBounds(Transform t, out Bounds b)
         {
-            var arm = new RocketboxJacketDrape.Armrest { inner = -0.248f, outer = -0.324f, top = 0.676f, seat = 0.549f, back = DrapedBack };
-            var pad = chair.Find("ArmPadL");
-            var seat = chair.Find("SeatPad");
-            Bounds b;
-            if (pad != null && LocalBounds(chair, pad, out b)) { arm.inner = b.max.x; arm.outer = b.min.x; arm.top = b.max.y; }
-            if (seat != null && LocalBounds(chair, seat, out b)) arm.seat = b.max.y;
-            return arm;
-        }
-
-        static bool LocalBounds(Transform frame, Transform t, out Bounds local)
-        {
-            local = new Bounds();
-            var r = t.GetComponent<Renderer>();
-            if (r == null) return false;
-            var w = r.bounds;
+            b = new Bounds();
             var first = true;
-            for (var i = 0; i < 8; i++)
+            foreach (var r in t.GetComponentsInChildren<Renderer>(true))
             {
-                var c = new Vector3((i & 1) == 0 ? w.min.x : w.max.x, (i & 2) == 0 ? w.min.y : w.max.y, (i & 4) == 0 ? w.min.z : w.max.z);
-                var p = frame.InverseTransformPoint(c);
-                if (first) { local = new Bounds(p, Vector3.zero); first = false; }
-                else local.Encapsulate(p);
+                if (first) { b = r.bounds; first = false; }
+                else b.Encapsulate(r.bounds);
             }
-            return true;
+            return !first;
         }
 
         /// <summary>
-        /// 場面 1: 左の肘掛けに掛けたジャケット（見た目）と、それを調べる対象を置き、着る流れを繋ぐ。
+        /// 場面 1: 椅子の右の卓に置いたジャケット（見た目）と、それを調べる対象を置き、着る流れを繋ぐ。
         /// 体のジャケットは脱いだ形で始める。調べる順は ジャック → 煙草 → ジャケット → そのほか（灰皿と箱は煙草の後から、座ったまま調べられる）
         /// </summary>
         static bool Jacket(GameObject her, Transform chair, SceneFlow flow, StringBuilder note)
@@ -69,39 +68,56 @@ namespace HalfAware.EditorTools
             var who = BuildRocketboxProtagonist.Chosen;
             var garment = her.GetComponentInChildren<Garment>(true);
             if (garment == null) { note.AppendLine("体にジャケットが無い"); return false; }
+            var room = GameObject.Find("Room");
+            if (room == null) { note.AppendLine("Room が無い"); return false; }
+            var table = room.transform.Find(TableName);
+            var hub = room.transform.Find(HubName);
+            Bounds tb, hb;
+            if (table == null || !WorldBounds(table, out tb)) { note.AppendLine("卓（Room/" + TableName + "）が無い"); return false; }
+            if (hub == null || !WorldBounds(hub, out hb)) { note.AppendLine("メモリハブ（Room/" + HubName + "）が無い"); return false; }
 
-            // 掛けたジャケット
-            Vector3 pick;
-            string drapeNote;
-            var mesh = RocketboxJacketDrape.Make(who, LeftArmrest(chair), out pick, out drapeNote);
-            note.AppendLine(drapeNote);
-            var draped = chair.Find(DrapedName);
-            if (draped == null)
+            // 前の置き場（左の肘掛け）のジャケットは消す
+            var old = chair.Find(OldDrapedName);
+            if (old != null) Object.DestroyImmediate(old.gameObject);
+            // 明かりは切る
+            var lamp = room.transform.Find(LampName);
+            if (lamp != null) lamp.gameObject.SetActive(false);
+            else note.AppendLine("明かり（Room/" + LampName + "）が無い");
+
+            // 卓のジャケット。天板の椅子の側の縁（卓のいちばん手前。天板が脚と引き出しより張り出している）の、メモリハブと卓の机の側の縁の間の真ん中から垂らす
+            var rot = Quaternion.Euler(0f, FoldedYaw, 0f);
+            float z0 = hb.max.z + Margin, z1 = tb.max.z - Margin;
+            var onTop = Mathf.Min(OnTopMax, tb.max.x - Margin - tb.min.x);
+            Vector3 size;
+            string foldNote;
+            var mesh = RocketboxJacketOff.MakeFolded(who, onTop, out size, out foldNote);
+            note.AppendLine(foldNote);
+            var at = new Vector3(tb.min.x, tb.max.y, (z0 + z1) * 0.5f);
+            if (size.x > z1 - z0)
+                note.AppendFormat(CultureInfo.InvariantCulture, "（思いがけない）卓のジャケットの幅 {0:0.000} m が、メモリハブと卓の縁の間 {1:0.000} m に収まらない", size.x, z1 - z0).AppendLine();
+            var folded = room.transform.Find(FoldedName);
+            if (folded == null)
             {
-                draped = new GameObject(DrapedName).transform;
-                draped.SetParent(chair, false);
+                folded = new GameObject(FoldedName).transform;
+                folded.SetParent(room.transform, false);
             }
-            draped.localPosition = Vector3.zero;
-            draped.localRotation = Quaternion.identity;
-            draped.localScale = Vector3.one;
-            var mf = draped.GetComponent<MeshFilter>();
-            if (mf == null) mf = draped.gameObject.AddComponent<MeshFilter>();
+            folded.position = at;
+            folded.rotation = rot;
+            folded.localScale = Vector3.one;
+            var mf = folded.GetComponent<MeshFilter>();
+            if (mf == null) mf = folded.gameObject.AddComponent<MeshFilter>();
             mf.sharedMesh = mesh;
-            var mr = draped.GetComponent<MeshRenderer>();
-            if (mr == null) mr = draped.gameObject.AddComponent<MeshRenderer>();
-            mr.sharedMaterials = new[]
-            {
-                AssetDatabase.LoadAssetAtPath<Material>(RocketboxJacket.LeatherPath(who)),
-                AssetDatabase.LoadAssetAtPath<Material>(RocketboxJacket.MetalPath(who)),
-                AssetDatabase.LoadAssetAtPath<Material>(RocketboxJacket.LiningPath(who)),
-                AssetDatabase.LoadAssetAtPath<Material>(RocketboxJacket.TeethPath(who)),
-            };
-            draped.gameObject.SetActive(true);
+            var mr = folded.GetComponent<MeshRenderer>();
+            if (mr == null) mr = folded.gameObject.AddComponent<MeshRenderer>();
+            mr.sharedMaterials = JacketMaterials(who);
+            folded.gameObject.SetActive(true);
+            note.AppendFormat(CultureInfo.InvariantCulture, "卓のジャケット: 縁 {0}、z {1:0.000}〜{2:0.000}（メモリハブの縁 z {3:0.000}、卓の机の側の縁 z {4:0.000}）、天板の上 x {5:0.000}〜{6:0.000}、垂れた裾の下の縁 y {7:0.000}",
+                at.ToString("F3"), at.z - size.x * 0.5f, at.z + size.x * 0.5f, hb.max.z, tb.max.z, at.x, at.x + onTop, at.y - size.y).AppendLine();
             // 体のジャケットは脱いだ形で始める
             garment.Worn = false;
             EditorUtility.SetDirty(garment);
 
-            // 調べる対象
+            // 調べる対象。天板の縁の角の上。メモリハブのチップより目に近くしておく
             var script = AssetDatabase.LoadAssetAtPath<RoomScript>(RoomText.ScriptPath);
             var parent = GameObject.Find("Interactables");
             if (parent == null) { note.AppendLine("Interactables が無い"); return false; }
@@ -111,7 +127,7 @@ namespace HalfAware.EditorTools
                 item = new GameObject(JacketItemName).transform;
                 item.SetParent(parent.transform, false);
             }
-            item.position = chair.TransformPoint(pick);
+            item.position = at + Vector3.up * 0.03f;
             var it = item.GetComponent<Interactable>();
             if (it == null) it = item.gameObject.AddComponent<Interactable>();
             var so = new SerializedObject(it);
@@ -122,7 +138,7 @@ namespace HalfAware.EditorTools
             so.FindProperty("once").boolValue = true;
             After(so, RoomIds.Cigarette);
             so.ApplyModifiedPropertiesWithoutUndo();
-            note.AppendFormat("ジャケットの調べる対象: 椅子から見て {0}", pick.ToString("F3")).AppendLine();
+            note.AppendFormat("ジャケットの調べる対象: {0}", item.position.ToString("F3")).AppendLine();
 
             // 調べる順: 歩いて調べる物は着た後。ドアは前提の先頭に文を持たない id（ジャケット）を置いて、着るまで弾く
             foreach (var other in Object.FindObjectsByType<Interactable>(FindObjectsInactive.Include, FindObjectsSortMode.None))
@@ -159,7 +175,7 @@ namespace HalfAware.EditorTools
             var iso = new SerializedObject(intro);
             iso.FindProperty("jacketId").stringValue = RoomIds.Jacket;
             iso.FindProperty("garment").objectReferenceValue = garment;
-            iso.FindProperty("draped").objectReferenceValue = draped.gameObject;
+            iso.FindProperty("folded").objectReferenceValue = folded.gameObject;
             var voice = GameObject.Find("Player/Main Camera/Voice");
             iso.FindProperty("voice").objectReferenceValue = voice != null ? voice.GetComponent<AudioSource>() : null;
             var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(JacketOnPath);
@@ -168,6 +184,18 @@ namespace HalfAware.EditorTools
             iso.ApplyModifiedPropertiesWithoutUndo();
             if (voice == null) note.AppendLine("口元の音源（Player/Main Camera/Voice）が無い");
             return true;
+        }
+
+        /// <summary>脱いだジャケットのマテリアル（着ているジャケットと同じ、革・金具・裏地・ジッパーの歯）</summary>
+        public static Material[] JacketMaterials(RocketboxPerson who)
+        {
+            return new[]
+            {
+                AssetDatabase.LoadAssetAtPath<Material>(RocketboxJacket.LeatherPath(who)),
+                AssetDatabase.LoadAssetAtPath<Material>(RocketboxJacket.MetalPath(who)),
+                AssetDatabase.LoadAssetAtPath<Material>(RocketboxJacket.LiningPath(who)),
+                AssetDatabase.LoadAssetAtPath<Material>(RocketboxJacket.TeethPath(who)),
+            };
         }
 
         static void After(SerializedObject so, params string[] ids)

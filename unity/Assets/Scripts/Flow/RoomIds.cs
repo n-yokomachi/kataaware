@@ -10,7 +10,7 @@ namespace HalfAware
         public const string Jack = "jack";
         /// <summary>煙草。取ると吸い終わるまで自動で進む</summary>
         public const string Cigarette = "cigarette";
-        /// <summary>左の肘掛けのジャケット。座ったまま着る。着ると立ち上がれる</summary>
+        /// <summary>椅子の右の卓に置いたジャケット。座ったまま着る。着ると立ち上がれる</summary>
         public const string Jacket = "jacket";
         /// <summary>抜き差し台のメモリ（チップ）</summary>
         public const string Chips = "chips";

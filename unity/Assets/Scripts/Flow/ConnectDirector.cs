@@ -7,9 +7,9 @@ namespace HalfAware
     /// 場面 3 の段の進行。<see cref="SceneFlow.Examined"/> を受けて、演出と対象の開閉を並べるだけ。
     /// 状態は「いまどの段まで来たか」しか持たない。
     ///
-    /// **椅子を調べたら、ジャケットを脱いでから座る。** 着る音（<c>JacketOn.wav</c>）を鳴らし、音の終わりの少し前に
-    /// 体のジャケットを消して左の肘掛けに掛けたジャケットを出し（脱ぐ動きは作らない）、鳴り終わってから腰を下ろす。
-    /// 間合いは <see cref="JacketBeats"/>。場面 3 は路地裏から着たまま帰ってくるので、頭では着せておく
+    /// **玄関先のコートハンガーを調べたら、ジャケットを脱いで掛ける。** 着る音（<c>JacketOn.wav</c>）を鳴らし、音の終わりの少し前に
+    /// 体のジャケットを消してハンガーに掛けたジャケットを出す（脱ぐ動きは作らない）。間合いは <see cref="JacketBeats"/>。
+    /// 場面 3 は路地裏から着たまま帰ってくるので、頭では着せておく。椅子はハンガーの後（<see cref="ConnectIds.After"/>）
     ///
     /// **jack と monitor は after ではなく有効・無効で開く。** after は「その id が済んだか」
     /// しか見ないので、座る演出と挿す演出は調べた後に数秒かかる。after だけだと
@@ -38,11 +38,11 @@ namespace HalfAware
         [Tooltip("間をおく行を引く文面。list の行を数える")]
         [SerializeField] RoomScript script;
 
-        [Header("ジャケットを脱ぐ")]
-        [Tooltip("体に付けたジャケット。頭では着ていて、座る前に脱ぐ")]
+        [Header("ジャケットをコートハンガーに掛ける")]
+        [Tooltip("体に付けたジャケット。頭では着ていて、コートハンガーで脱ぐ")]
         [SerializeField] Garment garment;
-        [Tooltip("椅子の左の肘掛けに掛けたジャケット。脱いだところで出す")]
-        [SerializeField] GameObject draped;
+        [Tooltip("コートハンガーに掛けたジャケット。掛けたところで出す")]
+        [SerializeField] GameObject hung;
         [Tooltip("脱ぐ音を鳴らす口元の音源")]
         [SerializeField] AudioSource voice;
         [Tooltip("脱ぐ音（着る音と同じもの）")]
@@ -70,6 +70,7 @@ namespace HalfAware
         string pauseLine;
         bool sitting;
         bool seated;
+        bool hanging;
         bool booted;
         bool opened;
         bool scrolling;
@@ -89,9 +90,9 @@ namespace HalfAware
             // 場面 3 は戸口から歩いて始まる。SeatedPose.Seated は直列化されないので、
             // ここで解かないと歩いている間じゅう体だけ座った形で運ばれる
             if (pose != null) pose.Seated = false;
-            // 路地裏から着たまま帰ってくる。肘掛けにはまだ掛かっていない
+            // 路地裏から着たまま帰ってくる。コートハンガーにはまだ掛かっていない
             if (garment != null) garment.Worn = true;
-            if (draped != null) draped.SetActive(false);
+            if (hung != null) hung.SetActive(false);
             if (chairBlocker != null) chairBlocker.SetActive(true);
             Shut(jackItem);
             Shut(monitorItem);
@@ -106,9 +107,12 @@ namespace HalfAware
                 flow.Examined -= OnExamined;
                 // 止められた場合は finally が走らないので、ここでも見回しを戻す
                 if (flow.Player != null) flow.Player.CanLook = true;
+                // 掛けている途中で止められたら、足も戻す
+                if (hanging && flow.Player != null) flow.Player.CanMove = true;
             }
             StopAllCoroutines();
             sitting = false;
+            hanging = false;
         }
 
         void Update()
@@ -153,6 +157,11 @@ namespace HalfAware
         {
             if (item == null) return;
             // note と monitor はここでは何もしない。次の段は after が開く
+            if (item.Id == ConnectIds.Coat)
+            {
+                if (!hanging) StartCoroutine(Hanging());
+                return;
+            }
             if (item.Id == ConnectIds.Chair)
             {
                 if (!sitting && !seated) StartCoroutine(Sitting());
@@ -172,7 +181,40 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// ジャケットを脱いでから、椅子に腰を下ろす。停止は毎フレーム掛け直す。ひとつの長い停止にすると
+        /// コートハンガーにジャケットを掛ける。脱ぐ音を鳴らし、音の終わりの少し前に体のジャケットを消して、ハンガーのジャケットを出す。
+        /// 鳴り終わるまで、ほかを調べさせず、足も止める（掛けながら歩き去らない）。見回しは止めない
+        /// </summary>
+        IEnumerator Hanging()
+        {
+            var player = flow.Player;
+            hanging = true;
+            if (player != null) player.CanMove = false;
+            try
+            {
+                var beats = new JacketBeats(jacketOff != null ? jacketOff.length : 0f, swapBeforeEnd);
+                if (voice != null && jacketOff != null) voice.PlayOneShot(jacketOff);
+                var off = false;
+                for (var t = 0f; t < beats.Sound; t += Time.deltaTime)
+                {
+                    flow.Freeze(FreezeMargin);
+                    if (!off && beats.Swapped(t))
+                    {
+                        off = true;
+                        TakeOff();
+                    }
+                    yield return null;
+                }
+                if (!off) TakeOff();
+            }
+            finally
+            {
+                hanging = false;
+                if (player != null) player.CanMove = true;
+            }
+        }
+
+        /// <summary>
+        /// 椅子に腰を下ろす。停止は毎フレーム掛け直す。ひとつの長い停止にすると
         /// 先に切れて、下ろしている途中で次を調べられる
         /// </summary>
         IEnumerator Sitting()
@@ -185,31 +227,20 @@ namespace HalfAware
             player.CanLook = false;
             try
             {
-                var beats = new JacketBeats(jacketOff != null ? jacketOff.length : 0f, swapBeforeEnd);
-                if (voice != null && jacketOff != null) voice.PlayOneShot(jacketOff);
                 var from = player.transform.position;
                 var fromEye = player.EyeHeight;
                 var fromYaw = player.Yaw;
                 var fromPitch = player.Pitch;
-                var off = false;
-                var end = beats.Seated(sitSeconds);
-                for (var t = 0f; t < end; t += Time.deltaTime)
+                for (var t = 0f; t < sitSeconds; t += Time.deltaTime)
                 {
                     flow.Freeze(FreezeMargin);
-                    // 脱いでから下ろす。下ろし具合は鳴り終わるまで 0
-                    if (!off && beats.Swapped(t))
-                    {
-                        off = true;
-                        TakeOff();
-                    }
-                    var k = beats.Sit(t, sitSeconds);
+                    var k = Mathf.SmoothStep(0f, 1f, t / sitSeconds);
                     player.transform.position = Vector3.Lerp(from, seatSpot, k);
                     player.EyeHeight = Mathf.Lerp(fromEye, seatEyeHeight, k);
                     player.Yaw = Mathf.LerpAngle(fromYaw, seatYaw, k);
                     player.Pitch = Mathf.Lerp(fromPitch, 0f, k);
                     yield return null;
                 }
-                if (!off) TakeOff();
                 player.transform.position = seatSpot;
                 player.EyeHeight = seatEyeHeight;
                 player.Yaw = seatYaw;
@@ -229,11 +260,11 @@ namespace HalfAware
             Open(jackItem);
         }
 
-        /// <summary>体のジャケットを消し、肘掛けに掛けたジャケットを出す</summary>
+        /// <summary>体のジャケットを消し、コートハンガーに掛けたジャケットを出す</summary>
         void TakeOff()
         {
             if (garment != null) garment.Worn = false;
-            if (draped != null) draped.SetActive(true);
+            if (hung != null) hung.SetActive(true);
         }
 
         /// <summary>

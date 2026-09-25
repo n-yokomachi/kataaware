@@ -150,8 +150,8 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 場面 3 で座る前に脱いだまま。体のジャケットは脱いだ形、左の肘掛けにジャケットが掛かっている。
-        /// 場面 3 の組み立ては肘掛けのジャケットを伏せて保存するので、ここで出す（切ってある物は GameObject.Find で拾えないので椅子から辿る）
+        /// 場面 3 で玄関先のコートハンガーに掛けたまま。体のジャケットは脱いだ形、ハンガーにジャケットが掛かっている。
+        /// 場面 3 の組み立てはハンガーのジャケットを伏せて保存するので、ここで出す（切ってある物は GameObject.Find で拾えないので Room から辿る）
         /// </summary>
         static void Undressed()
         {
@@ -159,10 +159,10 @@ namespace HalfAware.EditorTools
             var garment = pro != null ? pro.GetComponentInChildren<Garment>(true) : null;
             if (garment == null) Debug.LogWarning("主人公にジャケットが無い");
             else { garment.Worn = false; EditorUtility.SetDirty(garment); }
-            var chair = Look("Room/Chair");
-            var draped = chair != null ? chair.Find(PlaceProtagonist.DrapedName) : null;
-            if (draped == null) Debug.LogWarning("左の肘掛けのジャケットが無い");
-            else draped.gameObject.SetActive(true);
+            var room = Look("Room");
+            var hung = room != null ? room.Find(BuildConnect.HungName) : null;
+            if (hung == null) Debug.LogWarning("コートハンガーのジャケットが無い");
+            else hung.gameObject.SetActive(true);
         }
 
         /// <summary>

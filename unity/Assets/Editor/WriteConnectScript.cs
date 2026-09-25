@@ -92,6 +92,9 @@ namespace HalfAware.EditorTools
 
             entries.Add(Say(ConnectIds.Note, "メモを見る", NoteLines));
 
+            // 玄関先のコートハンガーにジャケットを掛ける。文は持たず、掛ける音と見た目は ConnectDirector が出す。ラベルは仮置き
+            entries.Add(Say(ConnectIds.Coat, "ジャケットを掛ける", new string[0]));
+
             // 座る演出がすぐに続くので短く
             entries.Add(Say(ConnectIds.Chair, "椅子に座る", new[] { "椅子に座る" }));
 

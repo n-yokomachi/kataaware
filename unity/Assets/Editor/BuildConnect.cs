@@ -3,6 +3,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using HalfAware.EditorTools.Rocketbox;
 
 namespace HalfAware.EditorTools
 {
@@ -240,8 +241,8 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 路地裏から着たまま帰ってくる。体のジャケットは着た形、左の肘掛けのジャケットは伏せておく。
-        /// 椅子を調べたら ConnectDirector が脱がせ、肘掛けに出してから座らせる
+        /// 路地裏から着たまま帰ってくる。体のジャケットは着た形。場面 1 の卓に置いてあったジャケットは消し、
+        /// 玄関先のコートハンガーに掛けたジャケットを伏せて置く。コートハンガーを調べたら ConnectDirector が脱がせて、ハンガーのジャケットを出す
         /// </summary>
         static void Dressed()
         {
@@ -249,8 +250,147 @@ namespace HalfAware.EditorTools
             var garment = pro != null ? pro.GetComponentInChildren<Garment>(true) : null;
             if (garment == null) Debug.LogWarning("主人公にジャケットが無い");
             else { garment.Worn = true; EditorUtility.SetDirty(garment); }
-            var draped = Look("Room/Chair/" + PlaceProtagonist.DrapedName);
-            if (draped != null) draped.gameObject.SetActive(false);
+            var folded = Find("Room/" + PlaceProtagonist.FoldedName);
+            if (folded != null) Object.DestroyImmediate(folded.gameObject);
+            var hung = HangJacket();
+            if (hung != null) hung.SetActive(false);
+        }
+
+        // ---- コートハンガー --------------------------------------------------
+
+        /// <summary>玄関先のコートハンガー（Room の子）</summary>
+        const string RackName = "CoatRack";
+        /// <summary>コートハンガーに掛けたジャケット（Room の子）の名前</summary>
+        public const string HungName = "CoatJacket";
+        /// <summary>襟の後ろの上の縁を、腕の先から柱の側へ入れる量（m）。腕の先が首の穴の中へ入り、襟の後ろが腕に載る</summary>
+        const float HookIn = 0.03f;
+        /// <summary>下の段の腕の先と、吊ったジャケットの背の間に空ける幅（m）</summary>
+        const float LowerArmClear = 0.01f;
+
+        /// <summary>コートハンガーの、ジャケットを掛ける腕</summary>
+        struct Hook
+        {
+            /// <summary>襟の後ろの上の縁が載る所</summary>
+            public Vector3 at;
+            /// <summary>柱から腕の先への向き（水平）。ジャケットの前はこちらを向く</summary>
+            public Vector3 outward;
+            /// <summary>柱の中心（床の高さ）</summary>
+            public Vector3 pole;
+            /// <summary>同じ向きの下の段の腕の、柱からの長さと高さの幅</summary>
+            public float lowerReach, lowerBottom, lowerTop;
+        }
+
+        /// <summary>
+        /// ジャケットを掛ける腕を、コートハンガーのメッシュから読む。上の段の 4 本の腕のうち、戸口の内側（立って始める所）を向いた 1 本に掛ける。
+        /// 真下に同じ向きの下の段の腕がある
+        /// </summary>
+        static bool FindHook(out Hook hook)
+        {
+            hook = new Hook();
+            var rack = Find("Room/" + RackName);
+            var mf = rack != null ? rack.GetComponentInChildren<MeshFilter>(true) : null;
+            if (mf == null || mf.sharedMesh == null) { Debug.LogWarning("コートハンガーが無い: Room/" + RackName); return false; }
+            var pole = new Vector3(rack.position.x, 0f, rack.position.z);
+            var toStart = StartAt - pole;
+            toStart.y = 0f;
+            // 腕は柱から ±x・±z へ伸びる。立って始める所に近い向き
+            var outward = Mathf.Abs(toStart.x) >= Mathf.Abs(toStart.z)
+                ? new Vector3(Mathf.Sign(toStart.x), 0f, 0f) : new Vector3(0f, 0f, Mathf.Sign(toStart.z));
+            var side = Vector3.Cross(Vector3.up, outward);
+            float topReach = 0f, topBottom = float.MaxValue, lowReach = 0f, lowBottom = float.MaxValue, lowTop = float.MinValue, height = 0f;
+            var world = new List<Vector3>();
+            foreach (var v in mf.sharedMesh.vertices) world.Add(mf.transform.TransformPoint(v));
+            foreach (var w in world) height = Mathf.Max(height, w.y);
+            // 上の段は高さの上の 1 割、下の段は上から 1 割 5 分〜3 割 5 分の所に探す
+            foreach (var w in world)
+            {
+                var d = w - pole;
+                var reach = Vector3.Dot(d, outward);
+                if (reach < 0.06f || Mathf.Abs(Vector3.Dot(d, side)) > 0.04f) continue;
+                if (w.y > height * 0.9f) topReach = Mathf.Max(topReach, reach);
+                else if (w.y > height * 0.65f && w.y < height * 0.85f)
+                {
+                    lowReach = Mathf.Max(lowReach, reach);
+                    lowBottom = Mathf.Min(lowBottom, w.y);
+                    lowTop = Mathf.Max(lowTop, w.y);
+                }
+            }
+            if (topReach <= 0f) { Debug.LogWarning("コートハンガーの上の段の腕が見つからない"); return false; }
+            // 襟が載る所の、腕の下の面
+            foreach (var w in world)
+            {
+                var d = w - pole;
+                var reach = Vector3.Dot(d, outward);
+                if (w.y > height * 0.9f && reach > topReach - HookIn - 0.01f && Mathf.Abs(Vector3.Dot(d, side)) < 0.04f)
+                    topBottom = Mathf.Min(topBottom, w.y);
+            }
+            hook.pole = pole;
+            hook.outward = outward;
+            hook.at = pole + outward * (topReach - HookIn) + Vector3.up * topBottom;
+            hook.lowerReach = lowReach;
+            hook.lowerBottom = lowBottom;
+            hook.lowerTop = lowTop;
+            return true;
+        }
+
+        /// <summary>
+        /// コートハンガーに掛けたジャケット（<see cref="RocketboxJacketOff.MakeHung"/>）を置く。前は腕の先の向き。
+        /// 下の段の腕が背に刺さらないよう、裾を外へ振る角を、刺さらなくなるまで 1 度ずつ増やして選ぶ
+        /// </summary>
+        static GameObject HangJacket()
+        {
+            Hook hook;
+            if (!FindHook(out hook)) return null;
+            var room = Find("Room");
+            if (room == null) return null;
+            var who = BuildRocketboxProtagonist.Chosen;
+            string note;
+            var mesh = RocketboxJacketOff.MakeHung(who, out note);
+            var face = Quaternion.LookRotation(hook.outward, Vector3.up);
+            var tiltAxis = Vector3.Cross(hook.outward, Vector3.up);
+            var side = Vector3.Cross(Vector3.up, hook.outward);
+            var verts = mesh.vertices;
+            var swing = 0;
+            for (; swing <= 30; swing++)
+            {
+                var rot = Quaternion.AngleAxis(swing, tiltAxis) * face;
+                var clear = true;
+                foreach (var v in verts)
+                {
+                    var w = hook.at + rot * v;
+                    if (w.y < hook.lowerBottom - 0.01f || w.y > hook.lowerTop + 0.01f) continue;
+                    var d = w - hook.pole;
+                    if (Mathf.Abs(Vector3.Dot(d, side)) > 0.03f) continue;
+                    if (Vector3.Dot(d, hook.outward) < hook.lowerReach + LowerArmClear) { clear = false; break; }
+                }
+                if (clear) break;
+            }
+            var t = room.Find(HungName);
+            if (t == null)
+            {
+                t = new GameObject(HungName).transform;
+                t.SetParent(room, false);
+            }
+            t.position = hook.at;
+            t.rotation = Quaternion.AngleAxis(swing, tiltAxis) * face;
+            t.localScale = Vector3.one;
+            var mf = t.GetComponent<MeshFilter>();
+            if (mf == null) mf = t.gameObject.AddComponent<MeshFilter>();
+            mf.sharedMesh = mesh;
+            var mr = t.GetComponent<MeshRenderer>();
+            if (mr == null) mr = t.gameObject.AddComponent<MeshRenderer>();
+            mr.sharedMaterials = PlaceProtagonist.JacketMaterials(who);
+            Debug.Log(string.Format("{0}。フック {1}、前の向き {2}、裾を外へ {3} 度振る（下の段の腕の先 {4:F3} m、高さ {5:F3}〜{6:F3}）",
+                note, hook.at.ToString("F3"), hook.outward.ToString("F0"), swing, hook.lowerReach, hook.lowerBottom, hook.lowerTop));
+            return t.gameObject;
+        }
+
+        /// <summary>コートハンガーの調べる対象。掛ける腕の先の少し下（掛ける前はジャケットが無いので、腕を見て拾う）</summary>
+        static Vector3 CoatAt()
+        {
+            Hook hook;
+            if (!FindHook(out hook)) return new Vector3(1.68f, 1.35f, -2.55f);
+            return hook.at + Vector3.down * 0.15f;
         }
 
         /// <summary>主人公の体の骨（Humanoid）。右の前腕は手首の差込口とジャックの受け口、左の手は掴む置き所を持つ</summary>
@@ -300,7 +440,7 @@ namespace HalfAware.EditorTools
         // ---- 調べる対象 ------------------------------------------------------
 
         /// <summary>
-        /// 6 つとも必須。<c>jack</c> と <c>monitor</c> だけは伏せて始める。
+        /// 7 つとも必須。<c>jack</c> と <c>monitor</c> だけは伏せて始める。前提は <see cref="ConnectIds.After"/>。
         /// after は「その id が済んだか」しか見ないので、座る演出と挿す演出の途中で
         /// 次が拾えてしまう。演出の終わりで ConnectDirector が開けば、
         /// 開く時刻が演出の終わりと一致する
@@ -314,11 +454,12 @@ namespace HalfAware.EditorTools
             if (script == null)
                 Debug.LogWarning("場面 3 の文面が無い。先に HalfAware/Write the connect script を走らせる: " + ScriptPath);
 
-            made[ConnectIds.Note] = Put(parent, "Note", NoteAt, script, ConnectIds.Note, ItemRadius, null, true);
-            made[ConnectIds.Chair] = Put(parent, "Chair", ChairAt, script, ConnectIds.Chair, ItemRadius, ConnectIds.Note, true);
-            made[ConnectIds.Monitor] = Put(parent, "Monitor", ScreenAt, script, ConnectIds.Monitor, ItemRadius, null, false);
-            made[ConnectIds.List] = Put(parent, "List", ScreenAt, script, ConnectIds.List, ItemRadius, ConnectIds.Monitor, true);
-            made[ConnectIds.Dive] = Put(parent, "Dive", ScreenAt, script, ConnectIds.Dive, ItemRadius, ConnectIds.List, true);
+            made[ConnectIds.Note] = Put(parent, "Note", NoteAt, script, ConnectIds.Note, ItemRadius, true);
+            made[ConnectIds.Coat] = Put(parent, "Coat", CoatAt(), script, ConnectIds.Coat, ItemRadius, true);
+            made[ConnectIds.Chair] = Put(parent, "Chair", ChairAt, script, ConnectIds.Chair, ItemRadius, true);
+            made[ConnectIds.Monitor] = Put(parent, "Monitor", ScreenAt, script, ConnectIds.Monitor, ItemRadius, false);
+            made[ConnectIds.List] = Put(parent, "List", ScreenAt, script, ConnectIds.List, ItemRadius, true);
+            made[ConnectIds.Dive] = Put(parent, "Dive", ScreenAt, script, ConnectIds.Dive, ItemRadius, true);
 
             // ジャックの対象はジャックに付いて回る。肘掛けに置いてある間はそこで拾い、
             // 挿した後は手首に付いていく
@@ -326,16 +467,16 @@ namespace HalfAware.EditorTools
             // 置き場（右の肘掛けの後ろ寄り）は目より後ろにあり、そこを見ると、首より上を映さない体の襟ぐりの中が見える
             if (socket != null)
             {
-                var item = Put(socket, "Jack", socket.position, script, ConnectIds.Jack, JackRadius, null, false);
+                var item = Put(socket, "Jack", socket.position, script, ConnectIds.Jack, JackRadius, false);
                 item.transform.localPosition = Vector3.zero;
                 made[ConnectIds.Jack] = item;
             }
             return made;
         }
 
-        /// <summary>調べる対象をひとつ立てる。どれも一度調べたら終わり</summary>
+        /// <summary>調べる対象をひとつ立てる。どれも一度調べたら終わり。前提は <see cref="ConnectIds.After"/></summary>
         static GameObject Put(Transform parent, string name, Vector3 at, RoomScript script,
-            string id, float radius, string after, bool live)
+            string id, float radius, bool live)
         {
             var go = new GameObject("Interactable_" + name);
             go.transform.SetParent(parent, false);
@@ -349,9 +490,10 @@ namespace HalfAware.EditorTools
             so.FindProperty("radius").floatValue = radius;
             so.FindProperty("required").boolValue = true;
             so.FindProperty("once").boolValue = true;
+            var after = ConnectIds.After(id);
             var chain = so.FindProperty("after");
-            chain.arraySize = after == null ? 0 : 1;
-            if (after != null) chain.GetArrayElementAtIndex(0).stringValue = after;
+            chain.arraySize = after.Length;
+            for (var i = 0; i < after.Length; i++) chain.GetArrayElementAtIndex(i).stringValue = after[i];
             so.ApplyModifiedPropertiesWithoutUndo();
             go.SetActive(live);
             return go;
@@ -652,11 +794,11 @@ namespace HalfAware.EditorTools
             so.FindProperty("script").objectReferenceValue = AssetDatabase.LoadAssetAtPath<RoomScript>(ScriptPath);
             so.FindProperty("seatSpot").vector3Value = SeatAt;
             so.FindProperty("seatEyeHeight").floatValue = SeatEyeHeight();
-            // 座る前にジャケットを脱いで左の肘掛けに掛ける。音は挿す音と同じ口元の音源で、着る音を鳴らす
+            // 玄関先のコートハンガーでジャケットを脱いで掛ける。音は挿す音と同じ口元の音源で、着る音を鳴らす
             var pro = Look("Player/Protagonist");
             so.FindProperty("garment").objectReferenceValue = pro != null ? pro.GetComponentInChildren<Garment>(true) : null;
-            var draped = Look("Room/Chair/" + PlaceProtagonist.DrapedName);
-            so.FindProperty("draped").objectReferenceValue = draped != null ? draped.gameObject : null;
+            var hung = Look("Room/" + HungName);
+            so.FindProperty("hung").objectReferenceValue = hung != null ? hung.gameObject : null;
             var voice = Look("Player/Main Camera/Voice");
             so.FindProperty("voice").objectReferenceValue = voice != null ? voice.GetComponent<AudioSource>() : null;
             var off = AssetDatabase.LoadAssetAtPath<AudioClip>(PlaceProtagonist.JacketOnPath);
@@ -754,6 +896,7 @@ namespace HalfAware.EditorTools
                     placed.Length, ConnectIds.Order.Length));
 
             Reach(ConnectIds.Note, NoteAt);
+            Reach(ConnectIds.Coat, CoatAt());
             Reach(ConnectIds.Chair, ChairAt);
 
             // 挿す前のジャックは肘掛けの上。判定点がそこから離れていると、

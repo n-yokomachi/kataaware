@@ -24,6 +24,13 @@ MonoBehaviour:
     choice:
       question: 
       afterYes: []
+  - id: coat
+    label: "\u30B8\u30E3\u30B1\u30C3\u30C8\u3092\u639B\u3051\u308B"
+    lines: []
+    hints: []
+    choice:
+      question: 
+      afterYes: []
   - id: chair
     label: "\u6905\u5B50\u306B\u5EA7\u308B"
     lines:

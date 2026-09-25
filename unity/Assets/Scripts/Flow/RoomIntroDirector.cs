@@ -8,8 +8,8 @@ namespace HalfAware
     /// 場面 1 固有の演出。始まってすぐ最初の独白を流す。
     /// 煙草を取ったら煙を立てて操作を止め、そのあいだに画面を 3 回黒く覆う。
     /// 覆っているあいだにクレジットとタイトルのカードを出し、戻ると消えている。
-    /// 吸い終わったら、座ったまま左の肘掛けのジャケットを着る。着る音を鳴らし、正面へ向き直してから、
-    /// 音の終わりの少し前に体へ着せて肘掛けのジャケットを消す（着る動きは作らない）。着た後の独白で締め、読み終えたら立ち上がる（SceneFlow の standAfter）。
+    /// 吸い終わったら、座ったまま椅子の右の卓に置いたジャケットを着る。着る音を鳴らし、正面へ向き直してから、
+    /// 音の終わりの少し前に体へ着せて卓のジャケットを消す（着る動きは作らない）。着た後の独白で締め、読み終えたら立ち上がる（SceneFlow の standAfter）。
     /// SceneFlow とは Examined / Say / Freeze だけで繋ぐ
     /// </summary>
     public sealed class RoomIntroDirector : MonoBehaviour
@@ -42,15 +42,16 @@ namespace HalfAware
         [SerializeField] string jacketId = RoomIds.Jacket;
         [Tooltip("体に付けたジャケット。着る音の終わりの少し前に着せる")]
         [SerializeField] Garment garment;
-        [Tooltip("椅子の左の肘掛けに掛けたジャケット。着せたところで消す")]
-        [SerializeField] GameObject draped;
+        [Tooltip("椅子の右の卓に置いたジャケット。着せたところで消す")]
+        [FormerlySerializedAs("draped")]
+        [SerializeField] GameObject folded;
         [Tooltip("着る音を鳴らす口元の音源（煙草の息と同じもの）")]
         [SerializeField] AudioSource voice;
         [Tooltip("着る音")]
         [SerializeField] AudioClip jacketOn;
         [Tooltip("音の終わりから、着せ替えるまでさかのぼる秒")]
         [SerializeField] float swapBeforeEnd = 0.6f;
-        [Tooltip("着る音のあいだに正面へ向き直すのにかける秒数。肘掛けを見たまま着せ替えを見せない")]
+        [Tooltip("着る音のあいだに正面へ向き直すのにかける秒数。卓を見たまま着せ替えを見せない")]
         [SerializeField] float jacketAimSeconds = 1.6f;
         [Tooltip("着た後の独白")]
         [FormerlySerializedAs("afterSmokeLines")]
@@ -151,8 +152,8 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// 座ったまま、左の肘掛けのジャケットを着る。着る音を鳴らし、正面へ向き直してから、
-        /// 音の終わりの少し前に体へ着せて肘掛けのジャケットを消す。音が鳴り終わってから独白
+        /// 座ったまま、右の卓のジャケットを着る。着る音を鳴らし、正面へ向き直してから、
+        /// 音の終わりの少し前に体へ着せて卓のジャケットを消す。音が鳴り終わってから独白
         /// </summary>
         IEnumerator PutOn()
         {
@@ -180,11 +181,11 @@ namespace HalfAware
             flow.Say(afterJacketLines);
         }
 
-        /// <summary>体へ着せ、肘掛けのジャケットを消す</summary>
+        /// <summary>体へ着せ、卓のジャケットを消す</summary>
         void Dress()
         {
             if (garment != null) garment.Worn = true;
-            if (draped != null) draped.SetActive(false);
+            if (folded != null) folded.SetActive(false);
         }
 
         /// <summary>座って始めたときの向きへ、滑らかに戻す。切り替えではなく回して戻すので繋ぎ目が出ない</summary>
