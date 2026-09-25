@@ -156,7 +156,7 @@ SOFTWARE.
 路地裏の通りとヤードの人（59 人）、ヤードの売り手、買い手 A・B・C（`docs/superpowers/specs/2026-09-25-alley-mob-design.md`）。
 人の定義は `Assets/Editor/Rocketbox/RocketboxMob.cs`（取り込みはメニューの HalfAware/Alley crowd/Import the people）、置き方は `Assets/Editor/BuildAlleyCrowd.cs`（`HalfAware/Build the alley` から呼ぶ）。
 主人公と違い、顔や体には手を入れない。肌に描くインプラント、姿勢に曲げて焼いた形、三角を減らした近さの段の形、マテリアルは、組み立てのたびに `Assets/Models/generated/alley/Crowd/` へ作り直す（リポジトリに入れない）。
-三角を減らすのは UnityMeshSimplifier（https://github.com/Whinarn/UnityMeshSimplifier 、MIT、v3.1.1 に固定。組み立てのときだけ使う）。
+三角を減らすのは UnityMeshSimplifier（https://github.com/Whinarn/UnityMeshSimplifier 、MIT、v3.1.1）。組み立てのときだけ使うので、`Packages/com.whinarn.unitymeshsimplifier/` に写して（同梱の LICENSE.md ごと）、実行時の assembly もエディタだけに限った（WebGL の書き出しに入らない）。
 
 どの人も FBX は手を加えずに写し、頭・体・透けのテクスチャ（2048 の TGA）は縮めた PNG の写しを置いた。群衆は 256、寄りで見る売り手と買い手は 512。
 女大 02・03・19 は、主人公の組み立てが使う 512 の写し（体・透け）がすでにあるので、それを使い、無かった頭だけを 512 で作った。
