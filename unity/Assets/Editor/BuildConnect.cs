@@ -75,6 +75,7 @@ namespace HalfAware.EditorTools
             Strip();
             Flow();
             Stand();
+            Dressed();
             var socket = Park();
             var items = Items(socket);
             var sheet = Screens();
@@ -236,6 +237,20 @@ namespace HalfAware.EditorTools
             if (pose != null) { pose.Seated = false; EditorUtility.SetDirty(pose); }
             var blocker = Look("Room/Chair/Blocker");
             if (blocker != null) blocker.gameObject.SetActive(true);
+        }
+
+        /// <summary>
+        /// 路地裏から着たまま帰ってくる。体のジャケットは着た形、左の肘掛けのジャケットは伏せておく。
+        /// 椅子を調べたら ConnectDirector が脱がせ、肘掛けに出してから座らせる
+        /// </summary>
+        static void Dressed()
+        {
+            var pro = Look("Player/Protagonist");
+            var garment = pro != null ? pro.GetComponentInChildren<Garment>(true) : null;
+            if (garment == null) Debug.LogWarning("主人公にジャケットが無い");
+            else { garment.Worn = true; EditorUtility.SetDirty(garment); }
+            var draped = Look("Room/Chair/" + PlaceProtagonist.DrapedName);
+            if (draped != null) draped.gameObject.SetActive(false);
         }
 
         /// <summary>主人公の体の骨（Humanoid）。右の前腕は手首の差込口とジャックの受け口、左の手は掴む置き所を持つ</summary>
@@ -637,6 +652,16 @@ namespace HalfAware.EditorTools
             so.FindProperty("script").objectReferenceValue = AssetDatabase.LoadAssetAtPath<RoomScript>(ScriptPath);
             so.FindProperty("seatSpot").vector3Value = SeatAt;
             so.FindProperty("seatEyeHeight").floatValue = SeatEyeHeight();
+            // 座る前にジャケットを脱いで左の肘掛けに掛ける。音は挿す音と同じ口元の音源で、着る音を鳴らす
+            var pro = Look("Player/Protagonist");
+            so.FindProperty("garment").objectReferenceValue = pro != null ? pro.GetComponentInChildren<Garment>(true) : null;
+            var draped = Look("Room/Chair/" + PlaceProtagonist.DrapedName);
+            so.FindProperty("draped").objectReferenceValue = draped != null ? draped.gameObject : null;
+            var voice = Look("Player/Main Camera/Voice");
+            so.FindProperty("voice").objectReferenceValue = voice != null ? voice.GetComponent<AudioSource>() : null;
+            var off = AssetDatabase.LoadAssetAtPath<AudioClip>(PlaceProtagonist.JacketOnPath);
+            if (off == null) Debug.LogWarning("着る音が無い: " + PlaceProtagonist.JacketOnPath);
+            so.FindProperty("jacketOff").objectReferenceValue = off;
             // モニターの方。部屋は z の正の向きに机が並んでいる
             so.FindProperty("seatYaw").floatValue = 0f;
             so.ApplyModifiedPropertiesWithoutUndo();

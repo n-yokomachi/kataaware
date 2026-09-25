@@ -28,6 +28,13 @@ MonoBehaviour:
     choice:
       question: 
       afterYes: []
+  - id: jacket
+    label: "\u30B8\u30E3\u30B1\u30C3\u30C8\u3092\u7740\u308B"
+    lines: []
+    hints: []
+    choice:
+      question: 
+      afterYes: []
   - id: chips
     label: "\u30C1\u30C3\u30D7\u3092\u629C\u304F"
     lines:

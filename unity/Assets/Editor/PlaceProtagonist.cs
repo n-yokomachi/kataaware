@@ -233,6 +233,9 @@ namespace HalfAware.EditorTools
             pose.Bind();
             JackHoldRoll.ForPull(pull, note);
 
+            // 左の肘掛けに掛けたジャケットと、着る流れ（体のジャケットは脱いだ形で始める）
+            if (!Jacket(her, chair.transform, flow, note)) return false;
+
             // 保存する姿は座った形（場面 1 は座って始まる）
             pose.Bind();
             pose.Apply();
@@ -388,7 +391,7 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 二つの一覧の差。Player/Protagonist の下は数えない。組み立てが変えてよい物（抜いたジャックの置き場、ケーブル、
-        /// 端末の画面に映る口元）の差は書くが、思いがけない差には数えない
+        /// 端末の画面に映る口元、左の肘掛けに掛けたジャケットとその調べる対象）の差は書くが、思いがけない差には数えない
         /// </summary>
         public static string Diff(Dictionary<string, string> a, Dictionary<string, string> b, out int unexpected)
         {
@@ -404,7 +407,8 @@ namespace HalfAware.EditorTools
                 b.TryGetValue(k, out y);
                 if (x == y) continue;
                 // 組み立てが変えてよい物: 抜いたジャックの置き場（座面の縁へ移す）、ケーブル（被膜の色を BuildProps.Tune が決める）、端末の画面に映る口元
-                var allowed = k == "Room/Chair/JackRest" || k == "Room/Chair/Cable" || k.EndsWith("/" + ReflectionName) || k.Contains("/" + ReflectionName + "/");
+                var allowed = k == "Room/Chair/JackRest" || k == "Room/Chair/Cable" || k.EndsWith("/" + ReflectionName) || k.Contains("/" + ReflectionName + "/")
+                    || k == "Room/Chair/" + DrapedName || k == "Interactables/" + JacketItemName;
                 if (!allowed) unexpected++;
                 sb.AppendFormat("  {0}{1}: {2} → {3}", allowed ? "" : "（思いがけない）", k, x ?? "無し", y ?? "無し").AppendLine();
             }
@@ -483,7 +487,9 @@ namespace HalfAware.EditorTools
         ///   座面が高く（0.549）、足を床へ下ろすと腿が座面の前の縁に 8 cm 食い込むため
         /// - 腕: 肩から肘掛けまでが上腕より長いので、前腕は肘掛けへ斜めに下ろし、手首から先を肘掛けに預ける。
         ///   右は手のひらを上へ返し（手首のジャックが目に入る）、差込口（肘掛けの前寄り）を前腕で塞がないよう内へ寄せる。
-        ///   左は手のひらを下へ
+        ///   左は手のひらを下へ。左の肘掛けにはジャケットが掛かっていて（場面 1 の着る前、場面 3 の脱いだ後、場面 5）、手はその袖の上に載る。
+        ///   その厚みの分だけ、左の手首を 6 mm 上げてある
+        ///   （左の手を腿へ下ろした形も試したが、ジャックを抜くしぐさで左手が右の前腕に潜り、手のひらのひねりも目安を越えた）
         /// </summary>
         /// <summary>端末の映り込みを見る間の座った形。<see cref="RoomSit"/> と同じ腰と脚で、両手を腿の上に置き、肘を体の脇へ下ろす</summary>
         public static BodyPoser.Sit TerminalSit(Transform chair)
@@ -517,7 +523,7 @@ namespace HalfAware.EditorTools
                 kneePoleL = P(-0.10f, 0.9f, 1.2f),
                 kneePoleR = P(0.10f, 0.9f, 1.2f),
                 footPoint = 15f,
-                wristL = P(-0.265f, 0.70f, 0.16f),
+                wristL = P(-0.265f, 0.706f, 0.16f),
                 wristR = P(0.215f, 0.70f, 0.25f),
                 elbowPoleL = P(-0.45f, 0.6f, -0.28f),
                 elbowPoleR = P(0.45f, 0.6f, -0.28f),

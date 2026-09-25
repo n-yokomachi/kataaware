@@ -2729,7 +2729,7 @@ namespace HalfAware.EditorTools.Rocketbox
 
         // ---- 書く ----------------------------------------------------------------
 
-        static void SaveMesh(Mesh mesh, string path)
+        internal static void SaveMesh(Mesh mesh, string path)
         {
             var dir = System.IO.Path.GetDirectoryName(path).Replace('\\', '/');
             if (!AssetDatabase.IsValidFolder(dir))

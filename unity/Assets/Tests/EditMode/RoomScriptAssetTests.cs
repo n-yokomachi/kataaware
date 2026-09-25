@@ -20,15 +20,17 @@ namespace HalfAware.Tests
         {
             Assert.That(Load().Ids(), Is.EquivalentTo(new[]
             {
-                "jack", "cigarette", "chips", "terminal", "door", "ashtray", "cigarette-box", "clipboard",
+                "jack", "cigarette", "jacket", "chips", "terminal", "door", "ashtray", "cigarette-box", "clipboard",
             }));
+            Assert.That(Load().Ids(), Is.EquivalentTo(RoomIds.All));
         }
 
         // 何ページに割るかは見た目の都合で変わるので、行の総数で見る。
         // 二択の後に出す文も、シナリオの一部なので数に入れる。
-        // 煙草だけ 0 行。吸い終わりの独白は RoomIntroDirector が言う
+        // 煙草とジャケットは 0 行。着た後の独白は RoomIntroDirector が言う
         [TestCase("jack", 1)]
         [TestCase("cigarette", 0)]
+        [TestCase("jacket", 0)]
         [TestCase("chips", 7)]
         [TestCase("terminal", 11)]
         [TestCase("door", 1)]
@@ -57,6 +59,7 @@ namespace HalfAware.Tests
         }
 
         [TestCase("jack")]
+        [TestCase("jacket")]
         [TestCase("ashtray")]
         [TestCase("cigarette-box")]
         [TestCase("clipboard")]
@@ -86,12 +89,20 @@ namespace HalfAware.Tests
         }
 
         [Test]
+        public void TheJacketIsLabelledToPutOn()
+        {
+            Assert.That(Load().Find(RoomIds.Jacket).label, Is.EqualTo("ジャケットを着る"));
+        }
+
+        [Test]
         public void TellsTheDoorWhichPrerequisiteIsMissing()
         {
             var door = Load().Find("door");
             Assert.That(door.HintFor("chips"), Is.Not.Null.And.Not.Empty);
             Assert.That(door.HintFor("terminal"), Is.Not.Null.And.Not.Empty);
             Assert.That(door.HintFor("jack"), Is.Null);
+            // 着る前にドアへ近づいても文は出さない（立ち上がれないので届かないが、先頭の前提は文を持たない id にする）
+            Assert.That(door.HintFor(RoomIds.Jacket), Is.Null);
         }
     }
 }

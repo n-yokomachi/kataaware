@@ -27,6 +27,13 @@ namespace HalfAware.EditorTools
             var so = new SerializedObject(asset);
             var entries = so.FindProperty("entries");
 
+            // ジャケット: 煙草の後に座ったまま着る。文は持たず、着る音と着た後の独白は RoomIntroDirector が出す。印は仮置き
+            var jacket = Ensure(entries, RoomIds.Jacket, RoomIds.Cigarette);
+            jacket.FindPropertyRelative("label").stringValue = "ジャケットを着る";
+            Lines(jacket, new string[0]);
+            jacket.FindPropertyRelative("hints").arraySize = 0;
+            Ask(jacket, "", new string[0]);
+
             // チップ: ラベルは 1 ページにまとめ、読み終えてから二択を出す
             var chips = Entry(entries, "chips");
             if (chips != null)
@@ -85,6 +92,24 @@ namespace HalfAware.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(asset);
             AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>id の項目を返す。無ければ afterId の項目の直後に作る</summary>
+        static SerializedProperty Ensure(SerializedProperty entries, string id, string afterId)
+        {
+            var at = entries.arraySize;
+            for (var i = 0; i < entries.arraySize; i++)
+            {
+                var e = entries.GetArrayElementAtIndex(i);
+                var name = e.FindPropertyRelative("id").stringValue;
+                if (name == id) return e;
+                if (name == afterId) at = i + 1;
+            }
+            entries.InsertArrayElementAtIndex(Mathf.Min(at, entries.arraySize));
+            // 挿した要素は隣の中身の写しなので、ここで全部書き直す
+            var made = entries.GetArrayElementAtIndex(Mathf.Min(at, entries.arraySize - 1));
+            made.FindPropertyRelative("id").stringValue = id;
+            return made;
         }
 
         static SerializedProperty Entry(SerializedProperty entries, string id)

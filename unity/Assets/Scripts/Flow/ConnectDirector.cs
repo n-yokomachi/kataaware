@@ -7,6 +7,10 @@ namespace HalfAware
     /// 場面 3 の段の進行。<see cref="SceneFlow.Examined"/> を受けて、演出と対象の開閉を並べるだけ。
     /// 状態は「いまどの段まで来たか」しか持たない。
     ///
+    /// **椅子を調べたら、ジャケットを脱いでから座る。** 着る音（<c>JacketOn.wav</c>）を鳴らし、音の終わりの少し前に
+    /// 体のジャケットを消して左の肘掛けに掛けたジャケットを出し（脱ぐ動きは作らない）、鳴り終わってから腰を下ろす。
+    /// 間合いは <see cref="JacketBeats"/>。場面 3 は路地裏から着たまま帰ってくるので、頭では着せておく
+    ///
     /// **jack と monitor は after ではなく有効・無効で開く。** after は「その id が済んだか」
     /// しか見ないので、座る演出と挿す演出は調べた後に数秒かかる。after だけだと
     /// その途中で次の対象が拾えてしまう。演出の終わりで開けば、開く時刻が演出の終わりと一致する。
@@ -33,6 +37,18 @@ namespace HalfAware
         [SerializeField] GameObject monitorItem;
         [Tooltip("間をおく行を引く文面。list の行を数える")]
         [SerializeField] RoomScript script;
+
+        [Header("ジャケットを脱ぐ")]
+        [Tooltip("体に付けたジャケット。頭では着ていて、座る前に脱ぐ")]
+        [SerializeField] Garment garment;
+        [Tooltip("椅子の左の肘掛けに掛けたジャケット。脱いだところで出す")]
+        [SerializeField] GameObject draped;
+        [Tooltip("脱ぐ音を鳴らす口元の音源")]
+        [SerializeField] AudioSource voice;
+        [Tooltip("脱ぐ音（着る音と同じもの）")]
+        [SerializeField] AudioClip jacketOff;
+        [Tooltip("音の終わりから、脱がせるまでさかのぼる秒")]
+        [SerializeField] float swapBeforeEnd = 0.6f;
 
         [Header("座る")]
         [Tooltip("腰を下ろす場所。足元の位置")]
@@ -73,6 +89,9 @@ namespace HalfAware
             // 場面 3 は戸口から歩いて始まる。SeatedPose.Seated は直列化されないので、
             // ここで解かないと歩いている間じゅう体だけ座った形で運ばれる
             if (pose != null) pose.Seated = false;
+            // 路地裏から着たまま帰ってくる。肘掛けにはまだ掛かっていない
+            if (garment != null) garment.Worn = true;
+            if (draped != null) draped.SetActive(false);
             if (chairBlocker != null) chairBlocker.SetActive(true);
             Shut(jackItem);
             Shut(monitorItem);
@@ -153,7 +172,7 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// 椅子に腰を下ろす。停止は毎フレーム掛け直す。ひとつの長い停止にすると
+        /// ジャケットを脱いでから、椅子に腰を下ろす。停止は毎フレーム掛け直す。ひとつの長い停止にすると
         /// 先に切れて、下ろしている途中で次を調べられる
         /// </summary>
         IEnumerator Sitting()
@@ -166,20 +185,31 @@ namespace HalfAware
             player.CanLook = false;
             try
             {
+                var beats = new JacketBeats(jacketOff != null ? jacketOff.length : 0f, swapBeforeEnd);
+                if (voice != null && jacketOff != null) voice.PlayOneShot(jacketOff);
                 var from = player.transform.position;
                 var fromEye = player.EyeHeight;
                 var fromYaw = player.Yaw;
                 var fromPitch = player.Pitch;
-                for (var t = 0f; t < sitSeconds; t += Time.deltaTime)
+                var off = false;
+                var end = beats.Seated(sitSeconds);
+                for (var t = 0f; t < end; t += Time.deltaTime)
                 {
                     flow.Freeze(FreezeMargin);
-                    var k = Mathf.SmoothStep(0f, 1f, t / sitSeconds);
+                    // 脱いでから下ろす。下ろし具合は鳴り終わるまで 0
+                    if (!off && beats.Swapped(t))
+                    {
+                        off = true;
+                        TakeOff();
+                    }
+                    var k = beats.Sit(t, sitSeconds);
                     player.transform.position = Vector3.Lerp(from, seatSpot, k);
                     player.EyeHeight = Mathf.Lerp(fromEye, seatEyeHeight, k);
                     player.Yaw = Mathf.LerpAngle(fromYaw, seatYaw, k);
                     player.Pitch = Mathf.Lerp(fromPitch, 0f, k);
                     yield return null;
                 }
+                if (!off) TakeOff();
                 player.transform.position = seatSpot;
                 player.EyeHeight = seatEyeHeight;
                 player.Yaw = seatYaw;
@@ -197,6 +227,13 @@ namespace HalfAware
                 if (player != null) player.CanLook = true;
             }
             Open(jackItem);
+        }
+
+        /// <summary>体のジャケットを消し、肘掛けに掛けたジャケットを出す</summary>
+        void TakeOff()
+        {
+            if (garment != null) garment.Worn = false;
+            if (draped != null) draped.SetActive(true);
         }
 
         /// <summary>

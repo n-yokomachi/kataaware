@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace HalfAware
 {
@@ -7,7 +8,9 @@ namespace HalfAware
     /// 場面 1 固有の演出。始まってすぐ最初の独白を流す。
     /// 煙草を取ったら煙を立てて操作を止め、そのあいだに画面を 3 回黒く覆う。
     /// 覆っているあいだにクレジットとタイトルのカードを出し、戻ると消えている。
-    /// 吸い終わりの独白で締める。SceneFlow とは Examined / Say / Freeze だけで繋ぐ
+    /// 吸い終わったら、座ったまま左の肘掛けのジャケットを着る。着る音を鳴らし、正面へ向き直してから、
+    /// 音の終わりの少し前に体へ着せて肘掛けのジャケットを消す（着る動きは作らない）。着た後の独白で締め、読み終えたら立ち上がる（SceneFlow の standAfter）。
+    /// SceneFlow とは Examined / Say / Freeze だけで繋ぐ
     /// </summary>
     public sealed class RoomIntroDirector : MonoBehaviour
     {
@@ -29,13 +32,32 @@ namespace HalfAware
         [Tooltip("ライターの音と息、そして煙。無くても場面は進む")]
         [SerializeField] Cigarette cigarette;
         [Tooltip("この id を調べたら煙草の演出を始める")]
-        [SerializeField] string cigaretteId = "cigarette";
+        [SerializeField] string cigaretteId = RoomIds.Cigarette;
         [SerializeField] string[] firstLines = { "うぅ…今回は酔いが酷い…" };
         [Tooltip("1 回につき 1 枚。空の要素は文字を出さずに黒くなるだけ")]
         [SerializeField, TextArea] string[] cards = new string[0];
-        [SerializeField] string[] afterSmokeLines = { "煙草が切れた…買いに行くついでに今日のメモリも売っちゃおう" };
+
+        [Header("ジャケット")]
+        [Tooltip("この id を調べたらジャケットを着る")]
+        [SerializeField] string jacketId = RoomIds.Jacket;
+        [Tooltip("体に付けたジャケット。着る音の終わりの少し前に着せる")]
+        [SerializeField] Garment garment;
+        [Tooltip("椅子の左の肘掛けに掛けたジャケット。着せたところで消す")]
+        [SerializeField] GameObject draped;
+        [Tooltip("着る音を鳴らす口元の音源（煙草の息と同じもの）")]
+        [SerializeField] AudioSource voice;
+        [Tooltip("着る音")]
+        [SerializeField] AudioClip jacketOn;
+        [Tooltip("音の終わりから、着せ替えるまでさかのぼる秒")]
+        [SerializeField] float swapBeforeEnd = 0.6f;
+        [Tooltip("着る音のあいだに正面へ向き直すのにかける秒数。肘掛けを見たまま着せ替えを見せない")]
+        [SerializeField] float jacketAimSeconds = 1.6f;
+        [Tooltip("着た後の独白")]
+        [FormerlySerializedAs("afterSmokeLines")]
+        [SerializeField] string[] afterJacketLines = { "煙草が切れた…買いに行くついでに今日のメモリも売っちゃおう" };
 
         bool smoking;
+        bool dressing;
         /// <summary>座って始めたときの体の向き。煙草のあいだはここへ戻す</summary>
         float seatedYaw;
 
@@ -66,6 +88,7 @@ namespace HalfAware
             }
             StopAllCoroutines();
             smoking = false;
+            dressing = false;
             if (hud == null) return;
             hud.SetCenter(null);
             hud.SetCurtain(false);
@@ -82,8 +105,8 @@ namespace HalfAware
 
         void OnExamined(IInteractable item)
         {
-            if (item.Id != cigaretteId || smoking) return;
-            StartCoroutine(Smoke());
+            if (item.Id == cigaretteId && !smoking) StartCoroutine(Smoke());
+            else if (item.Id == jacketId && !dressing) StartCoroutine(PutOn());
         }
 
         /// <summary>
@@ -99,7 +122,7 @@ namespace HalfAware
             try
             {
                 flow.Freeze(aimSeconds + FreezeMargin);
-                yield return AimForward(player);
+                yield return AimForward(player, aimSeconds);
                 // 向き直してから火を点ける。以後はこの時刻表どおりに音と煙とカードが並ぶ
                 if (cigarette != null) cigarette.Light(Drags);
                 var started = Time.time;
@@ -124,19 +147,55 @@ namespace HalfAware
                 smoking = false;
                 if (player != null) player.CanLook = true;
             }
+            // 吸い終わりには何も言わない。独白はジャケットを着た後
+        }
+
+        /// <summary>
+        /// 座ったまま、左の肘掛けのジャケットを着る。着る音を鳴らし、正面へ向き直してから、
+        /// 音の終わりの少し前に体へ着せて肘掛けのジャケットを消す。音が鳴り終わってから独白
+        /// </summary>
+        IEnumerator PutOn()
+        {
+            var player = flow.Player;
+            dressing = true;
+            var beats = new JacketBeats(jacketOn != null ? jacketOn.length : 0f, swapBeforeEnd);
+            // 鳴り終わるまで止めておく。途中で他を調べさせない
+            flow.Freeze(beats.Sound + FreezeMargin);
+            if (player != null) player.CanLook = false;
+            try
+            {
+                if (voice != null && jacketOn != null) voice.PlayOneShot(jacketOn);
+                var started = Time.time;
+                yield return AimForward(player, jacketAimSeconds);
+                while (Time.time - started < beats.SwapAt) yield return null;
+                Dress();
+                while (Time.time - started < beats.Sound) yield return null;
+            }
+            finally
+            {
+                dressing = false;
+                if (player != null) player.CanLook = true;
+            }
             if (flow.Completed) yield break;
-            flow.Say(afterSmokeLines);
+            flow.Say(afterJacketLines);
+        }
+
+        /// <summary>体へ着せ、肘掛けのジャケットを消す</summary>
+        void Dress()
+        {
+            if (garment != null) garment.Worn = true;
+            if (draped != null) draped.SetActive(false);
         }
 
         /// <summary>座って始めたときの向きへ、滑らかに戻す。切り替えではなく回して戻すので繋ぎ目が出ない</summary>
-        IEnumerator AimForward(PlayerController player)
+        IEnumerator AimForward(PlayerController player, float seconds)
         {
-            if (player == null || aimSeconds <= 0f) yield break;
+            if (player == null || seconds <= 0f) yield break;
             var fromYaw = player.Yaw;
             var fromPitch = player.Pitch;
-            for (var t = 0f; t < aimSeconds; t += Time.deltaTime)
+            for (var t = 0f; t < seconds; t += Time.deltaTime)
             {
-                var k = Mathf.SmoothStep(0f, 1f, t / aimSeconds);
+                var k = Mathf.SmoothStep(0f, 1f, t / seconds);
                 player.Yaw = Mathf.LerpAngle(fromYaw, seatedYaw, k);
                 player.Pitch = Mathf.Lerp(fromPitch, 0f, k);
                 yield return null;
