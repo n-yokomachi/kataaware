@@ -1,45 +1,40 @@
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using HalfAware.EditorTools.Rocketbox;
 
 namespace HalfAware.EditorTools
 {
     /// <summary>
-    /// 記憶の中の人を組む（設計書 9.5 節）。
+    /// 記憶の中の人を組む（設計書 9.5 節、<c>docs/superpowers/specs/2026-09-26-dive-people-design.md</c> 7 節）。
     ///
     /// **人は一人ずつの登場人物として持つ。** 誰かは一覧（<see cref="DiveRoster"/>）の Seen の飛び先で決まり、
-    /// 見た目は <see cref="DiveCast"/> の十六人から写す。同じ人はどの記憶に出ても同じ模型・同じ色・同じ背。
-    /// 記憶 0 の母と記憶 8 の隣の母親は、どちらもハンナ（34）。
+    /// 見た目は <see cref="BuildDiveCast"/> が Rocketbox の模型で組んだ一人ずつのプレハブ（<c>generated/dive/People/{id}.prefab</c>）。
+    /// 同じ人はどの記憶に出ても同じプレハブ・同じ背。記憶 0 の母と記憶 8 の隣の母親は、どちらもハンナ（34）。
     ///
-    /// **模型は Quaternius の FBX をプレハブのまま置き、骨で動かす**（<see cref="PersonMotion"/>）。
-    /// 焼いた形を置いていた頃は、全員が暗い一色（買い手のマテリアル）で、姿勢は一つに固まり、
-    /// 子どもは大人を縮めただけだった。
+    /// **プレハブをそのまま置き、骨で動かす**（<see cref="PersonMotion"/>）。動きは Quaternius の立ち・歩き・走りを
+    /// Humanoid へ移した物（<see cref="RocketboxRetarget.BakeMemory"/>）で、女の人は W_Suit、男の人は M_Suit から。
+    /// 骨は名前ではなく <see cref="Animator.GetBoneTransform"/> で引く。
     ///
     /// ここで決めるのは次のとおり。どれも人ごとに一度だけ測り、同じ人には同じ値を使う。
-    /// - 色: 部位ごとのマテリアルを一枚の <c>Person.mat</c> に揃え、色は <see cref="PersonTint"/> が持つ
-    /// - 骨の縮尺: 年齢の区分（<see cref="DiveCast.ProportionOf"/>）と体の太さ
-    /// - 背: 立った形で測って、一覧の背に合うよう模型ごと縮める
-    /// - 座り方・腕の組み方: 路地裏の姿勢（<c>BuildAlley.Pose</c>）を写した <see cref="FigurePosture"/> で、
-    ///   脚と腕の向きを模型から見た向きとして据える
+    /// - 背: プレハブの縮尺のまま（<see cref="BuildDiveCast"/> が一覧の背に合わせてある）。ここでは測り直さない
+    /// - 骨の縮尺と背の丸み: <see cref="RocketboxMemory.Proportion"/> と <see cref="DiveCast"/> の curl を、動きを置くたびに掛け直す。
+    ///   **掛けるのは一度だけ。** Quaternius の頃の年齢の比（<see cref="DiveCast.ProportionOf"/>）と太さ（girth）は、Rocketbox の模型の上では使わない
+    /// - 立ち方: 場面 2 の姿勢（<see cref="BuildAlleyCrowd.Apply"/> の Rest・Crossed・SitChair）と、手を後ろで組む形（<see cref="HandsBehind"/>）・
+    ///   机に肘をつく形（<see cref="LeanOnDesk"/>）を写しの上で作り、その骨の向きを模型の根から見た向きとして据える
     /// - 床: 靴の裏が床に来る高さ
     /// - 歩幅: 歩きの動きを置いて、着いている足が後ろへ流れる速さを測る
+    ///
+    /// 色は人ごとのテクスチャのマテリアル（プレハブのまま）。Quaternius の頃の一枚の <c>Person.mat</c> と部位ごとの色（<see cref="PersonTint"/>）は、場面 4 では使わない
     /// </summary>
     public static partial class BuildDive
     {
-        const string ModelsAt = "Assets/Models/quaternius/";
-        public const string PersonMatPath = Materials + "Person.mat";
-        /// <summary>立ちの動き。Idle は構えた広い足幅で、日常の立ち姿に見えない</summary>
-        const string StandClip = "CharacterArmature|Idle_Neutral";
-        const string WalkClip = "CharacterArmature|Walk";
-        const string RunClip = "CharacterArmature|Run";
-
         /// <summary>組んでいる記憶の一覧の行。<see cref="Cast"/> は板の相手の名前から人を引く</summary>
         static DiveEntry casting;
 
         /// <summary>人ごとに測った値。同じ人は一度だけ測る</summary>
         sealed class FigureFit
         {
-            public float scale;
             public float[] strides;
             public float runStride;
         }
@@ -58,22 +53,26 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 人をひとり置く。名前は一覧の <see cref="Seen.name"/> と揃える。誰かは Seen の飛び先で決まる。
-        /// pose は立ち方: 0 立つ／1 片脚に預ける／2 腕組み／3 手を後ろ／4 振り向く／
-        /// 5 椅子に座る／6 卓に肘をつく／7 横を向いて座る。0・1・4 はどれも立ちの動きのまま
+        /// pose は立ち方: 0 立つ／1 片脚に預ける／2 腕組み／3 手を後ろ／4 振り向く／5 椅子に座る／6 机に肘をつく。
+        /// 0 は立ちの動きのまま
         /// </summary>
         static Transform Cast(Transform take, string name, Vector3 at, float yaw, int pose)
         {
-            var root = new GameObject(name).transform;
+            Person person;
+            GameObject prefab = null;
+            if (!CastOf(name, out person)) Debug.LogWarning("一覧の板の相手に無い人: " + take.name + "/" + name);
+            else
+            {
+                var path = BuildDiveCast.PrefabPath(RocketboxMemory.ById(person.id));
+                prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                if (prefab == null) Debug.LogWarning("人のプレハブが無い（HalfAware/Dive people/Build the people）: " + path);
+            }
+            var root = prefab != null ? ((GameObject)PrefabUtility.InstantiatePrefab(prefab, take)).transform : new GameObject(name).transform;
             root.SetParent(take, false);
+            root.name = name;
             root.localPosition = at;
             root.localRotation = Quaternion.Euler(0f, yaw, 0f);
-            Person person;
-            if (!CastOf(name, out person))
-            {
-                Debug.LogWarning("一覧の板の相手に無い人: " + take.name + "/" + name);
-                return root;
-            }
-            DressFigure(root, person, pose, take.name);
+            if (prefab != null) DressFigure(root, person, pose, take.name);
             return root;
         }
 
@@ -89,112 +88,77 @@ namespace HalfAware.EditorTools
 
         static bool IsSeated(int pose)
         {
-            return pose >= 5 && pose <= 7;
+            return pose >= 5;
         }
 
         static void DressFigure(Transform root, Person person, int pose, string takeName)
         {
-            var src = AssetDatabase.LoadAssetAtPath<GameObject>(ModelsAt + person.model + ".fbx");
-            if (src == null) { Debug.LogWarning("模型が無い: " + person.model); return; }
-            var model = (GameObject)PrefabUtility.InstantiatePrefab(src, root);
-            model.name = "Figure";
+            var m = RocketboxMemory.ById(person.id);
+            var model = root.Find("Figure").gameObject;
+            // 背はプレハブの縮尺のまま。置き場は測ってから決める
             model.transform.localPosition = Vector3.zero;
             model.transform.localRotation = Quaternion.identity;
-            model.transform.localScale = Vector3.one;
-
-            var bones = new Dictionary<string, Transform>();
-            foreach (var t in model.GetComponentsInChildren<Transform>(true))
-                if (!bones.ContainsKey(t.name)) bones[t.name] = t;
-
-            PaintFigure(root, model, person);
 
             var animator = model.GetComponent<Animator>();
-            if (animator == null) animator = model.AddComponent<Animator>();
             animator.runtimeAnimatorController = null;
             animator.applyRootMotion = false;
             animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            // 広がりは組み立てで据える（FigureBounds）。毎こま皮から測り直さない
+            foreach (var smr in model.GetComponentsInChildren<SkinnedMeshRenderer>(true)) smr.updateWhenOffscreen = false;
 
             var seated = IsSeated(pose);
-            var clips = FigureClips(person.model);
+            var clips = FigureClips(person.female);
             var motion = root.gameObject.AddComponent<PersonMotion>();
 
             // ---- 骨の組み ----
-            var prop = DiveCast.ProportionOf(person.Band);
-            var g = person.girth;
+            // 骨の縮尺（頭・腕・脚）。プレハブの骨にも入っているが、動きを置いたあとに毎こま掛け直す
             var sized = new List<Transform>();
             var sizes = new List<Vector3>();
-            System.Action<string, Vector3> size = (bone, k) =>
+            System.Action<HumanBodyBones, float> size = (bone, k) =>
             {
-                Transform b;
-                if (!bones.TryGetValue(bone, out b)) return;
+                var b = animator.GetBoneTransform(bone);
+                if (b == null || Mathf.Abs(k - 1f) < 1e-4f) return;
                 sized.Add(b);
-                sizes.Add(Vector3.Scale(b.localScale, k));
+                sizes.Add(Vector3.one * k);
             };
-            // 太さは胴の根（Body）の横と前後だけ。Body の Y は上を向いているので、
-            // 体をひねっても横と前後の比は崩れない。腕と脚は Body の子なので、太さはそのまま付いてくる。
-            // 頭は太らせない。首から上で打ち消す
-            size("Body", new Vector3(g, 1f, g));
-            size("Head", new Vector3(prop.head / g, prop.head, prop.head / g));
-            size("UpperArm.L", Vector3.one * prop.arm);
-            size("UpperArm.R", Vector3.one * prop.arm);
-            size("UpperLeg.L", Vector3.one * prop.leg);
-            size("UpperLeg.R", Vector3.one * prop.leg);
-            // 足は脛の子ではないので、脚を縮めた分は足にも掛ける
-            size("Foot.L", Vector3.one * prop.leg);
-            size("Foot.R", Vector3.one * prop.leg);
+            size(HumanBodyBones.Head, m.Proportion.head);
+            size(HumanBodyBones.LeftUpperArm, m.Proportion.arm);
+            size(HumanBodyBones.RightUpperArm, m.Proportion.arm);
+            size(HumanBodyBones.LeftUpperLeg, m.Proportion.leg);
+            size(HumanBodyBones.RightUpperLeg, m.Proportion.leg);
 
-            // 背の丸み（年寄り）と、座った背の傾き。親から順に並べる
-            var spine = new[] { "Abdomen", "Torso", "Chest", "Neck", "Head" };
-            var curl = new[] { 0.30f, 0.40f, 0.30f, -0.45f, -0.30f };
-            var lean = new[] { 0.45f, 0.35f, 0.20f, -0.35f, -0.25f };
-            var sit = pose == 5 ? 4f : pose == 6 ? 8f : pose == 7 ? 10f : 0f;
-            var bentStand = new List<Transform>();
-            var bendsStand = new List<float>();
+            // 背の丸み（年寄り）。BuildDiveCast.Curl と同じ骨と比。親から順に並べる
             var bent = new List<Transform>();
             var bends = new List<float>();
-            for (var i = 0; i < spine.Length; i++)
+            for (var i = 0; i < BuildDiveCast.CurlBones.Length; i++)
             {
-                Transform b;
-                if (!bones.TryGetValue(spine[i], out b)) continue;
-                var c = person.curl * curl[i];
-                if (Mathf.Abs(c) > 1e-3f) { bentStand.Add(b); bendsStand.Add(c); }
-                var all = c + sit * lean[i];
-                if (Mathf.Abs(all) > 1e-3f) { bent.Add(b); bends.Add(all); }
+                var b = animator.GetBoneTransform(BuildDiveCast.CurlBones[i]);
+                var c = person.curl * BuildDiveCast.CurlShare[i];
+                if (b == null || Mathf.Abs(c) < 1e-3f) continue;
+                bent.Add(b);
+                bends.Add(c);
             }
 
-            var heldNames = HeldBones(pose);
+            var heldBones = HeldBones(pose);
             var held = new List<Transform>();
-            var holds = FigureHolds(person.model, pose, heldNames);
-            for (var i = 0; i < heldNames.Length; i++)
-            {
-                Transform b;
-                bones.TryGetValue(heldNames[i], out b);
-                held.Add(b);
-            }
+            foreach (var hb in heldBones) held.Add(animator.GetBoneTransform(hb));
+            var holds = FigureHolds(person, m, pose, heldBones);
 
-            var feet = new[] { Bone(bones, "Foot.L"), Bone(bones, "Foot.R") };
-            var ankles = new[] { Bone(bones, "LowerLeg.L_end"), Bone(bones, "LowerLeg.R_end") };
+            // Rocketbox（Biped）の足は脛の子なので、Quaternius の頃のように足首へ付け直さない
+            var none = new Transform[0];
+            var feet = new[] { animator.GetBoneTransform(HumanBodyBones.LeftFoot), animator.GetBoneTransform(HumanBodyBones.RightFoot) };
 
-            // ---- 背を合わせる ----
-            // 立った形（腕も脚も据えない、背の丸みだけ）で測る。座る人も立った背で合わせる
+            // ---- 歩幅を測る（座る人は歩かない） ----
             FigureFit fit;
             if (!figureFits.TryGetValue(person.id, out fit))
             {
                 fit = new FigureFit();
-                RigFigure(motion, animator, model.transform, clips, false, Vector3.zero, null, 0f, 0f,
-                    sized, sizes, bentStand, bendsStand, new List<Transform>(), new Quaternion[0], feet, ankles);
-                motion.Sample(clips[0], 0f);
-                var tall = FigureExtent(root, model).size.y;
-                fit.scale = tall > 0.1f ? person.height / tall : 1f;
                 figureFits[person.id] = fit;
             }
-            model.transform.localScale = Vector3.one * fit.scale;
-
-            // ---- 歩幅を測る（座る人は歩かない） ----
             if (!seated && fit.strides == null)
             {
                 RigFigure(motion, animator, model.transform, clips, false, Vector3.zero, null, 0f, 0f,
-                    sized, sizes, bent, bends, held, holds, feet, ankles);
+                    sized, sizes, bent, bends, new List<Transform>(), new Quaternion[0]);
                 fit.strides = new float[PersonMotion.Reaches.Length];
                 for (var i = 0; i < fit.strides.Length; i++)
                     fit.strides[i] = FigureStride(root, model, motion, clips[0], clips[1], PersonMotion.Reaches[i], feet);
@@ -202,12 +166,12 @@ namespace HalfAware.EditorTools
             }
 
             // ---- 床に下ろす ----
-            var seatKey = person.id + "/" + (seated ? pose : pose == 2 || pose == 3 ? pose : 0);
+            var seatKey = person.id + "/" + pose;
             float drop;
             if (!figureSeats.TryGetValue(seatKey, out drop))
             {
                 RigFigure(motion, animator, model.transform, clips, seated, Vector3.zero, null, 0f, 0f,
-                    sized, sizes, bent, bends, held, holds, feet, ankles);
+                    sized, sizes, bent, bends, held, holds);
                 motion.Sample(clips[0], 0f);
                 drop = -FigureExtent(root, model).min.y;
                 figureSeats[seatKey] = drop;
@@ -217,21 +181,23 @@ namespace HalfAware.EditorTools
 
             RigFigure(motion, animator, model.transform, clips, seated, seat,
                 seated ? null : fit.strides, fit.runStride, FigureLag(takeName + "/" + root.name),
-                sized, sizes, bent, bends, held, holds, feet, ankles);
+                sized, sizes, bent, bends, held, holds);
             // 立ちの動きの頭の一こまを置いたまま返す。持ち物はこの形で骨に付ける
             motion.Still();
             FigureBounds(root, model);
 
             // プレハブの上書きとして Unity に知らせる。知らせないまま同じプレハブの別の上書きを戻すと
-            // （UnposeFigures）、模型の縮尺と置き場まで素へ戻ってしまう
+            // （UnposeFigures）、置き場まで素へ戻ってしまう
+            PrefabUtility.RecordPrefabInstancePropertyModifications(root.gameObject);
+            PrefabUtility.RecordPrefabInstancePropertyModifications(root);
             PrefabUtility.RecordPrefabInstancePropertyModifications(model.transform);
+            PrefabUtility.RecordPrefabInstancePropertyModifications(animator);
             foreach (var smr in model.GetComponentsInChildren<SkinnedMeshRenderer>(true))
                 PrefabUtility.RecordPrefabInstancePropertyModifications(smr);
-            PrefabUtility.RecordPrefabInstancePropertyModifications(model);
         }
 
         /// <summary>
-        /// 骨の上書きを消す。測りと持ち物のために置いた形を模型の素へ戻してから保存する。
+        /// 骨の上書きを消す。測りと持ち物のために置いた形をプレハブの素へ戻してから保存する。
         /// 置いた形のまま保存すると、一人あたり骨の数 × 位置・向き・縮尺の上書きが残り、
         /// シーンが 0.8 MB から 4 MB へ太った。形は実行時に <see cref="PersonMotion"/> が毎こま置く
         /// </summary>
@@ -250,92 +216,22 @@ namespace HalfAware.EditorTools
             }
         }
 
-        static Transform Bone(Dictionary<string, Transform> bones, string name)
+        /// <summary>立ち・歩き・走りの動き。女の人は W_Suit、男の人は M_Suit から Humanoid へ移した物</summary>
+        static AnimationClip[] FigureClips(bool female)
         {
-            Transform b;
-            return bones.TryGetValue(name, out b) ? b : null;
-        }
-
-        /// <summary>
-        /// 部位ごとのマテリアルを一枚に揃え、色を <see cref="PersonTint"/> に並べる。
-        /// 知らない部位があれば言う（肌の色で塗っておく）
-        /// </summary>
-        static void PaintFigure(Transform root, GameObject model, Person person)
-        {
-            var mat = PersonMat();
-            var rs = new List<Renderer>();
-            var ss = new List<int>();
-            var cs = new List<Color>();
-            var gs = new List<float>();
-            foreach (var smr in model.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            return new[]
             {
-                var n = smr.sharedMaterials.Length;
-                var mats = new Material[n];
-                for (var i = 0; i < n; i++)
-                {
-                    mats[i] = mat;
-                    Part part;
-                    if (!DiveCast.TryPartOf(person.model, smr.name, i, out part))
-                    {
-                        Debug.LogWarning("部位が分からない: " + person.model + "/" + smr.name + "[" + i + "]");
-                        part = Part.Skin;
-                    }
-                    rs.Add(smr);
-                    ss.Add(i);
-                    cs.Add(person[part]);
-                    gs.Add(DiveCast.GlossOf(part));
-                }
-                smr.sharedMaterials = mats;
-                smr.updateWhenOffscreen = false;
-            }
-            var tint = root.gameObject.AddComponent<PersonTint>();
-            tint.Set(person.id, rs.ToArray(), ss.ToArray(), cs.ToArray(), gs.ToArray());
-        }
-
-        /// <summary>
-        /// 人のマテリアル。全員で一枚。色と艶は <see cref="PersonTint"/> が部位ごとに上書きする。
-        /// 映り込みを切るのは、暗い場所で服が空の色を拾って濡れたように光らないようにするため
-        /// </summary>
-        static Material PersonMat()
-        {
-            var m = AssetDatabase.LoadAssetAtPath<Material>(PersonMatPath);
-            if (m == null)
-            {
-                m = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-                m.name = "Person";
-                AssetDatabase.CreateAsset(m, PersonMatPath);
-            }
-            m.SetTexture("_BaseMap", null);
-            m.SetColor("_BaseColor", Color.white);
-            m.SetFloat("_Smoothness", 0.1f);
-            m.SetFloat("_Metallic", 0f);
-            m.SetFloat("_EnvironmentReflections", 0f);
-            m.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
-            EditorUtility.SetDirty(m);
-            return m;
-        }
-
-        /// <summary>立ち・歩き・走りの動き。FBX の中に入っているものをそのまま使う</summary>
-        static AnimationClip[] FigureClips(string model)
-        {
-            var clips = new AnimationClip[3];
-            foreach (var o in AssetDatabase.LoadAllAssetRepresentationsAtPath(ModelsAt + model + ".fbx"))
-            {
-                var c = o as AnimationClip;
-                if (c == null) continue;
-                if (c.name == StandClip) clips[0] = c;
-                else if (c.name == WalkClip) clips[1] = c;
-                else if (c.name == RunClip) clips[2] = c;
-            }
-            if (clips[0] == null) Debug.LogWarning("立ちの動きが無い: " + model);
-            return clips;
+                BuildDiveCast.Clip(female, "Idle"),
+                BuildDiveCast.Clip(female, "Walk"),
+                BuildDiveCast.Clip(female, "Run"),
+            };
         }
 
         /// <summary>PersonMotion の中身を書く。private な [SerializeField] なので SerializedObject 越し</summary>
         static void RigFigure(PersonMotion motion, Animator animator, Transform body, AnimationClip[] clips,
             bool seated, Vector3 seat, float[] strides, float runStride, float lag,
             List<Transform> sized, List<Vector3> sizes, List<Transform> bent, List<float> bends,
-            List<Transform> held, Quaternion[] holds, Transform[] feet, Transform[] ankles)
+            List<Transform> held, Quaternion[] holds)
         {
             var so = new SerializedObject(motion);
             so.FindProperty("animator").objectReferenceValue = animator;
@@ -358,8 +254,8 @@ namespace HalfAware.EditorTools
             var ph = so.FindProperty("holds");
             ph.arraySize = holds.Length;
             for (var i = 0; i < holds.Length; i++) ph.GetArrayElementAtIndex(i).quaternionValue = holds[i];
-            Fill(so.FindProperty("feet"), feet);
-            Fill(so.FindProperty("ankles"), ankles);
+            Fill(so.FindProperty("feet"), new Transform[0]);
+            Fill(so.FindProperty("ankles"), new Transform[0]);
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
@@ -399,7 +295,8 @@ namespace HalfAware.EditorTools
         ///
         /// **縦は皮の頂点どおり、横と前後だけ歩く脚のぶん広げる。** 目から相手の頭と胸へ撃つ光線
         /// （DiveDirector.Body）は、最初のレンダラーの広がりの上端と高さの比で頭と胸を決める。
-        /// 模型の素の広がりのままだと、胴のレンダラーは肩までしか無く、頭のつもりで肩を狙うことになる
+        /// 手首の差込口のある人（エミリー・プリヤ）は、差込口の小さな部品が体の皮より先に並ぶので、
+        /// 部品にも体と同じ広がりを入れる（どの部品も根の骨は腰）
         /// </summary>
         static void FigureBounds(Transform root, GameObject model)
         {
@@ -423,7 +320,7 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 一周期で進む m。歩きの動きを立ちの動きへ reach だけ寄せて置き、
-        /// 着いている足（いちばん低い所から 1.5 cm 以内の足）が人の根から見て後ろへ流れる速さを測る。
+        /// 着いている足（いちばん低い所から 1.5 cm 以内の足首）が人の根から見て後ろへ流れる速さを測る。
         /// その速さで根を運べば、着いている足は床に止まって見える
         /// </summary>
         static float FigureStride(Transform root, GameObject model, PersonMotion motion,
@@ -488,52 +385,88 @@ namespace HalfAware.EditorTools
 
         // ---- 据える姿勢 ----------------------------------------------------------
 
-        /// <summary>姿勢ごとに向きを据える骨。立ちの動きのままの姿勢は無い</summary>
-        static string[] HeldBones(int pose)
+        static readonly HumanBodyBones[] ArmBones =
         {
-            var arms = new[] { "UpperArm.L", "UpperArm.R", "LowerArm.L", "LowerArm.R" };
+            HumanBodyBones.LeftUpperArm, HumanBodyBones.RightUpperArm,
+            HumanBodyBones.LeftLowerArm, HumanBodyBones.RightLowerArm,
+            HumanBodyBones.LeftHand, HumanBodyBones.RightHand,
+        };
+
+        /// <summary>
+        /// 姿勢ごとに向きを据える骨。<see cref="BuildAlleyCrowd.Apply"/>（と <see cref="LeanOnDesk"/>）が曲げる骨で、
+        /// 親から順に並べる。据えない骨は立ちの動きのまま揺れる（腕を据えた人も胸は息をする）。
+        /// 座る形は背骨から頭までと脚と腕を全部据える（腰の高さは床に下ろすときに合う）
+        /// </summary>
+        static HumanBodyBones[] HeldBones(int pose)
+        {
             switch (pose)
             {
-                case 2:
-                case 3:
-                    return arms;
-                case 5:
-                case 6:
-                case 7:
+                case 1:
                     return new[]
                     {
-                        "UpperLeg.L", "UpperLeg.R", "LowerLeg.L", "LowerLeg.R",
-                        "UpperArm.L", "UpperArm.R", "LowerArm.L", "LowerArm.R",
+                        HumanBodyBones.Spine, HumanBodyBones.Chest, HumanBodyBones.Head,
+                        HumanBodyBones.LeftUpperLeg, HumanBodyBones.LeftLowerLeg,
+                        HumanBodyBones.LeftUpperArm, HumanBodyBones.LeftLowerArm,
                     };
+                case 2:
+                case 3:
+                    return ArmBones;
+                case 4:
+                    return new[]
+                    {
+                        HumanBodyBones.Spine, HumanBodyBones.Chest, HumanBodyBones.Neck, HumanBodyBones.Head,
+                        HumanBodyBones.RightUpperArm, HumanBodyBones.RightLowerArm, HumanBodyBones.LeftUpperArm,
+                    };
+                case 0:
+                    return new HumanBodyBones[0];
                 default:
-                    return new string[0];
+                    var seated = new List<HumanBodyBones>
+                    {
+                        HumanBodyBones.Spine, HumanBodyBones.Chest, HumanBodyBones.UpperChest, HumanBodyBones.Neck, HumanBodyBones.Head,
+                        HumanBodyBones.LeftUpperLeg, HumanBodyBones.RightUpperLeg,
+                        HumanBodyBones.LeftLowerLeg, HumanBodyBones.RightLowerLeg,
+                        HumanBodyBones.LeftFoot, HumanBodyBones.RightFoot,
+                    };
+                    seated.AddRange(ArmBones);
+                    return seated.ToArray();
             }
         }
 
         /// <summary>
-        /// 据える骨の向き。素の模型を <see cref="FigurePosture"/> で曲げ、模型の根から見た向きとして取る。
-        /// 骨の親（Body）は動きの中でひねられるので、親から見た向きで据えると脚がよそを向く
+        /// 据える骨の向き。その人のプレハブの写しを原点に置き、立ちの動きの頭の一こまに骨の縮尺と背の丸みを掛けてから、
+        /// 姿勢へ曲げて、模型の根から見た向きとして取る。人ごと（背と骨の縮尺が違う）・姿勢ごとに一度だけ。
+        /// 骨の親（背骨）は動きの中でひねられるので、親から見た向きで据えると腕や脚がよそを向く
         /// </summary>
-        static Quaternion[] FigureHolds(string model, int pose, string[] names)
+        static Quaternion[] FigureHolds(Person person, RocketboxMemory m, int pose, HumanBodyBones[] bones)
         {
-            var key = model + "/" + pose;
+            var key = person.id + "/" + pose;
             Quaternion[] had;
             if (figureHolds.TryGetValue(key, out had)) return had;
-            var all = new Quaternion[names.Length];
-            if (names.Length > 0)
+            var all = new Quaternion[bones.Length];
+            if (bones.Length > 0)
             {
-                var src = AssetDatabase.LoadAssetAtPath<GameObject>(ModelsAt + model + ".fbx");
+                var src = AssetDatabase.LoadAssetAtPath<GameObject>(BuildDiveCast.PrefabPath(m));
                 var scratch = (GameObject)Object.Instantiate(src);
                 scratch.hideFlags = HideFlags.HideAndDontSave;
-                scratch.transform.position = new Vector3(-7000f, 0f, -7000f);
+                // 場面 2 の姿勢は、模型が原点で +z を向き、靴の裏が高さ 0 にある前提で世界の位置を狙う（座面の高さなど）
+                scratch.transform.position = Vector3.zero;
                 scratch.transform.rotation = Quaternion.identity;
                 try
                 {
-                    FigurePosture(scratch.transform, pose);
-                    var inverse = Quaternion.Inverse(scratch.transform.rotation);
-                    for (var i = 0; i < names.Length; i++)
+                    var figure = scratch.transform.Find("Figure");
+                    var an = figure.GetComponent<Animator>();
+                    an.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+                    an.applyRootMotion = false;
+                    BodyPoser.Stand(an, BuildDiveCast.Clip(person.female, "Idle"));
+                    BuildDiveCast.Size(an, m.Proportion);
+                    BuildDiveCast.Curl(an, person.curl);
+                    var box = BuildDiveCast.Extent(scratch.transform, BuildDiveCast.Body(figure.gameObject));
+                    figure.localPosition -= Vector3.up * box.min.y;
+                    FigurePosture(an, pose, BuildDiveCast.Body(figure.gameObject));
+                    var inverse = Quaternion.Inverse(figure.rotation);
+                    for (var i = 0; i < bones.Length; i++)
                     {
-                        var b = FigureBoneOf(scratch.transform, names[i]);
+                        var b = an.GetBoneTransform(bones[i]);
                         all[i] = b != null ? inverse * b.rotation : Quaternion.identity;
                     }
                 }
@@ -546,102 +479,187 @@ namespace HalfAware.EditorTools
             return all;
         }
 
-        static Transform FigureBoneOf(Transform root, string name)
-        {
-            foreach (var t in root.GetComponentsInChildren<Transform>(true)) if (t.name == name) return t;
-            return null;
-        }
-
         /// <summary>
-        /// 骨を曲げて姿勢を作る。<c>BuildAlley.Pose</c> の写し（路地裏の側は触らない決まりなので、
-        /// 要る分をここへ写した）。素の模型（取り込んだままの姿勢）の上に曲げを重ねる。
-        /// 模型は +z を向いている。角度はどれも「正なら前」
+        /// 骨を曲げて姿勢を作る。場面 2 の姿勢（<see cref="BuildAlleyCrowd.Apply"/>）を使い、
+        /// 机に肘をつく形（6）と、手を後ろで組む形（3）だけここで作る（<see cref="LeanOnDesk"/>・<see cref="HandsBehind"/>）。
+        /// 模型は原点で +z を向いている
         /// </summary>
-        static void FigurePosture(Transform root, int pose)
+        static void FigurePosture(Animator an, int pose, SkinnedMeshRenderer skin)
         {
-            float thighL = 2f, thighR = -2f, kneeL = 0f, kneeR = 0f;
-            float armL = 6f, armR = -6f, elbowL = 12f, elbowR = 12f;
-            float outL = 4f, outR = -4f, spine = 2f, lean = 0f;
-
             switch (pose)
             {
-                case 1:
-                    thighL = 5f; thighR = -7f; kneeL = -4f; kneeR = 3f;
-                    armL = 4f; armR = -9f; elbowL = 18f; elbowR = 10f;
-                    outL = 7f; outR = -3f; spine = 1f;
-                    break;
-                case 2:  // 腕を組んで立つ
-                    armL = 44f; armR = -44f; elbowL = 76f; elbowR = 76f;
-                    outL = 12f; outR = -12f;
-                    break;
-                case 3:  // 手を後ろで組むように、腕を少し引いた立ち姿
-                    armL = -12f; armR = -16f; elbowL = 26f; elbowR = 24f;
-                    outL = 2f; outR = -6f; thighR = -4f; spine = 1f;
-                    break;
-                case 4:
-                    armL = 10f; armR = -4f; elbowL = 14f; elbowR = 20f;
-                    outL = 9f; outR = -8f; spine = 3f; thighL = -3f; thighR = 4f;
-                    break;
-                case 5:  // 椅子に座る
-                    thighL = 85f; thighR = 84f; kneeL = -70f; kneeR = -72f;
-                    outL = 12f; outR = -12f; armL = 26f; armR = 22f; elbowL = 48f; elbowR = 44f;
-                    spine = 4f;
-                    break;
-                case 6:  // 卓に肘をついて座る
-                    thighL = 84f; thighR = 86f; kneeL = -72f; kneeR = -68f;
-                    outL = 16f; outR = -9f; armL = 14f; armR = 44f; elbowL = 26f; elbowR = 64f;
-                    spine = 8f;
-                    break;
-                case 7:  // 膝を寄せて横を向いて座る
-                    thighL = 86f; thighR = 83f; kneeL = -68f; kneeR = -74f;
-                    outL = 3f; outR = -22f; armL = 38f; armR = 20f; elbowL = 56f; elbowR = 36f;
-                    spine = 10f;
+                case 1: BuildAlleyCrowd.Apply(an, BuildAlleyCrowd.Pose.Rest); break;
+                case 2: BuildAlleyCrowd.Apply(an, BuildAlleyCrowd.Pose.Crossed); break;
+                case 3: HandsBehind(an, skin); break;
+                case 4: BuildAlleyCrowd.Apply(an, BuildAlleyCrowd.Pose.Turn); break;
+                case 6: LeanOnDesk(an); break;
+                default:
+                    if (IsSeated(pose)) BuildAlleyCrowd.Apply(an, BuildAlleyCrowd.Pose.SitChair);
                     break;
             }
-
-            FigureTurn(root, "Hips", lean, 0f);
-            FigureTurn(root, "Abdomen", spine * 0.45f, 0f);
-            FigureTurn(root, "Torso", spine * 0.35f, 0f);
-            FigureTurn(root, "Chest", spine * 0.20f, 0f);
-            FigureTurn(root, "Neck", -spine * 0.35f, 0f);
-            FigureTurn(root, "Head", -spine * 0.25f, 0f);
-
-            // 立ち姿は歩幅を詰める（素の模型は歩いている途中の姿勢で入っている）
-            var close = IsSeated(pose) ? 0f : 9.5f;
-            FigureTurn(root, "UpperLeg.L", -(thighL + close), outL * 0.25f);
-            FigureTurn(root, "UpperLeg.R", -(thighR - close), outR * 0.25f);
-            FigureTurn(root, "LowerLeg.L", -kneeL, 0f);
-            FigureTurn(root, "LowerLeg.R", -kneeR, 0f);
-
-            FigureTurn(root, "UpperArm.L", -armL, outL);
-            FigureTurn(root, "UpperArm.R", -armR, outR);
-            FigureTurn(root, "LowerArm.L", -elbowL, 0f);
-            FigureTurn(root, "LowerArm.R", -elbowR, 0f);
         }
 
-        /// <summary>骨ひとつを、体から見た軸で曲げる。左右で符号が揃う</summary>
-        static void FigureTurn(Transform root, string bone, float pitch, float roll)
+        /// <summary>机に肘をつく形で、上体を椅子に座った形からさらに前へ倒す一段（度）と、その上限</summary>
+        const float DeskLeanStep = 2f;
+        const float DeskLeanMost = 40f;
+        /// <summary>机の天板の高さ（教室の机。<c>BuildDiveClassroom.DeskY</c> の板の上の面）</summary>
+        const float DeskTop = DeskY + 0.02f;
+        /// <summary>椅子の座面の真ん中から、机の手前の縁まで（教室の机と椅子の並び）</summary>
+        const float DeskNear = 0.56f - 0.22f;
+        /// <summary>肘を置く所。机の手前の縁からこれだけ奥</summary>
+        const float DeskElbowIn = 0.02f;
+        /// <summary>前腕の下の面から骨の線まで（天板に食い込まないよう、肘と手首を天板からこれだけ上げる）</summary>
+        const float ForearmHalf = 0.035f;
+
+        /// <summary>
+        /// 机に肘をつく（pose 6）。椅子に座った形（<see cref="BuildAlleyCrowd.Pose.SitChair"/>。座面の高さは教室の椅子と同じ 0.46 m）から、
+        /// 上体を前へ倒し、両の肘を机の手前の縁の少し奥に、前腕を天板の上に置いて、手を前で寄せる（<see cref="BodyPoser.Arm"/>）。
+        ///
+        /// **倒す角は、肘が天板に届くまで。** 決め打ちの 16° では肩が座面の真上近くに残り、机の縁（座面の真ん中から 0.34 m 先）まで
+        /// 上腕（0.23 m ほど）が届かず、腕が伸び切って天板の上に浮いた。肩から上腕の長さだけ離れた天板の上の点が
+        /// 机の縁より奥に来るまで、上体を一段ずつ倒す。背丈が違っても肘が天板から浮かない。
+        /// 倒したあとで、脚を座った形の足首の置き場へ解き直す（Rocketbox は腿が背骨の一つ目の子で、背骨と一緒に振れる）。
+        /// 首と頭は倒した分の半分だけ起こし返し、顔は机の上のノートへ向く
+        /// </summary>
+        static void LeanOnDesk(Animator an)
         {
-            if (Mathf.Approximately(pitch, 0f) && Mathf.Approximately(roll, 0f)) return;
-            var b = FigureBoneOf(root, bone);
-            if (b == null) return;
-            b.rotation = Quaternion.AngleAxis(pitch, Vector3.right) * Quaternion.AngleAxis(roll, Vector3.forward) * b.rotation;
+            BuildAlleyCrowd.Apply(an, BuildAlleyCrowd.Pose.SitChair);
+            System.Func<HumanBodyBones, Transform> B = an.GetBoneTransform;
+            var right = Vector3.right;
+            var y = DeskTop + ForearmHalf;
+            var want = DeskNear + DeskElbowIn;
+            var upper = new float[2];
+            var fore = new float[2];
+            for (var i = 0; i < 2; i++)
+            {
+                var left = i == 0;
+                var s = B(left ? HumanBodyBones.LeftUpperArm : HumanBodyBones.RightUpperArm).position;
+                var e = B(left ? HumanBodyBones.LeftLowerArm : HumanBodyBones.RightLowerArm).position;
+                var w = B(left ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand).position;
+                upper[i] = Vector3.Distance(s, e);
+                fore[i] = Vector3.Distance(e, w);
+            }
+            // 肘: 肩の真下から少し外、天板の高さで、肩から上腕の長さだけ前
+            System.Func<int, Vector3> elbowOf = i =>
+            {
+                var sign = i == 0 ? -1f : 1f;
+                var s = B(i == 0 ? HumanBodyBones.LeftUpperArm : HumanBodyBones.RightUpperArm).position;
+                var dx = sign * 0.03f;
+                var dy = s.y - y;
+                var reach = Mathf.Sqrt(Mathf.Max(0f, upper[i] * upper[i] - dy * dy - dx * dx));
+                return new Vector3(s.x + dx, y, s.z + reach);
+            };
+            // 足首の置き場と足の向き。上体を倒したあとで脚を解き直す（Rocketbox（Biped）は腿が背骨の一つ目の子なので、
+            // 背骨を曲げると脚ごと前へ振れて、足先が床に沈む）
+            var legs = new[]
+            {
+                new[] { HumanBodyBones.LeftUpperLeg, HumanBodyBones.LeftLowerLeg, HumanBodyBones.LeftFoot },
+                new[] { HumanBodyBones.RightUpperLeg, HumanBodyBones.RightLowerLeg, HumanBodyBones.RightFoot },
+            };
+            var ankles = new Vector3[2];
+            var feet = new Quaternion[2];
+            var knees = new Vector3[2];
+            for (var i = 0; i < 2; i++)
+            {
+                ankles[i] = B(legs[i][2]).position;
+                feet[i] = B(legs[i][2]).rotation;
+                knees[i] = B(legs[i][1]).position + Vector3.forward * 0.6f;
+            }
+            for (var lean = 0f; lean < DeskLeanMost; lean += DeskLeanStep)
+            {
+                if (elbowOf(0).z >= want && elbowOf(1).z >= want) break;
+                FigureTurnBone(B(HumanBodyBones.Spine), right, DeskLeanStep * 0.40f);
+                FigureTurnBone(B(HumanBodyBones.Chest), right, DeskLeanStep * 0.35f);
+                FigureTurnBone(B(HumanBodyBones.UpperChest), right, DeskLeanStep * 0.25f);
+                FigureTurnBone(B(HumanBodyBones.Neck), right, -DeskLeanStep * 0.25f);
+                FigureTurnBone(B(HumanBodyBones.Head), right, -DeskLeanStep * 0.25f);
+            }
+            for (var i = 0; i < 2; i++)
+            {
+                ArmReach.Solve(B(legs[i][0]), B(legs[i][1]), B(legs[i][2]), ankles[i], knees[i], 1f);
+                B(legs[i][2]).rotation = feet[i];
+            }
+            for (var i = 0; i < 2; i++)
+            {
+                var left = i == 0;
+                var sign = left ? -1f : 1f;
+                var elbow = elbowOf(i);
+                // 手首: 肘から前腕の長さだけ、体の真ん中へ寄せながら前へ
+                var toward = new Vector3(-sign * 0.55f, 0f, 1f).normalized;
+                var wrist = elbow + toward * fore[i];
+                BodyPoser.Arm(an, left, wrist, elbow + new Vector3(sign * 0.05f, -0.02f, 0f), toward, Vector3.down);
+            }
+        }
+
+        /// <summary>手を後ろで組む形で、手首を背中の皮からどれだけ後ろ・腰の骨からどれだけ上に置くか（m）</summary>
+        const float BehindOff = 0.05f;
+        const float BehindUp = 0.12f;
+
+        /// <summary>
+        /// 手を後ろで組む（pose 3）。両の手首を腰の後ろで重ね、肘を外の後ろへ逃がして曲げる（<see cref="BodyPoser.Arm"/>）。
+        ///
+        /// **場面 2 の形（<see cref="BuildAlleyCrowd.Pose.Behind"/>）は使わない。** あちらは手首を腰の骨の 17 cm 後ろ・2 cm 上に置くので、
+        /// 腕がほとんど伸び切り、肘が肩と手首を結ぶ線の上（胴の中）に来る。背中の厚い人（男大 05 のベスト、背を丸めた年寄り）では、
+        /// 肘から先がベストの背中の中に沈んだ。手首を背中の皮の <see cref="BehindOff"/> 後ろ、腰の骨の <see cref="BehindUp"/> 上に置いて、
+        /// 腕に曲がる余りを作る
+        /// </summary>
+        static void HandsBehind(Animator an, SkinnedMeshRenderer skin)
+        {
+            var hips = an.GetBoneTransform(HumanBodyBones.Hips).position;
+            var y = hips.y + BehindUp;
+            // 手首の高さの背中の面（背骨の線の近く、横 0.15 m の内でいちばん後ろ）。模型は原点に置いてあるので世界の座がそのまま根の座
+            var back = hips.z - 0.15f;
+            var tmp = new Mesh();
+            try
+            {
+                skin.BakeMesh(tmp, true);
+                var at = skin.transform.localToWorldMatrix;
+                var first = true;
+                foreach (var v in tmp.vertices)
+                {
+                    var p = at.MultiplyPoint3x4(v);
+                    if (Mathf.Abs(p.y - y) > 0.05f || Mathf.Abs(p.x) > 0.15f) continue;
+                    if (first || p.z < back) { back = p.z; first = false; }
+                }
+            }
+            finally
+            {
+                Object.DestroyImmediate(tmp);
+            }
+            var elbow = an.GetBoneTransform(HumanBodyBones.LeftLowerArm).position.y;
+            BodyPoser.Arm(an, true, new Vector3(-0.05f, y, back - BehindOff), new Vector3(-0.45f, elbow, back - 0.35f),
+                new Vector3(0.6f, -0.6f, -0.2f), new Vector3(0f, 0f, 1f));
+            BodyPoser.Arm(an, false, new Vector3(0.05f, y + 0.01f, back - BehindOff - 0.01f), new Vector3(0.45f, elbow, back - 0.35f),
+                new Vector3(-0.6f, -0.6f, -0.2f), new Vector3(0f, 0f, 1f));
+        }
+
+        static void FigureTurnBone(Transform t, Vector3 axis, float degrees)
+        {
+            if (t == null || Mathf.Approximately(degrees, 0f)) return;
+            t.rotation = Quaternion.AngleAxis(degrees, axis) * t.rotation;
         }
 
         // ---- 持ち物 ----------------------------------------------------------------
         //
         // 骨に付いて動かす。形は立った形を置いた人の根の座で作り、骨から見た置き場を覚えさせる
 
+        /// <summary>人の Humanoid の骨</summary>
+        static Transform FigureBone(Transform who, HumanBodyBones bone)
+        {
+            var an = who.GetComponentInChildren<Animator>(true);
+            return an != null ? an.GetBoneTransform(bone) : null;
+        }
+
         /// <summary>
         /// 人の根の座で形を作り、骨に付ける。形は人の根の子に置いたまま、
         /// <see cref="PersonMotion.Carry"/> でこまの頭ごとに骨の所へ据え直させる
         /// </summary>
-        static Transform FigureAttach(Transform who, string bone, string name, Mesh mesh, Material mat)
+        static Transform FigureAttach(Transform who, HumanBodyBones bone, string name, Mesh mesh, Material mat)
         {
             var go = Piece(who, name, mesh, mat);
             go.localPosition = Vector3.zero;
             go.localRotation = Quaternion.identity;
-            var b = FigureBoneOf(who, bone);
+            var b = FigureBone(who, bone);
             var motion = who.GetComponent<PersonMotion>();
             if (b != null && motion != null)
             {
@@ -652,32 +670,31 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>人の根の座での骨の位置</summary>
-        static Vector3 FigureAt(Transform who, string bone)
+        static Vector3 FigureAt(Transform who, HumanBodyBones bone)
         {
-            var b = FigureBoneOf(who, bone);
+            var b = FigureBone(who, bone);
             return b != null ? who.InverseTransformPoint(b.position) : Vector3.zero;
         }
 
-        /// <summary>頭の広がり（頭のレンダラーの皮）を人の根の座で</summary>
-        static Bounds FigureHead(Transform who)
+        /// <summary>体の皮を置いた形の頂点を、人の根の座で</summary>
+        static Vector3[] FigureSkin(Transform who)
         {
-            var box = new Bounds();
-            var first = true;
+            var figure = who.Find("Figure");
+            if (figure == null) return new Vector3[0];
+            var smr = BuildDiveCast.Body(figure.gameObject);
             var tmp = new Mesh();
-            foreach (var smr in who.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            try
             {
-                if (!smr.name.EndsWith("_Head")) continue;
                 smr.BakeMesh(tmp, true);
                 var at = who.worldToLocalMatrix * smr.transform.localToWorldMatrix;
-                foreach (var v in tmp.vertices)
-                {
-                    var p = at.MultiplyPoint3x4(v);
-                    if (first) { box = new Bounds(p, Vector3.zero); first = false; }
-                    else box.Encapsulate(p);
-                }
+                var v = tmp.vertices;
+                for (var i = 0; i < v.Length; i++) v[i] = at.MultiplyPoint3x4(v[i]);
+                return v;
             }
-            Object.DestroyImmediate(tmp);
-            return box;
+            finally
+            {
+                Object.DestroyImmediate(tmp);
+            }
         }
     }
 }

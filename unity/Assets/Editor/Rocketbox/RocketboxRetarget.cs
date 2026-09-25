@@ -31,6 +31,12 @@ namespace HalfAware.EditorTools.Rocketbox
     /// - 歩きの腕は、上腕・前腕・手を肩の付け根まわりに一緒に回して、振りの真ん中が体の横に来るようにする（振りの幅は変わらない）。
     ///   そのうえで、前への振りだけを縮める（<see cref="WalkArmFrontScale"/>）。後ろへの振りはそのまま。
     ///   肘の曲がる向きも体の真ん前へ向け直す（<see cref="WalkElbowTurn"/>）。元の歩きは上腕が内へねじれていて、手が体の真ん中へ寄っていた
+    ///
+    /// 場面 4 の記憶の人の立ち・歩き・走り（Quaternius の W_Suit と M_Suit の FBX に入っている Idle_Neutral・Walk・Run）も、
+    /// 同じ作りで移す（<see cref="BakeMemory"/>）。主人公だけの直し（なで肩の <see cref="ClavicleDrop"/> と、
+    /// 一人称で手が画面の真ん中へ振れないよう前への振りを縮める <see cref="WalkArmFrontScale"/>）は外し、
+    /// 直立の立ち（<see cref="Job.CalibrateStand"/>）と肘の曲がる向きの直し（<see cref="WalkElbowTurn"/>）は残す。
+    /// 移す元・当てる模型・この二つの値は <see cref="Setup"/> で渡す
     /// </summary>
     public static class RocketboxRetarget
     {
@@ -117,6 +123,36 @@ namespace HalfAware.EditorTools.Rocketbox
         /// </summary>
         public const float ClavicleDrop = 10f;
 
+        // ---- 移す組 ---------------------------------------------------------------
+
+        /// <summary>
+        /// 一回分の移し替えの組。元の模型（Quaternius の FBX）、元の立ち・歩き（・走り）、当てる模型（Rocketbox の FBX）、
+        /// 主人公だけの直しの二つの値（なで肩の度・前への振りの割合）
+        /// </summary>
+        public sealed class Setup
+        {
+            public string SourceModel;
+            public AnimationClip Idle, Walk, Run;
+            public string TargetModel;
+            /// <summary>鎖骨を束ねた姿勢からさらに下げる度（<see cref="RocketboxRetarget.ClavicleDrop"/>）。0 で束ねた姿勢の向きのまま</summary>
+            public float ClavicleDrop;
+            /// <summary>歩きの前への振りの割合（<see cref="RocketboxRetarget.WalkArmFrontScale"/>）。1 で縮めない</summary>
+            public float WalkArmFrontScale = 1f;
+        }
+
+        /// <summary>主人公の組（女大 14 に、前の主人公の立ちと歩きを、なで肩と前への振りの半分の直しを掛けて移す）</summary>
+        public static Setup Protagonist()
+        {
+            var idle = AssetDatabase.LoadAssetAtPath<AnimationClip>(SourceIdle);
+            var walk = AssetDatabase.LoadAssetAtPath<AnimationClip>(SourceWalk);
+            if (idle == null || walk == null) throw new InvalidOperationException("元の動きが無い");
+            return new Setup
+            {
+                SourceModel = SourceModel, Idle = idle, Walk = walk, TargetModel = RocketboxPerson.Adult14.Model,
+                ClavicleDrop = ClavicleDrop, WalkArmFrontScale = WalkArmFrontScale,
+            };
+        }
+
         [MenuItem("HalfAware/Rocketbox/Retarget the idle and walk")]
         public static void Menu()
         {
@@ -128,36 +164,130 @@ namespace HalfAware.EditorTools.Rocketbox
         {
             if (!AssetDatabase.IsValidFolder(OutDir)) AssetDatabase.CreateFolder("Assets/Animation", "Humanoid");
             var sb = new StringBuilder();
-            var idle = AssetDatabase.LoadAssetAtPath<AnimationClip>(SourceIdle);
-            var walk = AssetDatabase.LoadAssetAtPath<AnimationClip>(SourceWalk);
-            if (idle == null || walk == null) throw new InvalidOperationException("元の動きが無い");
             var made = new Dictionary<AnimationClip, AnimationClip>();
-            using (var job = new Job())
+            foreach (var kv in Retarget(Protagonist(), sb))
             {
-                sb.AppendLine(job.CalibrateArms(walk));
-                sb.AppendLine(job.CalibrateTrunk(idle));
-                sb.AppendLine(job.CalibrateStand(idle));
-                foreach (var clip in new[] { idle, walk })
-                {
-                    string note;
-                    var human = job.Convert(clip, out note);
-                    var path = OutDir + "/" + clip.name + ".anim";
-                    var old = AssetDatabase.LoadAssetAtPath<AnimationClip>(path);
-                    if (old != null)
-                    {
-                        EditorUtility.CopySerialized(human, old);
-                        Object.DestroyImmediate(human);
-                        human = old;
-                        EditorUtility.SetDirty(old);
-                    }
-                    else AssetDatabase.CreateAsset(human, path);
-                    made[clip] = human;
-                    sb.AppendLine(clip.name + ": " + note + " → " + path);
-                }
+                var path = OutDir + "/" + kv.Key.name + ".anim";
+                made[kv.Key] = Write(kv.Value, path);
+                sb.AppendLine("  → " + path);
             }
             MakeController(made);
             AssetDatabase.SaveAssets();
             sb.AppendLine("状態機械: " + ControllerPath);
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// 移し替えて、書かずに返す（元の動き → Humanoid の動き。並びは立ち・歩き・走り）。
+        /// 返した動きはどのアセットにも属さないので、使い終えたら壊すか <see cref="Write"/> で書く
+        /// </summary>
+        public static List<KeyValuePair<AnimationClip, AnimationClip>> Retarget(Setup setup, StringBuilder sb)
+        {
+            var made = new List<KeyValuePair<AnimationClip, AnimationClip>>();
+            using (var job = new Job(setup))
+            {
+                sb.AppendLine(job.CalibrateArms(setup.Walk));
+                sb.AppendLine(job.CalibrateTrunk(setup.Idle));
+                sb.AppendLine(job.CalibrateStand(setup.Idle));
+                foreach (var clip in new[] { setup.Idle, setup.Walk, setup.Run })
+                {
+                    if (clip == null) continue;
+                    string note;
+                    var human = job.Convert(clip, out note);
+                    made.Add(new KeyValuePair<AnimationClip, AnimationClip>(clip, human));
+                    sb.AppendLine(clip.name + ": " + note);
+                }
+            }
+            return made;
+        }
+
+        /// <summary>動きをアセットへ書く。あれば中身だけ差し替える（GUID を保つ）</summary>
+        public static AnimationClip Write(AnimationClip human, string path)
+        {
+            var old = AssetDatabase.LoadAssetAtPath<AnimationClip>(path);
+            if (old != null)
+            {
+                EditorUtility.CopySerialized(human, old);
+                Object.DestroyImmediate(human);
+                EditorUtility.SetDirty(old);
+                return old;
+            }
+            AssetDatabase.CreateAsset(human, path);
+            return human;
+        }
+
+        // ---- 場面 4 の記憶の人 ------------------------------------------------------
+
+        /// <summary>記憶の人の動きの書き出し先。主人公の動き（<see cref="OutDir"/>）とは分ける</summary>
+        public const string MemoryDir = OutDir + "/Memory";
+        /// <summary>記憶の人の元の動き（Quaternius の FBX の中の名前）</summary>
+        public const string MemoryIdle = "CharacterArmature|Idle_Neutral";
+        public const string MemoryWalk = "CharacterArmature|Walk";
+        public const string MemoryRun = "CharacterArmature|Run";
+        /// <summary>男の人の動きを当てる模型（男大 06）。女の人は主人公と同じ女大 14 に当てる</summary>
+        public const string MaleTarget = "Assets/Models/rocketbox/Male_Adult_06/Male_Adult_06.fbx";
+        /// <summary>立ち・歩き・走りの並び（<see cref="MemoryClip"/> の名前）</summary>
+        public static readonly string[] Gaits = { "Idle", "Walk", "Run" };
+
+        /// <summary>記憶の人の動きのパス。female で女の人（W_Suit から）、でなければ男の人（M_Suit から）。gait は Idle・Walk・Run</summary>
+        public static string MemoryClip(bool female, string gait)
+        {
+            return MemoryDir + "/" + (female ? "Female_" : "Male_") + gait + ".anim";
+        }
+
+        /// <summary>
+        /// 記憶の人の組。女の人は W_Suit、男の人は M_Suit の立ち・歩き・走りを移す。
+        /// Quaternius は男女で動きの長さが違う（女は立ち 2.08・歩き 1.67・走り 1.00 秒、男は 1.67・1.33・0.80 秒）ので、
+        /// 別の組として移して今の男女の歩き方の違いを残す（設計メモ 7 節）。主人公だけの直しは外す
+        /// </summary>
+        public static Setup Memory(bool female)
+        {
+            var model = "Assets/Models/quaternius/" + (female ? "W_Suit" : "M_Suit") + ".fbx";
+            var setup = new Setup
+            {
+                SourceModel = model,
+                TargetModel = female ? RocketboxPerson.Adult14.Model : MaleTarget,
+                ClavicleDrop = 0f,
+                WalkArmFrontScale = 1f,
+            };
+            foreach (var o in AssetDatabase.LoadAllAssetRepresentationsAtPath(model))
+            {
+                var c = o as AnimationClip;
+                if (c == null) continue;
+                if (c.name == MemoryIdle) setup.Idle = c;
+                else if (c.name == MemoryWalk) setup.Walk = c;
+                else if (c.name == MemoryRun) setup.Run = c;
+            }
+            if (setup.Idle == null || setup.Walk == null || setup.Run == null) throw new InvalidOperationException("元の動きが無い: " + model);
+            return setup;
+        }
+
+        [MenuItem("HalfAware/Dive people/Retarget the motions", false, 312)]
+        public static void MemoryMenu()
+        {
+            Debug.Log(BakeMemory());
+        }
+
+        /// <summary>記憶の人の立ち・歩き・走り（女と男で 6 本）を移し替えて書く。主人公の動き（<see cref="OutDir"/> の直下）には触らない</summary>
+        public static string BakeMemory()
+        {
+            if (!AssetDatabase.IsValidFolder(OutDir)) AssetDatabase.CreateFolder("Assets/Animation", "Humanoid");
+            if (!AssetDatabase.IsValidFolder(MemoryDir)) AssetDatabase.CreateFolder(OutDir, "Memory");
+            var sb = new StringBuilder();
+            sb.AppendLine("場面 4 の記憶の人の動きを移した");
+            foreach (var female in new[] { true, false })
+            {
+                sb.AppendLine(female ? "女（W_Suit → 女大 14）" : "男（M_Suit → 男大 06）");
+                var made = Retarget(Memory(female), sb);
+                for (var i = 0; i < made.Count; i++)
+                {
+                    var path = MemoryClip(female, Gaits[i]);
+                    made[i].Value.name = System.IO.Path.GetFileNameWithoutExtension(path);
+                    Write(made[i].Value, path);
+                    sb.AppendLine("  → " + path);
+                }
+            }
+            AssetDatabase.SaveAssets();
             return sb.ToString();
         }
 
@@ -476,14 +606,14 @@ namespace HalfAware.EditorTools.Rocketbox
                 ResetSource();
                 clip.SampleAnimation(src, t);
                 var stand = clip == standClip;
-                // 鎖骨: 束ねた姿勢の向きから ClavicleDrop だけ肩の先を下げる（胸の骨の中の向きで決めるので、胸の動きに付いて動く）
+                // 鎖骨: 束ねた姿勢の向きから clavicleDrop だけ肩の先を下げる（胸の骨の中の向きで決めるので、胸の動きに付いて動く）
                 foreach (var side in new[] { "L", "R" })
                 {
                     var cl = D("Bip01 " + side + " Clavicle");
                     var parent = cl.parent;
                     var bindLocal = Quaternion.Inverse(dstBind[parent]) * dstBind[cl];
                     var axis = Quaternion.Inverse(dstBind[parent]) * Vector3.forward;
-                    cl.localRotation = Quaternion.AngleAxis(side == "L" ? ClavicleDrop : -ClavicleDrop, axis) * bindLocal;
+                    cl.localRotation = Quaternion.AngleAxis(side == "L" ? clavicleDrop : -clavicleDrop, axis) * bindLocal;
                 }
                 foreach (var j in joints)
                 {
@@ -552,7 +682,7 @@ namespace HalfAware.EditorTools.Rocketbox
                     foreach (var bone in new[] { "UpperArm.", "LowerArm.", "Hand." }) armFix[bone + side] = fix;
                     sb.AppendFormat(CultureInfo.InvariantCulture, "{0} 開き {1:0}°→{2:0}°、前後 {3:0}°→{4:0}°（{5:0.0}° 回す）/ ", side, open, WalkArmOpen, fwd, WalkArmForward, Quaternion.Angle(Quaternion.identity, fix));
                 }
-                sb.AppendFormat(CultureInfo.InvariantCulture, "前への振りは {0:0.00} 倍（真下から {1:0}° までなだらかに）", WalkArmFrontScale, WalkArmFrontEase);
+                sb.AppendFormat(CultureInfo.InvariantCulture, "前への振りは {0:0.00} 倍（真下から {1:0}° までなだらかに）、鎖骨を {2:0}° 下げる", frontScale, WalkArmFrontEase, clavicleDrop);
                 ResetSource();
                 return sb.ToString();
             }
@@ -568,7 +698,7 @@ namespace HalfAware.EditorTools.Rocketbox
                     var up = D("Bip01 " + side + " UpperArm");
                     var d = D("Bip01 " + side + " Forearm").position - up.position;
                     var fwd = Mathf.Atan2(d.z, -d.y) * Mathf.Rad2Deg;
-                    var want = FrontSquash(fwd, WalkArmFrontScale, WalkArmFrontEase);
+                    var want = FrontSquash(fwd, frontScale, WalkArmFrontEase);
                     if (Mathf.Abs(want - fwd) < 1e-4f) continue;
                     // x まわりの正の回しで、下向きの腕は後ろへ回る
                     up.rotation = Quaternion.AngleAxis(fwd - want, Vector3.right) * up.rotation;
@@ -609,11 +739,16 @@ namespace HalfAware.EditorTools.Rocketbox
                 return Vector3.Cross(D("Bip01 " + side + " Finger2").position - hand, D("Bip01 " + side + " Finger1").position - D("Bip01 " + side + " Finger4").position).normalized;
             }
 
-            public Job()
+            /// <summary>鎖骨を下げる度と、歩きの前への振りの割合（<see cref="Setup"/>）</summary>
+            readonly float clavicleDrop, frontScale;
+
+            public Job(Setup setup)
             {
-                src = Spawn(SourceModel, new Vector3(0f, -600f, 0f));
+                clavicleDrop = setup.ClavicleDrop;
+                frontScale = setup.WalkArmFrontScale;
+                src = Spawn(setup.SourceModel, new Vector3(0f, -600f, 0f));
                 // HumanPoseHandler は体の位置を世界の原点からの値で返すので、Rocketbox は原点に置く
-                dst = Spawn(RocketboxPerson.Adult14.Model, Vector3.zero);
+                dst = Spawn(setup.TargetModel, Vector3.zero);
                 try
                 {
                     foreach (var t in src.GetComponentsInChildren<Transform>(true)) s[t.name] = t;

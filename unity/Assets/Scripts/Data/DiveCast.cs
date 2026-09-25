@@ -80,7 +80,13 @@ namespace HalfAware
     /// 記憶の中で板の出る相手は、一覧（<see cref="DiveRoster"/>）の Seen の飛び先で誰かが決まる。
     /// 通りすがり（公園を横切るプリヤ、デッキを通るローザ、戸口で待つアイシャ）も同じ人として持つ。
     ///
-    /// 服の模型は日常に合う七つだけ（<see cref="Models"/>）。冒険家・宇宙服・パンクは使わない
+    /// 服の模型は日常に合う七つだけ（<see cref="Models"/>）。冒険家・宇宙服・パンクは使わない。
+    ///
+    /// **場面 4 の人は Rocketbox の模型に替えた**（<c>BuildDiveCast</c>・<c>BuildDivePeople</c>、設計メモ 2026-09-26）。
+    /// そちらが使うのは id・名前・年・性・背（height）・背の丸み（curl）だけで、背の丸みは動きを置いたあとに一度だけ掛ける。
+    /// model・太さ（girth）・部位ごとの色（colors と <see cref="Part"/>）は Quaternius の頃の物で、Rocketbox の人には掛けない。
+    /// 年齢の比（<see cref="ProportionOf"/>）も区分から直には掛けない。骨の縮尺は <c>RocketboxMemory.Proportion</c> が持つ
+    /// （10 代の頭の比だけそこから借りる）。二重に掛けると体つきが崩れる
     /// </summary>
     public static class DiveCast
     {

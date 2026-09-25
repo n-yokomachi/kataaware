@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
+using HalfAware.EditorTools.Rocketbox;
 
 namespace HalfAware.EditorTools
 {
@@ -19,6 +20,17 @@ namespace HalfAware.EditorTools
 
         // ---- 人の一覧 ------------------------------------------------------------------
 
+        /// <summary>
+        /// 記憶の人の id（<see cref="DiveCast"/> の id）。記憶に置いた人は一人ずつのプレハブ（<see cref="BuildDiveCast"/>）の写しなので、
+        /// 元のプレハブの名前が id。プレハブと結ばれていなければ null
+        /// </summary>
+        public static string PersonId(Transform who)
+        {
+            if (who == null) return null;
+            var src = UnityEditor.PrefabUtility.GetCorrespondingObjectFromSource(who.gameObject);
+            return src != null ? src.name : null;
+        }
+
         /// <summary>記憶ごとに、誰がどの名前で、どの模型・どの背で立っているか</summary>
         public static string Table()
         {
@@ -29,15 +41,15 @@ namespace HalfAware.EditorTools
             {
                 using (new CheckDiveSky.Stage(Place(take), int.Parse(take.name)))
                 {
-                    foreach (var tint in take.GetComponentsInChildren<PersonTint>(true))
+                    foreach (var motion in take.GetComponentsInChildren<PersonMotion>(true))
                     {
+                        var id = PersonId(motion.transform);
                         Person p;
-                        DiveCast.TryById(tint.Person, out p);
-                        var motion = tint.GetComponent<PersonMotion>();
-                        var box = Extent(tint.transform);
+                        DiveCast.TryById(id, out p);
+                        var box = Extent(motion.transform);
                         sb.AppendLine(string.Format("| {0} | {1} | {2} | {3} | {4} | {5} | {6:F2} |",
-                            take.name, tint.name, p.name, p.age, p.model,
-                            motion != null && motion.Seated ? "座る" : tint.GetComponent<Mover>() != null ? "歩く" : "立つ",
+                            take.name, motion.name, p.name, p.age, id != null ? RocketboxMemory.ById(id).Model.Label : "?",
+                            motion.Seated ? "座る" : motion.GetComponent<Mover>() != null ? "歩く" : "立つ",
                             box.size.y));
                     }
                 }
@@ -46,7 +58,7 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 同じ人が同じ見た目か。人ごとに、部位の色と模型の縮尺と、立った背（座る人は除く）を比べる
+        /// 同じ人が同じ見た目か。人ごとに、マテリアルの並びと模型の縮尺と、立った背（座る人は除く）を比べる
         /// </summary>
         public static string SameLook()
         {
@@ -59,20 +71,20 @@ namespace HalfAware.EditorTools
             {
                 using (new CheckDiveSky.Stage(Place(take), int.Parse(take.name)))
                 {
-                    foreach (var tint in take.GetComponentsInChildren<PersonTint>(true))
+                    foreach (var motion in take.GetComponentsInChildren<PersonMotion>(true))
                     {
-                        var id = tint.Person;
+                        var id = PersonId(motion.transform) ?? motion.name;
                         var sb = new StringBuilder();
-                        for (var i = 0; i < tint.Count; i++) sb.Append(ColorUtility.ToHtmlStringRGB(tint.ColorAt(i))).Append(',');
-                        var motion = tint.GetComponent<PersonMotion>();
+                        foreach (var smr in motion.Body.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+                            foreach (var mat in smr.sharedMaterials) sb.Append(mat != null ? mat.name : "-").Append(',');
                         var scale = motion.Body.localScale.x;
-                        var tall = motion.Seated ? -1f : Extent(tint.transform).size.y;
+                        var tall = motion.Seated ? -1f : Extent(motion.transform).size.y;
                         if (!seen.ContainsKey(id)) seen[id] = new List<string>();
-                        seen[id].Add(take.name + "/" + tint.name);
+                        seen[id].Add(take.name + "/" + motion.name);
                         string had;
                         if (colours.TryGetValue(id, out had))
                         {
-                            if (had != sb.ToString()) bad.Add(id + " の色が " + take.name + "/" + tint.name + " で違う");
+                            if (had != sb.ToString()) bad.Add(id + " のマテリアルが " + take.name + "/" + motion.name + " で違う");
                             if (Mathf.Abs(scales[id] - scale) > 1e-4f) bad.Add(id + " の縮尺が違う");
                             if (tall > 0f && heights[id] > 0f && Mathf.Abs(heights[id] - tall) > 0.005f)
                                 bad.Add(id + " の背が " + heights[id].ToString("F3") + " と " + tall.ToString("F3"));
@@ -92,8 +104,8 @@ namespace HalfAware.EditorTools
             {
                 if (kv.Value.Count < 2) continue;
                 out1.AppendLine(kv.Key + " : " + string.Join(", ", kv.Value.ToArray()) + "  背 " +
-                    (heights[kv.Key] > 0f ? heights[kv.Key].ToString("F3") : "（座る）") + "  部位 " +
-                    colours[kv.Key].Split(',').Length.ToString());
+                    (heights[kv.Key] > 0f ? heights[kv.Key].ToString("F3") : "（座る）") + "  マテリアル " +
+                    (colours[kv.Key].Split(',').Length - 1).ToString());
             }
             out1.AppendLine(bad.Count == 0 ? "食い違い無し" : string.Join("\n", bad.ToArray()));
             return out1.ToString();
@@ -104,12 +116,12 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// 子ども・十代・大人・年寄りの代表で、背、頭の高さと背の比、脚の長さと背の比。
         /// 頭の高さは頭の骨（首の付け根の上）から頭のてっぺんまで、脚の長さは腿の付け根の高さ。
-        /// 比べる「今」は模型をそのまま縮めた形で、比は模型の素の値と同じになる
+        /// 比べる「模型のまま」は Rocketbox の模型を骨の縮尺を掛けずに立たせた形
         /// </summary>
         public static string Proportions()
         {
             var sb = new StringBuilder();
-            sb.AppendLine("| 人 | 区分 | 背 m | 頭/背 | 脚/背 | 縮めただけの頭/背 | 縮めただけの脚/背 |");
+            sb.AppendLine("| 人 | 区分 | 背 m | 頭/背 | 脚/背 | 模型のままの頭/背 | 模型のままの脚/背 |");
             sb.AppendLine("|---|---|---|---|---|---|---|");
             var ids = new[] { "Mei", "Sofia", "Lucas", "Daniel", "Aisha", "Priya", "Hanna", "Mark", "Albert", "Rosa" };
             foreach (var id in ids)
@@ -123,7 +135,7 @@ namespace HalfAware.EditorTools
                     float head, leg, tall;
                     Ratios(copy, out tall, out head, out leg);
                     float head0, leg0, tall0;
-                    RawRatios(p.model, out tall0, out head0, out leg0);
+                    RawRatios(RocketboxMemory.ById(id), out tall0, out head0, out leg0);
                     sb.AppendLine(string.Format("| {0} {1} | {2} | {3:F2} | {4:F3} | {5:F3} | {6:F3} | {7:F3} |",
                         p.name, p.age, p.Band, tall, head / tall, leg / tall, head0 / tall0, leg0 / tall0));
                 }
@@ -139,28 +151,23 @@ namespace HalfAware.EditorTools
         {
             var box = Extent(who);
             tall = box.size.y;
-            var h = Bone(who, "Head");
+            var h = Bone(who, HumanBodyBones.Head);
             head = box.max.y - who.InverseTransformPoint(h.position).y;
-            var l = who.InverseTransformPoint(Bone(who, "UpperLeg.L").position).y;
-            var r = who.InverseTransformPoint(Bone(who, "UpperLeg.R").position).y;
+            var l = who.InverseTransformPoint(Bone(who, HumanBodyBones.LeftUpperLeg).position).y;
+            var r = who.InverseTransformPoint(Bone(who, HumanBodyBones.RightUpperLeg).position).y;
             leg = (l + r) * 0.5f - box.min.y;
         }
 
-        /// <summary>模型をそのまま、立ちの動きの頭で置いた比。組み直す前の「大人を縮めただけ」の比はこれと同じ</summary>
-        static void RawRatios(string model, out float tall, out float head, out float leg)
+        /// <summary>Rocketbox の模型をそのまま（骨の縮尺も背の丸みも掛けず）、記憶の人の立ちの動きの頭で置いた比</summary>
+        static void RawRatios(RocketboxMemory m, out float tall, out float head, out float leg)
         {
-            var src = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/quaternius/" + model + ".fbx");
+            var src = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(m.Model.Model);
             var inst = Object.Instantiate(src);
             inst.hideFlags = HideFlags.HideAndDontSave;
             inst.transform.position = Yard + new Vector3(0f, 0f, -20f);
             try
             {
-                foreach (var o in UnityEditor.AssetDatabase.LoadAllAssetRepresentationsAtPath(
-                    "Assets/Models/quaternius/" + model + ".fbx"))
-                {
-                    var c = o as AnimationClip;
-                    if (c != null && c.name == "CharacterArmature|Idle_Neutral") c.SampleAnimation(inst, 0f);
-                }
+                BodyPoser.Stand(inst.GetComponent<Animator>(), BuildDiveCast.Clip(m.Cast.female, "Idle"));
                 Ratios(inst.transform, out tall, out head, out leg);
             }
             finally
@@ -212,8 +219,10 @@ namespace HalfAware.EditorTools
             motion.Late();
             var first = Snap(motion.Body);
 
-            var feet = new[] { Bone(motion.transform, "Foot.L"), Bone(motion.transform, "Foot.R") };
-            var floor = motion.transform.position.y;
+            // 足首の骨（Rocketbox の足は足首の関節）。着いているかは、立った形の足首の高さから 3 cm 以内で見る
+            var feet = new[] { Bone(motion.transform, HumanBodyBones.LeftFoot), Bone(motion.transform, HumanBodyBones.RightFoot) };
+            var rest = float.MaxValue;
+            for (var f = 0; f < 2; f++) if (feet[f] != null) rest = Mathf.Min(rest, feet[f].position.y - motion.transform.position.y);
             var lastTicks = motion.Ticks;
             var lastFeet = new Vector3[2];
             var lastPlanted = -1;
@@ -263,7 +272,7 @@ namespace HalfAware.EditorTools
                     var y = feet[f].position.y - motion.transform.position.y;
                     if (y < low) { low = y; planted = f; }
                 }
-                if (low > 0.03f + 0.02f) planted = -1;
+                if (low > rest + 0.03f) planted = -1;
                 if (planted >= 0 && planted == lastPlanted && g != PersonMotion.Gait.Stand)
                 {
                     slips.Add(Flat(feet[planted].position - lastFeet[planted]));
@@ -291,7 +300,7 @@ namespace HalfAware.EditorTools
             travels.Sort();
             var sb = new StringBuilder();
             Person p;
-            DiveCast.TryById(motion.GetComponent<PersonTint>().Person, out p);
+            DiveCast.TryById(PersonId(motion.transform), out p);
             sb.Append(take.name + "/" + motion.name + "（" + p.name + "）");
             sb.Append(string.Format(" 線 {0:F2} m を {1:F1} 秒", Flat(mover.To - mover.From) + (mover.Returns ? Flat(mover.Next - mover.To) : 0f), span));
             sb.Append(string.Format("｜こま {0:F1}/秒", fps));
@@ -578,10 +587,10 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 歩きの数こまを横に並べた一枚。一人を写し、こまの頭ごとに歩きを置いて並べる。
+        /// 歩き（run なら走り）の数こまを横に並べた一枚。一人を写し、こまの頭ごとに歩きを置いて並べる。
         /// 周期は一周期を <paramref name="frames"/> こまで回す（こまの間隔は一周期 ÷ こま数）
         /// </summary>
-        public static string WalkFrames(string id, int frames, string path)
+        public static string WalkFrames(string id, int frames, string path, bool run = false)
         {
             var made = new List<GameObject>();
             try
@@ -593,14 +602,15 @@ namespace HalfAware.EditorTools
                     var motion = copy.GetComponent<PersonMotion>();
                     copy.position = Yard + new Vector3((i - (frames - 1) * 0.5f) * 0.7f, 0f, 0f);
                     copy.rotation = Quaternion.Euler(0f, 90f, 0f);
-                    motion.Sample(motion.Walk, motion.Walk.length * i / frames);
+                    var clip = run ? motion.Run : motion.Walk;
+                    motion.Sample(clip, clip.length * i / frames);
                     made.Add(copy.gameObject);
                 }
                 made.Add(Floor());
                 made.Add(Lamp(Yard + new Vector3(-2f, 4f, -4f), 9f));
                 made.Add(Lamp(Yard + new Vector3(3f, 3f, -3f), 5f));
                 Pair(Yard + new Vector3(0f, 0.9f, -7f), 0f, -2f, 32f, path);
-                return "歩きを " + frames + " こま → " + path;
+                return (run ? "走り" : "歩き") + "を " + frames + " こま → " + path;
             }
             finally
             {
@@ -806,18 +816,18 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// その人を記憶から一人写して、何も無い所へ置く。写しはプレハブと結ばれない一時の物。
-        /// 座っている人は写さない（立った形で並べたいので、同じ人の立っている記憶を探す）
+        /// 座っている人は写さない（立った形で並べたいので、同じ人の立っている記憶を探す）。
+        /// 据えた姿勢（腕組み・手を後ろ・片脚に預ける）も写る
         /// </summary>
         static Transform Copy(string id)
         {
             foreach (var take in Takes())
             {
-                foreach (var tint in take.GetComponentsInChildren<PersonTint>(true))
+                foreach (var motion in take.GetComponentsInChildren<PersonMotion>(true))
                 {
-                    if (tint.Person != id) continue;
-                    var motion = tint.GetComponent<PersonMotion>();
-                    if (motion != null && motion.Seated) continue;
-                    var copy = Object.Instantiate(tint.gameObject);
+                    if (PersonId(motion.transform) != id) continue;
+                    if (motion.Seated) continue;
+                    var copy = Object.Instantiate(motion.gameObject);
                     copy.hideFlags = HideFlags.HideAndDontSave;
                     copy.SetActive(true);
                     foreach (var m in copy.GetComponents<Mover>()) Object.DestroyImmediate(m);
@@ -825,7 +835,6 @@ namespace HalfAware.EditorTools
                     copy.transform.rotation = Quaternion.identity;
                     var cm = copy.GetComponent<PersonMotion>();
                     if (cm != null) cm.Still();
-                    copy.GetComponent<PersonTint>().Apply();
                     return copy.transform;
                 }
             }
@@ -855,10 +864,11 @@ namespace HalfAware.EditorTools
             return go;
         }
 
-        static Transform Bone(Transform root, string name)
+        /// <summary>人の Humanoid の骨</summary>
+        static Transform Bone(Transform root, HumanBodyBones bone)
         {
-            foreach (var t in root.GetComponentsInChildren<Transform>(true)) if (t.name == name) return t;
-            return null;
+            var an = root.GetComponentInChildren<Animator>(true);
+            return an != null ? an.GetBoneTransform(bone) : null;
         }
 
         /// <summary>皮を置いた形の広がり。人の根のローカル</summary>

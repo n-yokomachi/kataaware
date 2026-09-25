@@ -11,8 +11,8 @@ namespace HalfAware.EditorTools
     /// 位置はどれも場所のローカルで、<c>yaw</c> は +z を 0 とした度、<c>pitch</c> は下が正。
     /// 鍵打ちの最後の <c>at</c> は一覧の <c>length</c> と揃える。揃っていなければ見直しが言う。
     ///
-    /// **顔は影で隠す。向きでは隠さない。** 買い手と同じ濃い色のマテリアルなので、
-    /// どの人も暗がりでは影にしか見えない。逆光・帽子の影・伏せた角度でそこを確かめる。
+    /// **顔は影で隠す。向きでは隠さない。** 人は Rocketbox の写真から作った顔を持つので、
+    /// 逆光・帽子の影・伏せた角度で見せる（設計書 6 節）。そこを確かめる。
     /// 背を向けて隠していた頃は、話しかけてくる相手まで後ろを向いていて、
     /// 誰が喋っているのか読めなかった。**相手をしている人はプレイヤーの方を向ける。**
     /// 目安は、話しかけに寄っていく主の立つ所への向きとの差が 90 度未満。
@@ -261,6 +261,7 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 人や鳩を一直線に動かす。位置は Take のローカル。
+        /// 片脚に預ける人（pose 1）と座る人は脚の向きを据えるので、動かさない（<see cref="HeldBones"/>）。
         ///
         /// <paramref name="ground"/> を立てると足元が真下の床へ下りる。
         /// 階段を降りる人も教壇から降りる人も、線の上下だけでは段を追えない
@@ -480,7 +481,9 @@ namespace HalfAware.EditorTools
         static HostKey[] Emily(Transform take)
         {
             Cast(take, "Junior", new Vector3(0.15f, 0f, -0.9f), 315f, 0);
-            Cast(take, "Passenger", new Vector3(SeatX, 0f, 1.8f), 250f, 5);
+            // 向かいの男は、肘掛け（z 1.75）と仕切り板（z 3.55）のあいだの座面の真ん中に座る。
+            // z 1.8 に置いていた頃は、肘掛けの上に跨って座っていた
+            Cast(take, "Passenger", new Vector3(SeatX, 0f, 2.65f), 250f, 5);
             return new[]
             {
                 K(0f,  0.2f,  0f, 0.6f,   70f,   6f, 1.58f),  // 窓の外を灯りが流れている
@@ -489,7 +492,7 @@ namespace HalfAware.EditorTools
                 K(14f, 0.2f,  0f, 0.45f, 178f,  10f, 1.58f),
                 K(17f, 0.32f, 0f, 0.35f, 205f,  18f, 1.52f),  // 電車が揺れて二人でよろける
                 K(20f, 0.2f,  0f, 0.45f, 175f,  14f, 1.58f),  // 腕に掴まられる
-                K(23f, 0.1f,  0f, 0.6f,   37f,   8f, 1.58f),  // 向かいの男が新聞を畳んで立つ
+                K(23f, 0.1f,  0f, 0.6f,   24f,   8f, 1.58f),  // 向かいの男が新聞を畳んで立つ
                 K(27f, 0.1f,  0f, 0.8f,  300f,   4f, 1.58f),  // 駅。ドアが開く
                 K(30f, 0.0f,  0f, 1.2f,  330f,   2f, 1.58f),
             };
@@ -723,8 +726,12 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Aisha(Transform take)
         {
-            var teacher = Cast(take, "Teacher", new Vector3(0.9f, 0f, 0.75f), 220f, 0);
-            Move(teacher, new Vector3(0.45f, 0.15f, 3.9f), new Vector3(0.9f, 0f, 0.75f), 6f, 9f, true);
+            // **先生は机の間の通路を歩いてくる。** 黒板の前から一直線に結んでいた頃は、アイシャの前の列の机と椅子を
+            // 突き抜けて歩いていた。黒板の前から通路（x 0 の列の間）を下り、アイシャの机の向こう側へ横に入る。
+            // 止まる所は机の奥の縁（z 0.62）から 20 cm 先。机に体が掛からない
+            var teacher = Cast(take, "Teacher", new Vector3(0.9f, 0f, 0.82f), 220f, 0);
+            Move(teacher, new Vector3(0.45f, 0.15f, 3.9f), new Vector3(0.1f, 0f, 1.0f), 6f, 6.5f, true);
+            Then(teacher, new Vector3(0.9f, 0f, 0.82f), 12.5f, 2.5f);
             Cast(take, "Neighbour", new Vector3(DeskX[3], 0f, DeskZ[1] - 0.56f), 355f, 6);
             var seat = new Vector3(DeskX[2], 0f, DeskZ[1] - 0.56f);
             return new[]
@@ -748,7 +755,9 @@ namespace HalfAware.EditorTools
         static HostKey[] Mateo(Transform take)
         {
             Cast(take, "Neighbour", new Vector3(DeskX[2], 0f, DeskZ[1] - 0.56f), 6f, 6);
-            Cast(take, "Teacher", new Vector3(DeskX[3], 0f, DeskZ[1] + 1.2f), 215f, 2);
+            // 先生はマテオの机の向こう側に立つ。机の奥の縁から 33 cm、前の列の椅子から 31 cm。
+            // z を 1.2 先に置いていた頃は、前の列の椅子の中に立っていた
+            Cast(take, "Teacher", new Vector3(DeskX[3], 0f, DeskZ[1] + 0.55f), 215f, 2);
             var seat = new Vector3(DeskX[3], 0f, DeskZ[1] - 0.56f);
             return new[]
             {
@@ -814,43 +823,65 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 買い物袋を二つ、両手に提げさせる。白いレジ袋。
-        /// 手首の骨に付けるので、立ちの動きで手が揺れると袋も付いてくる。
-        /// 持ち手の上端を指先の高さに、袋は手首から体の背丈に比した長さだけ下げる。
+        /// 手の骨（Humanoid の手。Rocketbox では手首の関節）に付けるので、立ちと歩きの動きで手が揺れると袋も付いてくる。
+        ///
+        /// **持ち手の上端を握った指の高さ（手首から 8 cm 下）に、袋の内側の面を腿の外側の面の 1 cm 外に置く。**
+        /// 手首から決めた長さだけ下げていた頃は、持ち手が指先より 10 cm ほど下に離れ、袋がスカートに食い込んだ。
+        /// 腿の外側の面は、袋の高さの皮のうち手より内の頂点から測る。
         /// 人の根の子として模型の後ろに置くので、光線の狙い（最初のレンダラーの広がり）には入らない
         /// </summary>
         static void ShopBags(Transform who)
         {
             var k = FigureSpan(who);
+            var skin = FigureSkin(who);
             for (var i = 0; i < 2; i++)
             {
                 var side = i == 0 ? "L" : "R";
-                var wrist = FigureAt(who, "Wrist." + side);
-                // 手首から少し外へ。手の甲と太腿に袋が埋まらないように
-                var x = wrist.x + (wrist.x < 0f ? -0.035f : 0.035f) * k;
-                var mesh = Shape("ShopBag" + side + Stamp(wrist) + Mathf.RoundToInt(k * 100f), 0.5f, b =>
+                var hand = i == 0 ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand;
+                var wrist = FigureAt(who, hand);
+                var sign = wrist.x < 0f ? -1f : 1f;
+                var grip = wrist.y - 0.08f * k;
+                var top = grip - 0.08f * k;
+                var bottom = top - 0.30f * k;
+                var thigh = 0f;
+                foreach (var p in skin)
                 {
-                    b.Box(new Vector3(x, wrist.y - 0.45f * k, wrist.z + 0.01f), new Vector3(0.10f, 0.30f, 0.28f) * k);
-                    // 持ち手
-                    b.Box(new Vector3(x, wrist.y - 0.26f * k, wrist.z + 0.01f), new Vector3(0.02f, 0.08f, 0.12f) * k);
+                    if (p.y < bottom || p.y > top || Mathf.Abs(p.z - wrist.z) > 0.16f * k) continue;
+                    var out1 = p.x * sign;
+                    if (out1 <= 0f || out1 > Mathf.Abs(wrist.x) - 0.03f) continue;
+                    thigh = Mathf.Max(thigh, out1);
+                }
+                var x = sign * (thigh + 0.01f + 0.05f * k);
+                var handle = (x + wrist.x) * 0.5f;
+                var mesh = Shape("ShopBag" + side + Stamp(new Vector3(x, grip, wrist.z)) + Mathf.RoundToInt(k * 100f), 0.5f, b =>
+                {
+                    b.Box(new Vector3(x, (top + bottom) * 0.5f, wrist.z + 0.01f), new Vector3(0.10f, 0.30f, 0.28f) * k);
+                    // 持ち手。袋の口から握った指まで
+                    b.Box(new Vector3(handle, (grip + top) * 0.5f, wrist.z + 0.01f), new Vector3(0.02f, grip - top + 0.01f, 0.12f * k));
                 });
-                FigureAttach(who, "Wrist." + side, "Bag" + side, mesh,
+                FigureAttach(who, hand, "Bag" + side, mesh,
                     AssetDatabase.LoadAssetAtPath<Material>(Materials + "EstateFrame.mat"));
             }
         }
 
         /// <summary>
-        /// 白いイヤホンを両耳に、線を胸まで。耳の高さは頭の皮の広がりから測り、頭の骨に付ける。
+        /// 白いイヤホンを両耳に、線を胸まで。頭の骨に付ける。
+        /// 耳の置き場は両目の骨から決める（目の高さの 2 cm 下、9 cm 後ろ、真ん中から 7.5 cm 外）。
+        /// 頭の皮の広がりの上端から測っていた頃は、プリヤの髪の上端から下げたので、耳より高い髪の中に浮いた。
         /// 遠目には点にしかならないが、近づいて見たときに「聞いている人」だと読める
         /// </summary>
         static void Earphones(Transform who)
         {
-            var head = FigureHead(who);
-            if (head.size.y < 0.05f) return;
             var k = FigureSpan(who);
-            var ear = head.max.y - 0.13f * k;
-            var mid = head.center.z - 0.01f * k;
-            var cx = head.center.x;
-            var half = Mathf.Max(0.06f, head.extents.x * 0.72f);
+            var le = FigureBone(who, HumanBodyBones.LeftEye);
+            var re = FigureBone(who, HumanBodyBones.RightEye);
+            Vector3 eyes;
+            if (le != null && re != null) eyes = (FigureAt(who, HumanBodyBones.LeftEye) + FigureAt(who, HumanBodyBones.RightEye)) * 0.5f;
+            else eyes = FigureAt(who, HumanBodyBones.Head) + new Vector3(0f, 0.08f, 0.08f) * k;
+            var ear = eyes.y - 0.02f * k;
+            var mid = eyes.z - 0.09f * k;
+            var cx = eyes.x;
+            var half = 0.075f * k;
             var mesh = Shape("Earphones" + Stamp(new Vector3(cx, ear, mid)) + Mathf.RoundToInt(half * 1000f), 0.5f, b =>
             {
                 for (var i = 0; i < 2; i++)
@@ -860,20 +891,22 @@ namespace HalfAware.EditorTools
                     b.Box(new Vector3(cx + (x - cx) * 0.6f, ear - 0.20f * k, mid + 0.05f * k), new Vector3(0.008f, 0.40f * k, 0.008f));
                 }
             });
-            FigureAttach(who, "Head", "Earphones", mesh,
+            FigureAttach(who, HumanBodyBones.Head, "Earphones", mesh,
                 AssetDatabase.LoadAssetAtPath<Material>(Materials + "EstateFrame.mat"));
         }
 
-        /// <summary>学校の鞄。背中に一つ。肩紐は付けない。胸の骨に付けて、背中の皮から少し離す</summary>
+        /// <summary>
+        /// 学校の鞄。背中に一つ。肩紐は付けない。上の胸の骨（Rocketbox の Spine2。肩甲骨の高さ）に付けて、背中の皮から少し離す
+        /// </summary>
         static void Satchel(Transform who)
         {
             var k = FigureSpan(who);
-            var chest = FigureAt(who, "Chest");
+            var chest = FigureAt(who, HumanBodyBones.UpperChest);
             var back = FigureBack(who, chest.y);
             var at = new Vector3(chest.x, chest.y - 0.12f * k, back - 0.065f * k);
             var mesh = Shape("Satchel" + Stamp(at) + Mathf.RoundToInt(k * 100f), 0.5f, b =>
                 b.Box(at, new Vector3(0.30f, 0.36f, 0.12f) * k));
-            FigureAttach(who, "Chest", "Satchel", mesh, Mat("Cloth"));
+            FigureAttach(who, HumanBodyBones.UpperChest, "Satchel", mesh, Mat("Cloth"));
         }
 
         /// <summary>模型ごとの縮尺。持ち物の大きさを背丈に合わせる。大人の模型の背（1.80 m）に対する比</summary>
@@ -883,25 +916,16 @@ namespace HalfAware.EditorTools
             return Mathf.Clamp(box.size.y / 1.80f, 0.4f, 1.2f);
         }
 
-        /// <summary>高さ y あたりの背中の面。胴の皮の、いちばん後ろの頂点</summary>
+        /// <summary>高さ y あたりの背中の面。体の皮の、背骨の線の近く（横 0.12 m の内）でいちばん後ろの頂点</summary>
         static float FigureBack(Transform who, float y)
         {
             var back = 0f;
             var first = true;
-            var tmp = new Mesh();
-            foreach (var smr in who.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            foreach (var p in FigureSkin(who))
             {
-                if (!smr.name.EndsWith("_Body")) continue;
-                smr.BakeMesh(tmp, true);
-                var at = who.worldToLocalMatrix * smr.transform.localToWorldMatrix;
-                foreach (var v in tmp.vertices)
-                {
-                    var p = at.MultiplyPoint3x4(v);
-                    if (Mathf.Abs(p.y - y) > 0.10f || Mathf.Abs(p.x) > 0.12f) continue;
-                    if (first || p.z < back) { back = p.z; first = false; }
-                }
+                if (Mathf.Abs(p.y - y) > 0.10f || Mathf.Abs(p.x) > 0.12f) continue;
+                if (first || p.z < back) { back = p.z; first = false; }
             }
-            Object.DestroyImmediate(tmp);
             return first ? -0.15f : back;
         }
 

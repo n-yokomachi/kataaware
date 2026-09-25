@@ -47,6 +47,16 @@ namespace HalfAware.EditorTools
         {
             var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(IdleClip);
             if (clip == null) { Debug.LogWarning("立ちの動きが無い: " + IdleClip); return; }
+            Stand(an, clip);
+        }
+
+        /// <summary>
+        /// 渡した Humanoid の立ちの動きの初めのこまで立たせる。場面 4 の記憶の人は、主人公の立ちではなく
+        /// 記憶の人の立ち（<c>RocketboxRetarget.MemoryClip</c>）で立たせる
+        /// </summary>
+        public static void Stand(Animator an, AnimationClip clip)
+        {
+            if (clip == null) { Debug.LogWarning("立ちの動きが無い"); return; }
             var graph = PlayableGraph.Create("BodyPoser");
             try
             {

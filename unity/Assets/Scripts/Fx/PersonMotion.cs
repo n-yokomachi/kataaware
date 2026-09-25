@@ -9,8 +9,8 @@ namespace HalfAware
     ///
     /// **実行時に骨で動かす。** 何こまかを焼いた mesh を差し替える作りは、一体一こまで 0.8〜0.9 MB あり、
     /// 歩く人だけで二十こま × 十人を超えるとリポジトリが百 MB 単位で増える。人ごとに骨の縮尺
-    /// （年齢と体つき）が違うので、焼いた形は人の間で使い回せない。骨で動かせば、模型と動きは
-    /// Quaternius の FBX に入っているものをそのまま使うので、増えるのはシーンの参照だけで済む。
+    /// （年齢と体つき）が違うので、焼いた形は人の間で使い回せない。骨で動かせば、模型は一人ずつのプレハブ
+    /// （Rocketbox の Humanoid）、動きは女と男で三本ずつの Humanoid の動きを使い回すので、増えるのはシーンの参照だけで済む。
     ///
     /// **PS1 らしく、こまを落として段々に動かす。** 一秒に <see cref="Fps"/> こまだけ骨を置き直し、
     /// そのあいだは姿勢も位置も止める。<see cref="Mover"/> が根を滑らかに運んでも、
@@ -85,7 +85,7 @@ namespace HalfAware
         [Tooltip("向きを据える骨。座った脚、組んだ腕。模型の根から見た向き")]
         [SerializeField] Transform[] held = new Transform[0];
         [SerializeField] Quaternion[] holds = new Quaternion[0];
-        [Tooltip("足首。模型の足は脛の子ではないので、脛の先へ付け直す")]
+        [Tooltip("足首を脛の先へ付け直す骨。足が脛の子でない模型（Quaternius）のためで、Rocketbox の人には入れない")]
         [SerializeField] Transform[] feet = new Transform[0];
         [SerializeField] Transform[] ankles = new Transform[0];
 

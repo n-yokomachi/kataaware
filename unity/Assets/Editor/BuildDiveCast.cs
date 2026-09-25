@@ -11,11 +11,12 @@ namespace HalfAware.EditorTools
 {
     /// <summary>
     /// 場面 4 の記憶の中の人 16 人を Rocketbox の模型で組み、一人ずつのプレハブにする（<c>docs/superpowers/specs/2026-09-26-dive-people-design.md</c>）。
-    /// 一段目として単独で組むだけで、場面（Dive.unity）には置かない。動きの移し替えもまだしない。
+    /// 場面（Dive.unity）の記憶へは、組み立て（<c>BuildDive</c> の Cast）がこのプレハブを置き、骨で動かす。
     ///
     /// 一人の組み（<see cref="Folder"/> の {id}.prefab）:
     /// - 根（id の名前）の子の Figure が模型（FBX のプレハブ）。マテリアルは人ごと。服の色は元のまま、塗り替えは <see cref="RocketboxMemoryPaint"/>
-    /// - 骨の縮尺（頭・腕・脚）と背の丸みを掛け、立ちの動き（<see cref="BodyPoser.Stand"/>）の頭の一こまで立たせた形で残す
+    /// - 骨の縮尺（頭・腕・脚）と背の丸みを掛け、記憶の人の立ちの動き（<see cref="RocketboxRetarget.MemoryClip"/>。女の人は W_Suit、
+    ///   男の人は M_Suit から移した物）の頭の一こまで立たせた形で残す。場面で動かすときの形と同じ
     /// - 背は <see cref="DiveCast"/> の値。立った形（背の丸みも掛けた形）の髪の上から靴の裏までを測り、Figure ごと縮める。靴の裏は根の高さ 0
     /// - 手首の差込口は、18 以上の大人で手首が出る人だけ（<see cref="RocketboxMemory.Port"/>）
     ///
@@ -36,8 +37,8 @@ namespace HalfAware.EditorTools
         /// 胸の二つで前へ丸め、首と頭で起こし返して、顔は 0.25 だけ下を向く（今の Quaternius の分け方と同じ和）。
         /// 鎖骨は首の子なので、肩は胸と一緒に前へ出る
         /// </summary>
-        static readonly HumanBodyBones[] CurlBones = { HumanBodyBones.Chest, HumanBodyBones.UpperChest, HumanBodyBones.Neck, HumanBodyBones.Head };
-        static readonly float[] CurlShare = { 0.45f, 0.55f, -0.35f, -0.40f };
+        public static readonly HumanBodyBones[] CurlBones = { HumanBodyBones.Chest, HumanBodyBones.UpperChest, HumanBodyBones.Neck, HumanBodyBones.Head };
+        public static readonly float[] CurlShare = { 0.45f, 0.55f, -0.35f, -0.40f };
 
         [MenuItem("HalfAware/Dive people/Build the people", false, 311)]
         public static void BuildMenu()
@@ -127,9 +128,18 @@ namespace HalfAware.EditorTools
         {
             an.cullingMode = AnimatorCullingMode.AlwaysAnimate;
             an.applyRootMotion = false;
-            BodyPoser.Stand(an);
+            BodyPoser.Stand(an, Clip(m.Cast.female, "Idle"));
             Size(an, m.Proportion);
             Curl(an, m.Cast.curl);
+        }
+
+        /// <summary>記憶の人の動き（gait は Idle・Walk・Run）。女の人は W_Suit、男の人は M_Suit から移した物</summary>
+        public static AnimationClip Clip(bool female, string gait)
+        {
+            var path = RocketboxRetarget.MemoryClip(female, gait);
+            var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(path);
+            if (clip == null) throw new System.InvalidOperationException("動きが無い（HalfAware/Dive people/Retarget the motions）: " + path);
+            return clip;
         }
 
         /// <summary>骨の縮尺。頭と、腕（上腕から先）と、脚（腿から先）に一様な縮尺を掛ける</summary>
