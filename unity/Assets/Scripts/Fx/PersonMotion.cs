@@ -31,6 +31,12 @@ namespace HalfAware
     /// 動きは全部の骨の位置・向き・縮尺を持っているので、置き直すたびに素の値へ戻る。
     /// 上書きは縮尺と向きをどちらも絶対の値で書くので、何度重ねても同じ形になる。
     /// **骨を identity へ戻すことはしない**（皮が裂ける。Models/LICENSES.md）
+    ///
+    /// **相手をしている人は、首と頭を主の目へ向ける**（<see cref="Watch"/>）。体の向き（根の向き）は組み立てで
+    /// 主の方へ向けてあるが、それだけでは、座った主を見下ろす先生も、子どもの主を見る大人も、顔は正面の上を向いたままだった。
+    /// 首と頭の上下と左右を、こまの頭ごとに <see cref="GazePerTick"/> ずつ主の目の方へ寄せる。
+    /// 首が折れて見えないよう、向ける角に上限（<see cref="GazeSide"/>・<see cref="GazeDown"/>・<see cref="GazeUp"/>）を置き、
+    /// 主が真後ろや真上に近い所にいるときは見るのをやめて、姿勢の頭の向きへ戻す（<see cref="GazeAt"/>）
     /// </summary>
     [ExecuteAlways]
     [DisallowMultipleComponent]
@@ -56,6 +62,26 @@ namespace HalfAware
         public const float TurnPerTick = 35f;
         /// <summary>一フレームで進めるこまの上限。処理が詰まって何秒も飛んだときに、周期を何周も回さない</summary>
         const int MostTicks = 3;
+
+        /// <summary>首と頭を主の目へ向ける上限。度。体の前から左右へ</summary>
+        public const float GazeSide = 55f;
+        /// <summary>首と頭を主の目へ向ける上限。度。体の前から下へ（座った人・子どもを見下ろす）</summary>
+        public const float GazeDown = 40f;
+        /// <summary>首と頭を主の目へ向ける上限。度。体の前から上へ（見上げる）</summary>
+        public const float GazeUp = 25f;
+        /// <summary>主がこれより横（後ろ寄り）にいれば見るのをやめる。度</summary>
+        public const float GazeSideRelease = 110f;
+        /// <summary>
+        /// 主がこれより上にいれば見るのをやめる。度。机の生徒の真上から先生が覗き込むと、生徒は見上げず
+        /// ノートへ目を落としたまま（設計書 6 節の 8「生徒は下を向いていて、つむじしか見えない」）
+        /// </summary>
+        public const float GazeUpRelease = 35f;
+        /// <summary>一こまで首と頭を回す上限。度</summary>
+        public const float GazePerTick = 20f;
+        /// <summary>首と頭のうち首が受け持つ割合。残りは頭</summary>
+        public const float NeckShare = 0.4f;
+        /// <summary>頭の骨から目の高さまで。m（模型の縮尺を掛けて使う）</summary>
+        const float EyeAbove = 0.09f;
 
         [SerializeField] Animator animator;
         [Tooltip("模型の根。こまの頭でだけ根の位置へ追いつかせる")]
@@ -89,6 +115,14 @@ namespace HalfAware
         [SerializeField] Transform[] feet = new Transform[0];
         [SerializeField] Transform[] ankles = new Transform[0];
 
+        [Header("目線")]
+        [Tooltip("相手をしている人。主の目の方へ首と頭を向ける")]
+        [SerializeField] bool attends;
+        [SerializeField] Transform neck;
+        [SerializeField] Transform head;
+        [Tooltip("頭の骨から見た、顔の向く向き（立った形で体の前を向く向き）")]
+        [SerializeField] Vector3 headAim = Vector3.forward;
+
         [Header("持ち物")]
         [Tooltip("骨に付いて動く持ち物。人の根の子に置き、こまの頭ごとに骨の所へ据え直す")]
         [SerializeField] Transform[] carried = new Transform[0];
@@ -113,6 +147,12 @@ namespace HalfAware
         Vector3 heldAt;
         float heldYaw;
         int ticks;
+        /// <summary>見る先（主の目）。記憶を起こすときに DiveDirector が渡す。シーンには残さない</summary>
+        Transform gaze;
+        /// <summary>今の首と頭の向けぶん。度。x は横（右が正）、y は縦（下が正）。姿勢の頭の向きからの差</summary>
+        Vector2 look;
+        /// <summary>次の上書きで首と頭を回してよい度</summary>
+        float gazeBudget;
 
         public Transform Body { get { return body; } }
         public AnimationClip Idle { get { return idle; } }
@@ -128,6 +168,9 @@ namespace HalfAware
         public float IdleTime { get { return idleTime; } }
         /// <summary>有効になってから置き直した回数</summary>
         public int Ticks { get { return ticks; } }
+        public bool Attends { get { return attends; } }
+        /// <summary>今の首と頭の向けぶん（度。x 横・右が正、y 縦・下が正）</summary>
+        public Vector2 Look { get { return look; } }
 
         /// <summary>その人の自然な歩きの速さ。m/s。歩きの動きのままの歩幅で一周期に進む m と、一周期の秒の比</summary>
         public float Natural
@@ -158,6 +201,16 @@ namespace HalfAware
         {
             if (natural <= 0f) return 1f;
             return Mathf.Clamp(Mathf.Sqrt(Mathf.Max(0f, speed) / natural), Reaches[0], 1f);
+        }
+
+        /// <summary>
+        /// 首と頭を向ける先。target は主の目の向き、rest は姿勢のままの顔の向きで、どちらも体から見た度
+        /// （x は横で右が正、y は縦で下が正）。上限で止め、主が後ろ寄りや真上に近ければ見るのをやめて rest を返す
+        /// </summary>
+        public static Vector2 GazeAt(Vector2 target, Vector2 rest)
+        {
+            if (Mathf.Abs(target.x) > GazeSideRelease || target.y < -GazeUpRelease) return rest;
+            return new Vector2(Mathf.Clamp(target.x, -GazeSide, GazeSide), Mathf.Clamp(target.y, -GazeUp, GazeDown));
         }
 
         /// <summary>歩幅の度合いでの一周期の進み。段のあいだは直線で繋ぐ</summary>
@@ -236,10 +289,19 @@ namespace HalfAware
         }
 
         /// <summary>
+        /// 見る先（主の目）を渡す。相手をしている人（<see cref="Attends"/>）だけが首と頭を向ける。null なら見ない
+        /// </summary>
+        public void Watch(Transform eye)
+        {
+            gaze = eye;
+        }
+
+        /// <summary>
         /// 頭から流し直す。有効になるたびに呼ばれる。エディタで確かめるときは直に呼ぶ
         /// </summary>
         public void Restart()
         {
+            look = Vector2.zero;
             Open();
             idleTime = idle != null ? lag * idle.length : 0f;
             phase = 0f;
@@ -286,10 +348,12 @@ namespace HalfAware
         {
             if (fresh)
             {
-                // Mover は同じ瞬間に開始位置へ戻っているので、ここで初めて根の置き場を読む
+                // Mover は同じ瞬間に開始位置へ戻っているので、ここで初めて根の置き場を読む。
+                // 主はもう記憶の頭の立ち位置にいるので、相手をしている人は初めから主を見ている
                 fresh = false;
                 Hold();
                 Place();
+                gazeBudget = 360f;
                 Evaluate();
                 return;
             }
@@ -334,6 +398,7 @@ namespace HalfAware
                 toward = Mathf.Atan2(moved.x, moved.z) * Mathf.Rad2Deg;
             heldYaw = Mathf.MoveTowardsAngle(heldYaw, toward, TurnPerTick * n);
             heldAt = transform.TransformPoint(seat);
+            gazeBudget = GazePerTick * n;
             travelled = 0f;
             moved = Vector3.zero;
         }
@@ -419,11 +484,51 @@ namespace HalfAware
             }
             for (var i = 0; i < feet.Length && i < ankles.Length; i++)
                 if (feet[i] != null && ankles[i] != null) feet[i].position = ankles[i].position;
+            // 首と頭は持ち物より先に回す（イヤホンは頭に付いてくる）
+            Gaze();
             for (var i = 0; i < carried.Length && i < carriers.Length && i < carryAt.Length && i < carryTurn.Length; i++)
             {
                 if (carried[i] == null || carriers[i] == null) continue;
                 carried[i].SetPositionAndRotation(carriers[i].TransformPoint(carryAt[i]), carriers[i].rotation * carryTurn[i]);
             }
+        }
+
+        /// <summary>
+        /// 首と頭を主の目へ向ける。姿勢のままの顔の向きから、向ける先（<see cref="GazeAt"/>）までの差を
+        /// <see cref="gazeBudget"/> だけ詰め、首に <see cref="NeckShare"/>、残りを頭に掛ける
+        /// </summary>
+        void Gaze()
+        {
+            var budget = gazeBudget;
+            gazeBudget = 0f;
+            if (!attends || gaze == null || body == null || head == null) return;
+            var eye = head.position + body.up * (EyeAbove * body.lossyScale.y);
+            var rest = AnglesOf(head.rotation * headAim);
+            var want = GazeAt(AnglesOf(gaze.position - eye), rest) - rest;
+            want.x = Mathf.DeltaAngle(0f, want.x);
+            look = Vector2.MoveTowards(look, want, budget);
+            if (look.sqrMagnitude < 1e-6f) return;
+            var aim = DirectionOf(rest + look);
+            if (neck != null)
+            {
+                var turn = Quaternion.FromToRotation(head.rotation * headAim, aim);
+                neck.rotation = Quaternion.Slerp(Quaternion.identity, turn, NeckShare) * neck.rotation;
+            }
+            head.rotation = Quaternion.FromToRotation(head.rotation * headAim, aim) * head.rotation;
+        }
+
+        /// <summary>世界の向きを、体から見た横と縦の度へ（x は右が正、y は下が正）</summary>
+        Vector2 AnglesOf(Vector3 world)
+        {
+            var local = Quaternion.Inverse(body.rotation) * world;
+            return new Vector2(Mathf.Atan2(local.x, local.z) * Mathf.Rad2Deg,
+                Mathf.Atan2(-local.y, new Vector2(local.x, local.z).magnitude) * Mathf.Rad2Deg);
+        }
+
+        /// <summary>体から見た横と縦の度を、世界の向きへ</summary>
+        Vector3 DirectionOf(Vector2 angles)
+        {
+            return body.rotation * (Quaternion.Euler(angles.y, angles.x, 0f) * Vector3.forward);
         }
 
         /// <summary>
@@ -456,6 +561,9 @@ namespace HalfAware
         {
             if (clip == null || body == null) return;
             clip.SampleAnimation(body.gameObject, time);
+            // 見る先を渡してあれば、首と頭は向け切った形で置く
+            look = Vector2.zero;
+            gazeBudget = 360f;
             Settle();
         }
     }

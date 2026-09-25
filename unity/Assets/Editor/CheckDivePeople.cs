@@ -643,10 +643,11 @@ namespace HalfAware.EditorTools
         /// 見え方はゲームのカメラ（Player/Main Camera）の写しで、後処理も通す。記憶の体の差は一時の Volume で掛ける:
         /// 色味（Color Filter）と、ぼやけ（<see cref="HostBody"/> と同じ式。疲れ <paramref name="strain"/>、1 でその体のぼやけが出きる）。
         /// 動く人は、記憶の時計で動く人も合図で動く人も <paramref name="at"/> 秒の所（負なら動き終えた所）に置く。
+        /// 相手をしている人は、首と頭をこのカメラ（主の目）へ向け切った形で撮る（<see cref="PersonMotion.Watch"/>。watch を切れば向けない）。
         /// 画面の角の白い膜と字幕は HUD の Canvas なので写らない。
         /// 抜けるときに、動く人の置き場・一時の Volume とカメラ・空を全部戻す
         /// </summary>
-        public static string Game(int which, Vector3 foot, string target, string path, float strain = 1f, float at = -1f, float lift = 0f)
+        public static string Game(int which, Vector3 foot, string target, string path, float strain = 1f, float at = -1f, float lift = 0f, bool watch = true)
         {
             var take = TakeAt(which);
             if (take == null) return "記憶 " + which + " が無い";
@@ -697,6 +698,12 @@ namespace HalfAware.EditorTools
                     data.renderPostProcessing = true;
                     eyeGo.transform.position = eye;
                     eyeGo.transform.rotation = Quaternion.Euler(pitch, yaw, 0f);
+                    if (watch)
+                        foreach (var motion in take.GetComponentsInChildren<PersonMotion>(true))
+                        {
+                            motion.Watch(eyeGo.transform);
+                            motion.Still();
+                        }
 
                     volGo = new GameObject("CheckDivePeopleVolume");
                     volGo.hideFlags = HideFlags.HideAndDontSave;
@@ -716,6 +723,7 @@ namespace HalfAware.EditorTools
                 if (volGo != null) Object.DestroyImmediate(volGo);
                 if (eyeGo != null) Object.DestroyImmediate(eyeGo);
                 foreach (var kv in kept) if (kv.Key != null) kv.Key.localPosition = kv.Value;
+                foreach (var motion in take.GetComponentsInChildren<PersonMotion>(true)) motion.Watch(null);
             }
         }
 

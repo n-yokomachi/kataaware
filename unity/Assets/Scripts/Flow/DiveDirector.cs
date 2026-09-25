@@ -267,6 +267,9 @@ namespace HalfAware
             else Debug.LogWarning("DiveDirector: 場所が無い " + entry.place, this);
             Sky(entry.place);
             take.gameObject.SetActive(true);
+            // 相手をしている人は、主の目の方へ首と頭を向ける（PersonMotion.Watch）
+            var eye = player != null ? player.Eye : null;
+            foreach (var person in take.GetComponentsInChildren<PersonMotion>(true)) person.Watch(eye);
             // 同じ人へ戻れば頭から流し直す。Mover は有効になった瞬間に開始位置へ戻る
             movers = take.GetComponentsInChildren<Mover>(true);
             cued = new float[movers.Length];

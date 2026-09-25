@@ -456,6 +456,7 @@ namespace HalfAware.EditorTools
             // 会話とは関わらないので記憶の時計で動く
             var stop = new Vector3(6.4f, 0f, 2.4f);
             var teen = Cast(take, "Passerby", stop, 188f, 0);
+            Aside(teen);
             Earphones(teen);
             Move(teen, new Vector3(7.6f, 0f, 10.5f), stop, 3f, 9f, true);
             return new[]
@@ -483,7 +484,7 @@ namespace HalfAware.EditorTools
             Cast(take, "Junior", new Vector3(0.15f, 0f, -0.9f), 315f, 0);
             // 向かいの男は、肘掛け（z 1.75）と仕切り板（z 3.55）のあいだの座面の真ん中に座る。
             // z 1.8 に置いていた頃は、肘掛けの上に跨って座っていた
-            Cast(take, "Passenger", new Vector3(SeatX, 0f, 2.65f), 250f, 5);
+            Aside(Cast(take, "Passenger", new Vector3(SeatX, 0f, 2.65f), 250f, 5));
             return new[]
             {
                 K(0f,  0.2f,  0f, 0.6f,   70f,   6f, 1.58f),  // 窓の外を灯りが流れている
@@ -506,7 +507,10 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Mark(Transform take)
         {
-            Cast(take, "Wife", new Vector3(0f, 0f, 0.35f), 175f, 1);
+            // **妻は戸口から台所のマークの方を向く。** 昼食の袋を手渡す相手なので（設計書 6 節の 6）。
+            // 175° では戸口で廊下の方を向き、マークに背を向けたまま袋を渡すことになっていた。
+            // 流しの前（鍵打ちの頭）と袋を受け取る所（13 秒）のあいだへ向ける。廊下の灯りを背にするので顔は逆光のまま
+            Cast(take, "Wife", new Vector3(0f, 0f, 0.35f), 335f, 1);
             var son = Cast(take, "Son", new Vector3(StairX, 0f, -0.7f), 190f, 0);
             Move(son, new Vector3(StairX, 2.4f, -4.1f), new Vector3(StairX, 0f, -0.7f), 16f, 6f, true);
             return new[]
@@ -559,7 +563,8 @@ namespace HalfAware.EditorTools
         static HostKey[] Lee(Transform take)
         {
             Cast(take, "Pupil", new Vector3(DeskX[2], 0f, DeskZ[1] - 0.56f), 0f, 6);
-            Cast(take, "Sleeper", new Vector3(DeskX[3], 0f, DeskZ[1] - 0.56f), 0f, 6);
+            // 隣の生徒は机に伏せて眠っている
+            Aside(Cast(take, "Sleeper", new Vector3(DeskX[3], 0f, DeskZ[1] - 0.56f), 0f, 6));
             return new[]
             {
                 K(0f,  0f,    0.15f, 4.1f,    0f, -12f, 1.70f),  // 黒板にチョークで書いている
@@ -590,7 +595,7 @@ namespace HalfAware.EditorTools
             Cast(take, "Wife", new Vector3(DoorB - 0.15f, EstateTop, EstateFace - 0.85f), 355f, 0);
             // 隣の母親は A の戸の前で娘を抱き上げているところ。記憶 1 でハンナが立っていた所。
             // こちらではなく西の娘を見ている
-            Cast(take, "Mother", new Vector3(5.05f, EstateTop, EstateWalk - 0.35f), 270f, 1);
+            Aside(Cast(take, "Mother", new Vector3(5.05f, EstateTop, EstateWalk - 0.35f), 270f, 1));
             // 隣は鍵を掛けて出てきたところなので、戸は閉まっている。自分の戸は開けて出てきた
             Shut(take, "ShutA", DoorA);
             Ajar(take, "AjarB", DoorB);
@@ -694,7 +699,9 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Daniel(Transform take)
         {
-            Cast(take, "Mother", new Vector3(0.1f, 0f, 0.2f), 300f, 1);
+            // **母は台所の戸口から、階段を降りてくるダニエルの方を向く。** 昼食の袋を渡す相手なので（設計書 6 節の 13）。
+            // 300° では台所の奥を向き、ダニエルに背を向けていた。階段の下（8 秒）と袋を受け取る所（12 秒）のあいだへ向ける
+            Cast(take, "Mother", new Vector3(0.1f, 0f, 0.2f), 150f, 1);
             Cast(take, "Father", new Vector3(-1.05f, 0f, 2.2f), 350f, 0);
             // 通りすがり。玄関の外の踊り場で待っている同級生（記憶 13 のアイシャ）。
             // 台所から教室へ出る口はここ一つ（設計書 6 節）。
@@ -704,6 +711,7 @@ namespace HalfAware.EditorTools
             // 戸口の脇の灯り（HallGlow、0.55 m 先）が正面から当たって顔の造りまで見えた。
             // 誰の相手もしていない人なので、向きで隠してよい（この関数群の頭の決まり）
             var mate = Cast(take, "Classmate", new Vector3(-3.15f, 0f, -1.95f), 270f, 0);
+            Aside(mate);
             Satchel(mate);
             return new[]
             {
@@ -732,7 +740,8 @@ namespace HalfAware.EditorTools
             var teacher = Cast(take, "Teacher", new Vector3(0.9f, 0f, 0.82f), 220f, 0);
             Move(teacher, new Vector3(0.45f, 0.15f, 3.9f), new Vector3(0.1f, 0f, 1.0f), 6f, 6.5f, true);
             Then(teacher, new Vector3(0.9f, 0f, 0.82f), 12.5f, 2.5f);
-            Cast(take, "Neighbour", new Vector3(DeskX[3], 0f, DeskZ[1] - 0.56f), 355f, 6);
+            // 隣（マテオ）は机に伏せて眠っている
+            Aside(Cast(take, "Neighbour", new Vector3(DeskX[3], 0f, DeskZ[1] - 0.56f), 355f, 6));
             var seat = new Vector3(DeskX[2], 0f, DeskZ[1] - 0.56f);
             return new[]
             {
@@ -803,6 +812,7 @@ namespace HalfAware.EditorTools
             // 会話とは関わらないので記憶の時計で動く
             var shopStop = new Vector3(DoorB - 0.20f, EstateTop, EstateWalk + 0.10f);
             var shopper = Cast(take, "Shopper", shopStop, 90f, 0);
+            Aside(shopper);
             ShopBags(shopper);
             Move(shopper, new Vector3(6.00f, EstateTop, EstateWalk + 0.20f), shopStop, 8f, 7f, true);
 

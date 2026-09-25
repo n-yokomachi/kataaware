@@ -76,6 +76,20 @@ namespace HalfAware.EditorTools
             return root;
         }
 
+        /// <summary>
+        /// 主の相手をしていない人。首と頭を主の目へ向けない（自分の娘を見ている母親、背を向けて待つ同級生、
+        /// 通りすがり、机に伏せて眠っている生徒、新聞を読んでいる乗客）。
+        /// 置いた人はどれも相手をしている人として組むので、外す人だけここを呼ぶ
+        /// </summary>
+        static void Aside(Transform who)
+        {
+            var motion = who != null ? who.GetComponent<PersonMotion>() : null;
+            if (motion == null) return;
+            var so = new SerializedObject(motion);
+            so.FindProperty("attends").boolValue = false;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         /// <summary>板の相手の名前から、飛び先の人を引く</summary>
         static bool CastOf(string name, out Person person)
         {
@@ -103,6 +117,10 @@ namespace HalfAware.EditorTools
             animator.runtimeAnimatorController = null;
             animator.applyRootMotion = false;
             animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            // 顔の向く向き。プレハブの骨は立ちの頭の一こまで、顔は体の前を向いている
+            var neckBone = animator.GetBoneTransform(HumanBodyBones.Neck);
+            var headBone = animator.GetBoneTransform(HumanBodyBones.Head);
+            var headAim = headBone != null ? Quaternion.Inverse(headBone.rotation) * model.transform.forward : Vector3.forward;
             // 広がりは組み立てで据える（FigureBounds）。毎こま皮から測り直さない
             foreach (var smr in model.GetComponentsInChildren<SkinnedMeshRenderer>(true)) smr.updateWhenOffscreen = false;
 
@@ -182,6 +200,13 @@ namespace HalfAware.EditorTools
             RigFigure(motion, animator, model.transform, clips, seated, seat,
                 seated ? null : fit.strides, fit.runStride, FigureLag(takeName + "/" + root.name),
                 sized, sizes, bent, bends, held, holds);
+            // 目線。相手をしている人は主の目の方へ首と頭を向ける。相手をしていない人は Aside で外す
+            var gso = new SerializedObject(motion);
+            gso.FindProperty("attends").boolValue = true;
+            gso.FindProperty("neck").objectReferenceValue = neckBone;
+            gso.FindProperty("head").objectReferenceValue = headBone;
+            gso.FindProperty("headAim").vector3Value = headAim.normalized;
+            gso.ApplyModifiedPropertiesWithoutUndo();
             // 立ちの動きの頭の一こまを置いたまま返す。持ち物はこの形で骨に付ける
             motion.Still();
             FigureBounds(root, model);

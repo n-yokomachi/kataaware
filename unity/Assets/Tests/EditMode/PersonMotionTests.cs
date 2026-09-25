@@ -67,6 +67,37 @@ namespace HalfAware.Tests
             Assert.That(PersonMotion.TicksIn(PersonMotion.Tick * 2.5f), Is.EqualTo(2));
         }
 
+        // ---- 目線 ------------------------------------------------------------------------
+
+        // 主が上限の内にいれば、首と頭はそのまま主の目へ向く
+        [Test]
+        public void TheHeadTurnsToThePlayerWithinReach()
+        {
+            var rest = new Vector2(0f, 20f);
+            Assert.That(PersonMotion.GazeAt(new Vector2(10f, 30f), rest), Is.EqualTo(new Vector2(10f, 30f)));
+            Assert.That(PersonMotion.GazeAt(new Vector2(-20f, -10f), rest), Is.EqualTo(new Vector2(-20f, -10f)));
+        }
+
+        // 上限の外は上限で止める。首が折れて見えない
+        [Test]
+        public void TheHeadStopsAtItsLimits()
+        {
+            var rest = Vector2.zero;
+            Assert.That(PersonMotion.GazeAt(new Vector2(80f, 0f), rest).x, Is.EqualTo(PersonMotion.GazeSide));
+            Assert.That(PersonMotion.GazeAt(new Vector2(-80f, 0f), rest).x, Is.EqualTo(-PersonMotion.GazeSide));
+            Assert.That(PersonMotion.GazeAt(new Vector2(0f, 70f), rest).y, Is.EqualTo(PersonMotion.GazeDown));
+            Assert.That(PersonMotion.GazeAt(new Vector2(0f, -30f), rest).y, Is.EqualTo(-PersonMotion.GazeUp));
+        }
+
+        // 主が後ろ寄りや真上に近ければ見るのをやめ、姿勢の顔の向き（机のノートなど）に戻す
+        [Test]
+        public void TheHeadLetsGoWhenThePlayerIsBehindOrRightAbove()
+        {
+            var rest = new Vector2(0f, 30f);
+            Assert.That(PersonMotion.GazeAt(new Vector2(150f, 0f), rest), Is.EqualTo(rest));
+            Assert.That(PersonMotion.GazeAt(new Vector2(0f, -PersonMotion.GazeUpRelease - 1f), rest), Is.EqualTo(rest));
+        }
+
         // ---- 動かしてみる ----------------------------------------------------------------
 
         static AnimationClip Clip(float length)
