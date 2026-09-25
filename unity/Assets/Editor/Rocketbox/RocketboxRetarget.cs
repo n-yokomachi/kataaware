@@ -29,7 +29,8 @@ namespace HalfAware.EditorTools.Rocketbox
     /// - 立ちの腕と脚は、Quaternius の立ちを写さず、Rocketbox の骨の上で直立の形を決める（<see cref="Job.CalibrateStand"/>）。
     ///   Quaternius の立ちは腕が体の前に来て肘が曲がっており、骨ごとの直しを重ねても直立に見えなかった。元の立ちからは腕の揺れだけを残す
     /// - 歩きの腕は、上腕・前腕・手を肩の付け根まわりに一緒に回して、振りの真ん中が体の横に来るようにする（振りの幅は変わらない）。
-    ///   そのうえで、前への振りだけを縮める（<see cref="WalkArmFrontScale"/>）。後ろへの振りはそのまま
+    ///   そのうえで、前への振りだけを縮める（<see cref="WalkArmFrontScale"/>）。後ろへの振りはそのまま。
+    ///   肘の曲がる向きも体の真ん前へ向け直す（<see cref="WalkElbowTurn"/>）。元の歩きは上腕が内へねじれていて、手が体の真ん中へ寄っていた
     /// </summary>
     public static class RocketboxRetarget
     {
@@ -100,6 +101,15 @@ namespace HalfAware.EditorTools.Rocketbox
         /// 歩き: 前への振りを縮め始める幅（度）。真下からこの角までは縮め方をなだらかに強め、腕の振りの速さが真下で折れないようにする
         /// </summary>
         public const float WalkArmFrontEase = 10f;
+        /// <summary>
+        /// 歩き: 肘の曲がる向きを体の真ん前へ向け直す割合（1 で真ん前）。
+        /// 元の歩きは上腕が内へ 30〜40° ねじれていて、肘の曲げの軸が体の左右の軸から内へ回っていた（立ちは 14° ほど）。
+        /// 前で肘が 37° 曲がると前腕が体の内へ 17° 向き、前へ出た手が体の真ん中から 7 cm（立ちは 20 cm）まで寄って、股の前へ入っていた。
+        /// 上腕を自分の軸まわりに回して、肘の曲げの軸を体の左右の軸に揃える。上腕の向き（前後の振りと開き）と肘の曲げの大きさは変わらず、
+        /// 肘の場所も動かない（肩も上がらず、肘も外へ張り出さない）。回した分、手のひらの向きは前腕を自分の軸まわりに回して戻す（手首の曲げは変わらない）。
+        /// 1 で、手の体の真ん中からの離れは一巡を通して 15〜24 cm（立ちと同じくらい）になる。前腕が内でなく前を向くぶん、前へ出た手は 4 cm 前へ出る
+        /// </summary>
+        public const float WalkElbowTurn = 1f;
         /// <summary>
         /// 立ち・歩き: 鎖骨を束ねた姿勢の向き（体の外へ 13〜14 度下がる）から、さらに肩の先を下げる角度（度）。なで肩に見せる。
         /// 胸の骨に付いて動く（胸の向きの中で回す）。10° で鎖骨は 13.4° から 23.4° 下がり、肩の関節の幅は 34.4 から 33.3 cm、高さは 1.6 cm 下がる。
@@ -491,7 +501,11 @@ namespace HalfAware.EditorTools.Rocketbox
                     else if (armFix.TryGetValue(j.Name, out c)) r = c * r;
                     j.Dst.rotation = r;
                 }
-                if (clip == armClip) SquashFront();
+                if (clip == armClip)
+                {
+                    SquashFront();
+                    TurnElbows();
+                }
                 // 腰の前後左右: 腿の付け根の中点を、脚の長さの比で縮めた Quaternius の中点へ
                 var dstPelvis = D("Bip01 Pelvis");
                 var srcMid = Mid(S("UpperLeg.L"), S("UpperLeg.R")) - src.transform.position;
@@ -559,6 +573,40 @@ namespace HalfAware.EditorTools.Rocketbox
                     // x まわりの正の回しで、下向きの腕は後ろへ回る
                     up.rotation = Quaternion.AngleAxis(fwd - want, Vector3.right) * up.rotation;
                 }
+            }
+
+            /// <summary>
+            /// 歩きの肘の曲がる向きを体の真ん前へ向け直す（<see cref="WalkElbowTurn"/>）。
+            /// 上腕を自分の軸まわりに回して、肘の曲げの軸（上腕と前腕に直交する軸）を体の左右の軸に揃え、
+            /// 手のひらの向きは前腕を自分の軸まわりに回して戻す。上腕の向きと肘の場所、肘と手首の曲げは変わらない
+            /// </summary>
+            void TurnElbows()
+            {
+                foreach (var side in new[] { "L", "R" })
+                {
+                    var up = D("Bip01 " + side + " UpperArm");
+                    var fo = D("Bip01 " + side + " Forearm");
+                    var ha = D("Bip01 " + side + " Hand");
+                    var u = (fo.position - up.position).normalized;
+                    var hinge = Vector3.ProjectOnPlane(Vector3.Cross(u, ha.position - fo.position), u);
+                    // 肘が伸びきっていると曲げの軸が決まらない
+                    if (hinge.sqrMagnitude < 1e-8f) continue;
+                    // 前へ曲がる肘の軸は、左右どちらの腕も体の -x（模型は +z を向く）
+                    var want = Vector3.ProjectOnPlane(Vector3.left, u);
+                    var turn = Vector3.SignedAngle(hinge, want, u) * WalkElbowTurn;
+                    var palm = Palm(side);
+                    up.rotation = Quaternion.AngleAxis(turn, u) * up.rotation;
+                    var f = (ha.position - fo.position).normalized;
+                    var back = Vector3.SignedAngle(Vector3.ProjectOnPlane(Palm(side), f), Vector3.ProjectOnPlane(palm, f), f);
+                    fo.rotation = Quaternion.AngleAxis(back, f) * fo.rotation;
+                }
+            }
+
+            /// <summary>手のひらの向き（手の中ほどの向きと、小指の付け根から人差し指の付け根への向きに直交する向き）。回す前と後を比べるだけに使う</summary>
+            Vector3 Palm(string side)
+            {
+                var hand = D("Bip01 " + side + " Hand").position;
+                return Vector3.Cross(D("Bip01 " + side + " Finger2").position - hand, D("Bip01 " + side + " Finger1").position - D("Bip01 " + side + " Finger4").position).normalized;
             }
 
             public Job()
