@@ -210,9 +210,18 @@ namespace HalfAware
         static readonly int BaseColour = Shader.PropertyToID("_BaseColor");
         MaterialPropertyBlock paint;
 
-        /// <summary>買い手の濃さ。0 で透明、1 で元の色</summary>
+        /// <summary>
+        /// 買い手の濃さ。0 で透明、1 で元の色。
+        /// 買い手が BuyerFade を持っていれば、浮かび上がるあいだだけ透かせるマテリアルに差し替える（ふだんは透かさない）
+        /// </summary>
         void Tint(GameObject who, float amount)
         {
+            var fade = who.GetComponent<BuyerFade>();
+            if (fade != null)
+            {
+                fade.Set(amount);
+                return;
+            }
             var r = who.GetComponent<Renderer>();
             if (r == null) return;
             if (paint == null) paint = new MaterialPropertyBlock();

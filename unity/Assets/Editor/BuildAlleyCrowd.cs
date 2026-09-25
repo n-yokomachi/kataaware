@@ -76,6 +76,16 @@ namespace HalfAware.EditorTools
         /// <summary>光の強さ（自己発光のテクスチャに掛ける）。ブルーム（しきい 0.85）に掛かって、2〜3 m で光の点や線として拾える強さ</summary>
         public const float GlowStrength = 3.0f;
 
+        /// <summary>
+        /// 買い手の色の濃さ（体・頭・髪の房の _BaseColor に掛ける）。
+        /// 買い手は自分の露店の卓の真上の豆電球（Bulb4、強さ 17）から 1.2〜1.5 m の所に立つ。群衆の人は豆電球から 3 m より遠いので、
+        /// 買い手の顔はその 5〜10 倍の光を受け、Rocketbox の肌や服（テクスチャの明るさ 0.4〜0.7）のままだと顔も服も白く飛んだ。
+        /// 前の Quaternius の買い手は 0.07〜0.09 の暗い色で、この明かりでちょうど見えていた。
+        /// 0.35 で、目鼻が読めて服の色も残り、群衆より少しはっきり見える（0.22 では沈み気味、0.14 では暗い灰色の人になる）。
+        /// 自己発光（インプラント）には掛からない
+        /// </summary>
+        public const float BuyerTone = 0.35f;
+
         /// <summary>光の色の並び（通りの看板のネオンの色）</summary>
         static readonly Color[] Palette =
         {
@@ -135,7 +145,9 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 買い手を一人作る（群衆と同じ人の作りで、段を持たない一つの形）。
-        /// 自分の番に AlleyDirector が出して、濃さを上げて浮かび上がらせるので、体と頭のマテリアルは透かせる側で作る
+        /// ふだんは群衆と同じ透かさないマテリアルで描く。自分の番に AlleyDirector が出して濃さを上げるあいだだけ、
+        /// 透かせるマテリアルへ差し替える（<see cref="BuyerFade"/>）。
+        /// 透かせる側のまま置くと深さを書かないので、口の中や後ろ頭の髪の塗りが顔の上に描かれ、顔が崩れた（女大 15 は顔が上下逆に見えた）
         /// </summary>
         public static GameObject Buyer(Transform parent, string name, RocketboxMob who, Pose pose, Vector3 at, float yaw, int seed, StringBuilder sb)
         {
@@ -155,6 +167,14 @@ namespace HalfAware.EditorTools
                     a.implants[i] = im;
                 }
                 var mats = Materials(a, 512, true, "Buyer");
+                // 浮かび上がるあいだの透かせる組。髪の房は切り抜きのまま（濃さの α で切り抜かれて現れる）
+                var fade = new Material[mats.Length];
+                for (var i = 0; i < mats.Length; i++)
+                {
+                    var path = AssetDatabase.GetAssetPath(mats[i]);
+                    fade[i] = mats[i].IsKeywordEnabled("_ALPHATEST_ON") ? mats[i]
+                        : Save(Faded(mats[i]), path.Substring(0, path.Length - ".mat".Length) + "_Fade.mat");
+                }
                 var mesh = Full(who, pose);
                 var go = new GameObject(name);
                 go.transform.SetParent(parent, false);
@@ -164,6 +184,7 @@ namespace HalfAware.EditorTools
                 var r = go.AddComponent<MeshRenderer>();
                 r.sharedMaterials = mats;
                 r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                go.AddComponent<BuyerFade>().Bind(mats, fade);
                 if (sb != null) sb.AppendFormat("{0}: {1}（{2}、{3}）、{4} 三角", name, who.Label, pose, Describe(a), mesh.triangles.Length / 3).AppendLine();
                 return go;
             }
@@ -987,7 +1008,7 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 一回分のテクスチャとマテリアルを作る（服の色は元のまま、肌にインプラントを描く）。面の組の順は FBX のマテリアルの順（体・頭・髪の房）。
-        /// n は描くテクスチャの大きさ（群衆は 256、売り手と買い手は 512）。buyer なら体と頭を透かせる側で作る
+        /// n は描くテクスチャの大きさ（群衆は 256、売り手と買い手は 512）。buyer なら色を暗くする（<see cref="BuyerTone"/>）
         /// </summary>
         static Material[] Materials(Appearance a, int n, bool buyer, string tag)
         {
@@ -1015,12 +1036,15 @@ namespace HalfAware.EditorTools
             Material hair = null;
             if (who.HasOpacity)
             {
-                // 髪の房はインプラントに関わらないので、人ごとに一つ
-                var hairPath = Folder + who.Name + "_Hair.mat";
+                // 髪の房はインプラントに関わらないので、群衆では人ごとに一つ。買い手は濃さを揃えた別の物（女大 15 は群衆にも出る）
+                var hairName = who.Name + (buyer ? "_Buyer_Hair" : "_Hair");
+                var hairPath = Folder + hairName + ".mat";
                 hair = AssetDatabase.LoadAssetAtPath<Material>(hairPath);
                 if (hair == null || !fresh.Contains(hairPath))
                 {
-                    hair = Save(BuildRocketboxProtagonist.Lit(who.Name + "_Hair", AssetDatabase.LoadAssetAtPath<Texture2D>(who.HairSrc), 0.34f, true), hairPath);
+                    var h = BuildRocketboxProtagonist.Lit(hairName, AssetDatabase.LoadAssetAtPath<Texture2D>(who.HairSrc), 0.34f, true);
+                    if (buyer) h.SetColor("_BaseColor", new Color(BuyerTone, BuyerTone, BuyerTone, 1f));
+                    hair = Save(h, hairPath);
                     fresh.Add(hairPath);
                 }
             }
@@ -1035,7 +1059,7 @@ namespace HalfAware.EditorTools
             return list;
         }
 
-        static Material Mat(string name, Texture2D tex, Texture2D glow, float smooth, bool fade)
+        static Material Mat(string name, Texture2D tex, Texture2D glow, float smooth, bool buyer)
         {
             var m = BuildRocketboxProtagonist.Lit(name, tex, smooth, false);
             if (glow != null)
@@ -1046,21 +1070,29 @@ namespace HalfAware.EditorTools
                 // None にすると、URP のマテリアルの見直し（取り込みのたびに走る）が _EMISSION を落とし、光らなくなった
                 m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
             }
-            if (fade)
-            {
-                // 買い手は出てくるときに濃さを上げる（AlleyDirector が _BaseColor の α を上書きする）。深さは書く（体の奥の面が透けないように）
-                m.SetFloat("_Surface", 1f);
-                m.SetFloat("_Blend", 0f);
-                m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                m.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                m.SetFloat("_SrcBlendAlpha", (float)UnityEngine.Rendering.BlendMode.One);
-                m.SetFloat("_DstBlendAlpha", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                m.SetFloat("_ZWrite", 1f);
-                m.SetFloat("_ZWriteControl", 1f);
-                m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-                m.SetOverrideTag("RenderType", "Transparent");
-                m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
-            }
+            // 卓の上の豆電球で白く飛ばないよう、買い手は色を暗くする（<see cref="BuyerTone"/>）。
+            // 浮かび上がるあいだは _BaseColor が全部の面の組に上書きされるので、どの組も同じ色にしておく
+            if (buyer) m.SetColor("_BaseColor", new Color(BuyerTone, BuyerTone, BuyerTone, 1f));
+            return m;
+        }
+
+        /// <summary>
+        /// 買い手が浮かび上がるあいだの、透かせる写し。深さは書かない（URP の見直しが透かせる側では必ず切る）ので、
+        /// 濃さを上げきったら透かさない組へ戻す（<see cref="BuyerFade"/>）
+        /// </summary>
+        static Material Faded(Material solid)
+        {
+            var m = new Material(solid) { name = solid.name + "_Fade" };
+            m.SetFloat("_Surface", 1f);
+            m.SetFloat("_Blend", 0f);
+            m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            m.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            m.SetFloat("_SrcBlendAlpha", (float)UnityEngine.Rendering.BlendMode.One);
+            m.SetFloat("_DstBlendAlpha", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            m.SetFloat("_ZWrite", 0f);
+            m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            m.SetOverrideTag("RenderType", "Transparent");
+            m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
             return m;
         }
 
