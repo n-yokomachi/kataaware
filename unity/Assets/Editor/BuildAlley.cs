@@ -27,6 +27,8 @@ namespace HalfAware.EditorTools
         public const float StreetSouth = -24f;
         /// <summary>ここより手前へは行かせない。見える街は先まで続く</summary>
         public const float WalkSouth = -4.5f;
+        /// <summary>場面の始まりの立ち位置（通りの真ん中）の z</summary>
+        public const float StartZ = WalkSouth + 1.6f;
         public const float StreetNorth = 56f;
         /// <summary>ここより奥へは行かせない。見える街は先まで続く</summary>
         public const float WalkNorth = 42f;
@@ -1033,8 +1035,16 @@ namespace HalfAware.EditorTools
             }
             // 車道の真ん中にまばらに。こちらも通りの先を向く
             for (var z = WalkSouth + 6f; z < StreetNorth - 6f; z += (float)(8.0 + rng.NextDouble() * 6.0))
-                Put(spots, new Vector3((float)(rng.NextDouble() * 2.0 - 1.0) * (RoadHalf - 0.6f), 0f, z),
-                    (rng.NextDouble() < 0.5 ? 0f : 180f) + (float)(rng.NextDouble() * 40.0 - 20.0), StandPose(rng), rng);
+            {
+                // 乱数を引く順は前のまま。ここを変えると、後に立つ人がみな入れ替わる
+                var at = new Vector3((float)(rng.NextDouble() * 2.0 - 1.0) * (RoadHalf - 0.6f), 0f, z);
+                var yaw = (rng.NextDouble() < 0.5 ? 0f : 180f) + (float)(rng.NextDouble() * 40.0 - 20.0);
+                var pose = StandPose(rng);
+                // 立ち位置のすぐ先で車道に一人で立つと、道の真ん中で変に目立つ。
+                // 近くの歩道の人の話し相手にして、向かい合わせる
+                if (z < StartZ + ChatReach) Chat(spots, ref at, ref yaw);
+                Put(spots, at, yaw, pose, rng);
+            }
 
             // 小路
             for (var x = LaneWest + 2.5f; x < -StreetHalf - 2f; x += (float)(4.0 + rng.NextDouble() * 3.0))
@@ -1311,6 +1321,60 @@ namespace HalfAware.EditorTools
 
         /// <summary>壁や物に当たって諦めた数。組み立ての最後に出す</summary>
         static int Skipped;
+
+        /// <summary>立ち位置からこの距離までの車道の人は、歩道の人の話し相手にする（<see cref="Chat"/>）</summary>
+        const float ChatReach = 8f;
+        /// <summary>立ち話の二人の間合い。足元の中心どうし</summary>
+        const float ChatGap = 0.85f;
+        /// <summary>
+        /// 相手が向いている向きから、壁の側へ振る角度。前から順に試す。
+        /// 振ると二人を結ぶ筋が立ち位置からの視線と斜めに交わり、二人とも横顔で見える。
+        /// 壁ぎわに箱やごみが積んであって立てなければ、相手の真正面（0）に立たせる（相手は向きを変えずに済む）
+        /// </summary>
+        static readonly float[] ChatTurns = { 20f, 12f, 0f };
+
+        /// <summary>
+        /// 車道の人を、いちばん近い歩道の一人の話し相手にする。相手の前（壁の側へ少し振った所）に立たせ、二人を向かい合わせる。
+        /// 相手の向きも、こちらへ向くよう回す。二人組の片方や、立てる所が無いときは動かさない（false）
+        /// </summary>
+        static bool Chat(List<Spot> spots, ref Vector3 at, ref float yaw)
+        {
+            var best = -1;
+            var near = float.MaxValue;
+            for (var i = 0; i < spots.Count; i++)
+            {
+                var s = spots[i];
+                if (s.seat != 0 || Mathf.Abs(s.at.x) <= RoadHalf) continue;
+                var d = new Vector2(s.at.x - at.x, s.at.z - at.z).magnitude;
+                if (d < near) { near = d; best = i; }
+            }
+            if (best < 0) return false;
+            var mate = spots[best];
+            // もう誰かと向かい合っている人は取らない
+            for (var i = 0; i < spots.Count; i++)
+                if (i != best && new Vector2(spots[i].at.x - mate.at.x, spots[i].at.z - mate.at.z).magnitude < 1.2f) return false;
+
+            var side = Mathf.Sign(mate.at.x);
+            var facing = Quaternion.Euler(0f, mate.yaw, 0f) * Vector3.forward;
+            var wall = new Vector3(side, 0f, 0f);
+            foreach (var turn in ChatTurns)
+            {
+                var toward = Vector3.RotateTowards(facing, wall, turn * Mathf.Deg2Rad, 0f);
+                var spot = mate.at + toward * ChatGap;
+                spot.y = KerbRise;
+                // 歩道の上に収める。縁石から落ちず、壁の飾りにも当たらない幅
+                if (Mathf.Abs(spot.x) < RoadHalf + 0.30f || Mathf.Abs(spot.x) > StreetHalf - 0.85f) continue;
+                if (AtDoor(spot.x, spot.z, DoorClear) || !Standable(spot, 0.85f, true) || !Free(spot.x, spot.z, 0.36f)) continue;
+                var look = spot - mate.at;
+                var face = Mathf.Atan2(look.x, look.z) * Mathf.Rad2Deg;
+                mate.yaw = face;
+                spots[best] = mate;
+                at = spot;
+                yaw = face + 180f;
+                return true;
+            }
+            return false;
+        }
 
         /// <summary>
         /// 立てない場所を少しずらして直す。8 方向を 2 段階の距離で当たり、
@@ -3911,7 +3975,7 @@ namespace HalfAware.EditorTools
             if (player == null) return;
             var cc = player.GetComponent<CharacterController>();
             if (cc != null) cc.enabled = false;
-            player.transform.position = new Vector3(0f, 0.1f, WalkSouth + 1.6f);
+            player.transform.position = new Vector3(0f, 0.1f, StartZ);
             player.transform.rotation = Quaternion.identity;
             if (cc != null) cc.enabled = true;
         }
