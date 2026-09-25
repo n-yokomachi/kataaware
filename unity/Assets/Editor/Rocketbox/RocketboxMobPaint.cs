@@ -371,22 +371,61 @@ namespace HalfAware.EditorTools.Rocketbox
 
         // ---- 吸い付けと塗り -----------------------------------------------------------
 
-        /// <summary>模型の面の画素の位置（頭と体の二枚）。線の案内の点をここへ落とす（塗るのは肌の画素だけ）</summary>
+        /// <summary>
+        /// 模型の面の画素の位置（頭と体の二枚）。線の案内の点をここへ落とす（塗るのは肌の画素だけ）。
+        /// 点は 1 cm の升目に分けて持つ（群衆の数十人ぶんを落とすので、全部の点を毎回なめない）
+        /// </summary>
         public sealed class Skin
         {
+            const float Cell = 0.01f;
+            readonly Dictionary<Vector3Int, List<Vector3>> grid = new Dictionary<Vector3Int, List<Vector3>>();
             readonly List<Vector3> points = new List<Vector3>();
+
+            static Vector3Int Key(Vector3 p)
+            {
+                return new Vector3Int(Mathf.FloorToInt(p.x / Cell), Mathf.FloorToInt(p.y / Cell), Mathf.FloorToInt(p.z / Cell));
+            }
 
             public void Add(RocketboxPaint.Surface s)
             {
                 for (var k = 0; k < s.P.Length; k++)
-                    if (s.On[k]) points.Add(s.P[k]);
+                {
+                    if (!s.On[k]) continue;
+                    var q = s.P[k];
+                    points.Add(q);
+                    List<Vector3> cell;
+                    var key = Key(q);
+                    if (!grid.TryGetValue(key, out cell)) grid[key] = cell = new List<Vector3>();
+                    cell.Add(q);
+                }
             }
 
-            /// <summary>いちばん近い面の点</summary>
+            /// <summary>いちばん近い面の点。まわりの升目から広げて探し、10 cm で見つからなければ全部をなめる</summary>
             public Vector3 Nearest(Vector3 p)
             {
+                var c = Key(p);
                 var best = p;
                 var bd = float.MaxValue;
+                for (var r = 0; r <= 10; r++)
+                {
+                    // 升目 r の殻だけを見る（内側は見終えている）
+                    for (var x = -r; x <= r; x++)
+                        for (var y = -r; y <= r; y++)
+                            for (var z = -r; z <= r; z++)
+                            {
+                                if (Mathf.Max(Mathf.Abs(x), Mathf.Max(Mathf.Abs(y), Mathf.Abs(z))) != r) continue;
+                                List<Vector3> cell;
+                                if (!grid.TryGetValue(new Vector3Int(c.x + x, c.y + y, c.z + z), out cell)) continue;
+                                foreach (var q in cell)
+                                {
+                                    var d = (q - p).sqrMagnitude;
+                                    if (d < bd) { bd = d; best = q; }
+                                }
+                            }
+                    // 殻 r まで見れば、r 升ぶんより近い点は見落とさない
+                    if (bd <= r * Cell * r * Cell) return best;
+                }
+                if (bd < float.MaxValue) return best;
                 foreach (var q in points)
                 {
                     var d = (q - p).sqrMagnitude;
@@ -405,13 +444,28 @@ namespace HalfAware.EditorTools.Rocketbox
                 var best = Vector3.zero;
                 var bestT = float.MinValue;
                 const float r2 = 0.003f * 0.003f;
-                foreach (var q in points)
+                var seen = new HashSet<Vector3Int>();
+                // 筋に沿って 5 mm ごとに、まわりの升目を見る
+                for (var t0 = -0.15f; t0 <= 0.15f + 1e-4f; t0 += 0.005f)
                 {
-                    var d = q - p;
-                    var t = Vector3.Dot(d, dir);
-                    if (t > 0.15f || t < -0.15f) continue;
-                    if ((d - dir * t).sqrMagnitude > r2) continue;
-                    if (t > bestT) { bestT = t; best = q; }
+                    var c = Key(p + dir * t0);
+                    for (var x = -1; x <= 1; x++)
+                        for (var y = -1; y <= 1; y++)
+                            for (var z = -1; z <= 1; z++)
+                            {
+                                var key = new Vector3Int(c.x + x, c.y + y, c.z + z);
+                                if (!seen.Add(key)) continue;
+                                List<Vector3> cell;
+                                if (!grid.TryGetValue(key, out cell)) continue;
+                                foreach (var q in cell)
+                                {
+                                    var d = q - p;
+                                    var t = Vector3.Dot(d, dir);
+                                    if (t > 0.15f || t < -0.15f) continue;
+                                    if ((d - dir * t).sqrMagnitude > r2) continue;
+                                    if (t > bestT) { bestT = t; best = q; }
+                                }
+                            }
                 }
                 return bestT > float.MinValue ? best : Nearest(p);
             }
@@ -482,6 +536,36 @@ namespace HalfAware.EditorTools.Rocketbox
             return Mathf.Pow(1f - x, 1.4f);
         }
 
+        /// <summary>模型の上の位置 p（画素の幅 ts）での、線の組の覆い</summary>
+        static Cover CoverAt(List<Stroke> strokes, Vector3 p, float ts)
+        {
+            var c = new Cover();
+            foreach (var st in strokes)
+            {
+                if (!st.bounds.Contains(p)) continue;
+                var d = st.isPort || st.nodesOnly ? float.MaxValue : Distance(st.path, st.closed, p);
+                var dn = float.MaxValue;
+                foreach (var q in st.nodes) dn = Mathf.Min(dn, (q - p).magnitude);
+                if (st.isPort)
+                {
+                    // 丸い座金、縁の暗い線、奥の穴、光る輪（穴の無い差込口は、真ん中が光る点）
+                    c.Max(In(dn - st.silver, ts), Line(Mathf.Abs(dn - st.silver * 0.93f), 0.0007f, ts), st.socket > 0f ? In(dn - st.socket, ts) : 0f);
+                    var ring = Mathf.Abs(dn - st.nodeRing);
+                    c.Light(Line(ring, 0.0015f, ts), Glow(ring, 0.0026f), st.color);
+                    if (st.socket <= 0f) c.Light(In(dn - st.nodeRing * 0.35f, ts), Glow(dn, st.nodeRing * 0.35f), st.color);
+                    continue;
+                }
+                c.Max(st.silver > 0f ? In(d - st.silver, ts) : 0f, st.silver > 0.005f ? Line(Mathf.Abs(d - st.silver * 0.92f), 0.0007f, ts) : 0f, 0f);
+                if (st.glow > 0f) c.Light(Line(d, st.glow * 0.6f, ts), Glow(d, st.glow), st.color);
+                if (st.node > 0f)
+                {
+                    c.Max(In(dn - st.node, ts), 0f, 0f);
+                    c.Light(In(dn - st.node * 0.45f, ts), Glow(dn, st.node * 0.5f), st.color);
+                }
+            }
+            return c;
+        }
+
         /// <summary>
         /// 一枚のテクスチャ（頭か体）へ線の組を塗る。px は塗る地の色で、書き換える。skinPx は肌の見分けに使う元の色。
         /// 戻り値は自己発光のテクスチャ（ネオン管のように、芯は白っぽく明るく、まわりへ色がにじむ。地は黒）
@@ -496,32 +580,7 @@ namespace HalfAware.EditorTools.Rocketbox
             for (var k = 0; k < px.Length; k++)
             {
                 if (!s.On[k]) continue;
-                var p = s.P[k];
-                var ts = Mathf.Max(size[k], 0.0006f);
-                var c = new Cover();
-                foreach (var st in strokes)
-                {
-                    if (!st.bounds.Contains(p)) continue;
-                    var d = st.isPort || st.nodesOnly ? float.MaxValue : Distance(st.path, st.closed, p);
-                    var dn = float.MaxValue;
-                    foreach (var q in st.nodes) dn = Mathf.Min(dn, (q - p).magnitude);
-                    if (st.isPort)
-                    {
-                        // 丸い座金、縁の暗い線、奥の穴、光る輪（穴の無い差込口は、真ん中が光る点）
-                        c.Max(In(dn - st.silver, ts), Line(Mathf.Abs(dn - st.silver * 0.93f), 0.0007f, ts), st.socket > 0f ? In(dn - st.socket, ts) : 0f);
-                        var ring = Mathf.Abs(dn - st.nodeRing);
-                        c.Light(Line(ring, 0.0015f, ts), Glow(ring, 0.0026f), st.color);
-                        if (st.socket <= 0f) c.Light(In(dn - st.nodeRing * 0.35f, ts), Glow(dn, st.nodeRing * 0.35f), st.color);
-                        continue;
-                    }
-                    c.Max(st.silver > 0f ? In(d - st.silver, ts) : 0f, st.silver > 0.005f ? Line(Mathf.Abs(d - st.silver * 0.92f), 0.0007f, ts) : 0f, 0f);
-                    if (st.glow > 0f) c.Light(Line(d, st.glow * 0.6f, ts), Glow(d, st.glow), st.color);
-                    if (st.node > 0f)
-                    {
-                        c.Max(In(dn - st.node, ts), 0f, 0f);
-                        c.Light(In(dn - st.node * 0.45f, ts), Glow(dn, st.node * 0.5f), st.color);
-                    }
-                }
+                var c = CoverAt(strokes, s.P[k], Mathf.Max(size[k], 0.0006f));
                 var lit = Mathf.Max(c.core.maxColorComponent, c.halo.maxColorComponent);
                 if (c.silver <= 0f && c.socket <= 0f && c.edge <= 0f && lit <= 0.002f) continue;
                 var w = Skinness(skinPx[k], skin);
@@ -543,6 +602,26 @@ namespace HalfAware.EditorTools.Rocketbox
                 painted++;
             }
             return glow;
+        }
+
+        /// <summary>
+        /// 線の組のうち、肌の上に載る分を onSkin と total へ加える（onSkin は肌らしさで重みを付けた覆い、total は覆いの全部）。
+        /// 襟や袖や髪に隠れる所は塗らないので、肌に載る比が小さい形はその人には選ばない
+        /// </summary>
+        public static void Coverage(List<Stroke> strokes, RocketboxPaint.Surface s, Color[] skinPx, Color skin, ref float onSkin, ref float total)
+        {
+            if (strokes.Count == 0) return;
+            var bounds = strokes[0].bounds;
+            foreach (var st in strokes) bounds.Encapsulate(st.bounds);
+            for (var k = 0; k < s.P.Length; k++)
+            {
+                if (!s.On[k] || !bounds.Contains(s.P[k])) continue;
+                var c = CoverAt(strokes, s.P[k], 0.002f);
+                var a = Mathf.Max(c.silver, c.core.maxColorComponent > 0f ? 1f : 0f);
+                if (a <= 0f) continue;
+                total += a;
+                onSkin += a * Skinness(skinPx[k], skin);
+            }
         }
 
         static float Distance(Vector3[] path, bool closed, Vector3 p)

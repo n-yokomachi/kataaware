@@ -215,17 +215,25 @@ namespace HalfAware.EditorTools
             return bad;
         }
 
-        /// <summary>人が床に立っているか。焼いた形の最下点を床と比べる</summary>
+        /// <summary>人が床に立っているか。一人ずつ、近くの段の焼いた形の最下点を床と比べる</summary>
         static int Feet(Transform root)
         {
-            var crowd = root.Find("Crowd/Crowd");
-            var filter = crowd == null ? null : crowd.GetComponent<MeshFilter>();
-            if (filter == null || filter.sharedMesh == null) return 0;
-            var verts = filter.sharedMesh.vertices;
+            var people = root.Find("Crowd/People");
+            if (people == null) return 0;
             var low = float.PositiveInfinity;
             var at = Vector3.zero;
-            for (var i = 0; i < verts.Length; i++)
-                if (verts[i].y < low) { low = verts[i].y; at = verts[i]; }
+            foreach (Transform person in people)
+            {
+                var near = person.Find("LOD0");
+                var filter = near == null ? null : near.GetComponent<MeshFilter>();
+                if (filter == null || filter.sharedMesh == null) continue;
+                var verts = filter.sharedMesh.vertices;
+                for (var i = 0; i < verts.Length; i++)
+                {
+                    var w = near.TransformPoint(verts[i]);
+                    if (w.y < low) { low = w.y; at = w; }
+                }
+            }
             // 中庭の敷石が 0.02、車道が 0.00。5 cm 沈んでいたら知らせる
             if (low > -0.05f) return 0;
             Debug.LogWarning(string.Format("見直し: 人の最下点が {0}（{1} のあたり）。床にめり込んでいる",

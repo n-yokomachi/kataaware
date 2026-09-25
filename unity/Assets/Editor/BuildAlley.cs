@@ -972,35 +972,28 @@ namespace HalfAware.EditorTools
 
         // ---- 人 ------------------------------------------------------------
 
-        /// <summary>仮置きの人に使うモデル。Quaternius の一式</summary>
         /// <summary>
-        /// 通りとヤードに立たせる模型。Quaternius の Ultimate Modular Women と
-        /// Ultimate Modular Men から、街に居そうな身なりだけを選んである。
-        /// 男女を同数並べて、拾い方は一様。半々くらいに散る
+        /// 置き場所ひとつ。どの姿勢で、どこへ向けて立たせるか。
+        /// pose は姿勢の番号（0 立つ／1 片脚に預ける／2 腕組み／3 手を後ろ／4 振り向く／5〜7 座る／8 壁にもたれる）。
+        /// seat は座る所（0 座らない／1 売り手の腰掛け／2 露天席の椅子）
         /// </summary>
-        static readonly string[] CrowdModels =
-        {
-            "W_Casual", "W_SciFi", "W_Formal", "W_Adventurer", "W_Suit", "W_Punk",
-            "M_Casual", "M_Hoodie", "M_Suit", "M_Worker", "M_Punk", "M_Adventurer",
-        };
-
-        /// <summary>置き場所ひとつ。どのモデルを、どの姿勢で、どこへ向けて立たせるか</summary>
         struct Spot
         {
             public Vector3 at;
             public float yaw;
             public int pose;
+            public int seat;
             public float scale;
         }
 
         /// <summary>
-        /// 通りとヤードの人。モデルの骨を曲げて姿勢を作り、その形を焼いて 1 枚の mesh へ束ねる。
-        /// 焼いてしまえば実行時に骨は動かないので、何十人立てても描画は 1 回で済む。
-        /// 顔は作らない方針どおり、色は灰ひと色の半透明だけを当てる
+        /// 通りとヤードの人。置き場所・向き・二人組をここで決め、人と姿勢は Rocketbox の人で組む（<see cref="BuildAlleyCrowd"/>）。
+        /// 一人ずつの物にして、近さの段（LODGroup）を持たせる
         /// </summary>
         static void Crowd(Transform parent)
         {
             Clear(parent);
+            BuildAlleyCrowd.Reset();
             var spots = new List<Spot>();
             var rng = new System.Random(4820);
             Skipped = 0;
@@ -1070,7 +1063,7 @@ namespace HalfAware.EditorTools
                     var seat = rng.Next(3);
                     var sit = new Vector3(p.x + back.x, 0.02f, p.z + back.z);
                     Put(spots, sit, yaw + 180f + (float)(rng.NextDouble() * 40.0 - 20.0),
-                        seat == 0 ? 5 : seat == 1 ? 6 : 7, rng, true);
+                        seat == 0 ? 5 : seat == 1 ? 6 : 7, rng, true, 1);
                     Stool(stalls, "Stool" + n++, sit, yaw);
                 }
             }
@@ -1122,7 +1115,7 @@ namespace HalfAware.EditorTools
                 // 椅子に深く腰掛けるので、座面より少し後ろへ置く
                 var back = Quaternion.Euler(0f, c.w, 0f) * new Vector3(0f, 0f, -0.07f);
                 Put(spots, new Vector3(c.x + back.x, c.y, c.z + back.z),
-                    c.w + (float)(rng.NextDouble() * 14.0 - 7.0), seat, rng, true);
+                    c.w + (float)(rng.NextDouble() * 14.0 - 7.0), seat, rng, true, 2);
                 Occupy(c.x, c.z, 0.34f);
             }
 
@@ -1152,7 +1145,44 @@ namespace HalfAware.EditorTools
             }
 
             UntouchShell();
-            Bake(parent, spots, rng);
+            People(parent, spots, rng);
+        }
+
+        /// <summary>
+        /// 置き場所を Rocketbox の人の置き方へ移して、群衆を組む（<see cref="BuildAlleyCrowd.Build"/>）。
+        /// 姿勢の番号は近い形へ移す。壁にもたれる形は無いので、壁ぎわでは手を後ろで組むか腕を組むか片脚に預ける。
+        /// 露店の前の客の「卓に肘をつく」（6）は、座る物が無いので立ち姿にする
+        /// </summary>
+        static void People(Transform parent, List<Spot> spots, System.Random rng)
+        {
+            var places = new List<BuildAlleyCrowd.Place>();
+            foreach (var s in spots)
+            {
+                BuildAlleyCrowd.Pose pose;
+                if (s.seat == 1) pose = BuildAlleyCrowd.Pose.Sit;
+                else if (s.seat == 2) pose = BuildAlleyCrowd.Pose.SitChair;
+                else
+                    switch (s.pose)
+                    {
+                        case 1: pose = BuildAlleyCrowd.Pose.Rest; break;
+                        case 2: pose = BuildAlleyCrowd.Pose.Crossed; break;
+                        case 3: pose = BuildAlleyCrowd.Pose.Behind; break;
+                        case 4: pose = BuildAlleyCrowd.Pose.Turn; break;
+                        case 6: pose = rng.NextDouble() < 0.5 ? BuildAlleyCrowd.Pose.Rest : BuildAlleyCrowd.Pose.Stand; break;
+                        case 8:
+                            {
+                                var r = rng.NextDouble();
+                                pose = r < 0.45 ? BuildAlleyCrowd.Pose.Behind : r < 0.75 ? BuildAlleyCrowd.Pose.Crossed : BuildAlleyCrowd.Pose.Rest;
+                                break;
+                            }
+                        default: pose = BuildAlleyCrowd.Pose.Stand; break;
+                    }
+                // Rocketbox の人は背の高さがもとからばらけているので、伸び縮みは半分にする
+                places.Add(new BuildAlleyCrowd.Place { at = s.at, yaw = s.yaw, pose = pose, seller = s.seat == 1, scale = 1f + (s.scale - 1.01f) * 0.5f });
+            }
+            var sb = new System.Text.StringBuilder();
+            BuildAlleyCrowd.Build(parent, places, 4821, sb);
+            Debug.Log(sb.ToString() + "壁や物に近くて見送った場所 " + Skipped);
         }
 
         /// <summary>
@@ -1258,7 +1288,7 @@ namespace HalfAware.EditorTools
         /// force は台帳を飛ばす指定で、売り手や椅子のように場所が決まっているとき。
         /// 壁との間合いだけは force でも見る。ここを飛ばすと壁に埋まる
         /// </summary>
-        static void Put(List<Spot> spots, Vector3 at, float yaw, int pose, System.Random rng, bool force = false)
+        static void Put(List<Spot> spots, Vector3 at, float yaw, int pose, System.Random rng, bool force = false, int seat = 0)
         {
             // 店の入口の前には立たせない。扉を塞いでいると入れない店に見える
             if (!force && AtDoor(at.x, at.z, DoorClear)) { Skipped++; return; }
@@ -1274,7 +1304,7 @@ namespace HalfAware.EditorTools
             }
             if (!force && !Free(at.x, at.z, 0.36f)) return;
             if (!force) Occupy(at.x, at.z, 0.30f);
-            spots.Add(Spot1(at, yaw, pose, rng));
+            spots.Add(Spot1(at, yaw, pose, seat, rng));
         }
 
         /// <summary>壁や物に当たって諦めた数。組み立ての最後に出す</summary>
@@ -1301,109 +1331,15 @@ namespace HalfAware.EditorTools
             return false;
         }
 
-        static Spot Spot1(Vector3 at, float yaw, int pose, System.Random rng)
+        static Spot Spot1(Vector3 at, float yaw, int pose, int seat, System.Random rng)
         {
             var s = new Spot();
             s.at = at;
             s.yaw = yaw;
             s.pose = pose;
+            s.seat = seat;
             s.scale = (float)(0.95 + rng.NextDouble() * 0.12);
             return s;
-        }
-
-        /// <summary>
-        /// 置き場所ぶんだけモデルを曲げて焼き、頂点をまとめて 1 枚の mesh にする。
-        /// 焼いたあとの形は骨を持たないので、場面には静かな塊として残る
-        /// </summary>
-        static void Bake(Transform parent, List<Spot> spots, System.Random rng)
-        {
-            var stage = new GameObject("__crowd_stage");
-            var insts = new GameObject[CrowdModels.Length];
-            var rests = new List<Dictionary<Transform, Quaternion>>();
-            for (var i = 0; i < CrowdModels.Length; i++)
-            {
-                var src = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/quaternius/" + CrowdModels[i] + ".fbx");
-                if (src == null) { Debug.LogWarning("モデルが無い: " + CrowdModels[i]); rests.Add(null); continue; }
-                var inst = (GameObject)PrefabUtility.InstantiatePrefab(src, stage.transform);
-                inst.transform.localPosition = Vector3.zero;
-                inst.transform.localRotation = Quaternion.identity;
-                // プレハブの結びを解かないと骨は繋ぎ変えられない。解かないまま曲げると靴だけ残る
-                PrefabUtility.UnpackPrefabInstance(inst, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
-                // 足首が脛の子ではないので、膝を曲げても靴が置き去りになる。繋ぎ直す
-                foreach (var pair in new[] { "L", "R" })
-                {
-                    var foot = Find(inst.transform, "Foot." + pair);
-                    var shin = Find(inst.transform, "LowerLeg." + pair);
-                    if (foot != null && shin != null && foot.parent != shin) foot.SetParent(shin, true);
-                }
-                var rest = new Dictionary<Transform, Quaternion>();
-                foreach (var t in inst.GetComponentsInChildren<Transform>(true)) rest[t] = t.localRotation;
-                insts[i] = inst;
-                rests.Add(rest);
-            }
-
-            var verts = new List<Vector3>();
-            var norms = new List<Vector3>();
-            var uvs = new List<Vector2>();
-            var tris = new List<int>();
-            var tmp = new Mesh();
-            var menCount = 0;
-            var womenCount = 0;
-            foreach (var spot in spots)
-            {
-                var k = rng.Next(CrowdModels.Length);
-                if (insts[k] == null) continue;
-                if (CrowdModels[k][0] == 'M') menCount++; else womenCount++;
-                Pose(insts[k].transform, rests[k], spot.pose);
-                var drop = PoseDrop(spot.pose);
-                var trs = Matrix4x4.TRS(spot.at + new Vector3(0f, -drop * spot.scale, 0f),
-                    Quaternion.Euler(0f, spot.yaw, 0f), Vector3.one * spot.scale);
-                foreach (var smr in insts[k].GetComponentsInChildren<SkinnedMeshRenderer>(true))
-                {
-                    // 骨組みは 100 倍で作られているので、縮尺を掛けずに焼く。
-                    // 焼いた形は取り込み時の向きのままなので、描画部の向きで起こし直す
-                    smr.BakeMesh(tmp, false);
-                    var frame = Matrix4x4.TRS(smr.transform.position, smr.transform.rotation, Vector3.one);
-                    var place = trs * frame;
-                    var v = tmp.vertices;
-                    var n = tmp.normals;
-                    var t2 = tmp.triangles;
-                    var at = verts.Count;
-                    for (var i = 0; i < v.Length; i++)
-                    {
-                        verts.Add(place.MultiplyPoint3x4(v[i]));
-                        norms.Add(place.MultiplyVector(i < n.Length ? n[i] : Vector3.up).normalized);
-                        uvs.Add(Vector2.zero);
-                    }
-                    for (var i = 0; i < t2.Length; i++) tris.Add(at + t2[i]);
-                }
-            }
-            Object.DestroyImmediate(tmp);
-            Object.DestroyImmediate(stage);
-            if (tris.Count == 0) return;
-
-            var mesh = new Mesh();
-            mesh.name = "Crowd";
-            mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
-            mesh.SetVertices(verts);
-            mesh.SetNormals(norms);
-            mesh.SetUVs(0, uvs);
-            mesh.SetTriangles(tris, 0);
-            mesh.RecalculateBounds();
-            var path = Generated + "Crowd.asset";
-            ProcMesh.Save(mesh, path);
-            var go = new GameObject("Crowd");
-            go.transform.SetParent(parent, false);
-            go.AddComponent<MeshFilter>().sharedMesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
-            go.AddComponent<MeshRenderer>().sharedMaterial = CrowdMat();
-            Debug.Log("人 " + spots.Count + " 体（男 " + menCount + " / 女 " + womenCount + "）、"
-                + (tris.Count / 3) + " ポリゴン。壁に近くて見送った場所 " + Skipped);
-        }
-
-        static Transform Find(Transform root, string name)
-        {
-            foreach (var t in root.GetComponentsInChildren<Transform>(true)) if (t.name == name) return t;
-            return null;
         }
 
         /// <summary>
@@ -1421,275 +1357,6 @@ namespace HalfAware.EditorTools
                 Box(g.transform, "Leg" + i,
                     new Vector3((i % 2 == 0 ? -1 : 1) * 0.14f, 0.19f, (i < 2 ? -1 : 1) * 0.13f),
                     new Vector3(0.04f, 0.38f, 0.04f), "Pole");
-        }
-
-        /// <summary>
-        /// 人をひとりだけ焼いて、自前の mesh を持った物として返す。
-        ///
-        /// 群衆は 62 体を 1 枚の mesh にまとめてしまうので、出したり消したりできない。
-        /// 売り買いの買い手のように、場面の途中で現れて去る人はこちらで作る。
-        /// build は体つき。この企画には女の模型しか無いので、
-        /// 男は縦横を少し増して体格で見分けさせる
-        /// </summary>
-        public static GameObject BakeOne(Transform parent, string name, string model,
-            Vector3 at, float yaw, int pose, Vector3 build, Material mat)
-        {
-            var src = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/quaternius/" + model + ".fbx");
-            if (src == null) { Debug.LogWarning("モデルが無い: " + model); return null; }
-
-            var stage = new GameObject("__one_stage");
-            var inst = (GameObject)PrefabUtility.InstantiatePrefab(src, stage.transform);
-            inst.transform.localPosition = Vector3.zero;
-            inst.transform.localRotation = Quaternion.identity;
-            PrefabUtility.UnpackPrefabInstance(inst, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
-            foreach (var pair in new[] { "L", "R" })
-            {
-                var foot = Find(inst.transform, "Foot." + pair);
-                var shin = Find(inst.transform, "LowerLeg." + pair);
-                if (foot != null && shin != null && foot.parent != shin) foot.SetParent(shin, true);
-            }
-            var rest = new Dictionary<Transform, Quaternion>();
-            foreach (var t in inst.GetComponentsInChildren<Transform>(true)) rest[t] = t.localRotation;
-            Pose(inst.transform, rest, pose);
-
-            var verts = new List<Vector3>();
-            var norms = new List<Vector3>();
-            var uvs = new List<Vector2>();
-            var tris = new List<int>();
-            var tmp = new Mesh();
-            // 焼いた形は原点に置く。位置と向きは物の transform で持たせて、あとから動かせるようにする
-            var trs = Matrix4x4.TRS(new Vector3(0f, -PoseDrop(pose) * build.y, 0f), Quaternion.identity, build);
-            foreach (var smr in inst.GetComponentsInChildren<SkinnedMeshRenderer>(true))
-            {
-                smr.BakeMesh(tmp, false);
-                var place = trs * Matrix4x4.TRS(smr.transform.position, smr.transform.rotation, Vector3.one);
-                var v = tmp.vertices;
-                var n = tmp.normals;
-                var t2 = tmp.triangles;
-                var head = verts.Count;
-                for (var i = 0; i < v.Length; i++)
-                {
-                    verts.Add(place.MultiplyPoint3x4(v[i]));
-                    norms.Add(place.MultiplyVector(i < n.Length ? n[i] : Vector3.up).normalized);
-                    uvs.Add(Vector2.zero);
-                }
-                for (var i = 0; i < t2.Length; i++) tris.Add(head + t2[i]);
-            }
-            Object.DestroyImmediate(tmp);
-            Object.DestroyImmediate(stage);
-            if (tris.Count == 0) return null;
-
-            var mesh = new Mesh();
-            mesh.name = name;
-            mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
-            mesh.SetVertices(verts);
-            mesh.SetNormals(norms);
-            mesh.SetUVs(0, uvs);
-            mesh.SetTriangles(tris, 0);
-            mesh.RecalculateBounds();
-            var path = Generated + name + ".asset";
-            ProcMesh.Save(mesh, path);
-
-            var go = new GameObject(name);
-            go.transform.SetParent(parent, false);
-            go.transform.position = at;
-            go.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
-            go.AddComponent<MeshFilter>().sharedMesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
-            go.AddComponent<MeshRenderer>().sharedMaterial = mat;
-            return go;
-        }
-
-        /// <summary>
-        /// 買い手の色。群衆より濃くして、まわりの人だかりから浮かせる。
-        /// 群衆は薄く透かしてあるが、こちらは芝居の相手なので透かさない
-        /// </summary>
-        public static Material BuyerMat()
-        {
-            var path = Materials + "Buyer.mat";
-            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
-            if (m == null)
-            {
-                if (!AssetDatabase.IsValidFolder("Assets/Materials/Alley"))
-                    AssetDatabase.CreateFolder("Assets/Materials", "Alley");
-                m = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-                m.name = "Buyer";
-                AssetDatabase.CreateAsset(m, path);
-            }
-            m.SetTexture("_BaseMap", null);
-            m.SetColor("_BaseColor", new Color(0.072f, 0.078f, 0.092f, 1f));
-            // 現れるときに濃さを上げていくので、透かせる側で作る
-            m.SetFloat("_Surface", 1f);
-            m.SetFloat("_Blend", 0f);
-            m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
-            m.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            m.SetFloat("_ZWrite", 1f);
-            m.SetFloat("_Smoothness", 0.10f);
-            m.SetFloat("_Metallic", 0f);
-            m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-            m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
-            EditorUtility.SetDirty(m);
-            return m;
-        }
-
-        /// <summary>
-        /// 姿勢ごとの下げ量。骨を曲げても腰は動かないので、座った形のまま床へ落とす。
-        /// 値は焼いた形の一番低い頂点を実測して決めてある。靴の裏が床に来る
-        /// </summary>
-        static float PoseDrop(int pose)
-        {
-            switch (pose)
-            {
-                case 5: return 0.422f;
-                case 6: return 0.415f;
-                case 7: return 0.432f;
-                // 立ち姿は歩幅を詰めたぶんだけ脚が伸びるので、そのぶん持ち上げる。
-                // 負の値は上げる向き。値は焼いた形の最下点を実測してある
-                case 1: return -0.051f;
-                case 2: return -0.043f;
-                case 3: return -0.047f;
-                case 4: return -0.028f;
-                case 8: return -0.018f;
-                default: return -0.045f;
-            }
-        }
-
-        /// <summary>
-        /// 骨を曲げて姿勢を作る。安静へ戻してから重ねるので、同じ体を何度でも使い回せる。
-        /// 模型は +z を向いている。角度はどれも「正なら前」に揃えてある。
-        /// 0 立つ／1 片脚に預ける／2 腕組み／3 手を後ろ／4 振り向く／
-        /// 5 椅子に座る／6 卓に肘をつく／7 横を向いて座る／8 壁にもたれる
-        /// </summary>
-        /// <summary>
-        /// 立ち姿で腕を前後から寄せる量。度。
-        ///
-        /// 配布の模型は歩いている途中の姿勢で入っており、
-        /// 素のままだと足首が前後に 0.29 m ずれている。
-        /// そのまま立たせると大股で止まっているように見えるので、
-        /// 腿を寄せて揃える。±10.5 度で足首が並ぶのを実測してある。
-        /// 少しだけ残して、突っ立ちすぎないようにする。
-        ///
-        /// 骨を素の向きへ戻す（localRotation を identity にする）のは驄目。
-        /// mesh はこの姿勢に合わせて皮を張ってあるので、大きくずらすと体が裂ける
-        /// </summary>
-        const float Stride = 9.5f;
-
-        static void Pose(Transform root, Dictionary<Transform, Quaternion> rest, int pose)
-        {
-            foreach (var pair in rest) pair.Key.localRotation = pair.Value;
-
-            float thighL = 2f, thighR = -2f, kneeL = 0f, kneeR = 0f;
-            float armL = 6f, armR = -6f, elbowL = 12f, elbowR = 12f;
-            float outL = 4f, outR = -4f, spine = 2f, lean = 0f;
-            // 足首。0 なら脛のまま。座ると爪先が下を向くので、起こして靴の裏を床へ向ける
-            var level = false;
-
-            switch (pose)
-            {
-                case 1:  // 重心を片脚に預けた立ち姿
-                    thighL = 5f; thighR = -7f; kneeL = -4f; kneeR = 3f;
-                    armL = 4f; armR = -9f; elbowL = 18f; elbowR = 10f;
-                    outL = 7f; outR = -3f; spine = 1f;
-                    break;
-                case 2:  // 腕を組んで立つ
-                    armL = 44f; armR = -44f; elbowL = 76f; elbowR = 76f;
-                    outL = 12f; outR = -12f;
-                    break;
-                case 3:  // 手を後ろで組むように、腕を少し引いた立ち姿
-                    armL = -12f; armR = -16f; elbowL = 26f; elbowR = 24f;
-                    outL = 2f; outR = -6f; thighR = -4f; spine = 1f;
-                    break;
-                case 4:  // 少し振り向いた立ち姿
-                    armL = 10f; armR = -4f; elbowL = 14f; elbowR = 20f;
-                    outL = 9f; outR = -8f; spine = 3f; thighL = -3f; thighR = 4f;
-                    break;
-                // 座る 3 つは腿と膝をほぼ揃える。腰の高さが揃わないと、
-                // 同じ椅子に座らせたときに浮いたり沈んだりする。
-                // 腿を水平に、脛をほぼ垂直に落として、靴の裏が床へ着く角度を測ってある
-                case 5:  // 椅子に座る
-                    thighL = 85f; thighR = 84f; kneeL = -70f; kneeR = -72f;
-                    outL = 12f; outR = -12f; armL = 26f; armR = 22f; elbowL = 48f; elbowR = 44f;
-                    spine = 4f; level = true;
-                    break;
-                case 6:  // 卓に肘をついて座る
-                    thighL = 84f; thighR = 86f; kneeL = -72f; kneeR = -68f;
-                    outL = 16f; outR = -9f; armL = 14f; armR = 44f; elbowL = 26f; elbowR = 64f;
-                    spine = 8f; level = true;
-                    break;
-                case 8:  // 壁に背をつけて立つ。足は体より前へ出る
-                    lean = -9f; thighL = 12f; thighR = 8f; kneeL = -8f; kneeR = -5f;
-                    armL = -16f; armR = 14f; elbowL = 30f; elbowR = 22f;
-                    outL = 3f; outR = -8f; spine = -4f;
-                    break;
-                case 7:  // 膝を寄せて横を向いて座る
-                    thighL = 86f; thighR = 83f; kneeL = -68f; kneeR = -74f;
-                    outL = 3f; outR = -22f; armL = 38f; armR = 20f; elbowL = 56f; elbowR = 36f;
-                    spine = 10f; level = true;
-                    break;
-            }
-
-            Turn(root, "Hips", lean, 0f);
-            Turn(root, "Abdomen", spine * 0.45f, 0f);
-            Turn(root, "Torso", spine * 0.35f, 0f);
-            Turn(root, "Chest", spine * 0.20f, 0f);
-            Turn(root, "Neck", -spine * 0.35f, 0f);
-            Turn(root, "Head", -spine * 0.25f + (float)0f, 0f);
-
-            // 四肢は下を向いた骨なので、正の値が前へ出るよう符号を返す。
-            // 背骨は上を向いているのでそのまま。
-            // 立ち姿はここで歩幅を詰める
-            var close = pose >= 5 && pose <= 7 ? 0f : Stride;
-            Turn(root, "UpperLeg.L", -(thighL + close), outL * 0.25f);
-            Turn(root, "UpperLeg.R", -(thighR - close), outR * 0.25f);
-            Turn(root, "LowerLeg.L", -kneeL, 0f);
-            Turn(root, "LowerLeg.R", -kneeR, 0f);
-
-            if (level)
-            {
-                Turn(root, "Foot.L", thighL + kneeL, 0f);
-                Turn(root, "Foot.R", thighR + kneeR, 0f);
-            }
-
-            Turn(root, "UpperArm.L", -armL, outL);
-            Turn(root, "UpperArm.R", -armR, outR);
-            Turn(root, "LowerArm.L", -elbowL, 0f);
-            Turn(root, "LowerArm.R", -elbowR, 0f);
-        }
-
-        /// <summary>骨ひとつを、体から見た軸で曲げる。左右で符号が揃う</summary>
-        static void Turn(Transform root, string bone, float pitch, float roll)
-        {
-            if (Mathf.Approximately(pitch, 0f) && Mathf.Approximately(roll, 0f)) return;
-            var b = Find(root, bone);
-            if (b == null) return;
-            b.rotation = Quaternion.AngleAxis(pitch, Vector3.right) * Quaternion.AngleAxis(roll, Vector3.forward) * b.rotation;
-        }
-
-        /// <summary>仮置きの人のマテリアル。灰色ひと色を少しだけ透かす</summary>
-        static Material CrowdMat()
-        {
-            var path = Materials + "Crowd.mat";
-            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
-            if (m == null)
-            {
-                if (!AssetDatabase.IsValidFolder("Assets/Materials/Alley"))
-                    AssetDatabase.CreateFolder("Assets/Materials", "Alley");
-                m = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-                m.name = "Crowd";
-                AssetDatabase.CreateAsset(m, path);
-            }
-            m.SetTexture("_BaseMap", null);
-            m.SetColor("_BaseColor", new Color(0.175f, 0.182f, 0.205f, 0.86f));
-            m.SetFloat("_Surface", 1f);
-            m.SetFloat("_Blend", 0f);
-            m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
-            m.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            m.SetFloat("_ZWrite", 1f);
-            m.SetFloat("_Smoothness", 0.12f);
-            m.SetFloat("_Metallic", 0f);
-            m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-            m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
-            EditorUtility.SetDirty(m);
-            return m;
         }
 
         // ---- 場所取り ------------------------------------------------------

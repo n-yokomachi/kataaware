@@ -1,5 +1,6 @@
 using UnityEditor;
 using UnityEngine;
+using HalfAware.EditorTools.Rocketbox;
 
 namespace HalfAware.EditorTools
 {
@@ -168,38 +169,34 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// 買い手。卓の手前に立ち、店の方を向く。
         ///
-        /// 6.4 のとおり 1 人目と 2 人目は男、3 人目は女。
-        /// 色は群衆より濃くして、後ろの人だかりから浮かせる。
-        /// はじめは伏せておき、その買い手の番だけ AlleyDirector が出す
+        /// 6.4 のとおり 1 人目と 2 人目は男、3 人目は女（<see cref="RocketboxMob.Buyers"/>）。
+        /// A は若い女の記憶を欲しがる常連（男大 14）、B は煙草で払う常連（男大 02）、C は初めての客（女大 15）。
+        /// 人の作りは群衆と同じ（服の色は元のまま、肌にインプラント）で、寄りで見るのでテクスチャは 512 のまま、三角も減らさない。
+        /// はじめは伏せておき、その買い手の番だけ AlleyDirector が出して、濃さを上げて浮かび上がらせる
         /// </summary>
         static GameObject[] MakeBuyers(Transform parent, Vector3 at, Quaternion spin, float yaw)
         {
             // 卓の前面はここから -z の側。買い手はそちらに立って、店を向く
             var front = spin * new Vector3(0f, 0f, -1f);
-            var mat = BuildAlley.BuyerMat();
             var made = new GameObject[MarketSale.Count];
-            var men = new[] { "M_Suit", "M_Worker" };
-            var women = new[] { "W_Formal", "W_Casual" };
-            var poses = new[] { 1, 2, 0 };
+            var poses = new[] { BuildAlleyCrowd.Pose.Rest, BuildAlleyCrowd.Pose.Crossed, BuildAlleyCrowd.Pose.Stand };
             // 看板の幅（1.5 m）の内側に収める。
             // 外へ外れると、看板と人が別々に見えて花が無い
             var sway = new[] { -0.26f, 0.22f, -0.06f };
-            var man = 0;
-            var lady = 0;
-            for (var i = 0; i < made.Length; i++)
+            var sb = new System.Text.StringBuilder("買い手\n");
+            for (var i = 0; i < made.Length && i < RocketboxMob.Buyers.Length; i++)
             {
-                var woman = MarketSale.Woman(i);
-                var model = woman ? women[lady++ % women.Length] : men[man++ % men.Length];
+                var who = RocketboxMob.Buyers[i];
                 // 卓を浅くしたので、前端は露店の中心から 0.80 m、
                 // 体が入るのは 1.12 m から。縁に寄って立たせる
                 var spot = at + front * 1.18f + spin * new Vector3(sway[i], 0f, 0f);
                 spot.y = Ground(spot);
-                var go = BuildAlley.BakeOne(parent, "Buyer" + i, model,
-                    spot, yaw, poses[i % poses.Length], Vector3.one, mat);
+                var go = BuildAlleyCrowd.Buyer(parent, "Buyer" + i, who, poses[i % poses.Length], spot, yaw, 7300 + i, sb);
                 if (go == null) continue;
                 go.SetActive(false);
                 made[i] = go;
             }
+            Debug.Log(sb.ToString());
             return made;
         }
 
