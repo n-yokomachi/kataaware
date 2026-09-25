@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 
 namespace HalfAware.EditorTools
 {
@@ -110,7 +111,7 @@ namespace HalfAware.EditorTools
             var sb = new StringBuilder();
             sb.AppendLine("| 人 | 区分 | 背 m | 頭/背 | 脚/背 | 縮めただけの頭/背 | 縮めただけの脚/背 |");
             sb.AppendLine("|---|---|---|---|---|---|---|");
-            var ids = new[] { "Lucas", "Mei", "Sofia", "Daniel", "Aisha", "Priya", "Hanna", "Mark", "Albert", "Rosa" };
+            var ids = new[] { "Mei", "Sofia", "Lucas", "Daniel", "Aisha", "Priya", "Hanna", "Mark", "Albert", "Rosa" };
             foreach (var id in ids)
             {
                 var copy = Copy(id);
@@ -201,10 +202,10 @@ namespace HalfAware.EditorTools
         static string Walk(Transform take, Mover mover, PersonMotion motion)
         {
             const float dt = 1f / 60f;
-            // 合図を持つ人は、記憶の頭で合図が来たことにする。DiveDirector はその時から数える
-            var t0 = mover.Cue < 0 ? mover.At : 0f;
-            var span = mover.Span;
-            var end = t0 + span + 1f;
+            // 合図を持つ人は、記憶の頭で合図が来たことにする。DiveDirector はその時から数える。
+            // 二本目の線（駆け出して戻ってくる人）があれば、戻り終えるまで
+            var span = mover.Span + (mover.Returns ? mover.NextSpan : 0f);
+            var end = mover.Until + 1f;
             mover.Play(0f);
             Physics.SyncTransforms();
             motion.Restart();
@@ -292,7 +293,7 @@ namespace HalfAware.EditorTools
             Person p;
             DiveCast.TryById(motion.GetComponent<PersonTint>().Person, out p);
             sb.Append(take.name + "/" + motion.name + "（" + p.name + "）");
-            sb.Append(string.Format(" 線 {0:F2} m を {1:F1} 秒", Flat(mover.To - mover.From), span));
+            sb.Append(string.Format(" 線 {0:F2} m を {1:F1} 秒", Flat(mover.To - mover.From) + (mover.Returns ? Flat(mover.Next - mover.To) : 0f), span));
             sb.Append(string.Format("｜こま {0:F1}/秒", fps));
             sb.Append("｜立 " + Count(counts, PersonMotion.Gait.Stand) + " 歩 " + Count(counts, PersonMotion.Gait.Walk) + " 走 " + Count(counts, PersonMotion.Gait.Run));
             if (walkTicks > 0)
@@ -526,7 +527,7 @@ namespace HalfAware.EditorTools
         {
             var rows = new[]
             {
-                new[] { "Lucas", "Mei", "Sofia" },
+                new[] { "Mei", "Sofia", "Lucas" },
                 new[] { "Daniel", "Aisha", "Priya", "Emily" },
                 new[] { "Hanna", "Lee", "Linda", "Mark" },
                 new[] { "Giorgio", "Elena", "Albert", "Rosa" },
@@ -623,6 +624,160 @@ namespace HalfAware.EditorTools
                 CheckDiveSky.PairIn(placeId, world, yaw, pitch, path);
             }
             return "撮った → " + path;
+        }
+
+        /// <summary>
+        /// 記憶の一本を、ゲームと同じ見え方で一枚撮る（960×540。パイプラインの render scale 1/3 で中は 320×180）。
+        /// 主の足元 <paramref name="foot"/>（場所のローカル）に立ち、一覧の目の高さから <paramref name="target"/> の人（板の相手の名前）を見る。
+        ///
+        /// 見え方はゲームのカメラ（Player/Main Camera）の写しで、後処理も通す。記憶の体の差は一時の Volume で掛ける:
+        /// 色味（Color Filter）と、ぼやけ（<see cref="HostBody"/> と同じ式。疲れ <paramref name="strain"/>、1 でその体のぼやけが出きる）。
+        /// 動く人は、記憶の時計で動く人も合図で動く人も <paramref name="at"/> 秒の所（負なら動き終えた所）に置く。
+        /// 画面の角の白い膜と字幕は HUD の Canvas なので写らない。
+        /// 抜けるときに、動く人の置き場・一時の Volume とカメラ・空を全部戻す
+        /// </summary>
+        public static string Game(int which, Vector3 foot, string target, string path, float strain = 1f, float at = -1f, float lift = 0f)
+        {
+            var take = TakeAt(which);
+            if (take == null) return "記憶 " + which + " が無い";
+            var roster = UnityEditor.AssetDatabase.LoadAssetAtPath<DiveRoster>(BuildDive.RosterPath);
+            var entry = roster[which];
+            var placeId = entry.place;
+            var main = GameObject.Find("Player/Main Camera");
+            if (main == null) return "Player/Main Camera が無い";
+            var kept = new Dictionary<Transform, Vector3>();
+            foreach (var m in take.GetComponentsInChildren<Mover>(true)) kept[m.transform] = m.transform.localPosition;
+            GameObject eyeGo = null, volGo = null;
+            VolumeProfileHolder hold = null;
+            try
+            {
+                using (var stage = new CheckDiveSky.Stage(placeId, which))
+                {
+                    var sky = CheckDiveSky.SkyOf(placeId);
+                    sky.Apply(null);
+                    foreach (var m in take.GetComponentsInChildren<Mover>(true))
+                    {
+                        m.Play(at < 0f ? m.Until + 1f : at);
+                        var motion = m.GetComponent<PersonMotion>();
+                        if (motion != null) motion.Still();
+                    }
+                    Physics.SyncTransforms();
+
+                    var who = take.Find(target);
+                    if (who == null) return "記憶 " + which + " に " + target + " がいない";
+                    var place = stage.Place;
+                    var footWorld = place != null ? place.TransformPoint(foot) : foot;
+                    // 目は体の前へ出ている（BuildDive.EyeLead）。体ごと相手へ向けてから目を置く
+                    var box = BodyBox(who);
+                    var aim = new Vector3(box.center.x, box.min.y + box.size.y * (0.78f + lift), box.center.z);
+                    var flat = aim - footWorld; flat.y = 0f;
+                    var yaw = Mathf.Atan2(flat.x, flat.z) * Mathf.Rad2Deg;
+                    var eye = footWorld + Quaternion.Euler(0f, yaw, 0f) * new Vector3(0f, entry.eyeHeight, 0.22f);
+                    var look = aim - eye;
+                    var pitch = Mathf.Atan2(-look.y, new Vector2(look.x, look.z).magnitude) * Mathf.Rad2Deg;
+
+                    eyeGo = new GameObject("CheckDivePeopleEye");
+                    eyeGo.hideFlags = HideFlags.HideAndDontSave;
+                    var cam = eyeGo.AddComponent<Camera>();
+                    cam.enabled = false;
+                    cam.CopyFrom(main.GetComponent<Camera>());
+                    cam.clearFlags = sky.skybox != null ? CameraClearFlags.Skybox : CameraClearFlags.SolidColor;
+                    cam.backgroundColor = sky.flat;
+                    var data = cam.GetUniversalAdditionalCameraData();
+                    data.renderPostProcessing = true;
+                    eyeGo.transform.position = eye;
+                    eyeGo.transform.rotation = Quaternion.Euler(pitch, yaw, 0f);
+
+                    volGo = new GameObject("CheckDivePeopleVolume");
+                    volGo.hideFlags = HideFlags.HideAndDontSave;
+                    hold = new VolumeProfileHolder(volGo, entry, strain);
+
+                    var shot = CheckDiveSky.Grab(cam, 960, 540);
+                    CheckDiveSky.Save(shot, path);
+                    Object.DestroyImmediate(shot);
+                    return string.Format("記憶 {0}: {1} を {2:F2} m 先に、目 {3:F2} m・向き {4:F0}°・俯き {5:F0}°、色味 {6}、ぼやけ {7} {8:F1}（疲れ {9:F1}） → {10}",
+                        which, target, Vector3.Distance(eye, aim), entry.eyeHeight, yaw, pitch,
+                        ColorUtility.ToHtmlStringRGB(entry.tint), entry.blur, entry.blurAmount, strain, path);
+                }
+            }
+            finally
+            {
+                if (hold != null) hold.Dispose();
+                if (volGo != null) Object.DestroyImmediate(volGo);
+                if (eyeGo != null) Object.DestroyImmediate(eyeGo);
+                foreach (var kv in kept) if (kv.Key != null) kv.Key.localPosition = kv.Value;
+            }
+        }
+
+        /// <summary>
+        /// 撮るあいだだけ置く Volume。記憶の色味とぼやけを、場面の Volume より高い優先度で掛ける。
+        /// profile も override も一時の物で、Dispose で捨てる（場面の DiveVolume.asset には触らない）
+        /// </summary>
+        sealed class VolumeProfileHolder : System.IDisposable
+        {
+            readonly UnityEngine.Rendering.VolumeProfile profile;
+
+            public VolumeProfileHolder(GameObject go, DiveEntry entry, float strain)
+            {
+                profile = ScriptableObject.CreateInstance<UnityEngine.Rendering.VolumeProfile>();
+                profile.hideFlags = HideFlags.HideAndDontSave;
+                var tone = profile.Add<UnityEngine.Rendering.Universal.ColorAdjustments>(false);
+                tone.hideFlags = HideFlags.HideAndDontSave;
+                tone.colorFilter.Override(entry.tint);
+                var blur = profile.Add<UnityEngine.Rendering.Universal.DepthOfField>(false);
+                blur.hideFlags = HideFlags.HideAndDontSave;
+                // HostBody.Blurred と同じ式
+                var force = Mathf.Clamp01(entry.blurAmount) * strain;
+                if (entry.blur == Blur.Sharp || force <= 1e-3f) blur.active = false;
+                else
+                {
+                    var start = entry.blur == Blur.Near ? HostBody.NearStart : HostBody.FarStart;
+                    var end = entry.blur == Blur.Near ? HostBody.NearEnd : HostBody.FarEnd;
+                    blur.mode.Override(UnityEngine.Rendering.Universal.DepthOfFieldMode.Gaussian);
+                    blur.gaussianStart.Override(Mathf.Lerp(24f, start, strain));
+                    blur.gaussianEnd.Override(Mathf.Lerp(24f + (end - start), end, strain));
+                    blur.gaussianMaxRadius.Override(force * 1.5f);
+                }
+                var volume = go.AddComponent<UnityEngine.Rendering.Volume>();
+                volume.isGlobal = true;
+                volume.priority = 100f;
+                volume.weight = 1f;
+                volume.sharedProfile = profile;
+            }
+
+            public void Dispose()
+            {
+                foreach (var c in profile.components) if (c != null) Object.DestroyImmediate(c);
+                Object.DestroyImmediate(profile);
+            }
+        }
+
+        /// <summary>人の体の皮の広がり（世界）。持ち物は除く</summary>
+        static Bounds BodyBox(Transform who)
+        {
+            var box = new Bounds();
+            var first = true;
+            var tmp = new Mesh();
+            try
+            {
+                foreach (var smr in who.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+                {
+                    if (smr.sharedMesh == null || !smr.gameObject.activeInHierarchy) continue;
+                    smr.BakeMesh(tmp, true);
+                    var at = smr.transform.localToWorldMatrix;
+                    foreach (var v in tmp.vertices)
+                    {
+                        var p = at.MultiplyPoint3x4(v);
+                        if (first) { box = new Bounds(p, Vector3.zero); first = false; }
+                        else box.Encapsulate(p);
+                    }
+                }
+            }
+            finally
+            {
+                Object.DestroyImmediate(tmp);
+            }
+            return box;
         }
 
         // ---- 道具 ---------------------------------------------------------------------------

@@ -8,7 +8,8 @@ namespace HalfAware.EditorTools.Rocketbox
     ///
     /// 名前・年・出身・背・背の丸みは <see cref="DiveCast"/> の十六人から引く（<see cref="Id"/> で結ぶ）。ここで持つのは次の所だけ:
     /// - 当てる模型（設計メモ 3 節の案）
-    /// - 骨の縮尺。子どもは 10〜12 歳の模型に対する比、15・16 歳は大人の模型に対する比（<see cref="DiveCast.ProportionOf"/> の 10 代）
+    /// - 骨の縮尺。メイとソフィア（6・7 歳）は 10〜12 歳の模型に対する比、15・16 歳は大人の模型に対する比（<see cref="DiveCast.ProportionOf"/> の 10 代）。
+    ///   ルーカス（11）は子どもの模型のまま
     /// - 塗り替え。年寄りの白髪・灰髪、メイとソフィアの髪、メイの上の服（<see cref="RocketboxMemoryPaint"/>）。服と肌の色は元のまま
     /// - 手首の差込口。18 以上の大人で手首が出る人だけ（エミリーとプリヤ）
     ///
@@ -56,11 +57,9 @@ namespace HalfAware.EditorTools.Rocketbox
 
         // ---- 骨の縮尺 --------------------------------------------------------------
 
-        /// <summary>
-        /// 3 歳（ルーカス）を 10〜12 歳の模型から作る比。今の <see cref="DiveCast.ProportionOf"/> の幼児（大人の模型に対して頭 1.42・腕 0.80・脚 0.72）を、
-        /// 子どもの模型に対する比へ読み替えた値（設計メモ 3 節）
-        /// </summary>
-        public static readonly DiveCast.Proportion ToddlerOnChild = new DiveCast.Proportion { head = 1.15f, arm = 0.88f, leg = 0.80f };
+        // ルーカス（11）は 10〜12 歳の模型（男子 01）を縮めずにそのまま使う（設計メモ 9 節の 8）。
+        // 3 歳として縮めていた頃の比（頭 1.15・腕 0.88・脚 0.80）では、7〜8 歳にしか見えなかった
+
         /// <summary>6〜7 歳（メイ・ソフィア）を 10〜12 歳の模型から作る比（設計メモ 3 節）</summary>
         public static readonly DiveCast.Proportion ChildOnChild = new DiveCast.Proportion { head = 1.08f, arm = 0.94f, leg = 0.90f };
         /// <summary>15・16 歳を大人の模型から作る比。今の 10 代の頭（1.03）のまま</summary>
@@ -131,7 +130,7 @@ namespace HalfAware.EditorTools.Rocketbox
             Who("Lee", "Business_Male_02"),
             new RocketboxMemory("Giorgio", RocketboxMob.DiveModel("Male_Adult_03")) { Hair = WhiteGrey },
             new RocketboxMemory("Rosa", RocketboxMob.DiveModel("Female_Adult_02")) { Hair = SaltPepper, HairLowest = 0.30f },
-            new RocketboxMemory("Lucas", RocketboxMob.DiveModel("Male_Child_01")) { Proportion = ToddlerOnChild },
+            Who("Lucas", "Male_Child_01"),
             new RocketboxMemory("Priya", RocketboxMob.DiveModel("Female_Party_02")) { Port = true },
             new RocketboxMemory("Daniel", RocketboxMob.DiveModel("Male_Adult_06")) { Proportion = TeenOnAdult },
             new RocketboxMemory("Aisha", RocketboxMob.DiveModel("Business_Female_01")) { Proportion = TeenOnAdult },

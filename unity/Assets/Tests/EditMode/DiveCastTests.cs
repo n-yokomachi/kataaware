@@ -114,8 +114,9 @@ namespace HalfAware.Tests
             }
         }
 
-        // 設計書 6 節の年齢から区分を取る。ジョルジョ 66・エレナ 63・アルベルト 78・ローザ 72 は年寄り
-        [TestCase("Lucas", AgeBand.Toddler)]
+        // 設計書 6 節の年齢から区分を取る。ジョルジョ 66・エレナ 63・アルベルト 78・ローザ 72 は年寄り。
+        // ルーカスは 11 歳（3 歳から上げた。設計メモ 9 節の 8）なので子ども。幼児は一人もいない
+        [TestCase("Lucas", AgeBand.Child)]
         [TestCase("Mei", AgeBand.Child)]
         [TestCase("Sofia", AgeBand.Child)]
         [TestCase("Daniel", AgeBand.Teen)]
@@ -136,7 +137,7 @@ namespace HalfAware.Tests
             Assert.That(Of(id).Band, Is.EqualTo(band));
         }
 
-        // 子どもは頭を大きく手足を短く、三歳はさらに寸詰まり。十代は細め、年寄りは背を丸める
+        // 子どもは頭を大きく手足を短く、幼児はさらに寸詰まり。十代は細め、年寄りは背を丸める
         [Test]
         public void BuildFollowsAge()
         {
@@ -156,8 +157,8 @@ namespace HalfAware.Tests
             {
                 switch (p.Band)
                 {
-                    case AgeBand.Toddler: Assert.That(p.height, Is.InRange(0.85f, 1.05f), p.id); break;
-                    case AgeBand.Child: Assert.That(p.height, Is.InRange(1.05f, 1.35f), p.id); break;
+                    case AgeBand.Toddler: Assert.Fail(p.id + " が幼児になっている。十六人に幼児はいない"); break;
+                    case AgeBand.Child: Assert.That(p.height, Is.InRange(1.05f, 1.45f), p.id); break;
                     case AgeBand.Teen:
                         Assert.That(p.height, Is.InRange(1.50f, 1.85f), p.id);
                         Assert.That(p.girth, Is.LessThan(1f), p.id + " は十代なので細め");
@@ -168,8 +169,9 @@ namespace HalfAware.Tests
                 else Assert.That(p.curl, Is.EqualTo(0f), p.id + " は背を丸めない");
                 Assert.That(p.girth, Is.InRange(0.85f, 1.15f), p.id);
             }
-            Assert.That(Of("Lucas").height, Is.LessThan(Of("Mei").height));
+            // 公園の兄妹は兄（ルーカス 11）の方が背が高い
             Assert.That(Of("Mei").height, Is.LessThan(Of("Sofia").height));
+            Assert.That(Of("Sofia").height, Is.LessThan(Of("Lucas").height));
         }
 
         // 倫敦の網に繋がった人々は世界に散っている。肌と髪の色もそれに合わせて散らす

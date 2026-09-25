@@ -283,6 +283,21 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
+        /// <see cref="Move"/> の線の終わりから、もう一本続けて動かす（駆け出して戻ってくる人）。
+        /// 秒は一本目と同じ時計で数える。同じ人に Mover を二つ付けると後の方が先の方を上書きするので、一つにまとめる
+        /// </summary>
+        static void Then(Transform who, Vector3 to, float at, float span)
+        {
+            var mover = who != null ? who.GetComponent<Mover>() : null;
+            if (mover == null) return;
+            var so = new SerializedObject(mover);
+            so.FindProperty("next").vector3Value = to;
+            so.FindProperty("nextAt").floatValue = at;
+            so.FindProperty("nextSpan").floatValue = span;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>
         /// 鳩の群れ。足元から一斉に飛び立つので、端は滑らかに繋がない。
         /// 場所ではなく記憶の側に置くのは、飛び立つ秒が記憶ごとに違うため
         /// </summary>
@@ -591,13 +606,22 @@ namespace HalfAware.EditorTools
         // ---- 9. 女 72『ローザ』 公園の門。30 秒 -----------------------------------
 
         /// <summary>
-        /// 手を引いていた幼い孫が鳩を追って駆け出す。呼び戻して手を取り直し、門を出る。
+        /// 隣を歩いていた孫息子（11 のルーカス）が鳩を追って池のほうへ駆け出す。名前を呼ぶと戻ってきて、餌の袋を持たせる。門を出る。
         /// 夫は門の柱に手を置いて振り返っているが、午後の日を背にしているので影になる
         /// </summary>
         static HostKey[] Rosa(Transform take)
         {
-            var tot = Cast(take, "Toddler", new Vector3(0.55f, 0f, 6.0f), 215f, 0);
-            Move(tot, new Vector3(0.55f, 0f, 6.0f), new Vector3(-1.5f, 0f, 4.6f), 6f, 6f, true);
+            // **孫息子は一度駆け出して、呼ばれて戻ってくる。** 手を引いていた幼い孫（3 歳）の頃は、
+            // 池のほうへ走ったきり戻ってこず、手を取り直す所で誰もいなかった。
+            // 隣（ローザの左、門へ向かう向きの西）から池の手前の鳩の群れへ駆け、
+            // 呼ばれて（11 秒の台詞のあと）歩いて戻り、ローザの前の西寄りで止まる。
+            // 止まったらローザの方を向く（袋を受け取る相手をしている）
+            var home = new Vector3(0.15f, 0f, 6.15f);
+            var pond = new Vector3(-1.5f, 0f, 4.75f);
+            var back = new Vector3(0.0f, 0f, 6.2f);
+            var boy = Cast(take, "Grandson", back, 73f, 0);
+            Move(boy, home, pond, 6.8f, 1.4f, true);
+            Then(boy, back, 15.5f, 3.0f);
             Cast(take, "Husband", new Vector3(-0.9f, 0f, 8.7f), 340f, 3);
             var girl = Cast(take, "Granddaughter", new Vector3(0.15f, 0f, 8.05f), 350f, 0);
             Move(girl, new Vector3(-0.9f, 0f, 6.6f), new Vector3(0.15f, 0f, 8.05f), 20f, 7f, true);
@@ -606,35 +630,37 @@ namespace HalfAware.EditorTools
             {
                 K(0f,  0.6f,  0f, 6.4f, 327f,   6f, 1.50f),  // 前から夫の声
                 K(4f,  0.6f,  0f, 6.3f, 327f,  10f, 1.48f),  // 膝が痛くて視界が揺れる
-                K(8f,  0.7f,  0f, 6.2f, 230f,  26f, 1.50f),  // 孫が鳩を追って駆け出す
-                K(12f, 0.7f,  0f, 6.2f, 234f,  22f, 1.50f),  // 名前を呼ぶ
-                K(17f, 0.7f,  0f, 6.3f, 240f,  26f, 1.50f),  // 戻ってくる
-                K(21f, 0.65f, 0f, 6.4f, 270f,  34f, 1.50f),  // 手を取り直す
+                K(8f,  0.7f,  0f, 6.2f, 230f,  12f, 1.50f),  // 隣を歩いていた孫が鳩を追って駆け出す
+                K(12f, 0.7f,  0f, 6.2f, 234f,   8f, 1.50f),  // 名前を呼ぶ
+                K(17f, 0.7f,  0f, 6.3f, 240f,  10f, 1.50f),  // 戻ってくる
+                K(21f, 0.65f, 0f, 6.4f, 255f,  30f, 1.50f),  // 餌の袋を持たせる
                 K(25f, 0.6f,  0f, 7.0f, 322f,   6f, 1.50f),  // 孫娘が夫の腕を取り直す
                 K(30f, 0.45f, 0f, 8.4f, 352f,   4f, 1.50f),  // 門を出る
             };
         }
 
-        // ---- 10. 男 3『ルーカス』 同じ公園。25 秒 ---------------------------------
+        // ---- 10. 男 11『ルーカス』 同じ公園。25 秒 ---------------------------------
 
         /// <summary>
-        /// 鳩を追いかけていたところを祖母に呼ばれる。目が低いので地面が近く、鳩が大きい
+        /// 鳩を追いかけて池の縁まで来ていたところを祖母に呼ばれる。祖母は門のほうに立って、こちらを向いて呼んでいる。
+        /// 戻って餌の袋を渡され、撒くと鳩がまた寄ってくる。目は 11 歳の高さ（1.32 m）で、祖母とはほぼ目が合う
         /// </summary>
         static HostKey[] Lucas(Transform take)
         {
-            Cast(take, "Grandmother", new Vector3(0.95f, 0f, 6.3f), 100f, 0);
+            // 祖母は呼んでいる相手（池の縁のルーカスと、袋を渡しに戻ってくる所）の方を向く
+            Cast(take, "Grandmother", new Vector3(0.95f, 0f, 6.3f), 240f, 0);
             Cast(take, "Grandfather", new Vector3(-0.4f, 0f, 8.6f), 355f, 3);
             Doves(take, new Vector3(-1.5f, 0.09f, 4.5f), 2f);
             return new[]
             {
-                K(0f,  -1.2f, 0f, 4.8f, 250f,  38f, 0.90f),  // 鳩を追いかけている。地面が近い
-                K(3f,  -1.4f, 0f, 4.6f, 240f,  34f, 0.90f),
-                K(6f,  -1.3f, 0f, 4.7f,  55f, -16f, 0.90f),  // 振り向くと祖母は大きい
-                K(11f, -0.4f, 0f, 5.4f,  52f, -18f, 0.90f),  // 戻る
-                K(15f,  0.55f, 0f, 6.1f,  40f, -34f, 0.90f), // 手を取られる
-                K(19f,  0.5f, 0f, 6.3f, 350f, -12f, 0.90f),  // 門の前に祖父と姉
-                K(22f,  0.5f, 0f, 6.3f, 330f,  26f, 0.90f),  // 鳩がまた足元に寄ってくる
-                K(25f,  0.5f, 0f, 6.2f, 300f,  40f, 0.90f),
+                K(0f,  -1.6f, 0f, 4.7f, 250f,  34f, 1.32f),  // 鳩を追って池の縁まで来ていた
+                K(3f,  -1.7f, 0f, 4.6f, 240f,  30f, 1.32f),
+                K(6f,  -1.6f, 0f, 4.7f,  58f,  -3f, 1.32f),  // 振り向くと、祖母が門のほうで呼んでいる
+                K(11f, -0.6f, 0f, 5.4f,  56f,   0f, 1.32f),  // 戻る
+                K(15f,  0.3f, 0f, 5.95f, 62f,  30f, 1.32f),  // 餌の袋を渡される
+                K(19f,  0.3f, 0f, 5.95f, 345f, -5f, 1.32f),  // 門の前に祖父と妹
+                K(22f,  0.3f, 0f, 5.95f, 300f, 40f, 1.32f),  // 袋から撒くと、鳩がまた足元に寄ってくる
+                K(25f,  0.25f, 0f, 5.9f, 290f, 50f, 1.32f),
             };
         }
 

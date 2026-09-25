@@ -5,6 +5,10 @@ namespace HalfAware
     /// <summary>
     /// 記憶の中で人や鳩を一直線に動かす。
     ///
+    /// **線は二本まで。** 一本目の終わり（<see cref="To"/>）から二本目の先（<see cref="Next"/>）へ続けて動ける。
+    /// 駆け出して戻ってくる人（記憶 9 の孫息子）のため。二本目の秒（<see cref="NextSpan"/>）が 0 なら一本だけ。
+    /// 同じ人に Mover を二つ付けると、後から置いた方が先の方の位置を毎フレーム上書きするので、一つにまとめる。
+    ///
     /// **自分の時計を持たない。** 記憶の再生位置は DiveDirector が握っていて、
     /// 同じ人へ戻れば頭から流し直すので、ここが Update で数えると主の体とずれる。
     /// 経過秒は外から渡してもらう。
@@ -27,11 +31,26 @@ namespace HalfAware
         [SerializeField] bool ground = true;
         [Tooltip("何行目の台詞が出たら動き出すか。-1 なら記憶の時計で動く")]
         [SerializeField] int cue = -1;
+        [Tooltip("二本目の線の先。一本目の終わり（to）からここへ。Take からのローカル")]
+        [SerializeField] Vector3 next;
+        [Tooltip("二本目の線を動き出す秒。一本目と同じ時計で数える")]
+        [SerializeField] float nextAt;
+        [Tooltip("二本目の線を動いているあいだの秒。0 なら二本目は無い")]
+        [SerializeField] float nextSpan;
 
         public Vector3 From { get { return from; } }
         public Vector3 To { get { return to; } }
         public float At { get { return at; } }
         public float Span { get { return span; } }
+        public Vector3 Next { get { return next; } }
+        public float NextAt { get { return nextAt; } }
+        public float NextSpan { get { return nextSpan; } }
+        /// <summary>二本目があるか</summary>
+        public bool Returns { get { return nextSpan > 0f; } }
+        /// <summary>動き終わる所。二本目があればその先</summary>
+        public Vector3 End { get { return Returns ? next : to; } }
+        /// <summary>動き終わる秒</summary>
+        public float Until { get { return Returns ? Mathf.Max(at + span, nextAt + nextSpan) : at + span; } }
 
         /// <summary>
         /// 動き出す合図。これだけの行数が出たら動き始める。-1 なら記憶の時計で動く。
@@ -78,12 +97,18 @@ namespace HalfAware
         /// <summary>そこから下へ探す長さ。これより下に何も無ければ、線のままにしておく</summary>
         const float Drop = 4f;
 
-        /// <summary>t 秒の位置。始まる前は開始位置、終わった後は終了位置</summary>
+        /// <summary>t 秒の位置。始まる前は開始位置、終わった後は終了位置（二本目があればその先）</summary>
         public Vector3 Where(float t)
         {
-            if (span <= 0f) return t < at ? from : to;
-            var k = Mathf.Clamp01((t - at) / span);
-            return Vector3.Lerp(from, to, ease ? Mathf.SmoothStep(0f, 1f, k) : k);
+            if (Returns && t >= nextAt) return Leg(to, next, t, nextAt, nextSpan);
+            return Leg(from, to, t, at, span);
+        }
+
+        Vector3 Leg(Vector3 a, Vector3 b, float t, float start, float length)
+        {
+            if (length <= 0f) return t < start ? a : b;
+            var k = Mathf.Clamp01((t - start) / length);
+            return Vector3.Lerp(a, b, ease ? Mathf.SmoothStep(0f, 1f, k) : k);
         }
     }
 }

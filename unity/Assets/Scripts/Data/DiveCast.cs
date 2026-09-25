@@ -112,7 +112,8 @@ namespace HalfAware
         /// <summary>
         /// 年齢の区分ごとの骨の縮尺。模型（大人）に対する比で、背はあとから全体の縮尺で合わせる。
         ///
-        /// 子どもは頭を大きく、手と脚を短く。三歳はさらに寸詰まり。
+        /// 子どもは頭を大きく、手と脚を短く。幼児（4 歳以下）はさらに寸詰まり。
+        /// いまの十六人に幼児はいない（ルーカスを 3 歳から 11 歳に上げた）。
         /// 大人を縮めただけでは、頭と背の比も脚と背の比も大人のままになる
         /// </summary>
         public struct Proportion
@@ -267,7 +268,7 @@ namespace HalfAware
                     .Put(Part.Top, Rgb(0x8C2F39)).Put(Part.Bottom, Rgb(0x232A3D))
                     .Put(Part.Shoe, Rgb(0x1C1A1A)).Put(Part.Legwear, Rgb(0x2A2A2E)).Done(),
 
-                // 公園の一家。コロンビアから来た祖父母と孫二人。
+                // 公園の一家。コロンビアから来た祖父母と孫二人（兄のルーカス 11 と妹のソフィア 7）。
                 // 祖父は鳥打帽と編んだベスト（M_Worker の安全帽と反射ベストを塗り替える）
                 Who("Albert", "アルベルト", 2, 78, false, "コロンビア", "M_Worker", 1.80f, 0.94f, 20f,
                     Rgb(0xA87A59), Rgb(0xD9D6CF))
@@ -312,7 +313,9 @@ namespace HalfAware
                     Rgb(0xB38561), Rgb(0xA8A4A0))
                     .Put(Part.Top, Rgb(0x2E6E73)).Put(Part.Bottom, Rgb(0x2E6E73)).Put(Part.TopTrim, Rgb(0xC9A45C))
                     .Put(Part.Legwear, Rgb(0x3A3236)).Put(Part.Shoe, Rgb(0x1A1818)).Done(),
-                Who("Lucas", "ルーカス", 10, 3, false, "コロンビア", "M_Hoodie", 0.98f, 1.04f, 0f,
+                // ルーカスは 11 歳。3 歳を 10〜12 歳の模型から縮めて作ると 7〜8 歳にしか見えなかったので、
+                // 年の方を模型（Rocketbox の男子 01、背 1.43 m）に合わせた（設計メモ 9 節の 8）
+                Who("Lucas", "ルーカス", 10, 11, false, "コロンビア", "M_Hoodie", 1.43f, 0.94f, 0f,
                     Rgb(0xC29470), Rgb(0x3A2616))
                     .Put(Part.Top, Rgb(0xD9632B)).Put(Part.Bottom, Rgb(0x2A3560))
                     .Put(Part.Legwear, Rgb(0x7A7F8A)).Put(Part.Shoe, Rgb(0x3F8C5A)).Put(Part.Sole, Rgb(0xE8E8E0)).Done(),
