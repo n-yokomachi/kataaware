@@ -19,13 +19,13 @@ namespace HalfAware.EditorTools
     /// ここで決めるのは次のとおり。どれも人ごとに一度だけ測り、同じ人には同じ値を使う。
     /// - 背: プレハブの縮尺のまま（<see cref="BuildDiveCast"/> が一覧の背に合わせてある）。ここでは測り直さない
     /// - 骨の縮尺と背の丸み: <see cref="RocketboxMemory.Proportion"/> と <see cref="DiveCast"/> の curl を、動きを置くたびに掛け直す。
-    ///   **掛けるのは一度だけ。** Quaternius の頃の年齢の比（<see cref="DiveCast.ProportionOf"/>）と太さ（girth）は、Rocketbox の模型の上では使わない
+    ///   **掛けるのは一度だけ。** 区分ごとの年齢の比（<see cref="DiveCast.ProportionOf"/>）は、Rocketbox の模型の上へ直には掛けない
     /// - 立ち方: 場面 2 の姿勢（<see cref="BuildAlleyCrowd.Apply"/> の Rest・Crossed・SitChair）と、手を後ろで組む形（<see cref="HandsBehind"/>）・
     ///   机に肘をつく形（<see cref="LeanOnDesk"/>）を写しの上で作り、その骨の向きを模型の根から見た向きとして据える
     /// - 床: 靴の裏が床に来る高さ
     /// - 歩幅: 歩きの動きを置いて、着いている足が後ろへ流れる速さを測る
     ///
-    /// 色は人ごとのテクスチャのマテリアル（プレハブのまま）。Quaternius の頃の一枚の <c>Person.mat</c> と部位ごとの色（<see cref="PersonTint"/>）は、場面 4 では使わない
+    /// 色は人ごとのテクスチャのマテリアル（プレハブのまま）
     /// </summary>
     public static partial class BuildDive
     {
