@@ -28,7 +28,8 @@ namespace HalfAware.EditorTools.Rocketbox
     ///   鎖骨が 47 度持ち上がって肩の付け根が 8 cm 上がり、肩が盛り上がって見えた
     /// - 立ちの腕と脚は、Quaternius の立ちを写さず、Rocketbox の骨の上で直立の形を決める（<see cref="Job.CalibrateStand"/>）。
     ///   Quaternius の立ちは腕が体の前に来て肘が曲がっており、骨ごとの直しを重ねても直立に見えなかった。元の立ちからは腕の揺れだけを残す
-    /// - 歩きの腕は、上腕・前腕・手を肩の付け根まわりに一緒に回して、振りの真ん中が体の横に来るようにする（振りの幅は変わらない）
+    /// - 歩きの腕は、上腕・前腕・手を肩の付け根まわりに一緒に回して、振りの真ん中が体の横に来るようにする（振りの幅は変わらない）。
+    ///   そのうえで、前への振りだけを縮める（<see cref="WalkArmFrontScale"/>）。後ろへの振りはそのまま
     /// </summary>
     public static class RocketboxRetarget
     {
@@ -86,6 +87,19 @@ namespace HalfAware.EditorTools.Rocketbox
         public const float HipsOverAnkles = 0.015f;
         /// <summary>歩き: 腕の振りの真ん中で、上腕が体の横から外へ開く角度と、真下から前へ出る角度（度）</summary>
         public const float WalkArmOpen = 5f, WalkArmForward = 0f;
+        /// <summary>
+        /// 歩き: 腕の前への振りを縮める割合。上腕が真下より前へ出る角（横から見て）を、この割合に縮める。後ろへの振りは縮めない。
+        /// 元の歩きは前へ 34°・後ろへ 29° 振り、前では肘も 37° ほど曲がるので、前腕が真下から 63° 前まで上がって、
+        /// 手が腰の高さで体の前 40 cm ほどまで出ていた（一人称で見下ろすと、手が画面の真ん中近くまで振れて見えた）。
+        /// 0.5 で、上腕の前は 34° から 19°、前腕は真下から 63° から 50° になり、手首のいちばん前は 9 cm 手前に下がる（後ろは 29° のまま）。
+        /// 上腕・前腕・手を肩の付け根まわりに一緒に回すので、肘と手首の曲げは変わらない。
+        /// 鎖骨は回さないので肩も上がらない
+        /// </summary>
+        public const float WalkArmFrontScale = 0.5f;
+        /// <summary>
+        /// 歩き: 前への振りを縮め始める幅（度）。真下からこの角までは縮め方をなだらかに強め、腕の振りの速さが真下で折れないようにする
+        /// </summary>
+        public const float WalkArmFrontEase = 10f;
         /// <summary>
         /// 立ち・歩き: 鎖骨を束ねた姿勢の向き（体の外へ 13〜14 度下がる）から、さらに肩の先を下げる角度（度）。なで肩に見せる。
         /// 胸の骨に付いて動く（胸の向きの中で回す）。10° で鎖骨は 13.4° から 23.4° 下がり、肩の関節の幅は 34.4 から 33.3 cm、高さは 1.6 cm 下がる。
@@ -212,6 +226,8 @@ namespace HalfAware.EditorTools.Rocketbox
             readonly Dictionary<Transform, Quaternion> srcIdle0 = new Dictionary<Transform, Quaternion>();
             /// <summary>立ちの形を使う動き（立ち）</summary>
             AnimationClip standClip;
+            /// <summary>腕の前への振りを縮める動き（歩き。<see cref="CalibrateArms"/> で決める）</summary>
+            AnimationClip armClip;
 
             /// <summary>
             /// 立ちの形を決める。元の立ちを写すと、膝が曲がって腰が引け、顎が上がり、腕が体の前に来ていたので、元の立ちの形は使わず、
@@ -475,6 +491,7 @@ namespace HalfAware.EditorTools.Rocketbox
                     else if (armFix.TryGetValue(j.Name, out c)) r = c * r;
                     j.Dst.rotation = r;
                 }
+                if (clip == armClip) SquashFront();
                 // 腰の前後左右: 腿の付け根の中点を、脚の長さの比で縮めた Quaternius の中点へ
                 var dstPelvis = D("Bip01 Pelvis");
                 var srcMid = Mid(S("UpperLeg.L"), S("UpperLeg.R")) - src.transform.position;
@@ -494,6 +511,7 @@ namespace HalfAware.EditorTools.Rocketbox
             /// </summary>
             public string CalibrateArms(AnimationClip walk)
             {
+                armClip = walk;
                 var mean = new Dictionary<string, Vector3>();
                 var steps = 24;
                 for (var k = 0; k < steps; k++)
@@ -520,8 +538,27 @@ namespace HalfAware.EditorTools.Rocketbox
                     foreach (var bone in new[] { "UpperArm.", "LowerArm.", "Hand." }) armFix[bone + side] = fix;
                     sb.AppendFormat(CultureInfo.InvariantCulture, "{0} 開き {1:0}°→{2:0}°、前後 {3:0}°→{4:0}°（{5:0.0}° 回す）/ ", side, open, WalkArmOpen, fwd, WalkArmForward, Quaternion.Angle(Quaternion.identity, fix));
                 }
+                sb.AppendFormat(CultureInfo.InvariantCulture, "前への振りは {0:0.00} 倍（真下から {1:0}° までなだらかに）", WalkArmFrontScale, WalkArmFrontEase);
                 ResetSource();
                 return sb.ToString();
+            }
+
+            /// <summary>
+            /// 歩きの腕の前への振りを縮める（<see cref="WalkArmFrontScale"/>）。横から見て上腕が真下より前へ出た角だけを縮め、後ろへの振りには触らない。
+            /// 上腕を肩の付け根まわりに体の左右の軸で回し、前腕と手は子なので一緒に付いてくる（肘と手首の曲げは変わらない）。鎖骨は回さない
+            /// </summary>
+            void SquashFront()
+            {
+                foreach (var side in new[] { "L", "R" })
+                {
+                    var up = D("Bip01 " + side + " UpperArm");
+                    var d = D("Bip01 " + side + " Forearm").position - up.position;
+                    var fwd = Mathf.Atan2(d.z, -d.y) * Mathf.Rad2Deg;
+                    var want = FrontSquash(fwd, WalkArmFrontScale, WalkArmFrontEase);
+                    if (Mathf.Abs(want - fwd) < 1e-4f) continue;
+                    // x まわりの正の回しで、下向きの腕は後ろへ回る
+                    up.rotation = Quaternion.AngleAxis(fwd - want, Vector3.right) * up.rotation;
+                }
             }
 
             public Job()
@@ -802,6 +839,18 @@ namespace HalfAware.EditorTools.Rocketbox
                 if (src != null) Object.DestroyImmediate(src);
                 if (dst != null) Object.DestroyImmediate(dst);
             }
+        }
+
+        /// <summary>
+        /// 真下からの前後の角 angle（度。前が正）の、前の側だけを scale の割合に縮める。後ろ（0 以下）はそのまま。
+        /// 0〜ease 度では縮め方をなだらかに強める（角の変わる速さが 0 度で折れない）
+        /// </summary>
+        public static float FrontSquash(float angle, float scale, float ease)
+        {
+            if (angle <= 0f) return angle;
+            if (ease <= 0f) return angle * scale;
+            if (angle <= ease) return angle - (1f - scale) * angle * angle / (2f * ease);
+            return ease * (1f + scale) * 0.5f + scale * (angle - ease);
         }
 
         /// <summary>
