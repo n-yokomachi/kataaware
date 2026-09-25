@@ -66,17 +66,45 @@ namespace HalfAware.EditorTools.Rocketbox
         /// <summary>立ち: 肘の曲げ（度。前腕が上腕の延長から前へ出る角度）</summary>
         public const float StandElbow = 8f;
         /// <summary>
-        /// 立ち・歩き: 指の曲げ（Humanoid の指の Stretched の筋肉の値。人差し指・中指・薬指・小指の順）。
+        /// 立ち: 指の曲げ（Humanoid の指の Stretched の筋肉の値。人差し指・中指・薬指・小指の順。三つの関節に同じ値）。歩きは <see cref="WalkFingerStretch"/>。
         /// Humanoid の指の筋肉は 0 でも一つの関節で 35° ほど曲がっていて、-0.35 では 52° ずつ曲がって握りこぶしに見えた。
         /// 0.3 で一つの関節 20° ほど。小指ほど少し深く曲げる
         /// </summary>
         public static readonly float[] FingerStretch = { 0.30f, 0.25f, 0.20f, 0.15f };
-        /// <summary>立ち・歩き: 親指の曲げ（Stretched）。正では親指が前へ突き出るので、負にして人差し指の横へ下ろす</summary>
+        /// <summary>立ち: 親指の曲げ（Stretched）。正では親指が前へ突き出るので、負にして人差し指の横へ下ろす</summary>
         public const float FingerStretchThumb = -0.4f;
-        /// <summary>立ち・歩き: 人差し指から小指の開き（Humanoid の指の Spread の筋肉の値）。0 では指の間が空いて見えたので少し寄せる</summary>
+        /// <summary>立ち: 人差し指から小指の開き（Humanoid の指の Spread の筋肉の値）。0 では指の間が空いて見えたので少し寄せる</summary>
         public const float FingerSpread = -0.4f;
-        /// <summary>立ち・歩き: 親指の開き（Spread）</summary>
+        /// <summary>立ち: 親指の開き（Spread）</summary>
         public const float ThumbSpread = 0f;
+        /// <summary>
+        /// 歩き: 指の曲げ（Humanoid の指の Stretched の筋肉の値）。人差し指・中指・薬指・小指ごとに、付け根・第二関節・第一関節の順。
+        /// 立ちの値（三つの関節を同じ 20° ほど）のままだと、一人称で手の甲の側から見たとき、指先まで同じに曲がった鉤爪の形に見えた。
+        /// 付け根と第二関節で軽く曲げ（0.15 で付け根 26°・第二関節 30° ほど）、第一関節はほぼ伸ばす（0.5 で 14° ほど）。
+        /// 小指の付け根は薬指より 0.8 cm 手のひらの側にあり、同じだけ曲げると中節が薬指の下へずれて隙間が空くので、小指だけ浅く曲げる。
+        /// 値の 1 あたりの角は、付け根 50°・第二関節と第一関節 45°（この体で測った）
+        /// </summary>
+        public static readonly float[][] WalkFingerStretch =
+        {
+            new[] { 0.18f, 0.18f, 0.5f },
+            new[] { 0.15f, 0.15f, 0.5f },
+            new[] { 0.12f, 0.12f, 0.5f },
+            new[] { 0.30f, 0.30f, 0.5f },
+        };
+        /// <summary>
+        /// 歩き: 人差し指から小指の開き（Spread）。隣どうしを寄せ、中節から先が隣と触れるくらいにする（人差し指・中指・薬指・小指の順）。
+        /// この体では Spread が -0.4 で四本の基節が平行になる。Rocketbox の指は付け根の間が 2 cm ほどあって先ほど細いので、
+        /// 平行のままだと先へ行くほど隙間が開き（中節で 1 cm ほど）、一本ずつ離れて見えた。
+        /// 人差し指と中指は小指の側へ、薬指と小指は人差し指の側へ向けて寄せる（薬指は 1 あたり 7.5° しか回らないので -1 を越えて使う）。
+        /// 手の骨から見た基節の横の向きは、人差し指 -8°・中指 -2°・薬指 +6°・小指 +11° になり、中節での隣との隙間は 0.2〜0.4 cm になる
+        /// </summary>
+        public static readonly float[] WalkFingerSpread = { -0.8f, -0.8f, -1.3f, -1.0f };
+        /// <summary>
+        /// 歩き: 親指の曲げ（Stretched。付け根・中の関節・先の関節の順）と開き（Spread）。親指を人差し指の脇へ軽く添える
+        /// （親指の先の腹が、人差し指の基節の横に 2 mm ほどの隙間で並ぶ）
+        /// </summary>
+        public static readonly float[] WalkThumbStretch = { -0.9f, -0.6f, -0.2f };
+        public const float WalkThumbSpread = 0.7f;
         /// <summary>立ち: 膝の曲げ（度。0 でまっすぐ）</summary>
         public const float StandKnee = 2f;
         /// <summary>立ち: 顔の向き。眉間から下唇への線が真下から前へ出る角度（度）。Rocketbox の束ねた姿勢は 8.8° で、顎が上がって見えた</summary>
@@ -724,15 +752,11 @@ namespace HalfAware.EditorTools.Rocketbox
                         Pose(clip, t);
                         lowFoot = Mathf.Min(lowFoot, Mathf.Min(D("Bip01 L Toe0").position.y, D("Bip01 R Toe0").position.y) - dst.transform.position.y);
                         handler.GetHumanPose(ref pose);
-                        // 指は軽く曲げた力の抜けた形（Quaternius の指は写していない）
+                        // 指は軽く曲げた力の抜けた形（Quaternius の指は写していない）。どのこまも同じ値なので、形はこまごとに変わらない
                         for (var m = 0; m < pose.muscles.Length; m++)
                         {
-                            var mn = HumanTrait.MuscleName[m];
-                            var finger = (mn.StartsWith("Left", StringComparison.Ordinal) || mn.StartsWith("Right", StringComparison.Ordinal)) && (mn.Contains("Thumb") || mn.Contains("Index") || mn.Contains("Middle") || mn.Contains("Ring") || mn.Contains("Little"));
-                            if (!finger) continue;
-                            if (mn.EndsWith("Stretched", StringComparison.Ordinal))
-                                pose.muscles[m] = mn.Contains("Thumb") ? FingerStretchThumb : FingerStretch[mn.Contains("Index") ? 0 : mn.Contains("Middle") ? 1 : mn.Contains("Ring") ? 2 : 3];
-                            else if (mn.EndsWith("Spread", StringComparison.Ordinal)) pose.muscles[m] = mn.Contains("Thumb") ? ThumbSpread : FingerSpread;
+                            float value;
+                            if (FingerMuscle(HumanTrait.MuscleName[m], clip == armClip, out value)) pose.muscles[m] = value;
                         }
                         muscles.Add((float[])pose.muscles.Clone());
                         bodyP.Add(pose.bodyPosition);
@@ -839,6 +863,31 @@ namespace HalfAware.EditorTools.Rocketbox
                 if (src != null) Object.DestroyImmediate(src);
                 if (dst != null) Object.DestroyImmediate(dst);
             }
+        }
+
+        /// <summary>
+        /// 指の筋肉 muscle（HumanTrait の名前）に当てる値。指の筋肉でなければ false。
+        /// 歩き（walking）は <see cref="WalkFingerStretch"/> などの歩きの形、ほかは立ちの形（<see cref="FingerStretch"/> など）
+        /// </summary>
+        public static bool FingerMuscle(string muscle, bool walking, out float value)
+        {
+            value = 0f;
+            if (!muscle.StartsWith("Left ", StringComparison.Ordinal) && !muscle.StartsWith("Right ", StringComparison.Ordinal)) return false;
+            var names = new[] { "Index", "Middle", "Ring", "Little" };
+            var thumb = muscle.Contains(" Thumb ");
+            var finger = -1;
+            for (var i = 0; i < names.Length; i++)
+                if (muscle.Contains(" " + names[i] + " ")) finger = i;
+            if (!thumb && finger < 0) return false;
+            var spread = muscle.EndsWith("Spread", StringComparison.Ordinal);
+            if (!spread && !muscle.EndsWith("Stretched", StringComparison.Ordinal)) return false;
+            // 関節の番号（1 が付け根）。"Left Index 2 Stretched" の 2
+            var joint = muscle.Contains(" 1 ") ? 0 : muscle.Contains(" 2 ") ? 1 : 2;
+            if (walking)
+                value = thumb ? (spread ? WalkThumbSpread : WalkThumbStretch[joint]) : (spread ? WalkFingerSpread[finger] : WalkFingerStretch[finger][joint]);
+            else
+                value = thumb ? (spread ? ThumbSpread : FingerStretchThumb) : (spread ? FingerSpread : FingerStretch[finger]);
+            return true;
         }
 
         /// <summary>
