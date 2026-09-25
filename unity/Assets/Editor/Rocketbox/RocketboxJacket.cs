@@ -22,8 +22,8 @@ namespace HalfAware.EditorTools.Rocketbox
     public static class RocketboxJacket
     {
         // ---- 形の値（m、比） ----
-        /// <summary>裾の高さ（腰の骨から上へ）。腰骨の上あたり</summary>
-        public const float HemAbovePelvis = 0.045f;
+        /// <summary>裾の高さ（腰の骨から上へ）。腰骨にかかる丈</summary>
+        public const float HemAbovePelvis = 0.02f;
         /// <summary>首まわりの切り口: 首の骨（首の付け根）から下への下がり（前・横・後ろ）</summary>
         public const float NeckDropFront = 0.045f, NeckDropSide = 0.010f, NeckDropBack = -0.010f;
         /// <summary>首まわりの切り口: 首の骨の軸から横へ、首の太さと向きごとのゆとり（前・横・後ろ）より外は覆う</summary>
@@ -74,17 +74,21 @@ namespace HalfAware.EditorTools.Rocketbox
         public static float FallFrontEnd = 70f;
 
         // ---- 前の開き（前は開けた形。オーナーの決め） ----
-        // 位置はどれも、前から見た（左右の外へ、上へ）の首の骨からの距離（m）。左右で映す（本人の右と左で折れ目の高さだけ違う）
-        /// <summary>首元の、襟返しの折り目の上の端（左右とも）</summary>
-        public static Vector2 FoldTop = new Vector2(0.040f, -0.035f);
-        /// <summary>襟返しの折り目の下の端（折れ目。ここから下が身頃の前の縁）。本人の右と左</summary>
-        public static Vector2 BreakRight = new Vector2(0.062f, -0.190f), BreakLeft = new Vector2(0.066f, -0.175f);
-        /// <summary>裾での前の縁の左右の外への距離。本人の右と左</summary>
-        public static float HemEdgeRight = 0.055f, HemEdgeLeft = 0.072f;
-        /// <summary>襟返し: 折れ目から外へ上がった先の角、角から上の縁を戻った所、刻み（ノッチ）の奥</summary>
-        public static Vector2 LapelCorner = new Vector2(0.130f, -0.102f), LapelTop = new Vector2(0.121f, -0.084f), Notch = new Vector2(0.098f, -0.070f);
-        /// <summary>襟の前の端: 刻みの奥から外へ上がった襟の先、襟の外の縁の肩の方、首の横</summary>
-        public static Vector2 CollarPoint = new Vector2(0.137f, -0.047f), CollarOuter = new Vector2(0.120f, 0.005f), CollarNeck = new Vector2(0.075f, 0.035f);
+        // ダブルのライダース: 本人の左の身頃が広く、右の方へ深く重なる。前を開けると、開きは本人の右寄りになる。
+        // 位置はどれも、前から見た首の骨からの（左右、上）の距離（m）。左右は本人の右が正
+        /// <summary>首元の、襟返しの折り目の上の端（本人の右と左）</summary>
+        public static Vector2 FoldTopRight = new Vector2(0.040f, -0.035f), FoldTopLeft = new Vector2(-0.040f, -0.035f);
+        /// <summary>襟返しの折り目の下の端（折れ目。ここから下が身頃の前の縁）。本人の左は体の真ん中を越えて右へ出る</summary>
+        public static Vector2 BreakRight = new Vector2(0.075f, -0.215f), BreakLeft = new Vector2(0.020f, -0.225f);
+        /// <summary>裾での前の縁の左右（本人の右の身頃と、本人の左の身頃）。本人の左の縁は裾から折れ目へ斜めに上がり、そこに斜めのジッパーが走る</summary>
+        public static float HemEdgeRight = 0.105f, HemEdgeLeft = -0.040f;
+        /// <summary>
+        /// 襟返し（本人の右。本人の左は左右を映す）: 折れ目から外へ上がった先の角（胸の高さ、肩の近くまで張り出す）、
+        /// 角から上の縁を戻った所、刻み（ノッチ）の奥
+        /// </summary>
+        public static Vector2 LapelCorner = new Vector2(0.118f, -0.140f), LapelTop = new Vector2(0.112f, -0.113f), Notch = new Vector2(0.085f, -0.085f);
+        /// <summary>襟の前の端（本人の右。左は映す）: 刻みの奥から外へ上がった襟の先、襟の外の縁の肩の方、首の横</summary>
+        public static Vector2 CollarPoint = new Vector2(0.125f, -0.065f), CollarOuter = new Vector2(0.112f, -0.005f), CollarNeck = new Vector2(0.075f, 0.035f);
 
         // ---- UV の置き場（テクスチャの中の四角） ----
         static readonly Rect TorsoUv = new Rect(0f, 0f, 1f, 0.5f);
@@ -107,8 +111,8 @@ namespace HalfAware.EditorTools.Rocketbox
         public static float EdgeTapeWidth = 0.008f, EdgeTeethWidth = 0.0034f, EdgeTeethIn = 0.0022f, EdgeTapeIn = 0.0045f;
         /// <summary>袖口のジッパーの長さと、袖の腕の軸のまわりの向き（外へ、後ろへ）</summary>
         public static float CuffZipLength = 0.09f, CuffZipBack = 0.6f;
-        /// <summary>胸のポケットのジッパー（本人の右の胸の斜め）: 前から見た上の端 (x, y) と下の端 (z, w)、首の骨から</summary>
-        public static Vector4 ChestZip = new Vector4(0.138f, -0.128f, 0.102f, -0.212f);
+        /// <summary>胸のポケットのジッパー（広い方の身頃、本人の左の胸の斜め）: 前から見た上の端 (x, y) と下の端 (z, w)、首の骨から（本人の右が正）</summary>
+        public static Vector4 ChestZip = new Vector4(-0.125f, -0.180f, -0.085f, -0.255f);
         /// <summary>腰の横のポケットのジッパー（左右）: 前から見た左右の外（上の端）、裾からの下の端と上の端、下の端の左右の外</summary>
         public static Vector4 SideZip = new Vector4(0.128f, 0.060f, 0.165f, 0.121f);
         /// <summary>スナップの半径と高さ</summary>
@@ -1165,29 +1169,52 @@ namespace HalfAware.EditorTools.Rocketbox
             var hem = r.HemY - r.Neck.y - 0.05f;
             return new[]
             {
-                new Vector2(HemEdgeRight, hem), new Vector2(BreakRight.x, BreakRight.y), new Vector2(FoldTop.x, FoldTop.y), new Vector2(FoldTop.x, 0.08f),
-                new Vector2(-FoldTop.x, 0.08f), new Vector2(-FoldTop.x, FoldTop.y), new Vector2(-BreakLeft.x, BreakLeft.y), new Vector2(-HemEdgeLeft, hem),
+                new Vector2(HemEdgeRight, hem), BreakRight, FoldTopRight, new Vector2(FoldTopRight.x, 0.08f),
+                new Vector2(FoldTopLeft.x, 0.08f), FoldTopLeft, BreakLeft, new Vector2(HemEdgeLeft, hem),
             };
+        }
+
+        /// <summary>前の縁（right なら本人の右の身頃）の、首の骨からの高さ y での左右の位置</summary>
+        static float EdgeX(Rig r, bool right, float y)
+        {
+            var hem = r.HemY - r.Neck.y - 0.05f;
+            var hx = right ? HemEdgeRight : HemEdgeLeft;
+            var b = right ? BreakRight : BreakLeft;
+            return Mathf.LerpUnclamped(hx, b.x, (y - hem) / (b.y - hem));
+        }
+
+        static Vector2 Mirror(Vector2 v, bool right)
+        {
+            return right ? v : new Vector2(-v.x, v.y);
         }
 
         /// <summary>前の開きの外（身頃を残す側）が正の値（m）。胴の前の半分だけを見る</summary>
         static float OpenG(Rig r, Slices s, Vector3 p)
         {
-            var c = s.CentreAt(p.y);
-            if (p.z < c.y) return 1f;
+            if (!FrontHalf(r, s, p)) return 1f;
             return -Inside(OpenPoly(r), new Vector2(p.x - r.Neck.x, p.y - r.Neck.y));
         }
 
-        /// <summary>襟の前の端（襟の先まで）の多角形（前から見た、首の骨からの左右の外・上）</summary>
-        static Vector2[] CollarFrontPoly()
+        /// <summary>
+        /// 胴の前の半分か。胴の断面の真ん中より前。ただし首の付け根のそばは断面の真ん中が前へ寄るので、首の骨より前を前とする
+        /// （断面の真ん中で分けると、首元の前の開きの上の角に身頃が切り残され、開きの中へ小さな板が出た）
+        /// </summary>
+        static bool FrontHalf(Rig r, Slices s, Vector3 p)
         {
-            return new[] { FoldTop, Notch, CollarPoint, CollarOuter, CollarNeck, new Vector2(FoldTop.x, CollarNeck.y) };
+            return p.z >= Mathf.Min(s.CentreAt(p.y).y, r.Neck.z);
         }
 
-        /// <summary>襟返しの多角形（前から見た、首の骨からの左右の外・上）。right は本人の右</summary>
+        /// <summary>襟の前の端（襟の先まで）の多角形（前から見た、首の骨からの左右・上。本人の右が正）。right は本人の右</summary>
+        static Vector2[] CollarFrontPoly(bool right)
+        {
+            var fold = right ? FoldTopRight : FoldTopLeft;
+            return new[] { fold, Mirror(Notch, right), Mirror(CollarPoint, right), Mirror(CollarOuter, right), Mirror(CollarNeck, right), new Vector2(fold.x, CollarNeck.y) };
+        }
+
+        /// <summary>襟返しの多角形（前から見た、首の骨からの左右・上。本人の右が正）。right は本人の右。本人の左の襟返しは体の真ん中を越える</summary>
         static Vector2[] LapelPoly(bool right)
         {
-            return new[] { FoldTop, right ? BreakRight : BreakLeft, LapelCorner, LapelTop, Notch };
+            return new[] { right ? FoldTopRight : FoldTopLeft, right ? BreakRight : BreakLeft, Mirror(LapelCorner, right), Mirror(LapelTop, right), Mirror(Notch, right) };
         }
 
         static Vector2 Centroid(Vector2[] poly)
@@ -1656,8 +1683,9 @@ namespace HalfAware.EditorTools.Rocketbox
             var front = -1f;
             if (p.z - nk.z > -0.005f)
             {
-                var q = new Vector2(Mathf.Abs(p.x - nk.x), p.y - nk.y);
-                front = Mathf.Max(Inside(CollarFrontPoly(), q), Inside(LapelPoly(p.x > nk.x), q));
+                var q = new Vector2(p.x - nk.x, p.y - nk.y);
+                front = Mathf.Max(Mathf.Max(Inside(CollarFrontPoly(true), q), Inside(CollarFrontPoly(false), q)),
+                    Mathf.Max(Inside(LapelPoly(true), q), Inside(LapelPoly(false), q)));
             }
             return Mathf.Max(band, front);
         }
@@ -1677,7 +1705,7 @@ namespace HalfAware.EditorTools.Rocketbox
             var turn = 0f;
             for (var i = 0; i < neck.Count; i++) turn += Mathf.DeltaAngle(angle(n.p[neck[i]]) * Mathf.Rad2Deg, angle(n.p[neck[(i + 1) % neck.Count]]) * Mathf.Rad2Deg);
             if (turn < 0f) neck.Reverse();
-            Func<Vector3, bool> inOpening = p => p.z > nk.z && Mathf.Abs(p.x - nk.x) < FoldTop.x;
+            Func<Vector3, bool> inOpening = p => p.z > nk.z && p.x - nk.x > FoldTopLeft.x && p.x - nk.x < FoldTopRight.x;
 
             var ringPts = new List<Vector3>();
             foreach (var i in neck) ringPts.Add(n.p[i]);
@@ -1936,6 +1964,8 @@ namespace HalfAware.EditorTools.Rocketbox
                 Vector3 q, fn;
                 int k;
                 s.Closest(p, reach, out q, out fn, out k);
+                // 届かなければ広げて探し直す（骨の重みの無い金具が面から離れて浮かないように）
+                if (k < 0) s.Closest(p, 0.25f, out q, out fn, out k);
                 if (k < 0)
                 {
                     normal = Vector3.up;
@@ -1950,12 +1980,51 @@ namespace HalfAware.EditorTools.Rocketbox
                 return q;
             }
 
-            /// <summary>前から見た (x, y) の所の、前の面の点</summary>
-            public Vector3 Front(float x, float y, out Vector3 normal, out BoneWeight w)
+            /// <summary>
+            /// 前から見た (x, y) の所の、前の面の点（前から後ろへ飛ばした線が最初に当たる三角）。
+            /// 一番近い点で探すと、肩の前の点が胸の前の面に引かれて外れ、面から離れた所に金具が浮いた
+            /// </summary>
+            public Vector3 Front(float x, float y, out Vector3 normal, out BoneWeight w, int retry = 0)
             {
-                var q = Snap(new Vector3(x, y, 0.35f), 0.45f, out normal, out w);
-                for (var i = 0; i < 2; i++) q = Snap(new Vector3(x, y, q.z + 0.03f), 0.08f, out normal, out w);
-                return q;
+                var o = new Vector3(x, y, 1f);
+                var d = Vector3.back;
+                var best = float.MaxValue;
+                var hit = -1;
+                for (var k = 0; k < n.t.Count; k += 3)
+                {
+                    Vector3 a = n.p[n.t[k]], b = n.p[n.t[k + 1]], c = n.p[n.t[k + 2]];
+                    if (x < Mathf.Min(a.x, Mathf.Min(b.x, c.x)) || x > Mathf.Max(a.x, Mathf.Max(b.x, c.x))) continue;
+                    if (y < Mathf.Min(a.y, Mathf.Min(b.y, c.y)) || y > Mathf.Max(a.y, Mathf.Max(b.y, c.y))) continue;
+                    var e1 = b - a;
+                    var e2 = c - a;
+                    var pv = Vector3.Cross(d, e2);
+                    var det = Vector3.Dot(e1, pv);
+                    if (Mathf.Abs(det) < 1e-12f) continue;
+                    var inv = 1f / det;
+                    var tv = o - a;
+                    var u = Vector3.Dot(tv, pv) * inv;
+                    if (u < 0f || u > 1f) continue;
+                    var qv = Vector3.Cross(tv, e1);
+                    var v = Vector3.Dot(d, qv) * inv;
+                    if (v < 0f || u + v > 1f) continue;
+                    var dist = Vector3.Dot(e2, qv) * inv;
+                    if (dist <= 0f || dist >= best) continue;
+                    best = dist;
+                    hit = k;
+                }
+                if (hit < 0)
+                {
+                    // 脇の下のすき間などで当たらなければ、体の真ん中の方へ少しずつ寄せて飛ばし直す
+                    if (Mathf.Abs(x) > 0.01f && retry < 6) return Front(x - Mathf.Sign(x) * 0.005f, y, out normal, out w, retry + 1);
+                    return Snap(new Vector3(x, y, 0.35f), 0.45f, out normal, out w);
+                }
+                var at = o + d * best;
+                int ia = n.t[hit], ib = n.t[hit + 1], ic = n.t[hit + 2];
+                float wa, wb, wc;
+                Bary(at, n.p[ia], n.p[ib], n.p[ic], out wa, out wb, out wc);
+                normal = (nrm[ia] * wa + nrm[ib] * wb + nrm[ic] * wc).normalized;
+                w = Mix(Mix(n.w[ia], n.w[ib], wb / Mathf.Max(1e-6f, wa + wb)), n.w[ic], wc);
+                return at;
             }
         }
 
@@ -2121,7 +2190,7 @@ namespace HalfAware.EditorTools.Rocketbox
         }
 
         /// <summary>
-        /// 飾りを付ける: 前の縁のジッパー（左右の身頃の縁に片側ずつ。本人の右の裾の近くに引き手）、本人の右の胸の斜めのポケットのジッパー、
+        /// 飾りを付ける: 前の縁のジッパー（左右の身頃の縁に片側ずつ。本人の左は襟返しの下の縁へ続き、裾の近くに引き手）、本人の左の胸の斜めのポケットのジッパー、
         /// 腰の横のポケットのジッパー（左右）、肩章とスナップ、袖口のジッパー、襟の先と襟返しの角のスナップ。
         /// 裾のベルト（<see cref="Belt"/>）は付けない
         /// </summary>
@@ -2152,26 +2221,46 @@ namespace HalfAware.EditorTools.Rocketbox
             var hemRel = r.HemY - nk.y;
             foreach (var right in new[] { true, false })
             {
+                // 身頃の側: 本人の右の身頃は縁より右、本人の左の身頃は縁より左
                 var sign = right ? 1f : -1f;
-                var hx = right ? HemEdgeRight : HemEdgeLeft;
                 var b = right ? BreakRight : BreakLeft;
-                Func<float, float> edgeX = y => Mathf.LerpUnclamped(hx, b.x, (y - (hemRel - 0.05f)) / (b.y - (hemRel - 0.05f)));
                 var teeth = new List<Vector3>();
                 var tape = new List<Vector3>();
                 for (var i = 0; i <= 30; i++)
                 {
                     var y = Mathf.Lerp(hemRel + 0.003f, b.y - 0.003f, i / 30f);
-                    var x = edgeX(y);
-                    teeth.Add(sh.Front(nk.x + sign * (x + EdgeTeethIn), nk.y + y, out nrm, out w));
-                    tape.Add(sh.Front(nk.x + sign * (x + EdgeTapeIn), nk.y + y, out nrm, out w));
+                    var x = EdgeX(r, right, y);
+                    teeth.Add(sh.Front(nk.x + x + sign * EdgeTeethIn, nk.y + y, out nrm, out w));
+                    tape.Add(sh.Front(nk.x + x + sign * EdgeTapeIn, nk.y + y, out nrm, out w));
                 }
                 Strap(o, sh, tape, false, f => EdgeTapeWidth, 0.0007f, 0, PartTape, TapeBand.y, TapeBand.yMax, 1f);
                 Strap(o, sh, teeth, false, f => EdgeTeethWidth, 0.0016f, 3, PartMetal, 0f, 0.5f, 1f / TeethPitch, 0.0028f);
-                if (right) Puller(o, sh, teeth[4], (teeth[0] - teeth[4]).normalized, 0.0012f, 0.8f);
+                // 引き手は本人の左の身頃（斜めのジッパー）の裾の近く
+                if (!right) Puller(o, sh, teeth[4], (teeth[0] - teeth[4]).normalized, 0.0012f, 0.8f);
             }
-            parts.Add("前の縁のジッパー 2");
+            // 広い方の身頃（本人の左）の襟返しの下の縁: 前の縁のジッパーが折れ目から襟返しの角の方へ続く（折り返した縁に務歯が見える）。
+            // 襟返しの面は身頃から FallLift だけ浮いているので、その上に載せる
+            {
+                var b = BreakLeft;
+                var corner = Mirror(LapelCorner, false);
+                var along = (corner - b).normalized;
+                var inward = new Vector2(-along.y, along.x);
+                if (inward.y < 0f) inward = -inward;
+                var len = (corner - b).magnitude;
+                var teeth = new List<Vector3>();
+                var tape = new List<Vector3>();
+                for (var i = 0; i <= 20; i++)
+                {
+                    var q = b + along * Mathf.Lerp(0.010f, len - 0.024f, i / 20f);
+                    teeth.Add(sh.Front(nk.x + q.x + inward.x * EdgeTeethIn, nk.y + q.y + inward.y * EdgeTeethIn, out nrm, out w));
+                    tape.Add(sh.Front(nk.x + q.x + inward.x * EdgeTapeIn, nk.y + q.y + inward.y * EdgeTapeIn, out nrm, out w));
+                }
+                Strap(o, sh, tape, false, f => EdgeTapeWidth, FallLift + 0.0010f, 0, PartTape, TapeBand.y, TapeBand.yMax, 1f);
+                Strap(o, sh, teeth, false, f => EdgeTeethWidth, FallLift + 0.0019f, 3, PartMetal, 0f, 0.5f, 1f / TeethPitch, 0.0028f);
+            }
+            parts.Add("前の縁のジッパー 2（本人の左の身頃の縁が斜めで、襟返しの下の縁へ続く）");
 
-            // 胸のポケット（本人の右の胸、斜め）
+            // 胸のポケット（広い方の身頃、本人の左の胸、斜め）
             {
                 var a = new Vector2(ChestZip.x, ChestZip.y);
                 var b = new Vector2(ChestZip.z, ChestZip.w);
@@ -2236,15 +2325,16 @@ namespace HalfAware.EditorTools.Rocketbox
             parts.Add("袖口のジッパー 2");
 
             // スナップ: 襟の先と襟返しの角（左右）。角から多角形の真ん中へ少し入れた所
-            var collar = CollarFrontPoly();
             foreach (var right in new[] { true, false })
             {
-                var sign = right ? 1f : -1f;
-                var cp = CollarPoint + (Centroid(collar) - CollarPoint).normalized * 0.014f;
-                Stud(o, sh, sh.Front(nk.x + sign * cp.x, nk.y + cp.y, out nrm, out w), FallLift);
+                var collar = CollarFrontPoly(right);
+                var point = Mirror(CollarPoint, right);
+                var cp = point + (Centroid(collar) - point).normalized * 0.015f;
+                Stud(o, sh, sh.Front(nk.x + cp.x, nk.y + cp.y, out nrm, out w), FallLift);
                 var lapel = LapelPoly(right);
-                var lc = LapelCorner + (Centroid(lapel) - LapelCorner).normalized * 0.014f;
-                Stud(o, sh, sh.Front(nk.x + sign * lc.x, nk.y + lc.y, out nrm, out w), FallLift);
+                var corner = Mirror(LapelCorner, right);
+                var lc = corner + (Centroid(lapel) - corner).normalized * 0.015f;
+                Stud(o, sh, sh.Front(nk.x + lc.x, nk.y + lc.y, out nrm, out w), FallLift);
             }
             parts.Add("スナップ 6（肩章 2・襟の先 2・襟返しの角 2）");
             return "飾り: " + string.Join("、", parts.ToArray());
@@ -2377,10 +2467,11 @@ namespace HalfAware.EditorTools.Rocketbox
                 var cen = s.CentreAt(p.y);
                 var th = Mathf.Atan2(p.x - cen.x, p.z - cen.y);
                 var rad = new Vector2(p.x - cen.x, p.z - cen.y).magnitude;
-                // 脇の縫い目（縦）
+                // 脇の縫い目（縦。裾から脇の下まで。脇より上へ伸ばすと、肩の上で縫い目が崩れた線になった）
                 var ds = (Mathf.Abs(th) - SideSeam) * rad;
-                groove = Mathf.Max(groove, Line(ds, 0.0012f));
-                stitch = Mathf.Max(stitch, Line(ds - 0.004f, 0.0006f) * Dash(p.y));
+                var belowPit = RocketboxPaint.Smooth(r.ArmpitY + 0.01f, r.ArmpitY - 0.01f, p.y);
+                groove = Mathf.Max(groove, Line(ds, 0.0012f) * belowPit);
+                stitch = Mathf.Max(stitch, Line(ds - 0.004f, 0.0006f) * Dash(p.y) * belowPit);
                 // 背中の切り替え（横）
                 if (Mathf.Abs(th) > SideSeam)
                 {
@@ -2389,7 +2480,7 @@ namespace HalfAware.EditorTools.Rocketbox
                     stitch = Mathf.Max(stitch, Line(dy + 0.004f, 0.0006f) * Dash(th * rad));
                 }
                 // 前の縁の縫い目（身頃の側へ）
-                if (p.z > cen.y)
+                if (FrontHalf(r, s, p))
                 {
                     var de = -Inside(OpenPoly(r), new Vector2(p.x - r.Neck.x, p.y - r.Neck.y));
                     stitch = Mathf.Max(stitch, Line(de - 0.0085f, 0.0006f) * Dash(p.y));

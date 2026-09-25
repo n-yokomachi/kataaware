@@ -916,13 +916,15 @@ namespace HalfAware.EditorTools.Rocketbox
             m.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
             if (clip)
             {
-                // 髪の房とまつ毛は透けの絵で切り抜き、両面を描く
+                // 髪の房とまつ毛は透けのテクスチャで切り抜く。描くのは表の面だけ（両面にすると、URP Lit では裏の面が表の法線のまま照らされて、
+                // 髪の板の裏が灰色の塊に浮いた。表の面だけでも、下の頭の面の髪の殻で覆われて抜けは見えない）
                 m.SetFloat("_AlphaClip", 1f);
                 m.SetFloat("_Cutoff", 0.45f);
                 // URP が切り抜きのマテリアルに入れる値に揃える（描き直すたびに差分が出ないように）
                 m.SetFloat("_AlphaToMask", 1f);
                 m.EnableKeyword("_ALPHATEST_ON");
-                m.SetFloat("_Cull", (float)CullMode.Off);
+                m.SetFloat("_Cull", (float)CullMode.Back);
+                m.doubleSidedGI = false;
                 m.SetOverrideTag("RenderType", "TransparentCutout");
                 m.renderQueue = (int)RenderQueue.AlphaTest;
                 // 黒い髪の房は拡散の光がほとんど無いので、照り返しだけが灰色に浮く。髪は照り返しを切る
