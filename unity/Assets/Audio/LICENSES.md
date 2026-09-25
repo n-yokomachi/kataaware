@@ -41,6 +41,22 @@ https://pixabay.com/service/license-summary/
 | `Idle.wav` | Pixabay `freesound_community-car-keys-in-ignition-starting-stopping-engine-31102` | Pixabay Content License | 28 秒地点から 8.6 秒。モノラル 44.1kHz へ。頭 0.6 秒を尻へ被せて輪にした。8.00 秒。イグニッションのあと走り出すまでの間を埋める |
 | `WindowDown.wav` | Pixabay `freesound_community-car-window-down-103833` | Pixabay Content License | 1.85 秒地点から 4.45 秒、+20dB。モノラル 44.1kHz へ。素材は 8.94 秒あるが、窓が動いているのは 2〜6 秒だけ。素のままだと実効 −41.9dB で、持ち上げた走行の輪（−19dB）に埋もれて聞こえなかった |
 | `JacketOn.wav` | Pixabay `freesound_community-jacket-rustling-35100`（オーナーが 0.844〜5.596 秒で切り出したもの） | Pixabay Content License | モノラル 44.1kHz へ、頭 20ms と尻 50ms をなだらかにし、+11.8dB で頂点を −6dB に揃えた。4.78 秒。場面 1 で椅子の左の肘掛けのジャケットを着る音 |
+| `CrowdLoop.wav` | Pixabay `freesound_community-crowd_talking-6762` | Pixabay Content License | 7.0〜57.0 秒の 50 秒を切り出し（6.6 秒のいちばん大きな声と、86 秒からのフェードアウトを避けた）、モノラル 22.05kHz へ。末尾 2 秒を頭に重ねて輪にし、実効値を −22dBFS に揃えた。48.0 秒。場面 2 の通りとヤードの雑踏 |
+
+## 曲
+
+オーナーが Suno の Pro プランで生成した曲（`docs/superpowers/specs/2026-09-24-music-design.md` の 4 節）。
+許諾は Pro プランの商用利用の権利で、帰属の表示は求められていない。元の mp3 は repo に置かない。
+
+| ファイル | 元の曲 | 許諾 | 加工 |
+|---|---|---|---|
+| `Music/SlowCountry.ogg` | 「Slow Country」 | Suno の Pro プランで生成 | ヤードの出店の古いスピーカーから鳴る音にした。モノラルに畳み、200Hz より下と 5kHz より上を 24dB/oct で落とし、1.8kHz を +3dB。軽く圧縮して軽く歪ませ、ffmpeg で作ったインパルス応答（煉瓦の壁の初期反射 5 本と、0.7 秒ほどの残響）の響きを 15〜20% 足した。integrated −18 LUFS・true peak −1.5dBTP 以下に揃え、22.05kHz の Ogg Vorbis（q5）へ。長さは元のまま |
+| `Music/PeachLight.ogg` | 「Peach Light」 | 同上 | 同上 |
+| `Music/TheOnesWhoStayed.ogg` | 「The Ones Who Stayed」 | 同上 | 同上 |
+| `Music/CopperHeart.ogg` | 「Copper Heart」 | 同上 | 同上 |
+
+雑踏の輪と曲の加工は `tools/make-ambience.sh` で作り直せる。WebGL では Unity のオーディオのフィルターが効かないので、
+スピーカーらしさと響きはファイルに焼き込んである。
 
 切り出しの手順は ffmpeg で、`docs/` ではなくここに残す。素材そのものは repo に置かず、加工後の物だけを置いている。
 

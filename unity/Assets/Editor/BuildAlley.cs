@@ -82,6 +82,8 @@ namespace HalfAware.EditorTools
             Mirrors(Child(root, "Mirrors"));
             BakeMirrors(root);
             Rain();
+            Noise();
+            Radio(root);
             // 調べる対象は、看板と露店が立ってから
             BuildAlleyItems.Build(root);
             var temp = GameObject.Find("TempGround");
@@ -3674,6 +3676,196 @@ namespace HalfAware.EditorTools
             a.priority = 200;
             EditorUtility.SetDirty(a);
             return a;
+        }
+
+        // ---- 雑踏とラジオ --------------------------------------------------
+
+        /// <summary>小路の範囲。雑踏の音とラジオが、いる所を見分けるのに使う（<see cref="AlleySound"/>）</summary>
+        public static Bounds LaneArea()
+        {
+            return new Bounds(new Vector3((LaneWest - StreetHalf) * 0.5f, 2f, LaneZ),
+                new Vector3(-StreetHalf - LaneWest, 6f, LaneHalf * 2f));
+        }
+
+        /// <summary>ヤードの範囲。小路との境（LaneWest）はヤードに数える</summary>
+        public static Bounds YardArea()
+        {
+            return new Bounds(new Vector3((YardWest + LaneWest) * 0.5f, 2f, (YardSouth + YardNorth) * 0.5f),
+                new Vector3(LaneWest - YardWest, 6f, YardNorth - YardSouth));
+        }
+
+        /// <summary>
+        /// 雑踏の音。雨の音と同じく、プレイヤーの頭上で 2D の輪にして流す。大きさはいる所で <see cref="CrowdNoise"/> が変える。
+        /// 大きさの値はオーナーが耳で決めるので、組み直しても書き戻さない（インスペクターで変えた値が残る）。
+        /// 音のファイルがまだ無ければ、音の無いまま組んでおき、置いてから組み直せば繋がる
+        /// </summary>
+        static void Noise()
+        {
+            var player = GameObject.Find("Player");
+            if (player == null) return;
+            var t = player.transform.Find("CrowdSound");
+            var go = t != null ? t.gameObject : new GameObject("CrowdSound");
+            go.transform.SetParent(player.transform, false);
+            go.transform.localPosition = new Vector3(0f, 2.2f, 0f);
+            var a = go.GetComponent<AudioSource>();
+            if (a == null) a = go.AddComponent<AudioSource>();
+            var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(AlleyAudioImport.CrowdLoop);
+            if (clip == null) Debug.LogWarning("雑踏の音がまだ無い: " + AlleyAudioImport.CrowdLoop + "。置いてから組み直すと繋がる");
+            a.clip = clip;
+            a.loop = true;
+            a.playOnAwake = true;
+            a.spatialBlend = 0f;
+            a.priority = 200;
+
+            var noise = go.GetComponent<CrowdNoise>();
+            if (noise == null) noise = go.AddComponent<CrowdNoise>();
+            var so = new SerializedObject(noise);
+            so.FindProperty("player").objectReferenceValue = player.transform;
+            so.FindProperty("sound").objectReferenceValue = a;
+            so.FindProperty("lane").boundsValue = LaneArea();
+            so.FindProperty("yard").boundsValue = YardArea();
+            so.ApplyModifiedPropertiesWithoutUndo();
+            // 鳴り始めの一こまは、通りの大きさで鳴らす（場面は通りから始まる）
+            a.volume = so.FindProperty("streetVolume").floatValue;
+            EditorUtility.SetDirty(a);
+            EditorUtility.SetDirty(noise);
+        }
+
+        /// <summary>ラジオを置く出店は、自分の露店からこれより離す。買い手の台詞の邪魔をしない</summary>
+        const float RadioAway = 6f;
+
+        /// <summary>
+        /// ヤードの出店に置く古いラジオ。売り手のいる出店のうち、自分の露店から離れていて、ヤードの真ん中にいちばん近い店の、
+        /// 売り手の脇の木箱の上に、筋の方を向けて置く。曲はここからの 3D の音で流す（<see cref="StallRadio"/>）。
+        /// 群衆を立て終えてから置く（先に置くと、人を立てるときの当たりが変わる）
+        /// </summary>
+        static void Radio(Transform root)
+        {
+            var market = root.Find("Market");
+            var stools = root.Find("Crowd/Stools");
+            if (market == null || stools == null) { Debug.LogWarning("出店か売り手の腰掛けが無い。ラジオを置けない"); return; }
+            // 前に置いたラジオを落とす。ラジオだけを置き直しても二つにならないように
+            foreach (Transform s in market)
+            {
+                var old = s.Find("Radio");
+                if (old != null) Object.DestroyImmediate(old.gameObject);
+            }
+            var centre = YardArea().center;
+            var mine = new Vector2(MyStallX, MyStallZ);
+            Transform pick = null;
+            var best = float.MaxValue;
+            foreach (Transform s in market)
+            {
+                if (!s.name.StartsWith("Stall")) continue;
+                var at = new Vector2(s.position.x, s.position.z);
+                if ((at - mine).magnitude < RadioAway) continue;
+                // 売り手のいる店だけ。誰もいない店でラジオが鳴っていると置き忘れに見える
+                var tended = false;
+                foreach (Transform st in stools)
+                    if ((new Vector2(st.position.x, st.position.z) - at).magnitude < 1.6f) tended = true;
+                if (!tended) continue;
+                var d = (at - new Vector2(centre.x, centre.z)).magnitude;
+                if (d < best) { best = d; pick = s; }
+            }
+            if (pick == null) { Debug.LogWarning("ラジオを置く出店が無い"); return; }
+
+            // いちばん高い木箱の上。重なった木箱があれば、その天面の高い方に載せる
+            Transform crate = null;
+            foreach (Transform c in pick)
+                if (c.name.StartsWith("Crate") && (crate == null || c.localPosition.y + c.localScale.y * 0.5f > crate.localPosition.y + crate.localScale.y * 0.5f))
+                    crate = c;
+            if (crate == null) { Debug.LogWarning("ラジオを載せる木箱が無い: " + pick.name); return; }
+            var top = 0f;
+            foreach (Transform c in pick)
+            {
+                if (!c.name.StartsWith("Crate")) continue;
+                var gap = new Vector2(c.localPosition.x - crate.localPosition.x, c.localPosition.z - crate.localPosition.z);
+                if (gap.magnitude < (c.localScale.x + crate.localScale.x) * 0.5f)
+                    top = Mathf.Max(top, c.localPosition.y + c.localScale.y * 0.5f);
+            }
+
+            var go = new GameObject("Radio");
+            go.transform.SetParent(pick, false);
+            go.transform.localPosition = new Vector3(crate.localPosition.x, top, crate.localPosition.z);
+            // 模型の正面は +z。出店の正面（-z、筋の側）へ向け、店の真ん中へ少し振る
+            go.transform.localRotation = Quaternion.Euler(0f, 180f + Mathf.Sign(crate.localPosition.x) * 14f, 0f);
+            RadioBody(go.transform);
+
+            var a = go.AddComponent<AudioSource>();
+            a.playOnAwake = false;
+            a.loop = false;
+            a.spatialBlend = 1f;
+            // 線形で減らす。対数だとヤードの奥で聞こえなくなる
+            a.rolloffMode = AudioRolloffMode.Linear;
+            a.minDistance = 2.5f;
+            a.maxDistance = 26f;
+            a.dopplerLevel = 0f;
+            a.volume = 0f;
+            a.priority = 96;
+
+            var tracks = new List<AudioClip>();
+            foreach (var path in AlleyAudioImport.Tracks)
+            {
+                var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(path);
+                if (clip == null) { Debug.LogWarning("曲がまだ無い: " + path + "。置いてから組み直すと繋がる"); continue; }
+                tracks.Add(clip);
+            }
+            var radio = go.AddComponent<StallRadio>();
+            var so = new SerializedObject(radio);
+            so.FindProperty("sound").objectReferenceValue = a;
+            var list = so.FindProperty("tracks");
+            list.arraySize = tracks.Count;
+            for (var i = 0; i < tracks.Count; i++) list.GetArrayElementAtIndex(i).objectReferenceValue = tracks[i];
+            var player = GameObject.Find("Player");
+            so.FindProperty("player").objectReferenceValue = player != null ? player.transform : null;
+            so.FindProperty("flow").objectReferenceValue = Object.FindFirstObjectByType<SceneFlow>();
+            so.FindProperty("lane").boundsValue = LaneArea();
+            so.FindProperty("yard").boundsValue = YardArea();
+            so.ApplyModifiedPropertiesWithoutUndo();
+            Debug.Log("ラジオを置いた: " + pick.name + " " + go.transform.position.ToString("F2") + "、曲 " + tracks.Count + " 曲");
+        }
+
+        /// <summary>
+        /// ラジオの形。ベークライトの箱に、布を張ったスピーカーと桟、灯る目盛りの窓、つまみ二つ、持ち手、斜めに伸ばしたアンテナ。
+        /// 箱を組むだけの粗い形にして、PS1 の見え方に揃える。原点は底の真ん中で、正面は +z
+        /// </summary>
+        static void RadioBody(Transform t)
+        {
+            var shell = Tinted("RadioShell", new Color(0.30f, 0.13f, 0.08f));
+            var cloth = Tinted("RadioCloth", new Color(0.13f, 0.11f, 0.09f), "GoodCloth");
+            var trim = Tinted("RadioTrim", new Color(0.52f, 0.43f, 0.26f));
+            var dark = Tinted("RadioKnob", new Color(0.07f, 0.06f, 0.06f));
+            RadioPart(t, "Case", new Vector3(0f, 0.110f, 0f), new Vector3(0.36f, 0.20f, 0.14f), shell);
+            RadioPart(t, "Cap", new Vector3(0f, 0.215f, 0f), new Vector3(0.33f, 0.02f, 0.125f), shell);
+            RadioPart(t, "Grille", new Vector3(-0.065f, 0.110f, 0.071f), new Vector3(0.19f, 0.15f, 0.01f), cloth);
+            for (var i = 0; i < 4; i++)
+                RadioPart(t, "Slat" + i, new Vector3(-0.065f, 0.060f + i * 0.033f, 0.077f), new Vector3(0.19f, 0.010f, 0.006f), trim);
+            // 目盛りの窓は灯っている。暗いヤードで、鳴っているのはこれだと分かる
+            RadioPart(t, "Dial", new Vector3(0.105f, 0.150f, 0.072f), new Vector3(0.10f, 0.045f, 0.008f), GlowMat(new Color(1.00f, 0.70f, 0.34f), 1.4f));
+            RadioPart(t, "Needle", new Vector3(0.095f, 0.150f, 0.077f), new Vector3(0.005f, 0.040f, 0.004f), dark);
+            RadioPart(t, "KnobL", new Vector3(0.070f, 0.068f, 0.080f), new Vector3(0.036f, 0.036f, 0.020f), dark);
+            RadioPart(t, "KnobR", new Vector3(0.135f, 0.068f, 0.080f), new Vector3(0.036f, 0.036f, 0.020f), dark);
+            RadioPart(t, "HandleL", new Vector3(-0.125f, 0.240f, 0f), new Vector3(0.016f, 0.032f, 0.016f), trim);
+            RadioPart(t, "HandleR", new Vector3(0.125f, 0.240f, 0f), new Vector3(0.016f, 0.032f, 0.016f), trim);
+            RadioPart(t, "Handle", new Vector3(0f, 0.260f, 0f), new Vector3(0.27f, 0.014f, 0.022f), trim);
+            var mast = new GameObject("Antenna").transform;
+            mast.SetParent(t, false);
+            mast.localPosition = new Vector3(0.150f, 0.225f, -0.045f);
+            mast.localRotation = Quaternion.Euler(-22f, 0f, -18f);
+            RadioPart(mast, "Rod", new Vector3(0f, 0.19f, 0f), new Vector3(0.006f, 0.38f, 0.006f), trim);
+        }
+
+        /// <summary>ラジオの部品ひとつ。小さいので当たりは付けない</summary>
+        static void RadioPart(Transform parent, string name, Vector3 centre, Vector3 size, Material mat)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            go.name = name;
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = centre;
+            go.transform.localScale = size;
+            go.GetComponent<MeshRenderer>().sharedMaterial = mat;
+            go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            Object.DestroyImmediate(go.GetComponent<Collider>());
         }
 
         /// <summary>雨粒のマテリアル。煙と同じ柔らかい絵を、細く引き伸ばして筋にする</summary>
