@@ -83,7 +83,7 @@ Beach・Farmer はこの街に合わないので入れていない。
 - 出どころ: https://github.com/microsoft/Microsoft-Rocketbox の `Assets/Avatars/Adults/` の下の人ごとのフォルダ
   - 2026-09-23 に落とした: `Female_Adult_14`、`Female_Adult_08`、`Female_Adult_03`、`Female_Adult_02`、`Female_Adult_11`、`Female_Party_02`
   - 2026-09-24 に落とした: `Sports_Female_02`、`Female_Adult_10`、`Female_Party_01`
-  - 2026-09-25 に落とした（場面 2 のモブの試し、未取り込み）: `Female_Adult_04`、`Male_Adult_04`、`Male_Adult_17`、`Female_Adult_01`、`Male_Adult_20`、`Male_Adult_03`。FBX と色のテクスチャ（頭・体・透け。男大 17 と男大 20 は透けが無い）が `unity/RawAssets/rocketbox/` にあるだけで、`Assets` にもリポジトリにも入れていない（`docs/superpowers/specs/2026-09-25-alley-mob-design.md` の 6 節）
+  - 2026-09-25 に落とした（場面 2 のモブの色の試し）: `Female_Adult_04`、`Male_Adult_04`、`Male_Adult_17`、`Female_Adult_01`、`Male_Adult_20`、`Male_Adult_03`。FBX と色のテクスチャ（頭・体・透け。男大 17 と男大 20 は透けが無い）。同じ日に取り込んだ（下の「場面 2 のモブ（色の試し）」）
 - ライセンス: MIT License（同じリポジトリの `LICENSE.md`）。配るものには下の著作権の表示とライセンスの文を添える（`docs/release/THIRD_PARTY_NOTICES.txt` に入れてある）
 
 ```
@@ -147,6 +147,23 @@ SOFTWARE.
 | `FaceSports02_Hair08_Body14/` | スポーツ 02 の顔と女大 08 の髪を女大 14 の体に |
 | `FaceSports02_Hair14/` | スポーツ 02 の顔に女大 14 の髪をかつらとして合わせ、体は女大 14 |
 | `Head08_Body14/` | 女大 08 の頭を女大 14 の体に |
+
+### 場面 2 のモブ（色の試し）
+
+路地裏の通りの人と売り手を Rocketbox に替える前の、色の試しの 6 人（`docs/superpowers/specs/2026-09-25-alley-mob-design.md`）。
+人の定義は `Assets/Editor/Rocketbox/RocketboxMob.cs`、置き方は `Assets/Editor/BuildAlleyMobTrial.cs`（メニューの HalfAware/Alley mob trial/）。
+主人公と違い、顔や体には手を入れない。肌に描くインプラント・暗くした色・焼いた姿勢の形は組み立てのたびに `Assets/Models/generated/alley/MobTrial/` へ作り直す（リポジトリに入れない）
+
+| 人 | 置き場 | 使い道 |
+|---|---|---|
+| 女大 04 | `Female_Adult_04/` | 通りの人 |
+| 男大 04 | `Male_Adult_04/` | 通りの人 |
+| 男大 17 | `Male_Adult_17/` | 通りの人（透けのテクスチャが無い） |
+| 女大 01 | `Female_Adult_01/` | 通りの人 |
+| 男大 20 | `Male_Adult_20/` | 通りの人（透けのテクスチャが無い） |
+| 男大 03 | `Male_Adult_03/` | ヤードの売り手 |
+
+どの人も FBX は手を加えずに写し、頭・体・透けのテクスチャ（2048 の TGA）は 512 の PNG に縮めた写しを置いた。男大 03 の透けのテクスチャだけ元が 2048×1024 で、512×256 に縮めた
 
 ### 元のファイルとリポジトリに入れた物
 

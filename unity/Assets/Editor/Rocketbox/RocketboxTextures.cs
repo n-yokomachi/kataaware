@@ -40,10 +40,13 @@ namespace HalfAware.EditorTools.Rocketbox
                 int w, h;
                 bool alpha;
                 var px = ReadTga(src, out w, out h, out alpha);
-                var small = Downsample(px, w, h, size, alpha);
+                // 幅を size に縮める。高さも同じ比で（男大 03 の透けのテクスチャは 2048×1024）
+                if (w % size != 0) throw new ArgumentException("幅が size で割り切れない: " + src);
+                var f = w / size;
+                var small = DownsampleBy(px, w, h, f, alpha);
                 var path = RocketboxImport.Root + who + "/" + n + ".png";
-                WritePng(small, size, size, path, alpha);
-                sb.AppendFormat("{0}: {1}×{2}{3} → {4}（{5}）\n", n, w, h, alpha ? " α" : "", size, path);
+                WritePng(small, w / f, h / f, path, alpha);
+                sb.AppendFormat("{0}: {1}×{2}{3} → {4}×{5}（{6}）\n", n, w, h, alpha ? " α" : "", w / f, h / f, path);
             }
             return sb.ToString();
         }
@@ -121,12 +124,19 @@ namespace HalfAware.EditorTools.Rocketbox
         public static Color32[] Downsample(Color32[] px, int w, int h, int size, bool alpha)
         {
             if (w != h || w % size != 0) throw new ArgumentException("正方形で、size で割り切れる大きさだけ縮められる");
-            var f = w / size;
+            return DownsampleBy(px, w, h, w / size, alpha);
+        }
+
+        /// <summary>テクスチャを縦横とも 1/f に縮める（幅と高さは f で割り切れること）。線形の光で平均し、α があれば α で重みを付ける</summary>
+        public static Color32[] DownsampleBy(Color32[] px, int w, int h, int f, bool alpha)
+        {
+            if (w % f != 0 || h % f != 0) throw new ArgumentException("幅と高さが f で割り切れる大きさだけ縮められる");
+            int ow = w / f, oh = h / f;
             var lin = new float[256];
             for (var i = 0; i < 256; i++) lin[i] = Mathf.GammaToLinearSpace(i / 255f);
-            var o = new Color32[size * size];
-            for (var y = 0; y < size; y++)
-                for (var x = 0; x < size; x++)
+            var o = new Color32[ow * oh];
+            for (var y = 0; y < oh; y++)
+                for (var x = 0; x < ow; x++)
                 {
                     double r = 0, g = 0, bl = 0, a = 0, pr = 0, pg = 0, pb = 0;
                     for (var dy = 0; dy < f; dy++)
@@ -146,7 +156,7 @@ namespace HalfAware.EditorTools.Rocketbox
                     {
                         r /= n; g /= n; bl /= n;
                     }
-                    o[y * size + x] = new Color32(ToByte(r), ToByte(g), ToByte(bl), alpha ? (byte)Mathf.RoundToInt((float)(a / n) * 255f) : (byte)255);
+                    o[y * ow + x] = new Color32(ToByte(r), ToByte(g), ToByte(bl), alpha ? (byte)Mathf.RoundToInt((float)(a / n) * 255f) : (byte)255);
                 }
             return o;
         }
