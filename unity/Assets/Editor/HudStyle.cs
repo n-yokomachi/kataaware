@@ -16,9 +16,10 @@ namespace HalfAware.EditorTools
     /// - 送れる時だけ右下に「E　送る ▼」
     /// - Tab の字のログ（LogPanel）は外す。ログは TAB のコンソール（<see cref="ImplantConsole"/>）が持つ
     ///
-    /// **寸法は粗い画面（<see cref="UiLens"/>、既定で画面の 1/2）の 1 画素 = Dot で決める。**
+    /// **寸法は粗さ 1/2 のときの粗い画面（<see cref="UiLens"/>）の 1 画素 = Dot で決めた。**
     /// 字はいちばん小さいものでも 11 Dot（粗い画面の中で縦 10 画素ほど）。印（E　調べる）と
     /// 場面 4 の右上の行も同じ粗い画面で描くので、同じ下限まで上げる。
+    /// 粗さを 0.6 に上げた今も、字幕の字の大きさ（キャンバスの単位）は変えていない（粗い画面の中では一回り大きい）
     /// 中央の文字（冒頭のカード・「続く」）は粗くしないので触らない。
     ///
     /// 場面の組み立て（<see cref="BuildDrive.Screen"/>・BuildDive の Screen）が Hud を作った後にこれを通す。
@@ -38,16 +39,16 @@ namespace HalfAware.EditorTools
         const float CaptionFont = 11f * Dot;
 
         /// <summary>地の上の縁から名前の行まで</summary>
-        const float Top = 8f * Dot;
+        const float Top = 10f * Dot;
         const float NameHeight = 14f * Dot;
-        const float NameGap = 1f * Dot;
+        const float NameGap = 3f * Dot;
         /// <summary>台詞 1 行の高さ。12 Dot の字の素の行送り（1.45 em）</summary>
         const float Row = 17.5f * Dot;
-        const float Bottom = 6f * Dot;
+        const float Bottom = 9f * Dot;
         /// <summary>左右の余白。画面の幅に対する割合</summary>
         const float Side = 0.12f;
         const float HintRight = 0.11f;
-        const float HintBottom = 4f * Dot;
+        const float HintBottom = 6f * Dot;
 
         /// <summary>E で送る字幕の地より薄い、流れる行の地の濃さ</summary>
         const float PassingAlpha = 0.45f;

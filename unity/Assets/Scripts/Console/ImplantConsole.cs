@@ -28,13 +28,14 @@ namespace HalfAware
     {
         // ---- 見た目 ------------------------------------------------------------
         //
-        // 案 A の CSS を手本にしているが、寸法は粗い画面（UiLens、既定で画面の 1/2）の 1 画素 = Dot で決める。
+        // 案 A の CSS を手本にしているが、寸法は粗い画面（UiLens、既定で画面の 0.6）の 1 画素 = Dot で決める。
         // CSS の px のまま縮めると、札や名前の字が粗い画面の中で縦 5〜6 画素になって読めない。
         // **字はいちばん小さいものでも 11 Dot**（粗い画面の中で縦 10 画素ほど）、線は 1 Dot 以上にする。
+        // 余白は案 A より一回り広く取る。詰めると端末の画面ではなく表計算に見える（2026-09-27 オーナー）。
         // 色は CSS のまま。薄い色の重ねはリニアの色空間だと明るく出るので、Tint・Veil で濃さを合わせる
 
-        /// <summary>粗い画面の 1 画素。1280×720 のキャンバスで、既定の粗さ（1/2 で 480×270 相当）のとき</summary>
-        const float Dot = 1280f / 480f;
+        /// <summary>粗い画面の 1 画素。1280×720 のキャンバスで、既定の粗さ（0.6 で 576×324 相当）のとき</summary>
+        const float Dot = 1280f / 576f;
         public const int SortingOrder = 500;
 
         static readonly Color Accent = Rgb(0x7f, 0xe3, 0xec, 1f);
@@ -51,58 +52,60 @@ namespace HalfAware
         static readonly Color BoxFill = Veil(Rgb(3, 10, 14, 0.92f));
         static readonly Color Clear = new Color(0f, 0f, 0f, 0f);
 
-        /// <summary>枠の内側の余白（上下・左右）。画面に対する割合</summary>
-        const float InsetY = 0.06f;
-        const float InsetX = 0.07f;
+        /// <summary>画面の縁から枠まで（上下・左右）。画面に対する割合</summary>
+        const float InsetY = 0.08f;
+        const float InsetX = 0.10f;
         const float Line = 1f * Dot;
-        const float HookSize = 8f * Dot;
+        const float HookSize = 10f * Dot;
         const float HookLine = 2f * Dot;
 
-        const float HeadTop = 5f * Dot;
-        const float HeadSide = 7f * Dot;
+        /// <summary>枠の内側の余白。頭の行・ボタン・ログの枠の左右と、頭の行の上</summary>
+        const float Inner = 14f * Dot;
+        const float HeadTop = 10f * Dot;
+        const float HeadSide = Inner;
         const float HeadFont = 11f * Dot;
         const float HeadHeight = 14f * Dot;
         /// <summary>頭の行の字の間。0.08 em</summary>
         const float HeadSpacing = 8f;
 
-        const float ButtonTop = 22f * Dot;
-        const float ButtonHeight = 19f * Dot;
-        const float ButtonGap = 5f * Dot;
-        const float ButtonFont = 12f * Dot;
-        const float ButtonSpacing = 10f;
+        const float ButtonTop = HeadTop + HeadHeight + 10f * Dot;
+        const float ButtonHeight = 26f * Dot;
+        const float ButtonGap = 10f * Dot;
+        const float ButtonFont = 11f * Dot;
+        const float ButtonSpacing = 12f;
 
-        const float LogTop = 47f * Dot;
-        const float LogSide = 7f * Dot;
-        const float LogBottom = 7f * Dot;
-        const float PadTop = 4f * Dot;
-        const float PadRight = 11f * Dot;
-        const float PadBottom = 4f * Dot;
-        const float PadLeft = 6f * Dot;
+        const float LogTop = ButtonTop + ButtonHeight + 14f * Dot;
+        const float LogSide = Inner;
+        const float LogBottom = Inner;
+        const float PadTop = 10f * Dot;
+        const float PadRight = 18f * Dot;
+        const float PadBottom = 10f * Dot;
+        const float PadLeft = 12f * Dot;
         /// <summary>枠の上のこの割合で、古い行が薄れて消える</summary>
         const float FadeBand = 0.22f;
 
         const float RowFont = 11f * Dot;
-        const float RowLine = 16f * Dot;
-        const float RowGap = 2f * Dot;
-        /// <summary>行の送り。TMP の Noto は素で 1.45 em。粗い画面では詰めずにそのまま使う</summary>
-        const float RowSpacing = 0f;
+        const float RowLine = 17f * Dot;
+        const float RowGap = 6f * Dot;
+        /// <summary>行の送り。TMP の Noto は素で 1.45 em。折り返した行のあいだも少し開ける</summary>
+        const float RowSpacing = 8f;
         const float TagFont = 11f * Dot;
-        const float TagHeight = 14f * Dot;
-        const float TagPad = 2f * Dot;
-        const float CellGap = 5f * Dot;
-        const float WhoMin = 3.5f * 11f * Dot;
+        const float TagHeight = 15f * Dot;
+        const float TagPad = 4f * Dot;
+        const float CellGap = 12f * Dot;
+        const float WhoMin = 4f * 11f * Dot;
 
         /// <summary>スクロールバーの溝。ログの枠の右の余白の中に立てる</summary>
-        const float BarRight = LogSide + 5f * Dot;
+        const float BarRight = LogSide + 8f * Dot;
         const float BarTop = LogTop + PadTop;
         const float BarBottom = LogBottom + PadBottom;
         const float BarWidth = 2f * Dot;
         /// <summary>つまみを掴める幅。見える溝は細いので、当たりだけ太くする</summary>
-        const float BarGrip = 9f * Dot;
+        const float BarGrip = 12f * Dot;
 
-        const float BoxWidth = 140f * Dot;
-        const float BoxRow = 16f * Dot;
-        const float BoxPad = 5f * Dot;
+        const float BoxWidth = 170f * Dot;
+        const float BoxRow = 19f * Dot;
+        const float BoxPad = 9f * Dot;
 
         public const string CloseHint = "TAB　閉じる";
         public const string ListTitle = "場面　　数字・E で飛ぶ";
@@ -139,6 +142,10 @@ namespace HalfAware
         RectTransform thumb;
         RectTransform box;
         Texture2D scanTexture;
+        /// <summary>塗りつぶしの上に置く暗い字の書体の色づけ。線を太らせて、粗い画面でも地に溶けないようにする</summary>
+        Material heavy;
+        /// <summary>暗い字の線をどれだけ太らせるか。SDF の縁を外へ寄せる量</summary>
+        const float HeavyDilate = 0.3f;
         float noteUntil;
         int shown = -1;
         float keptScale = 1f;
@@ -256,10 +263,16 @@ namespace HalfAware
                 if (IsOpen) Close();
                 instance = null;
             }
-            if (scanTexture == null) return;
-            if (Application.isPlaying) Destroy(scanTexture);
-            else DestroyImmediate(scanTexture);
-            scanTexture = null;
+            if (scanTexture != null)
+            {
+                if (Application.isPlaying) Destroy(scanTexture);
+                else DestroyImmediate(scanTexture);
+                scanTexture = null;
+            }
+            if (heavy == null) return;
+            if (Application.isPlaying) Destroy(heavy);
+            else DestroyImmediate(heavy);
+            heavy = null;
         }
 
         /// <summary>場面を移った。記憶の中の日時は前の場面のものなので捨てる</summary>
@@ -289,6 +302,15 @@ namespace HalfAware
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
             scaler.matchWidthOrHeight = 0.5f;
             gameObject.AddComponent<GraphicRaycaster>();
+
+            var font = TMP_Settings.defaultFontAsset;
+            if (font != null && font.material != null)
+            {
+                heavy = new Material(font.material);
+                heavy.name = "ConsoleHeavy";
+                heavy.hideFlags = HideFlags.DontSave;
+                if (heavy.HasProperty(ShaderUtilities.ID_FaceDilate)) heavy.SetFloat(ShaderUtilities.ID_FaceDilate, HeavyDilate);
+            }
 
             root = Rect(transform, "Screen");
             Stretch(root, 0f, 0f, 0f, 0f);
@@ -364,6 +386,7 @@ namespace HalfAware
                 view.label.characterSpacing = ButtonSpacing;
                 // 塗りつぶしの上の暗い字は、粗い画面だと線が 1 画素に満たずに地の色へ溶ける。太くして残す
                 view.label.fontStyle = FontStyles.Bold;
+                Heavy(view.label);
                 view.label.text = ConsoleMenu.Labels[i];
                 var index = i;
                 var hit = b.gameObject.AddComponent<ConsolePointer>();
@@ -438,11 +461,12 @@ namespace HalfAware
                 view.fill = r.gameObject.AddComponent<Image>();
                 view.fill.color = Clear;
                 view.label = Text(r, "Label", RowFont, ButtonText, TextAlignmentOptions.Left);
-                Stretch(view.label.rectTransform, 4f * Dot, 4f * Dot, 0f, 0f);
+                Stretch(view.label.rectTransform, 7f * Dot, 7f * Dot, 0f, 0f);
                 view.label.text = Mono((i + 1).ToString()) + "　" + SceneMenu.Titles[i];
                 view.label.fontStyle = FontStyles.Bold;
+                Heavy(view.label);
                 view.mark = Text(r, "Here", TagFont, Accent, TextAlignmentOptions.Right);
-                Stretch(view.mark.rectTransform, 4f * Dot, 4f * Dot, 0f, 0f);
+                Stretch(view.mark.rectTransform, 7f * Dot, 7f * Dot, 0f, 0f);
                 var row = i;
                 var hit = r.gameObject.AddComponent<ConsolePointer>();
                 hit.Entered = () => { menu.HoverRow(row); Paint(); };
@@ -663,6 +687,7 @@ namespace HalfAware
             view.tag.pivot = new Vector2(0f, 1f);
             view.tagText = Text(view.tag, "Text", TagFont, Ink, TextAlignmentOptions.Center);
             view.tagText.fontStyle = FontStyles.Bold;
+            Heavy(view.tagText);
             Stretch(view.tagText.rectTransform, 0f, 0f, 0f, 0f);
             view.who = Text(view.rect, "Who", RowFont, Accent, TextAlignmentOptions.TopLeft);
             view.text = Text(view.rect, "Text", RowFont, RowText, TextAlignmentOptions.TopLeft);
@@ -759,6 +784,12 @@ namespace HalfAware
                 r.anchoredPosition = new Vector2(left, 0f);
                 r.sizeDelta = new Vector2(width, height);
             }
+        }
+
+        /// <summary>塗りつぶしの上に置く暗い字を太らせる</summary>
+        void Heavy(TMP_Text text)
+        {
+            if (heavy != null) text.fontSharedMaterial = heavy;
         }
 
         static RectTransform Rect(Transform parent, string name)
