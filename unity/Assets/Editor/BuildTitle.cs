@@ -16,7 +16,8 @@ namespace HalfAware.EditorTools
     /// 見た目は <see cref="TitleScreen"/> が遊び始めに組む。**シーンは手で直さず、ここで組み直す。**
     ///
     /// 開いている場面には触らない。Title.unity を横に開いて組み、保存して閉じる（同じエディタで別の担当が場面を開いていても崩さない）。
-    /// 環境音の大きさはオーナーが耳で決めるので、組み直しても前の値を引き継ぐ
+    /// 環境音の大きさは、はじめは <see cref="TitleBackdrops.SoundsOf"/> の値（その場面の中と同じ）。
+    /// オーナーが耳で決めるので、組み直しても前の値（背景と音の名が同じ物）を引き継ぐ
     /// </summary>
     public static class BuildTitle
     {
@@ -49,13 +50,13 @@ namespace HalfAware.EditorTools
                 scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
                 opened = true;
             }
-            float volume = TitleScreen.DefaultVolume;
+            var heard = new Dictionary<string, float>();
             try
             {
                 foreach (var r in scene.GetRootGameObjects())
                 {
                     var old = r.GetComponentInChildren<TitleScreen>(true);
-                    if (old != null) volume = new SerializedObject(old).FindProperty("volume").floatValue;
+                    if (old != null) Heard(old, heard);
                     Object.DestroyImmediate(r);
                 }
                 SceneManager.SetActiveScene(scene);
@@ -65,11 +66,9 @@ namespace HalfAware.EditorTools
                 sound.playOnAwake = false;
                 sound.loop = true;
                 sound.spatialBlend = 0f;
+                sound.priority = 200;
                 var screen = title.AddComponent<TitleScreen>();
-                var note = Wire(screen, sound);
-                var so = new SerializedObject(screen);
-                so.FindProperty("volume").floatValue = volume;
-                so.ApplyModifiedPropertiesWithoutUndo();
+                var note = Wire(screen, sound, heard);
                 // 3D の物は無いので、空も環境光も使わない
                 RenderSettings.skybox = null;
                 RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
@@ -108,27 +107,60 @@ namespace HalfAware.EditorTools
             go.AddComponent<AudioListener>();
         }
 
+        /// <summary>前に組んだ物の環境音の大きさ（オーナーがインスペクターで変えた値）を、背景と音の名で拾う</summary>
+        static void Heard(TitleScreen old, Dictionary<string, float> heard)
+        {
+            var list = new SerializedObject(old).FindProperty("ambience");
+            if (list == null || !list.isArray) return;
+            for (var i = 0; i < list.arraySize; i++)
+            {
+                var e = list.GetArrayElementAtIndex(i);
+                var clip = e.FindPropertyRelative("clip").objectReferenceValue as AudioClip;
+                if (clip == null) continue;
+                heard[Key((TitleBackdrop)e.FindPropertyRelative("backdrop").enumValueIndex, clip.name)] =
+                    e.FindPropertyRelative("volume").floatValue;
+            }
+        }
+
+        static string Key(TitleBackdrop b, string file)
+        {
+            return b + "/" + file;
+        }
+
         /// <summary>
         /// 背景の絵・環境音・明朝・潜るの日時と場所を繋ぐ。撮るとき（<see cref="TitleShots"/>）にも使う。
+        /// 環境音の大きさは <see cref="TitleBackdrops.SoundsOf"/> の値で、heard に前の値があればそちらを残す。
         /// 何が欠けているかを返す
         /// </summary>
-        public static string Wire(TitleScreen screen, AudioSource sound)
+        public static string Wire(TitleScreen screen, AudioSource sound, Dictionary<string, float> heard = null)
         {
             var missing = new List<string>();
             var so = new SerializedObject(screen);
             var pics = so.FindProperty("backdrops");
-            var clips = so.FindProperty("sounds");
             pics.arraySize = TitleBackdrops.Count;
-            clips.arraySize = TitleBackdrops.Count;
+            var sounds = new List<KeyValuePair<TitleBackdrop, TitleSound>>();
             for (var i = 0; i < TitleBackdrops.Count; i++)
             {
                 var b = (TitleBackdrop)i;
                 var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(PicturePath(b));
                 if (tex == null) missing.Add(TitleBackdrops.FileName(b));
                 pics.GetArrayElementAtIndex(i).objectReferenceValue = tex;
-                var clipPath = SoundPath(b);
-                clips.GetArrayElementAtIndex(i).objectReferenceValue =
-                    clipPath != null ? AssetDatabase.LoadAssetAtPath<AudioClip>(clipPath) : null;
+                foreach (var s in TitleBackdrops.SoundsOf(b)) sounds.Add(new KeyValuePair<TitleBackdrop, TitleSound>(b, s));
+            }
+            var list = so.FindProperty("ambience");
+            list.arraySize = sounds.Count;
+            for (var i = 0; i < sounds.Count; i++)
+            {
+                var b = sounds[i].Key;
+                var s = sounds[i].Value;
+                var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(SoundPath(s.File));
+                if (clip == null) missing.Add(s.File);
+                float volume;
+                if (heard == null || !heard.TryGetValue(Key(b, s.File), out volume)) volume = s.Volume;
+                var e = list.GetArrayElementAtIndex(i);
+                e.FindPropertyRelative("backdrop").enumValueIndex = (int)b;
+                e.FindPropertyRelative("clip").objectReferenceValue = clip;
+                e.FindPropertyRelative("volume").floatValue = volume;
             }
             var mincho = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(BuildDrive.MinchoPath);
             if (mincho == null) missing.Add("明朝");
@@ -136,7 +168,7 @@ namespace HalfAware.EditorTools
             so.FindProperty("divingLine").stringValue = DivingLine();
             if (sound != null) so.FindProperty("sound").objectReferenceValue = sound;
             so.ApplyModifiedPropertiesWithoutUndo();
-            return missing.Count == 0 ? "絵と音と書体は揃っている" : "無い物: " + string.Join("・", missing) + "（HalfAware/Shoot the title backgrounds で撮る）";
+            return missing.Count == 0 ? "絵と音と書体は揃っている" : "無い物: " + string.Join("・", missing) + "（絵は HalfAware/Shoot the title backgrounds で撮る）";
         }
 
         public static string PicturePath(TitleBackdrop b)
@@ -144,18 +176,10 @@ namespace HalfAware.EditorTools
             return PictureDir + "/" + TitleBackdrops.FileName(b) + ".png";
         }
 
-        /// <summary>背景の場所の環境音。場面で流している輪を小さく流す。無い所（潜る・ガレージ）は無音</summary>
-        static string SoundPath(TitleBackdrop b)
+        /// <summary>環境音のファイル（<see cref="TitleSound.File"/>）の置き場</summary>
+        public static string SoundPath(string file)
         {
-            switch (b)
-            {
-                case TitleBackdrop.Room: return "Assets/Audio/RoomTone.wav";
-                case TitleBackdrop.Alley: return "Assets/Audio/CrowdLoop.wav";
-                case TitleBackdrop.VillageMorning: return "Assets/Audio/VillageMorning.wav";
-                // 夕方の村は麦の風だけ（VillageAmbience と同じ）
-                case TitleBackdrop.VillageEvening: return "Assets/Audio/WheatWind.wav";
-                default: return null;
-            }
+            return "Assets/Audio/" + file + ".wav";
         }
 
         /// <summary>潜るの背景に撮った記憶（記憶 0、メイ）の日時と場所。コンソールの頭の行と同じ書き方</summary>

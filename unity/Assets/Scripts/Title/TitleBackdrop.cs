@@ -20,6 +20,19 @@ namespace HalfAware
         VillageEvening,
     }
 
+    /// <summary>背景の場所の環境音の一本。file は <c>Assets/Audio/</c> の中の名（拡張子なし）、volume はふだんの大きさ</summary>
+    public struct TitleSound
+    {
+        public readonly string File;
+        public readonly float Volume;
+
+        public TitleSound(string file, float volume)
+        {
+            File = file;
+            Volume = volume;
+        }
+    }
+
     /// <summary>タイトルの画面の背景と、起動の表示の日時と場所を選ぶ</summary>
     public static class TitleBackdrops
     {
@@ -65,6 +78,33 @@ namespace HalfAware
                 case TitleBackdrop.VillageMorning: return 1f;
                 case TitleBackdrop.VillageEvening: return EveningLight;
                 default: return 0f;
+            }
+        }
+
+        /// <summary>路地裏の雨の大きさ。場面 2 の Player/RainSound と同じ値（BuildAlley の RainSound）</summary>
+        public const float AlleyRain = 0.30f;
+
+        /// <summary>村の環境音の大きさ。場面の中より小さく流す（村の背景を作った時の値のまま）</summary>
+        public const float VillageQuiet = 0.3f;
+
+        /// <summary>
+        /// 背景の場所の環境音。その場面で流している輪を、その場面の中と同じ大きさで重ねて流す（オーナー、2026-09-27）。
+        /// 自室は部屋の空気（Player/RoomTone、<see cref="RoomTone.DefaultVolume"/>）。
+        /// 路地裏は、場面 2 の通りの所の釣り合い（雑踏 <see cref="CrowdNoise.StreetDefault"/> と雨 <see cref="AlleyRain"/>）。
+        /// 村は前からの小さめの値。潜る・車内（ガレージ）は無音。
+        /// 音のファイルは <c>Assets/Audio/</c> の <c>名.wav</c>
+        /// </summary>
+        public static TitleSound[] SoundsOf(TitleBackdrop b)
+        {
+            switch (b)
+            {
+                case TitleBackdrop.Room: return new[] { new TitleSound("RoomTone", RoomTone.DefaultVolume) };
+                case TitleBackdrop.Alley:
+                    return new[] { new TitleSound("CrowdLoop", CrowdNoise.StreetDefault), new TitleSound("RainLoop", AlleyRain) };
+                case TitleBackdrop.VillageMorning: return new[] { new TitleSound("VillageMorning", VillageQuiet) };
+                // 夕方の村は麦の風だけ（VillageAmbience と同じ）
+                case TitleBackdrop.VillageEvening: return new[] { new TitleSound("WheatWind", VillageQuiet) };
+                default: return new TitleSound[0];
             }
         }
 

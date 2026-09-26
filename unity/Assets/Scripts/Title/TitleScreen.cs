@@ -24,6 +24,7 @@ namespace HalfAware
     /// 枠・起動の表示・ボタンはコンソールと同じ粗い画面（<see cref="UiLens"/>）で描く。
     /// **題と読みだけは粗くせず、画面の解像度でくっきり描く**（オーナー、2026-09-27）。
     /// 場面の見出し（<see cref="HudView.Unblur"/>）と同じく、粗い画面を重ねる層の一つ上の Canvas に分け、同じ拡縮を持たせる。
+    /// 環境音は背景の場所のものを、その場面の中と同じ大きさで流す（<see cref="TitleBackdrops.SoundsOf"/>）。
     /// 見た目はここで組む（シーンに置くのはこの部品と、絵・音・書体の参照だけ）
     /// </summary>
     public sealed class TitleScreen : MonoBehaviour
@@ -130,16 +131,22 @@ namespace HalfAware
         const float ButtonsAfter = 0.5f;
         const float LeaveSeconds = 0.6f;
 
-        public const float DefaultVolume = 0.3f;
-
         // ---- シーンに置く物 -----------------------------------------------------
+
+        /// <summary>背景の場所の環境音の一本。背景ごとに何本でも（路地裏は雑踏と雨の二本）</summary>
+        [Serializable]
+        public struct Ambience
+        {
+            public TitleBackdrop backdrop;
+            public AudioClip clip;
+            [Range(0f, 1f)] public float volume;
+        }
 
         [Tooltip("背景の絵。TitleBackdrop の並び（自室・路地裏・潜る・車内・村の朝・村の夕方）")]
         [SerializeField] Texture2D[] backdrops = new Texture2D[TitleBackdrops.Count];
-        [Tooltip("背景の場所の環境音。TitleBackdrop の並び。無い所は無音")]
-        [SerializeField] AudioClip[] sounds = new AudioClip[TitleBackdrops.Count];
-        [Tooltip("環境音の大きさ。小さく流す")]
-        [SerializeField, Range(0f, 1f)] float volume = DefaultVolume;
+        [Tooltip("背景の場所の環境音。背景が同じ物はみな重ねて流す。大きさはその場面の中と同じ（組み直しても前の値を引き継ぐ）")]
+        [SerializeField] Ambience[] ambience = new Ambience[0];
+        [Tooltip("環境音を流す口。二本目からは、遊び始めにこの横へ同じ設定の口を足す")]
         [SerializeField] AudioSource sound;
         [Tooltip("題の書体（しっぽり明朝）")]
         [SerializeField] TMP_FontAsset mincho;
@@ -171,6 +178,11 @@ namespace HalfAware
         readonly List<TMP_Text> bootLines = new List<TMP_Text>();
         readonly List<Row> buttons = new List<Row>();
         readonly List<Row> rows = new List<Row>();
+        /// <summary>鳴らしている環境音の口と、それぞれのふだんの大きさ</summary>
+        readonly List<AudioSource> voices = new List<AudioSource>();
+        readonly List<float> levels = new List<float>();
+        /// <summary>環境音をいまふだんの大きさの何割で鳴らしているか（明けで 0 から 1、閉じるときに 0 へ）</summary>
+        float loud;
 
         Texture2D dimTexture;
         Texture2D scanTexture;
@@ -189,6 +201,9 @@ namespace HalfAware
 
         /// <summary>題と読みの Canvas。画面の解像度でくっきり描き、粗い画面の上に重ねる</summary>
         public Canvas NameCanvas { get { return nameCanvas; } }
+
+        /// <summary>鳴らしている環境音の口。確かめ用</summary>
+        public IReadOnlyList<AudioSource> Voices { get { return voices; } }
 
         /// <summary>
         /// 背景の絵を差し替える。エディタで背景の候補を題と重ねて撮るときに使う
@@ -263,16 +278,40 @@ namespace HalfAware
             made = null;
         }
 
+        /// <summary>
+        /// 背景の場所の環境音を、みな輪にして鳴らし始める。大きさは 0 から始め、背景が明けるのに合わせて上げる
+        /// （<see cref="Loudness"/>）。一本目はシーンに置いた口で、二本目からはその横に同じ設定の口を足す
+        /// </summary>
         void Play()
         {
-            if (sound == null) return;
-            var clip = sounds != null && (int)backdrop < sounds.Length ? sounds[(int)backdrop] : null;
-            if (clip == null) return;
-            sound.clip = clip;
-            sound.loop = true;
-            sound.spatialBlend = 0f;
-            sound.volume = 0f;
-            sound.Play();
+            voices.Clear();
+            levels.Clear();
+            loud = 0f;
+            if (sound == null || ambience == null) return;
+            for (var i = 0; i < ambience.Length; i++)
+            {
+                var a = ambience[i];
+                if (a.backdrop != backdrop || a.clip == null) continue;
+                var voice = voices.Count == 0 ? sound : sound.gameObject.AddComponent<AudioSource>();
+                voice.playOnAwake = false;
+                voice.outputAudioMixerGroup = sound.outputAudioMixerGroup;
+                voice.priority = sound.priority;
+                voice.clip = a.clip;
+                voice.loop = true;
+                voice.spatialBlend = 0f;
+                voice.volume = 0f;
+                voice.Play();
+                voices.Add(voice);
+                levels.Add(a.volume);
+            }
+        }
+
+        /// <summary>環境音をふだんの大きさの t 割にする</summary>
+        void Loudness(float t)
+        {
+            loud = Mathf.Clamp01(t);
+            for (var i = 0; i < voices.Count; i++)
+                if (voices[i] != null) voices[i].volume = levels[i] * loud;
         }
 
         // ---- 流れ ------------------------------------------------------------
@@ -316,7 +355,7 @@ namespace HalfAware
             cover.color = new Color(0f, 0f, 0f, 1f - t);
             Chrome(t);
             menuGroup.alpha = buttonsT;
-            if (sound != null && sound.clip != null) sound.volume = volume * t;
+            Loudness(t);
         }
 
         /// <summary>枠と題と読みの濃さ。題と読みは別の Canvas にあるので、枠と揃えて一緒に動かす</summary>
@@ -366,14 +405,14 @@ namespace HalfAware
         IEnumerator Leaving(Action then)
         {
             var start = Time.unscaledTime;
-            var from = sound != null ? sound.volume : 0f;
+            var from = loud;
             while (true)
             {
                 var t = Mathf.Clamp01((Time.unscaledTime - start) / LeaveSeconds);
                 cover.color = new Color(0f, 0f, 0f, t);
                 Chrome(1f - t);
                 for (var i = 0; i < bootLines.Count; i++) bootLines[i].alpha = 1f - t;
-                if (sound != null) sound.volume = from * (1f - t);
+                Loudness(from * (1f - t));
                 if (t >= 1f) break;
                 yield return null;
             }

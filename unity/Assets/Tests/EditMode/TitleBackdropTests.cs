@@ -128,6 +128,37 @@ namespace HalfAware.Tests
             Assert.AreEqual("Dive", TitleBackdrops.SceneOf(TitleBackdrop.Dive));
         }
 
+        // ---- 環境音 ------------------------------------------------------------
+
+        [Test]
+        public void TheRoomSoundsAsLoudAsInTheRoom()
+        {
+            var room = TitleBackdrops.SoundsOf(TitleBackdrop.Room);
+            Assert.AreEqual(1, room.Length);
+            Assert.AreEqual("RoomTone", room[0].File);
+            Assert.AreEqual(RoomTone.DefaultVolume, room[0].Volume, 1e-6f);
+        }
+
+        [Test]
+        public void TheAlleyHasTheCrowdAndTheRainOfTheStreet()
+        {
+            var alley = TitleBackdrops.SoundsOf(TitleBackdrop.Alley);
+            Assert.AreEqual(2, alley.Length);
+            Assert.AreEqual("CrowdLoop", alley[0].File);
+            Assert.AreEqual(CrowdNoise.StreetDefault, alley[0].Volume, 1e-6f);
+            Assert.AreEqual("RainLoop", alley[1].File);
+            Assert.AreEqual(TitleBackdrops.AlleyRain, alley[1].Volume, 1e-6f);
+        }
+
+        [Test]
+        public void TheDiveAndTheGarageAreSilent()
+        {
+            Assert.AreEqual(0, TitleBackdrops.SoundsOf(TitleBackdrop.Dive).Length);
+            Assert.AreEqual(0, TitleBackdrops.SoundsOf(TitleBackdrop.Drive).Length);
+            Assert.AreEqual(1, TitleBackdrops.SoundsOf(TitleBackdrop.VillageMorning).Length);
+            Assert.AreEqual(1, TitleBackdrops.SoundsOf(TitleBackdrop.VillageEvening).Length);
+        }
+
         // ---- 起動の表示の日時と場所 ------------------------------------------------
 
         [Test]
