@@ -39810,13 +39810,13 @@ MonoBehaviour:
   hud: {fileID: 230293359}
   daze: {fileID: 835399818}
   maxAngle: 0.7
-  nextScene: 
+  nextScene: Connect
   openingCard: "<size=34><voffset=1.05em><size=17>\u30ED\u30F3\u30C9\u30F3</size></voffset><space=-2em>\u502B\u6566\u3000\u30DB\u30EB\u30DC\u30FC\u30F3\u3000\u30B0\u30EC\u30D3\u30EB\u30FB\u30B9\u30C8\u30EA\u30FC\u30C8</size>"
   cardSeconds: 2.6
   cardLiftSeconds: 1.8
   exitSound: {fileID: 0}
   exitSoundSeconds: 1.7
-  cutToBlack: 0
+  cutToBlack: 1
   blackHoldSeconds: 0.55
   seatEyeHeight: 1.1
   standAfter: 
@@ -39876,6 +39876,7 @@ MonoBehaviour:
   player: {fileID: 2045684572}
   script: {fileID: 11400000, guid: 9b9528b3c0c432843a5cd2202e52a5f5, type: 2}
   sellSpot: {fileID: 1944198225}
+  sellPitch: 8
   chips:
   - {fileID: 617120120}
   - {fileID: 712669904}

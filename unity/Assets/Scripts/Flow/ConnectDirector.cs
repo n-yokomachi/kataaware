@@ -7,6 +7,10 @@ namespace HalfAware
     /// 場面 3 の段の進行。<see cref="SceneFlow.Examined"/> を受けて、演出と対象の開閉を並べるだけ。
     /// 状態は「いまどの段まで来たか」しか持たない。
     ///
+    /// **場面の頭は、路地裏の暗転から玄関のドアを閉める音で明ける。** 黒から明け始めるのと同じフレームに
+    /// <c>DoorShut.wav</c> を鳴らし、閉まった音のすぐ後に戸口の内側に立っている（<see cref="Start"/>）。
+    /// 明け方・立ち位置・見出しの有無は SceneFlow と組み立て（BuildConnect）のまま
+    ///
     /// **玄関先のコートハンガーを調べたら、ジャケットを脱いで掛ける。** 着る音（<c>JacketOn.wav</c>）を鳴らし、音の終わりの少し前に
     /// 体のジャケットを消してハンガーに掛けたジャケットを出す（脱ぐ動きは作らない）。間合いは <see cref="JacketBeats"/>。
     /// 場面 3 は路地裏から着たまま帰ってくるので、頭では着せておく。椅子はハンガーの後（<see cref="ConnectIds.After"/>）
@@ -60,6 +64,12 @@ namespace HalfAware
         [Tooltip("腰を下ろすのにかける秒数")]
         [SerializeField] float sitSeconds = 1.4f;
 
+        [Header("帰ってくる")]
+        [Tooltip("黒から明け始めるときに 1 度鳴らす、玄関のドアを閉める音。路地裏の暗転から、閉めた音のすぐ後に戸口の内側で明ける")]
+        [SerializeField] AudioSource doorShut;
+        [Tooltip("ドアを閉める音をどこから鳴らすか。音の頭からの秒。DoorShut.wav は閉まる音が 1.43 秒目にあり、頭から鳴らすと明けきった後で閉まる。0 なら頭から")]
+        [SerializeField] float doorShutFrom = 1.3f;
+
         [Header("リストを送る間")]
         [Tooltip("list の何行目で間をおくか。0 から数える。負なら間をおかない")]
         [SerializeField] int pauseAfterLine = 4;
@@ -98,6 +108,21 @@ namespace HalfAware
             Shut(monitorItem);
             pauseLine = PauseLine();
             flow.Examined += OnExamined;
+        }
+
+        /// <summary>
+        /// 場面の頭。SceneFlow.Start が黒から明け始めるのと同じフレームに、玄関のドアを閉める音を鳴らす。
+        /// こちらの実行順が前（-5）なので、明けの 1 フレーム目に間に合う。明け方そのもの（黒から 1.2 秒）は SceneFlow のまま。
+        /// 音の頭の、閉まる前の間（取っ手と軋み）は <see cref="doorShutFrom"/> で飛ばす
+        /// </summary>
+        void Start()
+        {
+            if (doorShut == null) return;
+            var clip = doorShut.clip;
+            // DoorShut.wav は先読みしない設定（場面 1 では出がけにしか鳴らない）。途中から鳴らすので、鳴らす前に読み終えておく
+            if (clip != null && clip.loadState != AudioDataLoadState.Loaded) clip.LoadAudioData();
+            doorShut.Play();
+            if (clip != null && doorShutFrom > 0f) doorShut.time = Mathf.Min(doorShutFrom, Mathf.Max(0f, clip.length - 0.05f));
         }
 
         void OnDisable()

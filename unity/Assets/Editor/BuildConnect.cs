@@ -29,6 +29,7 @@ namespace HalfAware.EditorTools
         public const string PanePath = Materials + "/TerminalPane.mat";
         public const string RowsPath = "Assets/Textures/TerminalRows.png";
         public const string PlugPath = "Assets/Audio/JackPlug.wav";
+        public const string DoorShutPath = "Assets/Audio/DoorShut.wav";
 
         /// <summary>手首に残す受け口の名前</summary>
         public const string SocketName = "JackSocket";
@@ -201,12 +202,16 @@ namespace HalfAware.EditorTools
 
         // ---- 夕方の状態に置き直す ---------------------------------------------
 
+        /// <summary>玄関のドアを閉める音。場面 1 の SceneFlow の出がけの音（SceneFlow/Door）を、<see cref="Flow"/> が外す前に拾っておく</summary>
+        static AudioSource DoorShut;
+
         /// <summary>
         /// 場面 3 の SceneFlow。座って始まる仕度と、場面 1 の頭と終わりの段取りを外す。
         /// SceneFlow そのものには手を入れない（場面 1・2・8 が同じものに乗っている）
         /// </summary>
         static void Flow()
         {
+            DoorShut = null;
             var flow = Object.FindFirstObjectByType<SceneFlow>(FindObjectsInactive.Include);
             if (flow == null) { Debug.LogError("SceneFlow が無い"); return; }
             var so = new SerializedObject(flow);
@@ -217,7 +222,9 @@ namespace HalfAware.EditorTools
             // 場面 2 の暗転から続くので見出しを挟まない
             so.FindProperty("openingCard").stringValue = "";
             so.FindProperty("cutToBlack").boolValue = false;
-            // 部屋を出ないので扉の音は鳴らない
+            // 場面 1 の出がけの音（玄関のドアを閉める音）は、場面 3 では帰ってきた頭で鳴らす。
+            // 鳴らすのは ConnectDirector（Director で繋ぐ）。SceneFlow の側からは外す。部屋を出ないので出がけには鳴らない
+            DoorShut = so.FindProperty("exitSound").objectReferenceValue as AudioSource;
             so.FindProperty("exitSound").objectReferenceValue = null;
             so.FindProperty("dazeUntil").stringValue = "";
             // **眩暈は繋がない。** dazeUntil が空でも ReleaseDaze は最初の Update で
@@ -777,6 +784,11 @@ namespace HalfAware.EditorTools
             var off = AssetDatabase.LoadAssetAtPath<AudioClip>(PlaceProtagonist.JacketOnPath);
             if (off == null) Debug.LogWarning("着る音が無い: " + PlaceProtagonist.JacketOnPath);
             so.FindProperty("jacketOff").objectReferenceValue = off;
+            // 路地裏から帰ってきて、黒から明け始めるときに鳴らす玄関のドアを閉める音。どこから鳴らすか（doorShutFrom）は Inspector に任せて書き戻さない
+            if (DoorShut == null) Debug.LogWarning("場面 1 の SceneFlow に出がけの音が無い。帰ってきた頭のドアの音を繋げない");
+            else if (DoorShut.clip == null || AssetDatabase.GetAssetPath(DoorShut.clip) != DoorShutPath)
+                Debug.LogWarning("帰ってきた頭の音が DoorShut.wav ではない: " + (DoorShut.clip != null ? AssetDatabase.GetAssetPath(DoorShut.clip) : "無し"));
+            so.FindProperty("doorShut").objectReferenceValue = DoorShut;
             // モニターの方。部屋は z の正の向きに机が並んでいる
             so.FindProperty("seatYaw").floatValue = 0f;
             so.ApplyModifiedPropertiesWithoutUndo();
