@@ -6,19 +6,19 @@ Mesh:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: TrainFloor
+  m_Name: OutsideFar
   serializedVersion: 12
   m_SubMeshes:
   - serializedVersion: 2
     firstByte: 0
-    indexCount: 6
+    indexCount: 12
     topology: 0
     baseVertex: 0
     firstVertex: 0
-    vertexCount: 4
+    vertexCount: 8
     localAABB:
-      m_Center: {x: 0, y: 0, z: 0}
-      m_Extent: {x: 1.3, y: 0, z: 4}
+      m_Center: {x: 0, y: 7, z: 0}
+      m_Extent: {x: 55, y: 15, z: 144}
   m_Shapes:
     vertices: []
     shapes: []
@@ -35,10 +35,10 @@ Mesh:
   m_KeepVertices: 1
   m_KeepIndices: 1
   m_IndexFormat: 0
-  m_IndexBuffer: 000001000200000002000300
+  m_IndexBuffer: 000001000200000002000300040005000600040006000700
   m_VertexData:
     serializedVersion: 3
-    m_VertexCount: 4
+    m_VertexCount: 8
     m_Channels:
     - stream: 0
       offset: 0
@@ -96,8 +96,8 @@ Mesh:
       offset: 0
       format: 0
       dimension: 0
-    m_DataSize: 128
-    _typelessdata: 6666a6bf0000000000008040000000000000803f00000000000050c0000020416666a63f0000000000008040000000000000803f0000000000005040000020416666a63f00000000000080c0000000000000803f00000000000050400000f0416666a6bf00000000000080c0000000000000803f00000000000050c00000f041
+    m_DataSize: 256
+    _typelessdata: 00005cc2000000c1000010430000803f00000000000000009a9919bf0000283f00005cc2000000c1000010c30000803f00000000000000009a99193f0000283f00005cc20000b041000010c30000803f00000000000000009a99193f0000683f00005cc20000b041000010430000803f00000000000000009a9919bf0000683f00005c42000000c1000010c3000080bf00000000000000009a99193f0000283f00005c42000000c100001043000080bf00000000000000009a9919bf0000283f00005c420000b04100001043000080bf00000000000000009a9919bf0000683f00005c420000b041000010c3000080bf00000000000000009a99193f0000683f
   m_CompressedMesh:
     m_Vertices:
       m_NumItems: 0
@@ -151,8 +151,8 @@ Mesh:
       m_BitSize: 0
     m_UVInfo: 0
   m_LocalAABB:
-    m_Center: {x: 0, y: 0, z: 0}
-    m_Extent: {x: 1.3, y: 0, z: 4}
+    m_Center: {x: 0, y: 7, z: 0}
+    m_Extent: {x: 55, y: 15, z: 144}
   m_MeshUsageFlags: 0
   m_CookingOptions: 30
   m_BakedConvexCollisionMesh: 

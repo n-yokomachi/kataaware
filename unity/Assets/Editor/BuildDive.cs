@@ -139,8 +139,8 @@ namespace HalfAware.EditorTools
         // ---- シーンの地 ----------------------------------------------------
 
         /// <summary>
-        /// 環境光の三色。空の絵を持たない場所（電車・教室）は、実行時もこの値のまま。
-        /// シーンにもこの値を置くので、エディタで開いたときの見え方もこれになる
+        /// 環境光の三色。潜る前のシーンに置く値で、エディタで開いたときの見え方もこれになる。
+        /// 潜ったあとは場所ごとの空から取った三色に差し替わる
         /// </summary>
         static readonly Color StageAmbientSky = new Color(0.135f, 0.145f, 0.170f);
         static readonly Color StageAmbientEquator = new Color(0.085f, 0.088f, 0.100f);
@@ -150,9 +150,9 @@ namespace HalfAware.EditorTools
         /// カメラの設定と、場所の外側の暗さ。
         ///
         /// **シーンに置くのは空を持たない場所の値。** 記憶はどれも屋内か暗がりで、
-        /// 空が映るのは団地の階段と公園と台所の窓だけ。この三つは空・霞・環境光を一揃いで持ち
-        /// （<see cref="EstatePlaceSky"/>・<see cref="ParkPlaceSky"/>・<see cref="KitchenPlaceSky"/>・<see cref="ClassroomPlaceSky"/>）、記憶を切り替えるたびに <see cref="DiveDirector"/> が
-        /// 場所の分へ差し替える。ここに置くのは、それ以外の場所と同じ、霞なし・一色の空・暗い環境光。
+        /// 五つの場所はどれも空・霞・環境光を一揃いで持ち
+        /// （<see cref="EstatePlaceSky"/>・<see cref="ParkPlaceSky"/>・<see cref="TrainPlaceSky"/>・<see cref="KitchenPlaceSky"/>・<see cref="ClassroomPlaceSky"/>）、記憶を切り替えるたびに <see cref="DiveDirector"/> が
+        /// 場所の分へ差し替える。ここに置くのは潜る前の、霞なし・一色の空・暗い環境光。
         /// 環境光を切ると屋内が真っ黒になるので、灯りの届かないところの下限としてだけ置く
         /// </summary>
         static void Stage()
@@ -643,11 +643,12 @@ namespace HalfAware.EditorTools
             sky.arraySize = Skies.Length;
             for (var i = 0; i < Skies.Length; i++)
             {
-                // 団地と公園と台所と教室は空・霞・環境光・日を一揃いで持つ。電車は一色の空のまま
+                // 五つとも空・霞・環境光・日を一揃いで持つ
                 var id = DiveIds.Places[i];
                 PlaceSky each;
                 if (id == DiveIds.Estate) each = EstatePlaceSky(places.Find(id));
                 else if (id == DiveIds.Park) each = ParkPlaceSky(places.Find(id));
+                else if (id == DiveIds.Train) each = TrainPlaceSky(places.Find(id));
                 else if (id == DiveIds.Kitchen) each = KitchenPlaceSky(places.Find(id));
                 else if (id == DiveIds.Classroom) each = ClassroomPlaceSky(places.Find(id));
                 else each = PlainSky(Skies[i]);
@@ -665,7 +666,7 @@ namespace HalfAware.EditorTools
         /// 台所が朝の七時前、教室が昼前。**真っ黒のままにしない。**
         /// 公園で見上げる記憶と、団地の廊下から外を向いたときに画面の上が抜ける。
         ///
-        /// 団地と公園と台所と教室の行はもう使わない。団地は <see cref="EstatePlaceSky"/>、公園は <see cref="ParkPlaceSky"/>、
+        /// どの行ももう使わない。団地は <see cref="EstatePlaceSky"/>、公園は <see cref="ParkPlaceSky"/>、電車は <see cref="TrainPlaceSky"/>、
         /// 台所は <see cref="KitchenPlaceSky"/>、教室は <see cref="ClassroomPlaceSky"/> の空の絵と霞の色で塗る。並びを <see cref="DiveIds.Places"/> と揃えておくために、行だけ残してある
         /// </summary>
         static readonly Color[] Skies =

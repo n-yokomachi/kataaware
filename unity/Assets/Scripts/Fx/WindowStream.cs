@@ -14,8 +14,11 @@ namespace HalfAware
     /// 八枚とも同じ絵になり、隣り合う窓に同じ建物が並んで書き割りだと分かってしまう。
     /// <see cref="TerminalScreen"/> と同じ手で、あちらは縦へ、こちらは横へ送る。
     ///
-    /// 帯は横に繋がるように描いてある（<c>tools/make-window.py</c>）ので、
-    /// ずれが 1 を越えたところで頭へ戻しても継ぎ目は出ない
+    /// 帯は横に繋がるように描いてある（<c>tools/make-window.py</c>・<c>HalfAware/Shoot the train backdrop</c>）ので、
+    /// ずれが 1 を越えたところで頭へ戻しても継ぎ目は出ない。
+    ///
+    /// **電車は窓の外を近く・中・遠くの三つの層に分け、層ごとに一つずつ付けて速さを変える**（設計書 9.1 節「電車の作り込み」）。
+    /// 層の帯は車両の両脇に通しで立てた一枚なので、窓ごとのずれ（stagger）は使わない
     /// </summary>
     [DefaultExecutionOrder(-20)]
     public sealed class WindowStream : MonoBehaviour

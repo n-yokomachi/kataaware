@@ -6,7 +6,7 @@ Mesh:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: TrainFloor
+  m_Name: NextFloor
   serializedVersion: 12
   m_SubMeshes:
   - serializedVersion: 2
@@ -17,7 +17,7 @@ Mesh:
     firstVertex: 0
     vertexCount: 4
     localAABB:
-      m_Center: {x: 0, y: 0, z: 0}
+      m_Center: {x: 0, y: 0, z: 4}
       m_Extent: {x: 1.3, y: 0, z: 4}
   m_Shapes:
     vertices: []
@@ -97,7 +97,7 @@ Mesh:
       format: 0
       dimension: 0
     m_DataSize: 128
-    _typelessdata: 6666a6bf0000000000008040000000000000803f00000000000050c0000020416666a63f0000000000008040000000000000803f0000000000005040000020416666a63f00000000000080c0000000000000803f00000000000050400000f0416666a6bf00000000000080c0000000000000803f00000000000050c00000f041
+    _typelessdata: 6666a6bf0000000000000041000000000000803f00000000000050c00000a0416666a63f0000000000000041000000000000803f00000000000050400000a0416666a63f0000000000000000000000000000803f0000000000005040000020426666a6bf0000000000000000000000000000803f00000000000050c000002042
   m_CompressedMesh:
     m_Vertices:
       m_NumItems: 0
@@ -151,7 +151,7 @@ Mesh:
       m_BitSize: 0
     m_UVInfo: 0
   m_LocalAABB:
-    m_Center: {x: 0, y: 0, z: 0}
+    m_Center: {x: 0, y: 0, z: 4}
     m_Extent: {x: 1.3, y: 0, z: 4}
   m_MeshUsageFlags: 0
   m_CookingOptions: 30
