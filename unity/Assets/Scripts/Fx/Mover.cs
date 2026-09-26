@@ -37,6 +37,8 @@ namespace HalfAware
         [SerializeField] float nextAt;
         [Tooltip("二本目の線を動いているあいだの秒。0 なら二本目は無い")]
         [SerializeField] float nextSpan;
+        [Tooltip("二本目の線を動き出す合図。何行目の台詞が出たら数え始めるか。-1 なら一本目と同じ時計で数える")]
+        [SerializeField] int nextCue = -1;
         [Tooltip("動き出す秒で向きを変える。その場で振り向く人のため")]
         [SerializeField] bool turns;
         [Tooltip("動き出す前の向き。度。Take からのローカル")]
@@ -72,6 +74,15 @@ namespace HalfAware
         /// </summary>
         public int Cue { get { return cue; } }
 
+        /// <summary>
+        /// 二本目の線の合図。これだけの行数が出たら二本目を数え始める。-1 なら一本目と同じ時計。
+        ///
+        /// **駆け出す線と戻ってくる線は、別の行で動き出す。** 記憶 10 の孫息子は、夫とのやりとりのあとで
+        /// 鳩を追って駆け出し、名を呼ばれて「今行くって」と返してから戻ってくる。
+        /// 二本とも一つの合図の時計で数えると、呼ばれる前に戻ってくるか、返事の後もしばらく池にいる
+        /// </summary>
+        public int NextCue { get { return nextCue; } }
+
         /// <summary>頭から流し直すので、有効になった瞬間は開始位置に戻しておく</summary>
         void OnEnable()
         {
@@ -81,7 +92,17 @@ namespace HalfAware
         /// <summary>記憶の頭からの秒を渡して置き直す</summary>
         public void Play(float t)
         {
-            transform.localPosition = Where(t);
+            Play(t, t);
+        }
+
+        /// <summary>
+        /// 一本目の時計 t と、二本目の合図からの秒 after を渡して置き直す。
+        /// 二本目が一本目と同じ時計（<see cref="NextCue"/> が -1）なら after は見ない。
+        /// 二本目の合図がまだなら after は負
+        /// </summary>
+        public void Play(float t, float after)
+        {
+            transform.localPosition = nextCue < 0 ? Where(t) : Where(t, after);
             // **根の向きは一息に替える。** 模型は PersonMotion がこまの頭ごとに根の向きへ寄せるので
             // （TurnPerTick）、振り向きはそちらで段々に回って見える
             if (turns) transform.localRotation = Quaternion.Euler(0f, t < at ? yawFrom : yawTo, 0f);
@@ -115,6 +136,25 @@ namespace HalfAware
         {
             if (Returns && t >= nextAt) return Leg(to, next, t, nextAt, nextSpan);
             return Leg(from, to, t, at, span);
+        }
+
+        /// <summary>二本目を別の合図で数えるときの位置。合図の前（after が負）は一本目の線の上</summary>
+        public Vector3 Where(float t, float after)
+        {
+            if (Returns && after >= 0f) return Leg(to, next, after, nextAt, nextSpan);
+            return Leg(from, to, t, at, span);
+        }
+
+        /// <summary>
+        /// いま線の上を動いているか。一本目の時計 t と、二本目の合図からの秒 after（合図の前は負）で見る。
+        /// 動き出す前と動き終えた後は止まっている
+        /// </summary>
+        public bool Moving(float t, float after)
+        {
+            if (t >= at && t < at + span) return true;
+            if (!Returns) return false;
+            var second = nextCue < 0 ? t : after;
+            return second >= nextAt && second < nextAt + nextSpan;
         }
 
         Vector3 Leg(Vector3 a, Vector3 b, float t, float start, float length)

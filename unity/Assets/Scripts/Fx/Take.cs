@@ -20,6 +20,8 @@ namespace HalfAware
         [SerializeField] AudioClip call;
         [Tooltip("板の出る相手。名前が DiveEntry の Seen.name と同じ")]
         [SerializeField] Transform[] people = new Transform[0];
+        [Tooltip("〔区切り〕の後の会話を始める所。区切りの並び。場所のローカル（鍵打ちと同じ）")]
+        [SerializeField] Vector3[] stops = new Vector3[0];
 
         public int Entry { get { return entry; } }
 
@@ -31,6 +33,24 @@ namespace HalfAware
 
         /// <summary>鍵打ちの最後の at。DiveEntry.length と揃っているかを組み立てが見直す</summary>
         public float Length { get { return HostPath.Length(keys); } }
+
+        /// <summary>〔区切り〕の行き先。区切りの並び。場所のローカル</summary>
+        public Vector3[] Stops { get { return stops; } }
+
+        /// <summary>
+        /// n 番目の〔区切り〕の後の会話を始める所（場所のローカル）。持っていなければ false で、
+        /// そのときは相手のそばで始める（<c>DiveDirector.Arrived</c>）。
+        ///
+        /// **区切りは主が体を動かしてから次を話す所。** 行き先は相手のそばとは限らない。
+        /// 記憶 6 のマークは玄関で靴を履いて振り返り、台所の戸口のリンダと話す（設計書 7 節）
+        /// </summary>
+        public bool Stop(int n, out Vector3 at)
+        {
+            at = Vector3.zero;
+            if (stops == null || n < 0 || n >= stops.Length) return false;
+            at = stops[n];
+            return true;
+        }
 
         /// <summary>名前で探す。見つからなければ null</summary>
         public Transform Person(string name)

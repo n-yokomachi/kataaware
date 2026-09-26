@@ -79,6 +79,10 @@ namespace HalfAware
         [Header("会話")]
         [Tooltip("一行目（名を呼ぶ声）を出しておく秒。送らずに消える。相手を探して振り向く間が要る")]
         [SerializeField] float firstSeconds = 9f;
+        [Tooltip("〔区切り〕の後の会話を始められる、主の足元から行き先（か相手）までの横の隔たり。m")]
+        [SerializeField] float reach = 1.6f;
+        [Tooltip("行き先と主の足元の高さの差がこれを超えたら、横が近くても着いていない。m。階の違う真上と真下を分ける")]
+        [SerializeField] float reachHigh = 1.2f;
 
         [Header("眩暈")]
         [Tooltip("`切断` が押せるようになってから、さらに cutAfter 人渡ったときの眩暈の濃さ")]
@@ -103,6 +107,8 @@ namespace HalfAware
         Mover[] movers = new Mover[0];
         /// <summary>合図を持つ者が動き出した時刻。まだ合図が来ていなければ負</summary>
         float[] cued = new float[0];
+        /// <summary>二本目の線に別の合図を持つ者が、二本目を数え始めた時刻。まだなら負</summary>
+        float[] cued2 = new float[0];
         CharacterController hull;
         /// <summary>目のカメラ。人が画面に映っているかを見るのに要る</summary>
         Camera lens;
@@ -273,7 +279,8 @@ namespace HalfAware
             // 同じ人へ戻れば頭から流し直す。Mover は有効になった瞬間に開始位置へ戻る
             movers = take.GetComponentsInChildren<Mover>(true);
             cued = new float[movers.Length];
-            for (var m = 0; m < cued.Length; m++) cued[m] = -1f;
+            cued2 = new float[movers.Length];
+            for (var m = 0; m < cued.Length; m++) { cued[m] = -1f; cued2[m] = -1f; }
 
             if (body != null) body.Apply(entry);
             if (caption != null) caption.text = entry.row ?? "";
@@ -372,16 +379,56 @@ namespace HalfAware
             for (var i = 0; i < movers.Length; i++)
             {
                 if (movers[i] == null) continue;
+                // 二本目に別の合図を持つ者は、その行が出てから二本目を数え始める（記憶 10 の孫息子）
+                if (movers[i].NextCue >= 0 && cued2[i] < 0f && spoken >= movers[i].NextCue) cued2[i] = clock;
+                var after = cued2[i] < 0f ? -1f : clock - cued2[i];
                 // 合図を持たない者は記憶の時計で動く。鳩の飛び立ちのように、
                 // 会話と関わりなく起きる出来事はこちら
-                if (movers[i].Cue < 0) { movers[i].Play(clock); continue; }
+                if (movers[i].Cue < 0) { movers[i].Play(clock, after); continue; }
                 if (cued[i] < 0f)
                 {
-                    if (spoken < movers[i].Cue) { movers[i].Play(0f); continue; }
+                    if (spoken < movers[i].Cue) { movers[i].Play(0f, after); continue; }
                     cued[i] = clock;
                 }
-                movers[i].Play(clock - cued[i]);
+                movers[i].Play(clock - cued[i], after);
             }
+        }
+
+        /// <summary>
+        /// その人がいま線の上を歩いているか。合図がまだ来ていない者は、始まりの位置に立っている
+        /// </summary>
+        bool Walking(Transform who)
+        {
+            for (var i = 0; i < movers.Length; i++)
+            {
+                if (movers[i] == null || movers[i].transform != who) continue;
+                var after = cued2[i] < 0f ? -1f : clock - cued2[i];
+                if (movers[i].Cue < 0) return movers[i].Moving(clock, after);
+                if (cued[i] < 0f) return false;
+                return movers[i].Moving(clock - cued[i], after);
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 次の会話を始められる所まで来ているか。〔区切り〕の後の会話だけが見る。
+        ///
+        /// **区切りは、主が体を動かしてから次を話す所**（設計書 7 節）。三階まで駆け上がる、池の縁まで歩く、
+        /// 玄関で靴を履く。行き先（<see cref="Take.Stop"/>）が無ければ相手のそば。
+        /// **相手が歩いているあいだは始めない。** 降りてくる息子や戻ってくる孫に、着く前から話しかけられてしまう
+        /// </summary>
+        bool Arrived(Transform who)
+        {
+            if (DiveEntry.AllDone(talks, done)) return false;
+            var talk = talks[done];
+            if (!talk.Cut) return true;
+            if (who == null || Walking(who)) return false;
+            Vector3 goal;
+            if (take.Stop(talk.stop, out goal)) goal = place != null ? place.TransformPoint(goal) : goal;
+            else goal = who.position;
+            var foot = player.transform.position;
+            var flat = new Vector2(foot.x - goal.x, foot.z - goal.z);
+            return flat.magnitude <= reach && Mathf.Abs(foot.y - goal.y) <= reachHigh;
         }
 
         /// <summary>
@@ -537,10 +584,13 @@ namespace HalfAware
             return who != null && DiveEntry.MayDive(talks, done, who.name);
         }
 
-        /// <summary>その人と次の会話を始められるか。会話は並びの順にしか始められない</summary>
+        /// <summary>
+        /// その人と次の会話を始められるか。会話は並びの順にしか始められない。
+        /// 〔区切り〕の後の会話は、行き先まで来てから（<see cref="Arrived"/>）
+        /// </summary>
         bool Talkable(Transform who)
         {
-            return who != null && DiveEntry.CanTalk(talks, done, who.name);
+            return who != null && DiveEntry.CanTalk(talks, done, who.name) && Arrived(who);
         }
 
         /// <summary>

@@ -33,13 +33,15 @@ namespace HalfAware
         public string line;
         [Tooltip("この行を交わしている人。Take の下の GameObject の名前。空なら相手を持たない行で、流さない")]
         public string partner;
+        [Tooltip("この行の前に〔区切り〕がある。同じ相手でもここで会話を切る。次の会話は主が行き先まで歩いてから始まる")]
+        public bool cut;
 
         /// <summary>相手を持つか。持たない行は会話に数えず、流さない</summary>
         public bool Partnered { get { return !string.IsNullOrEmpty(partner); } }
     }
 
     /// <summary>
-    /// 会話ひとつ。二行目から、相手が同じ行が続く所。
+    /// 会話ひとつ。二行目から、相手が同じ行が続く所。〔区切り〕（<see cref="Said.cut"/>）があればそこでも切る。
     /// 相手を持たない行は飛ばして数えるので、lines の番号は続いているとは限らない
     /// </summary>
     public struct Exchange
@@ -48,6 +50,14 @@ namespace HalfAware
         public string partner;
         /// <summary>この会話で出す行。<see cref="DiveEntry.said"/> での番号を並びの順に</summary>
         public int[] lines;
+        /// <summary>
+        /// 〔区切り〕の後の会話なら、記憶の頭から数えて何番目の区切りか（0 始まり）。区切りの後でなければ -1。
+        /// 行き先は <see cref="Take.Stop"/> がこの番号で持つ
+        /// </summary>
+        public int stop;
+
+        /// <summary>〔区切り〕の後の会話か。始めるには、主が行き先まで歩いてきている要る</summary>
+        public bool Cut { get { return stop >= 0; } }
     }
 
     /// <summary>記憶一つ分の値。場所と人の形はシーン（Take）が持ち、ここは数と文字だけ</summary>
@@ -102,7 +112,10 @@ namespace HalfAware
         /// **一行目は相手を持っていても数えない。** 記憶に入った瞬間に勝手に出る声で、
         /// 人を選んで始めるものではないから。
         /// **相手を持たない行は飛ばす。** 会話に数えず、流さない。前後が同じ相手なら、
-        /// 飛ばした行を挟んでも一つの会話のまま続く
+        /// 飛ばした行を挟んでも一つの会話のまま続く。
+        /// **〔区切り〕では同じ相手でも切る**（設計書 7 節）。区切りの後の会話は <see cref="Exchange.stop"/> に
+        /// 区切りの番号を持ち、主が行き先まで歩いてくるまで始められない。
+        /// 相手を持たない行に付いた区切りは、次の相手を持つ行へ持ち越す
         /// </summary>
         public static Exchange[] Exchanges(Said[] said)
         {
@@ -110,18 +123,24 @@ namespace HalfAware
             if (said == null) return all.ToArray();
             var lines = new List<int>();
             string partner = null;
+            var stop = -1;
+            var cuts = 0;
+            var pending = false;
             for (var k = 1; k < said.Length; k++)
             {
+                if (said[k].cut) pending = true;
                 if (!said[k].Partnered) continue;
-                if (partner != null && said[k].partner != partner)
+                if (partner != null && (said[k].partner != partner || pending))
                 {
-                    all.Add(new Exchange { partner = partner, lines = lines.ToArray() });
+                    all.Add(new Exchange { partner = partner, lines = lines.ToArray(), stop = stop });
                     lines.Clear();
                 }
+                if (lines.Count == 0) stop = pending ? cuts++ : -1;
+                pending = false;
                 partner = said[k].partner;
                 lines.Add(k);
             }
-            if (partner != null) all.Add(new Exchange { partner = partner, lines = lines.ToArray() });
+            if (partner != null) all.Add(new Exchange { partner = partner, lines = lines.ToArray(), stop = stop });
             return all.ToArray();
         }
 

@@ -268,5 +268,90 @@ namespace HalfAware.Tests
             Assert.That(DiveEntry.MayDive(talks, 2, ""), Is.False);
             Assert.That(DiveEntry.CanTalk(talks, 0, null), Is.False);
         }
+
+        // ---- 〔区切り〕 ---------------------------------------------------------
+
+        /// <summary>区切りの後の行を組む</summary>
+        static Said C(string line, string partner)
+        {
+            return new Said { line = line, partner = partner, cut = true };
+        }
+
+        /// <summary>メイの記憶の形。階段の下で母と二行、〔区切り〕、三階の戸口で母と二行</summary>
+        static Said[] Mei()
+        {
+            return new[]
+            {
+                L("ハンナ「メイ！」", null),
+                L("メイ「えー」", "Mother"),
+                L("ハンナ「水筒！」", "Mother"),
+                C("ハンナ「毎日でしょ」", "Mother"),
+                L("メイ「いってきます」", "Mother"),
+            };
+        }
+
+        // 区切りでは、同じ相手でも会話を二つに分ける。区切りの後の会話は区切りの番号を持つ
+        [Test]
+        public void ACutSplitsATalkWithTheSamePartner()
+        {
+            var talks = DiveEntry.Exchanges(Mei());
+            Assert.That(talks.Length, Is.EqualTo(2));
+            Assert.That(talks[0].lines, Is.EqualTo(new[] { 1, 2 }));
+            Assert.That(talks[0].Cut, Is.False);
+            Assert.That(talks[0].stop, Is.EqualTo(-1));
+            Assert.That(talks[1].lines, Is.EqualTo(new[] { 3, 4 }));
+            Assert.That(talks[1].Cut, Is.True);
+            Assert.That(talks[1].stop, Is.EqualTo(0));
+        }
+
+        // 区切りの前の会話を終えても、区切りの後の会話が済むまでは、その相手に板を出さない
+        [Test]
+        public void ThePanelWaitsForTheTalkAfterTheCut()
+        {
+            var talks = DiveEntry.Exchanges(Mei());
+            Assert.That(DiveEntry.MayDive(talks, 1, "Mother"), Is.False);
+            Assert.That(DiveEntry.CanTalk(talks, 1, "Mother"), Is.True);
+            Assert.That(DiveEntry.MayDive(talks, 2, "Mother"), Is.True);
+        }
+
+        // 区切りは記憶の頭から数える。相手の替わる所に付いた区切りも数え、
+        // 区切りの無い会話を挟んでも番号は続く（記憶 13 のダニエル）
+        [Test]
+        public void CutsAreCountedFromTheTopOfTheMemory()
+        {
+            var said = new[]
+            {
+                L("リンダ「ダニエル」", null),
+                L("ダニエル「分かってる」", "Mother"),
+                C("ダニエル「おはよ」", "Father"),
+                L("リンダ「ランチ」", "Mother"),
+                C("ダニエル「いってきます」", "Mother"),
+            };
+            var talks = DiveEntry.Exchanges(said);
+            Assert.That(talks.Length, Is.EqualTo(4));
+            Assert.That(talks[0].stop, Is.EqualTo(-1));
+            Assert.That(talks[1].stop, Is.EqualTo(0));
+            Assert.That(talks[1].partner, Is.EqualTo("Father"));
+            Assert.That(talks[2].stop, Is.EqualTo(-1));
+            Assert.That(talks[3].stop, Is.EqualTo(1));
+            Assert.That(talks[3].lines, Is.EqualTo(new[] { 4 }));
+        }
+
+        // 相手を持たない行に付いた区切りは、次の相手を持つ行へ持ち越す
+        [Test]
+        public void ACutOnALineWithoutAPartnerCarriesOver()
+        {
+            var said = new[]
+            {
+                L("呼ぶ声", null),
+                L("一", "A"),
+                C("流さない", null),
+                L("二", "A"),
+            };
+            var talks = DiveEntry.Exchanges(said);
+            Assert.That(talks.Length, Is.EqualTo(2));
+            Assert.That(talks[1].lines, Is.EqualTo(new[] { 3 }));
+            Assert.That(talks[1].stop, Is.EqualTo(0));
+        }
     }
 }
