@@ -26,6 +26,30 @@ namespace HalfAware.Tests
             return mover;
         }
 
+        // その場で振り向く人（記憶 12 の先輩）。動き出す秒の前は置いた向き、後は振り向いた向き。
+        // 背を向けたまま会話の相手をしていた、と差し戻された
+        [Test]
+        public void ATurnerFacesAwayUntilHerCueThenTurns()
+        {
+            GameObject go;
+            var mover = Make(out go, 0f);
+            try
+            {
+                var so = new SerializedObject(mover);
+                so.FindProperty("turns").boolValue = true;
+                so.FindProperty("yawFrom").floatValue = 20f;
+                so.FindProperty("yawTo").floatValue = 182f;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                mover.Play(0.5f);
+                Assert.That(go.transform.localEulerAngles.y, Is.EqualTo(20f).Within(1e-3f));
+                mover.Play(1.2f);
+                Assert.That(go.transform.localEulerAngles.y, Is.EqualTo(182f).Within(1e-3f));
+                mover.Play(0f);
+                Assert.That(go.transform.localEulerAngles.y, Is.EqualTo(20f).Within(1e-3f), "頭から流し直しても振り向いたまま");
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
         // 二本目が無ければ、一本目の終わりで止まったまま
         [Test]
         public void OneLineStopsAtItsEnd()
