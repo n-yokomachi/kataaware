@@ -284,6 +284,33 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
+        /// その場で振り向かせる。<paramref name="cue"/> 行が出てから <paramref name="at"/> 秒で、根の向きを <paramref name="yaw"/> へ替える。
+        /// 振り向く前の向きは、置いたときの向き。
+        /// 模型は PersonMotion がこまの頭ごとに根の向きへ寄せるので、半秒ほどで回り切る
+        /// </summary>
+        static void Turn(Transform who, float yaw, float at, int cue)
+        {
+            if (who == null) return;
+            var from = who.localEulerAngles.y;
+            Move(who, who.localPosition, who.localPosition, at, 0.1f, false, true, cue);
+            var so = new SerializedObject(who.GetComponent<Mover>());
+            so.FindProperty("turns").boolValue = true;
+            so.FindProperty("yawFrom").floatValue = from;
+            so.FindProperty("yawTo").floatValue = yaw;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>from から to を向く向き。+z を 0 とした度</summary>
+        static float Toward(Vector3 from, Vector3 to)
+        {
+            var d = to - from;
+            return Mathf.Repeat(Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg, 360f);
+        }
+
+        /// <summary>記憶 12 の先輩が、一行目が出てから振り向くまでの秒。背中を一度見せてから回る</summary>
+        const float SeniorTurnsAfter = 0.8f;
+
+        /// <summary>
         /// <see cref="Move"/> の線の終わりから、もう一本続けて動かす（駆け出して戻ってくる人）。
         /// 秒は一本目と同じ時計で数える。同じ人に Mover を二つ付けると後の方が先の方を上書きするので、一つにまとめる
         /// </summary>
@@ -675,11 +702,16 @@ namespace HalfAware.EditorTools
         // ---- 11. 女 18『プリヤ』 同じ電車。25 秒 -----------------------------------
 
         /// <summary>
-        /// 先輩の背中に声を掛けて本を差し出したところ。振り向いた先輩は車内の灯りを背にする
+        /// 先輩の背中に声を掛けて本を差し出したところ。振り向いた先輩は車内の灯りを背にする。
+        ///
+        /// **先輩は背中から始めて、名を返すところで振り向く。** 20° のまま据えていた頃は、
+        /// 会話のあいだもずっとプリヤに背を向けていて、「エミリーが逆方向を向いている」と差し戻された。
+        /// 一行目（「プリヤ？」）が出てから <see cref="SeniorTurnsAfter"/> 秒で、プリヤの立つ所（鍵打ちの頭）の方へ向き直る
         /// </summary>
         static HostKey[] Priya(Transform take)
         {
-            Cast(take, "Senior", new Vector3(0.2f, 0f, 0.6f), 20f, 1);
+            var senior = Cast(take, "Senior", new Vector3(0.2f, 0f, 0.6f), 20f, 1);
+            Turn(senior, Toward(senior.localPosition, new Vector3(0.15f, 0f, -0.9f)), SeniorTurnsAfter, 1);
             return new[]
             {
                 K(0f,  0.15f, 0f, -0.9f,   2f,   8f, 1.55f),  // 先輩の背中に本を差し出したところ

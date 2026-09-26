@@ -381,7 +381,8 @@ namespace HalfAware.EditorTools
             var takeActive = new bool[takes.Length]; for (var i = 0; i < takes.Length; i++) takeActive[i] = takes[i].gameObject.activeSelf;
             var placeActive = new bool[places.Length]; for (var i = 0; i < places.Length; i++) placeActive[i] = places[i].gameObject.activeSelf;
             var moverPos = new System.Collections.Generic.Dictionary<UnityEngine.Transform, UnityEngine.Vector3>();
-            foreach (var t in takes) foreach (var m in t.GetComponentsInChildren<HalfAware.Mover>(true)) moverPos[m.transform] = m.transform.localPosition;
+            var moverRot = new System.Collections.Generic.Dictionary<UnityEngine.Transform, UnityEngine.Quaternion>();
+            foreach (var t in takes) foreach (var m in t.GetComponentsInChildren<HalfAware.Mover>(true)) { moverPos[m.transform] = m.transform.localPosition; moverRot[m.transform] = m.transform.localRotation; }
             var promptActive = prompt.gameObject.activeSelf; var promptText0 = prompt.text;
             var bandActive = band.activeSelf; var subText0 = subText.text;
             var sky = HalfAware.EditorTools.CheckDiveSky.Sky.Read();
@@ -488,6 +489,8 @@ namespace HalfAware.EditorTools
                 panel.gameObject.SetActive(panActive);
                 panT.position = panPos; panT.rotation = panRot; panT.localScale = panScale;
                 foreach (var kv in moverPos) kv.Key.localPosition = kv.Value;
+                // 振り向く人（Mover.Turns）は根の向きも動くので戻す
+                foreach (var kv in moverRot) kv.Key.localRotation = kv.Value;
                 for (var i = 0; i < takes.Length; i++) takes[i].gameObject.SetActive(takeActive[i]);
                 for (var i = 0; i < places.Length; i++) places[i].gameObject.SetActive(placeActive[i]);
                 hull.enabled = false; pT.position = pPos; pT.rotation = pRot; hull.enabled = true;
@@ -657,7 +660,8 @@ namespace HalfAware.EditorTools
             var main = GameObject.Find("Player/Main Camera");
             if (main == null) return "Player/Main Camera が無い";
             var kept = new Dictionary<Transform, Vector3>();
-            foreach (var m in take.GetComponentsInChildren<Mover>(true)) kept[m.transform] = m.transform.localPosition;
+            var turned = new Dictionary<Transform, Quaternion>();
+            foreach (var m in take.GetComponentsInChildren<Mover>(true)) { kept[m.transform] = m.transform.localPosition; turned[m.transform] = m.transform.localRotation; }
             GameObject eyeGo = null, volGo = null;
             VolumeProfileHolder hold = null;
             try
@@ -723,6 +727,7 @@ namespace HalfAware.EditorTools
                 if (volGo != null) Object.DestroyImmediate(volGo);
                 if (eyeGo != null) Object.DestroyImmediate(eyeGo);
                 foreach (var kv in kept) if (kv.Key != null) kv.Key.localPosition = kv.Value;
+                foreach (var kv in turned) if (kv.Key != null) kv.Key.localRotation = kv.Value;
                 foreach (var motion in take.GetComponentsInChildren<PersonMotion>(true)) motion.Watch(null);
             }
         }

@@ -37,6 +37,12 @@ namespace HalfAware
         [SerializeField] float nextAt;
         [Tooltip("二本目の線を動いているあいだの秒。0 なら二本目は無い")]
         [SerializeField] float nextSpan;
+        [Tooltip("動き出す秒で向きを変える。その場で振り向く人のため")]
+        [SerializeField] bool turns;
+        [Tooltip("動き出す前の向き。度。Take からのローカル")]
+        [SerializeField] float yawFrom;
+        [Tooltip("動き出してからの向き。度。Take からのローカル")]
+        [SerializeField] float yawTo;
 
         public Vector3 From { get { return from; } }
         public Vector3 To { get { return to; } }
@@ -45,6 +51,10 @@ namespace HalfAware
         public Vector3 Next { get { return next; } }
         public float NextAt { get { return nextAt; } }
         public float NextSpan { get { return nextSpan; } }
+        /// <summary>動き出す秒で向きを変えるか</summary>
+        public bool Turns { get { return turns; } }
+        public float YawFrom { get { return yawFrom; } }
+        public float YawTo { get { return yawTo; } }
         /// <summary>二本目があるか</summary>
         public bool Returns { get { return nextSpan > 0f; } }
         /// <summary>動き終わる所。二本目があればその先</summary>
@@ -72,6 +82,9 @@ namespace HalfAware
         public void Play(float t)
         {
             transform.localPosition = Where(t);
+            // **根の向きは一息に替える。** 模型は PersonMotion がこまの頭ごとに根の向きへ寄せるので
+            // （TurnPerTick）、振り向きはそちらで段々に回って見える
+            if (turns) transform.localRotation = Quaternion.Euler(0f, t < at ? yawFrom : yawTo, 0f);
             if (ground) Land();
         }
 
