@@ -9,14 +9,14 @@ namespace HalfAware
     public static class SceneMenu
     {
         /// <summary>表に出す名。物語の順に並べる</summary>
-        public static readonly string[] Titles = { "自室", "路地裏", "自室・接続", "潜る", "小休止", "車内" };
+        public static readonly string[] Titles = { "自室", "路地裏", "自室・接続", "潜る", "小休止", "車内", "村" };
 
         /// <summary>
         /// 読み込むシーンの名。Titles と同じ並び。
         /// ここに挙げた名は組み立ての一覧にも入っていること。
         /// 入っていないと、数字を押した先で読み込みが落ちる
         /// </summary>
-        public static readonly string[] Scenes = { "Room", "Alley", "Connect", "Dive", "Rest", "Drive" };
+        public static readonly string[] Scenes = { "Room", "Alley", "Connect", "Dive", "Rest", "Drive", "Village" };
 
         /// <summary>押せる数字の数</summary>
         public static int Count { get { return Scenes.Length; } }

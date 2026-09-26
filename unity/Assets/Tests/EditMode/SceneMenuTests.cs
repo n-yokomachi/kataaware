@@ -20,6 +20,7 @@ namespace HalfAware.Tests
             Assert.That(SceneMenu.Pick(4), Is.EqualTo("Dive"));
             Assert.That(SceneMenu.Pick(5), Is.EqualTo("Rest"));
             Assert.That(SceneMenu.Pick(6), Is.EqualTo("Drive"));
+            Assert.That(SceneMenu.Pick(7), Is.EqualTo("Village"));
         }
 
         // 数字は鍵盤から直に読んでいて、読んでいるのは 1〜9。

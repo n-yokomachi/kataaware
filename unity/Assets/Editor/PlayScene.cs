@@ -25,6 +25,7 @@ namespace HalfAware.EditorTools
             new Entry { title = "潜る", path = "Assets/Scenes/Dive.unity", note = "場面 4。他人の記憶を人から人へ渡り歩き、切断で戻る" },
             new Entry { title = "小休止", path = "Assets/Scenes/Rest.unity", note = "場面 5。座ったまま眩暈が薄れ、一本吸って、もう一度潜る" },
             new Entry { title = "車内", path = "Assets/Scenes/Drive.unity", note = "場面 8。ガレージから乗り込み、3 つの景色を抜ける" },
+            new Entry { title = "村", path = "Assets/Scenes/Village.unity", note = "場面 9。車を降りたところの朝の村（夕方の場面 6 と同じ場所）" },
         };
 
         [MenuItem("HalfAware/Scenes", false, 0)]
