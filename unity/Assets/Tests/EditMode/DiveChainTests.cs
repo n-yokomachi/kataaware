@@ -101,6 +101,30 @@ namespace HalfAware.Tests
         }
 
         [Test]
+        public void TheDazeWaitsUntilTheCutOpens()
+        {
+            var chain = Fresh();
+            Assert.AreEqual(0f, DiveDirector.Dizziness(chain, 0.8f), 1e-4f, "最初の一人から眩暈が出ている");
+            for (var i = 0; i < 8; i++)
+            {
+                chain.Hop(i + 1);
+                Assert.AreEqual(0f, DiveDirector.Dizziness(chain, 0.8f), 1e-4f, chain.Hops + " 人目で眩暈が出ている");
+            }
+            Assert.IsTrue(chain.CanCut);
+            chain.Hop(10);
+            Assert.Greater(DiveDirector.Dizziness(chain, 0.8f), 0f, "押せるようになった後も眩暈が出ない");
+        }
+
+        [Test]
+        public void TheDazeTopsOutWhereTheRosterEnds()
+        {
+            var chain = Fresh();
+            for (var i = 1; i < 16; i++) chain.Hop(i);
+            Assert.AreEqual(15, chain.Hops);
+            Assert.AreEqual(0.875f * 0.8f, DiveDirector.Dizziness(chain, 0.8f), 1e-4f, "十六人の名簿では 0.7 で止まる");
+        }
+
+        [Test]
         public void CutOnlyGrows()
         {
             var chain = Fresh();

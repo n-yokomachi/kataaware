@@ -81,7 +81,7 @@ namespace HalfAware
         [SerializeField] float firstSeconds = 9f;
 
         [Header("眩暈")]
-        [Tooltip("cutAfter 人まで渡ったときの眩暈の濃さ")]
+        [Tooltip("`切断` が押せるようになってから、さらに cutAfter 人渡ったときの眩暈の濃さ")]
         [SerializeField] float dazeMax = 0.8f;
 
         [Header("切り替え")]
@@ -465,12 +465,26 @@ namespace HalfAware
             Drop();
         }
 
-        /// <summary>渡るたびに眩暈を一段濃くする。cutAfter 人で最大に達し、以後は最大のまま</summary>
+        /// <summary>
+        /// 渡るたびに眩暈を一段濃くする。
+        ///
+        /// **`切断` が押せるようになるまでは掛けない。** 最初の一人から Hops / cutAfter で濃くしていた頃は、
+        /// 二人目でもう画が二重にぶれ始めて、「視界がぼやけるのが速い。8人までは無効にして」と差し戻された。
+        /// 目の疲れ（<see cref="Wear"/>）と同じく <see cref="DiveChain.Past"/> で上げる。
+        /// cutAfter 人に届くまで 0、押せるようになったその瞬間もまだ 0、そこから先でもう cutAfter 人渡るあいだに
+        /// <see cref="dazeMax"/> まで上がる
+        /// </summary>
         void Deepen()
         {
             if (daze == null) return;
-            var step = Mathf.Clamp01((float)chain.Hops / Mathf.Max(1, cutAfter)) * dazeMax;
+            var step = Dizziness(chain, dazeMax);
             daze.Hold(step, step);
+        }
+
+        /// <summary>いまの人数での眩暈の濃さ。0 から most。動作確認とテストから読む</summary>
+        public static float Dizziness(DiveChain chain, float most)
+        {
+            return chain != null ? chain.Past * most : 0f;
         }
 
         // ---- 板 --------------------------------------------------------------
