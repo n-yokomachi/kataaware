@@ -58,6 +58,26 @@ namespace HalfAware
         }
 
         /// <summary>
+        /// 場面の番号から頭の行の左。タイトルの画面の起動の表示にも使う。
+        /// シーンのある場面はそのシーンの物。まだシーンの無い場面は、分かっている所だけ
+        /// </summary>
+        public static string ForStage(int stage)
+        {
+            var scene = StageMap.SceneOf(stage);
+            if (scene != null) return For(scene);
+            switch (stage)
+            {
+                // 場面 6。庭の記憶。記憶の日時は場面 6 を作る時に決める
+                case 6: return Diving + Gap + "村";
+                // 場面 7。潜って戻った夜の自室。時刻は場面 7 を作る時に決める
+                case 7: return "倫敦・自室";
+                // 場面 10。場面 9 と同じ朝の村
+                case 10: return For("Village");
+                default: return string.Empty;
+            }
+        }
+
+        /// <summary>
         /// 記憶の中の頭の行。row は場面 3 のモニターの列と同じ書式（「女　6　『メイ』　2156/03/02 07:14」）で、
         /// そこから日時を拾う。place は DiveIds の場所
         /// </summary>

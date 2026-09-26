@@ -19,6 +19,7 @@ namespace HalfAware.EditorTools
 
         static readonly Entry[] Scenes =
         {
+            new Entry { title = "タイトル", path = "Assets/Scenes/Title.unity", note = "インプラントの起動。はじめる・思い出す。背景はいちばん新しいセーブの場面" },
             new Entry { title = "自室", path = "Assets/Scenes/Room.unity", note = "場面 1。ロンドンの安宿。煙草と記憶の抜き取り" },
             new Entry { title = "路地裏", path = "Assets/Scenes/Alley.unity", note = "場面 2。グレビル・ストリートとブリーディング・ハート・ヤード" },
             new Entry { title = "自室・接続", path = "Assets/Scenes/Connect.unity", note = "場面 3。売上を書き足し、ジャックを繋いで潜る" },
