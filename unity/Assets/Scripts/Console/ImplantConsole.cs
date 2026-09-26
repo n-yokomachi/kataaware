@@ -122,10 +122,38 @@ namespace HalfAware
         public const string RecallTitle = "思い出す　　E で読む";
         public const string HereMark = "いま";
 
-        /// <summary>知らせを出しておく秒。unscaled</summary>
-        const float NoteSeconds = 2.4f;
         /// <summary>車輪 1 刻みで送る行数</summary>
         const float WheelRows = 3f;
+
+        // 浮かべる板（上書きの確かめと知らせ）。コンソールのいちばん上の層に重ねる。
+        // 見た目は二択の札（ChoiceView）に倣う: 暗い地、青緑の細い枠、左上と右下の鉤。
+        // 地は枠（BoxFill）と同じ色で、濃さだけ 1 にする。記憶する・思い出すの枠の明るい行の字の上に重なるので、
+        // リニアで重ねると 0.996 でも後ろの字が暗い地の上に浮いて読めてしまう（2026-09-27 撮って確かめた）
+
+        /// <summary>浮かべる板の地</summary>
+        static readonly Color FloatFill = new Color(BoxFill.r, BoxFill.g, BoxFill.b, 1f);
+        /// <summary>知らせの字。いちばん小さい字（11 Dot）より大きくして、粗い画面の中でもはっきり読ませる</summary>
+        const float NoteFont = 14f * Dot;
+        const float NoteRow = 20f * Dot;
+        const float NotePadX = 24f * Dot;
+        const float NotePadY = 10f * Dot;
+        /// <summary>
+        /// 知らせの板の幅の下限。記憶する・思い出すの行と同じ幅（枠 280 から両脇の 12 を引いた 256、確かめの板とも同じ）。
+        /// 行の下に出す時、下の行を途中で切らずに覆う
+        /// </summary>
+        const float NoteLeast = SlotBoxWidth - BoxPad * 2f;
+        /// <summary>知らせの字の間。0.12 em</summary>
+        const float NoteSpacing = 12f;
+        /// <summary>浮かべる板と、選んでいる行のあいだ。隣の行の字の頭（行の上の縁から 5 Dot ほど）が覗かない幅</summary>
+        const float FloatGap = 3f * Dot;
+        /// <summary>浮かべる板の鉤の一辺と太さ</summary>
+        const float FloatHook = 8f * Dot;
+        static readonly Color FloatEdge = Tint(Rgb(127, 227, 236, 0.45f));
+        static readonly Color AskRule = Tint(Rgb(127, 227, 236, 0.35f));
+        static readonly Color Bracket = Tint(Rgb(127, 227, 236, 0.7f));
+        static readonly Color Chosen = Tint(Rgb(127, 227, 236, 0.22f));
+        /// <summary>札の括弧の腕の長さ（二択の札と同じ）</summary>
+        const float Arm = 5f * Dot;
 
         // ---- 状態 ------------------------------------------------------------
 
@@ -138,6 +166,10 @@ namespace HalfAware
         public static ImplantConsole Instance { get { return instance; } }
 
         readonly ConsoleMenu menu = new ConsoleMenu();
+        readonly ConsoleNote note = new ConsoleNote();
+        /// <summary>確かめの札へのマウス。二択の札と同じ決まり（出した直後にカーソルが乗っているだけでは選ばない）</summary>
+        readonly ChoicePointer askPointer = new ChoicePointer();
+        readonly List<CardView> askCards = new List<CardView>();
         readonly LogScroll scroll = new LogScroll();
         readonly List<RowView> rows = new List<RowView>();
         readonly List<ButtonView> buttons = new List<ButtonView>();
@@ -151,19 +183,28 @@ namespace HalfAware
         RawImage scan;
         TMP_Text headLeft;
         TMP_Text headRight;
-        TMP_Text note;
         RectTransform viewport;
         RectTransform content;
         RectTransform thumb;
         RectTransform box;
         RectTransform rememberBox;
         RectTransform recallBox;
+        /// <summary>上書きの確かめ。画面いっぱいの当たり（下のボタンや行へクリックを通さない）と、その上の板</summary>
+        RectTransform askLayer;
+        RectTransform askBoard;
+        TMP_Text askQuestion;
+        RectTransform askRule;
+        ChoiceLayout.Frame askFrame;
+        bool askLaid;
+        /// <summary>知らせの板。いちばん上の層</summary>
+        RectTransform noteBoard;
+        CanvasGroup noteGroup;
+        TMP_Text noteText;
         Texture2D scanTexture;
         /// <summary>塗りつぶしの上に置く暗い字の書体の色づけ。線を太らせて、粗い画面でも地に溶けないようにする</summary>
         Material heavy;
         /// <summary>暗い字の線をどれだけ太らせるか。SDF の縁を外へ寄せる量</summary>
         const float HeavyDilate = 0.3f;
-        float noteUntil;
         int shown = -1;
         float keptScale = 1f;
         CursorLockMode keptLock;
@@ -350,8 +391,6 @@ namespace HalfAware
             Top(headRight.rectTransform, HeadSide, HeadSide, HeadTop, HeadHeight);
             headRight.characterSpacing = HeadSpacing;
             headRight.text = Mono(CloseHint);
-            note = Text(panel, "Note", HeadFont, ButtonText, TextAlignmentOptions.Top);
-            Top(note.rectTransform, HeadSide, HeadSide, HeadTop, HeadHeight);
 
             Buttons(panel);
             Log(panel);
@@ -359,8 +398,131 @@ namespace HalfAware
             List();
             rememberBox = SlotBox("Remember", RememberTitle, ConsoleMenu.RememberRows, rememberRows);
             recallBox = SlotBox("Recall", RecallTitle, ConsoleMenu.RecallRows, recallRows);
+            // 浮かべる板は最後に作って、いちばん上の層に置く。知らせは確かめよりさらに上
+            BuildAsk();
+            BuildNote();
 
             root.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// 上書きの確かめ。問い・細い線・「はい／いいえ」の札を、二択の札と同じ並べ方（<see cref="ChoiceLayout"/>）で組む。
+        /// 下に画面いっぱいの透明な当たりを敷き、確かめの間はボタンや行へクリックを通さない
+        /// </summary>
+        void BuildAsk()
+        {
+            askLayer = Rect(root, "Ask");
+            Stretch(askLayer, 0f, 0f, 0f, 0f);
+            var blocker = askLayer.gameObject.AddComponent<Image>();
+            blocker.color = Clear;
+            askBoard = Board(askLayer, "Board");
+            askQuestion = Text(askBoard, "Question", ChoiceLayout.QuestionFont, ButtonText, TextAlignmentOptions.Center);
+            askQuestion.characterSpacing = ChoiceLayout.QuestionSpacing;
+            askRule = Fill(askBoard, "Rule", AskRule, false).rectTransform;
+            for (var i = 0; i < ConsoleMenu.Answers.Length; i++) askCards.Add(MakeCard(askBoard, i));
+            askLayer.gameObject.SetActive(false);
+        }
+
+        CardView MakeCard(RectTransform parent, int index)
+        {
+            var c = new CardView();
+            c.rect = Rect(parent, "Card" + index);
+            c.fill = c.rect.gameObject.AddComponent<Image>();
+            c.fill.color = Clear;
+            c.fill.raycastTarget = false;
+            c.brackets = Brackets(c.rect);
+            c.label = Text(c.rect, "Label", ChoiceLayout.CardFont, ButtonText, TextAlignmentOptions.Center);
+            c.label.characterSpacing = ChoiceLayout.CardSpacing;
+            Stretch(c.label.rectTransform, 0f, 0f, 0f, 0f);
+            c.label.text = ConsoleMenu.Answers[index];
+            c.Paint(false);
+            return c;
+        }
+
+        /// <summary>知らせの板。字の幅に合わせて、出すたびに大きさと置き場を決める</summary>
+        void BuildNote()
+        {
+            noteBoard = Board(root, "Note");
+            noteGroup = noteBoard.gameObject.AddComponent<CanvasGroup>();
+            noteGroup.blocksRaycasts = false;
+            noteGroup.interactable = false;
+            noteText = Text(noteBoard, "Text", NoteFont, ButtonText, TextAlignmentOptions.Center);
+            noteText.characterSpacing = NoteSpacing;
+            Stretch(noteText.rectTransform, 0f, 0f, 0f, 0f);
+            noteBoard.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// 浮かべる板の地・枠・鉤。暗い地に青緑の細い枠、左上と右下に鉤（二択の札と同じ出し方）。
+        /// 真ん中を軸にして置く（<see cref="Float"/>）
+        /// </summary>
+        static RectTransform Board(RectTransform parent, string name)
+        {
+            var b = Rect(parent, name);
+            b.anchorMin = new Vector2(0.5f, 0.5f);
+            b.anchorMax = new Vector2(0.5f, 0.5f);
+            b.pivot = new Vector2(0.5f, 0.5f);
+            var bg = b.gameObject.AddComponent<Image>();
+            bg.color = FloatFill;
+            bg.raycastTarget = false;
+            Border(b, FloatEdge, Line);
+            Corner(b, 0f, 1f);
+            Corner(b, 1f, 0f);
+            return b;
+        }
+
+        /// <summary>板の角の鉤。枠の線に重ねる。x・y は角（0 が左・下、1 が右・上）</summary>
+        static void Corner(RectTransform board, float x, float y)
+        {
+            var hook = Rect(board, "Hook" + x + y);
+            hook.anchorMin = new Vector2(x, y);
+            hook.anchorMax = new Vector2(x, y);
+            hook.pivot = new Vector2(x, y);
+            hook.anchoredPosition = Vector2.zero;
+            hook.sizeDelta = new Vector2(FloatHook, FloatHook);
+            var across = Fill(hook, "Across", Accent, false).rectTransform;
+            across.anchorMin = new Vector2(0f, y);
+            across.anchorMax = new Vector2(1f, y);
+            across.pivot = new Vector2(0.5f, y);
+            across.anchoredPosition = Vector2.zero;
+            across.sizeDelta = new Vector2(0f, HookLine);
+            var down = Fill(hook, "Down", Accent, false).rectTransform;
+            down.anchorMin = new Vector2(x, 0f);
+            down.anchorMax = new Vector2(x, 1f);
+            down.pivot = new Vector2(x, 0.5f);
+            down.anchoredPosition = Vector2.zero;
+            down.sizeDelta = new Vector2(HookLine, 0f);
+        }
+
+        /// <summary>札の左右の括弧。縦の線と、上下へ内側に伸ばす短い腕（二択の札と同じ）</summary>
+        static Image[] Brackets(RectTransform card)
+        {
+            var list = new Image[6];
+            for (var side = 0; side < 2; side++)
+            {
+                var x = side == 0 ? 0f : 1f;
+                var up = Fill(card, "Bracket" + side, Bracket, false);
+                var r = up.rectTransform;
+                r.anchorMin = new Vector2(x, 0f);
+                r.anchorMax = new Vector2(x, 1f);
+                r.pivot = new Vector2(x, 0.5f);
+                r.anchoredPosition = Vector2.zero;
+                r.sizeDelta = new Vector2(Line, 0f);
+                list[side * 3] = up;
+                for (var end = 0; end < 2; end++)
+                {
+                    var y = end == 0 ? 1f : 0f;
+                    var arm = Fill(card, "Arm" + side + end, Bracket, false);
+                    var a = arm.rectTransform;
+                    a.anchorMin = new Vector2(x, y);
+                    a.anchorMax = new Vector2(x, y);
+                    a.pivot = new Vector2(x, y);
+                    a.anchoredPosition = Vector2.zero;
+                    a.sizeDelta = new Vector2(Arm, Line);
+                    list[side * 3 + 1 + end] = arm;
+                }
+            }
+            return list;
         }
 
         /// <summary>細い走査線。1 px の線と 2 px の隙間の繰り返し。1 本の絵を繰り返して貼る</summary>
@@ -533,12 +695,7 @@ namespace HalfAware
                 var row = i;
                 var hit = r.gameObject.AddComponent<ConsolePointer>();
                 hit.Entered = () => { menu.HoverRow(row); Paint(); };
-                hit.Clicked = () =>
-                {
-                    menu.HoverRow(row);
-                    // 空きの行は選べないので、押しても選んでいる行が替わらない。そのときは何もしない
-                    if (menu.Row == row) Act();
-                };
+                hit.Clicked = () => PressRow(row);
                 into.Add(view);
             }
             b.gameObject.SetActive(false);
@@ -593,8 +750,7 @@ namespace HalfAware
                 menu.Hover((int)ActionOf(panel));
                 menu.Decide(Here);
             }
-            noteUntil = 0f;
-            note.text = string.Empty;
+            note.Clear();
             root.gameObject.SetActive(true);
             Canvas.ForceUpdateCanvases();
             Head();
@@ -609,26 +765,32 @@ namespace HalfAware
         void Update()
         {
             var keys = Keyboard.current;
+            var mouse = Mouse.current;
             if (!IsOpen)
             {
-                // タイトルの画面では開かない。インプラントはまだ起動の途中
-                if (keys != null && keys.tabKey.wasPressedThisFrame && !SaveFlow.OnTitle) Open();
+                // TAB か右クリックで開く（二択の札を指している間も同じ）。タイトルの画面では開かない。
+                // 右クリックは遊びの中でほかに使っていない。PlayerController は書き換えず、ここで右ボタンを直に読む
+                var tab = keys != null && keys.tabKey.wasPressedThisFrame;
+                var right = mouse != null && mouse.rightButton.wasPressedThisFrame;
+                if (ConsoleMenu.Opens(tab, right, SaveFlow.OnTitle)) Open();
                 return;
             }
+            // 知らせは、出した後の次の入力で消す。入力は消すだけでなく、そのままふだんどおり効く
+            note.Step(Time.unscaledTime, Time.frameCount, Pressed(keys, mouse));
             // 開いている間に行が増えることは無いはずだが、増えたら並べ直す
             if (ConsoleLog.Here().Count != shown) Rows();
             if (keys != null && Keys(keys)) return;
-            var mouse = Mouse.current;
-            if (mouse != null && menu.Panel == ConsolePanel.None)
+            if (mouse != null)
             {
-                var wheel = mouse.scroll.ReadValue().y;
-                if (wheel > 0.01f) scroll.By(Step() * WheelRows);       // 奥へ回すと上（古い方）へ
-                else if (wheel < -0.01f) scroll.By(-Step() * WheelRows);
-            }
-            if (noteUntil > 0f && Time.unscaledTime > noteUntil)
-            {
-                noteUntil = 0f;
-                note.text = string.Empty;
+                // 右クリックは Esc と同じく一つ前に戻る。何も開いていなければ閉じる
+                if (mouse.rightButton.wasPressedThisFrame && Back()) return;
+                if (menu.Asking) PointAsk(mouse);
+                else if (menu.Panel == ConsolePanel.None)
+                {
+                    var wheel = mouse.scroll.ReadValue().y;
+                    if (wheel > 0.01f) scroll.By(Step() * WheelRows);       // 奥へ回すと上（古い方）へ
+                    else if (wheel < -0.01f) scroll.By(-Step() * WheelRows);
+                }
             }
             Paint();
             // 押したボタンやつまみが選ばれたままだと、矢印の入力を uGUI が横取りする
@@ -636,11 +798,45 @@ namespace HalfAware
             if (events != null && events.currentSelectedGameObject != null) events.SetSelectedGameObject(null);
         }
 
+        /// <summary>このフレームで何か押したか。キー・マウスのボタン・車輪。知らせを消すのに使う</summary>
+        static bool Pressed(Keyboard keys, Mouse mouse)
+        {
+            if (keys != null && keys.anyKey.wasPressedThisFrame) return true;
+            if (mouse == null) return false;
+            return mouse.leftButton.wasPressedThisFrame || mouse.rightButton.wasPressedThisFrame
+                || mouse.middleButton.wasPressedThisFrame || Mathf.Abs(mouse.scroll.ReadValue().y) > 0.01f;
+        }
+
+        /// <summary>
+        /// 一つ前に戻る（Esc・右クリック）。上書きの確かめ、記憶する・思い出す・デバッグの枠の順に、
+        /// いちばん上の物を一つ閉じる。何も開いていなければコンソールを閉じる。閉じたら true
+        /// </summary>
+        public bool Back()
+        {
+            if (menu.Back())
+            {
+                Paint();
+                return false;
+            }
+            Close();
+            return true;
+        }
+
         /// <summary>鍵盤。閉じたら true</summary>
         bool Keys(Keyboard keys)
         {
             if (keys.tabKey.wasPressedThisFrame) { Close(); return true; }
-            if (keys.escapeKey.wasPressedThisFrame && !menu.Back()) { Close(); return true; }
+            if (keys.escapeKey.wasPressedThisFrame) return Back();
+            var decide = keys.eKey.wasPressedThisFrame || keys.enterKey.wasPressedThisFrame
+                || keys.numpadEnterKey.wasPressedThisFrame;
+            if (menu.Asking)
+            {
+                // 確かめの間は、左右で札を選び、E・Enter で決めるだけ。数字で場面へ飛ばない
+                if (keys.leftArrowKey.wasPressedThisFrame || keys.aKey.wasPressedThisFrame) menu.MoveAnswer(-1);
+                if (keys.rightArrowKey.wasPressedThisFrame || keys.dKey.wasPressedThisFrame) menu.MoveAnswer(1);
+                if (decide) Answer();
+                return false;
+            }
             var digit = Digit(keys);
             if (digit > 0 && Jump(SceneMenu.Target(digit, Here))) return true;
             if (keys.leftArrowKey.wasPressedThisFrame || keys.aKey.wasPressedThisFrame) menu.Move(-1);
@@ -659,8 +855,6 @@ namespace HalfAware
                 if (keys.pageUpKey.wasPressedThisFrame) scroll.By(scroll.View * 0.9f);
                 if (keys.pageDownKey.wasPressedThisFrame) scroll.By(-scroll.View * 0.9f);
             }
-            var decide = keys.eKey.wasPressedThisFrame || keys.enterKey.wasPressedThisFrame
-                || keys.numpadEnterKey.wasPressedThisFrame;
             if (!decide) return false;
             // 枠を出している間の決定は、選んでいる行に効く（場面へ飛ぶ・書く・読む）
             if (menu.Panel != ConsolePanel.None) return Act();
@@ -704,11 +898,19 @@ namespace HalfAware
                     return Jump(menu.RowTarget(Here));
                 case ConsolePanel.Remember:
                 {
-                    var slot = menu.RowSlot;
-                    if (slot == null) return false;
-                    var wrote = SaveFlow.Remember(slot.Value);
-                    Say(wrote != null ? ConsoleMenu.Remembered + "　―　" + SaveStore.NameOf(slot.Value) : ConsoleMenu.CannotRemember);
+                    if (menu.RowSlot == null) return false;
+                    // 書けない所（場面の頭が無い）なら、上書きを確かめる前に知らせる
+                    if (SaveFlow.Head == null)
+                    {
+                        Say(ConsoleMenu.CannotRemember);
+                        Paint();
+                        return false;
+                    }
+                    // 中身のある置き場なら上書きを確かめる。空きならそのまま書く
                     Refresh();
+                    var slot = menu.Commit();
+                    if (slot != null) Store(slot.Value);
+                    else if (menu.Asking) Ask();
                     Paint();
                     return false;
                 }
@@ -746,11 +948,146 @@ namespace HalfAware
             return true;
         }
 
-        /// <summary>頭の行の真ん中に、少しのあいだ知らせを出す</summary>
-        void Say(string said)
+        /// <summary>
+        /// 枠の行を押す（クリック・撮影）。選べない行（思い出すの空き）なら選びが替わらないので何もしない。
+        /// 閉じたら true
+        /// </summary>
+        public bool PressRow(int row)
         {
-            note.text = said;
-            noteUntil = Time.unscaledTime + NoteSeconds;
+            menu.HoverRow(row);
+            if (menu.Asking || menu.Row != row) return false;
+            return Act();
+        }
+
+        /// <summary>置き場へ書いて、書いたか書けなかったかを知らせる</summary>
+        void Store(SaveSlot slot)
+        {
+            var wrote = SaveFlow.Remember(slot);
+            Refresh();
+            Say(wrote != null ? ConsoleMenu.Remembered + "　―　" + SaveStore.NameOf(slot) : ConsoleMenu.CannotRemember);
+        }
+
+        /// <summary>上書きの確かめを出す。はじめは「いいえ」を選んでいる（ConsoleMenu.Commit）</summary>
+        void Ask()
+        {
+            askLayer.gameObject.SetActive(true);
+            if (!askLaid) LayAsk();
+            Float(askBoard, askFrame.size);
+            askPointer.Reset();
+        }
+
+        /// <summary>確かめの札に決める。「はい」なら書いて知らせ、「いいえ」なら記憶するの枠へ戻る</summary>
+        void Answer()
+        {
+            var slot = menu.Confirm();
+            if (slot != null) Store(slot.Value);
+            Paint();
+        }
+
+        /// <summary>確かめの札を押す（撮影・確かめ）。index は ConsoleMenu.YesIndex か NoIndex</summary>
+        public void Answer(int index)
+        {
+            menu.HoverAnswer(index);
+            Answer();
+        }
+
+        /// <summary>
+        /// 確かめの札へのマウス。二択の札と同じく、入ったら選び、同じ札の上で押して離したら決める。
+        /// 出した直後にカーソルが札に乗っているだけでは選ばない
+        /// </summary>
+        void PointAsk(Mouse mouse)
+        {
+            askPointer.Step(AskAt(mouse.position.ReadValue()), mouse.leftButton.wasPressedThisFrame,
+                mouse.leftButton.wasReleasedThisFrame);
+            if (askPointer.Entered >= 0) menu.HoverAnswer(askPointer.Entered);
+            if (askPointer.Picked >= 0) Answer(askPointer.Picked);
+        }
+
+        /// <summary>
+        /// 画面の座標 screen の下にある確かめの札。無ければ -1。
+        /// 粗い画面で描いているので、座標をそちらへ直してから、Canvas を描くカメラで板の中の座標へ移す
+        /// </summary>
+        int AskAt(Vector2 screen)
+        {
+            if (!askLaid || !askBoard.gameObject.activeInHierarchy) return -1;
+            var canvas = GetComponent<Canvas>().rootCanvas;
+            var overlay = canvas.renderMode == RenderMode.ScreenSpaceOverlay;
+            var cam = overlay ? null : canvas.worldCamera;
+            var at = overlay ? screen : UiLens.ToLens(screen);
+            Vector2 local;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(askBoard, at, cam, out local)) return -1;
+            return ChoiceLayout.Hit(askFrame, local);
+        }
+
+        /// <summary>確かめの問いと札を、二択の札と同じ寸法で並べる。字の幅を測るので、出した後に一度だけ</summary>
+        void LayAsk()
+        {
+            askQuestion.text = ConsoleMenu.OverwriteQuestion;
+            var widths = new float[askCards.Count];
+            for (var i = 0; i < askCards.Count; i++)
+                widths[i] = askCards[i].label.GetPreferredValues(askCards[i].label.text).x;
+            askFrame = ChoiceLayout.Lay(askQuestion.GetPreferredValues(askQuestion.text).x, widths);
+            askBoard.sizeDelta = askFrame.size;
+            Place(askQuestion.rectTransform, askFrame.question);
+            Place(askRule, askFrame.line);
+            for (var i = 0; i < askCards.Count; i++) Place(askCards[i].rect, askFrame.cards[i]);
+            askLaid = true;
+        }
+
+        /// <summary>
+        /// 知らせを出す。コンソールのいちばん上の層に、暗い板に載せて出す。
+        /// <see cref="ConsoleNote.Seconds"/> 秒たつか、次の入力で消える
+        /// </summary>
+        public void Say(string said)
+        {
+            note.Say(said, Time.unscaledTime, Time.frameCount);
+            noteBoard.gameObject.SetActive(true);
+            noteText.text = Mono(said);
+            var width = noteText.GetPreferredValues(noteText.text).x + NotePadX * 2f;
+            var size = new Vector2(Snap(Mathf.Max(NoteLeast, width)), NoteRow + NotePadY * 2f);
+            Float(noteBoard, size);
+            noteGroup.alpha = 1f;
+        }
+
+        /// <summary>
+        /// 浮かべる板（確かめ・知らせ）を置く。記憶する・思い出すの枠を開いていれば、選んでいる行のすぐ下
+        /// （ログの枠の下の縁に収まらなければすぐ上）に、行の頭に揃えて置く。行の字も書いた日時も隠さない。
+        /// 枠を開いていなければ画面の真ん中
+        /// </summary>
+        void Float(RectTransform board, Vector2 size)
+        {
+            board.sizeDelta = size;
+            var slotPanel = menu.Panel == ConsolePanel.Remember || menu.Panel == ConsolePanel.Recall;
+            if (!slotPanel || menu.Row < 0)
+            {
+                board.anchoredPosition = Vector2.zero;
+                return;
+            }
+            var frame = (RectTransform)viewport.parent;
+            var fr = frame.rect;
+            // 行の上下。ログの枠の上の縁から（SlotBox の並べ方と同じ）
+            var rowTop = PadTop + BoxPad * 2f + HeadHeight + BoxRow * menu.Row;
+            var top = rowTop + BoxRow + FloatGap;
+            if (top + size.y > fr.height - FloatGap) top = rowTop - FloatGap - size.y;
+            var corner = new Vector3(fr.xMin + PadLeft + BoxPad, fr.yMax - top, 0f);
+            var at = (Vector2)root.InverseTransformPoint(frame.TransformPoint(corner));
+            board.anchoredPosition = at + new Vector2(size.x * 0.5f, -size.y * 0.5f) - root.rect.center;
+        }
+
+        /// <summary>Dot の整数倍に切り上げる。細い線と字が粗い画素の境目に揃う</summary>
+        static float Snap(float units)
+        {
+            return Mathf.Ceil(units / Dot - 1e-3f) * Dot;
+        }
+
+        /// <summary>板の中の矩形（板の真ん中が原点）に置く</summary>
+        static void Place(RectTransform r, Rect box)
+        {
+            r.anchorMin = new Vector2(0.5f, 0.5f);
+            r.anchorMax = new Vector2(0.5f, 0.5f);
+            r.pivot = Vector2.zero;
+            r.anchoredPosition = box.min;
+            r.sizeDelta = box.size;
         }
 
         static ConsoleAction ActionOf(ConsolePanel panel)
@@ -897,6 +1234,11 @@ namespace HalfAware
                 : menu.Panel == ConsolePanel.Recall ? recallRows : null;
             if (slotRows != null)
                 for (var i = 0; i < slotRows.Count; i++) slotRows[i].PaintSlot(i == menu.Row, menu.Usable(i));
+            if (askLayer.gameObject.activeSelf != menu.Asking) askLayer.gameObject.SetActive(menu.Asking);
+            if (menu.Asking)
+                for (var i = 0; i < askCards.Count; i++) askCards[i].Paint(i == menu.Answer);
+            if (noteBoard.gameObject.activeSelf != note.Visible) noteBoard.gameObject.SetActive(note.Visible);
+            if (note.Visible) noteGroup.alpha = note.Alpha(Time.unscaledTime);
             var size = root.rect.size;
             if (size.x > 0f && size.y > 0f) scan.uvRect = new Rect(0f, 0f, 1f, size.y / (3f * Dot));
         }
@@ -923,6 +1265,22 @@ namespace HalfAware
                 fill.color = on ? Accent : Clear;
                 label.color = on ? Ink : usable ? ButtonText : Faded;
                 mark.color = on ? Ink : usable ? RowText : Faded;
+            }
+        }
+
+        /// <summary>確かめの札。二択の札と同じく、選んでいる札は薄い青緑で塗り、字と括弧を明るくする</summary>
+        sealed class CardView
+        {
+            public RectTransform rect;
+            public Image fill;
+            public Image[] brackets;
+            public TMP_Text label;
+
+            public void Paint(bool on)
+            {
+                fill.color = on ? Chosen : Clear;
+                label.color = on ? Color.white : ButtonText;
+                for (var i = 0; i < brackets.Length; i++) brackets[i].color = on ? Accent : Bracket;
             }
         }
 
