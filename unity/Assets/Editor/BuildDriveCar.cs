@@ -1065,10 +1065,11 @@ namespace HalfAware.EditorTools
         /// 剥き出しで、床さえ張っていない。下を向けば車輪のあいだの地面が見えていた。
         /// 原作の主人公は荷を積んで倫敦からエディンバラ近郊へ走るので、後ろが空では困る。
         ///
-        /// **運転席の背もたれだけは作らない。** 目は座席の (0.38, 1.55, 0) にあって、
-        /// 後ろを向くと <see cref="EyeLead"/> のぶん z -0.22 へ下がる。背もたれは
-        /// z -0.24 に立つので、作れば振り返った目の 2 cm 前に板が立って画面を塞ぐ。
-        /// 座面だけ置いて、背は座っている本人（主人公の体）が受け持つ。
+        /// **運転席の背もたれは、主人公の背のすぐ後ろに立てる**（<see cref="DriverBack"/>）。
+        /// もとは作っていなかった。体を座らせる前は、振り返ると根ごと回って目が <see cref="EyeLead"/> のぶん
+        /// z -0.22 へ下がり、z -0.24 に立つ背もたれが目の 2 cm 前で画面を塞いだため。
+        /// 今は座ると根を正面に据えて首だけで振り向く（DriveDirector の seatedYawLimit）ので、目は z +0.22 から動かない。
+        /// 背もたれが無いと、ガレージで開いたドアから覗いたときに、床に座面の板が一枚あるだけで運転席が無いように見えていた。
         ///
         /// 寸法はどれも既にある車体から割り出す。内張りの外面は外板の内面
         /// （<see cref="SkinIn"/> 0.93）、天井は荷室の蓋の下面（1.88）、
@@ -1123,7 +1124,7 @@ namespace HalfAware.EditorTools
             trim.Box(new Vector3(0.055f, 1.078f, -0.238f), new Vector3(0.048f, 0.048f, 0.110f),
                 Quaternion.Euler(22f, 0f, 0f));
 
-            // 運転席の座面。背もたれは作らない（<see cref="Hold"/> の但し書き）。
+            // 運転席の座面。
             // 主人公の体を目（SeatAt）に合わせて座らせるので、座面は助手席より低く、
             // 床にじかに据える（<see cref="DriverSeatTop"/>）。下の枠は床に埋まるので作らない。
             // 下の面は床より 1 cm 沈めて、床と同じ面に重ねない
@@ -1132,6 +1133,38 @@ namespace HalfAware.EditorTools
             for (var i = 0; i < 2; i++)
                 seat.Box(new Vector3(SeatAt.x + (i == 0 ? -0.235f : 0.235f), DriverSeatTop - 0.025f, 0.06f),
                     new Vector3(0.07f, 0.11f, 0.46f));
+            DriverBack(seat, steel);
+        }
+
+        /// <summary>助手席の座面の上面。運転席の背もたれと枕は、助手席の作りをここから <see cref="DriverSeatTop"/> まで下げて立てる</summary>
+        const float PassengerSeatTop = 1.05f;
+
+        /// <summary>
+        /// 運転席の背もたれの前の面。主人公の座った形で、いちばん後ろへ出るのは腰の上の上着の背（z -0.099、腕組みもハンドルも同じ）。
+        /// その 2 cm 後ろに立てる。背は腕を組んで前へ倒しているので、上へ行くほど背もたれから離れる
+        /// </summary>
+        const float DriverBackFront = -0.12f;
+
+        /// <summary>
+        /// 運転席の背もたれと枕。助手席（<see cref="PassengerSeat"/>）と同じ寸法・同じ形を、座面を下げたぶん（0.265）だけ下げて、
+        /// 前の面を主人公の背の後ろ（<see cref="DriverBackFront"/>）に合わせる。
+        ///
+        /// 枕の上の縁は 1.485 で、目（1.55。乗り込む間は 1.55〜1.70）より下にある。
+        /// 目は乗り込む間も枕の上を通らない（座った目は枕の 0.37 m 前）が、通っても手前の切り（0.1 m）に掛からない
+        /// </summary>
+        static void DriverBack(Bank seat, Bank steel)
+        {
+            var x = SeatAt.x;
+            var drop = PassengerSeatTop - DriverSeatTop;
+            const float thick = 0.13f;
+            var back = DriverBackFront - thick * 0.5f;
+            seat.Box(new Vector3(x, 1.300f - drop, back), new Vector3(0.50f, 0.58f, thick));
+            // 枕は背もたれより少し後ろ（助手席と同じ 2.5 cm）
+            var head = back - 0.025f;
+            seat.Box(new Vector3(x, 1.675f - drop, head), new Vector3(0.24f, 0.15f, 0.11f));
+            for (var i = 0; i < 2; i++)
+                steel.Box(new Vector3(x + (i == 0 ? -0.07f : 0.07f), 1.605f - drop, head + 0.007f),
+                    new Vector3(0.018f, 0.060f, 0.018f));
         }
 
         /// <summary>
