@@ -628,13 +628,58 @@ def honeysuckle():
     return b.done()
 
 
+def canopy(seed, light, dark, leaf=(9, 13), branches=True):
+    """
+    木の樹冠（2×2 升）。**葉の房（ローブ）を幾つか重ねた丸い輪郭**にし、房ごとに上を明るく下を暗く塗る。
+    葉を一様に詰めた塊を交差の札にしたら、遠目に角の丸い箱に見えた（2026-09-27、親の差し戻し）。
+    房は上の弧に沿って並べてドームの形にし、下の縁にも小さな房を垂らして、底を一文字に切らない。
+    下の房から描き始め、上の房を後から重ねる（上の房の暗い裾が下の房の明るい頭に掛かり、房の境が立つ）。
+    branches なら、幹の股から房の中へ枝を透かして描く
+    """
+    w, h = UNIT * 2, UNIT * 2
+    rng = random.Random(seed)
+    b = Brush(w, h)
+    lobes = [(128, 138, 64)]
+    for k in range(7):
+        a = math.radians(12 + k * 26 + rng.uniform(-6, 6))
+        lobes.append((128 + math.cos(a) * 70, 128 - math.sin(a) * 58 + rng.uniform(-6, 6), rng.uniform(36, 46)))
+    lobes.append((78 + rng.uniform(-6, 6), 184, rng.uniform(28, 34)))
+    lobes.append((178 + rng.uniform(-6, 6), 186, rng.uniform(28, 34)))
+    lobes.append((128, 196, 30))
+
+    def room(x, y):
+        return max(lr - math.hypot(x - lx, y - ly) for lx, ly, lr in lobes)
+
+    if branches:
+        for dx in (-1, 1):
+            pts = [(128, 250), (128 + dx * 8, 214), (128 + dx * 34, 176), (128 + dx * 52, 140)]
+            b.line(pts, (74, 62, 46), 4)
+        b.line([(128, 250), (126, 200), (130, 150)], (74, 62, 46), 3)
+    # 房ごとに、下の房から上の房へ
+    for lx, ly, lr in sorted(lobes, key=lambda l: -l[1]):
+        n = int(lr * lr * 0.30)
+        for _ in range(n):
+            a = rng.uniform(0, 2 * math.pi)
+            d = lr * math.sqrt(rng.random()) * 0.92
+            x = lx + math.cos(a) * d
+            y = ly + math.sin(a) * d
+            # 房の上ほど明るい。房の外周は少し暗い
+            t = (y - (ly - lr)) / (2 * lr)
+            t = min(1.0, max(0.0, t * 0.85 + (d / lr) * 0.25 + rng.uniform(-0.12, 0.12)))
+            col = jitter(mix(light, dark, t), rng, 7)
+            size = rng.uniform(*leaf)
+            b.leaf(x, y, size, rng.uniform(0, 360), size * 0.42, col)
+    b.room = room
+    return b, rng
+
+
 def apple():
-    """リンゴの樹冠。密な葉の塊に、赤い実を点々と。札を交差させて丸い樹冠にする"""
+    """リンゴの樹冠。葉の房を重ねた丸い樹冠に、赤い実を点々と。札を交差させて丸い樹冠にする"""
     # 暗い緑では、日陰の樹冠が黒い塊に沈んだ。葉は明るめの緑に置く
-    b, rng = tangle(359, count=420, size=13, dark=(58, 88, 40), light=(118, 152, 66))
-    for _ in range(34):
+    b, rng = canopy(359, (128, 162, 70), (54, 82, 38), (10, 13))
+    for _ in range(40):
         x = rng.uniform(26, 230)
-        y = rng.uniform(40, 236)
+        y = rng.uniform(40, 220)
         if b.room(x, y) < 10:
             continue
         r = rng.uniform(5, 6.5)
@@ -784,32 +829,19 @@ def obelisk_vine():
 
 def oak():
     """
-    畑の生け垣の並木の楢の樹冠（2×2 升）。丸い塊を幾つか重ねた輪郭に、下ほど暗く上ほど明るい葉を詰め、
-    ところどころ空を透かす。**箱を重ねた樹冠をやめる。** 葉の玉を箱三つで組んだら、庭の奥の生け垣の上に
-    緑の立方体が並んで見えた（2026-09-27）
+    畑の生け垣の並木と周りの庭の木の樹冠（2×2 升）。葉の房を重ねた丸い樹冠に、幹の股から枝を透かす。
+    **箱を重ねた樹冠をやめる。** 葉の玉を箱三つで組んだら、庭の奥の生け垣の上に緑の立方体が並んで見えた（2026-09-27）
     """
-    w, h = UNIT * 2, UNIT * 2
-    rng = random.Random(389)
-    b = Brush(w, h)
-    blobs = [(128, 142, 92)]
-    for _ in range(8):
-        blobs.append((128 + rng.uniform(-70, 70), 120 + rng.uniform(-62, 38), rng.uniform(40, 54)))
+    b, rng = canopy(389, (112, 140, 64), (36, 56, 30), (9, 12))
+    return b.done()
 
-    def room(x, y):
-        return max(br - math.hypot(x - bx, (y - by) * 1.08) for bx, by, br in blobs)
 
-    # 空の透ける穴
-    holes = [(rng.uniform(50, 206), rng.uniform(50, 200), rng.uniform(6, 11)) for _ in range(7)]
-    for _ in range(3400):
-        x = rng.uniform(4, 252)
-        y = rng.uniform(4, 252)
-        if room(x, y) < 8:
-            continue
-        if any(math.hypot(x - hx, y - hy) < hr for hx, hy, hr in holes):
-            continue
-        t = y / 256.0
-        col = jitter(mix((104, 132, 62), (38, 58, 30), min(1.0, t * 0.9 + rng.uniform(0, 0.35))), rng, 8)
-        b.leaf(x, y, rng.uniform(9, 13), rng.uniform(0, 360), 4.6, col)
+def yew():
+    """
+    教会の墓地のイチイの樹冠（2×2 升）。葉の房を重ねた丸い樹冠を、暗く青みの緑で。
+    箱を重ねた玉では、裏庭から塀の向こうに暗い緑の箱が見えた（2026-09-27、親の差し戻し）
+    """
+    b, rng = canopy(397, (78, 104, 70), (20, 38, 28), (8, 11))
     return b.done()
 
 
@@ -848,6 +880,7 @@ CELLS = [
     (4, 8, 1, 1, potmix),                                                  # 27 鉢の寄せ植え
     (5, 8, 1, 2, obelisk_vine),                                            # 28 オベリスクのスイートピー
     (6, 8, 2, 2, oak),                                                     # 29 畑の並木の楢の樹冠
+    (6, 10, 2, 2, yew),                                                    # 30 教会の墓地のイチイの樹冠
 ]
 
 

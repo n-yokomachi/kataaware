@@ -39,7 +39,7 @@ namespace HalfAware.EditorTools
             HollyPink, HollyWhite, Delph, Foxglove, DahliaRed, DahliaPink, Rudbeckia, EchPink, EchWhite, Aster,
             Allium, Rosemary, SweetPea, Pelargonium, Catmint, Geranium, Lavender, Mantle, Sage, Hydrangea,
             Filler, Ivy, Roses, Clematis, Honeysuckle, Apple,
-            Garland, PotMix, ObeliskVine, Oak,
+            Garland, PotMix, ObeliskVine, Oak, Yew,
         }
 
         /// <summary>升の (x, y, 幅, 高さ)。make-garden.py の CELLS と同じ値。y は絵の上から数える</summary>
@@ -51,7 +51,7 @@ namespace HalfAware.EditorTools
             { 4, 2, 2, 1 }, { 6, 2, 2, 1 }, { 6, 3, 2, 1 }, { 6, 4, 2, 1 }, { 0, 5, 2, 1 }, { 2, 5, 2, 1 },
             { 4, 5, 2, 1 }, { 6, 5, 2, 1 },
             { 0, 6, 2, 2 }, { 2, 6, 2, 2 }, { 4, 6, 2, 2 }, { 6, 6, 2, 2 },
-            { 0, 8, 4, 1 }, { 4, 8, 1, 1 }, { 5, 8, 1, 2 }, { 6, 8, 2, 2 },
+            { 0, 8, 4, 1 }, { 4, 8, 1, 1 }, { 5, 8, 1, 2 }, { 6, 8, 2, 2 }, { 6, 10, 2, 2 },
         };
 
         /// <summary>
@@ -67,7 +67,7 @@ namespace HalfAware.EditorTools
             new Vector3(0.48f, 0.95f, 3), new Vector3(0.42f, 0.85f, 3), new Vector3(0.55f, 0.95f, 3), new Vector3(0.36f, 0.75f, 3),
             new Vector3(0.42f, 0.80f, 3), new Vector3(1.05f, 1.60f, 3), new Vector3(0.45f, 0.90f, 3), new Vector3(0.60f, 1.20f, 1),
             new Vector3(1.00f, 1.00f, 1), new Vector3(1.00f, 1.00f, 1), new Vector3(1.00f, 1.00f, 1), new Vector3(3.00f, 3.20f, 3),
-            new Vector3(0.24f, 1.00f, 1), new Vector3(0.62f, 0.62f, 3), new Vector3(1.45f, 0.62f, 3), new Vector3(6.0f, 7.0f, 3),
+            new Vector3(0.24f, 1.00f, 1), new Vector3(0.62f, 0.62f, 3), new Vector3(1.45f, 0.62f, 3), new Vector3(6.0f, 7.0f, 3), new Vector3(5.6f, 4.4f, 3),
         };
 
         /// <summary>升の uv。左下と右上。縁を 1.5 画素内へ寄せて、隣の升の滲みを拾わない</summary>
