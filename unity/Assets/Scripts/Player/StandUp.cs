@@ -27,6 +27,17 @@ namespace HalfAware
         /// <summary>立ち終わったか。true になったら移動を許してよい</summary>
         public bool Standing { get; private set; }
 
+        /// <summary>立ち上がっている最中か（始まって、まだ立ち終わっていない）</summary>
+        public bool Rising { get { return elapsed >= 0f && !Standing; } }
+
+        /// <summary>立ち終わった形にする。思い出した時に、立ち上がった後の形へ一度に置く</summary>
+        public void Finish()
+        {
+            elapsed = Mathf.Max(0f, seconds);
+            EyeHeight = standing;
+            Standing = true;
+        }
+
         /// <summary>
         /// 目線の高さから、立ち上がりのどのあたりかを 0〜1 で返す。
         /// 高さ以外（体を椅子から離すなど）を同じ進みで動かすのに使う

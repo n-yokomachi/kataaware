@@ -520,6 +520,15 @@ namespace HalfAware
             }
         }
 
+        /// <summary>
+        /// もう歩き出していれば、据えた形を解き終えた所まで一度に進める（letsGo）。
+        /// 思い出して記憶の途中から始める時に、手すりから身を起こす動きをやり直させない
+        /// </summary>
+        public void SkipLetGo()
+        {
+            if (LetGo()) letGo = 1f;
+        }
+
         /// <summary>据えた形を解いているか。letsGo の人が、Mover で歩き出したあと</summary>
         bool LetGo()
         {

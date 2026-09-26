@@ -107,6 +107,16 @@ namespace HalfAware
         int attendLines;
         /// <summary>その物を調べたその時に掛かった止まりの終わり</summary>
         float attendUntil;
+        /// <summary>場面の演出の、状態を取り出す・当てる口。初めて使う時に拾う</summary>
+        List<ISceneMemory> memories;
+        /// <summary>直近の自由に動ける所の写し。まだ一度も来ていなければ null</summary>
+        SceneMemo kept;
+        /// <summary>前のフレームも自由に動ける所だったか。来たばかりのフレームで写しを取り直す</summary>
+        bool keptLast;
+        /// <summary>写しを取った時の調べ済みの数。増えたら取り直す</summary>
+        int keptDone = -1;
+        /// <summary>思い出して来た。場面の頭の見出しを出さない</summary>
+        bool resumed;
 
         /// <summary>
         /// 対象を調べたその時。前提が揃っていて、その対象の文を出し始めたときに呼ぶ。
@@ -190,7 +200,8 @@ namespace HalfAware
         /// </summary>
         IEnumerator Start()
         {
-            if (!string.IsNullOrEmpty(openingCard))
+            // 思い出して来た時は見出しを出さない。当て終えた形を黒から明ける
+            if (!resumed && !string.IsNullOrEmpty(openingCard))
             {
                 // 幕は見出しの下に敷く層。暗転の層とは別に持つ
                 hud.SetFade(0f);
@@ -288,6 +299,148 @@ namespace HalfAware
             hud.SetSubtitle(choice != null ? null : subtitles.Current, SubtitleKind.Line, !frozenNow);
             hud.SetChoice(choice);
             if (progress.IsComplete && !subtitles.IsTalking && choice == null && !frozenNow && !Held) StartCoroutine(Complete());
+            Keep();
+        }
+
+        // ---- 記憶する・思い出す（設計書 5 節） ------------------------------------
+        //
+        // 記憶するは、押した時の場面の中の状態を残す。台詞・二択・止まり・演出の途中で押した時は、その直前の自由に動ける所を残す。
+        // 自由に動けるフレームごとに写しを持っておき（Keep）、押した時に自由に動けなければそれを渡す（Kept）
+
+        /// <summary>
+        /// いまが自由に動ける所か。字幕・二択・止まりのどれも無く、場面を閉じ始めてもおらず、調べている物も無く、
+        /// 目覚めと立ち上がりの途中でもなく、どの演出も途中でない（<see cref="ISceneMemory.Settled"/>）。
+        /// <see cref="Held"/> はここでは見ない。押さえている演出（路地裏の売り買い・車内の帯）が、自分の区切りを Settled で言う
+        /// </summary>
+        public bool Calm
+        {
+            get
+            {
+                if (Completed || subtitles.IsTalking || choice != null || asking != null || Frozen) return false;
+                if (attending != null) return false;
+                if (wakeUp != null && !wakeUp.Done) return false;
+                if (standUp != null && standUp.Rising) return false;
+                return SceneMemory.Settled(Memories);
+            }
+        }
+
+        List<ISceneMemory> Memories
+        {
+            get
+            {
+                if (memories == null) memories = SceneMemory.Find();
+                return memories;
+            }
+        }
+
+        /// <summary>
+        /// フレームの終わりに、自由に動ける所なら写しを持つ。来たばかりのフレームと、調べ済みが増えたフレームは丸ごと取り直し、
+        /// それ以外は立ち位置と向きだけ書き直す（毎フレーム演出ごとの状態を JSON にしない）
+        /// </summary>
+        void Keep()
+        {
+            if (!Calm)
+            {
+                keptLast = false;
+                return;
+            }
+            if (!keptLast || kept == null || keptDone != progress.Done.Count) kept = Capture();
+            else SceneMemory.Hold(player, kept);
+            keptLast = true;
+        }
+
+        /// <summary>
+        /// いまを区切りとして写しを取る。自由に動けるフレームの無い演出（路地裏の売り買いの、買い手と買い手の間）が、
+        /// ここからなら続けられるという所で呼ぶ
+        /// </summary>
+        public void Checkpoint()
+        {
+            kept = Capture();
+            keptLast = false;
+        }
+
+        /// <summary>いまの状態を丸ごと取り出す。動作確認からも呼ぶ</summary>
+        public SceneMemo Capture()
+        {
+            Ensure();
+            var memo = new SceneMemo();
+            SceneMemory.Hold(player, memo);
+            var ids = new List<string>(progress.Done);
+            ids.Sort(string.CompareOrdinal);
+            memo.done = ids.ToArray();
+            memo.parts = SceneMemory.Capture(Memories);
+            keptDone = progress.Done.Count;
+            return memo;
+        }
+
+        /// <summary>
+        /// 記憶するが書く状態。いま自由に動けるならその場で取り、そうでなければ直前の自由に動ける所の写し。
+        /// 場面に入ってからまだ一度も自由に動ける所へ来ていなければ null（場面の頭を書く）
+        /// </summary>
+        public SceneMemo Kept()
+        {
+            if (player != null && Calm) kept = Capture();
+            return kept;
+        }
+
+        /// <summary>
+        /// 思い出した時に、残した状態を当てる。シーンを読んだ直後、最初のフレームを出す前に呼ぶ（<see cref="SceneMemory.Resume"/>）。
+        /// 調べ済みの物を戻し、目覚めと入った時の眩暈は出さずに済ませ、立ち上がった後なら立った形にし、
+        /// 演出ごとの状態を当ててから、残した立ち位置へ置く。音も字幕も出さない。黒から明けるのは Start
+        /// </summary>
+        public void Restore(SceneMemo memo)
+        {
+            if (memo == null || player == null) return;
+            Ensure();
+            resumed = true;
+            if (memo.done != null)
+                foreach (var id in memo.done)
+                    if (!string.IsNullOrEmpty(id)) progress.Done.Add(id);
+            // 目覚めは出さない
+            wakeUp = null;
+            player.CanLook = true;
+            // 立ち上がった後なら、立った形。椅子は押し下げ、椅子のコライダーを入れる
+            if (standAfter.Length > 0 && progress.Done.Contains(standAfter))
+            {
+                if (standUp != null) standUp.Finish();
+                if (seatedPose != null) seatedPose.Seated = false;
+                if (chair != null) chair.position = chairSpot - chair.forward * chairPushBack;
+                if (chairBlocker != null) chairBlocker.SetActive(true);
+            }
+            // 入った時の眩暈は出さない。調べるまで保つ眩暈（場面 1 のジャック）は、まだ調べていなければ保ったまま
+            if (daze != null && (dazeUntil.Length == 0 || progress.Done.Contains(dazeUntil)))
+            {
+                dazeReleased = true;
+                daze.Clear();
+            }
+            SceneMemory.Restore(Memories, memo);
+            SceneMemory.Place(player, memo);
+            kept = memo;
+            keptLast = false;
+            keptDone = progress.Done.Count;
+        }
+
+        /// <summary>
+        /// 調べる対象と、演出の状態を取り出す・当てる口を、シーンを探さずに渡す。テストから呼ぶ
+        /// </summary>
+        public void Use(IEnumerable<IInteractable> things, IEnumerable<ISceneMemory> parts)
+        {
+            items = new List<IInteractable>(things);
+            progress = new SceneProgress(items);
+            memories = new List<ISceneMemory>(parts);
+            memories.Sort((a, b) => string.CompareOrdinal(a.MemoryKey, b.MemoryKey));
+            if (player != null) seatedSpot = player.transform.position;
+            if (chair != null) chairSpot = chair.position;
+        }
+
+        /// <summary>調べる対象を拾ってあるか。エディタで当てて撮る時は Awake が鳴らないので、ここで拾う</summary>
+        void Ensure()
+        {
+            if (items != null) return;
+            items = new List<IInteractable>(FindObjectsByType<Interactable>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID));
+            progress = new SceneProgress(items);
+            if (player != null) seatedSpot = player.transform.position;
+            if (chair != null) chairSpot = chair.position;
         }
 
         /// <summary>

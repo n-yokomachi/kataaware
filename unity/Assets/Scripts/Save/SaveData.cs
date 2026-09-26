@@ -13,7 +13,11 @@ namespace HalfAware
     }
 
     /// <summary>
-    /// セーブ一つの中身。**残すのは場面の頭。** 読むと、その場面の頭から始まる（設計書 5 節）。
+    /// セーブ一つの中身（設計書 5 節）。
+    ///
+    /// - **自動**は場面の頭を残す。読むと、その場面の頭から始まる
+    /// - **手動（記憶する）**は、押した時の場面の中の状態（<see cref="memo"/>）も残す。読むと、そこから続ける。
+    ///   台詞・二択・演出の途中で記憶した時は、その直前の、自由に動ける所を残す（<see cref="SceneMemory"/>）
     ///
     /// 場面をまたいで持ち越す状態（いまは場面 4 から場面 5 へ渡す <see cref="DiveHandoff"/> だけ）も入れる。
     /// ログは入れない（場面ごとに消える物なので）。
@@ -23,7 +27,11 @@ namespace HalfAware
     [Serializable]
     public sealed class SaveData
     {
-        public const int CurrentVersion = 1;
+        /// <summary>
+        /// 1: 場面の頭だけ。2: 手動は場面の中の状態（<see cref="within"/>・<see cref="memo"/>）も持つ（2026-09-27）。
+        /// 1 の物には <see cref="within"/> が無いので false に読め、場面の頭から始まる
+        /// </summary>
+        public const int CurrentVersion = 2;
 
         /// <summary>形の版。項目の意味を変えたら上げる</summary>
         public int version = CurrentVersion;
@@ -48,6 +56,16 @@ namespace HalfAware
 
         /// <summary>書いた日時の UTC の Ticks。いちばん新しいセーブを選ぶのに使う</summary>
         public long writtenTicks;
+
+        /// <summary>
+        /// 場面の中の状態を持っているか。false なら場面の頭から始まる（自動、前の形のセーブ、
+        /// 場面に入ってから自由に動ける所へまだ一度も来ていない時の記憶する）。
+        /// JsonUtility は入れ子の物を null のまま書けないので、<see cref="memo"/> の有無はこれで見る
+        /// </summary>
+        public bool within;
+
+        /// <summary>場面の中の状態。<see cref="within"/> が true の時だけ使う</summary>
+        public SceneMemo memo = new SceneMemo();
 
         public SaveData Copy()
         {

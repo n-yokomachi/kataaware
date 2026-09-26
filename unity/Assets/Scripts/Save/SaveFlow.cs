@@ -11,8 +11,9 @@ namespace HalfAware
     /// **シーンには何も置かない。** コンソール（<see cref="ImplantConsole"/>）と同じく、
     /// 再生の始まりに <c>RuntimeInitializeOnLoadMethod</c> で <c>sceneLoaded</c> を拾う。
     ///
-    /// 場面の頭の状態（<see cref="Head"/>）は、着いた時に拾っておく。手動の記憶するは、押した時の途中の状態ではなく
-    /// この頭を書く（思い出すと場面の頭から始まるので）
+    /// 場面の頭の状態（<see cref="Head"/>）は、着いた時に拾っておく。自動はこれを書く。
+    /// 手動の記憶するは、これに押した時の場面の中の状態（<see cref="SceneMemory.Take"/>）を足して書き、
+    /// 思い出すと、シーンを読んだ直後に当ててからそこから続ける（<see cref="SceneMemory.Resume"/>）
     /// </summary>
     public static class SaveFlow
     {
@@ -58,7 +59,9 @@ namespace HalfAware
 
         /// <summary>
         /// シーンに着いた。思い出した物なら村の時刻を戻す。場面の頭を拾って自動に書く。
-        /// VillageHour の Awake の後、Start の前に来るので、村の環境音も戻した時刻から始まる
+        /// 手動のセーブを思い出した物なら、場面の中の状態を当てる。
+        /// どれも Awake・OnEnable の後、Start の前（最初のフレームを出す前）に来るので、村の環境音も戻した時刻から始まり、
+        /// 場面の頭の演出（目覚め、見出し、入った時の眩暈、名を呼ぶ声など）は Start で当てた印を見て出さない
         /// </summary>
         static void Arrived(Scene scene, LoadSceneMode mode)
         {
@@ -76,6 +79,7 @@ namespace HalfAware
             }
             head = SaveStore.Capture(stage, scene.name, hour);
             SaveStore.Write(SaveSlot.Auto, head);
+            if (resumed != null && resumed.within) SceneMemory.Resume(resumed.memo);
         }
 
         /// <summary>
@@ -110,7 +114,10 @@ namespace HalfAware
             get { return CanLoad(TitleScene); }
         }
 
-        /// <summary>思い出す。そのセーブの場面の頭から始める。読めなければ false</summary>
+        /// <summary>
+        /// 思い出す。そのセーブの場面を読む。手動のセーブなら、着いた所で場面の中の状態を当ててそこから続け、
+        /// 自動と前の形のセーブなら場面の頭から始める。タイトルの画面とコンソールの両方からここを通る。読めなければ false
+        /// </summary>
         public static bool Resume(SaveSlot slot)
         {
             var data = SaveStore.Read(slot);
@@ -121,11 +128,24 @@ namespace HalfAware
             return true;
         }
 
-        /// <summary>記憶する。いまの場面の頭を手動の置き場へ書く。書けたら書いた物、書けなければ null</summary>
+        /// <summary>
+        /// 記憶する。いまの場面の頭に、押した時の場面の中の状態（台詞・二択・演出の途中なら、その直前の自由に動ける所）を足して、
+        /// 手動の置き場へ書く。場面に入ってから自由に動ける所へまだ一度も来ていなければ、場面の頭だけを書く。
+        /// 書けたら書いた物、書けなければ null
+        /// </summary>
         public static SaveData Remember(SaveSlot slot)
         {
             if (slot == SaveSlot.Auto || head == null) return null;
-            return SaveStore.Write(slot, head);
+            return SaveStore.Write(slot, Within(head, SceneMemory.Take()));
+        }
+
+        /// <summary>場面の頭 at に、場面の中の状態 memo を足した物。memo が null なら場面の頭のまま</summary>
+        public static SaveData Within(SaveData at, SceneMemo memo)
+        {
+            var d = at.Copy();
+            d.within = memo != null;
+            d.memo = memo ?? new SceneMemo();
+            return d;
         }
 
         /// <summary>目を閉じる。タイトルの画面へ。組み立ての一覧に無ければ false</summary>

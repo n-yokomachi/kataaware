@@ -159,6 +159,27 @@ namespace HalfAware
             if (Mathf.Abs(carried) > 1e-4f) transform.Rotate(0f, carried, 0f);
         }
 
+        /// <summary>
+        /// 立ち位置・体の向き・首の限りと向き・上下・目の高さを一度に置く。思い出した時に、記憶した形へ戻すのに使う
+        /// （<see cref="SceneMemory.Place"/>）。CharacterController のコライダーを切ってから動かす（入れたままだと床や壁に押し出される）。
+        /// 目を向ける動きはやめ、目の置き場もその場で書き直す（最初のフレームから置いた形で映る）
+        /// </summary>
+        public void PlaceAt(Vector3 position, float bodyYaw, float headLimit, float headYaw, float pitchDegrees, float eyeHeight)
+        {
+            StopFacing();
+            head.Release();
+            head.Limit = headLimit;
+            var hull = body != null ? body : GetComponent<CharacterController>();
+            var was = hull != null && hull.enabled;
+            if (was) hull.enabled = false;
+            transform.SetPositionAndRotation(position, Quaternion.Euler(0f, bodyYaw, 0f));
+            if (was) hull.enabled = true;
+            if (head.Limited) head.Set(headYaw);
+            Pitch = pitchDegrees;
+            EyeHeight = eyeHeight;
+            if (eye != null) Aim();
+        }
+
         /// <summary>左右の向き。度。体と首を合わせた向きを指す。演出から正面へ戻すのに使う</summary>
         public float Yaw
         {

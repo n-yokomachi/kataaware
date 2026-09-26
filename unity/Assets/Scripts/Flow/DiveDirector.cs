@@ -44,6 +44,11 @@ namespace HalfAware
     /// そのまま最初の会話（「投げてよー」「投げません。いいから上がっておいで」まで）へ続ける。
     /// 母は「いいから上がっておいで」で手すりから身を起こして戸口へ戻り（<see cref="PersonMotion"/> の letsGo）、
     /// 会話を閉じたら見回しが戻る
+    ///
+    /// **記憶するは、今いる記憶と、そこまで渡った道筋を残す**（設計書 5 節）。区切りは会話と会話の間
+    /// （名を呼ぶ声を送る帯も、話している間も、切断の間も無い時）で、そこでは歩ける。そのフレームごとに写しを持ち（<see cref="Keep"/>）、
+    /// 話している途中で記憶した時は、その会話を始める前の写しを書く。思い出した時は、道筋を辿り直して `切断` の大きさと眩暈を戻し、
+    /// 今いる記憶を名を呼ぶ声を出さずに開いて、記憶の時計・出した行・済んだ会話を当て、人と鳩を残した時刻の所へ置く（<see cref="Restore"/>）
     /// </summary>
     [DefaultExecutionOrder(-15)]
     public sealed class DiveDirector : MonoBehaviour
@@ -215,8 +220,31 @@ namespace HalfAware
 
         IEnumerator Start()
         {
-            // どれも直列化されないので、組み立てではなくここで掛ける。
-            // 首の制限は解く。記憶の中でも場面 1・2・3 と同じに体ごと回って歩く
+            // 思い出して来た時は、道筋と今いる記憶を Restore が開いてある。名を呼ぶ声は出さず、黒から明けるだけ
+            if (!resumed)
+            {
+                Ready();
+                chain = new DiveChain(roster.Count, DiveIds.Listed, cutAfter, new System.Random());
+                path.Clear();
+                path.Add(chain.Current);
+                Shut();
+                // 暗転から明けきってから目を回す。黒いうちに回し終えると、行き先を示す動きが見えない
+                turnDelay = hud != null ? openSeconds : 0f;
+                Play(chain.Current);
+            }
+
+            // 場面 3 からは暗転して来る。明けるのはこちらの仕事
+            if (hud == null) yield break;
+            hud.SetFade(1f);
+            yield return hud.FadeTo(0f, openSeconds);
+        }
+
+        /// <summary>
+        /// 場面の頭の仕度。どれも直列化されないので、組み立てではなくここで掛ける。
+        /// 首の制限は解く。記憶の中でも場面 1・2・3 と同じに体ごと回って歩く
+        /// </summary>
+        void Ready()
+        {
             player.CanMove = true;
             player.CanLook = true;
             player.HeadYawLimit = 0f;
@@ -225,17 +253,6 @@ namespace HalfAware
             if (volume == null || volume.sharedProfile == null)
                 Debug.LogWarning("DiveDirector: Volume に profile が無い。記憶ごとのぼやけと色味が掛からない", this);
             else volume.weight = 1f;
-
-            chain = new DiveChain(roster.Count, DiveIds.Listed, cutAfter, new System.Random());
-            Shut();
-            // 暗転から明けきってから目を回す。黒いうちに回し終えると、行き先を示す動きが見えない
-            turnDelay = hud != null ? openSeconds : 0f;
-            Play(chain.Current);
-
-            // 場面 3 からは暗転して来る。明けるのはこちらの仕事
-            if (hud == null) yield break;
-            hud.SetFade(1f);
-            yield return hud.FadeTo(0f, openSeconds);
         }
 
         void OnDisable()
@@ -256,6 +273,13 @@ namespace HalfAware
             var press = player.InteractPressed || pending;
             pending = false;
             Step(Time.deltaTime, press);
+        }
+
+        /// <summary>歩いた後の立ち位置で写しを持つ。PlayerController より先に動くので、Update の終わりでは一フレーム古い</summary>
+        void LateUpdate()
+        {
+            if (ImplantConsole.IsOpen) return;
+            Keep();
         }
 
         /// <summary>
@@ -299,8 +323,11 @@ namespace HalfAware
                 if (takes[i] != null) takes[i].gameObject.SetActive(false);
         }
 
-        /// <summary>i 番の記憶を頭から流す。前の記憶と場所は伏せる</summary>
-        void Play(int i)
+        /// <summary>
+        /// i 番の記憶を頭から流す。前の記憶と場所は伏せる。
+        /// lead が false なら、記憶の頭の名を呼ぶ声（<see cref="DiveEntry.leads"/>）を流さない（思い出した時）
+        /// </summary>
+        void Play(int i, bool lead = true)
         {
             if (roster == null || i < 0 || i >= roster.Count) return;
             if (take != null) take.gameObject.SetActive(false);
@@ -360,7 +387,7 @@ namespace HalfAware
             player.SpeedScale = entry.speed;
             Stand();
             player.CanMove = true;
-            if (entry.leads) Lead();
+            if (entry.leads && lead) Lead();
         }
 
         /// <summary>
@@ -1033,6 +1060,7 @@ namespace HalfAware
             var target = Target(shown);
             if (target < 0) return;
             chain.Hop(target);
+            path.Add(chain.Current);
             Play(chain.Current);
         }
 
@@ -1085,6 +1113,151 @@ namespace HalfAware
                 yield break;
             }
             SceneManager.LoadScene(SceneExit.Target(nextScene));
+        }
+
+        // ---- 記憶する・思い出す（設計書 5 節） ------------------------------------
+
+        public const string MemoryKey = "dive.chain";
+
+        /// <summary>残す形。渡った道筋と、今いる記憶の進み</summary>
+        [System.Serializable]
+        public sealed class Memo
+        {
+            /// <summary>頭を借りた順の一覧。先頭は最初の一人。同じ人へ戻った時も並べる。最後が今いる記憶</summary>
+            public int[] path = new int[0];
+            /// <summary>記憶の頭からの秒</summary>
+            public float clock;
+            /// <summary>これまでに出した行数（<see cref="Spoken"/>）</summary>
+            public int spoken;
+            /// <summary>済んだ会話の数（<see cref="Done"/>）</summary>
+            public int talked;
+            /// <summary>合図を持つ者が動き出した記憶の時計の秒。人ごと、まだなら負</summary>
+            public float[] cued = new float[0];
+            /// <summary>二本目の合図を数え始めた秒。人ごと、まだなら負</summary>
+            public float[] cued2 = new float[0];
+        }
+
+        /// <summary>頭を借りた順。最初の一人から、板で渡った先を足していく</summary>
+        readonly System.Collections.Generic.List<int> path = new System.Collections.Generic.List<int>();
+        /// <summary>直近の会話と会話の間の、立ち位置と向き。まだ一度も来ていなければ null</summary>
+        SceneMemo keptPose;
+        /// <summary>そのときの道筋と記憶の進み</summary>
+        readonly Memo keptChain = new Memo();
+        bool resumed;
+
+        /// <summary>頭を借りた順（動作確認から読む）</summary>
+        public System.Collections.Generic.IReadOnlyList<int> Path { get { return path; } }
+
+        /// <summary>
+        /// 道筋 trail を頭から辿り直した渡り歩き。先頭は最初の一人（列の一番上なので読まない）、二つ目から板で渡った先。
+        /// 同じ人へ戻っても人数は増えないので、`切断` の大きさも目の疲れも、渡った時と同じになる。
+        /// into があれば、辿り直した順をそこへ書く
+        /// </summary>
+        public static DiveChain Retrace(int count, int threshold, int[] trail, System.Collections.Generic.List<int> into)
+        {
+            var c = new DiveChain(count, DiveIds.Listed, threshold, new System.Random());
+            if (into != null)
+            {
+                into.Clear();
+                into.Add(c.Current);
+            }
+            if (trail == null) return c;
+            for (var k = 1; k < trail.Length; k++)
+            {
+                c.Hop(trail[k]);
+                if (into != null) into.Add(c.Current);
+            }
+            return c;
+        }
+
+        /// <summary>
+        /// いまが自由に動ける所か。会話と会話の間で、名を呼ぶ声を送る帯も、話している間も、切断の間も無い時。
+        /// 板を出していても、`話す` の案内を出していても、歩けるので区切りにしてよい
+        /// </summary>
+        public bool Calm
+        {
+            get { return chain != null && take != null && !leading && !Talking && !cutting; }
+        }
+
+        /// <summary>自由に動けるフレームごとに、立ち位置と向き、道筋と記憶の進みを写す。配列は長さが同じなら使い回す</summary>
+        void Keep()
+        {
+            if (!Calm) return;
+            if (keptPose == null) keptPose = new SceneMemo();
+            SceneMemory.Hold(player, keptPose);
+            Write(keptChain);
+        }
+
+        /// <summary>いまの道筋と記憶の進みを into へ写す</summary>
+        void Write(Memo into)
+        {
+            if (into.path == null || into.path.Length != path.Count) into.path = path.ToArray();
+            into.clock = clock;
+            into.spoken = spoken;
+            into.talked = done;
+            if (into.cued == null || into.cued.Length != cued.Length) into.cued = new float[cued.Length];
+            System.Array.Copy(cued, into.cued, cued.Length);
+            if (into.cued2 == null || into.cued2.Length != cued2.Length) into.cued2 = new float[cued2.Length];
+            System.Array.Copy(cued2, into.cued2, cued2.Length);
+        }
+
+        /// <summary>
+        /// 記憶するが書く状態。いま自由に動けるならその場で取り、話している途中なら、その会話を始める前の写し。
+        /// 場面に入ってからまだ一度も自由に動ける所へ来ていなければ（記憶 0 の頭の会話の途中）null（場面の頭を書く）
+        /// </summary>
+        public SceneMemo Kept()
+        {
+            if (Calm) Keep();
+            if (keptPose == null) return null;
+            var memo = new SceneMemo
+            {
+                at = keptPose.at,
+                turn = keptPose.turn,
+                headLimit = keptPose.headLimit,
+                head = keptPose.head,
+                pitch = keptPose.pitch,
+                eye = keptPose.eye,
+                moves = true,
+                parts = new[] { new MemoPart(MemoryKey, JsonUtility.ToJson(keptChain)) },
+            };
+            return memo;
+        }
+
+        /// <summary>
+        /// 思い出した時に当てる。シーンを読んだ直後、Start の前に呼ぶ（<see cref="SceneMemory.Resume"/>）。
+        /// 道筋を頭から辿り直し（`切断` の大きさ・目の疲れ・眩暈が渡った人数に戻る）、今いる記憶を名を呼ぶ声を出さずに開き、
+        /// 記憶の時計・出した行・済んだ会話・合図を当てて人と鳩をその時刻の所へ置き、残した立ち位置で歩ける形にする。
+        /// 一行目（名を呼ぶ声）はもう出た扱い。黒から明けるのは Start
+        /// </summary>
+        public void Restore(SceneMemo memo)
+        {
+            if (memo == null || player == null || roster == null || roster.Count == 0) return;
+            var data = memo.Part(MemoryKey);
+            var m = string.IsNullOrEmpty(data) ? null : JsonUtility.FromJson<Memo>(data);
+            if (m == null || m.path == null || m.path.Length == 0) return;
+            resumed = true;
+            if (hull == null) hull = player.GetComponent<CharacterController>();
+            if (lens == null && player.Eye != null) lens = player.Eye.GetComponent<Camera>();
+            Ready();
+            chain = Retrace(roster.Count, cutAfter, m.path, path);
+            Shut();
+            turnDelay = 0f;
+            Play(chain.Current, false);
+            if (take == null) return;
+            clock = Mathf.Max(0f, m.clock);
+            spoken = Mathf.Max(0, m.spoken);
+            done = Mathf.Clamp(m.talked, 0, talks.Length);
+            called = true;
+            hushed = true;
+            if (m.cued != null && m.cued.Length == cued.Length) System.Array.Copy(m.cued, cued, cued.Length);
+            if (m.cued2 != null && m.cued2.Length == cued2.Length) System.Array.Copy(m.cued2, cued2, cued2.Length);
+            Drift();
+            // 手すりから身を起こす母のような、動き出してから据えた形を解く人は、解き終えた形から
+            foreach (var person in take.GetComponentsInChildren<PersonMotion>(true)) person.SkipLetGo();
+            SceneMemory.Place(player, memo);
+            player.CanMove = true;
+            keptPose = null;
+            Keep();
         }
     }
 }
