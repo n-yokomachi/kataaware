@@ -1366,7 +1366,7 @@ namespace HalfAware.EditorTools
         /// 字幕・印・暗転・幕・ログ。作りも値もほかの場面の Hud に揃えてある。
         /// 並び順がそのまま重なりの順になるので、暗転より後に中央の文字を置く
         /// </summary>
-        static HudView Screen()
+        internal static HudView Screen()
         {
             var go = new GameObject("Hud", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(HudView));
             var canvas = go.GetComponent<Canvas>();

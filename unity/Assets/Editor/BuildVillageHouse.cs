@@ -12,7 +12,8 @@ namespace HalfAware.EditorTools
     /// 家の中は作らない。窓の奥に暗い室内の面を置き、両脇にカーテンを下げて、空っぽに見えないようにする。
     ///
     /// **開ける物は形を分けておく。** 裏口の戸（場面 10 で開く）と格子戸は、丁番の所を原点にした
-    /// 子にしてあり、y で回せば開く。いまはどちらも閉じた形で置く。格子戸は通れる扱いで、当たりを入れない。
+    /// 子にしてあり、y で回せば開く。いまはどちらも閉じた形で置く。格子戸は調べて開ける（<see cref="SwingGate"/>、
+    /// 設計書 7 節）。閉じている間は口を塞ぐ当たりが効き、開けると切れる。
     /// 戸口の奥は深さ 1.2 m の暗がりにしてあるので、開けても家の中の虚空は見えない
     /// </summary>
     public static partial class BuildVillage
@@ -518,6 +519,86 @@ namespace HalfAware.EditorTools
             GateLeaf(paint, iron, leafWide);
             Emit(pivot, "SideGatePaint", paint, PaintMat(), false);
             Emit(pivot, "SideGateIron", iron, IronMat(), false);
+            GateLatch(parent, pivot);
+        }
+
+        /// <summary>格子戸を調べる対象の id。文面は <see cref="VillageScriptPath"/></summary>
+        public const string GateId = "village.gate";
+        const string VillageScriptPath = "Assets/Data/VillageScript.asset";
+        /// <summary>開ける音。自室の戸の音の頭（開ける所）だけを鳴らす</summary>
+        const string GateSoundPath = "Assets/Audio/DoorShut.wav";
+
+        /// <summary>
+        /// 格子戸を調べて開ける仕掛け（設計書 7 節）。<see cref="SwingGate"/> に、調べる対象（戸の真ん中）と、
+        /// 閉じている間の当たり（戸の口を塞ぐ箱）と、開ける音を繋ぐ。案内の文は村の文面（VillageScript）の label
+        /// </summary>
+        static void GateLatch(Transform parent, Transform leaf)
+        {
+            var latch = new GameObject("GateLatch");
+            latch.transform.SetParent(parent, false);
+            latch.transform.localPosition = new Vector3((GatePostWest + GatePostEast) * 0.5f, 1.15f, GateZ);
+            var item = latch.AddComponent<Interactable>();
+            var iso = new UnityEditor.SerializedObject(item);
+            iso.FindProperty("id").stringValue = GateId;
+            iso.FindProperty("script").objectReferenceValue = VillageScript();
+            iso.FindProperty("radius").floatValue = 2.2f;
+            iso.FindProperty("required").boolValue = false;
+            iso.FindProperty("once").boolValue = true;
+            iso.ApplyModifiedPropertiesWithoutUndo();
+
+            var shut = new GameObject("GateShut");
+            shut.transform.SetParent(latch.transform, false);
+            shut.transform.localPosition = new Vector3(0f, -0.05f, 0f);
+            var box = shut.AddComponent<BoxCollider>();
+            box.size = new Vector3(GatePostEast - GatePostWest, 2.2f, 0.25f);
+
+            var src = latch.AddComponent<AudioSource>();
+            src.playOnAwake = false;
+            src.loop = false;
+            src.spatialBlend = 0.8f;
+            src.minDistance = 2f;
+            src.maxDistance = 20f;
+            src.volume = 0.7f;
+            var clip = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>(GateSoundPath);
+            if (clip == null) Debug.LogWarning("格子戸の音が無い: " + GateSoundPath);
+
+            var gate = latch.AddComponent<SwingGate>();
+            var so = new UnityEditor.SerializedObject(gate);
+            so.FindProperty("player").objectReferenceValue = Object.FindFirstObjectByType<PlayerController>();
+            so.FindProperty("hud").objectReferenceValue = Object.FindFirstObjectByType<HudView>(FindObjectsInactive.Include);
+            so.FindProperty("item").objectReferenceValue = item;
+            so.FindProperty("leaf").objectReferenceValue = leaf;
+            so.FindProperty("openYaw").floatValue = 100f;
+            so.FindProperty("seconds").floatValue = 1.0f;
+            so.FindProperty("shut").objectReferenceValue = box;
+            so.FindProperty("source").objectReferenceValue = src;
+            so.FindProperty("clip").objectReferenceValue = clip;
+            so.FindProperty("clipLength").floatValue = 0.9f;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>村の文面。無ければ作り、格子戸の項目を書き直す</summary>
+        static RoomScript VillageScript()
+        {
+            var script = UnityEditor.AssetDatabase.LoadAssetAtPath<RoomScript>(VillageScriptPath);
+            if (script == null)
+            {
+                script = ScriptableObject.CreateInstance<RoomScript>();
+                UnityEditor.AssetDatabase.CreateAsset(script, VillageScriptPath);
+            }
+            var so = new UnityEditor.SerializedObject(script);
+            var entries = so.FindProperty("entries");
+            entries.arraySize = 1;
+            var e = entries.GetArrayElementAtIndex(0);
+            e.FindPropertyRelative("id").stringValue = GateId;
+            e.FindPropertyRelative("label").stringValue = "開ける";
+            e.FindPropertyRelative("lines").arraySize = 0;
+            e.FindPropertyRelative("hints").arraySize = 0;
+            e.FindPropertyRelative("choice").FindPropertyRelative("question").stringValue = "";
+            e.FindPropertyRelative("choice").FindPropertyRelative("afterYes").arraySize = 0;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            UnityEditor.EditorUtility.SetDirty(script);
+            return script;
         }
 
         /// <summary>
