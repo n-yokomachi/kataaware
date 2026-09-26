@@ -11,7 +11,12 @@ namespace HalfAware
     /// 字幕の表示中は E とクリックを字幕の送りにだけ使い、調べる操作は受け付けない。
     /// 二択は画面の真ん中の札（<see cref="HudView.SetChoice"/>）に出し、そのあいだはカーソルを出して札をマウスでも選べるようにする。
     /// 止まっている間は調べる操作と進行が止まる。見回しと移動は止めない（場面 1 の停止はすべて座っている間に起きる）。
-    /// 必須の対象をすべて調べ、字幕も出ておらず、止まってもいなければ暗転して「続く」を出す
+    /// 必須の対象をすべて調べ、字幕も出ておらず、止まってもいなければ暗転して「続く」を出す。
+    ///
+    /// **調べたら、その物を画面の真ん中へ持ってくる。** 調べる操作は視線から 40 度の内の物を拾うので、
+    /// 調べた物が真ん中から外れていることがある。調べたら目をその物へ回し（<see cref="PlayerController.Face"/>）、
+    /// その物の字幕・二択・その物が起こした止まりが済むまで見回しを封じる（<see cref="PlayerController.HoldLook"/>）。歩きは止めない。
+    /// 演出がもともと目を動かす所（端末の前へ座る、露店の内側へ回る）は、演出の側が勝つ
     /// </summary>
     public sealed class SceneFlow : MonoBehaviour
     {
@@ -96,6 +101,12 @@ namespace HalfAware
         readonly ChoicePointer pointer = new ChoicePointer();
         /// <summary>二択を開いたフレーム。札はまだ出ておらず、カーソルの位置も古いので、マウスは次のフレームから見る</summary>
         bool opened;
+        /// <summary>調べている物。その字幕・二択・止まりが済むまで見回しを封じる。調べていなければ null</summary>
+        IInteractable attending;
+        /// <summary>その物の文（と、調べたその時に演出が足した文）を積み終えた所。<see cref="SubtitleQueue.Passed"/> がここへ届けば読み終えた</summary>
+        int attendLines;
+        /// <summary>その物を調べたその時に掛かった止まりの終わり</summary>
+        float attendUntil;
 
         /// <summary>
         /// 対象を調べたその時。前提が揃っていて、その対象の文を出し始めたときに呼ぶ。
@@ -246,9 +257,12 @@ namespace HalfAware
                 var eye = player.Eye;
                 selected = InteractionPicker.Select(eye.position, eye.forward, items, progress.Done, maxAngle);
             }
-            hud.SetPrompt(selected != null ? "E  " + selected.Label : null);
+            hud.SetPrompt(selected != null ? HudView.Prompt(selected.Label) : null);
             if (selected != null && interact)
             {
+                // 目は先に向け始める。同じフレームで演出が見回しを預かるか向きを書き換えたら、そちらが勝つ
+                player.Face(selected.Position);
+                player.HoldLook(this);
                 // 前提が揃っているかは、済んだことにする前に見る
                 var ready = InteractionPicker.UnmetPrerequisite(selected, progress.Done) == null;
                 var said = progress.Examine(selected);
@@ -259,9 +273,12 @@ namespace HalfAware
                 asking = selected.Asks ? selected : null;
                 if (asking != null && !subtitles.IsTalking) OpenChoice();
                 if (progress.Done.Contains(selected.Id) && Examined != null) Examined(selected);
+                attending = selected;
+                Attended();
             }
             // 調べた先の演出が Freeze を呼ぶので、止まっているかは調べた後に見直す
             var frozenNow = Frozen;
+            Unattend();
             ReleaseDaze();
             Wake();
             // 独白を読み終えてから腰を上げる。喋りながら立ち上がらせない
@@ -300,6 +317,48 @@ namespace HalfAware
             subtitles.Enqueue(said);
             ConsoleLog.Examined(item.Label, said);
             if (Examined != null) Examined(item);
+            // 「はい」の後の文と、それで演出が掛けた止まりも、調べている間に入れる
+            if (attending == item) Attended();
+        }
+
+        /// <summary>
+        /// 調べている物の文と止まりを、いま積まれている所まで伸ばす。調べたその時（と「はい」を選んだその時）に、
+        /// 演出が足した文と掛けた止まりまで含める。そのあと演出が別に積む文（路地裏の買い手の台詞など）は含めない
+        /// </summary>
+        void Attended()
+        {
+            attendLines = subtitles.Queued;
+            attendUntil = Mathf.Max(attendUntil, frozenUntil);
+        }
+
+        /// <summary>調べている物の文を読み終え、二択も閉じ、止まりも過ぎたら、見回しを返す</summary>
+        void Unattend()
+        {
+            if (attending == null) return;
+            if (StillAttending(subtitles.Passed, attendLines, choice != null, Time.time, attendUntil)) return;
+            Forget();
+        }
+
+        /// <summary>
+        /// 調べている間か。その物の文（積み終えた所 lines まで）を送り終えていない、二択を出している、
+        /// その物が起こした止まり（until まで）が続いている、のどれかなら true。見回しを封じる間
+        /// </summary>
+        public static bool StillAttending(int passed, int lines, bool choosing, float now, float until)
+        {
+            return passed < lines || choosing || now < until;
+        }
+
+        /// <summary>調べている物を手放し、見回しを返す</summary>
+        void Forget()
+        {
+            attending = null;
+            attendUntil = 0f;
+            if (player != null) player.FreeLook(this);
+        }
+
+        void OnDisable()
+        {
+            Forget();
         }
 
         /// <summary>
@@ -380,6 +439,7 @@ namespace HalfAware
         IEnumerator Complete()
         {
             Completed = true;
+            Forget();
             player.CanMove = false;
             hud.SetPrompt(null);
             hud.SetSubtitle(null);

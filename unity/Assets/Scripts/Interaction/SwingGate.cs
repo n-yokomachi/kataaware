@@ -6,9 +6,10 @@ namespace HalfAware
     /// <summary>
     /// 調べて開ける戸。村の片割れの家の格子戸（村と庭の設計書 7 節）。
     ///
-    /// 目を留めると、ほかの場面の調べる操作と同じ案内（<c>E  開ける</c>）を <see cref="HudView.SetPrompt"/> に出し、
+    /// 目を留めると、ほかの場面の調べる操作と同じ案内（<see cref="HudView.Prompt"/>、<c>E/(左クリック)　開ける</c>）を <see cref="HudView.SetPrompt"/> に出し、
     /// 調べる操作で開く。選び方は <see cref="InteractionPicker.Select"/> で、距離と視線の角度もほかの場面と同じ。
     /// 開くと戸の板（丁番を原点にした子）を y まわりに回し、閉じている間の当たりを切る。開いたままにする。
+    /// 開けたら、ほかの場面で調べたときと同じく目を戸へ向け（<see cref="PlayerController.Face"/>）、開き切るまで見回しを封じる。
     ///
     /// **場面の進行（SceneFlow）には繋がない。** 必須や出来事はまだ入れない（設計書 4 節）。
     /// 場面の流れが入ったら、この案内と SceneFlow の案内がぶつからないよう、どちらかへまとめる
@@ -59,6 +60,8 @@ namespace HalfAware
                     t = Mathf.Min(1f, t + Time.deltaTime / Mathf.Max(0.05f, seconds));
                     Pose(t);
                 }
+                // 開き切ったら見回しを返す
+                if (t >= 1f && player != null) player.FreeLook(this);
                 return;
             }
             if (player == null || hud == null || items.Count == 0) return;
@@ -66,10 +69,20 @@ namespace HalfAware
             var picked = eye != null ? InteractionPicker.Select(eye.position, eye.forward, items, done) : null;
             if (picked != null || prompting)
             {
-                hud.SetPrompt(picked != null ? "E  " + picked.Label : null);
+                hud.SetPrompt(picked != null ? HudView.Prompt(picked.Label) : null);
                 prompting = picked != null;
             }
-            if (picked != null && player.InteractPressed) Open();
+            if (picked != null && player.InteractPressed)
+            {
+                player.Face(picked.Position);
+                player.HoldLook(this);
+                Open();
+            }
+        }
+
+        void OnDisable()
+        {
+            if (player != null) player.FreeLook(this);
         }
 
         /// <summary>開ける。当たりを切り、音を鳴らし、板を回し始める</summary>
