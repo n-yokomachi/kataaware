@@ -36,6 +36,18 @@ namespace HalfAware.Tests
             Assert.That(Load().Count, Is.EqualTo(16));
         }
 
+        // 記憶の頭から声の主へ目を向けて流すのは、記憶 0（メイ）だけ。母は三階の手すりから呼び、庭から行き先が読めない
+        [Test]
+        public void OnlyMeiLeadsFromTheCall()
+        {
+            var roster = Load();
+            Assert.That(roster[0].leads, Is.True, "記憶 0 の頭を流す");
+            for (var i = 1; i < roster.Count; i++) Assert.That(roster[i].leads, Is.False, "記憶 " + i + " は流さない");
+            var talks = DiveEntry.Exchanges(roster[0].said);
+            Assert.That(talks.Length, Is.GreaterThan(0));
+            Assert.That(talks[0].Cut, Is.False, "流す会話は区切りの前（呼ばれたその場）");
+        }
+
         [Test]
         public void EveryHopLandsInsideTheRoster()
         {

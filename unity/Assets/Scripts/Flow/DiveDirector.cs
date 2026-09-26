@@ -28,13 +28,22 @@ namespace HalfAware
     /// あちらは最初の一人を決める <see cref="DiveChain"/> の作りの一部として残してある。
     ///
     /// **会話は人を選んで進める。** 一行目（名を呼ぶ声）だけは記憶に入った瞬間に出て、
-    /// 送らずに消える。二行目からは、次の会話の相手に目を留めて `E　話す` で始め、
+    /// 送らずに消える。二行目からは、次の会話の相手に目を留めて `話す` の案内で始め、
     /// 一行ずつ E で送る。板はその人との会話が済んでから出す。決まりは
     /// <see cref="DiveEntry.Exchanges"/> から <see cref="DiveEntry.MayDive"/> までが持っている。
     ///
-    /// **E が効くのは三つだけ。** 次の会話の相手への `E　話す`、話しているあいだの送り、
+    /// **E が効くのは三つだけ。** 次の会話の相手への `話す`、話しているあいだの送り、
     /// 板の `潜る` と `切断`。一度の押下はこのうち一つにしか使わない。
-    /// `E 次へ` は無い（設計書 2 節）
+    /// `E 次へ` は無い（設計書 2 節）。案内の書式は <see cref="HudView.Prompt"/>。
+    ///
+    /// **話しているあいだは、相手の顔へ目を向けて見回しを封じる。** `話す` で始めたら目を相手の顔へ回し、
+    /// 動けば追う（<see cref="PlayerController.Follow"/>）。会話を閉じたら見回しを返す。
+    ///
+    /// **記憶 0（メイ）だけは頭から流す**（<see cref="DiveEntry.leads"/>）。母は三階の手すりから呼ぶので、
+    /// 庭からは行き先が読めない。記憶に入ると同時に目を母へ回し、名を呼ぶ声を E で送る帯に出して、
+    /// そのまま最初の会話（「投げてよー」「投げません。いいから上がっておいで」まで）へ続ける。
+    /// 母は「いいから上がっておいで」で手すりから身を起こして戸口へ戻り（<see cref="PersonMotion"/> の letsGo）、
+    /// 会話を閉じたら見回しが戻る
     /// </summary>
     [DefaultExecutionOrder(-15)]
     public sealed class DiveDirector : MonoBehaviour
@@ -83,6 +92,8 @@ namespace HalfAware
         [SerializeField] float reach = 1.6f;
         [Tooltip("行き先と主の足元の高さの差がこれを超えたら、横が近くても着いていない。m。階の違う真上と真下を分ける")]
         [SerializeField] float reachHigh = 1.2f;
+        [Tooltip("記憶の頭で、名を呼ぶ声の主へ目を回すのにかける秒（DiveEntry.leads の記憶だけ）")]
+        [SerializeField] float callTurnSeconds = 0.8f;
 
         [Header("眩暈")]
         [Tooltip("`切断` が押せるようになってから、さらに cutAfter 人渡ったときの眩暈の濃さ")]
@@ -136,12 +147,23 @@ namespace HalfAware
         readonly RaycastHit[] hits = new RaycastHit[16];
         /// <summary>いま目を留めている相手。外していれば null</summary>
         Transform aimed;
-        /// <summary>板か `E　話す` を、いま誰に出しているか</summary>
+        /// <summary>板か `話す` の案内を、いま誰に出しているか</summary>
         Transform shown;
         /// <summary>同じ相手を留めている（あるいは外している）秒</summary>
         float dwell;
         int lastStep;
         bool cutting;
+        /// <summary>
+        /// 記憶の頭で、名を呼ぶ声を E で送る帯に出し、目を声の主へ向けている間（<see cref="DiveEntry.leads"/>）。
+        /// E を押すと最初の会話へ続く
+        /// </summary>
+        bool leading;
+        /// <summary>いま目を向けて見回しを封じている相手。向けていなければ null</summary>
+        Transform attending;
+        /// <summary>記憶の頭で、声の主へ目を回し始める記憶の時計の秒。場面の頭は暗転から明けるのを待つ</summary>
+        float turnAt;
+        /// <summary>次に流す記憶の頭で、目を回すのを待つ秒。場面の頭の一度だけ</summary>
+        float turnDelay;
 
         /// <summary>いま潜っている人。一覧での番号。動作確認から読む</summary>
         public int Current { get { return chain != null ? chain.Current : -1; } }
@@ -164,7 +186,13 @@ namespace HalfAware
         /// <summary>話しているあいだ。動作確認から読む</summary>
         public bool Talking { get { return line >= 0; } }
 
-        /// <summary>いま板か `E　話す` を出している相手。出していなければ null。動作確認から読む</summary>
+        /// <summary>記憶の頭で、名を呼ぶ声を送りの帯に出して声の主へ目を向けている間。動作確認から読む</summary>
+        public bool Leading { get { return leading; } }
+
+        /// <summary>いま目を向けて見回しを封じている相手。動作確認から読む</summary>
+        public Transform Attending { get { return attending; } }
+
+        /// <summary>いま板か `話す` の案内を出している相手。出していなければ null。動作確認から読む</summary>
         public Transform Shown { get { return shown; } }
 
         /// <summary>
@@ -200,6 +228,8 @@ namespace HalfAware
 
             chain = new DiveChain(roster.Count, DiveIds.Listed, cutAfter, new System.Random());
             Shut();
+            // 暗転から明けきってから目を回す。黒いうちに回し終えると、行き先を示す動きが見えない
+            turnDelay = hud != null ? openSeconds : 0f;
             Play(chain.Current);
 
             // 場面 3 からは暗転して来る。明けるのはこちらの仕事
@@ -212,6 +242,7 @@ namespace HalfAware
         {
             if (body != null) body.Clear();
             if (player == null) return;
+            Unattend();
             player.CanLook = true;
             // 借りた体の速さは場面の外へ持ち出さない
             player.SpeedScale = 1f;
@@ -242,6 +273,13 @@ namespace HalfAware
             clock += dt;
             Drift();
             Voice();
+            // 記憶の頭の、名を呼ぶ声。目を声の主へ回し、E で最初の会話へ続ける
+            if (leading)
+            {
+                if (attending == null && clock >= turnAt) Attend(Partner(0), callTurnSeconds);
+                if (press) Begin(Partner(0));
+                return;
+            }
             if (Talking) { Converse(press); return; }
             Call();
             Watch(dt);
@@ -310,6 +348,8 @@ namespace HalfAware
             line = -1;
             hushed = false;
             pending = false;
+            leading = false;
+            Unattend();
             if (panel != null) panel.Hide();
             if (hud != null) { hud.SetSubtitle(null); hud.SetPrompt(null); }
             // 首は溜めた向きを体へ渡して正面へ戻す。前の記憶で振り向いたままだと、
@@ -320,6 +360,62 @@ namespace HalfAware
             player.SpeedScale = entry.speed;
             Stand();
             player.CanMove = true;
+            if (entry.leads) Lead();
+        }
+
+        /// <summary>
+        /// 記憶の頭を流す（<see cref="DiveEntry.leads"/>）。名を呼ぶ声を E で送る帯に出し、目を声の主へ回して追う。
+        /// 声の主は最初の会話の相手。送ると <see cref="Begin"/> で最初の会話へ続く。
+        ///
+        /// **一行目を薄い帯（<see cref="HudView.SetPassing"/>）で出さない。** 薄い帯は、声の主をプレイヤーが探して振り向くあいだ
+        /// 勝手に消える行として作った。ここでは目を声の主へ向けてあるので、ふつうの会話と同じく E で送らせる
+        /// </summary>
+        void Lead()
+        {
+            var who = Partner(0);
+            if (who == null || entry.said == null || entry.said.Length == 0) return;
+            leading = true;
+            hushed = true;
+            spoken = 1;
+            ConsoleLog.Said(entry.said[0].line);
+            if (hud != null) hud.SetSubtitle(entry.said[0].line, SubtitleKind.Line, true);
+            player.CanMove = false;
+            // 見回しは頭から封じる。目を回し始めるのは暗転が明けてから（Step）
+            player.HoldLook(this);
+            turnAt = turnDelay;
+            turnDelay = 0f;
+            if (turnAt <= 0f) Attend(who, callTurnSeconds);
+        }
+
+        /// <summary>k 番目の会話の相手。いなければ null</summary>
+        Transform Partner(int k)
+        {
+            if (take == null || talks == null || k < 0 || k >= talks.Length) return null;
+            return take.Person(talks[k].partner);
+        }
+
+        /// <summary>
+        /// who の顔へ seconds 秒かけて目を回し、そのあとも追う。見回しは封じる。
+        /// 同じ相手をもう追っていれば、そのまま追い続ける
+        /// </summary>
+        void Attend(Transform who, float seconds)
+        {
+            if (who == null) return;
+            if (attending == who && player.Facing) return;
+            attending = who;
+            Vector3 offset;
+            var aim = FaceAnchor(who, out offset);
+            player.Follow(aim, offset, seconds);
+            player.HoldLook(this);
+        }
+
+        /// <summary>相手を追うのをやめ、見回しを返す</summary>
+        void Unattend()
+        {
+            if (player == null) return;
+            if (attending != null) player.StopFacing();
+            attending = null;
+            player.FreeLook(this);
         }
 
         /// <summary>土と板の床。公園と電車だけ。ほかはコンクリート</summary>
@@ -484,16 +580,19 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// 次の会話を始める。話しているあいだは歩けない。見回しはできる。
+        /// 次の会話を始める。話しているあいだは歩けない。
+        /// 目は相手 who の顔へ回して追い、見回しは封じる（閉じたら返す）。
         /// 足音も止まる（<see cref="Footsteps"/> が <see cref="PlayerController.CanMove"/> を見ている）
         /// </summary>
-        void Begin()
+        void Begin(Transform who)
         {
+            leading = false;
             if (DiveEntry.AllDone(talks, done)) return;
             Hush();
             Drop();
             line = 0;
             player.CanMove = false;
+            Attend(who, PlayerController.FaceSeconds);
             Say();
         }
 
@@ -521,6 +620,7 @@ namespace HalfAware
             done++;
             if (hud != null) hud.SetSubtitle(null);
             player.CanMove = true;
+            Unattend();
             Drop();
         }
 
@@ -573,14 +673,14 @@ namespace HalfAware
             {
                 shown = aimed;
                 lastStep = 0;
-                // 板は潜ってよい人にだけ出す。次の会話の相手には、画面の下の `E　話す` だけ
+                // 板は潜ってよい人にだけ出す。次の会話の相手には、画面の下の `話す` の案内だけ
                 if (Divable(shown)) panel.Show(shown, entry.row, Row(Target(shown)));
                 else panel.Hide();
             }
             if (shown == null) return;
             if (!Divable(shown))
             {
-                if (hud != null) hud.SetPrompt(Key + TalkLabel);
+                if (hud != null) hud.SetPrompt(HudView.Prompt(TalkLabel));
                 return;
             }
             panel.Grow(chain.CutSize);
@@ -606,7 +706,7 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// 目を留める甲斐のある人か。板が出るか、`E　話す` が出るか。
+        /// 目を留める甲斐のある人か。板が出るか、`話す` の案内が出るか。
         /// どちらでもない人（まだ順の来ない会話の相手、会話が残っているあいだの会話を持たない人）は
         /// 狙いに入れない。入れると、その人が次の相手より中央に来ただけで何も出なくなる
         /// </summary>
@@ -650,16 +750,51 @@ namespace HalfAware
         {
             if (who == null || !who.gameObject.activeInHierarchy) return false;
             if (lens == null) return true;
-            var at = lens.WorldToViewportPoint(Head(who));
+            Vector3 face, chest, hips;
+            Aims(who, out face, out chest, out hips);
+            return InView(face) || InView(chest) || InView(hips);
+        }
+
+        bool InView(Vector3 point)
+        {
+            var at = lens.WorldToViewportPoint(point);
             if (at.z <= 0f) return false;
             return at.x >= -edgeMargin && at.x <= 1f + edgeMargin
                 && at.y >= -edgeMargin && at.y <= 1f + edgeMargin;
         }
 
-        /// <summary>その人の顔のあたり。足元で測ると、近くに立つほど下を向かないと拾えない</summary>
-        static Vector3 Head(Transform who)
+        /// <summary>顔の真ん中。頭の骨（首の付け根寄りにある）からこれだけ上。m</summary>
+        const float FaceAbove = 0.07f;
+
+        /// <summary>
+        /// その人の顔・胸・腰。目を留めたかを測る所と、見えているかの光線を撃つ所。
+        ///
+        /// **骨から取る。** 足元から決まった高さ（1.2 m）や、体の広がり（骨つきのレンダラーの広がりは腰の骨に付いて回る）で
+        /// 測っていた頃は、形を据えた人の顔が測る所から外れた。記憶 0 の母は三階の手すりから身を乗り出していて、
+        /// 顔は足元の 1.2 m 上より手すりの外へ 0.4 m 出ている。三階のデッキで母のそばまで行くと、母の顔を見ても
+        /// 測る所から 12 度より外れ、`話す` が出なかった（2026-09-27）。
+        /// 骨の無い人（Humanoid でない）は、体の広がりから取る
+        /// </summary>
+        public static void Aims(Transform who, out Vector3 face, out Vector3 chest, out Vector3 hips)
         {
-            return who.position + Vector3.up * 1.2f;
+            var an = who.GetComponentInChildren<Animator>();
+            if (an != null && an.isHuman)
+            {
+                var head = an.GetBoneTransform(HumanBodyBones.Head);
+                var upper = an.GetBoneTransform(HumanBodyBones.UpperChest);
+                if (upper == null) upper = an.GetBoneTransform(HumanBodyBones.Chest);
+                if (upper == null) upper = an.GetBoneTransform(HumanBodyBones.Spine);
+                var pelvis = an.GetBoneTransform(HumanBodyBones.Hips);
+                if (head != null && upper != null && pelvis != null)
+                {
+                    face = head.position + Vector3.up * FaceAbove;
+                    chest = upper.position;
+                    hips = pelvis.position;
+                    return;
+                }
+            }
+            Body(who, out face, out chest);
+            hips = who.position + Vector3.up * 0.9f;
         }
 
         /// <summary>
@@ -679,7 +814,7 @@ namespace HalfAware
             var closest = watchAngle;
             if (shown != null)
             {
-                var held = Vector3.Angle(eye.forward, Head(shown) - eye.position);
+                var held = Apart(eye, shown);
                 if (held < closest) closest = held;
             }
             var people = take.People;
@@ -688,9 +823,7 @@ namespace HalfAware
                 var who = people[i];
                 if (who == null || !who.gameObject.activeInHierarchy) continue;
                 if (!Offers(who)) continue;
-                var toward = Head(who) - eye.position;
-                if (toward.sqrMagnitude < 1e-4f) continue;
-                var apart = Vector3.Angle(eye.forward, toward);
+                var apart = Apart(eye, who);
                 if (apart >= closest) continue;
                 // 光線は角の内側に入った人にだけ撃つ
                 if (!Visible(who)) continue;
@@ -708,9 +841,50 @@ namespace HalfAware
         {
             var eye = player.Eye;
             if (eye == null || who == null) return true;
-            Vector3 head, chest;
-            Body(who, out head, out chest);
-            return Blocking(eye.position, head, who) == null || Blocking(eye.position, chest, who) == null;
+            Vector3 face, chest, hips;
+            Aims(who, out face, out chest, out hips);
+            return Blocking(eye.position, face, who) == null || Blocking(eye.position, chest, who) == null;
+        }
+
+        /// <summary>
+        /// 目の中央から、その人の顔・胸・腰のうちいちばん近い所までの角。度。
+        /// 顔だけで測ると、そばに立つ子どもの目（1.0 m）から大人の顔は見上げないと入らない。胸や腰を見ていても留めたことにする
+        /// </summary>
+        static float Apart(Transform eye, Transform who)
+        {
+            Vector3 face, chest, hips;
+            Aims(who, out face, out chest, out hips);
+            var least = 180f;
+            least = Mathf.Min(least, Angle(eye, face));
+            least = Mathf.Min(least, Angle(eye, chest));
+            least = Mathf.Min(least, Angle(eye, hips));
+            return least;
+        }
+
+        static float Angle(Transform eye, Vector3 at)
+        {
+            var toward = at - eye.position;
+            if (toward.sqrMagnitude < 1e-4f) return 180f;
+            return Vector3.Angle(eye.forward, toward);
+        }
+
+        /// <summary>
+        /// 話す相手の顔を追うための、付いていく物とそこからのずれ。頭の骨があればそれ（顔はその少し上）、
+        /// 無ければ人の根と、根から見た顔の高さ
+        /// </summary>
+        static Transform FaceAnchor(Transform who, out Vector3 offset)
+        {
+            var an = who.GetComponentInChildren<Animator>();
+            var head = an != null && an.isHuman ? an.GetBoneTransform(HumanBodyBones.Head) : null;
+            if (head != null)
+            {
+                offset = Vector3.up * FaceAbove;
+                return head;
+            }
+            Vector3 face, chest, hips;
+            Aims(who, out face, out chest, out hips);
+            offset = face - who.position;
+            return who;
         }
 
         /// <summary>
@@ -749,15 +923,16 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// その人の頭と胸。体の大きさで測る。背丈は模型と縮尺でまちまちで、
-        /// 高さを決め打ちにすると、子どもでは頭の上の何も無い所を狙うことになる
+        /// 骨の無い人の頭と胸。体の大きさで測る。背丈は模型と縮尺でまちまちで、
+        /// 高さを決め打ちにすると、子どもでは頭の上の何も無い所を狙うことになる。
+        /// 骨のある人は骨から取る（<see cref="Aims"/>）
         /// </summary>
         static void Body(Transform who, out Vector3 head, out Vector3 chest)
         {
             var shape = who.GetComponentInChildren<Renderer>();
             if (shape == null)
             {
-                head = Head(who);
+                head = who.position + Vector3.up * 1.2f;
                 chest = who.position + Vector3.up * 0.9f;
                 return;
             }
@@ -768,13 +943,10 @@ namespace HalfAware
 
         // ---- 画面の下の案内 --------------------------------------------------
 
-        /// <summary>鍵の案内の頭。場面 1・2・3・8 の `E ○○` と同じ書式</summary>
-        const string Key = "E  ";
-
-        /// <summary>`E` の後ろに続く、潜る先の言い方</summary>
+        /// <summary>案内の鍵の後ろに続く、潜る先の言い方</summary>
         const string DiveLabel = "この人の記憶へ潜る";
 
-        /// <summary>次の会話の相手に目を留めたときの、`E` の後ろに続く言い方</summary>
+        /// <summary>次の会話の相手に目を留めたときの、案内の鍵の後ろに続く言い方</summary>
         const string TalkLabel = "話す";
 
         /// <summary>選んでいない方に付ける余白。<see cref="Choice.Cursor"/> と同じ幅</summary>
@@ -787,23 +959,23 @@ namespace HalfAware
         public const string Axis = "（↑↓ かホイールで選ぶ）";
 
         /// <summary>
-        /// 板が出ているあいだ、画面の下に `E ○○` を出す。
+        /// 板が出ているあいだ、画面の下に案内（`E/(左クリック)　○○`、<see cref="HudView.Prompt"/>）を出す。
         ///
         /// **潜るのはプレイヤーが決めることだと、この一行で伝える。** 板の二行目だけでは
         /// 「自分が選んでいるのかどうか分からない」と差し戻された。調べられるものに
-        /// 近づくと `E ○○` が出るのは場面 1・2・3・8 で通した決まりなので、
+        /// 近づくと案内が出るのは場面 1・2・3・8 で通した決まりなので、
         /// 同じ場所・同じ書式に載せる。
         ///
-        /// 会話の `E　話す` は <see cref="Watch"/> が出す。話しているあいだは案内を出さない。
-        /// 場面 1・2・3・8 と同じく、帯が出ていて案内が無いことが「E で送る」の合図になる
+        /// 会話の `話す` は <see cref="Watch"/> が出す。話しているあいだは案内を出さない。
+        /// 場面 1・2・3・8 と同じく、帯の右下の送りの印が「E で送る」の合図になる
         /// </summary>
         void Guide()
         {
             if (hud == null || panel == null || chain == null) return;
-            if (!chain.CanCut) { hud.SetPrompt(Key + DiveLabel); return; }
+            if (!chain.CanCut) { hud.SetPrompt(HudView.Prompt(DiveLabel)); return; }
             var dive = (panel.Index == 0 ? Choice.Cursor : Blank) + DiveLabel;
             var cut = (panel.Index == 1 ? Choice.Cursor : Blank) + HoloPanel.Cut;
-            hud.SetPrompt(Key + dive + Blank + cut + "　" + Axis);
+            hud.SetPrompt(HudView.Prompt(dive + Blank + cut + "　" + Axis));
         }
 
         /// <summary>その人の飛び先。一覧に無ければ -1</summary>
@@ -835,10 +1007,10 @@ namespace HalfAware
         /// または矢印）」がそのまま <see cref="PlayerController.LogStep"/> にあるので、そちらを読む。
         ///
         /// 左クリックは E と同じ調べる操作（<see cref="PlayerController.InteractPressed"/>）で来る。
-        /// 一度の押しは、話している間なら送り（<see cref="Converse"/>）、`E　話す` の相手なら話し始め、
+        /// 一度の押しは、話している間なら送り（<see cref="Converse"/>）、`話す` の案内の相手なら話し始め、
         /// 板が出ていれば決める、のどれか一つにしか使わない（<see cref="Step"/>）
         ///
-        /// 板ではなく `E　話す` を出している相手なら、E で会話を始める。
+        /// 板ではなく `話す` の案内を出している相手なら、E で会話を始める。
         /// どちらも出ていなければ E は何もしない
         /// </summary>
         void Choose(bool press)
@@ -846,7 +1018,7 @@ namespace HalfAware
             if (panel == null || shown == null) return;
             if (!Divable(shown))
             {
-                if (press && Talkable(shown)) Begin();
+                if (press && Talkable(shown)) Begin(shown);
                 return;
             }
             var pick = Pick(panel.Index, player.LogStep, ref lastStep);

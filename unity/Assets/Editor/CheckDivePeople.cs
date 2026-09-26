@@ -391,20 +391,22 @@ namespace HalfAware.EditorTools
             var step = T.GetMethod("Step", flags);
             var blocking = T.GetMethod("Blocking", flags);
             System.Action<float, bool> S = (dt, press) => { step.Invoke(d, new object[] { dt, press }); UnityEngine.Physics.SyncTransforms(); };
-            System.Func<UnityEngine.Transform, UnityEngine.Vector3> headOf = w => { var b = w.GetComponentInChildren<UnityEngine.Renderer>().bounds; return new UnityEngine.Vector3(b.center.x, b.max.y - b.size.y * 0.08f, b.center.z); };
-            System.Func<UnityEngine.Transform, UnityEngine.Vector3> chestOf = w => { var b = w.GetComponentInChildren<UnityEngine.Renderer>().bounds; return new UnityEngine.Vector3(b.center.x, b.min.y + b.size.y * 0.70f, b.center.z); };
-            // ゲームと同じく、体ごと相手へ向けてから目を向ける。目は体の前へ 0.22 m 出ているので、体を回さないと目の置き場が横へずれる
+            // 顔と胸は DiveDirector と同じ所（骨から取る。DiveDirector.Aims）
+            System.Func<UnityEngine.Transform, UnityEngine.Vector3> headOf = w => { UnityEngine.Vector3 f, c, h; HalfAware.DiveDirector.Aims(w, out f, out c, out h); return f; };
+            System.Func<UnityEngine.Transform, UnityEngine.Vector3> chestOf = w => { UnityEngine.Vector3 f, c, h; HalfAware.DiveDirector.Aims(w, out f, out c, out h); return c; };
+            // ゲームと同じく、体ごと相手の顔へ向けてから目を向ける。目は体の前へ 0.22 m 出ているので、体を回さないと目の置き場が横へずれる
             System.Action<UnityEngine.Transform> aim = w => {
-                var flat = (w.position + UnityEngine.Vector3.up * 1.2f) - eye.position; flat.y = 0f;
+                var flat = headOf(w) - eye.position; flat.y = 0f;
                 if (flat.sqrMagnitude > 1e-6f) pT.rotation = UnityEngine.Quaternion.LookRotation(flat);
                 UnityEngine.Physics.SyncTransforms();
-                eye.rotation = UnityEngine.Quaternion.LookRotation((w.position + UnityEngine.Vector3.up * 1.2f) - eye.position);
+                eye.rotation = UnityEngine.Quaternion.LookRotation(headOf(w) - eye.position);
                 UnityEngine.Physics.SyncTransforms(); };
             System.Func<string> state = () => "t=" + d.Clock.ToString("F1")
                 + " 帯=" + (band.activeSelf ? "「" + subText.text.Replace("\n", "/") + "」" : "なし")
                 + " 案内=" + (prompt.gameObject.activeSelf ? "[" + prompt.text + "]" : "なし")
                 + " 板=" + (panel.gameObject.activeSelf && panel.Showing ? "出" : "なし")
-                + " 相手=" + (d.Shown != null ? d.Shown.name : "-") + " 話中=" + d.Talking + " 済=" + d.Done + " 出行=" + d.Spoken;
+                + " 相手=" + (d.Shown != null ? d.Shown.name : "-") + " 話中=" + d.Talking + " 済=" + d.Done + " 出行=" + d.Spoken
+                + (d.Leading ? " 頭を流し中" : "") + (d.Attending != null ? " 目=" + d.Attending.name : "");
             System.Func<UnityEngine.Transform, UnityEngine.Collider> blockHead = w => (UnityEngine.Collider)blocking.Invoke(d, new object[] { eye.position, headOf(w), w });
             System.Func<UnityEngine.Transform, UnityEngine.Collider> blockChest = w => (UnityEngine.Collider)blocking.Invoke(d, new object[] { eye.position, chestOf(w), w });
             System.Func<UnityEngine.Transform, string> sight = w => {
@@ -472,7 +474,13 @@ namespace HalfAware.EditorTools
                 };
                 System.Func<UnityEngine.Transform, bool> stand = w => standIf(w, _ => true);
                 var talks = HalfAware.DiveEntry.Exchanges(entry.said);
-                for (var k = 0; k < talks.Length; k++) {
+                // 頭を流す記憶（DiveEntry.leads）は、名を呼ぶ声から最初の会話までを E で送り切る。相手は選ばない
+                if (d.Leading) {
+                    var lead = 0;
+                    while ((d.Leading || d.Talking) && lead++ < 20) S(0.02f, true);
+                    sb.AppendLine("[頭を流した（" + lead + " 回）] " + state());
+                }
+                for (var k = d.Done; k < talks.Length; k++) {
                     var w = take.Find(talks[k].partner);
                     for (var i = 0; i < 70; i++) S(0.1f, false);
                     // 歩いている相手とは話し始めない。歩き終えるまで待つ
@@ -532,6 +540,9 @@ namespace HalfAware.EditorTools
                 caption.text = capText;
                 subText.text = subText0; band.SetActive(bandActive);
                 player.CanMove = true; player.SpeedScale = 1f;
+                // 話す相手へ向けた目と、封じた見回しを解く（再生していないので目は動いていないが、封じた者は PlayerController に残る）
+                player.StopFacing(); player.FreeLook(d);
+                F("leading").SetValue(d, false); F("attending").SetValue(d, null);
                 F("chain").SetValue(d, null); F("take").SetValue(d, null); F("place").SetValue(d, null);
                 sky.Write();
                 UnityEngine.Physics.SyncTransforms();

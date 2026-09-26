@@ -82,6 +82,11 @@ namespace HalfAware
         public const float NeckShare = 0.4f;
         /// <summary>頭の骨から目の高さまで。m（模型の縮尺を掛けて使う）</summary>
         const float EyeAbove = 0.09f;
+        /// <summary>
+        /// 据えた形を解くのにかける秒（letsGo）。記憶 0 の母が手すりから身を起こす。
+        /// 一こまで解くと、身を乗り出した形から立った形へ跳ねて見える
+        /// </summary>
+        public const float LetGoSeconds = 0.5f;
 
         [SerializeField] Animator animator;
         [Tooltip("模型の根。こまの頭でだけ根の位置へ追いつかせる")]
@@ -155,6 +160,10 @@ namespace HalfAware
         Vector2 look;
         /// <summary>次の上書きで首と頭を回してよい度</summary>
         float gazeBudget;
+        /// <summary>据えた形をどれだけ解いたか。0 で据えたまま、1 で動きのまま（letsGo）</summary>
+        float letGo;
+        /// <summary>据えた骨の、動きが置いた向き。解くあいだの混ぜに使う</summary>
+        Quaternion[] moving = new Quaternion[0];
 
         public Transform Body { get { return body; } }
         public AnimationClip Idle { get { return idle; } }
@@ -304,6 +313,7 @@ namespace HalfAware
         public void Restart()
         {
             look = Vector2.zero;
+            letGo = 0f;
             Open();
             idleTime = idle != null ? lag * idle.length : 0f;
             phase = 0f;
@@ -401,6 +411,8 @@ namespace HalfAware
             heldYaw = Mathf.MoveTowardsAngle(heldYaw, toward, TurnPerTick * n);
             heldAt = transform.TransformPoint(seat);
             gazeBudget = GazePerTick * n;
+            // 歩き出したら、据えた形をこまごとに少しずつ解く
+            if (LetGo()) letGo = Mathf.Min(1f, letGo + span / LetGoSeconds);
             travelled = 0f;
             moved = Vector3.zero;
         }
@@ -481,9 +493,21 @@ namespace HalfAware
                 for (var i = 0; i < bent.Length && i < bends.Length; i++)
                     if (bent[i] != null) bent[i].rotation = Quaternion.AngleAxis(bends[i], right) * bent[i].rotation;
                 var frame = body.rotation;
-                if (!LetGo())
+                var keep = LetGo() ? 1f - letGo : 1f;
+                if (keep >= 1f)
+                {
                     for (var i = 0; i < held.Length && i < holds.Length; i++)
                         if (held[i] != null) held[i].rotation = frame * holds[i];
+                }
+                else if (keep > 0f)
+                {
+                    // 解くあいだは、動きが置いた向きと据えた向きを混ぜる。
+                    // 親の骨から順に書くと子の向きが変わるので、動きの向きは先に全部拾っておく
+                    if (moving.Length != held.Length) moving = new Quaternion[held.Length];
+                    for (var i = 0; i < held.Length; i++) moving[i] = held[i] != null ? held[i].rotation : Quaternion.identity;
+                    for (var i = 0; i < held.Length && i < holds.Length; i++)
+                        if (held[i] != null) held[i].rotation = Quaternion.Slerp(moving[i], frame * holds[i], keep);
+                }
             }
             for (var i = 0; i < feet.Length && i < ankles.Length; i++)
                 if (feet[i] != null && ankles[i] != null) feet[i].position = ankles[i].position;
@@ -575,6 +599,8 @@ namespace HalfAware
             // 見る先を渡してあれば、首と頭は向け切った形で置く
             look = Vector2.zero;
             gazeBudget = 360f;
+            // 据えた形も、解き始めていれば解き切った形で置く（確かめの道具が歩き終えた所に置いて撮る）
+            letGo = LetGo() ? 1f : 0f;
             Settle();
         }
     }

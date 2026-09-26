@@ -129,6 +129,12 @@ namespace HalfAware.EditorTools
                 entries[i] = e;
             }
 
+            // 記憶 0 は、名を呼ぶ母が三階の手すりにいて、庭から行き先が読めない。
+            // 記憶に入ると同時に目を母へ向け、呼ぶ声から「投げません。いいから上がっておいで」までを続けて流す（DiveEntry.leads）
+            var mei = entries[0];
+            mei.leads = true;
+            entries[0] = mei;
+
             return entries;
         }
 
@@ -582,6 +588,7 @@ namespace HalfAware.EditorTools
                 e.FindPropertyRelative("tint").colorValue = entries[i].tint;
                 e.FindPropertyRelative("muffle").floatValue = entries[i].muffle;
                 e.FindPropertyRelative("heartbeat").boolValue = entries[i].heartbeat;
+                e.FindPropertyRelative("leads").boolValue = entries[i].leads;
                 Fill(e.FindPropertyRelative("seen"), entries[i].seen);
                 Lines(e.FindPropertyRelative("said"), entries[i].said);
             }
