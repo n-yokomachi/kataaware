@@ -220,45 +220,69 @@ namespace HalfAware.EditorTools
             b.Paint.Box(at + Vector3.up * (apex + 0.08f), new Vector3(0.06f, 0.16f, 0.06f));
             b.Paint.Box(at + Vector3.up * (apex * 0.5f), new Vector3(0.04f, apex, 0.04f));
 
-            // 卓。丸い天板を八角で、三本の脚は外へ反らせる
-            Prism(b.Iron, at + Vector3.up * 0.70f, 0.46f, 0.03f, 10);
-            Prism(b.Iron, at + Vector3.up * 0.62f, 0.10f, 0.08f, 6);
+            // 卓。**白く塗った鉄**（設計書 7 節）。丸い天板を八角で、三本の脚は外へ反らせる
+            Prism(b.Paint, at + Vector3.up * 0.70f, 0.46f, 0.03f, 10);
+            Prism(b.Paint, at + Vector3.up * 0.62f, 0.10f, 0.08f, 6);
             for (var i = 0; i < 3; i++)
             {
                 var a = Mathf.PI * 2f * i / 3f + 0.3f;
                 var o = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
-                Beam(b.Iron, at + Vector3.up * 0.64f + o * 0.06f, at + Vector3.up * 0.30f + o * 0.22f, 0.03f, 0.03f);
-                Beam(b.Iron, at + Vector3.up * 0.30f + o * 0.22f, at + o * 0.34f, 0.03f, 0.03f);
+                Beam(b.Paint, at + Vector3.up * 0.64f + o * 0.06f, at + Vector3.up * 0.30f + o * 0.22f, 0.03f, 0.03f);
+                Beam(b.Paint, at + Vector3.up * 0.30f + o * 0.22f, at + o * 0.34f, 0.03f, 0.03f);
             }
-            // 椅子。卓を囲んで三脚、卓へ向ける
+            // 椅子。卓を囲んで三脚、卓へ向ける。白
             foreach (var deg in new[] { 200f, 320f, 80f })
             {
                 var a = deg * Mathf.Deg2Rad;
                 var foot = at + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * 0.82f;
-                Chair(b.Iron, foot, Quaternion.LookRotation(at - foot, Vector3.up));
+                Chair(b.Paint, foot, Quaternion.LookRotation(at - foot, Vector3.up));
             }
         }
 
-        /// <summary>鉄の椅子。丸い座面、四本の脚、輪の背。rot の +z が前（卓の側）</summary>
+        /// <summary>
+        /// 白い鉄のビストロの椅子。丸い座面、四本の脚、背。rot の +z が前（卓の側）。
+        ///
+        /// **背は後ろの二本の脚をそのまま上へ伸ばして作る。** 背の柱を座面の外に別に立てたら、
+        /// 背もたれが座面から離れて宙に浮いて見えた（オーナーの指摘）。
+        /// 後ろの脚は床から座面の縁を通って背の頭まで一本で通し、座面の縁の輪と背の横木で繋ぐ
+        /// </summary>
         static void Chair(Bank b, Vector3 foot, Quaternion rot)
         {
-            Prism(b, foot + Vector3.up * 0.44f, 0.21f, 0.03f, 8);
-            for (var i = 0; i < 4; i++)
-            {
-                var a = Mathf.PI * 0.5f * i + Mathf.PI * 0.25f;
-                var o = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
-                Beam(b, foot + Vector3.up * 0.44f + o * 0.15f, foot + o * 0.21f, 0.022f, 0.022f);
-            }
+            const float seat = 0.45f;
+            const float r = 0.21f;
+            Prism(b, foot + Vector3.up * (seat - 0.03f), r, 0.03f, 8);
             var back = rot * Vector3.back;
             var side = rot * Vector3.right;
-            var p0 = foot + back * 0.18f + side * 0.17f + Vector3.up * 0.46f;
-            var p1 = foot + back * 0.18f - side * 0.17f + Vector3.up * 0.46f;
-            var h = Vector3.up * 0.40f + back * 0.06f;
-            Beam(b, p0, p0 + h, 0.022f, 0.022f);
-            Beam(b, p1, p1 + h, 0.022f, 0.022f);
-            Beam(b, p0 + h, foot + back * 0.25f + Vector3.up * 0.96f, 0.022f, 0.022f);
-            Beam(b, p1 + h, foot + back * 0.25f + Vector3.up * 0.96f, 0.022f, 0.022f);
-            Beam(b, p0 + h * 0.55f, p1 + h * 0.55f, 0.02f, 0.02f);
+            var fwd = -back;
+            // 前の二本の脚。座面の縁の下から床へ少し開いて
+            foreach (var s in new[] { -1f, 1f })
+            {
+                var rim = foot + (fwd * 0.7f + side * s * 0.7f).normalized * (r - 0.03f) + Vector3.up * (seat - 0.03f);
+                Beam(b, rim, foot + (fwd * 0.7f + side * s * 0.7f).normalized * (r + 0.02f), 0.024f, 0.024f);
+            }
+            // 後ろの二本。床から座面の縁を通り、背の頭まで一本で
+            var tops = new Vector3[2];
+            var k = 0;
+            foreach (var s in new[] { -1f, 1f })
+            {
+                var dir = (back * 0.75f + side * s * 0.66f).normalized;
+                var floor = foot + dir * (r + 0.03f);
+                var rim = foot + dir * (r - 0.02f) + Vector3.up * (seat - 0.02f);
+                var top = foot + dir * (r - 0.01f) + back * 0.07f + Vector3.up * 0.93f;
+                Beam(b, floor, rim, 0.024f, 0.024f);
+                Beam(b, rim, top, 0.024f, 0.024f);
+                tops[k++] = top;
+            }
+            // 背の頭の横木（ゆるい弧を二つの桟で）と、中ほどの横木、真ん中の縦の飾り
+            var crown = (tops[0] + tops[1]) * 0.5f + back * 0.03f + Vector3.up * 0.03f;
+            Beam(b, tops[0], crown, 0.03f, 0.03f);
+            Beam(b, crown, tops[1], 0.03f, 0.03f);
+            var mid0 = Vector3.Lerp(tops[0], foot + (back * 0.75f - side * 0.66f).normalized * (r - 0.02f) + Vector3.up * seat, 0.5f);
+            var mid1 = Vector3.Lerp(tops[1], foot + (back * 0.75f + side * 0.66f).normalized * (r - 0.02f) + Vector3.up * seat, 0.5f);
+            Beam(b, mid0, mid1, 0.02f, 0.02f);
+            Beam(b, foot + back * (r - 0.02f) + Vector3.up * seat, crown, 0.02f, 0.02f);
+            // 脚の下の輪（脚どうしを繋ぐ桟）
+            Prism(b, foot + Vector3.up * 0.16f, r * 0.8f, 0.015f, 8);
         }
 
         // ---- 境界 -----------------------------------------------------------------------

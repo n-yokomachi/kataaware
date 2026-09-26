@@ -308,24 +308,47 @@ namespace HalfAware.EditorTools
 
         // ---- 花 -------------------------------------------------------------------------
 
-        /// <summary>家 A。暖かい色。赤・橙・黄に、ピンクのタチアオイ</summary>
+        /// <summary>
+        /// 家 A の裏庭。暖かい色（赤・橙・黄）。背の高い物は花の終わったジギタリスの葉の株と白いタチアオイを少し。
+        /// **ピンクのタチアオイは使わない。** 家々の軒先に背の高いピンクが並ぶと、片割れの庭の主役を食う（設計書 7 節）
+        /// </summary>
         static readonly Palette WarmPlan = new Palette
         {
-            Tall = new[] { Kind.HollyPink, Kind.Foxglove },
-            TallW = new[] { 3f, 1f },
+            Tall = new[] { Kind.Foxglove, Kind.HollyWhite },
+            TallW = new[] { 2f, 0.6f },
             Mid = new[] { Kind.Rudbeckia, Kind.DahliaRed, Kind.EchPink, Kind.Allium },
             MidW = new[] { 3f, 2f, 1.5f, 0.6f },
             Low = new[] { Kind.Mantle, Kind.Catmint, Kind.Filler },
             LowW = new[] { 2f, 1.5f, 1f },
         };
 
-        /// <summary>家 B。冷たい色。青・紫・白</summary>
+        /// <summary>家 B の裏庭。冷たい色。青・紫・白。背の高い物は花の終わったデルフィニウムを主に</summary>
         static readonly Palette CoolPlan = new Palette
         {
             Tall = new[] { Kind.Delph, Kind.HollyWhite },
-            TallW = new[] { 2f, 1.5f },
+            TallW = new[] { 2f, 0.6f },
             Mid = new[] { Kind.Aster, Kind.Hydrangea, Kind.EchWhite, Kind.Rosemary },
             MidW = new[] { 3f, 2f, 1.5f, 1f },
+            Low = new[] { Kind.Lavender, Kind.Catmint, Kind.Geranium },
+            LowW = new[] { 2.5f, 2f, 2f },
+        };
+
+        /// <summary>
+        /// 家 A と家 B の前庭。路地から見えるので、背の高い物を置かず、中くらいを落ち着いた色で。
+        /// 家 A は黄と白（ルドベキア・白いエキナセア）、家 B は青と白（アスター・アジサイ）
+        /// </summary>
+        static readonly Palette FrontWarmPlan = new Palette
+        {
+            Mid = new[] { Kind.Rudbeckia, Kind.EchWhite, Kind.Rosemary },
+            MidW = new[] { 2f, 1.5f, 1f },
+            Low = new[] { Kind.Mantle, Kind.Catmint, Kind.Lavender },
+            LowW = new[] { 2f, 1.5f, 1f },
+        };
+
+        static readonly Palette FrontCoolPlan = new Palette
+        {
+            Mid = new[] { Kind.Aster, Kind.Hydrangea, Kind.EchWhite },
+            MidW = new[] { 2.5f, 2f, 1f },
             Low = new[] { Kind.Lavender, Kind.Catmint, Kind.Geranium },
             LowW = new[] { 2.5f, 2f, 2f },
         };
@@ -337,23 +360,19 @@ namespace HalfAware.EditorTools
             LowW = new[] { 2.5f, 2f, 2f, 1f },
         };
 
-        /// <summary>家 C。白とピンクと、アジサイの青</summary>
+        /// <summary>家 C の前庭。白とアジサイの青。背の高い物は置かない</summary>
         static readonly Palette BrickPlan = new Palette
         {
-            Tall = new[] { Kind.HollyWhite },
-            TallW = new[] { 1f },
-            Mid = new[] { Kind.Hydrangea, Kind.DahliaPink, Kind.EchWhite },
-            MidW = new[] { 2.5f, 1.5f, 1.5f },
+            Mid = new[] { Kind.Hydrangea, Kind.EchWhite, Kind.Rosemary },
+            MidW = new[] { 2.5f, 1.5f, 1f },
             Low = new[] { Kind.Lavender, Kind.Geranium, Kind.Mantle },
             LowW = new[] { 2f, 1.5f, 1.5f },
         };
 
-        /// <summary>家 D。黄と青の混ぜ植え</summary>
+        /// <summary>家 D の前庭。黄と青の混ぜ植え。背の高い物は置かない</summary>
         static readonly Palette MixPlan = new Palette
         {
-            Tall = new[] { Kind.HollyPink, Kind.Delph },
-            TallW = new[] { 1.5f, 1f },
-            Mid = new[] { Kind.Rudbeckia, Kind.Aster, Kind.EchPink },
+            Mid = new[] { Kind.Rudbeckia, Kind.Aster, Kind.Sage },
             MidW = new[] { 2f, 2f, 1f },
             Low = new[] { Kind.Catmint, Kind.Mantle, Kind.Geranium, Kind.Lavender },
             LowW = new[] { 2f, 2f, 1.5f, 1f },
@@ -374,12 +393,12 @@ namespace HalfAware.EditorTools
         {
             return new List<Border>
             {
-                AlongX("AFront", PlotAWest + 1.0f, -34.0f - 0.7f, NorthEdge + 0.85f, 6.35f, WarmPlan, 401),
-                AlongX("AWingFront", -34.0f + 0.7f, PlotAEast - 0.5f, NorthEdge + 0.85f, 8.15f, WarmPlan, 403),
+                AlongX("AFront", PlotAWest + 1.0f, -34.0f - 0.7f, NorthEdge + 0.85f, 6.35f, FrontWarmPlan, 401),
+                AlongX("AWingFront", -34.0f + 0.7f, PlotAEast - 0.5f, NorthEdge + 0.85f, 8.15f, FrontWarmPlan, 403),
                 AlongZ("AWest", 17.8f, 34.6f, PlotAWest + 1.6f, PlotAWest + 0.6f, WarmPlan, 405),
                 AlongX("ABack", PlotAWest + 1.5f, -32.0f, 34.2f, BackHedge - 0.55f, WarmPlan, 407),
-                AlongX("BFront0", PlotBWest + 0.5f, -17.6f - 0.7f, NorthEdge + 0.8f, 5.95f, CoolPlan, 411),
-                AlongX("BFront1", -17.6f + 0.7f, -13.4f, NorthEdge + 0.8f, 5.95f, CoolPlan, 413),
+                AlongX("BFront0", PlotBWest + 0.5f, -17.6f - 0.7f, NorthEdge + 0.8f, 5.95f, FrontCoolPlan, 411),
+                AlongX("BFront1", -17.6f + 0.7f, -13.4f, NorthEdge + 0.8f, 5.95f, FrontCoolPlan, 413),
                 AlongX("BSide", -12.3f, PlotBEast - 0.3f, NorthEdge + 0.75f, NorthEdge + 1.55f, LowCoolPlan, 415),
                 AlongZ("BEast", 13.6f, 34.4f, PlotBEast - 1.7f, PlotBEast - 0.75f, CoolPlan, 417),
                 AlongX("BBack", -18.0f, PlotBEast - 1.4f, 34.3f, BackHedge - 0.55f, CoolPlan, 419),
@@ -436,7 +455,7 @@ namespace HalfAware.EditorTools
                 WallRose(g, new Vector3(r.x, 0f, r.y), Vector3.right, r.w, Kind.Roses);
             // 家 B の正面の壁のバラ（茅の軒の下）と、家 A の西の妻のアイビー、家 D の壁のアイビー
             for (var k = 0; k < 3; k++)
-                Flat(g, Kind.Roses, new Vector3(-21.4f + k * 3.2f, 0.05f, 6.2f - 0.07f), new Vector3(0.45f, 0f, 0f), Vector3.up * 1.9f);
+                Flat(g, Kind.Roses, new Vector3(-21.4f + k * 3.2f, 0.05f, 6.2f - 0.07f), new Vector3(0.4f, 0f, 0f), Vector3.up * 1.3f);
             for (var k = 0; k < 4; k++)
                 Flat(g, Kind.Ivy, new Vector3(-42.07f, 0f, 7.6f + k * 1.9f), new Vector3(0f, 0f, 0.9f), Vector3.up * (2.2f + Hash(503, k) * 1.6f));
             Flat(g, Kind.Ivy, new Vector3(-16.67f, 0f, -8.0f), new Vector3(0f, 0f, 0.9f), Vector3.up * 2.4f);

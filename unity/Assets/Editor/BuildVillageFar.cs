@@ -13,7 +13,8 @@ namespace HalfAware.EditorTools
     /// 朝靄の溜まりだけ切る（村は時刻を切り替えるので、場面 8 の朝の靄の色を焼き込まない）。
     /// 札は路地から離れるほど幅を広く、間を粗くする。家の裏の畑は塀と生け垣の上に穂先が覗くだけなので粗くてよい。
     ///
-    /// **遠く（撮って貼る）:** 麦畑と牧草地の継ぎはぎの丘、生け垣と雑木林、村の教会の塔、遠くの農家。
+    /// **遠く（撮って貼る）:** 麦畑と牧草地の継ぎはぎの丘、生け垣と雑木林、遠くの農家。
+    /// 村の教会は書き割りに撮らず、村の東の外れに組む（<see cref="ChurchNear"/>、設計書 7 節）。
     /// 場面 4 と同じ書き割りの道具（<see cref="FarBackdrop"/>）で、路地の真ん中を中心にした輪に貼る。
     ///
     /// **書き割りは時刻ごとに二枚撮る。** 朝は東北東の低い日に靄、夕方は西北西の地平の日に暖かい霞で、
@@ -186,6 +187,7 @@ namespace HalfAware.EditorTools
             NoShadow(Emit(parent, "VillagePasture", pasture, VergeMat(), false));
 
             Wheat(parent);
+            ChurchNear(b);
 
             foreach (var h in Hedgerows)
                 FieldHedge(b, new Vector3(h.x, 0f, h.y), new Vector3(h.z, 0f, h.w), 2.1f, 1.3f, (int)(h.x * 3f + h.y));
@@ -204,6 +206,160 @@ namespace HalfAware.EditorTools
                     FieldTree(b, at, 0.8f + Hash(605, n) * 0.5f, n);
                     n++;
                 }
+            }
+        }
+
+        // ---- 村の教会（組む） --------------------------------------------------------
+
+        /// <summary>
+        /// 村の教会の塔の足元の芯。**村の東の外れの畑越し**（設計書 7 節）。路地の真ん中から 157 m、
+        /// 片割れの家の前から 130 m、車の着く所から 199 m。書き割りの輪（半径 190 m）の内に置くので、板より手前に描かれる。
+        /// 路地を東へ歩くと、片割れの家の屋根の左（北東）に塔と身廊の屋根が出る
+        /// </summary>
+        public static readonly Vector3 ChurchAt = new Vector3(110f, 0f, 70f);
+
+        /// <summary>
+        /// 村の教会。コッツウォルズの羊毛の教会の、胸壁と四隅の尖りを持つ四角い塔を西（村の側）に、
+        /// その東に石版の屋根の身廊と、一段低い内陣。南に小さなポーチ。
+        /// まわりに野石の墓地の塀と、濃いイチイの木と、墓石を少し。
+        /// 足元は書き割りの地面の上に立つので、墓地の塀とイチイで根元を隠す
+        /// </summary>
+        static void ChurchNear(Banks b)
+        {
+            var t = ChurchAt;
+            // 塔は 24 m（羊毛の教会の塔の高さ）。19 m では路地から生け垣の上に頭が少し出るだけだった
+            const float tw = 6.8f;
+            const float th = 24f;
+            // 塔。胴と、隅の控え壁（二段）、途中の水切りの帯
+            b.Stone.Box(t + Vector3.up * (th * 0.5f - 0.5f), new Vector3(tw, th + 1f, tw));
+            foreach (var sx in new[] { -1f, 1f })
+                foreach (var sz in new[] { -1f, 1f })
+                {
+                    b.Stone.Box(t + new Vector3(sx * (tw * 0.5f + 0.25f), 4f, sz * (tw * 0.5f - 0.6f)), new Vector3(0.5f, 8f, 1.0f));
+                    b.Stone.Box(t + new Vector3(sx * (tw * 0.5f - 0.6f), 4f, sz * (tw * 0.5f + 0.25f)), new Vector3(1.0f, 8f, 0.5f));
+                    b.Stone.Box(t + new Vector3(sx * (tw * 0.5f + 0.15f), 11f, sz * (tw * 0.5f - 0.6f)), new Vector3(0.3f, 6f, 0.8f));
+                    b.Stone.Box(t + new Vector3(sx * (tw * 0.5f - 0.6f), 11f, sz * (tw * 0.5f + 0.15f)), new Vector3(0.8f, 6f, 0.3f));
+                }
+            foreach (var y in new[] { 8.2f, 16.2f })
+                b.Dressed.Box(t + Vector3.up * y, new Vector3(tw + 0.24f, 0.22f, tw + 0.24f));
+            // 鐘楼の窓（四方）と、西の戸口と窓
+            foreach (var d in new[] { Vector3.forward, Vector3.back, Vector3.left, Vector3.right })
+            {
+                var at = t + d * (tw * 0.5f + 0.02f) + Vector3.up * 20.6f;
+                b.Dark.Box(at, new Vector3(d.x != 0f ? 0.06f : 1.3f, 2.6f, d.z != 0f ? 0.06f : 1.3f));
+                b.Dressed.Box(at + Vector3.up * 1.4f, new Vector3(d.x != 0f ? 0.12f : 1.6f, 0.2f, d.z != 0f ? 0.12f : 1.6f));
+            }
+            b.Dark.Box(t + new Vector3(-tw * 0.5f - 0.02f, 1.3f, 0f), new Vector3(0.06f, 2.6f, 1.5f));
+            b.Dark.Box(t + new Vector3(-tw * 0.5f - 0.02f, 5.4f, 0f), new Vector3(0.06f, 2.8f, 1.1f));
+            // 胸壁。四辺に帯を回し、上に凸の石を並べる。四隅に尖り
+            const float top = th;
+            b.Dressed.Box(t + Vector3.up * (top + 0.1f), new Vector3(tw + 0.4f, 0.2f, tw + 0.4f));
+            for (var k = 0; k < 4; k++)
+            {
+                var rot = Quaternion.Euler(0f, k * 90f, 0f);
+                var n = rot * Vector3.forward;
+                var r = rot * Vector3.right;
+                b.Stone.Box(t + n * (tw * 0.5f) + Vector3.up * (top + 0.55f), new Vector3(tw + 0.4f, 0.7f, 0.4f), rot);
+                for (var i = 0; i < 4; i++)
+                {
+                    var u = -tw * 0.5f + tw * (i + 0.5f) / 4f;
+                    b.Stone.Box(t + n * (tw * 0.5f) + r * u + Vector3.up * (top + 1.15f), new Vector3(0.7f, 0.5f, 0.4f), rot);
+                }
+            }
+            foreach (var sx in new[] { -1f, 1f })
+                foreach (var sz in new[] { -1f, 1f })
+                {
+                    var c = t + new Vector3(sx * tw * 0.5f, 0f, sz * tw * 0.5f);
+                    b.Stone.Box(c + Vector3.up * (top + 1.3f), new Vector3(0.6f, 2.6f, 0.6f));
+                    b.Dressed.Box(c + Vector3.up * (top + 2.9f), new Vector3(0.36f, 0.8f, 0.36f), Quaternion.Euler(0f, 45f, 0f));
+                    b.Dressed.Box(c + Vector3.up * (top + 3.5f), new Vector3(0.14f, 0.6f, 0.14f));
+                }
+            // 身廊。塔の東に
+            var nave = t + new Vector3(tw * 0.5f + 10f, 0f, 0f);
+            const float nl = 20f;
+            const float nw = 8.4f;
+            ChurchBody(b, nave, nl, nw, 9f, 42f, false);
+            for (var i = 0; i < 4; i++)
+                foreach (var sz in new[] { -1f, 1f })
+                    b.Dark.Box(nave + new Vector3(-nl * 0.5f + 3f + i * 4.6f, 4.2f, sz * (nw * 0.5f + 0.02f)), new Vector3(1.3f, 4.2f, 0.06f));
+            // 内陣。身廊の東に一段低く
+            var chancel = nave + new Vector3(nl * 0.5f + 4.5f, 0f, 0f);
+            ChurchBody(b, chancel, 9f, 6.4f, 7f, 42f, false);
+            b.Dark.Box(chancel + new Vector3(4.52f, 3.4f, 0f), new Vector3(0.06f, 3.6f, 2.2f));
+            // 南のポーチ
+            ChurchBody(b, nave + new Vector3(-nl * 0.5f + 5f, 0f, -nw * 0.5f - 1.6f), 3.2f, 3.2f, 3.2f, 45f, true);
+            // 墓地の塀。身廊を囲む四角に、西（村の側）に口
+            var x0 = t.x - tw * 0.5f - 9f;
+            var x1 = chancel.x + 12f;
+            var z0 = t.z - 16f;
+            var z1 = t.z + 16f;
+            var segs = new[]
+            {
+                new Vector4(x0, z0, x1, z0), new Vector4(x1, z0, x1, z1), new Vector4(x1, z1, x0, z1),
+                new Vector4(x0, z1, x0, t.z + 2f), new Vector4(x0, t.z - 2f, x0, z0),
+            };
+            foreach (var sg in segs)
+            {
+                var a = new Vector3(sg.x, 0f, sg.y);
+                var e = new Vector3(sg.z, 0f, sg.w);
+                b.Stone.Box((a + e) * 0.5f + Vector3.up * 0.7f, new Vector3(0.6f, 1.4f, (e - a).magnitude), Quaternion.LookRotation((e - a).normalized, Vector3.up));
+            }
+            // イチイの木。墓地の隅と口の脇
+            var yews = new[]
+            {
+                new Vector3(x0 + 3f, 0f, z0 + 3f), new Vector3(x0 + 3f, 0f, z1 - 3f), new Vector3(x0 + 2.5f, 0f, t.z + 4f),
+                new Vector3(x1 - 4f, 0f, z1 - 4f), new Vector3(nave.x + 2f, 0f, z1 - 4f), new Vector3(x1 - 3f, 0f, z0 + 4f),
+            };
+            for (var i = 0; i < yews.Length; i++)
+            {
+                var y = yews[i];
+                var s = 1.0f + Hash(951, i) * 0.5f;
+                b.Bark.Box(y + Vector3.up * 1.2f, new Vector3(0.6f, 2.4f, 0.6f));
+                Ball(b.Yew, y + Vector3.up * (3.6f * s), 2.4f * s);
+                Ball(b.Yew, y + Vector3.up * (5.8f * s) + new Vector3(0.4f, 0f, -0.3f), 1.7f * s);
+                Ball(b.Yew, y + Vector3.up * (2.4f * s) + new Vector3(-0.8f, 0f, 0.6f), 1.8f * s);
+            }
+            // 墓石。身廊の南と北に疎らに
+            for (var i = 0; i < 14; i++)
+            {
+                var gx = nave.x - 8f + Hash(961, i) * 20f;
+                var gz = (i % 2 == 0 ? -1f : 1f) * (nw * 0.5f + 3f + Hash(963, i) * 6f) + t.z;
+                b.Dressed.Box(new Vector3(gx, 0.45f, gz), new Vector3(0.12f, 0.9f, 0.6f), Quaternion.Euler(0f, 0f, (Hash(965, i) - 0.5f) * 8f));
+            }
+        }
+
+        /// <summary>
+        /// 教会の棟一つ。芯・長さ（x）・幅（z）・軒の高さ・屋根の勾配。石の四方の壁と、石版の切妻の屋根と、妻の三角と十字。
+        /// alongZ なら棟を z に沿わせる（南のポーチ）
+        /// </summary>
+        static void ChurchBody(Banks b, Vector3 c, float len, float wide, float eaves, float pitch, bool alongZ)
+        {
+            var lx = alongZ ? wide : len;
+            var lz = alongZ ? len : wide;
+            b.Stone.Box(c + Vector3.up * (eaves * 0.5f), new Vector3(lx, eaves, lz));
+            var half = (alongZ ? lx : lz) * 0.5f;
+            var rise = half * Mathf.Tan(pitch * Mathf.Deg2Rad);
+            var slope = Mathf.Sqrt(half * half + rise * rise) + 0.3f;
+            var run = alongZ ? lz : lx;
+            foreach (var side in new[] { -1f, 1f })
+            {
+                // 斜面の中ほどを芯に、勾配だけ傾けた薄い板
+                var q = alongZ ? Quaternion.Euler(0f, 0f, side * pitch) : Quaternion.Euler(side * pitch, 0f, 0f);
+                var mid = alongZ
+                    ? c + new Vector3(-side * half * 0.5f, eaves + rise * 0.5f + 0.1f, 0f)
+                    : c + new Vector3(0f, eaves + rise * 0.5f + 0.1f, side * half * 0.5f);
+                var size = alongZ ? new Vector3(slope, 0.16f, run + 0.3f) : new Vector3(run + 0.3f, 0.16f, slope);
+                b.Slate.Box(mid, size, q);
+            }
+            foreach (var e in new[] { -1f, 1f })
+            {
+                var ec = alongZ ? c + new Vector3(0f, 0f, e * lz * 0.5f) : c + new Vector3(e * lx * 0.5f, 0f, 0f);
+                var outward = alongZ ? new Vector3(0f, 0f, e) : new Vector3(e, 0f, 0f);
+                var across = alongZ ? Vector3.right : Vector3.forward;
+                Face(b.Stone, ec + Vector3.up * eaves - across * half, ec + Vector3.up * eaves + across * half,
+                    ec + Vector3.up * (eaves + rise + 0.3f), ec + Vector3.up * (eaves + rise + 0.3f), outward);
+                b.Dressed.Box(ec + Vector3.up * (eaves + rise + 0.8f), new Vector3(0.14f, 0.9f, 0.14f));
+                b.Dressed.Box(ec + Vector3.up * (eaves + rise + 0.95f), alongZ ? new Vector3(0.6f, 0.14f, 0.14f) : new Vector3(0.14f, 0.14f, 0.6f));
             }
         }
 
@@ -314,7 +470,6 @@ namespace HalfAware.EditorTools
         /// <list type="table">
         /// <item><term>ぐるり</term><description>麦畑と牧草地の継ぎはぎの丘。升を畑に見立て、升の境に生け垣</description></item>
         /// <item><term>尾根</term><description>雑木林の帯と、点々と木立</description></item>
-        /// <item><term>東北東（路地の先の左）</term><description>村の教会の塔。四隅に尖りの付いた石の塔と、身廊の屋根</description></item>
         /// <item><term>西・南・北</term><description>遠くの農家と納屋</description></item>
         /// </list>
         /// 作った mesh とマテリアルは <paramref name="made"/> へ入れる。捨てるのは呼ぶ側
@@ -370,8 +525,7 @@ namespace HalfAware.EditorTools
                         Copse(wood, Vector3.Lerp(p00, p11, 0.5f), 3.2f + rings[k] * 0.006f, 3 + (int)(h * 40f) % 4, k * 131 + i);
                 }
 
-            // 村の教会の塔。東北東、路地の先の左
-            Church(stone, slate, dark, wood, new Vector3(146f, 0f, 92f));
+            // 村の教会は書き割りに撮らない。村の東の外れに組んである（ChurchNear）
             // 遠くの農家と納屋
             Farm(stone, slate, dark, wood, new Vector3(-236f, 0f, 70f), 20f);
             Farm(stone, slate, dark, wood, new Vector3(-150f, 0f, -190f), 70f);
@@ -462,34 +616,6 @@ namespace HalfAware.EditorTools
                 Ball(b, p + new Vector3(r * 0.5f, -r * 0.35f, r * 0.3f), r * 0.75f);
                 b.Box(new Vector3(p.x, p.y - r * 0.9f, p.z), new Vector3(r * 0.25f, r * 0.9f, r * 0.25f));
             }
-        }
-
-        /// <summary>
-        /// 村の教会。コッツウォルズの羊毛の教会の、四隅に尖りを立てた石の塔と、胸壁。西に身廊の長い屋根
-        /// </summary>
-        static void Church(Bank stone, Bank slate, Bank dark, Bank wood, Vector3 at)
-        {
-            at.y = HillY(at.x, at.z);
-            const float tw = 6f;
-            const float th = 24f;
-            stone.Box(at + Vector3.up * (th * 0.5f), new Vector3(tw, th, tw));
-            stone.Box(at + Vector3.up * (th + 0.6f), new Vector3(tw + 0.4f, 1.2f, tw + 0.4f));
-            foreach (var sx in new[] { -1f, 1f })
-                foreach (var sz in new[] { -1f, 1f })
-                {
-                    stone.Box(at + new Vector3(sx * tw * 0.45f, th + 2.4f, sz * tw * 0.45f), new Vector3(0.7f, 3.6f, 0.7f));
-                    stone.Box(at + new Vector3(sx * tw * 0.45f, th + 4.6f, sz * tw * 0.45f), new Vector3(0.35f, 1.2f, 0.35f));
-                }
-            // 鐘楼の窓
-            foreach (var d in new[] { Vector3.forward, Vector3.back, Vector3.left, Vector3.right })
-                dark.Box(at + d * (tw * 0.5f + 0.02f) + Vector3.up * (th - 4f), new Vector3(d.x != 0f ? 0.05f : 1.4f, 3f, d.z != 0f ? 0.05f : 1.4f));
-            // 身廊。塔の西に
-            var nave = at + new Vector3(-tw * 0.5f - 11f, 0f, 0f);
-            stone.Box(nave + Vector3.up * 5f, new Vector3(22f, 10f, 9f));
-            foreach (var side in new[] { -1f, 1f })
-                slate.Box(nave + new Vector3(0f, 12.4f, side * 2.3f), new Vector3(22.6f, 0.4f, 6.6f), Quaternion.Euler(side * -38f, 0f, 0f));
-            // 教会の墓地の木
-            Copse(wood, nave + new Vector3(0f, 0f, 14f), 5f, 3, 811);
         }
 
         /// <summary>遠くの農家。二階建ての石の母屋と、長い納屋。yaw で向きを振る</summary>

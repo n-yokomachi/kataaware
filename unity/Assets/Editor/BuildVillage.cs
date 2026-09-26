@@ -50,11 +50,14 @@ namespace HalfAware.EditorTools
         public const float LaneEast = 18f;
 
         /// <summary>
-        /// 車の着く所の立ち位置と向き。未舗装路の上の、止まった車（<see cref="DriveCarAt"/>）の前。
-        /// 東の村と路地を向く
+        /// 車の着く所の立ち位置と向き。北の路肩へ寄せて停めた車（<see cref="DriveCarAt"/>）の、運転席のドアを降りてすぐの所。
+        /// 右ハンドルなので運転席は車の右（東を向いた車の南の側）。東の村と路地を向く
         /// </summary>
-        public static readonly Vector3 ArriveAt = new Vector3(-72f, 0f, 1.2f);
-        public const float ArriveYaw = 90f;
+        public static readonly Vector3 ArriveAt = new Vector3(-76.3f, 0f, 0.1f);
+        /// <summary>
+        /// 東の少し右（路地の真ん中）を向く。真東を向くと、左の手前を停めた車の屋根が大きく塞ぐ
+        /// </summary>
+        public const float ArriveYaw = 97f;
 
         /// <summary>片割れの敷地。前庭の石垣（z <see cref="NorthEdge"/>）から奥の生け垣まで</summary>
         public const float PlotWest = -7f;
@@ -78,6 +81,9 @@ namespace HalfAware.EditorTools
             Drop("Main Camera");
             Drop("Directional Light");
             Rig();
+            // 案内（E  開ける）を出す画面。ほかの場面と同じ作りの Hud を置く（BuildDrive.Screen）
+            Drop("Hud");
+            BuildDrive.Screen();
 
             var root = Root("Village");
             Clear(root);

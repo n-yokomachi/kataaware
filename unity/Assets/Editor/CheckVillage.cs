@@ -40,9 +40,10 @@ namespace HalfAware.EditorTools
         {
             return new[]
             {
-                // 1. 車の着く所から、村と路地を。1b は振り返って、止まった車と麦畑の未舗装路（場面 8 の最後の帯）を
-                new View("1_arrive", new Vector3(-71.8f, 1.6f, 1.2f), 90f, 3f),
-                new View("1b_back", new Vector3(-71.8f, 1.6f, 1.2f), 262f, 3f),
+                // 1. 車の着く所から、村と路地を（車を降りてすぐの Player の目）。
+                // 1b は少し歩いて振り返り、路肩に寄せて停めた車と麦畑の未舗装路（場面 8 の最後の帯）を
+                new View("1_arrive", BuildVillage.ArriveAt + new Vector3(0.22f, 1.6f, -0.03f), BuildVillage.ArriveYaw, 3f),
+                new View("1b_back", new Vector3(-69.5f, 1.6f, -0.6f), 262f, 3f),
                 // 2. 路地の途中。家 A の前から東へ。電話ボックスと家 B の茅葺きが見える
                 new View("2_lane", new Vector3(-44f, 1.6f, 0.4f), 80f, 2f),
                 // 3. 家 B と片割れの家のあいだ越しに、片割れの裏庭の白いパラソル
@@ -50,6 +51,13 @@ namespace HalfAware.EditorTools
                 // 路地から畑と丘を。南は農場の門の向こうの麦畑、北は車の着く所の塀の向こう
                 new View("fields_south", new Vector3(-28.7f, 1.6f, -1.2f), 190f, 1f),
                 new View("fields_north", new Vector3(-58f, 1.6f, 1.6f), 330f, 1f),
+                // 路地の東の方から、屋根越しに村の教会の塔（設計書 7 節）
+                new View("church", new Vector3(-6f, 1.6f, 0.4f), 60f, -2f),
+                // 空。路地の真ん中から東を見上げる
+                new View("sky", new Vector3(-30f, 1.6f, 0f), 60f, -30f),
+                // 格子戸を内から見る所と、テラスの卓と椅子の寄り
+                new View("gate", new Vector3(-4.2f, 1.6f, 9.4f), 0f, 8f),
+                new View("table", new Vector3(-0.2f, 1.45f, 19.3f), 225f, 22f),
                 // 4. 閉じた格子戸を、脇の小路の外から
                 new View("4_gate", new Vector3(BuildVillage.SidePathX + 0.3f, 1.6f, 7.4f), -4f, 4f),
                 // 5. アーチの下の煉瓦の小路。アーチの手前から、くぐった先を見通す

@@ -32,17 +32,20 @@ namespace HalfAware.EditorTools
         static readonly Vector3 MorningAim = new Vector3(15f, 70f + 180f, 0f);
 
         /// <summary>
-        /// 朝の霞。薄い朝靄。裏庭の奥（20 m）で 1%、路地の端から端（80 m）で 15%、書き割りの板（190 m）で 60%。
-        /// 公営住宅の朝（0.003）より濃い。畑の上の靄がまだ残っている。
-        /// **0.008 から下げた。** 0.008 では 250 m で 98% になり、書き割りに撮った丘も教会の塔も
-        /// 靄の色一色に沈んで、村の外に何も無いように見えた
+        /// 朝の霞。ごく薄い朝靄。路地の端から端（80 m）で 7%、書き割りの板（190 m）で 36%。
+        /// **晴れて遠くまで見える朝にする**（設計書 7 節）。0.008 では 250 m で 98% になり、書き割りの丘も
+        /// 靄の色一色に沈んだ。0.005 でもまだ白く霞んで見えたので、さらに下げた
         /// </summary>
-        const float MorningHaze = 0.0050f;
+        const float MorningHaze = 0.0034f;
 
-        static readonly Color MorningZenith = new Color(0.33f, 0.48f, 0.70f);
-        static readonly Color MorningMiddle = new Color(0.56f, 0.67f, 0.80f);
-        /// <summary>地平の色。霞の色もこれにする。靄で白む</summary>
-        static readonly Color MorningHorizon = new Color(0.83f, 0.84f, 0.82f);
+        /// <summary>
+        /// 天頂の色。**上へ行くほど濃い青**（設計書 7 節）。もとの (0.33, 0.48, 0.70) では空ぜんたいが白っぽく、
+        /// 曇りの朝に見えた
+        /// </summary>
+        static readonly Color MorningZenith = new Color(0.16f, 0.34f, 0.72f);
+        static readonly Color MorningMiddle = new Color(0.40f, 0.57f, 0.83f);
+        /// <summary>地平の色。霞の色もこれにする。地平だけ少し白む</summary>
+        static readonly Color MorningHorizon = new Color(0.76f, 0.83f, 0.88f);
         static readonly Color MorningWarm = new Color(1.00f, 0.87f, 0.68f);
         static readonly Color MorningGlow = new Color(1.00f, 0.90f, 0.72f);
         static readonly Color MorningDisc = new Color(1.00f, 0.97f, 0.88f);
@@ -108,11 +111,12 @@ namespace HalfAware.EditorTools
         /// </summary>
         static readonly Vector3 EveningAim = new Vector3(5f, 295f - 180f, 0f);
 
-        /// <summary>夕方の霞。朝より薄い。暖かい地平の色に遠くを溶かす</summary>
-        const float EveningHaze = 0.0045f;
+        /// <summary>夕方の霞。暖かい地平の色に遠くを溶かす。朝と揃えて薄くした</summary>
+        const float EveningHaze = 0.0036f;
 
-        static readonly Color EveningZenith = new Color(0.27f, 0.37f, 0.60f);
-        static readonly Color EveningMiddle = new Color(0.54f, 0.57f, 0.70f);
+        /// <summary>天頂の色。**上の方は青を残す**（設計書 7 節）。地平の暖かさとの間を青みの中間でつなぐ</summary>
+        static readonly Color EveningZenith = new Color(0.18f, 0.32f, 0.64f);
+        static readonly Color EveningMiddle = new Color(0.44f, 0.52f, 0.72f);
         static readonly Color EveningHorizon = new Color(0.90f, 0.78f, 0.64f);
         static readonly Color EveningWarm = new Color(1.00f, 0.66f, 0.38f);
         static readonly Color EveningGlow = new Color(1.00f, 0.74f, 0.46f);

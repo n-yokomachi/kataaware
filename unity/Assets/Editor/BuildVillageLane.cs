@@ -62,8 +62,11 @@ namespace HalfAware.EditorTools
         static readonly Vector3 FingerpostAt = new Vector3(VillageWest + 1.2f, 0f, 2.85f);
         /// <summary>路肩に停めた車。家 A の前の北の路肩に、東を向けて</summary>
         static readonly Vector3 ParkedCarAt = new Vector3(-37.8f, 0f, 1.95f);
-        /// <summary>場面 8 の車の止まった姿。未舗装路の上、Player の後ろ</summary>
-        public static readonly Vector3 DriveCarAt = new Vector3(-76.4f, 0f, 0.35f);
+        /// <summary>
+        /// 場面 8 の車の止まった姿。**道の脇に寄せて停める**（設計書 7 節）。東を向け、左（北）の車輪を路肩の芝に乗せ、
+        /// 路地の南の 3 m を空ける。車の着く所の農場の門の口（x -73.6 から東）は塞がない
+        /// </summary>
+        public static readonly Vector3 DriveCarAt = new Vector3(-77.0f, 0f, 1.9f);
 
         /// <summary>壁の素材</summary>
         enum WallKind { Stone, Render, Brick }
@@ -919,7 +922,7 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// 場面 8 の車の止まった姿。場面 8 が焼いた車体の mesh（<c>Assets/Models/generated/drive/</c>）と
         /// マテリアルをそのまま使い、素材ごとに車体とドアを一枚にまとめて置く。
-        /// 車内の計器・紙・水滴は外からは見えないので置かない。当たりは箱一つ
+        /// 車内の内張り・計器・紙・水滴は外からはほとんど見えないので置かない（内張りだけで三角が 1,600 ある）。当たりは箱一つ
         /// </summary>
         static void DriveCar(Transform parent, Transform bounds)
         {
@@ -931,7 +934,7 @@ namespace HalfAware.EditorTools
             {
                 new[] { "CarBody", "CarBody", "DoorBody" }, new[] { "CarSteel", "CarSteel", "DoorSteel" },
                 new[] { "CarGap", "CarGap", "DoorGap" }, new[] { "CarGlass", "CarGlass", "DoorGlass" },
-                new[] { "CarTrim", "CarTrim", "DoorTrim" }, new[] { "CarTyre", "CarTyre" },
+                new[] { "CarTyre", "CarTyre" },
                 new[] { "CarLamp", "CarLamp" }, new[] { "CarSeat", "CarSeat" },
             };
             var made = 0;
