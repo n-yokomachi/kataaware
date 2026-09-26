@@ -414,8 +414,9 @@ namespace HalfAware.EditorTools
         // ---- 前庭 -----------------------------------------------------------------------
 
         /// <summary>
-        /// 前庭。低い野石の塀（縦に並べた笠石）と、玄関までの煉瓦の小路、窓の花箱、玄関脇のツゲの玉。
-        /// 塀の口は二つ。玄関の小路と、家の西の脇へ回る小路
+        /// 前庭。路地の側は、野石を低く積んだ足元の上に刈り込んだイチイの生け垣（家の囲いは生け垣を主にする。
+        /// オーナー、2026-09-26）。玄関までの煉瓦の小路、窓の花箱、玄関脇のツゲの玉。
+        /// 垣の口は二つ。玄関の小路と、家の西の脇へ回る小路。口の脇の野石の柱は残す
         /// </summary>
         static void FrontGarden(Banks b)
         {
@@ -429,8 +430,10 @@ namespace HalfAware.EditorTools
             };
             foreach (var g in gaps)
             {
-                b.Stone.Box(new Vector3((g.x + g.y) * 0.5f, FrontWallHigh * 0.5f, (z0 + z1) * 0.5f), new Vector3(g.y - g.x, FrontWallHigh, FrontWallThick));
-                CockAndHen(b, new Vector3(g.x, FrontWallHigh, (z0 + z1) * 0.5f), new Vector3(g.y, FrontWallHigh, (z0 + z1) * 0.5f), FrontWallThick - 0.04f);
+                // 足元の野石は低く（0.4 m）。その上にイチイ（1.2 m まで）
+                b.Stone.Box(new Vector3((g.x + g.y) * 0.5f, 0.2f, (z0 + z1) * 0.5f), new Vector3(g.y - g.x, 0.4f, FrontWallThick));
+                Clipped(b, null, null, Shrub.Yew, new Vector3(g.x + 0.05f, 0.38f, (z0 + z1) * 0.5f), new Vector3(g.y - 0.05f, 0.38f, (z0 + z1) * 0.5f),
+                    1.2f - 0.38f, FrontWallThick - 0.06f, 7 + (int)(g.x * 3f));
             }
             // 口の脇の柱
             foreach (var x in new[] { SidePathX - PathWide * 0.5f - 0.25f, SidePathX + PathWide * 0.5f + 0.25f,
@@ -461,7 +464,8 @@ namespace HalfAware.EditorTools
 
             // 前庭の横の境。西は家 B の庭との低い生け垣、東は低い生け垣
             Hedge(b, new Vector3(PlotWest, 0f, z1), new Vector3(PlotWest, 0f, GateZ), 1.0f, 0.6f, 3);
-            Hedge(b, new Vector3(PlotEast, 0f, z1), new Vector3(PlotEast, 0f, HouseFront), 1.0f, 0.6f, 5);
+            // 東は放牧地との境。家どうしの境と同じく高く
+            Clipped(b, null, null, Shrub.Yew, new Vector3(PlotEast, 0f, z1), new Vector3(PlotEast, 0f, HouseFront), 1.6f, 0.7f, 5);
         }
 
         /// <summary>

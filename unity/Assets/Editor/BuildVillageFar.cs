@@ -140,10 +140,10 @@ namespace HalfAware.EditorTools
         /// <summary>麦畑。(西, 東, 南, 北)</summary>
         static readonly Vector4[] WheatFields =
         {
-            new Vector4(-131f, LaneWest - 0.5f, TrackHalf + 1.0f, 100f),
+            new Vector4(-131f, LaneWest - 0.5f, RoadHalf + 1.0f, 100f),
             new Vector4(LaneWest, PlotAWest - 0.6f, NorthEdge + 0.9f, 100f),
             new Vector4(PlotAWest + 0.6f, 20f, BackHedge + 0.8f, 100f),
-            new Vector4(-131f, LaneWest - 0.5f, -98f, -TrackHalf - 1.0f),
+            new Vector4(-131f, LaneWest - 0.5f, -98f, -RoadHalf - 1.0f),
             new Vector4(LaneWest, PlotCWest - 0.6f, -98f, -NorthEdge - 0.9f),
             new Vector4(PlotCWest, 40f, -98f, SouthHedge - 0.8f),
             new Vector4(PlotCEast + 0.6f, PlotDWest - 0.6f, SouthHedge - 0.4f, -NorthEdge - 0.9f),
@@ -162,7 +162,7 @@ namespace HalfAware.EditorTools
         static readonly Vector4[] Hedgerows =
         {
             new Vector4(-131f, 72f, 69f, 72f), new Vector4(-131f, -62f, 69f, -62f),
-            new Vector4(-100f, TrackHalf + 0.8f, -100f, 100f), new Vector4(-100f, -TrackHalf - 0.8f, -100f, -98f),
+            new Vector4(-100f, RoadHalf + 0.8f, -100f, 100f), new Vector4(-100f, -RoadHalf - 0.8f, -100f, -98f),
             new Vector4(PlotAWest, BackHedge, PlotAWest, 100f), new Vector4(20f, BackHedge, 20f, 100f),
             new Vector4(PlotDWest, SouthHedge, PlotDWest, -98f), new Vector4(40f, SouthHedge, 40f, -98f),
             new Vector4(PlotEast + 0.4f, BackHedge, 20f, BackHedge), new Vector4(PlotDEast, SouthHedge, 40f, SouthHedge),

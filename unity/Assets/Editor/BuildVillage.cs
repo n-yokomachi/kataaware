@@ -158,7 +158,11 @@ namespace HalfAware.EditorTools
         // ---- 地面 -------------------------------------------------------------------------
 
         /// <summary>
-        /// 路地と芝の路肩、未舗装路、片割れの敷地の地面、周りの家の庭の芝。
+        /// 路地と芝の路肩、片割れの敷地の地面、周りの家の庭の芝。
+        ///
+        /// **路地は舗装しない**（オーナー、2026-09-26）。車の着く所の未舗装路がそのまま村の中まで続く。
+        /// 路面は一枚の絵（<c>VillageRoad.png</c>、make-garden.py の road）に、踏み固めた土と砂利・二本の轍・
+        /// 真ん中の草の筋・縁の砂利の溜まりを描き込み、路地に沿って縦にだけ繰り返す。門の前には砂利の溜まりを足す（<see cref="Road"/>）
         ///
         /// **縁を突き合わせない。** 高さの違う面を縁で突き合わせると、その段の隙間から地面の裏の空が覗き、
         /// 塀の根元に白い点線が出た（一段目）。庭の芝（VillageLawns）は少し下げて村の帯の下まで一枚で敷き、
@@ -167,34 +171,15 @@ namespace HalfAware.EditorTools
         /// </summary>
         static void Ground(Transform parent)
         {
-            var lane = new Bank { Texel = 0.3f };
-            lane.FaceY(0.02f, PaveWest, LaneEast, -LaneHalf + 0.3f, LaneHalf - 0.3f, 1);
-            NoShadow(Emit(parent, "VillageLane", lane, Paint("VillageLane", new Color(0.20f, 0.20f, 0.21f), 0.12f), true));
+            var road = new Bank { Texel = 1f };
+            Road(road);
+            NoShadow(Emit(parent, "VillageRoad", road, Pictured("VillageRoad", "VillageRoad.png", Color.white, 0.06f), true));
 
-            // 路地の縁の砂利。舗装の端が崩れて路肩の芝へ混じる帯
-            var gravel = new Bank { Texel = 0.3f };
-            gravel.FaceY(0.018f, PaveWest, LaneEast, LaneHalf - 0.3f, LaneHalf, 1);
-            gravel.FaceY(0.018f, PaveWest, LaneEast, -LaneHalf, -LaneHalf + 0.3f, 1);
-            NoShadow(Emit(parent, "VillageGravel", gravel, Paint("VillageGravel", new Color(0.48f, 0.44f, 0.36f), 0.05f), true));
-
-            // 芝の路肩。舗装の所は路地の縁から、未舗装路の所は土の縁から
+            // 芝の路肩。路地の縁から、家並みの垣と畑の塀の手前まで
             var verge = new Bank { Texel = 0.3f };
-            verge.FaceY(0.01f, PaveWest, LaneEast, LaneHalf, NorthEdge, 1);
-            verge.FaceY(0.01f, PaveWest, LaneEast, -NorthEdge, -LaneHalf, 1);
-            verge.FaceY(0.01f, TrackWest, PaveWest, TrackHalf, NorthEdge, 1);
-            verge.FaceY(0.01f, TrackWest, PaveWest, -NorthEdge, -TrackHalf, 1);
+            verge.FaceY(0.01f, TrackWest, LaneEast, RoadHalf, NorthEdge, 1);
+            verge.FaceY(0.01f, TrackWest, LaneEast, -NorthEdge, -RoadHalf, 1);
             NoShadow(Emit(parent, "VillageVerge", verge, VergeMat(), true));
-
-            // 未舗装路の土と二本の轍。場面 8 の最後の帯の土と轍のマテリアルをそのまま使う
-            // 場面 8 の道は z に沿って走るので、絵の縦（v）が道に沿う。村の未舗装路は x に沿うので、uv を入れ替えて貼る。
-            // FaceY のまま貼ると、絵の繰り返しの継ぎ目が道を横切る縞になって、板を並べた床に見えた
-            var track = new Bank { Texel = 0.2f };
-            AlongX(track, 0.008f, TrackWest, PaveWest + 0.4f, -TrackHalf, TrackHalf);
-            NoShadow(Emit(parent, "VillageTrack", track, DriveMat("Dirt", new Color(0.38f, 0.31f, 0.22f)), true));
-            var ruts = new Bank { Texel = 0.3f };
-            foreach (var x in new[] { -0.95f, 0.95f })
-                AlongX(ruts, 0.012f, TrackWest, PaveWest + 0.2f, x - 0.26f, x + 0.26f);
-            NoShadow(Emit(parent, "VillageRuts", ruts, DriveMat("Rut", new Color(0.30f, 0.24f, 0.17f)), false));
 
             // 片割れの敷地。芝と花の縁の土と菜園を一枚の絵で塗り分ける（GroundPicture）
             var plot = new Bank { Texel = 1f };
@@ -209,19 +194,73 @@ namespace HalfAware.EditorTools
             NoShadow(Emit(parent, "VillageLawns", rest, VergeMat(), false));
         }
 
-        /// <summary>上を向いた四角を一枚。uv の縦（v）を x に、横（u）を z に取る。x に沿って走る道の面</summary>
-        static void AlongX(Bank b, float y, float x0, float x1, float z0, float z1)
+        /// <summary>路地の半幅。路面の絵の横の幅（make-garden.py の ROAD_M）の半分</summary>
+        public const float RoadHalf = 2.3f;
+        /// <summary>路面の絵が路地に沿って繰り返す長さ（make-garden.py の ROAD_LEN）</summary>
+        const float RoadRepeat = 9.2f;
+
+        /// <summary>
+        /// 路面。路地を 10 m ごとの四角に割って張る。uv の横（u）が路地の幅（南の縁 0、北の縁 1）、
+        /// 縦（v）が路地に沿った長さで、絵は縦にだけ繰り返す。
+        /// 門の前と電話ボックスの前には、路面の縁の砂利の帯を引いた溜まりを路肩へ広げる
+        /// </summary>
+        static void Road(Bank b)
         {
-            var t = b.Texel;
-            b.Patch(new Vector3(x0, y, z1), new Vector3(x1, y, z1), new Vector3(x1, y, z0), new Vector3(x0, y, z0),
-                new Vector2(z1 * t, x0 * t), new Vector2(z1 * t, x1 * t), new Vector2(z0 * t, x1 * t), new Vector2(z0 * t, x0 * t));
+            const float y = 0.015f;
+            const float u0 = 0.004f;
+            const float u1 = 0.996f;
+            for (var x0 = TrackWest; x0 < LaneEast - 0.01f; x0 += 10f)
+            {
+                var x1 = Mathf.Min(x0 + 10f, LaneEast);
+                b.Patch(new Vector3(x0, y, RoadHalf), new Vector3(x1, y, RoadHalf), new Vector3(x1, y, -RoadHalf), new Vector3(x0, y, -RoadHalf),
+                    new Vector2(u1, x0 / RoadRepeat), new Vector2(u1, x1 / RoadRepeat), new Vector2(u0, x1 / RoadRepeat), new Vector2(u0, x0 / RoadRepeat));
+            }
+            var seed = 0;
+            foreach (var g in GravelPools)
+                Pool(b, g.x, g.y, g.z, seed++);
         }
 
-        /// <summary>場面 8 のマテリアル。無ければ一色で代える</summary>
-        static Material DriveMat(string name, Color fallback)
+        /// <summary>砂利の溜まり。(x, 北か南（±1）, 横の広がり)。門の口と、電話ボックスとベンチの前</summary>
+        static readonly Vector3[] GravelPools =
         {
-            var m = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/Drive/" + name + ".mat");
-            return m != null ? m : Paint("Village" + name, fallback, 0.03f);
+            new Vector3(-71.9f, 1f, 1.8f), new Vector3(-34.0f, 1f, 1.3f), new Vector3(-25.3f, 1f, 1.0f), new Vector3(-17.6f, 1f, 1.2f),
+            new Vector3(-4.2f, 1f, 1.1f), new Vector3(2.5f, 1f, 1.2f),
+            new Vector3(-47.5f, -1f, 1.2f), new Vector3(-35.4f, -1f, 1.2f), new Vector3(-28.7f, -1f, 1.8f), new Vector3(-23.2f, -1f, 1.1f), new Vector3(-10.6f, -1f, 1.2f),
+        };
+
+        /// <summary>
+        /// 路面の縁から路肩へ広がる砂利の溜まりを一つ。形は縁の揺れた半楕円で、uv は路面の絵の縁の砂利の帯を引く
+        /// </summary>
+        static void Pool(Bank b, float x, float side, float reach, int seed)
+        {
+            const float y = 0.016f;
+            var z0 = side * (RoadHalf - 0.2f);
+            var depth = NorthEdge - RoadHalf + 0.05f;
+            const int n = 10;
+            var rim = new Vector3[n + 1];
+            for (var i = 0; i <= n; i++)
+            {
+                var a = Mathf.PI * i / n;
+                var r = 0.8f + Hash(900 + seed, i) * 0.35f;
+                rim[i] = new Vector3(x + Mathf.Cos(a) * reach * r, y, z0 + side * Mathf.Sin(a) * depth * r);
+            }
+            var c = new Vector3(x, y, z0);
+            // 横（u）は縁の砂利の帯の中を、路地の側から路肩の側へ引く。u を一つに留めると、
+            // 絵の縦の筋が溜まりを横切る縞になって板を並べたように見えた
+            System.Func<Vector3, Vector2> uv = p => new Vector2(
+                side > 0f ? 0.90f + 0.085f * Mathf.Abs(p.z - z0) / depth : 0.10f - 0.085f * Mathf.Abs(p.z - z0) / depth,
+                p.x / RoadRepeat);
+            var uc = uv(c);
+            for (var i = 0; i < n; i++)
+            {
+                var p = rim[i];
+                var q = rim[i + 1];
+                var up = uv(p);
+                var uq = uv(q);
+                // 上を向かせる。北の側は角が増えると西へ回る（上から見て左回り）ので、渡す順を側で入れ替える
+                if (side > 0f) b.Patch(c, q, p, c, uc, uq, up, uc);
+                else b.Patch(c, p, q, c, uc, up, uq, uc);
+            }
         }
 
         /// <summary>芝の路肩と周りの庭の芝と牧草地。地面の絵の芝と揃えた色</summary>
@@ -462,6 +501,13 @@ namespace HalfAware.EditorTools
             public readonly Bank Thatch = new Bank { Texel = 0.5f };
             /// <summary>色の升で塗る小物（戸・電話ボックス・郵便ポスト・道標・車・子どもの物）</summary>
             public readonly Bank Swatch = new Bank { Texel = 1f };
+            /// <summary>
+            /// 家の囲いの生け垣の樹種。絵は同じ葉の絵（VillageHedge.png）で、色を掛けて分ける。
+            /// イチイは濃く青みの緑、ブナは明るく黄みの緑、イボタは明るい緑。サンザシは Hedge（畑の生け垣と同じ）
+            /// </summary>
+            public readonly Bank Yew = new Bank { Texel = 1f };
+            public readonly Bank Beech = new Bank { Texel = 1f };
+            public readonly Bank Privet = new Bank { Texel = 1f };
 
             /// <summary>
             /// 焼いて置く。**平らな物と窓の奥は影を落とさない。** 影は日の側からもう一度描くので、
@@ -491,6 +537,9 @@ namespace HalfAware.EditorTools
                 BuildVillage.Emit(parent, prefix + "RedBrick", RedBrick, Pictured("VillageRedBrick", "VillageRedBrick.png", Color.white, 0.06f), false);
                 BuildVillage.Emit(parent, prefix + "Thatch", Thatch, Pictured("VillageThatch", "VillageThatch.png", new Color(0.84f, 0.80f, 0.74f), 0.03f), false);
                 BuildVillage.Emit(parent, prefix + "Swatch", Swatch, SwatchMat(), false);
+                BuildVillage.Emit(parent, prefix + "Yew", Yew, Pictured("VillageYew", "VillageHedge.png", new Color(0.56f, 0.66f, 0.60f), 0.06f), false);
+                BuildVillage.Emit(parent, prefix + "Beech", Beech, Pictured("VillageBeech", "VillageHedge.png", new Color(1.10f, 1.06f, 0.74f), 0.04f), false);
+                BuildVillage.Emit(parent, prefix + "Privet", Privet, Pictured("VillagePrivet", "VillageHedge.png", new Color(1.02f, 1.14f, 0.88f), 0.08f), false);
             }
         }
 

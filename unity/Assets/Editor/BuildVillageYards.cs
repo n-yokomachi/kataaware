@@ -263,19 +263,17 @@ namespace HalfAware.EditorTools
         };
 
         /// <summary>
-        /// 家 C と家 D の脇。家の脇を板の塀と木戸で閉じ、その奥は見せない。
-        /// 塀の上に裏庭の木の頭と物置の屋根が覗く
+        /// 家 C と家 D の脇。家の脇を刈り込んだ生け垣で閉じ、その奥は見せない。
+        /// 垣の上に裏庭の木の頭と物置の屋根が覗く
         /// </summary>
         static void YardSouth(Banks b)
         {
-            foreach (var span in new[] { new Vector2(PlotCWest + 0.3f, -52.6f), new Vector2(-42.4f, PlotCEast - 0.45f),
+            foreach (var span in new[] { new Vector2(PlotCWest + 0.45f, -52.6f), new Vector2(-42.4f, PlotCEast - 0.45f),
                 new Vector2(PlotDWest + 0.45f, -16.6f), new Vector2(-5.6f, PlotDEast - 0.45f) })
             {
-                var z = span.x < -40f ? -9.4f : -8.6f;
-                b.Boards.Box(new Vector3((span.x + span.y) * 0.5f, 0.9f, z), new Vector3(span.y - span.x, 1.8f, 0.05f));
-                b.Boards.Box(new Vector3((span.x + span.y) * 0.5f, 1.83f, z), new Vector3(span.y - span.x, 0.05f, 0.1f));
-                b.Boards.Box(new Vector3(span.x + 0.05f, 0.92f, z), new Vector3(0.1f, 1.85f, 0.1f));
-                b.Boards.Box(new Vector3(span.y - 0.05f, 0.92f, z), new Vector3(0.1f, 1.85f, 0.1f));
+                var c = span.x < -40f;
+                var z = c ? -9.4f : -8.6f;
+                Clipped(b, null, null, c ? Shrub.Privet : Shrub.Beech, new Vector3(span.x, 0f, z), new Vector3(span.y, 0f, z), 1.8f, 0.6f, (int)(span.x * 5f));
             }
             // 裏の物置の屋根。塀の上に覗く
             SimpleShed(b, -55.2f, -52.8f, -17.2f, -14.6f, 2.2f, SwBlueGrey);
@@ -376,14 +374,14 @@ namespace HalfAware.EditorTools
         {
             return new List<Border>
             {
-                AlongX("AFront", PlotAWest + 0.5f, -34.0f - 0.7f, NorthEdge + 0.55f, 6.35f, WarmPlan, 401),
-                AlongX("AWingFront", -34.0f + 0.7f, PlotAEast - 0.5f, NorthEdge + 0.55f, 8.15f, WarmPlan, 403),
-                AlongZ("AWest", 17.8f, 34.6f, PlotAWest + 1.4f, PlotAWest + 0.4f, WarmPlan, 405),
+                AlongX("AFront", PlotAWest + 1.0f, -34.0f - 0.7f, NorthEdge + 0.85f, 6.35f, WarmPlan, 401),
+                AlongX("AWingFront", -34.0f + 0.7f, PlotAEast - 0.5f, NorthEdge + 0.85f, 8.15f, WarmPlan, 403),
+                AlongZ("AWest", 17.8f, 34.6f, PlotAWest + 1.6f, PlotAWest + 0.6f, WarmPlan, 405),
                 AlongX("ABack", PlotAWest + 1.5f, -32.0f, 34.2f, BackHedge - 0.55f, WarmPlan, 407),
                 AlongX("BFront0", PlotBWest + 0.5f, -17.6f - 0.7f, NorthEdge + 0.8f, 5.95f, CoolPlan, 411),
                 AlongX("BFront1", -17.6f + 0.7f, -13.4f, NorthEdge + 0.8f, 5.95f, CoolPlan, 413),
                 AlongX("BSide", -12.3f, PlotBEast - 0.3f, NorthEdge + 0.75f, NorthEdge + 1.55f, LowCoolPlan, 415),
-                AlongZ("BEast", 13.6f, 34.4f, PlotBEast - 1.3f, PlotBEast - 0.25f, CoolPlan, 417),
+                AlongZ("BEast", 13.6f, 34.4f, PlotBEast - 1.7f, PlotBEast - 0.75f, CoolPlan, 417),
                 AlongX("BBack", -18.0f, PlotBEast - 1.4f, 34.3f, BackHedge - 0.55f, CoolPlan, 419),
             };
         }
@@ -393,10 +391,10 @@ namespace HalfAware.EditorTools
         {
             return new List<Border>
             {
-                AlongX("CFront0", PlotCWest + 0.5f, -47.5f - 0.85f, -NorthEdge - 0.55f, -6.95f, BrickPlan, 421),
-                AlongX("CFront1", -47.5f + 0.85f, PlotCEast - 0.6f, -NorthEdge - 0.55f, -6.95f, BrickPlan, 423),
-                AlongX("DFront0", PlotDWest + 0.6f, -10.6f - 0.75f, -NorthEdge - 0.55f, -6.35f, MixPlan, 425),
-                AlongX("DFront1", -10.6f + 0.75f, PlotDEast - 0.5f, -NorthEdge - 0.55f, -6.35f, MixPlan, 427),
+                AlongX("CFront0", PlotCWest + 1.0f, -47.5f - 0.85f, -NorthEdge - 0.85f, -6.95f, BrickPlan, 421),
+                AlongX("CFront1", -47.5f + 0.85f, PlotCEast - 0.6f, -NorthEdge - 0.85f, -6.95f, BrickPlan, 423),
+                AlongX("DFront0", PlotDWest + 0.6f, -10.6f - 0.75f, -NorthEdge - 0.9f, -6.35f, MixPlan, 425),
+                AlongX("DFront1", -10.6f + 0.75f, PlotDEast - 0.5f, -NorthEdge - 0.9f, -6.35f, MixPlan, 427),
             };
         }
 

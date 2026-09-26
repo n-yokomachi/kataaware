@@ -6,8 +6,8 @@ namespace HalfAware.EditorTools
     /// <summary>
     /// 路地と村の家並み（設計書 2 節の 1・2）。二段目。
     ///
-    /// 路地は z 0 を東西に走る。西の端（車の着く所）は麦畑のあいだの未舗装路で、
-    /// <see cref="PaveWest"/> から東が一車線の舗装になる。北に家 A（ハチミツ色の石・妻を路地へ向けた二階建て）、
+    /// 路地は z 0 を東西に走り、舗装しない。西の端（車の着く所）の麦畑のあいだの未舗装路が、そのまま村の中まで続く。
+    /// <see cref="VillageWest"/> から東が村で、北に家 A（ハチミツ色の石・妻を路地へ向けた二階建て）、
     /// 家 B（白い漆喰の壁の茅葺き）、片割れの家。南に家 C（赤煉瓦の二階建て）、電話ボックス、農場の門と麦畑、
     /// 家 D（石の平屋）。
     ///
@@ -24,12 +24,13 @@ namespace HalfAware.EditorTools
     {
         // ---- 並び（設計書 2 節の 1・2） --------------------------------------------------
 
-        /// <summary>舗装の西の端。ここより西は麦畑のあいだの未舗装路（場面 8 の最後の帯と同じ作り）</summary>
-        public const float PaveWest = -64f;
+        /// <summary>
+        /// 村の西の縁。ここより東は家並みの生け垣、西は車の着く所の野石の塀と、麦畑のあいだの未舗装路。
+        /// 路地は舗装せず、未舗装路がそのまま村の中まで続く
+        /// </summary>
+        public const float VillageWest = -64f;
         /// <summary>未舗装路の西の端。書き割りの地面の中まで伸ばす</summary>
         const float TrackWest = -150f;
-        /// <summary>未舗装路の土の半幅。場面 8 の轍の道（DirtHalf 2.3）と同じ</summary>
-        const float TrackHalf = 2.3f;
 
         /// <summary>路地の北の家並みの奥の生け垣。片割れの敷地の奥（<see cref="PlotNorth"/>）と揃える</summary>
         const float BackHedge = PlotNorth + 0.5f;
@@ -58,7 +59,7 @@ namespace HalfAware.EditorTools
         static readonly Vector3 PostBoxAt = new Vector3(-37.3f, 0f, -3.62f);
         static readonly Vector3 BenchAt = new Vector3(-23.2f, 0f, -2.85f);
         /// <summary>道標。未舗装路が舗装に入る所の北の路肩</summary>
-        static readonly Vector3 FingerpostAt = new Vector3(PaveWest + 1.2f, 0f, 2.85f);
+        static readonly Vector3 FingerpostAt = new Vector3(VillageWest + 1.2f, 0f, 2.85f);
         /// <summary>路肩に停めた車。家 A の前の北の路肩に、東を向けて</summary>
         static readonly Vector3 ParkedCarAt = new Vector3(-37.8f, 0f, 1.95f);
         /// <summary>場面 8 の車の止まった姿。未舗装路の上、Player の後ろ</summary>
@@ -214,7 +215,6 @@ namespace HalfAware.EditorTools
             Bench(b, BenchAt, bounds);
             Fingerpost(b, FingerpostAt);
             ParkedCar(b, ParkedCarAt, 90f, SwCarPaint, bounds);
-            Arrival(b, bounds);
             DriveCar(parent, bounds);
         }
 
@@ -495,8 +495,13 @@ namespace HalfAware.EditorTools
         // ---- 前庭と路地の縁 ---------------------------------------------------------------
 
         /// <summary>
-        /// 路地の縁の塀と生け垣と門。北は家 A・フットパス・家 B、南は家 C・農場の門・家 D。
-        /// 敷地の境の生け垣と塀は、前庭から奥の生け垣まで伸ばす。当たりは塀と生け垣と、口を塞ぐ見えない箱
+        /// 路地の縁の囲いと門。北は家 A・フットパス・家 B、南は家 C・農場の門・家 D。
+        ///
+        /// **家の囲いは植物の生け垣を主にする**（オーナー、2026-09-26）。路地に面した前庭も、家と家のあいだも、
+        /// 裏庭のまわりも刈り込んだ生け垣で囲い、樹種（イチイ・ブナ・イボタ・サンザシ）と高さを家ごとに変える。
+        /// 前庭は 1.1〜1.35 m、家どうしの境は 1.7〜1.9 m。野石は門の脇の低い柱と、生け垣の足元（家 D）にだけ残す。
+        /// 車の着く所の野石の塀と、郵便ポストを埋めた塀の一区切りは残す（畑の境で、家の囲いではない）。
+        /// 当たりは垣と、口を塞ぐ見えない箱
         /// </summary>
         static void LaneFronts(Banks b, Transform bounds)
         {
@@ -504,69 +509,70 @@ namespace HalfAware.EditorTools
             var zn1 = NorthEdge + FrontWallThick;
             var zs0 = -NorthEdge;
             var zs1 = -NorthEdge - FrontWallThick;
+            // 前庭の垣の芯。路肩の芝の縁から 0.35 m 内
+            var zn = NorthEdge + 0.35f;
+            var zs = -NorthEdge - 0.35f;
 
-            // 北の西の端（車の着く所）から家 A の敷地まで。野石の塀と、農場の門
+            // 北の西の端（車の着く所）。野石の塀と農場の門。村の西の縁から東はサンザシの生け垣
             FieldWall(b, bounds, "WallNW0", new Vector3(LaneWest, 0f, (zn0 + zn1) * 0.5f), new Vector3(ArriveGateWest - 0.25f, 0f, (zn0 + zn1) * 0.5f));
-            FieldWall(b, bounds, "WallNW1", new Vector3(ArriveGateEast + 0.25f, 0f, (zn0 + zn1) * 0.5f), new Vector3(PlotAWest, 0f, (zn0 + zn1) * 0.5f));
+            FieldWall(b, bounds, "WallNW1", new Vector3(ArriveGateEast + 0.25f, 0f, (zn0 + zn1) * 0.5f), new Vector3(VillageWest, 0f, (zn0 + zn1) * 0.5f));
             FieldGate(b, bounds, "GateArrive", ArriveGateWest, ArriveGateEast, (zn0 + zn1) * 0.5f, true);
+            Clipped(b, bounds, "HedgeNW", Shrub.Thorn, new Vector3(VillageWest, 0f, zn + 0.1f), new Vector3(PlotAWest, 0f, zn + 0.1f), 1.5f, 0.9f, 11);
 
-            // 家 A。低い野石の塀に口が一つ（翼の玄関へ）。西の境は野石の塀、東はフットパスとの生け垣
+            // 家 A。路地の側はブナ（1.3 m）、口は翼の玄関へ一つ。西の境はイチイ（1.9 m）、東はフットパスとの生け垣
             var aDoor = -34.0f;
-            FrontWall(b, bounds, "FrontA", PlotAWest, PlotAEast, zn0, zn1, new[] { aDoor });
-            FieldWall(b, bounds, "SideA", new Vector3(PlotAWest, 0f, zn1), new Vector3(PlotAWest, 0f, BackHedge), 1.45f);
+            FrontHedge(b, bounds, "FrontA", Shrub.Beech, PlotAWest, PlotAEast, zn, 1.3f, 0.75f, aDoor, false, 0f);
+            Clipped(b, bounds, "SideA", Shrub.Yew, new Vector3(PlotAWest, 0f, zn + 0.4f), new Vector3(PlotAWest, 0f, BackHedge), 1.9f, 0.9f, 13);
             b.Flag.FaceY(0.03f, aDoor - 0.55f, aDoor + 0.55f, zn1, 8.4f - 1.1f, 1);
 
-            // フットパス。家 A と家 B の間を北の畑へ抜ける細い道。口に踏み越し段の代わりに木の小門（キッシングゲート）
+            // フットパス。家 A と家 B の間を北の畑へ抜ける細い道。両脇はサンザシの生け垣。口に木の小門（キッシングゲート）
             var fpW = PlotAEast;
             var fpE = PlotBWest;
-            FieldHedge(b, new Vector3(fpW, 0f, zn1), new Vector3(fpW, 0f, BackHedge), 1.7f, 0.7f, 21);
-            FieldHedge(b, new Vector3(fpE, 0f, zn1), new Vector3(fpE, 0f, BackHedge), 1.7f, 0.7f, 23);
-            Wall(bounds, "HedgeFpW", new Vector3(fpW, 0f, zn1), new Vector3(fpW, 0f, BackHedge), 2.2f, 0.7f);
-            Wall(bounds, "HedgeFpE", new Vector3(fpE, 0f, zn1), new Vector3(fpE, 0f, BackHedge), 2.2f, 0.7f);
+            Clipped(b, bounds, "HedgeFpW", Shrub.Thorn, new Vector3(fpW, 0f, zn1), new Vector3(fpW, 0f, BackHedge), 1.8f, 0.7f, 21);
+            Clipped(b, bounds, "HedgeFpE", Shrub.Thorn, new Vector3(fpE, 0f, zn1), new Vector3(fpE, 0f, BackHedge), 1.8f, 0.7f, 23);
             KissingGate(b, (fpW + fpE) * 0.5f, zn0 + 0.2f);
             Block(bounds, "ShutFootpath", new Vector3((fpW + fpE) * 0.5f, 1.1f, zn0 + 0.25f), new Vector3(fpE - fpW, 2.2f, 0.4f));
             // 道の土
             b.Soil.FaceY(0.015f, fpW + 0.35f, fpE - 0.35f, zn0, BackHedge - 0.3f, 1);
 
-            // 家 B。路地の側は刈り込んだ低い生け垣（家の前と、家の東の脇の庭の前）。
-            // **東の脇の庭の垣は低くする**（設計書 2 節の 3）。その上から片割れの裏庭の白いパラソルが覗く
+            // 家 B。路地の側はイボタ（1.1 m）。**東の脇の庭の垣は低くする**（設計書 2 節の 3）。
+            // その上から片割れの裏庭の白いパラソルが覗く。片割れとの境の裏庭の側（板の塀の手前）はブナ
             var bDoor = -17.6f;
-            HedgeRun(b, bounds, "FrontB0", new Vector3(PlotBWest, 0f, zn0 + 0.35f), new Vector3(bDoor - 0.7f, 0f, zn0 + 0.35f), 1.05f, 0.7f, 31);
-            HedgeRun(b, bounds, "FrontB1", new Vector3(bDoor + 0.7f, 0f, zn0 + 0.35f), new Vector3(-12.4f, 0f, zn0 + 0.35f), 1.05f, 0.7f, 33);
-            HedgeRun(b, bounds, "FrontB2", new Vector3(-12.4f, 0f, zn0 + 0.35f), new Vector3(PlotBEast + 0.1f, 0f, zn0 + 0.35f), 0.72f, 0.6f, 35);
-            Block(bounds, "ShutB", new Vector3(bDoor, 1.1f, zn0 + 0.35f), new Vector3(1.4f, 2.2f, 0.5f));
-            // 門の口に白い木戸
-            PicketGate(b, bDoor - 0.62f, bDoor + 0.62f, zn0 + 0.35f);
+            FrontHedge(b, bounds, "FrontB", Shrub.Privet, PlotBWest, -12.4f, zn, 1.1f, 0.7f, bDoor, false, 0f);
+            Clipped(b, bounds, "FrontB2", Shrub.Privet, new Vector3(-12.4f, 0f, zn), new Vector3(PlotBEast + 0.1f, 0f, zn), 0.72f, 0.6f, 35);
+            Clipped(b, null, null, Shrub.Beech, new Vector3(PlotBEast - 0.3f, 0f, GateZ + 0.3f), new Vector3(PlotBEast - 0.3f, 0f, BackHedge - 0.5f), 1.8f, 0.7f, 37);
             b.Flag.FaceY(0.03f, bDoor - 0.5f, bDoor + 0.5f, zn0 + 0.7f, 6.2f - 0.3f, 1);
 
-            // 南の西の端から家 C の敷地まで
-            FieldWall(b, bounds, "WallSW", new Vector3(LaneWest, 0f, (zs0 + zs1) * 0.5f), new Vector3(PlotCWest, 0f, (zs0 + zs1) * 0.5f));
+            // 南の西の端（車の着く所）は野石の塀。村の西の縁から東はサンザシの生け垣
+            FieldWall(b, bounds, "WallSW", new Vector3(LaneWest, 0f, (zs0 + zs1) * 0.5f), new Vector3(VillageWest, 0f, (zs0 + zs1) * 0.5f));
+            Clipped(b, bounds, "HedgeSW", Shrub.Thorn, new Vector3(VillageWest, 0f, zs - 0.1f), new Vector3(PlotCWest, 0f, zs - 0.1f), 1.5f, 0.9f, 15);
 
-            // 家 C。低い赤煉瓦の塀に石の笠、口に白い木戸
+            // 家 C。路地の側はイボタ（1.15 m）に、赤煉瓦の門柱と白い木戸。西の境はイチイ
             var cDoor = -47.5f;
-            BrickFront(b, bounds, "FrontC", PlotCWest, PlotCEast, zs0, zs1, cDoor);
-            FieldWall(b, bounds, "SideCW", new Vector3(PlotCWest, 0f, zs1), new Vector3(PlotCWest, 0f, SouthHedge), 1.45f);
+            FrontHedge(b, bounds, "FrontC", Shrub.Privet, PlotCWest, PlotCEast, zs, 1.15f, 0.7f, cDoor, true, 0f);
+            Clipped(b, bounds, "SideCW", Shrub.Yew, new Vector3(PlotCWest, 0f, zs - 0.4f), new Vector3(PlotCWest, 0f, SouthHedge), 1.8f, 0.9f, 17);
             b.Flag.FaceY(0.03f, cDoor - 0.55f, cDoor + 0.55f, -7.2f + 0.7f, zs1, 1);
 
-            // 農場の門の畑。電話ボックスの後ろから家 D の敷地まで野石の塀。郵便ポストはこの塀の西の端に埋める
-            FieldWall(b, bounds, "WallFarm0", new Vector3(PlotCEast, 0f, (zs0 + zs1) * 0.5f), new Vector3(FarmGateWest - 0.25f, 0f, (zs0 + zs1) * 0.5f));
-            FieldWall(b, bounds, "WallFarm1", new Vector3(FarmGateEast + 0.25f, 0f, (zs0 + zs1) * 0.5f), new Vector3(PlotDWest, 0f, (zs0 + zs1) * 0.5f));
+            // 農場の門の畑。電話ボックスの後ろに、郵便ポストを埋めた野石の塀を一区切りだけ残し、その先はサンザシの生け垣
+            FieldWall(b, bounds, "WallPost", new Vector3(PlotCEast, 0f, (zs0 + zs1) * 0.5f), new Vector3(-36.1f, 0f, (zs0 + zs1) * 0.5f));
+            Clipped(b, bounds, "HedgeFarm0", Shrub.Thorn, new Vector3(-36.1f, 0f, zs - 0.1f), new Vector3(FarmGateWest - 0.4f, 0f, zs - 0.1f), 1.4f, 0.9f, 19);
+            Clipped(b, bounds, "HedgeFarm1", Shrub.Thorn, new Vector3(FarmGateEast + 0.4f, 0f, zs - 0.1f), new Vector3(PlotDWest, 0f, zs - 0.1f), 1.4f, 0.9f, 29);
             FieldGate(b, bounds, "GateFarm", FarmGateWest, FarmGateEast, (zs0 + zs1) * 0.5f, false);
-            // 家 C と畑の境、畑と家 D の境の生け垣
-            FieldHedge(b, new Vector3(PlotCEast, 0f, zs1), new Vector3(PlotCEast, 0f, SouthHedge), 1.8f, 0.9f, 41);
-            FieldHedge(b, new Vector3(PlotDWest, 0f, zs1), new Vector3(PlotDWest, 0f, SouthHedge), 1.8f, 0.9f, 43);
+            // 家 C と畑の境、畑と家 D の境
+            Clipped(b, bounds, "HedgeCE", Shrub.Thorn, new Vector3(PlotCEast, 0f, zs1), new Vector3(PlotCEast, 0f, SouthHedge), 1.8f, 0.9f, 41);
+            Clipped(b, bounds, "HedgeDW", Shrub.Beech, new Vector3(PlotDWest, 0f, zs1), new Vector3(PlotDWest, 0f, SouthHedge), 1.7f, 0.9f, 43);
 
-            // 家 D。低い野石の塀に口が一つ
+            // 家 D。低い野石の足元（0.45 m）の上にブナ（1.35 m まで）。口が一つ
             var dDoor = -10.6f;
-            FrontWall(b, bounds, "FrontD", PlotDWest, PlotDEast, zs1, zs0, new[] { dDoor });
+            FrontHedge(b, bounds, "FrontD", Shrub.Beech, PlotDWest, PlotDEast, zs, 1.35f, 0.75f, dDoor, false, 0.45f);
             b.Flag.FaceY(0.03f, dDoor - 0.55f, dDoor + 0.55f, -6.6f - 1.1f + 0.2f, zs1, 1);
-            FieldHedge(b, new Vector3(PlotDEast, 0f, zs1), new Vector3(PlotDEast, 0f, SouthHedge), 1.8f, 0.9f, 45);
+            Clipped(b, bounds, "HedgeDE", Shrub.Yew, new Vector3(PlotDEast, 0f, zs1), new Vector3(PlotDEast, 0f, SouthHedge), 1.9f, 0.9f, 45);
             // 家 D の東から路地の東の端の先まで。放牧地との生け垣。路地の東の端より先は粗く
-            HedgeRun(b, bounds, "HedgeSE", new Vector3(PlotDEast, 0f, (zs0 + zs1) * 0.5f), new Vector3(LaneEast + 1f, 0f, (zs0 + zs1) * 0.5f), 1.5f, 0.9f, 47);
-            FieldHedge(b, new Vector3(LaneEast + 1f, 0f, (zs0 + zs1) * 0.5f), new Vector3(LaneEast + 30f, 0f, (zs0 + zs1) * 0.5f), 1.5f, 0.9f, 147);
+            Clipped(b, bounds, "HedgeSE", Shrub.Thorn, new Vector3(PlotDEast, 0f, zs - 0.1f), new Vector3(LaneEast + 1f, 0f, zs - 0.1f), 1.5f, 0.9f, 47);
+            FieldHedge(b, new Vector3(LaneEast + 1f, 0f, zs - 0.1f), new Vector3(LaneEast + 30f, 0f, zs - 0.1f), 1.5f, 0.9f, 147);
             // 片割れの敷地の東から路地の東の端の先まで。北の放牧地の生け垣
-            HedgeRun(b, bounds, "HedgeNE", new Vector3(PlotEast + 0.4f, 0f, (zn0 + zn1) * 0.5f + 0.1f), new Vector3(LaneEast + 1f, 0f, (zn0 + zn1) * 0.5f + 0.1f), 1.5f, 0.9f, 49);
-            FieldHedge(b, new Vector3(LaneEast + 1f, 0f, (zn0 + zn1) * 0.5f + 0.1f), new Vector3(LaneEast + 30f, 0f, (zn0 + zn1) * 0.5f + 0.1f), 1.5f, 0.9f, 149);
+            Clipped(b, bounds, "HedgeNE", Shrub.Thorn, new Vector3(PlotEast + 0.4f, 0f, zn + 0.1f), new Vector3(LaneEast + 1f, 0f, zn + 0.1f), 1.5f, 0.9f, 49);
+            FieldHedge(b, new Vector3(LaneEast + 1f, 0f, zn + 0.1f), new Vector3(LaneEast + 30f, 0f, zn + 0.1f), 1.5f, 0.9f, 149);
 
             // 南の家の裏の生け垣
             FieldHedge(b, new Vector3(PlotCWest, 0f, SouthHedge), new Vector3(PlotCEast, 0f, SouthHedge), 1.7f, 0.9f, 51);
@@ -577,54 +583,72 @@ namespace HalfAware.EditorTools
             FieldHedge(b, new Vector3(PlotBWest, 0f, BackHedge), new Vector3(PlotBEast, 0f, BackHedge), 1.9f, 1.0f, 57);
         }
 
-        /// <summary>前庭の低い野石の塀。縦の笠石を載せ、doors の x に口を開ける。z0 から z1 が厚み</summary>
-        static void FrontWall(Banks b, Transform bounds, string name, float x0, float x1, float z0, float z1, float[] doors)
+        /// <summary>生け垣の樹種。刈り込んだ家の囲いに使う物</summary>
+        enum Shrub { Thorn, Yew, Beech, Privet }
+
+        static Bank ShrubBank(Banks b, Shrub s)
         {
-            var zc = (z0 + z1) * 0.5f;
-            var thick = Mathf.Abs(z1 - z0);
-            var cuts = new List<float> { x0 };
-            foreach (var d in doors) { cuts.Add(d - PathWide * 0.5f - 0.05f); cuts.Add(d + PathWide * 0.5f + 0.05f); }
-            cuts.Add(x1);
-            for (var i = 0; i + 1 < cuts.Count; i += 2)
-            {
-                var a = cuts[i];
-                var c = cuts[i + 1];
-                b.Stone.Box(new Vector3((a + c) * 0.5f, FrontWallHigh * 0.5f, zc), new Vector3(c - a, FrontWallHigh, thick));
-                Coping(b, new Vector3(a, FrontWallHigh, zc), new Vector3(c, FrontWallHigh, zc), thick - 0.04f, 0.26f);
-                Wall(bounds, name + i, new Vector3(a, 0f, zc), new Vector3(c, 0f, zc), 1.2f, thick);
-            }
-            foreach (var d in doors)
-            {
-                foreach (var x in new[] { d - PathWide * 0.5f - 0.25f, d + PathWide * 0.5f + 0.25f })
-                {
-                    b.Stone.Box(new Vector3(x, 0.55f, zc), new Vector3(0.5f, 1.1f, 0.55f));
-                    b.Dressed.Box(new Vector3(x, 1.15f, zc), new Vector3(0.6f, 0.1f, 0.65f));
-                }
-                PicketGate(b, d - PathWide * 0.5f, d + PathWide * 0.5f, zc);
-                Block(bounds, name + "Shut", new Vector3(d, 1.1f, zc), new Vector3(PathWide + 0.2f, 2.2f, thick));
-            }
+            return s == Shrub.Yew ? b.Yew : s == Shrub.Beech ? b.Beech : s == Shrub.Privet ? b.Privet : b.Hedge;
         }
 
-        /// <summary>家 C の前の、赤煉瓦の低い塀と石の笠と、白い木戸</summary>
-        static void BrickFront(Banks b, Transform bounds, string name, float x0, float x1, float z0, float z1, float door)
+        /// <summary>
+        /// 刈り込んだ生け垣を一続き。根は from.y、背は high。頭の凸凹は 0.9 m ごと（片割れの前庭の <see cref="Hedge"/> の 0.7 m より粗い）。
+        /// footing があれば、根に野石の低い足元を積む。bounds があれば当たりも置く
+        /// </summary>
+        static void Clipped(Banks b, Transform bounds, string name, Shrub s, Vector3 from, Vector3 to, float high, float thick, int seed, float footing = 0f)
         {
-            var zc = (z0 + z1) * 0.5f;
-            var thick = 0.34f;
-            const float high = 0.78f;
-            foreach (var span in new[] { new Vector2(x0, door - 0.8f), new Vector2(door + 0.8f, x1) })
+            var run = to - from;
+            run.y = 0f;
+            var len = run.magnitude;
+            if (len < 0.05f) return;
+            var dir = run / len;
+            var rot = Quaternion.LookRotation(dir, Vector3.up);
+            var bank = ShrubBank(b, s);
+            var mid = (from + to) * 0.5f;
+            if (footing > 0f)
             {
-                b.RedBrick.Box(new Vector3((span.x + span.y) * 0.5f, high * 0.5f, zc), new Vector3(span.y - span.x, high, thick));
-                b.Dressed.Box(new Vector3((span.x + span.y) * 0.5f, high + 0.04f, zc), new Vector3(span.y - span.x + 0.04f, 0.08f, thick + 0.08f));
-                Wall(bounds, name + span.x, new Vector3(span.x, 0f, zc), new Vector3(span.y, 0f, zc), 1.2f, thick);
+                b.Stone.Box(mid + Vector3.up * (footing * 0.5f), new Vector3(thick + 0.12f, footing, len), rot);
+                b.Dressed.Box(mid + Vector3.up * (footing + 0.03f), new Vector3(thick + 0.18f, 0.06f, len + 0.04f), rot);
             }
-            foreach (var x in new[] { door - 0.9f, door + 0.9f })
+            var y0 = footing > 0f ? footing + 0.04f : 0f;
+            bank.Box(mid + Vector3.up * ((y0 + high) * 0.5f), new Vector3(thick, high - y0, len), rot);
+            var n = Mathf.Max(1, Mathf.RoundToInt(len / 0.9f));
+            for (var i = 0; i < n; i++)
             {
-                b.RedBrick.Box(new Vector3(x, 0.6f, zc), new Vector3(0.44f, 1.2f, 0.44f));
-                b.Dressed.Box(new Vector3(x, 1.24f, zc), new Vector3(0.52f, 0.08f, 0.52f));
-                b.Dressed.Box(new Vector3(x, 1.36f, zc), new Vector3(0.24f, 0.16f, 0.24f));
+                var at = from + dir * (len * (i + 0.5f) / n);
+                var bump = 0.05f + Hash(seed, i) * 0.12f;
+                bank.Box(new Vector3(at.x, from.y + high + bump * 0.5f - 0.02f, at.z), new Vector3(thick * 0.86f, bump, len / n * 0.92f), rot);
             }
-            PicketGate(b, door - 0.68f, door + 0.68f, zc);
-            Block(bounds, name + "Shut", new Vector3(door, 1.1f, zc), new Vector3(1.6f, 2.2f, thick));
+            if (bounds != null) Wall(bounds, name, new Vector3(from.x, 0f, from.z), new Vector3(to.x, 0f, to.z), 2.2f, thick + (footing > 0f ? 0.12f : 0f));
+        }
+
+        /// <summary>
+        /// 前庭の路地の側の生け垣。door の x に口を開け、口の脇に低い門柱（野石か赤煉瓦）と白い木戸。
+        /// footing があれば垣の根に野石の低い足元を積む
+        /// </summary>
+        static void FrontHedge(Banks b, Transform bounds, string name, Shrub s, float x0, float x1, float z, float high, float thick,
+            float door, bool brick, float footing)
+        {
+            var gap0 = door - PathWide * 0.5f - 0.35f;
+            var gap1 = door + PathWide * 0.5f + 0.35f;
+            Clipped(b, bounds, name + "W", s, new Vector3(x0, 0f, z), new Vector3(gap0 - 0.2f, 0f, z), high, thick, (int)(x0 * 7f), footing);
+            Clipped(b, bounds, name + "E", s, new Vector3(gap1 + 0.2f, 0f, z), new Vector3(x1, 0f, z), high, thick, (int)(x1 * 7f), footing);
+            foreach (var x in new[] { gap0, gap1 })
+            {
+                if (brick)
+                {
+                    b.RedBrick.Box(new Vector3(x, 0.6f, z), new Vector3(0.44f, 1.2f, 0.44f));
+                    b.Dressed.Box(new Vector3(x, 1.24f, z), new Vector3(0.52f, 0.08f, 0.52f));
+                    b.Dressed.Box(new Vector3(x, 1.36f, z), new Vector3(0.24f, 0.16f, 0.24f));
+                }
+                else
+                {
+                    b.Stone.Box(new Vector3(x, 0.5f, z), new Vector3(0.45f, 1.0f, 0.5f));
+                    b.Dressed.Box(new Vector3(x, 1.04f, z), new Vector3(0.55f, 0.08f, 0.6f));
+                }
+            }
+            PicketGate(b, gap0 + 0.22f, gap1 - 0.22f, z);
+            Block(bounds, name + "Shut", new Vector3(door, 1.1f, z), new Vector3(gap1 - gap0 + 0.4f, 2.2f, thick));
         }
 
         /// <summary>
@@ -665,13 +689,6 @@ namespace HalfAware.EditorTools
                 var tall = i % 3 == 0 ? 0.21f : 0.14f + Hash(43, i) * 0.04f;
                 b.Stone.Box(at + Vector3.up * (tall * 0.5f), new Vector3(thick, tall, len / n - 0.01f), rot);
             }
-        }
-
-        /// <summary>生け垣と当たりを一度に</summary>
-        static void HedgeRun(Banks b, Transform bounds, string name, Vector3 from, Vector3 to, float high, float thick, int seed)
-        {
-            Hedge(b, from, to, high, thick, seed);
-            Wall(bounds, name, from, to, 2.2f, thick);
         }
 
         /// <summary>
@@ -898,19 +915,6 @@ namespace HalfAware.EditorTools
         }
 
         // ---- 車の着く所 ---------------------------------------------------------------------
-
-        /// <summary>
-        /// 車の着く所（設計書 2 節の 1）。場面 8 の最後の帯と同じ、土の面と二本の轍の未舗装路が、
-        /// <see cref="PaveWest"/> で舗装に入る。未舗装路の両側は麦畑（<c>BuildVillageFar.cs</c>）で、
-        /// <see cref="LaneWest"/> より東は野石の塀が立つ
-        /// </summary>
-        static void Arrival(Banks b, Transform bounds)
-        {
-            // 土と轍は地面の側（Ground）。ここは未舗装路が舗装に入る所の目印だけ:
-            // 舗装の端の崩れた縁石代わりの砂利の山
-            b.Dressed.Box(new Vector3(PaveWest + 0.1f, 0.03f, LaneHalf - 0.1f), new Vector3(0.5f, 0.06f, 0.4f), Quaternion.Euler(0f, 20f, 0f));
-            b.Dressed.Box(new Vector3(PaveWest + 0.2f, 0.03f, -LaneHalf + 0.15f), new Vector3(0.4f, 0.06f, 0.35f), Quaternion.Euler(0f, -15f, 0f));
-        }
 
         /// <summary>
         /// 場面 8 の車の止まった姿。場面 8 が焼いた車体の mesh（<c>Assets/Models/generated/drive/</c>）と
