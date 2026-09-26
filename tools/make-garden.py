@@ -846,6 +846,80 @@ def redbrick():
     return im
 
 
+ROAD_W = 256
+ROAD_H = 512
+# 路地の幅（m）と、絵の縦の長さ（m）。BuildVillage.RoadWide・RoadRepeat と揃える
+ROAD_M = 4.6
+ROAD_LEN = 9.2
+
+
+def road():
+    """
+    村の路地。舗装しない（オーナー、2026-09-26）。横（絵の左右）が路地の幅 4.6 m、縦が路地に沿った 9.2 m で、
+    縦にだけ繰り返す。場面 8 の最後の帯の土（make-drive.py の dirt と rut）と同じ系統の色で、
+    踏み固めた土に砂利を混ぜ、二本の轍と真ん中の草の筋を絵の中に描き込む。
+    轍と草の筋は縦の繰り返しに合わせてゆるく揺らす（揺れの周期を絵の縦の長さで割り切る）ので、継ぎ目が出ない。
+    縁は砂利が溜まり、端は路肩の芝へ草の房でほどける
+    """
+    w, h = ROAD_W, ROAD_H
+    size = (w, h)
+    rng = random.Random(481)
+    px_per_m = w / ROAD_M
+
+    def x_of(m):
+        return w * 0.5 + m * px_per_m
+
+    grain = Image.blend(D.noise(size, 4811, 100, 186, 0.7), D.clouds(size, 4813, 5, 1.8), 0.5)
+    im = D.tint(size, grain, (92, 72, 48), (186, 158, 118))
+    wr = D.Wrap(im)
+
+    def wobble(y, amp, k, phase):
+        return amp * math.sin(2 * math.pi * (y / float(h) * k + phase))
+
+    # 轍。土より少し明るく、踏み固めて滑らか。**段ごとに色を振らない。** 横の細い帯を色を変えて重ねたら、
+    # 轍が横縞の板張りに見えた。一色の帯を置き、粒は後の斑でまとめて付ける
+    for side in (-1, 1):
+        pts_l = []
+        pts_r = []
+        for y in range(-4, h + 5, 4):
+            cx = x_of(side * 0.95) + wobble(y, 3.0, 2, 0.1 * side) + wobble(y, 1.2, 5, 0.3)
+            half = 0.27 * px_per_m + wobble(y, 1.5, 3, 0.2 * side)
+            pts_l.append((cx - half, y))
+            pts_r.append((cx + half, y))
+        wr.d.polygon(pts_l + pts_r[::-1], fill=(162, 138, 100))
+    # 真ん中の草の筋。細く疎らに。緑は路肩の芝より褪せた色
+    for _ in range(700):
+        y = rng.uniform(0, h)
+        cx = x_of(0.0) + wobble(y, 3.5, 2, 0.6) + rng.gauss(0, 0.09 * px_per_m)
+        r = rng.uniform(1.0, 2.4)
+        col = mix((74, 88, 46), (132, 122, 76), rng.random() * 0.7)
+        wr.ellipse([cx - r, y - r * 1.5, cx + r, y + r * 1.5], fill=jitter(col, rng, 6))
+    # 縁の砂利の溜まりと、路肩の芝へほどける房
+    for side in (-1, 1):
+        for _ in range(900):
+            y = rng.uniform(0, h)
+            d = abs(rng.gauss(0, 0.28)) * px_per_m
+            cx = x_of(side * 2.3) - side * d
+            r = rng.uniform(0.8, 2.0)
+            v = rng.randint(128, 196)
+            wr.ellipse([cx - r, y - r * 0.8, cx + r, y + r * 0.8], fill=(v, v - 8, v - 26))
+        for _ in range(420):
+            y = rng.uniform(0, h)
+            cx = x_of(side * 2.3) - side * abs(rng.gauss(0, 0.12)) * px_per_m
+            r = rng.uniform(1.2, 2.6)
+            wr.ellipse([cx - r, y - r * 1.5, cx + r, y + r * 1.5], fill=jitter((66, 88, 42), rng, 10))
+    # 土の小石
+    for _ in range(420):
+        x, y = rng.uniform(0, w), rng.uniform(0, h)
+        r = rng.uniform(0.8, 2.2)
+        v = rng.randint(140, 206)
+        wr.ellipse([x - r, y - r * 0.8, x + r, y + r * 0.8], fill=(v, v - 12, v - 32))
+    im = Image.blend(im, D.tile_blur(im, 1.0), 0.45)
+    im = D.shade(im, D.noise(size, 4819, 100, 156, 0.5), 0.14)
+    im = D.shade(im, D.blot(size, 4817, 18, 46, 36, 9.0), 0.20)
+    return im
+
+
 def save(im, name):
     path = os.path.join(OUT, name + '.png')
     im.save(path)
@@ -864,6 +938,7 @@ def main():
     save(boards(), 'VillageBoards')
     save(thatch(), 'VillageThatch')
     save(redbrick(), 'VillageRedBrick')
+    save(road(), 'VillageRoad')
 
 
 if __name__ == '__main__':
