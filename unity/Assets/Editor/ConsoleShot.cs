@@ -38,6 +38,15 @@ namespace HalfAware.EditorTools
         /// <summary>コンソールを開いて、ボタンの下の枠（記憶する・思い出す・デバッグ）を開いた形で撮る</summary>
         public static string Shoot(string path, int w, int h, float uiScale, bool console, float back, ConsolePanel open, Stage stage)
         {
+            return Shoot(path, w, h, uiScale, console, back, open, stage, null);
+        }
+
+        /// <summary>
+        /// 開いた形に並べた後で、コンソールへ手を入れてから撮る（after）。
+        /// 行を押して上書きの確かめを出す・知らせを出す、のように、開いた後の操作を撮るときに使う
+        /// </summary>
+        public static string Shoot(string path, int w, int h, float uiScale, bool console, float back, ConsolePanel open, Stage stage, Action<ImplantConsole> after)
+        {
             var cam = Eye();
             if (cam == null) return "カメラが無い";
             var hud = UnityEngine.Object.FindFirstObjectByType<HudView>(FindObjectsInactive.Include);
@@ -73,6 +82,11 @@ namespace HalfAware.EditorTools
                 }
                 if (stage != null) stage(hud, panel);
                 if (panel != null) panel.Show(back, open);
+                if (panel != null && after != null)
+                {
+                    after(panel);
+                    Canvas.ForceUpdateCanvases();
+                }
                 lens.Draw();
                 ui = Read(lens.Target);
                 shot = Blend(scene, ui, w, h);
