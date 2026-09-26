@@ -777,14 +777,14 @@ namespace HalfAware
         /// <summary>次の会話の相手に目を留めたときの、`E` の後ろに続く言い方</summary>
         const string TalkLabel = "話す";
 
-        /// <summary>選んでいない方に付ける余白。<see cref="Choice.Compose"/> と同じ形に揃える</summary>
+        /// <summary>選んでいない方に付ける余白。<see cref="Choice.Cursor"/> と同じ幅</summary>
         const string Blank = "　　";
 
         /// <summary>
-        /// 上下で選べることを言い添える。<see cref="Choice"/> の二択は左右で動かすので、
+        /// 上下とホイールで選べることを言い添える。<see cref="Choice"/> の二択は左右で動かすので、
         /// 印だけ倣っても軸までは伝わらない
         /// </summary>
-        const string Axis = "（↑↓ で選ぶ）";
+        public const string Axis = "（↑↓ かホイールで選ぶ）";
 
         /// <summary>
         /// 板が出ているあいだ、画面の下に `E ○○` を出す。
@@ -826,12 +826,17 @@ namespace HalfAware
         // ---- 選ぶ ------------------------------------------------------------
 
         /// <summary>
-        /// 板が出ているあいだの入力。上下で `潜る` と `切断` を選び、E で決める。
+        /// 板が出ているあいだの入力。上下の矢印かホイールで `潜る` と `切断` を選び、E か左クリックで決める。
+        /// 人は視線で選ぶので、SceneFlow の二択と違ってカーソルは出さない。
         ///
         /// **左右（<see cref="PlayerController.ChoiceStep"/>）は使わない。**
         /// あれは Move の x をそのまま読むので、記憶の中を歩くようになった今は
         /// 横へ一歩動くたびに選びが入れ替わる。設計書 3 節の「上下（マウスの車輪、
         /// または矢印）」がそのまま <see cref="PlayerController.LogStep"/> にあるので、そちらを読む。
+        ///
+        /// 左クリックは E と同じ調べる操作（<see cref="PlayerController.InteractPressed"/>）で来る。
+        /// 一度の押しは、話している間なら送り（<see cref="Converse"/>）、`E　話す` の相手なら話し始め、
+        /// 板が出ていれば決める、のどれか一つにしか使わない（<see cref="Step"/>）
         ///
         /// 板ではなく `E　話す` を出している相手なら、E で会話を始める。
         /// どちらも出ていなければ E は何もしない
@@ -844,21 +849,33 @@ namespace HalfAware
                 if (press && Talkable(shown)) Begin();
                 return;
             }
-            // 車輪を手前へ回すと 1。上が `潜る`、下が `切断` なので向きを裏返す
-            var step = -player.LogStep;
-            if (step != 0 && step != lastStep)
+            var pick = Pick(panel.Index, player.LogStep, ref lastStep);
+            if (pick != panel.Index)
             {
-                panel.Select(step > 0 ? 1 : 0);
+                panel.Select(pick);
                 // 案内は Watch が毎フレーム出しているが、選んだ手応えを一フレーム遅らせない
                 Guide();
             }
-            lastStep = step;
             if (!press) return;
             if (panel.Index == 1 && chain.CanCut) { Cut(); return; }
             var target = Target(shown);
             if (target < 0) return;
             chain.Hop(target);
             Play(chain.Current);
+        }
+
+        /// <summary>
+        /// 上下の送り一段で、板の選びがどこへ移るか。logStep は <see cref="PlayerController.LogStep"/>
+        /// （上の矢印・ホイールを奥へで 1、下の矢印・ホイールを手前へで -1）。上が `潜る`（0）、下が `切断`（1）。
+        /// 送りが続けて来ても、動かすのは来はじめの一度だけ（last に前のフレームの送りを持つ）。
+        /// 一刻みが数フレームに割れて届くホイールでも、一段ぶんしか動かない
+        /// </summary>
+        public static int Pick(int index, int logStep, ref int last)
+        {
+            var moved = logStep != 0 && logStep != last;
+            last = logStep;
+            if (!moved) return index;
+            return logStep > 0 ? 0 : 1;
         }
 
         // ---- 切断 ------------------------------------------------------------

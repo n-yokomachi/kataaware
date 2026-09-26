@@ -300,11 +300,16 @@ namespace HalfAware
             return subtitleText.rectTransform.rect.width / size;
         }
 
-        /// <summary>null で隠す</summary>
+        /// <summary>
+        /// null で隠す。印は割らずに一行で出す。
+        /// 場面 4 の板の案内（`E　▶ この人の記憶へ潜る　　切断　（↑↓ かホイールで選ぶ）`）は印の枠より長いが、
+        /// 割ると印が二段になって読みにくい。真ん中に寄せたまま両脇へはみ出させる
+        /// </summary>
         public void SetPrompt(string text)
         {
             promptOn = text != null;
             Sync();
+            if (promptText.textWrappingMode != TextWrappingModes.NoWrap) promptText.textWrappingMode = TextWrappingModes.NoWrap;
             promptText.text = text ?? string.Empty;
         }
 
