@@ -43,6 +43,9 @@ https://pixabay.com/service/license-summary/
 | `JacketOn.wav` | Pixabay `freesound_community-jacket-rustling-35100`（オーナーが 0.844〜5.596 秒で切り出したもの） | Pixabay Content License | モノラル 44.1kHz へ、頭 20ms と尻 50ms をなだらかにし、+11.8dB で頂点を −6dB に揃えた。4.78 秒。場面 1 で椅子の左の肘掛けのジャケットを着る音 |
 | `RoomTone.wav` | Pixabay `xomxomski-ambient-empty-room-noise-sound-effect-429845` | Pixabay Content License | 3.0〜33.5 秒を切り出し（冒頭の録音の立ち上がりと、33.75 秒・53.5 秒の小さな高い音を避けた）、モノラル 22.05kHz へ。末尾 1.5 秒を頭に重ねて輪にし、実効値を −24dBFS に揃えた。29.0 秒。自室の場面の空気の音 |
 | `CrowdLoop.wav` | Pixabay `freesound_community-crowd_talking-6762` | Pixabay Content License | 7.0〜57.0 秒の 50 秒を切り出し（6.6 秒のいちばん大きな声と、86 秒からのフェードアウトを避けた）、モノラル 22.05kHz へ。末尾 2 秒を頭に重ねて輪にし、実効値を −22dBFS に揃えた。48.0 秒。場面 2 の通りとヤードの雑踏 |
+| `VillageMorning.wav` | Pixabay `freesound_community-030510whichford-18349`（「030510whichford」。作者 lunasound（Freesound）。イギリスの村の夜明けの鳥の声） | Pixabay Content License | 元は 309.2 秒。60.5〜122.5 秒の 62 秒を切り出し、モノラル 22.05kHz へ。末尾 2 秒を頭に重ねて輪にし、実効値を −24dBFS に揃えた。60.0 秒。避けたのは、録り始めの低い揺れ（0〜4 秒）、大きなしわがれた鳴き声（48.5〜53 秒・56〜60 秒）、150Hz より下の唸りが続く所（124〜234 秒。風か遠くの車か見分けられない。218 秒に低い衝撃音）、520〜560Hz の小さな音が 2.5 秒おきに続く所（186〜200 秒。遠くのカッコウか鳩の候補）、倍音のそろった鳴き声（256〜259 秒・302〜304 秒）、教会の鐘（268〜300 秒）。カッコウらしい「高→低」の二音の繰り返しは全体で見つからなかった。区間の中には 106.8〜109 秒に倍音のある鳴き声が 3〜4 回残る。村の朝 |
+| `WheatWind.wav` | Pixabay `freesound_community-wheat-in-the-wind-7159`（「Wheat in the Wind」。作者 bdvictor（Freesound）） | Pixabay Content License | 元は 137.7 秒。37.8〜105.8 秒の 68 秒を切り出し（37.0 秒と 106.0 秒の乾いたクリックを避けた）、モノラル 22.05kHz へ。末尾 2 秒を頭に重ねて輪にし、実効値を −24dBFS に揃えた。66.0 秒。約 10 秒おきに入る 5.2kHz の虫の声は残してある（オーナーの了承済み）。村の朝と夕方、場面 8 の麦畑 |
+| `GateCreak.wav` | Pixabay `dobcommunications-creaky-wooden-gate-opens-170210`（「Creaky Wooden Gate Opens」。作者 DOBCommunications） | Pixabay Content License | モノラル 44.1kHz へ、前後の −60dB 未満を落とし、頂点を −6dB に揃えた。2.19 秒。村の片割れの家の格子戸を開ける音 |
 
 ## 曲
 
@@ -56,7 +59,8 @@ https://pixabay.com/service/license-summary/
 | `Music/TheOnesWhoStayed.ogg` | 「The Ones Who Stayed」 | 同上 | 同上 |
 | `Music/CopperHeart.ogg` | 「Copper Heart」 | 同上 | 同上 |
 
-雑踏の輪と曲の加工は `tools/make-ambience.sh` で作り直せる。WebGL では Unity のオーディオのフィルターが効かないので、
+雑踏の輪と曲の加工は `tools/make-ambience.sh` で作り直せる（村の朝・麦の風・格子戸は同じ中の 5 節。`bash make-ambience.sh village` でそれだけ作り直す。
+素材の mp3 は `unity/RawAssets/audio/pixabay/` に Pixabay の元の名前で置く。git には入れない）。WebGL では Unity のオーディオのフィルターが効かないので、
 スピーカーらしさと響きはファイルに焼き込んである。
 
 切り出しの手順は ffmpeg で、`docs/` ではなくここに残す。素材そのものは repo に置かず、加工後の物だけを置いている。
@@ -71,6 +75,13 @@ https://pixabay.com/service/license-summary/
   同じ足音を裸のコンクリートの上で鳴らすと床が土に聞こえるので、場面 8 だけ作り直してある。
   ガレージの反響は素材に焼かず、足元の `AudioReverbFilter` に持たせる
 - 自室の空気の音は `RoomTone`。自室が舞台の場面 1・3・5 で、プレイヤーの頭上で 2D の輪にして小さく流す（`RoomTone`。大きさはインスペクターで変える）。場面を終えて暗転するときは、その暗転に合わせて絞る
+- 村（`Village.unity`）の環境音は `VillageAmbience`（Player/Ambience）。プレイヤーの頭上で 2D の輪にして流し、時刻（`VillageHour`）で鳴らす物を替える。
+  朝は `VillageMorning`（0.6）と `WheatWind`（0.5）を重ね、夕方は `WheatWind`（0.6）だけ。時刻が替わると 2 秒で入れ替える。
+  大きさはインスペクターで変える。組み直しても前の値を引き継ぐ
+- 格子戸は `GateCreak`。`SwingGate` が開けるときに頭から終わりまで 1 度鳴らす（以前は自室の扉の `DoorShut` の頭を借りていた）
+- 場面 8 の最後の景色（朝靄の未舗装路と小麦畑）で窓を調べて開けると、`WindowDown` と同時に `WheatWind` を走行音に重ね始める（`DriveSound.Field`、Motor/Field）。
+  0 から 3 秒で 0.80 まで上げる。夜の高速の煙草でも窓は下りるが、そちらでは鳴らさない。
+  未舗装の輪は 500Hz より下に寄っていて上の帯が −41〜−51dB しかなく、麦の風は上の帯が −29〜−31dB あるので、0.80 でも埋もれない
 
 ## 車の音
 

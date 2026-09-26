@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # HALF AWARE 音素材の生成スクリプト（ffmpeg 8.0.1 のみで完結）
-# 使い方: bash make-ambience.sh
+# 使い方: bash make-ambience.sh           （全部）
+#         bash make-ambience.sh village   （5 節の村と麦畑の 3 つだけ）
 # 出力先は OUT_DIR 直下。中間ファイルは OUT_DIR/tmp に置く。
 set -euo pipefail
+
+PART="${1:-all}"
 
 # ---------------------------------------------------------------------------
 # 入力パス（ここだけ書き換えれば別環境でも動く）
@@ -11,10 +14,20 @@ SRC_ROOMTONE="D:/Downloads/xomxomski-ambient-empty-room-noise-sound-effect-42984
 SRC_CROWD="D:/Downloads/freesound_community-crowd_talking-6762.mp3"
 SRC_OST_DIR="D:/Downloads/HALF_AWARE_OST"
 
+# 村と麦畑の素材は unity/RawAssets/audio/pixabay/ に Pixabay の元の名前のまま置く（git に入れない）
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SRC_PIXABAY_DIR="${SRC_PIXABAY_DIR:-$SCRIPT_DIR/../unity/RawAssets/audio/pixabay}"
+SRC_WHICHFORD="$SRC_PIXABAY_DIR/freesound_community-030510whichford-18349.mp3"
+SRC_WHEAT="$SRC_PIXABAY_DIR/freesound_community-wheat-in-the-wind-7159.mp3"
+SRC_GATE="$SRC_PIXABAY_DIR/dobcommunications-creaky-wooden-gate-opens-170210.mp3"
+
 OUT_DIR="${OUT_DIR:-./out-ambience}"   # 出来た物を unity/Assets/Audio/ と unity/Assets/Audio/Music/ へ写す
 TMP_DIR="$OUT_DIR/tmp"
 ANALYSIS_DIR="$OUT_DIR/analysis"
 mkdir -p "$TMP_DIR" "$ANALYSIS_DIR"
+
+# 1〜4 節は PART=all のときだけ（字下げはせず、4 節の末尾で閉じる）
+if [ "$PART" = "all" ]; then
 
 # ---------------------------------------------------------------------------
 # 1. RoomTone.wav — 自室の空気の音（ループ）
@@ -159,5 +172,83 @@ process_bgm "SlowCountry"     "$SRC_OST_DIR/Slow Country.mp3"
 process_bgm "PeachLight"      "$SRC_OST_DIR/Peach Light.mp3"
 process_bgm "TheOnesWhoStayed" "$SRC_OST_DIR/The Ones Who Stayed.mp3"
 process_bgm "CopperHeart"     "$SRC_OST_DIR/Copper Heart.mp3"
+
+fi   # PART=all
+
+# ---------------------------------------------------------------------------
+# 5. 村と麦畑の 3 つ（VillageMorning.wav / WheatWind.wav / GateCreak.wav）
+#    輪の 2 つはモノラル 22.05kHz / 16bit。末尾 2 秒を頭に重ねる等パワー(qsin)
+#    クロスフェードで輪にし、実効値(RMS)を -24dBFS 前後に揃える。
+#    継ぎ目の確かめ用に、末尾 2 秒 + 頭 2 秒をつないだ 4 秒の波形とスペクトルを
+#    ANALYSIS_DIR に書き出す。
+# ---------------------------------------------------------------------------
+make_ambient_loop () {
+  local name="$1" src="$2" start="$3" len="$4" fade="$5" target="$6"
+  local bodyend
+  bodyend=$(awk "BEGIN{print $len-$fade}")
+  echo "=== ${name}.wav ==="
+
+  ffmpeg -y -v error -i "$src" -ss "$start" -t "$len" -ac 1 -ar 22050 -c:a pcm_s16le "$TMP_DIR/${name}_seg.wav"
+
+  ffmpeg -y -v error -i "$TMP_DIR/${name}_seg.wav" -filter_complex "
+[0:a]asplit=2[a][b];
+[a]atrim=start=0:end=${bodyend},asetpts=PTS-STARTPTS[body];
+[b]atrim=start=${bodyend}:end=${len},asetpts=PTS-STARTPTS[tail];
+[tail][body]acrossfade=d=${fade}:curve1=qsin:curve2=qsin[out]
+" -map "[out]" -c:a pcm_s16le "$TMP_DIR/${name}_loop.wav"
+
+  local rms gain
+  rms=$(ffmpeg -hide_banner -i "$TMP_DIR/${name}_loop.wav" -af "astats=metadata=0:reset=0" -f null - 2>&1 | grep "RMS level dB" | tail -1 | grep -oE '[-0-9.]+$')
+  gain=$(awk "BEGIN{print $target - ($rms)}")
+  echo "${name}: measured RMS=${rms}dB, applying gain=${gain}dB"
+  ffmpeg -y -v error -i "$TMP_DIR/${name}_loop.wav" -af "volume=${gain}dB" -c:a pcm_s16le "$OUT_DIR/${name}.wav"
+
+  # 継ぎ目: 輪の末尾 2 秒のあとに頭 2 秒をつなぐ（loop で鳴らしたときと同じ並び）
+  local dur tailst
+  dur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$OUT_DIR/${name}.wav")
+  tailst=$(awk "BEGIN{print $dur-2}")
+  ffmpeg -y -v error -i "$OUT_DIR/${name}.wav" -filter_complex "
+[0:a]asplit=2[a][b];
+[a]atrim=start=${tailst},asetpts=PTS-STARTPTS[t];
+[b]atrim=end=2,asetpts=PTS-STARTPTS[h];
+[t][h]concat=n=2:v=0:a=1[s]
+" -map "[s]" -c:a pcm_s16le "$ANALYSIS_DIR/${name}_seam.wav"
+  ffmpeg -y -v error -i "$ANALYSIS_DIR/${name}_seam.wav" -lavfi "showwavespic=s=1600x300:colors=0x3070c0" -frames:v 1 "$ANALYSIS_DIR/${name}_seam_wave.png"
+  ffmpeg -y -v error -i "$ANALYSIS_DIR/${name}_seam.wav" -lavfi "showspectrumpic=s=1600x420:fscale=lin:legend=1:color=intensity:gain=2:start=0:stop=11025:win_func=hann" "$ANALYSIS_DIR/${name}_seam_spec.png"
+}
+
+# 5-1. VillageMorning.wav — 朝の村（whichford。イギリスの村の夜明けの録音。名前の 030510 は 5 月の日付と読める）
+#    元は 309.2 秒。0〜3kHz の帯のスペクトルと、0.5 秒窓の帯域別の実効値
+#    （25〜150 / 150〜450 / 450〜1100 / 1100〜3000Hz）で調べた。避けた物:
+#    - 0〜4 秒: 録り始めの低い揺れ（150Hz 以下が中央値より +11dB）
+#    - 48.5〜53 秒・56〜60 秒: 大きな鳴き声（450〜1100Hz が +14〜17dB。しわがれた
+#      鳥の声と思われる）
+#    - 124〜234 秒: 150Hz 以下の唸りが +6〜11dB で続く区間（風か遠くの車か
+#      見分けられない）。218 秒に +21dB の低い衝撃音
+#    - 186〜200 秒: 520〜560Hz のかすかな音が約 2.5 秒おきに続く（遠くのカッコウか
+#      鳩の候補。はっきりした「高→低」の二音は見分けられなかったが、念のため避けた）
+#    - 256〜259 秒・302〜304 秒: 倍音の山がそろった声（ミヤマガラスか羊の声と思われる）
+#    - 268〜300 秒: 380〜1300Hz に長く伸びる音程が重なる（教会の鐘）
+#    カッコウらしい「高→低」の二音の繰り返しは全体で見つからなかった。
+#    60.5〜122.5 秒（62 秒）を採用。区間内に残る目立つ物は 106.8〜109 秒の倍音の
+#    ある鳴き声 3〜4 回（全帯域では +2.5dB ほど）と、112.5〜114 秒の弱い音程のある声。
+#    輪は 60.0 秒。
+make_ambient_loop "VillageMorning" "$SRC_WHICHFORD" 60.5 62.0 2.0 -24
+
+# 5-2. WheatWind.wav — 麦の風（Wheat in the Wind。虫の声入り、オーナーの了承済み）
+#    元は 137.7 秒。頭 0.6 秒のフェードインと 134 秒からのフェードアウトがある。
+#    全体に 5.2kHz の短い鳴き声が約 10 秒おきに入る（虫。残す）。
+#    37.0 秒と 106.0 秒に 1〜3.5kHz の乾いたクリック（450〜3000Hz が +5〜7dB）があるので、
+#    その間の 37.8〜105.8 秒（68 秒）を採用。輪は 66.0 秒。
+make_ambient_loop "WheatWind" "$SRC_WHEAT" 37.8 68.0 2.0 -24
+
+# 5-3. GateCreak.wav — 格子戸を開ける軋み（Creaky Wooden Gate Opens、2.35 秒）
+#    前後の無音（-60dB 未満）を落とし、頂点を -6dB に揃える。モノラル 44.1kHz。
+echo "=== GateCreak.wav ==="
+ffmpeg -y -v error -i "$SRC_GATE" -af "pan=mono|c0=0.5*c0+0.5*c1,aresample=44100,silenceremove=start_periods=1:start_threshold=-60dB:start_silence=0.005,areverse,silenceremove=start_periods=1:start_threshold=-60dB:start_silence=0.02,areverse" -c:a pcm_s16le "$TMP_DIR/gate_trim.wav"
+GATE_PEAK=$(ffmpeg -hide_banner -i "$TMP_DIR/gate_trim.wav" -af "astats=metadata=0" -f null - 2>&1 | grep "Peak level dB" | tail -1 | grep -oE '[-0-9.]+$')
+GATE_GAIN=$(awk "BEGIN{print -6 - ($GATE_PEAK)}")
+echo "GateCreak: measured peak=${GATE_PEAK}dB, applying gain=${GATE_GAIN}dB"
+ffmpeg -y -v error -i "$TMP_DIR/gate_trim.wav" -af "volume=${GATE_GAIN}dB" -ar 44100 -ac 1 -c:a pcm_s16le "$OUT_DIR/GateCreak.wav"
 
 echo "=== done ==="
