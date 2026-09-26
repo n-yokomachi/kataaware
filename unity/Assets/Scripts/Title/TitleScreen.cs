@@ -384,25 +384,25 @@ namespace HalfAware
                 return;
             }
             if (phase == Phase.Leaving) return;
-            if (keys != null)
+            var up = keys != null && (keys.upArrowKey.wasPressedThisFrame || keys.wKey.wasPressedThisFrame);
+            var down = keys != null && (keys.downArrowKey.wasPressedThisFrame || keys.sKey.wasPressedThisFrame);
+            var decide = keys != null && (keys.eKey.wasPressedThisFrame || keys.enterKey.wasPressedThisFrame
+                || keys.numpadEnterKey.wasPressedThisFrame);
+            if (phase == Phase.Menu)
             {
-                var up = keys.upArrowKey.wasPressedThisFrame || keys.wKey.wasPressedThisFrame;
-                var down = keys.downArrowKey.wasPressedThisFrame || keys.sKey.wasPressedThisFrame;
-                var decide = keys.eKey.wasPressedThisFrame || keys.enterKey.wasPressedThisFrame
-                    || keys.numpadEnterKey.wasPressedThisFrame;
-                if (phase == Phase.Menu)
-                {
-                    if (up) Move(-1);
-                    if (down) Move(1);
-                    if (decide) Decide();
-                }
-                else if (phase == Phase.Recall)
-                {
-                    if (up) row = NextRow(row, -1);
-                    if (down) row = NextRow(row, 1);
-                    if (keys.escapeKey.wasPressedThisFrame) CloseList();
-                    else if (decide) Pick();
-                }
+                if (up) Move(-1);
+                if (down) Move(1);
+                if (decide) Decide();
+            }
+            else if (phase == Phase.Recall)
+            {
+                if (up) row = NextRow(row, -1);
+                if (down) row = NextRow(row, 1);
+                // 一つ前に戻る。コンソールと同じく Esc か右クリック
+                var back = (keys != null && keys.escapeKey.wasPressedThisFrame)
+                    || (mouse != null && mouse.rightButton.wasPressedThisFrame);
+                if (back) CloseList();
+                else if (decide) Pick();
             }
             if (phase == Phase.Leaving) return;
             Paint();
