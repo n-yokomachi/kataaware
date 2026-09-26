@@ -193,7 +193,9 @@ namespace HalfAware.EditorTools
 
             foreach (var h in Hedgerows)
                 FieldHedge(b, new Vector3(h.x, 0f, h.y), new Vector3(h.z, 0f, h.w), 2.1f, 1.3f, (int)(h.x * 3f + h.y));
-            // 並木の木。生け垣に沿って間を不揃いに
+            // 並木の木。生け垣に沿って間を不揃いに。樹冠は花と葉のアトラスの札（FieldTree）
+            fieldCrowns = FloraBank();
+            fieldCrowns.CardLift = 2.0f;
             var n = 0;
             foreach (var h in Hedgerows)
             {
@@ -209,7 +211,11 @@ namespace HalfAware.EditorTools
                     n++;
                 }
             }
+            // 焼くのは周りの庭の木と一緒に（BuildVillageYards の FloraLaneTrees）。一枚にまとめて描く回数を増やさない
         }
+
+        /// <summary>並木の樹冠の札を溜める入れ物。Fields で溜め、周りの庭の木と一緒に焼いたら捨てる</summary>
+        static Bank fieldCrowns;
 
         // ---- 村の教会（組む） --------------------------------------------------------
 
@@ -560,25 +566,41 @@ namespace HalfAware.EditorTools
             if (len < 0.05f) return;
             var dir = run / len;
             var rot = Quaternion.LookRotation(dir, Vector3.up);
-            b.Hedge.Box((from + to) * 0.5f + Vector3.up * (high * 0.5f), new Vector3(thick, high, len), rot);
+            // 底は地面と生け垣の頭に隠れて見えないので張らない（三角を抑える）
+            b.Hedge.BoxOpenBottom((from + to) * 0.5f + Vector3.up * (high * 0.5f), new Vector3(thick, high, len), rot);
             var n = Mathf.Max(1, Mathf.RoundToInt(len / 3.5f));
             for (var i = 0; i < n; i++)
             {
                 var at = from + dir * (len * (i + 0.5f) / n);
                 var bump = 0.15f + Hash(seed, i) * 0.45f;
-                b.Hedge.Box(at + Vector3.up * (high + bump * 0.5f - 0.05f), new Vector3(thick * 0.8f, bump, len / n * (0.55f + Hash(seed + 1, i) * 0.4f)), rot);
+                b.Hedge.BoxOpenBottom(at + Vector3.up * (high + bump * 0.5f - 0.05f), new Vector3(thick * 0.8f, bump, len / n * (0.55f + Hash(seed + 1, i) * 0.4f)), rot);
             }
         }
 
-        /// <summary>生け垣の並木の木（楢）。幹と、葉の玉を幾つか重ねた樹冠</summary>
+        /// <summary>
+        /// 生け垣の並木の木（楢）。幹と、札を三枚交差させた樹冠に、上から見たとき用の寝かせた札を一枚。
+        /// **樹冠を箱で組まない。** 葉の玉を箱三つで組んで四つ重ねていたら、庭の奥の生け垣の上に
+        /// 緑の立方体が並んで見えた（2026-09-27、庭の仕上げ直し）。札にすると三角も一本 144 から 8 に減る
+        /// </summary>
         static void FieldTree(Banks b, Vector3 at, float scale, int seed)
         {
-            Beam(b.Bark, at, at + Vector3.up * 3.2f * scale, 0.45f * scale, 0.42f * scale);
-            for (var i = 0; i < 4; i++)
+            Beam(b.Bark, at, at + Vector3.up * 3.6f * scale, 0.45f * scale, 0.42f * scale);
+            Vector2 min, max;
+            CellUv(Kind.Oak, out min, out max);
+            var f = fieldCrowns;
+            var high = 6.2f * scale * (0.92f + Hash(seed * 7 + 5, 0) * 0.16f);
+            var wide = 7.2f * scale * (0.9f + Hash(seed * 7 + 6, 0) * 0.2f);
+            var foot = at + Vector3.up * (2.6f * scale);
+            f.RootY = at.y;
+            f.RootHigh = foot.y - at.y + high;
+            var yaw = Hash(seed * 7 + 7, 0) * 180f;
+            for (var c = 0; c < 3; c++)
             {
-                var o = new Vector3(Hash(seed * 7 + 1, i) - 0.5f, Hash(seed * 7 + 2, i) * 0.6f, Hash(seed * 7 + 3, i) - 0.5f) * 3.6f * scale;
-                Ball(b.Hedge, at + Vector3.up * 5.4f * scale + o, (1.8f + Hash(seed * 7 + 4, i) * 0.9f) * scale);
+                var a = (yaw + 60f * c) * Mathf.Deg2Rad;
+                var across = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * (wide * 0.5f);
+                f.AtlasCard(foot, across, Vector3.up * high, min, max);
             }
+            f.AtlasCard(foot + Vector3.up * (high * 0.55f) + Vector3.back * (wide * 0.42f), Vector3.right * (wide * 0.42f), Vector3.forward * (wide * 0.84f), min, max);
         }
 
         /// <summary>

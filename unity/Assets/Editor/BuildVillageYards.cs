@@ -480,8 +480,8 @@ namespace HalfAware.EditorTools
                 Flat(g, Kind.SweetPea, new Vector3(-19.3f, 0.22f, 21.0f + k * 1.7f), new Vector3(0f, 0f, 0.7f), Vector3.up * 1.8f);
             NoShadow(Emit(parent, "FloraLaneClimbers", g, mat, false));
 
-            // 周りの庭の木
-            var t = FloraBank();
+            // 周りの庭の木。畑の並木の樹冠（BuildVillageFar.FieldTree が溜めた札）と一枚に焼く
+            var t = fieldCrowns ?? FloraBank();
             t.CardLift = 2.0f;
             foreach (var at in YardTrees)
             {
@@ -490,6 +490,7 @@ namespace HalfAware.EditorTools
                 Clump(t, Kind.Apple, crown + new Vector3(0.3f, 0.45f, -0.2f), 0.7f, at.x * 17f + 50f, Vector3.zero);
             }
             Emit(parent, "FloraLaneTrees", t, mat, false);
+            fieldCrowns = null;
         }
     }
 }
