@@ -76,6 +76,51 @@ namespace HalfAware.EditorTools
             };
         }
 
+        /// <summary>
+        /// 片割れの裏庭の見る所（2026-09-27 の庭の仕上げ直し）。
+        /// タイトルの背景（東屋の側からアーチを正面に）・格子戸をくぐった所・テラスから芝と奥・東屋の角・
+        /// 場面 6 の座った目（テラスの卓）・夕日の庭の全体
+        /// </summary>
+        public static View[] GardenViews()
+        {
+            return new[]
+            {
+                new View("g1_title", new Vector3(-3.25f + 0.048f * 2.5f, 1.6f, 25.30f + 0.999f * 2.5f), 182.75f, 0f),
+                new View("g2_gate", new Vector3(-4.2f, 1.6f, 12.9f), 4f, 3f),
+                new View("g3_terrace", new Vector3(1.2f, 1.7f, 17.8f), 352f, 6f),
+                new View("g4_gazebo", new Vector3(-1.3f, 1.6f, 27.4f), 322f, 5f),
+                new View("g5_seated", new Vector3(-1.66f, 1.25f, 17.95f), 18f, 2f),
+                new View("g6_whole", new Vector3(3.4f, 1.7f, 19.6f), 325f, 6f),
+            };
+        }
+
+        /// <summary>
+        /// 庭の見る所を朝と夕方で撮る。only が空でなければ、名前にその字を含む所だけ。
+        /// hours は "me"（朝と夕方）・"m"（朝だけ）・"e"（夕方だけ）。終わったら朝に戻す
+        /// </summary>
+        public static string ShootGarden(string dir, string only, string hours)
+        {
+            var sb = new StringBuilder();
+            System.IO.Directory.CreateDirectory(dir);
+            try
+            {
+                foreach (var h in hours)
+                {
+                    BuildVillage.SetHour(h == 'e' ? VillageHour.Hour.Evening : VillageHour.Hour.Morning);
+                    foreach (var v in GardenViews())
+                    {
+                        if (!string.IsNullOrEmpty(only) && !v.Name.Contains(only)) continue;
+                        sb.AppendLine(Game(v, dir + "/" + v.Name + (h == 'e' ? "_evening" : "_morning") + ".png"));
+                    }
+                }
+            }
+            finally
+            {
+                BuildVillage.SetHour(VillageHour.Hour.Morning);
+            }
+            return sb.ToString();
+        }
+
         /// <summary>ゲームの見え方で一枚。hour はそのときの時刻に切り替えてから撮る</summary>
         public static string Game(View v, string path)
         {
