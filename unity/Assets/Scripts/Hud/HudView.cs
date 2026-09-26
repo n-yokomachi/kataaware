@@ -7,14 +7,14 @@ using UnityEngine.UI;
 namespace HalfAware
 {
     /// <summary>
-    /// 字幕（画面の下から上へ薄れる黒の地に、名前の行と台詞の行）、印（中央）、中央の文字、暗転、幕。
+    /// 字幕（画面の下から上へ薄れる黒の地に、名前の行と台詞の行）、二択の札（<see cref="ChoiceView"/>）、印（中央）、中央の文字、暗転、幕。
     /// 見せるだけで、何をいつ出すかは SceneFlow と場面固有の演出が決める。
     /// 煙は画面を覆う層ではなく世界の粒で描くので、ここには無い（SmokePuffs）。
     /// 暗転と幕の層は、繋がっていなければ何もしない。
     ///
     /// 遊んでいる間は、この Canvas を粗い画面（<see cref="UiLens"/>）で描く。
     /// 中央の文字（冒頭のカード・「続く」）だけは粗くせず、別の Canvas に分けてくっきり描く。
-    /// TAB のコンソールを開いている間は、字幕・印・中央の文字を伏せる
+    /// TAB のコンソールを開いている間は、字幕・二択の札・印・中央の文字を伏せる
     /// </summary>
     public sealed class HudView : MonoBehaviour
     {
@@ -53,7 +53,10 @@ namespace HalfAware
         bool subtitleOn;
         bool promptOn;
         bool centerOn;
+        bool choiceOn;
         bool hidden;
+        /// <summary>二択の札。初めて二択を出すときに作る</summary>
+        ChoiceView choiceView;
 
         void Awake()
         {
@@ -113,6 +116,37 @@ namespace HalfAware
             if (subtitleBand != null) subtitleBand.SetActive(subtitleOn && !hidden);
             if (promptText != null) promptText.gameObject.SetActive(promptOn && !hidden);
             if (centerText != null) centerText.gameObject.SetActive(centerOn && !hidden);
+            if (choiceView != null) choiceView.Visible = choiceOn && !hidden;
+        }
+
+        /// <summary>
+        /// 二択の札を出す。null で下げる。字幕の枠には出さず、画面の真ん中に浮かべる（<see cref="ChoiceView"/>）。
+        /// 札は初めて出すときに HUD の Canvas の中に作る。毎フレーム呼んでよく、選びが変わった時だけ塗り直す
+        /// </summary>
+        public void SetChoice(Choice choice)
+        {
+            choiceOn = choice != null;
+            if (choiceOn && choiceView == null) choiceView = MakeChoice();
+            if (choiceView != null) choiceView.Show(choice);
+            Sync();
+        }
+
+        /// <summary>画面の座標 screen の下にある札の番号。札を出していない・伏せている・札の外なら -1</summary>
+        public int ChoiceAt(Vector2 screen)
+        {
+            if (choiceView == null || !choiceOn || hidden) return -1;
+            return choiceView.At(screen);
+        }
+
+        /// <summary>札を組む。暗転と幕より下に重ねる（二択の最中に暗転することは無いが、重なりの順は崩さない）</summary>
+        ChoiceView MakeChoice()
+        {
+            var view = ChoiceView.Build((RectTransform)transform);
+            var below = int.MaxValue;
+            if (fadeLayer != null && fadeLayer.transform.parent == transform) below = Mathf.Min(below, fadeLayer.transform.GetSiblingIndex());
+            if (curtainLayer != null && curtainLayer.transform.parent == transform) below = Mathf.Min(below, curtainLayer.transform.GetSiblingIndex());
+            if (below != int.MaxValue) view.Root.SetSiblingIndex(below);
+            return view;
         }
 
         /// <summary>
@@ -157,10 +191,7 @@ namespace HalfAware
             SetSubtitle(text, SubtitleKind.Line);
         }
 
-        /// <summary>
-        /// 二択は表に組まず、地の真ん中へ寄せる。
-        /// 「はい　いいえ」を左に寄せると、どちらを選んでいるかが目で追いにくい
-        /// </summary>
+        /// <summary>kind で寄せ方と表に組むかを決める。台詞として E で送れるものは「E　送る」を添える</summary>
         public void SetSubtitle(string text, SubtitleKind kind)
         {
             Show(text, kind, false, kind == SubtitleKind.Line);
@@ -216,9 +247,7 @@ namespace HalfAware
             // ルビのある文は行を少し開ける。
             // そのままだと下の行のルビが上の行の字にかぶる
             subtitleText.lineSpacing = shown.IndexOf(Ruby.Head) >= 0 ? Ruby.ExtraLineSpacing : 0f;
-            subtitleText.alignment =
-                kind == SubtitleKind.Choice ? TextAlignmentOptions.Top :
-                list ? TextAlignmentOptions.TopLeft : listlessAlignment;
+            subtitleText.alignment = list ? TextAlignmentOptions.TopLeft : listlessAlignment;
             // 字を小さくしたぶん 1 行も低くなる。地の高さも同じだけ詰める
             var body = subtitleRowHeight * rows * scale;
             var band = subtitleBand.GetComponent<RectTransform>();

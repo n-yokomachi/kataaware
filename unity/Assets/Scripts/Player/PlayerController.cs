@@ -1,11 +1,13 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
 
 namespace HalfAware
 {
     /// <summary>
     /// 歩く・見回す。CharacterController と Input System の Player マップ（Move / Look / Interact）で動く。
     /// カーソルは画面のクリックでロックし、ロック中だけ見回しと移動と調べる操作を受け付ける。
+    /// 二択の札を出している間（<see cref="Pointing"/>）だけは、カーソルを出してロックを外し、マウスを札へ回す。
     /// SceneFlow より先に Update が走るよう実行順を前に置く
     /// </summary>
     [DefaultExecutionOrder(-10)]
@@ -38,6 +40,7 @@ namespace HalfAware
         InputAction look;
         InputAction interact;
         float pitch;
+        bool pointing;
 
         /// <summary>走っているときの速さ。押している間だけ上げる</summary>
         public static float Speed(bool running)
@@ -79,10 +82,39 @@ namespace HalfAware
         public bool InteractPressed { get; private set; }
 
         /// <summary>
-        /// 上下の送り。1 で上（車輪を手前に回す・上の矢印・PageUp）、-1 で下、0 で据え置き。
+        /// 上下の送り。1 で上（車輪を奥へ回す・上の矢印・PageUp）、-1 で下、0 で据え置き。
         /// 場面 4 の板の `潜る`・`切断` の選びが読む。TAB のコンソールは自分で鍵盤を読む
         /// </summary>
         public int LogStep { get; private set; }
+
+        /// <summary>
+        /// 二択の札をマウスで指している間。true にするとカーソルを出してロックを外し、false に戻すとロックして隠す。
+        ///
+        /// そのあいだ見回しと歩きは止まる。左右（<see cref="ChoiceStep"/>）と E（<see cref="InteractPressed"/>）は今どおり読むが、
+        /// 左クリックは調べる操作にせず、カーソルの位置（<see cref="Pointer"/>）と一緒に札の当たりへ回す。
+        /// クリックでロックし直すこともしない。
+        /// TAB のコンソールは開く前のカーソルを覚えて閉じると戻すので、二択の間に開け閉めしてもロックは外れたまま
+        /// </summary>
+        public bool Pointing
+        {
+            get { return pointing; }
+            set
+            {
+                if (pointing == value) return;
+                pointing = value;
+                if (value) Free();
+                else Lock();
+            }
+        }
+
+        /// <summary>カーソルの位置。画面の座標。<see cref="Pointing"/> の間だけ書き直す</summary>
+        public Vector2 Pointer { get; private set; }
+
+        /// <summary>このフレームで左ボタンを押したか。<see cref="Pointing"/> の間だけ true になる</summary>
+        public bool PointerPressed { get; private set; }
+
+        /// <summary>このフレームで左ボタンを離したか。<see cref="Pointing"/> の間だけ true になる</summary>
+        public bool PointerReleased { get; private set; }
 
         /// <summary>
         /// 二択の左右。-1 が左、+1 が右、倒していなければ 0。
@@ -154,6 +186,23 @@ namespace HalfAware
         void OnDisable() => actions.FindActionMap("Player", true).Disable();
 
         /// <summary>
+        /// 車輪の一フレームぶんの回りを、上下の送りの一段にする。奥へ回すと 1（上）、手前へ回すと -1（下）。
+        /// 一刻みの量は環境で違う（120 や 1）ので、向きだけを見る
+        /// </summary>
+        public static int WheelStep(float scrollY)
+        {
+            if (scrollY > 0.01f) return 1;
+            if (scrollY < -0.01f) return -1;
+            return 0;
+        }
+
+        /// <summary>左右の倒れ具合。半分より倒していれば -1 か 1</summary>
+        public static int SideStep(Vector2 stick)
+        {
+            return stick.x > 0.5f ? 1 : stick.x < -0.5f ? -1 : 0;
+        }
+
+        /// <summary>
         /// 上下の送りの入力。専用の割り当ては作らず、車輪と上下の矢印を直に見る。
         /// 板を出している間しか使わないので、歩きの入力とは取り合わない
         /// </summary>
@@ -162,9 +211,8 @@ namespace HalfAware
             var mouse = UnityEngine.InputSystem.Mouse.current;
             if (mouse != null)
             {
-                var wheel = mouse.scroll.ReadValue().y;
-                if (wheel > 0.01f) return 1;      // 手前に回すと古い方へ
-                if (wheel < -0.01f) return -1;
+                var wheel = WheelStep(mouse.scroll.ReadValue().y);
+                if (wheel != 0) return wheel;
             }
             var keys = UnityEngine.InputSystem.Keyboard.current;
             if (keys == null) return 0;
@@ -178,6 +226,8 @@ namespace HalfAware
             InteractPressed = false;
             LogStep = 0;
             ChoiceStep = 0;
+            PointerPressed = false;
+            PointerReleased = false;
             // コンソールを開いている間は、歩く・見回す・調べる・送るを全部止める。
             // カーソルもコンソールが預かっているので、ここでロックし直さない
             if (ImplantConsole.IsOpen)
@@ -187,11 +237,17 @@ namespace HalfAware
                 return;
             }
             LogStep = ReadLogStep();
+            if (pointing)
+            {
+                Point();
+                Aim();
+                return;
+            }
             if (CursorLocked)
             {
                 InteractPressed = interact.WasPressedThisFrame();
                 var stick = move.ReadValue<Vector2>();
-                ChoiceStep = stick.x > 0.5f ? 1 : stick.x < -0.5f ? -1 : 0;
+                ChoiceStep = SideStep(stick);
                 if (CanLook) Look(look.ReadValue<Vector2>());
                 if (CanMove) Walk(stick);
             }
@@ -215,10 +271,46 @@ namespace HalfAware
             eye.localRotation = Quaternion.Euler(pitch + EyeTilt.x, head.Yaw + EyeTilt.y, 0f);
         }
 
+        /// <summary>
+        /// 札を指している間の入力。見回しも歩きもしない。E と左右は読み、マウスは位置と押し離しだけ渡す。
+        /// カーソルは外したまま・見せたままを毎フレーム言い直す。ほかの所がロックし直しても、札を指せなくならないように
+        /// </summary>
+        void Point()
+        {
+            Running = false;
+            Free();
+            InteractPressed = PressedByKeys(interact);
+            ChoiceStep = SideStep(move.ReadValue<Vector2>());
+            var mouse = Mouse.current;
+            if (mouse == null) return;
+            Pointer = mouse.position.ReadValue();
+            PointerPressed = mouse.leftButton.wasPressedThisFrame;
+            PointerReleased = mouse.leftButton.wasReleasedThisFrame;
+        }
+
+        /// <summary>action がこのフレームでマウス以外（E・パッド）から押されたか。左クリックは札の当たりが受け持つ</summary>
+        static bool PressedByKeys(InputAction action)
+        {
+            var controls = action.controls;
+            for (var i = 0; i < controls.Count; i++)
+            {
+                if (controls[i].device is Mouse) continue;
+                var button = controls[i] as ButtonControl;
+                if (button != null && button.wasPressedThisFrame) return true;
+            }
+            return false;
+        }
+
         static void Lock()
         {
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
+        }
+
+        static void Free()
+        {
+            if (Cursor.lockState != CursorLockMode.None) Cursor.lockState = CursorLockMode.None;
+            if (!Cursor.visible) Cursor.visible = true;
         }
 
         void Look(Vector2 delta)

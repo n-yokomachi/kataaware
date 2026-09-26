@@ -9,6 +9,7 @@ namespace HalfAware
     /// <summary>
     /// 歩いて調べる場面 1 つ分の進行。毎フレーム、対象の選択 → 印 → 調べる → 字幕 → 完了の判定の順に進める。
     /// 字幕の表示中は E とクリックを字幕の送りにだけ使い、調べる操作は受け付けない。
+    /// 二択は画面の真ん中の札（<see cref="HudView.SetChoice"/>）に出し、そのあいだはカーソルを出して札をマウスでも選べるようにする。
     /// 止まっている間は調べる操作と進行が止まる。見回しと移動は止めない（場面 1 の停止はすべて座っている間に起きる）。
     /// 必須の対象をすべて調べ、字幕も出ておらず、止まってもいなければ暗転して「続く」を出す
     /// </summary>
@@ -92,7 +93,9 @@ namespace HalfAware
         Vector3 chairSpot;
         Choice choice;
         IInteractable asking;
-        int lastStep;
+        readonly ChoicePointer pointer = new ChoicePointer();
+        /// <summary>二択を開いたフレーム。札はまだ出ておらず、カーソルの位置も古いので、マウスは次のフレームから見る</summary>
+        bool opened;
 
         /// <summary>
         /// 対象を調べたその時。前提が揃っていて、その対象の文を出し始めたときに呼ぶ。
@@ -263,25 +266,34 @@ namespace HalfAware
             Wake();
             // 独白を読み終えてから腰を上げる。喋りながら立ち上がらせない
             Stand(frozenNow || subtitles.IsTalking || choice != null);
-            // 送れるのは、二択でなく、止まってもいない間だけ。そのときだけ「E　送る」を添える
-            hud.SetSubtitle(choice != null ? choice.Compose() : subtitles.Current,
-                choice == null ? SubtitleKind.Line : SubtitleKind.Choice, choice == null && !frozenNow);
+            // 二択は字幕の枠から出して札に浮かべる。そのあいだ字幕は下げる。
+            // 送れるのは止まっていない間だけ。そのときだけ「E　送る」を添える
+            hud.SetSubtitle(choice != null ? null : subtitles.Current, SubtitleKind.Line, !frozenNow);
+            hud.SetChoice(choice);
             if (progress.IsComplete && !subtitles.IsTalking && choice == null && !frozenNow && !Held) StartCoroutine(Complete());
         }
 
         /// <summary>
-        /// 二択を出しているあいだ。左右で選び、調べる操作で決める。
+        /// 二択を出しているあいだ。左右で選び、調べる操作（E）で決める。
+        /// マウスでは、札に入ると選び、札の上で押して離すと決める（<see cref="ChoicePointer"/>）。
+        /// 止まっている間はマウスでも決めない。
         /// 「はい」なら済んだことにして続きの文を出し、「いいえ」なら何もせず閉じる
         /// </summary>
         void Ask(bool interact)
         {
-            var step = player.ChoiceStep;
-            if (step != 0 && step != lastStep) choice.Move(step);
-            lastStep = step;
+            choice.Tilt(player.ChoiceStep);
+            if (opened) opened = false;
+            else pointer.Step(hud.ChoiceAt(player.Pointer), player.PointerPressed, player.PointerReleased);
+            if (pointer.Entered >= 0) choice.Hover(pointer.Entered);
+            if (pointer.Picked >= 0 && !Frozen)
+            {
+                choice.Hover(pointer.Picked);
+                interact = true;
+            }
             if (!interact) return;
             var accepted = choice.Accepted;
             var item = asking;
-            ConsoleLog.Picked(choice.Question, accepted ? Choice.Yes : Choice.No);
+            ConsoleLog.Picked(choice.Question, choice.Label);
             CloseChoice();
             if (!accepted) return;
             var said = progress.Confirm(item);
@@ -290,19 +302,26 @@ namespace HalfAware
             if (Examined != null) Examined(item);
         }
 
-        /// <summary>二択を開く。左右の入力が歩きに化けないよう、そのあいだは足を止める</summary>
+        /// <summary>
+        /// 二択を開く。左右の入力が歩きに化けないよう、そのあいだは足を止める。
+        /// カーソルを出してロックを外し、見回しを止める（<see cref="PlayerController.Pointing"/>）
+        /// </summary>
         void OpenChoice()
         {
             choice = new Choice(asking.Question);
-            lastStep = 0;
+            pointer.Reset();
+            opened = true;
             player.CanMove = false;
+            player.Pointing = true;
         }
 
+        /// <summary>二択を閉じる。カーソルはロックして隠す</summary>
         void CloseChoice()
         {
             choice = null;
             asking = null;
-            lastStep = 0;
+            pointer.Reset();
+            player.Pointing = false;
             player.CanMove = standUp == null || standUp.Standing;
         }
 
