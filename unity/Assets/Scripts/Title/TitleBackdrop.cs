@@ -50,10 +50,22 @@ namespace HalfAware
             }
         }
 
-        /// <summary>明るい背景か。沈め方を弱めて、時刻の感じを残す</summary>
-        public static bool Bright(TitleBackdrop b)
+        /// <summary>夕方の村の沈め方の弱さ。朝と、ふつうの沈め方のあいだより朝寄り</summary>
+        public const float EveningLight = 0.75f;
+
+        /// <summary>
+        /// 背景の沈め方をどれだけ弱めるか。0 でふつう（夜の場面）、1 で朝の村の弱さ。
+        /// 村は時刻の感じを残す。朝は明るさ、夕方は夕日に照らされた家の壁とアーチの花の暖かい色
+        /// （庭はオーナーが最重要とする場所。ふつうに沈めると夕日の色が消え、家もアーチも暗い塊になる）
+        /// </summary>
+        public static float Light(TitleBackdrop b)
         {
-            return b == TitleBackdrop.VillageMorning;
+            switch (b)
+            {
+                case TitleBackdrop.VillageMorning: return 1f;
+                case TitleBackdrop.VillageEvening: return EveningLight;
+                default: return 0f;
+            }
         }
 
         /// <summary>絵のファイルの名（拡張子なし）。<c>Assets/Textures/Title/</c> に置く</summary>

@@ -511,7 +511,7 @@ namespace HalfAware
             picture.color = picture.texture != null ? Color.white : Color.black;
             ImplantConsole.Stretch(picture.rectTransform, 0f, 0f, 0f, 0f);
 
-            dimTexture = MakeDim(TitleBackdrops.Bright(backdrop));
+            dimTexture = MakeDim(TitleBackdrops.Light(backdrop));
             var dim = new GameObject("Dim", typeof(RectTransform), typeof(CanvasRenderer), typeof(RawImage));
             dim.transform.SetParent(go.transform, false);
             var dimImage = dim.GetComponent<RawImage>();
@@ -524,20 +524,23 @@ namespace HalfAware
 
         /// <summary>
         /// 背景を沈める暗さ。案の CSS の楕円のグラデーション（中心は横の真ん中、上から 55%）。
-        /// u は左から、v は上から（0〜1）。ふつうは 0.45 から縁の 0.82 へ。
-        /// 明るい背景は、題の後ろだけ少し沈め（0.42）、その外は 0.18 まで明るく残し、縁で 0.62
+        /// u は左から、v は上から（0〜1）。light は沈め方の弱さ（<see cref="TitleBackdrops.Light"/>）で、
+        /// 0 のふつうと 1 の朝の村のあいだを混ぜる。
+        /// ふつうは 0.45 から縁の 0.82 へ。朝の村は、題の後ろだけ少し沈め（0.42）、その外は 0.18 まで明るく残し、縁で 0.62
         /// </summary>
-        public static float DimAt(float u, float v, bool bright)
+        public static float DimAt(float u, float v, float light)
         {
             var du = (u - 0.5f) / 0.5f;
             var dv = (v - 0.55f) / 0.55f;
             var t = Mathf.Sqrt(du * du + dv * dv) / Mathf.Sqrt(2f);
-            if (!bright) return Mathf.Lerp(0.45f, 0.82f, Mathf.Clamp01(t / 0.75f));
-            if (t < 0.45f) return Mathf.Lerp(0.42f, 0.18f, t / 0.45f);
-            return Mathf.Lerp(0.18f, 0.62f, Mathf.Clamp01((t - 0.45f) / 0.4f));
+            var plain = Mathf.Lerp(0.45f, 0.82f, Mathf.Clamp01(t / 0.75f));
+            var bright = t < 0.45f
+                ? Mathf.Lerp(0.42f, 0.18f, t / 0.45f)
+                : Mathf.Lerp(0.18f, 0.62f, Mathf.Clamp01((t - 0.45f) / 0.4f));
+            return Mathf.Lerp(plain, bright, Mathf.Clamp01(light));
         }
 
-        static Texture2D MakeDim(bool bright)
+        static Texture2D MakeDim(float light)
         {
             const int w = 128;
             const int h = 72;
@@ -551,7 +554,7 @@ namespace HalfAware
                 for (var x = 0; x < w; x++)
                 {
                     var c = Shade;
-                    c.a = DimAt((x + 0.5f) / w, 1f - (y + 0.5f) / h, bright);
+                    c.a = DimAt((x + 0.5f) / w, 1f - (y + 0.5f) / h, light);
                     px[y * w + x] = ImplantConsole.Veil(c);
                 }
             tex.SetPixels(px);

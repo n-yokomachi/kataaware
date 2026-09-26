@@ -97,13 +97,23 @@ namespace HalfAware.Tests
         }
 
         [Test]
-        public void OnlyTheMorningVillageIsSunkLess()
+        public void TheVillageIsSunkLessAndTheEveningLeansToTheMorning()
         {
-            foreach (TitleBackdrop b in System.Enum.GetValues(typeof(TitleBackdrop)))
-                Assert.AreEqual(b == TitleBackdrop.VillageMorning, TitleBackdrops.Bright(b), b.ToString());
+            Assert.AreEqual(1f, TitleBackdrops.Light(TitleBackdrop.VillageMorning));
+            Assert.AreEqual(0f, TitleBackdrops.Light(TitleBackdrop.Room));
+            Assert.AreEqual(0f, TitleBackdrops.Light(TitleBackdrop.Alley));
+            Assert.AreEqual(0f, TitleBackdrops.Light(TitleBackdrop.Dive));
+            Assert.AreEqual(0f, TitleBackdrops.Light(TitleBackdrop.Drive));
+            // 夕方は朝とふつうのあいだより朝寄り
+            var evening = TitleBackdrops.Light(TitleBackdrop.VillageEvening);
+            Assert.Greater(evening, 0.5f);
+            Assert.Less(evening, 1f);
             // 題の後ろは沈め、明るい背景はその外を明るく残す
-            Assert.Less(TitleScreen.DimAt(0.5f, 0.3f, true), TitleScreen.DimAt(0.5f, 0.3f, false));
-            Assert.Greater(TitleScreen.DimAt(0f, 0f, false), TitleScreen.DimAt(0.5f, 0.55f, false));
+            Assert.Less(TitleScreen.DimAt(0.5f, 0.3f, 1f), TitleScreen.DimAt(0.5f, 0.3f, 0f));
+            Assert.Greater(TitleScreen.DimAt(0f, 0f, 0f), TitleScreen.DimAt(0.5f, 0.55f, 0f));
+            var mid = TitleScreen.DimAt(0.2f, 0.4f, evening);
+            Assert.Less(mid, TitleScreen.DimAt(0.2f, 0.4f, 0f));
+            Assert.Greater(mid, TitleScreen.DimAt(0.2f, 0.4f, 1f));
         }
 
         [Test]
