@@ -105,6 +105,8 @@ namespace HalfAware
         Take take;
         Transform place;
         Mover[] movers = new Mover[0];
+        /// <summary>台詞の合図で手から手へ渡る持ち物</summary>
+        Handed[] handed = new Handed[0];
         /// <summary>合図を持つ者が動き出した時刻。まだ合図が来ていなければ負</summary>
         float[] cued = new float[0];
         /// <summary>二本目の線に別の合図を持つ者が、二本目を数え始めた時刻。まだなら負</summary>
@@ -278,6 +280,7 @@ namespace HalfAware
             foreach (var person in take.GetComponentsInChildren<PersonMotion>(true)) person.Watch(eye);
             // 同じ人へ戻れば頭から流し直す。Mover は有効になった瞬間に開始位置へ戻る
             movers = take.GetComponentsInChildren<Mover>(true);
+            handed = take.GetComponentsInChildren<Handed>(true);
             cued = new float[movers.Length];
             cued2 = new float[movers.Length];
             for (var m = 0; m < cued.Length; m++) { cued[m] = -1f; cued2[m] = -1f; }
@@ -392,6 +395,8 @@ namespace HalfAware
                 }
                 movers[i].Play(clock - cued[i], after);
             }
+            for (var i = 0; i < handed.Length; i++)
+                if (handed[i] != null) handed[i].Show(spoken);
         }
 
         /// <summary>

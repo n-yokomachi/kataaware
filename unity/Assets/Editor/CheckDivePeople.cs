@@ -518,6 +518,8 @@ namespace HalfAware.EditorTools
                 foreach (var kv in moverPos) kv.Key.localPosition = kv.Value;
                 // 振り向く人（Mover.Turns）は根の向きも動くので戻す
                 foreach (var kv in moverRot) kv.Key.localRotation = kv.Value;
+                // 手から手へ渡る持ち物は、合図の前の形へ
+                foreach (var t in takes) foreach (var h in t.GetComponentsInChildren<HalfAware.Handed>(true)) h.Show(0);
                 for (var i = 0; i < takes.Length; i++) takes[i].gameObject.SetActive(takeActive[i]);
                 for (var i = 0; i < places.Length; i++) places[i].gameObject.SetActive(placeActive[i]);
                 hull.enabled = false; pT.position = pPos; pT.rotation = pRot; hull.enabled = true;

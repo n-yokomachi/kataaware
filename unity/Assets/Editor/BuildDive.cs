@@ -1057,6 +1057,8 @@ namespace HalfAware.EditorTools
                 case "Ground": col = new Color(0.150f, 0.163f, 0.122f); smooth = 0.04f; break;
                 case "Leaf": col = new Color(0.062f, 0.078f, 0.056f); smooth = 0.02f; break;
                 case "Board": col = new Color(0.082f, 0.112f, 0.092f); smooth = 0.10f; break;
+                // 餌の紙袋。茶色いクラフト紙（記憶 10・11）
+                case "Paper": col = new Color(0.360f, 0.268f, 0.165f); smooth = 0.06f; break;
                 case "Bird": col = new Color(0.235f, 0.238f, 0.248f); smooth = 0.06f; break;
                 case "Door": col = new Color(0.108f, 0.092f, 0.082f); smooth = 0.10f; break;
                 // 公園の池。空を映して、地面より一段明るい灰青に見える。艶を上げて、低い日の照り返しを拾わせる
