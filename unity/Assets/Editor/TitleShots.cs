@@ -40,8 +40,9 @@ namespace HalfAware.EditorTools
                 case TitleBackdrop.Room: return new CheckVillage.View(name, new Vector3(1.0f, 1.6f, -2.4f), 0f, 4f);
                 // 場面 2 の始まりの立ち位置から北へ、通りの奥を見上げる
                 case TitleBackdrop.Alley: return new CheckVillage.View(name, new Vector3(0f, 1.7f, -2.9f), 0f, -14f);
-                // 記憶 0（メイ）。三階のデッキを西へ、A の戸口の脇から
-                case TitleBackdrop.Dive: return new CheckVillage.View(name, new Vector3(6.8f, 6.6f, -13.5f), 240f, -2f);
+                // 記憶 0（メイ）の団地を外から。中庭の芝生の北の塀の近くから、棟のデッキの面と折り返す外階段を見上げる
+                // （2026-09-27、四つの候補から選んだ。title_shots/dive_candidates）
+                case TitleBackdrop.Dive: return new CheckVillage.View(name, new Vector3(7.0f, 1.6f, -1.8f), 195f, -16f);
                 // 場面 8 の頭。ガレージの始まりの立ち位置から北北西
                 case TitleBackdrop.Drive: return new CheckVillage.View(name, new Vector3(4.1f, 1.7f, -6.8f), 345f, 6f);
                 // 東屋の側から、裏庭のアーチのトンネルを軸に沿って正面に（CheckVillage.GardenViews の g1_title と同じ目）
@@ -110,6 +111,97 @@ namespace HalfAware.EditorTools
                 Back(setup);
             }
             return sb.ToString().TrimEnd();
+        }
+
+        /// <summary>
+        /// 潜るの背景の候補を撮る。記憶 0 の場所と記憶を起こし、記憶の色味を掛けて、
+        /// 中の 320×180 を dir に「名前.png」で置く（アセットにはしない）。撮る前に開いていた場面へ戻す
+        /// </summary>
+        public static string DiveTrials(string dir, params CheckVillage.View[] views)
+        {
+            if (EditorApplication.isPlaying) return "再生中は撮らない";
+            for (var i = 0; i < SceneManager.sceneCount; i++)
+                if (SceneManager.GetSceneAt(i).isDirty)
+                    return "開いている場面に未保存の変更がある。少し待ってからもう一度: " + SceneManager.GetSceneAt(i).path;
+            var setup = EditorSceneManager.GetSceneManagerSetup();
+            var sb = new StringBuilder();
+            var async = ShaderUtil.allowAsyncCompilation;
+            try
+            {
+                ShaderUtil.allowAsyncCompilation = false;
+                var scene = EditorSceneManager.OpenScene("Assets/Scenes/" + TitleBackdrops.SceneOf(TitleBackdrop.Dive) + ".unity", OpenSceneMode.Single);
+                if (!scene.IsValid()) return "Dive を開けない";
+                Directory.CreateDirectory(dir);
+                foreach (var v in views)
+                {
+                    var shot = Dive(v);
+                    if (shot == null) { sb.AppendLine(v.Name + ": カメラか記憶の一覧が無い"); continue; }
+                    try
+                    {
+                        int loose;
+                        var small = Shrink(shot, out loose);
+                        try
+                        {
+                            var path = Path.Combine(dir, v.Name + ".png");
+                            CheckDiveSky.Save(small, path);
+                            sb.AppendLine(string.Format("{0} → {1}（3×3 が揃っていない塊 {2}）", v.Name, path, loose));
+                        }
+                        finally
+                        {
+                            Object.DestroyImmediate(small);
+                        }
+                    }
+                    finally
+                    {
+                        Object.DestroyImmediate(shot);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                sb.AppendLine("例外: " + e);
+            }
+            finally
+            {
+                ShaderUtil.allowAsyncCompilation = async;
+                Back(setup);
+            }
+            return sb.ToString().TrimEnd();
+        }
+
+        /// <summary>
+        /// 絵のファイル（picturePng、320×180 など）を背景に敷いたタイトルの画面を撮る。
+        /// 見本のセーブは backdrop の場面がいちばん新しい形（背景の沈め方もその場面の物になる）
+        /// </summary>
+        public static string ScreenOver(string picturePng, string path, TitleBackdrop backdrop)
+        {
+            var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false, false);
+            tex.hideFlags = HideFlags.HideAndDontSave;
+            try
+            {
+                if (!tex.LoadImage(File.ReadAllBytes(picturePng))) return "読めない: " + picturePng;
+                tex.filterMode = FilterMode.Point;
+                tex.wrapMode = TextureWrapMode.Clamp;
+                return Screen(path, false, Sample(StageOf(backdrop)), false, tex);
+            }
+            finally
+            {
+                Object.DestroyImmediate(tex);
+            }
+        }
+
+        /// <summary>背景の場面の番号の一つ（見本のセーブを作るため）</summary>
+        static int StageOf(TitleBackdrop b)
+        {
+            switch (b)
+            {
+                case TitleBackdrop.Alley: return 2;
+                case TitleBackdrop.Dive: return 4;
+                case TitleBackdrop.VillageEvening: return 6;
+                case TitleBackdrop.Drive: return 8;
+                case TitleBackdrop.VillageMorning: return 9;
+                default: return 1;
+            }
         }
 
         /// <summary>撮る前の場面へ戻す。撮る間に汚した場面は、開き直して捨てる</summary>
@@ -316,14 +408,13 @@ namespace HalfAware.EditorTools
         // ---- タイトルの画面を Canvas ごと撮る -------------------------------------
 
         /// <summary>
-        /// タイトルの画面を、ゲームと同じ見え方で撮る（960×540）。背景の Canvas は画面の解像度で、
+        /// タイトルの画面を、ゲームと同じ見え方で撮る（既定は 960×540）。背景の Canvas は画面の解像度で、
         /// 枠と字の Canvas は粗い画面（UiLens）で描いて重ね、その上に題と読みの Canvas を画面の解像度で重ねる。
-        /// セーブは手元の辞書（saves）に差し替えて撮る（PlayerPrefs を汚さない）。recall で思い出すの枠を開いた形
+        /// セーブは手元の辞書（saves）に差し替えて撮る（PlayerPrefs を汚さない）。recall で思い出すの枠を開いた形。
+        /// picture を渡すと、背景の絵をそれに差し替える（背景の候補を題と重ねて見るとき）
         /// </summary>
-        public static string Screen(string path, bool cleared, SaveData[] saves, bool recall)
+        public static string Screen(string path, bool cleared, SaveData[] saves, bool recall, Texture2D picture = null, int w = 960, int h = 540)
         {
-            const int w = 960;
-            const int h = 540;
             var box = new MemoryBox();
             if (saves != null)
                 for (var i = 0; i < saves.Length && i < SaveStore.All.Length; i++)
@@ -347,6 +438,7 @@ namespace HalfAware.EditorTools
                 screen = holder.AddComponent<TitleScreen>();
                 BuildTitle.Wire(screen, null);
                 screen.Compose(SaveStore.Cleared, SaveStore.Newest());
+                if (picture != null) screen.ShowPicture(picture);
                 foreach (var t in holder.GetComponentsInChildren<Transform>(true)) t.gameObject.hideFlags = HideFlags.HideAndDontSave;
 
                 // 背景。画面の解像度で、UI のレンダラー（全画面の後処理なし）で描く

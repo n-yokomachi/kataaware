@@ -190,6 +190,17 @@ namespace HalfAware
         /// <summary>題と読みの Canvas。画面の解像度でくっきり描き、粗い画面の上に重ねる</summary>
         public Canvas NameCanvas { get { return nameCanvas; } }
 
+        /// <summary>
+        /// 背景の絵を差し替える。エディタで背景の候補を題と重ねて撮るときに使う
+        /// </summary>
+        public void ShowPicture(Texture2D tex)
+        {
+            if (picture == null) return;
+            picture.texture = tex;
+            picture.color = tex != null ? Color.white : Color.black;
+            Crop();
+        }
+
         // ---- 始まり ------------------------------------------------------------
 
         void Start()

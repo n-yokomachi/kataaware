@@ -10,7 +10,7 @@ namespace HalfAware
         Room,
         /// <summary>路地裏（場面 2）。<c>alley_1</c></summary>
         Alley,
-        /// <summary>潜る（場面 4）。記憶 0（メイ）の色味を掛けて撮る。<c>dive_3</c></summary>
+        /// <summary>潜る（場面 4）。記憶 0（メイ）の団地の外観。記憶の色味を掛けて撮る。<c>dive_estate</c></summary>
         Dive,
         /// <summary>車内（場面 8）。ガレージ。<c>drive_1</c></summary>
         Drive,
@@ -74,7 +74,7 @@ namespace HalfAware
             switch (b)
             {
                 case TitleBackdrop.Alley: return "alley_1";
-                case TitleBackdrop.Dive: return "dive_3";
+                case TitleBackdrop.Dive: return "dive_estate";
                 case TitleBackdrop.Drive: return "drive_1";
                 case TitleBackdrop.VillageMorning: return "village_a1_morning";
                 case TitleBackdrop.VillageEvening: return "village_a1_evening";

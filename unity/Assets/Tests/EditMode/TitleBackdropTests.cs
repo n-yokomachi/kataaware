@@ -121,7 +121,7 @@ namespace HalfAware.Tests
         {
             Assert.AreEqual(TitleBackdrops.Count, System.Enum.GetValues(typeof(TitleBackdrop)).Length);
             Assert.AreEqual("room_1", TitleBackdrops.FileName(TitleBackdrop.Room));
-            Assert.AreEqual("dive_3", TitleBackdrops.FileName(TitleBackdrop.Dive));
+            Assert.AreEqual("dive_estate", TitleBackdrops.FileName(TitleBackdrop.Dive));
             Assert.AreEqual("village_a1_morning", TitleBackdrops.FileName(TitleBackdrop.VillageMorning));
             Assert.AreEqual("village_a1_evening", TitleBackdrops.FileName(TitleBackdrop.VillageEvening));
             Assert.AreEqual("Village", TitleBackdrops.SceneOf(TitleBackdrop.VillageEvening));
