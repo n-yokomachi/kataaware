@@ -411,18 +411,19 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// 次の会話を始められる所まで来ているか。〔区切り〕の後の会話だけが見る。
+        /// 次の会話を始められる所まで来ているか。
         ///
-        /// **区切りは、主が体を動かしてから次を話す所**（設計書 7 節）。三階まで駆け上がる、池の縁まで歩く、
-        /// 玄関で靴を履く。行き先（<see cref="Take.Stop"/>）が無ければ相手のそば。
-        /// **相手が歩いているあいだは始めない。** 降りてくる息子や戻ってくる孫に、着く前から話しかけられてしまう
+        /// **相手が歩いているあいだは始めない。** 降りてくる息子や戻ってくる孫、机の列を歩いてくる先生に、
+        /// 着く前から話しかけられてしまう（設計書 7 節の「先生が机の列を歩いて近づいてから」）。
+        /// **〔区切り〕の後の会話は、主が体を動かしてから次を話す所**（設計書 7 節）。三階まで駆け上がる、池の縁まで歩く、
+        /// 玄関で靴を履く。主の足元が行き先（<see cref="Take.Stop"/>）の近くに来るまで始めない。行き先が無ければ相手のそば
         /// </summary>
         bool Arrived(Transform who)
         {
             if (DiveEntry.AllDone(talks, done)) return false;
+            if (who == null || Walking(who)) return false;
             var talk = talks[done];
             if (!talk.Cut) return true;
-            if (who == null || Walking(who)) return false;
             Vector3 goal;
             if (take.Stop(talk.stop, out goal)) goal = place != null ? place.TransformPoint(goal) : goal;
             else goal = who.position;

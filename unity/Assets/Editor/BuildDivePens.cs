@@ -11,7 +11,8 @@ namespace HalfAware.EditorTools
     /// インタラクトできる人以外のところにあまり出歩きすぎないように」と差し戻された。
     ///
     /// 囲う点は、鍵打ちの全部（始めの立ち位置と、出来事で主が向かう階段・玄関・ホワイトボードなど）、
-    /// 人の止まる所（動く人は <see cref="Mover.End"/>）、記憶ごとの足し（<see cref="PenShape.extra"/>）。
+    /// 人の止まる所（動く人は <see cref="Mover.End"/>）、〔区切り〕の行き先（<see cref="Take.Stops"/>）、
+    /// 記憶ごとの足し（<see cref="PenShape.extra"/>）。
     /// その点の一つずつを余白（<see cref="PenShape.margin"/>）の八角形に膨らませ、全部を包む凸の多角形を取り、
     /// 辺ごとに薄い箱のコライダーを立てる。凸なので、点どうしを結ぶ道筋は必ず内に入る。
     ///
@@ -118,7 +119,7 @@ namespace HalfAware.EditorTools
             return pen;
         }
 
-        /// <summary>囲う点。鍵打ち・人の止まる所・足し。場所のローカル</summary>
+        /// <summary>囲う点。鍵打ち・人の止まる所・〔区切り〕の行き先・足し。場所のローカル</summary>
         public static List<Vector3> PenPoints(Transform take, HostKey[] keys, PenShape shape)
         {
             var points = new List<Vector3>();
@@ -129,6 +130,9 @@ namespace HalfAware.EditorTools
                 var mover = who.GetComponent<Mover>();
                 points.Add(mover != null ? mover.End : who.localPosition);
             }
+            // 〔区切り〕の行き先。主が歩いて向かう所なので、鍵打ちと同じく囲う
+            var t = take.GetComponent<Take>();
+            if (t != null && t.Stops != null) points.AddRange(t.Stops);
             if (shape.extra != null) points.AddRange(shape.extra);
             return points;
         }

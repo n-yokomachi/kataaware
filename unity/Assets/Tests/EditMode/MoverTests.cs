@@ -89,5 +89,79 @@ namespace HalfAware.Tests
                 Object.DestroyImmediate(go);
             }
         }
+
+        // 二本目に別の合図を持つ人（記憶 10 の孫息子）。二本目の合図が来るまでは一本目の終わりで待ち、
+        // 合図からの秒で二本目を動く
+        [Test]
+        public void TheSecondLineWaitsForItsOwnCue()
+        {
+            GameObject go;
+            var mover = Make(out go, 2f);
+            try
+            {
+                var so = new SerializedObject(mover);
+                so.FindProperty("nextCue").intValue = 6;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                Assert.That(mover.NextCue, Is.EqualTo(6));
+                Assert.That(mover.Where(30f, -1f), Is.EqualTo(new Vector3(0f, 0f, 2f)), "二本目の合図の前は一本目の終わりで待つ");
+                Assert.That(mover.Where(30f, 6f).x, Is.EqualTo(0.5f).Within(1e-4f), "二本目は合図からの秒で動く");
+                Assert.That(mover.Where(30f, 20f), Is.EqualTo(new Vector3(1f, 0f, 2f)));
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        // 歩いているあいだだけ Moving。動き出す前・一本目と二本目のあいだ・歩き終えた後は止まっている
+        [Test]
+        public void MovingOnlyWhileOnALine()
+        {
+            GameObject go;
+            var mover = Make(out go, 2f);
+            try
+            {
+                Assert.That(mover.Moving(0.5f, 0.5f), Is.False, "動き出す前");
+                Assert.That(mover.Moving(1.5f, 1.5f), Is.True, "一本目");
+                Assert.That(mover.Moving(3f, 3f), Is.False, "一本目と二本目のあいだ");
+                Assert.That(mover.Moving(6f, 6f), Is.True, "二本目");
+                Assert.That(mover.Moving(20f, 20f), Is.False, "歩き終えた後");
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        // 向き直る人。歩くあいだは歩く向き、歩き終えたら相手の方、二本目を歩き出したらその向き
+        [Test]
+        public void ASettlerTurnsToFaceWhenSheArrives()
+        {
+            GameObject go;
+            var mover = Make(out go, 2f);
+            try
+            {
+                var so = new SerializedObject(mover);
+                so.FindProperty("turns").boolValue = true;
+                so.FindProperty("yawFrom").floatValue = 10f;
+                so.FindProperty("yawTo").floatValue = 90f;
+                so.FindProperty("settles").boolValue = true;
+                so.FindProperty("yawEnd").floatValue = 200f;
+                so.FindProperty("yawNext").floatValue = 300f;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                mover.Play(0.5f);
+                Assert.That(go.transform.localEulerAngles.y, Is.EqualTo(10f).Within(0.01f));
+                mover.Play(1.5f);
+                Assert.That(go.transform.localEulerAngles.y, Is.EqualTo(90f).Within(0.01f));
+                mover.Play(3f);
+                Assert.That(go.transform.localEulerAngles.y, Is.EqualTo(200f).Within(0.01f));
+                mover.Play(6f);
+                Assert.That(go.transform.localEulerAngles.y, Is.EqualTo(300f).Within(0.01f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
     }
 }

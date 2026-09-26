@@ -154,8 +154,8 @@ namespace HalfAware.Tests
             Assert.That(DiveEntry.MayDive(talks, 2, "Mother"), Is.True);
         }
 
-        // ハンナは隣の老人と四行、次に娘と十行。娘は老人との最後の行
-        // （五行目、ジョルジョ「おや。誰か上がってくるぞ」）が出たら階段を上がり始める（Mover の合図 5）。
+        // ハンナは隣の老人と四行、次に娘と十行。娘は老人とのやりとりの終わり際
+        // （四行目、ハンナ「今日は十時からなんです」）が出たら階段を上がり始める（Mover の合図 4）。
         // 並びが入れ替わると、まだ上がってきていない娘に話しかけることになる
         [Test]
         public void HannaTalksToTheNeighbourAndThenToTheDaughter()

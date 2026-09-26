@@ -45,6 +45,12 @@ namespace HalfAware
         [SerializeField] float yawFrom;
         [Tooltip("動き出してからの向き。度。Take からのローカル")]
         [SerializeField] float yawTo;
+        [Tooltip("一本目を歩き終えたら向き直る。歩いた向きのまま止まると、話す相手に背を向ける人のため")]
+        [SerializeField] bool settles;
+        [Tooltip("一本目を歩き終えてからの向き。度。Take からのローカル")]
+        [SerializeField] float yawEnd;
+        [Tooltip("二本目を歩き出してからの向き。度。Take からのローカル。向き直る者（settles）で二本目があるときだけ見る")]
+        [SerializeField] float yawNext;
 
         public Vector3 From { get { return from; } }
         public Vector3 To { get { return to; } }
@@ -105,8 +111,21 @@ namespace HalfAware
             transform.localPosition = nextCue < 0 ? Where(t) : Where(t, after);
             // **根の向きは一息に替える。** 模型は PersonMotion がこまの頭ごとに根の向きへ寄せるので
             // （TurnPerTick）、振り向きはそちらで段々に回って見える
-            if (turns) transform.localRotation = Quaternion.Euler(0f, t < at ? yawFrom : yawTo, 0f);
+            if (turns) transform.localRotation = Quaternion.Euler(0f, Yaw(t, after), 0f);
             if (ground) Land();
+        }
+
+        /// <summary>
+        /// 根の向き。動き出す前は yawFrom、一本目を歩くあいだは yawTo、
+        /// 向き直る者（settles）は一本目を歩き終えたら yawEnd、二本目を歩き出したら yawNext
+        /// </summary>
+        float Yaw(float t, float after)
+        {
+            if (t < at) return yawFrom;
+            if (!settles) return yawTo;
+            var second = nextCue < 0 ? t : after;
+            if (Returns && second >= nextAt) return yawNext;
+            return t >= at + span ? yawEnd : yawTo;
         }
 
         /// <summary>

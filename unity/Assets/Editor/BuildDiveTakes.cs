@@ -25,12 +25,14 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// 組み終えた直後に立っている場所。記憶 0 の頭と同じ点。
         ///
-        /// **階段の下の、上り口のすぐ手前。** 庭の真ん中（z 2.4）から始めていた頃は、
-        /// 潜った直後に何も無い地面を 15.8 m 歩かされてから、ようやく一段目に着いた
+        /// **階段の前の庭。上り口から 4 m ほど、三階の手すりの真下から 3.5 m。** 庭の真ん中（z 2.4）から始めていた頃は、
+        /// 潜った直後に何も無い地面を 15.8 m 歩かされてから、ようやく一段目に着いた。
+        /// 上り口のすぐ手前（デッキの下）から始めていた頃は、三階の手すりから呼ぶ母が
+        /// デッキの床に遮られて見えず、「えーなにー？」と見上げて返す相手を選べなかった（設計書 7 節の 1）
         /// </summary>
-        static readonly Vector3 FirstStand = new Vector3(StairEastMid, 0f, WalkFront - 0.45f);
-        /// <summary>始まりの向き。東の一本は +z へ上がっていくので、0 度でそのまま階段が正面に来る</summary>
-        const float FirstYaw = 0f;
+        static readonly Vector3 FirstStand = new Vector3(3.0f, 0f, WalkFront + 3.5f);
+        /// <summary>始まりの向き。棟の方（南）を向く。見上げれば三階の手すりに母がいる</summary>
+        const float FirstYaw = 174f;
 
         static Transform Takes(Transform root, DiveRoster roster)
         {
@@ -45,6 +47,7 @@ namespace HalfAware.EditorTools
                 go.transform.localPosition = PlaceOrigin(roster[i].place);
                 // 人は板の相手の名前から一覧の飛び先を引いて決まる（BuildDivePeople の Cast）
                 casting = roster[i];
+                stops.Clear();
                 var keys = Memories[i](go.transform);
 
                 var take = go.AddComponent<Take>();
@@ -52,6 +55,9 @@ namespace HalfAware.EditorTools
                 so.FindProperty("entry").intValue = i;
                 Notes(so.FindProperty("keys"), keys);
                 Fill(so.FindProperty("people"), Lineup(go.transform, roster[i].seen));
+                var stopRow = so.FindProperty("stops");
+                stopRow.arraySize = stops.Count;
+                for (var s = 0; s < stops.Count; s++) stopRow.GetArrayElementAtIndex(s).vector3Value = stops[s];
                 so.ApplyModifiedPropertiesWithoutUndo();
                 // 歩ける範囲の見えない囲い（BuildDivePens）。記憶の子なので、起こした記憶の分だけが効く
                 Pen(go.transform, keys, i);
@@ -62,6 +68,22 @@ namespace HalfAware.EditorTools
                 UnposeFigures(go.transform);
             }
             return parent;
+        }
+
+        /// <summary>
+        /// 組んでいる記憶の〔区切り〕の行き先。区切りの並び。場所のローカル。
+        /// 記憶ごとの関数が <see cref="Stop"/> で積み、<see cref="Takes"/> が Take へ書く
+        /// </summary>
+        static readonly List<Vector3> stops = new List<Vector3>();
+
+        /// <summary>
+        /// 〔区切り〕の後の会話を始める所を積む。区切りの並びに呼ぶ。
+        /// 主の足元がここから <c>DiveDirector.reach</c> の内に入るまで、区切りの後の会話は始まらない。
+        /// 囲い（BuildDivePens）もこの点を囲う
+        /// </summary>
+        static void Stop(float x, float y, float z)
+        {
+            stops.Add(new Vector3(x, y, z));
         }
 
         /// <summary>記憶ごとの受け持ち。並びが一覧の番号になる</summary>
@@ -302,6 +324,26 @@ namespace HalfAware.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        /// <summary>
+        /// 歩く人の向きを据える。<paramref name="walk"/> は歩くあいだの向き、<paramref name="end"/> は歩き終えてからの向き。
+        /// 歩き出す前は置いたときの向き。**Move の後に呼ぶ。**
+        /// 根の向きを替えないまま歩かせると、階段の上から見下ろしていた母が、戸口まで横歩きで戻ってくる
+        /// </summary>
+        static void Face(Transform who, float walk, float end, float next = float.NaN)
+        {
+            var mover = who != null ? who.GetComponent<Mover>() : null;
+            if (mover == null) return;
+            var so = new SerializedObject(mover);
+            so.FindProperty("turns").boolValue = true;
+            so.FindProperty("yawFrom").floatValue = who.localEulerAngles.y;
+            so.FindProperty("yawTo").floatValue = walk;
+            so.FindProperty("settles").boolValue = true;
+            so.FindProperty("yawEnd").floatValue = end;
+            // 二本目を歩き出してからの向き。渡さなければ一本目を歩き終えた向きのまま
+            so.FindProperty("yawNext").floatValue = float.IsNaN(next) ? end : next;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         /// <summary>from から to を向く向き。+z を 0 とした度</summary>
         static float Toward(Vector3 from, Vector3 to)
         {
@@ -316,7 +358,7 @@ namespace HalfAware.EditorTools
         /// <see cref="Move"/> の線の終わりから、もう一本続けて動かす（駆け出して戻ってくる人）。
         /// 秒は一本目と同じ時計で数える。同じ人に Mover を二つ付けると後の方が先の方を上書きするので、一つにまとめる
         /// </summary>
-        static void Then(Transform who, Vector3 to, float at, float span)
+        static void Then(Transform who, Vector3 to, float at, float span, int cue = -1)
         {
             var mover = who != null ? who.GetComponent<Mover>() : null;
             if (mover == null) return;
@@ -324,6 +366,8 @@ namespace HalfAware.EditorTools
             so.FindProperty("next").vector3Value = to;
             so.FindProperty("nextAt").floatValue = at;
             so.FindProperty("nextSpan").floatValue = span;
+            // 二本目を別の行で動かし出すなら、at はその合図から数える
+            so.FindProperty("nextCue").intValue = cue;
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
@@ -331,7 +375,7 @@ namespace HalfAware.EditorTools
         /// 鳩の群れ。足元から一斉に飛び立つので、端は滑らかに繋がない。
         /// 場所ではなく記憶の側に置くのは、飛び立つ秒が記憶ごとに違うため
         /// </summary>
-        static void Doves(Transform take, Vector3 at, float when)
+        static Transform Doves(Transform take, Vector3 at, float when, int cue = -1)
         {
             var flock = Child(take, "Doves");
             var mesh = Shape("Pigeon", 1f, b =>
@@ -347,9 +391,11 @@ namespace HalfAware.EditorTools
                 bird.localRotation = Quaternion.Euler(0f, i * 47f + 20f, 0f);
                 // 飛ぶので床へは下ろさない
                 Move(bird, at + spread, at + spread * 2.4f + new Vector3(0f, 3.4f + i * 0.2f, 0.6f),
-                    when + i * 0.06f, 1.6f, false, false);
+                    when + i * 0.06f, 1.6f, false, false, cue);
             }
+            return flock;
         }
+
 
         // ---- 0. 女 6『メイ』 団地の外階段。60 秒 ---------------------------------
 
@@ -359,21 +405,33 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Mei(Transform take)
         {
-            // **母は戸口の敷居に立ち、デッキの西（階段の側）を向く。** メイは階段を上がり切ると
-            // デッキを東へ駆けてくるので、そちらへ顔を向けておく。デッキの幅の真ん中から
-            // 見上げる所（下の鍵打ちの 23 秒）への向きは 310 度で、差は 10 度。
+            // **母は初め三階のデッキの手すりから庭を見下ろして呼ぶ。** 階段の下のメイが見上げて
+            // 「えーなにー？」と返す相手なので（設計書 7 節の 1）、庭から見えなければならない。
+            // デッキの下（階段の上り口）からはデッキの床に遮られて見えないので、メイは階段の前の庭で
+            // 靴紐を結んでいたことにして、そこから見上げる。手すり（高さ 1.1 m）に胸を付けるほど寄せ（面から 0.15 m）、
+            // 庭の z -8〜-10 から胸まで見える。0.25 m 奥に立たせると、頭の天辺しか手すりの上に出なかった
+            // **「いいから上がっておいで」が出たら戸口へ戻る。** 三階の戸口で区切りの後の会話をする。
+            // 戸口では敷居に立ち、デッキの西（階段の側）を向く。メイは階段を上がり切ると
+            // デッキを東へ駆けてくるので、そちらへ顔を向けておく。
             // 顔が影になるのは向きではなく、背にした玄関の灯り（RoomAHall）と四階の張り出しのせい。
             // 穴の奥（面から内）へ入れると、デッキの西からは戸口の東の縁に隠れて選べない
-            Cast(take, "Mother",
-                new Vector3(DoorA, EstateTop, EstateFace + 0.05f), 320f, 1);
+            var rail = new Vector3(3.4f, EstateTop, WalkFront - 0.15f);
+            var sill = new Vector3(DoorA, EstateTop, EstateFace + 0.05f);
+            var mother = Cast(take, "Mother", rail, 354f, 0);
+            // 五行目（ハンナ「投げません。いいから上がっておいで」）が出たら戸口へ戻る
+            Move(mother, rail, sill, 0.6f, 2.4f, true, true, 5);
+            Face(mother, Toward(rail, sill), 320f);
+            // 区切りの行き先は、A の戸口の前のデッキ
+            Stop(4.60f, EstateTop, EstateWalk);
             // メイの家は母が戸口に立っているので開いている。隣の老夫婦はまだ一度も出てきていない
             Ajar(take, "AjarA", DoorA);
             Shut(take, "ShutB", DoorB);
             return new[]
             {
-                // 階段の下。上り口のすぐ手前で、始まりの立ち位置（FirstStand）と同じ点。正面に東の一本の段
-                K(0f,   StairEastMid, 0f, WalkFront - 0.45f,   0f,  48f, 0.55f),  // しゃがんで靴紐。指と地面しか見えない
-                K(3f,   StairEastMid, 0f, WalkFront - 0.35f,   0f, -32f, 1.00f),  // 立って階段の上を仰ぐ
+                // 階段の前の庭。始まりの立ち位置（FirstStand）と同じ点。正面に階段の口と、三階の手すり
+                K(0f,   FirstStand.x, 0f, FirstStand.z, FirstYaw,  48f, 0.55f),  // しゃがんで靴紐。指と地面しか見えない
+                K(3f,   FirstStand.x, 0f, FirstStand.z, FirstYaw, -38f, 1.00f),  // 立って三階の手すりの母を仰ぐ
+                K(5f,   StairEastMid, 0f, WalkFront - 0.35f,   0f, -12f, 1.00f),  // 階段の上り口
                 // 東の一本を北へ上がり、折り返して西の一本を南へ。半階ごとに向きが入れ替わる
                 K(8f,   0f,   Floor * 0.5f, EstateTurn,     180f, -12f, 1.00f),  // 一つ目の折り返し
                 K(12f,  0f,   Floor,        EstateLanding1,   0f, -10f, 1.00f),  // 二階の踊り場
@@ -407,8 +465,9 @@ namespace HalfAware.EditorTools
             // 始まりの一枚にも娘が入る（下の鍵打ちの先頭の向き）
             var stood = new Vector3(4.30f, EstateTop, EstateWalk - 0.05f);
             var kid = Cast(take, "Daughter", stood, 80f, 0);
-            // 娘が駆けてくるのは、老人とのやりとりが終わってから。
-            // 四行目（ハンナ「ええ、午後からで」）が出たら数え始める。6 m を 3.5 秒で
+            // 娘が駆けてくるのは、老人とのやりとりの終わり際。
+            // 四行目（ハンナ「今日は十時からなんです」）が出たら数え始める。6 m を 3.5 秒で。
+            // 次の老人の「おや。誰か上がってくるぞ」で、階段の口から駆けてくる娘が見える
             Move(kid, new Vector3(StairWestMid, EstateTop, WalkFront - 0.35f), stood, 0f, 3.5f, true, true, 4);
             // 老人は B の戸口の前で、西のハンナの方を向く。新聞を取りに出たところ
             Cast(take, "Neighbour",
@@ -442,11 +501,25 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Albert(Transform take)
         {
-            var girl = Cast(take, "Granddaughter", new Vector3(-0.9f, 0f, 0.7f), 0f, 0);
-            Move(girl, new Vector3(-0.9f, 0f, 0.7f), new Vector3(-0.9f, 0f, 7.6f), 12f, 34f, true);
-            var wife = Cast(take, "Wife", new Vector3(2.2f, 0f, 0.6f), 8f, 0);
-            Move(wife, new Vector3(2.2f, 0f, 0.6f), new Vector3(0.9f, 0f, 7.2f), 16f, 38f, true);
-            Doves(take, new Vector3(-1.1f, 0.09f, 5.6f), 39f);
+            // **人は台詞で動き出す**（設計書 7 節）。ベンチの前の会話を終えると（六行目、アルベルト「助かるよ」）、
+            // 孫娘は池の縁へ、妻は門の前へ先に歩いていく。主は〔区切り〕で池の縁まで歩き、
+            // 鳩の話と石の話を孫娘とし、門の前の妻と話す
+            var girlFrom = new Vector3(-0.9f, 0f, 0.7f);
+            var girlTo = new Vector3(-0.55f, 0f, 4.7f);
+            var girl = Cast(take, "Granddaughter", girlFrom, 0f, 0);
+            Move(girl, girlFrom, girlTo, 0.5f, 6f, true, true, 6);
+            // 池の縁では、ベンチの方から歩いてくる祖父の方を向いて待つ
+            Face(girl, Toward(girlFrom, girlTo), 230f);
+            var wifeFrom = new Vector3(2.2f, 0f, 0.6f);
+            var wifeTo = new Vector3(0.9f, 0f, 7.2f);
+            var wife = Cast(take, "Wife", wifeFrom, 8f, 0);
+            Move(wife, wifeFrom, wifeTo, 1.5f, 11f, true, true, 6);
+            // 門の前では、池の方から来る夫の方を向く
+            Face(wife, Toward(wifeFrom, wifeTo), 215f);
+            // 鳩は区切りの後の最初の行（ソフィア「見て！　鳩がいっせいに飛んだ」）で飛び立つ
+            Doves(take, new Vector3(-1.1f, 0.09f, 5.6f), 0.2f, 7);
+            // 区切りの行き先は池の縁
+            Stop(-1.1f, 0f, 4.3f);
             return new[]
             {
                 K(0f,  0f,    0f, -0.1f,   0f,  55f, 1.20f),  // 掛けたまま。膝の上の手がぼやけている
@@ -474,11 +547,24 @@ namespace HalfAware.EditorTools
         {
             // 祖父はベンチの +x 側の端に立たせる。正面から向き合わせると、
             // 逆光にも帽子の影にも入らないまま、顔だけが画面いっぱいに来る
-            var old = Cast(take, "Grandfather", new Vector3(0.95f, 0f, 0.35f), 20f, 3);
-            Move(old, new Vector3(0.95f, 0f, 0.35f), new Vector3(-0.5f, 0f, 4.9f), 11f, 17f, true);
-            var gran = Cast(take, "Grandmother", new Vector3(2.2f, 0f, 0.4f), 10f, 0);
-            Move(gran, new Vector3(2.2f, 0f, 0.4f), new Vector3(0.6f, 0f, 5.4f), 14f, 16f, true);
-            Doves(take, new Vector3(-1.2f, 0.09f, 4.4f), 21f);
+            // **人は台詞で動き出す**（設計書 7 節）。ベンチの前の会話を終えると（五行目、アルベルト「助かるよ」）、
+            // 祖父はゆっくり池の縁へ、祖母はその後ろを歩く。主は〔区切り〕で池の縁まで歩き、
+            // 鳩が飛び立って、石を祖父の手に握らせる
+            var oldFrom = new Vector3(0.95f, 0f, 0.35f);
+            var oldTo = new Vector3(-0.5f, 0f, 4.9f);
+            var old = Cast(take, "Grandfather", oldFrom, 20f, 3);
+            Move(old, oldFrom, oldTo, 0.5f, 8f, true, true, 5);
+            // 池の縁では、ベンチの方から来るソフィアの方を向く
+            Face(old, Toward(oldFrom, oldTo), 200f);
+            var granFrom = new Vector3(2.2f, 0f, 0.4f);
+            var granTo = new Vector3(0.6f, 0f, 5.4f);
+            var gran = Cast(take, "Grandmother", granFrom, 10f, 0);
+            Move(gran, granFrom, granTo, 1.0f, 9f, true, true, 5);
+            Face(gran, Toward(granFrom, granTo), 231f);
+            // 鳩は区切りの後の最初の行（ソフィア「見て！　鳩がいっせいに飛んだ」）で飛び立つ
+            Doves(take, new Vector3(-1.2f, 0.09f, 4.4f), 0.2f, 6);
+            // 区切りの行き先は池の縁
+            Stop(-0.9f, 0f, 4.2f);
             // 通りすがり。イヤホンをした少女（記憶 11 のプリヤ）が、小径の東の芝生の奥を北から南へ横切り、
             // 三脚目のベンチの北東で止まる。公園から電車へ出る口はここ一つ（設計書 6 節）。
             // ソフィアがしゃがんでいた所から東を向けば、植え込みの南の端より手前を通って見える。
@@ -540,8 +626,11 @@ namespace HalfAware.EditorTools
             // 175° では戸口で廊下の方を向き、マークに背を向けたまま袋を渡すことになっていた。
             // 流しの前（鍵打ちの頭）と袋を受け取る所（13 秒）のあいだへ向ける。廊下の灯りを背にするので顔は逆光のまま
             Cast(take, "Wife", new Vector3(0f, 0f, 0.35f), 335f, 1);
+            // 息子は、妻が二階へ声を掛けて返事をしたら（十行目、ダニエル「分かってる」）階段を降りてくる
             var son = Cast(take, "Son", new Vector3(StairX, 0f, -0.7f), 190f, 0);
-            Move(son, new Vector3(StairX, 2.4f, -4.1f), new Vector3(StairX, 0f, -0.7f), 16f, 6f, true);
+            Move(son, new Vector3(StairX, 2.4f, -4.1f), new Vector3(StairX, 0f, -0.7f), 0.5f, 5f, true, true, 10);
+            // 〔区切り〕の行き先は玄関。靴を履き、戸を開けて振り返ると、台所の戸口に妻がいる
+            Stop(-1.75f, 0f, -1.9f);
             return new[]
             {
                 K(0f,  -1.05f, 0f,  2.3f,    0f,  44f, 1.72f),  // 皿を洗っている手
@@ -567,16 +656,28 @@ namespace HalfAware.EditorTools
         static HostKey[] Linda(Transform take)
         {
             Cast(take, "Husband", new Vector3(-1.05f, 0f, 2.2f), 350f, 0);
-            var son = Cast(take, "Son", new Vector3(1.75f, 0f, -1.9f), 215f, 0);
-            Move(son, new Vector3(StairX, 2.4f, -4.1f), new Vector3(1.75f, 0f, -1.9f), 15f, 8f, true);
+            // **息子は初め階段の途中にいる。** 「ダニエル、七時のバスでしょ」と見上げて声を掛ける相手なので。
+            // 記憶 13 でダニエルが呼ばれる所（階段の途中、手すり）と同じ。二階の上り口（y 2.4）に置いていた頃は、
+            // 廊下のどこから見上げても天井に隠れて選べなかった。
+            // 返事（六行目、ダニエル「分かってる」）が出たら降りてくる。〔区切り〕の後の会話は降り切ってから。
+            // 夫が「鞄に入ってる」と返したら（十五行目）玄関へ歩き、靴を履いて戸を開ける
+            var sonFrom = new Vector3(StairX, 1.85f, -3.3f);
+            var sonTo = new Vector3(1.75f, 0f, -1.9f);
+            var sonOut = new Vector3(-1.6f, 0f, -1.75f);
+            var son = Cast(take, "Son", sonFrom, 180f, 0);
+            Move(son, sonFrom, sonTo, 0.5f, 5f, true, true, 6);
+            Then(son, sonOut, 0.5f, 3.5f, 15);
+            Face(son, Toward(sonFrom, sonTo), 321f, Toward(sonTo, sonOut));
+            // 〔区切り〕の行き先は台所の戸口の前。息子が降りてくるのを待つ
+            Stop(0.2f, 0f, -0.5f);
             return new[]
             {
                 K(0f,   0f,    0f,  0.25f, 182f,   4f, 1.58f),  // 戸口。出かけるところだった
                 K(3f,   0f,    0f,  0.3f,  331f,   6f, 1.58f),  // 台所から夫の声
                 K(7f,  -0.2f,  0f,  0.8f,  335f,  10f, 1.58f),  // 皿を手にした夫が棚を顎で指す
                 K(11f, -0.8f,  0f,  1.6f,  320f, -18f, 1.58f),  // 吊り棚を開けて場所を教える
-                K(15f, -0.7f,  0f,  1.4f,  190f, -32f, 1.58f),  // 二階から足音
-                K(19f, -0.2f,  0f,  0.5f,  150f,   2f, 1.58f),  // 階段を見上げると息子が降りてくる
+                K(15f,  0.6f,  0f, -0.6f,  154f, -30f, 1.58f),  // 二階から足音。廊下へ出て、階段の途中の息子を見上げる
+                K(19f,  0.2f,  0f, -0.5f,  150f,   2f, 1.58f),  // 息子が降りてくる
                 K(22f, -0.1f,  0f, -0.5f,  160f,   8f, 1.58f),  // 昼食の袋を渡す
                 K(26f, -0.4f,  0f, -1.0f,  235f,   6f, 1.58f),  // ドアが開いて白い光。閉まる
                 K(30f, -0.5f,  0f,  0.9f,  350f,  20f, 1.58f),  // 台所へ戻って蛇口を締める
@@ -594,6 +695,8 @@ namespace HalfAware.EditorTools
             Cast(take, "Pupil", new Vector3(DeskX[2], 0f, DeskZ[1] - 0.56f), 0f, 6);
             // 隣の生徒は机に伏せて眠っている
             Aside(Cast(take, "Sleeper", new Vector3(DeskX[3], 0f, DeskZ[1] - 0.56f), 0f, 6));
+            // 〔区切り〕の行き先はアイシャの机の前。ホワイトボードの前から「どこだ。見せてみろ」と返し、机の列を歩いて近づく
+            Stop(0.8f, 0f, 0.9f);
             return new[]
             {
                 K(0f,  0f,    0f,    4.1f,    0f, -12f, 1.70f),  // ホワイトボードにマーカーで書いている
@@ -651,18 +754,25 @@ namespace HalfAware.EditorTools
             // **孫息子は一度駆け出して、呼ばれて戻ってくる。** 手を引いていた幼い孫（3 歳）の頃は、
             // 池のほうへ走ったきり戻ってこず、手を取り直す所で誰もいなかった。
             // 隣（ローザの左、門へ向かう向きの西）から池の手前の鳩の群れへ駆け、
-            // 呼ばれて（11 秒の台詞のあと）歩いて戻り、ローザの前の西寄りで止まる。
-            // 止まったらローザの方を向く（袋を受け取る相手をしている）
+            // 呼ばれて歩いて戻り、ローザの前の西寄りで止まる。止まったらローザの方を向く（袋を受け取る相手をしている）。
+            // **駆け出す線と戻る線は、別の行で動き出す**（設計書 7 節の「人も台詞で動き出す」）。
+            // 駆け出すのは夫とのやりとりの中（三行目、アルベルト「ベンチに座りすぎたんだ」）、
+            // 戻るのは返事（六行目、ルーカス「今行くって。鳩がすごいんだよ」）のあと。
+            // 〔区切り〕の後の会話は、戻り切ってから
             var home = new Vector3(0.15f, 0f, 6.15f);
             var pond = new Vector3(-1.5f, 0f, 4.75f);
             var back = new Vector3(0.0f, 0f, 6.2f);
-            var boy = Cast(take, "Grandson", back, 73f, 0);
-            Move(boy, home, pond, 6.8f, 1.4f, true);
-            Then(boy, back, 15.5f, 3.0f);
+            var boy = Cast(take, "Grandson", home, 73f, 0);
+            Move(boy, home, pond, 0.3f, 1.4f, true, true, 3);
+            Then(boy, back, 0.5f, 3.0f, 6);
+            Face(boy, Toward(home, pond), Toward(home, pond), 65f);
+            // 〔区切り〕の行き先は、夫の方を向いて立っていた所。孫が戻ってくるのを待つ
+            Stop(0.6f, 0f, 6.35f);
             Cast(take, "Husband", new Vector3(-0.9f, 0f, 8.7f), 340f, 3);
             var girl = Cast(take, "Granddaughter", new Vector3(0.15f, 0f, 8.05f), 350f, 0);
             Move(girl, new Vector3(-0.9f, 0f, 6.6f), new Vector3(0.15f, 0f, 8.05f), 20f, 7f, true);
-            Doves(take, new Vector3(-1.4f, 0.09f, 4.4f), 8f);
+            // 鳩は駆け込んでくる孫に追われて飛び立つ
+            Doves(take, new Vector3(-1.4f, 0.09f, 4.4f), 1.2f, 3);
             return new[]
             {
                 K(0f,  0.6f,  0f, 6.4f, 327f,   6f, 1.50f),  // 前から夫の声
@@ -687,7 +797,11 @@ namespace HalfAware.EditorTools
             // 祖母は呼んでいる相手（池の縁のルーカスと、袋を渡しに戻ってくる所）の方を向く
             Cast(take, "Grandmother", new Vector3(0.95f, 0f, 6.3f), 240f, 0);
             Cast(take, "Grandfather", new Vector3(-0.4f, 0f, 8.6f), 355f, 3);
+            var gate = new Vector3(0.1f, 0f, 8.1f);
             Doves(take, new Vector3(-1.5f, 0.09f, 4.5f), 2f);
+            // 〔区切り〕の行き先。一つ目は祖母のそば、二つ目は門の前
+            Stop(0.3f, 0f, 5.95f);
+            Stop(gate.x, gate.y, gate.z);
             return new[]
             {
                 K(0f,  -1.6f, 0f, 4.7f, 250f,  34f, 1.32f),  // 鳩を追って池の縁まで来ていた
@@ -696,8 +810,8 @@ namespace HalfAware.EditorTools
                 K(11f, -0.6f, 0f, 5.4f,  56f,   0f, 1.32f),  // 戻る
                 K(15f,  0.3f, 0f, 5.95f, 62f,  30f, 1.32f),  // 餌の袋を渡される
                 K(19f,  0.3f, 0f, 5.95f, 345f, -5f, 1.32f),  // 門の前に祖父と妹
-                K(22f,  0.3f, 0f, 5.95f, 300f, 40f, 1.32f),  // 袋から撒くと、鳩がまた足元に寄ってくる
-                K(25f,  0.25f, 0f, 5.9f, 290f, 50f, 1.32f),
+                K(22f, gate.x, 0f, gate.z, 250f, 40f, 1.32f), // 門の前で袋から撒くと、鳩がまた足元に寄ってくる
+                K(25f, gate.x, 0f, gate.z, 250f, 50f, 1.32f),
             };
         }
 
@@ -737,6 +851,9 @@ namespace HalfAware.EditorTools
             // 300° では台所の奥を向き、ダニエルに背を向けていた。階段の下（8 秒）と袋を受け取る所（12 秒）のあいだへ向ける
             Cast(take, "Mother", new Vector3(0.1f, 0f, 0.2f), 150f, 1);
             Cast(take, "Father", new Vector3(-1.05f, 0f, 2.2f), 350f, 0);
+            // 〔区切り〕の行き先。一つ目は階段の下（階段を降りる）、二つ目は玄関（靴を履く）
+            Stop(1.5f, 0f, -1.4f);
+            Stop(-1.75f, 0f, -1.9f);
             // 通りすがり。玄関の外の踊り場で待っている同級生（記憶 13 のアイシャ）。
             // 台所から教室へ出る口はここ一つ（設計書 6 節）。
             // 設計書の「台所の窓の外」は、窓の外が朝の光を塗った板で、その先に何も無いので立たせられない。
@@ -772,9 +889,13 @@ namespace HalfAware.EditorTools
             // 突き抜けて歩いていた。ホワイトボードの前から通路（x 0 の列の間）を下り、アイシャの机の向こう側へ横に入る。
             // 教壇は置かないので、歩き始めも床の高さ
             // 止まる所は机の奥の縁（z 0.62）から 20 cm 先。机に体が掛からない
+            // **歩き出すのは名を呼んでから**（設計書 7 節の「人も台詞で動き出す」）。一行目（リー「アイシャ、どこだ。見せてみろ」）が
+            // 出て 1 秒で歩き出す。会話は先生が歩き終えてから（DiveDirector は歩いている相手と話し始めない）
+            var aisle = new Vector3(0.1f, 0f, 1.0f);
             var teacher = Cast(take, "Teacher", new Vector3(0.9f, 0f, 0.82f), 220f, 0);
-            Move(teacher, new Vector3(0.45f, 0f, 3.9f), new Vector3(0.1f, 0f, 1.0f), 6f, 6.5f, true);
-            Then(teacher, new Vector3(0.9f, 0f, 0.82f), 12.5f, 2.5f);
+            Move(teacher, new Vector3(0.45f, 0f, 3.9f), aisle, 1.0f, 6.5f, true, true, 1);
+            Then(teacher, new Vector3(0.9f, 0f, 0.82f), 7.5f, 2.5f);
+            Face(teacher, Toward(new Vector3(0.45f, 0f, 3.9f), aisle), 187f, 220f);
             // 隣（マテオ）は机に伏せて眠っている
             Aside(Cast(take, "Neighbour", new Vector3(DeskX[3], 0f, DeskZ[1] - 0.56f), 355f, 6));
             var seat = new Vector3(DeskX[2], 0f, DeskZ[1] - 0.56f);

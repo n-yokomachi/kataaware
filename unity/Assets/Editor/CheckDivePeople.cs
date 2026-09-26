@@ -433,8 +433,19 @@ namespace HalfAware.EditorTools
                 System.Action<UnityEngine.Vector3> standWorld = at => { hull.enabled = false; pT.position = at + UnityEngine.Vector3.up * 0.06f; hull.enabled = true; UnityEngine.Physics.SyncTransforms(); };
                 sb.AppendLine("記憶 " + which + " " + caption.text);
                 S(0.1f, false); sb.AppendLine("[入った直後] " + state());
+                UnityEngine.Vector3? stopAt = null;
                 System.Func<UnityEngine.Transform, System.Collections.Generic.List<UnityEngine.Vector3>> spots = w => {
                     var all = new System.Collections.Generic.List<UnityEngine.Vector3>();
+                    // 〔区切り〕の行き先があれば、そのまわりを先に当たる
+                    if (stopAt.HasValue)
+                        foreach (var r in new[]{0f, 0.5f, 1.0f})
+                            for (var a = 0; a < (r == 0f ? 1 : 12); a++) {
+                                var ang = a * 30f * UnityEngine.Mathf.Deg2Rad;
+                                var c = stopAt.Value + new UnityEngine.Vector3(UnityEngine.Mathf.Sin(ang) * r, 0f, UnityEngine.Mathf.Cos(ang) * r);
+                                UnityEngine.RaycastHit hit;
+                                if (UnityEngine.Physics.Raycast(c + UnityEngine.Vector3.up * 1.0f, UnityEngine.Vector3.down, out hit, 1.6f) && hit.collider.GetComponent<UnityEngine.Renderer>() != null)
+                                    all.Add(hit.point);
+                            }
                     foreach (var k in tk.Keys) all.Add(place.TransformPoint(k.position));
                     // 鍵打ちの点は、相手に近い順に当たる
                     all.Sort((a, b) => (a - w.position).sqrMagnitude.CompareTo((b - w.position).sqrMagnitude));
@@ -448,15 +459,28 @@ namespace HalfAware.EditorTools
                         }
                     return all;
                 };
-                System.Func<UnityEngine.Transform, bool> stand = w => {
-                    foreach (var at in spots(w)) { standWorld(at); aim(w); if (seen(w)) { sb.AppendLine("   立ち位置 " + place.InverseTransformPoint(at).ToString("F2") + " から " + sight(w)); return true; } }
+                var talkable = T.GetMethod("Talkable", flags);
+                var walking = T.GetMethod("Walking", flags);
+                System.Func<UnityEngine.Transform, bool> canTalk = w => (bool)talkable.Invoke(d, new object[] { w });
+                System.Func<UnityEngine.Transform, bool> isWalking = w => (bool)walking.Invoke(d, new object[] { w });
+                System.Func<UnityEngine.Transform, System.Func<UnityEngine.Transform, bool>, bool> standIf = (w, ok) => {
+                    foreach (var at in spots(w)) { standWorld(at); aim(w); if (seen(w) && ok(w)) { sb.AppendLine("   立ち位置 " + place.InverseTransformPoint(at).ToString("F2") + " から " + sight(w)); return true; } }
                     sb.AppendLine("   " + w.name + " の見える所が無い"); return false;
                 };
+                System.Func<UnityEngine.Transform, bool> stand = w => standIf(w, _ => true);
                 var talks = HalfAware.DiveEntry.Exchanges(entry.said);
                 for (var k = 0; k < talks.Length; k++) {
                     var w = take.Find(talks[k].partner);
                     for (var i = 0; i < 70; i++) S(0.1f, false);
-                    if (!stand(w)) { sb.AppendLine("会話 " + k + " の相手が選べない"); break; }
+                    // 歩いている相手とは話し始めない。歩き終えるまで待つ
+                    for (var i = 0; i < 200 && isWalking(w); i++) S(0.1f, false);
+                    // 〔区切り〕の後の会話は、行き先（Take.Stop）のまわりから探す。行き先の近くでなければ E　話す が出ない
+                    UnityEngine.Vector3 goal;
+                    if (talks[k].Cut && tk.Stop(talks[k].stop, out goal)) {
+                        stopAt = place.TransformPoint(goal);
+                        sb.AppendLine("   区切り " + talks[k].stop + " の行き先 " + goal.ToString("F2"));
+                    } else stopAt = null;
+                    if (!standIf(w, canTalk)) { sb.AppendLine("会話 " + k + " の相手が選べない"); break; }
                     for (var i = 0; i < 7; i++) S(0.1f, false);
                     sb.AppendLine("[会話 " + k + " " + w.name + " を留める] " + state());
                     HalfAware.EditorTools.CheckDiveSky.Pair(eye.position, eye.eulerAngles.y, pitchOf(), clear, psky.flat, System.IO.Path.Combine(shotDir, "m" + which + "_talk" + k + "_" + w.name));
@@ -466,6 +490,7 @@ namespace HalfAware.EditorTools
                     sb.AppendLine("   送り終え（" + guard + " 回）: " + state());
                 }
                 sb.AppendLine("会話 済 " + d.Done + "/" + talks.Length);
+                stopAt = null;
                 foreach (var s in entry.seen) {
                     var w = take.Find(s.name);
                     // 歩く人は止まるまで待つ。記憶の時計で動く人の、いちばん遅い止まり時まで
@@ -473,6 +498,8 @@ namespace HalfAware.EditorTools
                     foreach (var m in take.GetComponentsInChildren<HalfAware.Mover>(true))
                         if (m.Cue < 0) still = UnityEngine.Mathf.Max(still, m.At + m.Span);
                     for (var i = 0; i < 70 || d.Clock < still + 0.5f; i++) S(0.1f, false);
+                    // 台詞の合図で歩き出した人も、歩き終えるまで待つ
+                    for (var i = 0; i < 200 && isWalking(w); i++) S(0.1f, false);
                     if (!stand(w)) continue;
                     for (var i = 0; i < 8; i++) S(0.1f, false);
                     sb.AppendLine("[板 " + s.name + "] " + state());
