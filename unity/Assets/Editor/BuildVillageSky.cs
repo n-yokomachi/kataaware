@@ -32,10 +32,12 @@ namespace HalfAware.EditorTools
         static readonly Vector3 MorningAim = new Vector3(15f, 70f + 180f, 0f);
 
         /// <summary>
-        /// 朝の霞。薄い朝靄。裏庭の奥（20 m）で 2.6%、路地の端から端（80 m）で 34%。
-        /// 公営住宅の朝（0.003）より濃い。畑の上の靄がまだ残っている
+        /// 朝の霞。薄い朝靄。裏庭の奥（20 m）で 1%、路地の端から端（80 m）で 15%、書き割りの板（190 m）で 60%。
+        /// 公営住宅の朝（0.003）より濃い。畑の上の靄がまだ残っている。
+        /// **0.008 から下げた。** 0.008 では 250 m で 98% になり、書き割りに撮った丘も教会の塔も
+        /// 靄の色一色に沈んで、村の外に何も無いように見えた
         /// </summary>
-        const float MorningHaze = 0.0080f;
+        const float MorningHaze = 0.0050f;
 
         static readonly Color MorningZenith = new Color(0.33f, 0.48f, 0.70f);
         static readonly Color MorningMiddle = new Color(0.56f, 0.67f, 0.80f);

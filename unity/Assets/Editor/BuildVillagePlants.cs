@@ -334,6 +334,16 @@ namespace HalfAware.EditorTools
         static void Plant(Transform parent, Border border, Material mat)
         {
             var f = FloraBank();
+            Sow(f, border);
+            Emit(parent, "Flora" + border.Name, f, mat, false);
+        }
+
+        /// <summary>
+        /// 花の縁一つ分の株を入れ物へ溜める。周りの家の庭は、家ごとに幾つもの縁を一つの入れ物へ溜めて一枚に焼く
+        /// （描く回数を抑えるため。<c>BuildVillageYards.cs</c>）
+        /// </summary>
+        static void Sow(Bank f, Border border)
+        {
             var seed = border.Seed;
             var n = 0;
             // 段ごとに、縁に沿ってまとまりを並べる
@@ -363,7 +373,6 @@ namespace HalfAware.EditorTools
                 Clump(f, Kind.Filler, new Vector3(p.x, 0f, p.y), 0.8f + Hash(seed + 2, i) * 0.4f, Hash(seed + 3, i) * 180f, Vector3.zero);
                 n++;
             }
-            Emit(parent, "Flora" + border.Name, f, mat, false);
         }
 
         /// <summary>

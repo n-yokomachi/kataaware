@@ -39,6 +39,9 @@ namespace HalfAware
 
         public Hour Current { get { return hour; } }
 
+        /// <summary>その時刻の空・霞・環境光・日。遠景の書き割りを撮るときに読む</summary>
+        public PlaceSky SkyOf(Hour h) { return h == Hour.Morning ? morning : evening; }
+
         public void Set(Hour next)
         {
             hour = next;
