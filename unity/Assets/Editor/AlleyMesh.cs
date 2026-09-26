@@ -117,6 +117,34 @@ namespace HalfAware.EditorTools
             tris.Add(i); tris.Add(i + 2); tris.Add(i + 3);
         }
 
+        /// <summary>
+        /// 立てた札 1 枚に、アトラスの升を一つ貼る。村の庭の花と葉の札（BuildVillagePlants.cs）が使う。
+        ///
+        /// <see cref="Card"/> と同じく root は下辺の中、across は下辺の半分、up は札の丈で、
+        /// 法線は面の向きを <see cref="CardLift"/> だけ上へ倒す。uv は横に繰り返さず、
+        /// <paramref name="uvMin"/>（左下）から <paramref name="uvMax"/>（右上）までをそのまま貼る
+        /// </summary>
+        public void AtlasCard(Vector3 root, Vector3 across, Vector3 up, Vector2 uvMin, Vector2 uvMax)
+        {
+            var a = root - across;
+            var b = root + across;
+            var c = b + up;
+            var d = a + up;
+            var face = Vector3.Cross(across, up);
+            if (face.sqrMagnitude < 1e-12f) return;
+            var n = (face.normalized + Vector3.up * CardLift).normalized;
+            var i = verts.Count;
+            verts.Add(a); verts.Add(b); verts.Add(c); verts.Add(d);
+            uvs.Add(new Vector2(uvMin.x, uvMin.y));
+            uvs.Add(new Vector2(uvMax.x, uvMin.y));
+            uvs.Add(new Vector2(uvMax.x, uvMax.y));
+            uvs.Add(new Vector2(uvMin.x, uvMax.y));
+            norms.Add(n); norms.Add(n); norms.Add(n); norms.Add(n);
+            Root(a); Root(b); Root(c); Root(d);
+            tris.Add(i); tris.Add(i + 1); tris.Add(i + 2);
+            tris.Add(i); tris.Add(i + 2); tris.Add(i + 3);
+        }
+
         void Root(Vector3 v)
         {
             if (!Rooted) return;
