@@ -782,6 +782,70 @@ def boards():
     return im
 
 
+def thatch():
+    """
+    家 B の茅葺きの屋根。256 画素で 2 m 四方（Texel 0.5）。縦（絵の上下）が屋根の流れ。
+    麦藁の束の端を段に葺いた面で、束ごとに色を揺らし、段の下の縁へ暗い影。
+    何年か経った茅なので、金色ではなく灰色がかった麦藁色に沈め、ところどころ苔で緑に
+    """
+    size = (256, 256)
+    rng = random.Random(461)
+    im = Image.new('RGB', size, (104, 88, 60))
+    w = D.Wrap(im)
+    course = 32
+    for row in range(0, 256 // course + 1):
+        y = row * course
+        x = rng.uniform(0, 8)
+        while x < 256 + 8:
+            ww = rng.uniform(5, 11)
+            base = jitter((146, 124, 88), rng, 7)
+            base = mix(base, (118, 112, 98), rng.random() * 0.4)
+            w.rect([x, y, x + ww - 1, y + course - 1], fill=base)
+            # 藁の筋。上から下へ細く
+            for _ in range(3):
+                sx = x + rng.uniform(0, ww)
+                w.line([(sx, y + 2), (sx + rng.uniform(-1.5, 1.5), y + course - 3)],
+                       fill=mix(base, (190, 170, 120), 0.35), width=1)
+            w.rect([x, y + course - 4, x + ww - 1, y + course - 1], fill=mix(base, (40, 32, 22), 0.28))
+            x += ww
+    for _ in range(14):
+        x, y = rng.uniform(0, 256), rng.uniform(0, 256)
+        r = rng.uniform(3, 7)
+        w.ellipse([x - r, y - r * 0.5, x + r, y + r * 0.5], fill=jitter((92, 98, 60), rng, 10))
+    D.shade(im, D.spread(D.clouds(size, 463, 4, 1.4), 2.0), 0.20)
+    return im
+
+
+def redbrick():
+    """
+    家 C の赤煉瓦の壁。128 画素で 1 m 四方（Texel 1）。段は 75 mm で 13 段と少し、
+    フランドル積み（一段に長手と小口を交互に）。目地は明るい灰。焼きの揺らぎで煉瓦ごとに色を振り、
+    ところどころ焦げた暗い小口を混ぜる
+    """
+    size = (128, 128)
+    rng = random.Random(471)
+    im = Image.new('RGB', size, (168, 160, 146))
+    w = D.Wrap(im)
+    rows = 13
+    bh = 128.0 / rows
+    long_, head = 23.5, 11.0
+    for row in range(rows):
+        y = row * bh
+        x = -(row % 2) * (long_ + head) * 0.5
+        k = 0
+        while x < 128 + 40:
+            ww = long_ if k % 2 == 0 else head
+            base = jitter((150, 66, 44), rng, 18)
+            if k % 2 == 1 and rng.random() < 0.35:
+                base = mix(base, (70, 38, 34), 0.5)
+            base = mix(base, (176, 110, 80), rng.random() * 0.25)
+            w.rect([x + 1, y + 1, x + ww - 1, y + bh - 1.2], fill=base)
+            x += ww + 1.0
+            k += 1
+    D.shade(im, D.spread(D.clouds(size, 473, 3, 1.0), 2.0), 0.14)
+    return im
+
+
 def save(im, name):
     path = os.path.join(OUT, name + '.png')
     im.save(path)
@@ -798,6 +862,8 @@ def main():
     save(flag(), 'VillageFlag')
     save(hedge(), 'VillageHedge')
     save(boards(), 'VillageBoards')
+    save(thatch(), 'VillageThatch')
+    save(redbrick(), 'VillageRedBrick')
 
 
 if __name__ == '__main__':
