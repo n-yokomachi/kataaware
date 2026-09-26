@@ -23,7 +23,7 @@ namespace HalfAware
         [SerializeField] TMP_Text subtitleText;
         [Tooltip("話した人の名前の行。台詞と色を変える。独白では出さない")]
         [SerializeField] TMP_Text subtitleName;
-        [Tooltip("送れる時だけ右下に出す「E　送る ▼」")]
+        [Tooltip("送れる時だけ右下に出す送りの印（「E/」と左クリックのアイコン）。字は HudView.Advance で上書きする")]
         [SerializeField] TMP_Text subtitleHint;
         [Tooltip("字幕 1 行ぶんの高さ。地はこの倍数で伸びる")]
         [SerializeField] float subtitleRowHeight = 44f;
@@ -57,6 +57,38 @@ namespace HalfAware
         bool hidden;
         /// <summary>二択の札。初めて二択を出すときに作る</summary>
         ChoiceView choiceView;
+
+        // ---- 案内の書式 ----------------------------------------------------------
+        //
+        // 調べられる物に目を留めたときの案内と、字幕の送りの印。**書式はここ一か所だけが持つ。**
+        // 調べる物（SceneFlow）・格子戸（SwingGate）・場面 4 の `話す` と板（DiveDirector）は、どれも Prompt を通して出す。
+        //
+        // 案内は「E/」＋左クリックのアイコン＋全角の空白＋対象の名。送りの印は「E/」＋アイコンだけ（「送る」も ▼ も付けない）。
+        // アイコンは左のボタンだけ塗ったマウスの画素絵で、TMP のスプライト（Resources/Sprite Assets/MouseLeft、
+        // 作るのは HalfAware/Make the click icon）。字の色で塗る（tint）。
+        // 粗い画面（UiLens、0.75）の中で、印の字（16.5 画素）には 15 画素の絵（large）、送りの印の字（11 画素）には 10 画素の絵（small）を、
+        // どちらも一画素ずつ字の高さに揃えて描き分けてある
+
+        /// <summary>左クリックのアイコンを持つ TMP のスプライトアセットの名。Resources/Sprite Assets/ の下に置く</summary>
+        public const string ClickAsset = "MouseLeft";
+
+        /// <summary>印（画面の真ん中の案内）の大きさの字に揃えたアイコン</summary>
+        public const string ClickLarge = "<sprite=\"" + ClickAsset + "\" name=\"large\" tint=1>";
+
+        /// <summary>送りの印の大きさの字に揃えたアイコン</summary>
+        public const string ClickSmall = "<sprite=\"" + ClickAsset + "\" name=\"small\" tint=1>";
+
+        /// <summary>調べる操作の鍵。E か左クリック</summary>
+        public const string Keys = "E/";
+
+        /// <summary>送りの印。「E/」と左クリックのアイコンだけ</summary>
+        public const string Advance = Keys + ClickSmall;
+
+        /// <summary>調べられる物に目を留めたときの案内。「E/」＋左クリックのアイコン＋全角の空白＋ label</summary>
+        public static string Prompt(string label)
+        {
+            return Keys + ClickLarge + "　" + label;
+        }
 
         void Awake()
         {
@@ -184,27 +216,27 @@ namespace HalfAware
 
         /// <summary>
         /// null で地ごと隠す。入っている行数に合わせて地を伸ばし、
-        /// 長いものは字を小さくして収める。台詞は E で送れるものとして「E　送る」を添える
+        /// 長いものは字を小さくして収める。台詞は E で送れるものとして送りの印（<see cref="Advance"/>）を添える
         /// </summary>
         public void SetSubtitle(string text)
         {
             SetSubtitle(text, SubtitleKind.Line);
         }
 
-        /// <summary>kind で寄せ方と表に組むかを決める。台詞として E で送れるものは「E　送る」を添える</summary>
+        /// <summary>kind で寄せ方と表に組むかを決める。台詞として E で送れるものは送りの印を添える</summary>
         public void SetSubtitle(string text, SubtitleKind kind)
         {
             Show(text, kind, false, kind == SubtitleKind.Line);
         }
 
-        /// <summary>advance が true の時だけ、右下に「E　送る ▼」を出す。送れない間（演出で止まっている間）は false</summary>
+        /// <summary>advance が true の時だけ、右下に送りの印（<see cref="Advance"/>）を出す。送れない間（演出で止まっている間）は false</summary>
         public void SetSubtitle(string text, SubtitleKind kind, bool advance)
         {
             Show(text, kind, false, advance);
         }
 
         /// <summary>
-        /// 送らずに流れて消える行。地を薄くし、「E　送る」も出さずに、E で送る字幕と見分ける。null で隠す。
+        /// 送らずに流れて消える行。地を薄くし、送りの印も出さずに、E で送る字幕と見分ける。null で隠す。
         ///
         /// **場面 4 の一行目（名を呼ぶ声）だけが使う。** 記憶に入った瞬間に出て、
         /// 決まった秒で勝手に消える。E で送る字幕と同じ地で出すと、
@@ -234,7 +266,12 @@ namespace HalfAware
             var said = text;
             if (kind == SubtitleKind.Line && !list) Speech.Split(text, out who, out said);
             if (subtitleName != null) subtitleName.text = Ruby.Expand(who);
-            if (subtitleHint != null) subtitleHint.gameObject.SetActive(advance && !passing && kind == SubtitleKind.Line);
+            if (subtitleHint != null)
+            {
+                // 場面に焼いてある字（組み立てた時の書式）に頼らず、ここで書式を当てる
+                if (subtitleHint.text != Advance) subtitleHint.text = Advance;
+                subtitleHint.gameObject.SetActive(advance && !passing && kind == SubtitleKind.Line);
+            }
             // 1 行に入る幅はウインドウの実寸から。全角 1 文字で半角 2 つぶん
             var fits = Mathf.Max(SubtitleBox.BaseRows * 2, Mathf.FloorToInt(RoomEm(1f) * 2f) - 1);
             var shown = list ? said : SubtitleBox.Wrap(said, fits);
@@ -246,10 +283,18 @@ namespace HalfAware
             subtitleText.text = Ruby.Expand(list ? ListFormat.Compose(said, RoomEm(scale)) : shown);
             // ルビのある文は行を少し開ける。
             // そのままだと下の行のルビが上の行の字にかぶる
-            subtitleText.lineSpacing = shown.IndexOf(Ruby.Head) >= 0 ? Ruby.ExtraLineSpacing : 0f;
+            var ruby = shown.IndexOf(Ruby.Head) >= 0;
+            subtitleText.lineSpacing = ruby ? Ruby.ExtraLineSpacing : 0f;
             subtitleText.alignment = list ? TextAlignmentOptions.TopLeft : listlessAlignment;
             // 字を小さくしたぶん 1 行も低くなる。地の高さも同じだけ詰める
             var body = subtitleRowHeight * rows * scale;
+            // 行を開けたぶん、地も伸ばす。下の行が地の下の余白へはみ出さないように
+            if (ruby)
+            {
+                var lines = SubtitleBox.LineCount(shown);
+                var opened = baseFontSize * scale * Ruby.ExtraLineSpacing * 0.01f * Mathf.Max(0, lines - 1);
+                body = Mathf.Max(body, subtitleRowHeight * lines * scale + opened);
+            }
             var band = subtitleBand.GetComponent<RectTransform>();
             if (band != null)
             {
@@ -302,7 +347,7 @@ namespace HalfAware
 
         /// <summary>
         /// null で隠す。印は割らずに一行で出す。
-        /// 場面 4 の板の案内（`E　▶ この人の記憶へ潜る　　切断　（↑↓ かホイールで選ぶ）`）は印の枠より長いが、
+        /// 場面 4 の板の案内（`E/(左クリック)　▶ この人の記憶へ潜る　　切断　（↑↓ かホイールで選ぶ）`）は印の枠より長いが、
         /// 割ると印が二段になって読みにくい。真ん中に寄せたまま両脇へはみ出させる
         /// </summary>
         public void SetPrompt(string text)

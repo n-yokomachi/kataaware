@@ -13,13 +13,13 @@ namespace HalfAware.EditorTools
     ///
     /// - 字幕の地: 黒い帯をやめ、画面の下から上へ薄れる黒のグラデーション（SubtitleShade.png）
     /// - 左に寄せて、名前の行（暖かい薄茶）と台詞の行（白）を分ける
-    /// - 送れる時だけ右下に「E　送る ▼」
+    /// - 送れる時だけ右下に送りの印（<see cref="HudView.Advance"/>、「E/」と左クリックのアイコン）
     /// - Tab の字のログ（LogPanel）は外す。ログは TAB のコンソール（<see cref="ImplantConsole"/>）が持つ
     ///
     /// **字幕の寸法は粗い画面（<see cref="UiLens"/>、既定の粗さ 0.75）の 1 画素 = Dot で決める。**
     /// 字はいちばん小さいものでも 11 Dot（粗い画面の中で縦 10 画素ほど）。台詞は 13 Dot。
     /// 地の高さと余白も字に合わせて詰め、字だけ小さくて地が大きく余る形にしない。左右の余白はコンソールの枠（画面の 14%）に揃える。
-    /// 印（E　調べる）と場面 4 の右上の行は、粗さ 1/2 のときの 11 画素（キャンバスで 29.3）のまま。
+    /// 印（<see cref="HudView.Prompt"/>）と場面 4 の右上の行は、粗さ 1/2 のときの 11 画素（キャンバスで 29.3）のまま。
     /// 中央の文字（冒頭のカード・「続く」）は粗くしないので触らない。
     ///
     /// 場面の組み立て（<see cref="BuildDrive.Screen"/>・BuildDive の Screen）が Hud を作った後にこれを通す。
@@ -56,7 +56,7 @@ namespace HalfAware.EditorTools
         const float PassingAlpha = 0.45f;
 
         static readonly Color NameColor = new Color(0xe6 / 255f, 0xc7 / 255f, 0xa0 / 255f, 1f);
-        public const string Hint = "E　送る ▼";
+        public const string Hint = HudView.Advance;
 
         [MenuItem("HalfAware/Restyle the HUD in the open scene", false, 280)]
         public static void RestyleMenu()
