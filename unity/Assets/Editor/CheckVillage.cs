@@ -91,6 +91,9 @@ namespace HalfAware.EditorTools
                 new View("g4_gazebo", new Vector3(-1.3f, 1.6f, 27.4f), 322f, 5f),
                 new View("g5_seated", new Vector3(-1.66f, 1.25f, 17.95f), 18f, 2f),
                 new View("g6_whole", new Vector3(3.4f, 1.7f, 19.6f), 325f, 6f),
+                // 小路のトンネル（2026-09-27）。格子戸の側（南）からトンネルの口を、トンネルの中を歩く目から上を見上げた所
+                new View("g7_tunnel", new Vector3(-4.15f, 1.6f, 18.2f), 7f, 3f),
+                new View("g8_tunnel_up", new Vector3(-3.55f, 1.6f, 23.0f), 8f, -38f),
             };
         }
 
