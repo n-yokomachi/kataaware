@@ -157,6 +157,61 @@ namespace HalfAware.EditorTools
         /// <summary>升目の原点。始めの立ち位置に揃える。升目の境に点が乗って、隣どうしが同じ升目に丸まらないように</summary>
         static Vector3 origin;
 
+        /// <summary>
+        /// 実際の CharacterController で歩かせる。始めの立ち位置（鍵打ちの頭）から goals（場所のローカル）を順に、
+        /// 一歩 5 cm ずつ Move で向かい、それぞれで止まった所を返す。重さは一歩ごとに下へ 8 cm。
+        /// 升目で歩く <see cref="Walk"/> は体を筒で近似するので、段や縁に引っ掛かるかはこちらで見る。
+        /// 主の置き場は抜けるときに戻す
+        /// </summary>
+        public static string Stroll(int which, Vector3[] goals)
+        {
+            var roster = AssetDatabase.LoadAssetAtPath<DiveRoster>(BuildDive.RosterPath);
+            var entry = roster[which];
+            var take = GameObject.Find("Dive").transform.Find("Takes/" + which);
+            var keys = take.GetComponent<Take>().Keys;
+            var player = GameObject.Find("Player");
+            var cc = player.GetComponent<CharacterController>();
+            var p0 = player.transform.position;
+            var r0 = player.transform.rotation;
+            var on = cc.enabled;
+            var sb = new StringBuilder("記憶 " + which + " " + entry.row);
+            try
+            {
+                using (var stage = new CheckDiveSky.Stage(entry.place, which))
+                {
+                    var place = stage.Place;
+                    player.transform.position = place.TransformPoint(keys[0].position) + Vector3.up * 0.06f;
+                    cc.enabled = true;
+                    Physics.SyncTransforms();
+                    sb.Append(" 始め " + place.InverseTransformPoint(player.transform.position).ToString("F2"));
+                    foreach (var goal in goals)
+                    {
+                        var g = place.TransformPoint(goal);
+                        for (var i = 0; i < 400; i++)
+                        {
+                            var d = g - player.transform.position;
+                            d.y = 0f;
+                            if (d.magnitude < 0.08f) break;
+                            cc.Move(d.normalized * 0.05f + Vector3.down * 0.08f);
+                        }
+                        var at = place.InverseTransformPoint(player.transform.position);
+                        var miss = new Vector2(at.x - goal.x, at.z - goal.z).magnitude;
+                        sb.Append(" → " + goal.ToString("F2") + " で " + at.ToString("F2") + (miss < 0.15f ? " 着" : " 止まる"));
+                    }
+                    cc.enabled = false;
+                }
+            }
+            finally
+            {
+                cc.enabled = false;
+                player.transform.position = p0;
+                player.transform.rotation = r0;
+                cc.enabled = on;
+                Physics.SyncTransforms();
+            }
+            return sb.ToString();
+        }
+
         static long Key(Vector3 p)
         {
             p -= origin;

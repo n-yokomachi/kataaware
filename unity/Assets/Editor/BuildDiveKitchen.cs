@@ -44,9 +44,15 @@ namespace HalfAware.EditorTools
         public static readonly Vector3 Sink = new Vector3(-1.1f, 0f, 2.35f);
         /// <summary>玄関の戸の前</summary>
         public static readonly Vector3 Entrance = new Vector3(-1.95f, 0f, -1.95f);
-        /// <summary>階段の真ん中の線と、下端と上端。廊下の東の端を南へ上がる</summary>
+        /// <summary>
+        /// 階段の真ん中の線と、下端と上端。廊下の東の端を南へ上がる。
+        ///
+        /// **下端は廊下の北の壁から 0.85 m 離す。** -0.6 に置いていた頃は、壁（-0.1）と親柱のあいだが 0.43 m しか無く、
+        /// 主の体（CharacterController、太さ 0.52 m と肌の 0.08 m ずつ）が段の足元から廊下へ抜けられなかった。
+        /// 記憶 13 のダニエルが階段から降りられずに見つかった。段の数と上端はそのままで、踏み面が 0.253 から 0.230 へ詰まる
+        /// </summary>
         public const float StairX = 1.9f;
-        public const float StairFoot = -0.6f;
+        public const float StairFoot = -0.95f;
         public const float StairHead = -4.4f;
         /// <summary>一階の床から二階の床まで。一階の天井もこの高さ</summary>
         const float HouseHigh = 2.6f;
@@ -80,12 +86,16 @@ namespace HalfAware.EditorTools
         /// <summary>段の数。一段の蹴上げと踏み面</summary>
         const int KitchenRisers = 15;
         const float KitchenRiseH = HouseHigh / KitchenRisers;                               // 0.173
-        const float KitchenGo = (StairFoot - StairHead) / KitchenRisers;                   // 0.253
+        const float KitchenGo = (StairFoot - StairHead) / KitchenRisers;                   // 0.230
         /// <summary>
         /// 階段の上が二階へ抜ける所の北の縁。ここより北（段の下の方）は二階の床が被さり、天井は一階の高さのまま。
-        /// 段の途中から見下ろすと、この縁の下から廊下と台所の戸口が見える
+        /// 段の途中から見下ろすと、この縁の下から廊下と台所の戸口が見える。
+        ///
+        /// **降りる主の頭が縁の壁に当たらない所に置く。** -1.5 では、六段目（1.04 m）に立った主の体の上端（2.82 m）が
+        /// 縁の下の壁（2.6 m から上）に当たって、段の途中から先へ降りられなかった。体が縁に掛かり始める所
+        /// （縁の 0.34 m 手前）で、足元が四段目（0.69 m）までに下りているように、縁を北へ寄せる
         /// </summary>
-        const float KitchenWell = -1.5f;
+        const float KitchenWell = -1.2f;
         /// <summary>階段の井戸の天井。二階の天井の高さ</summary>
         const float KitchenVoidTop = 5.0f;
         /// <summary>玄関の戸の開口。z の両端と戸の高さ、上の明かり取りの上端</summary>
