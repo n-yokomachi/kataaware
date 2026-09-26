@@ -23,7 +23,11 @@ namespace HalfAware
 
         static readonly Color Accent = Rgb(0x7f, 0xe3, 0xec, 1f);
         static readonly Color Pale = Rgb(0xcf, 0xf7, 0xfa, 1f);
-        static readonly Color Fill = ImplantConsole.Veil(Rgb(3, 10, 14, 0.62f));
+        /// <summary>
+        /// 板の地。案の CSS は 0.62 だが、あちらは背景を 2 px ぼかしていた。ゲームではぼかせず、
+        /// 村の花の上で問いの字が模様に混ざりかけたので 0.76 まで濃くした（2026-09-27）
+        /// </summary>
+        static readonly Color Fill = ImplantConsole.Veil(Rgb(3, 10, 14, 0.76f));
         static readonly Color Edge = ImplantConsole.Tint(Rgb(127, 227, 236, 0.28f));
         static readonly Color Rule = ImplantConsole.Tint(Rgb(127, 227, 236, 0.35f));
         static readonly Color Bracket = ImplantConsole.Tint(Rgb(127, 227, 236, 0.7f));
