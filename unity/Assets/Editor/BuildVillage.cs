@@ -18,7 +18,8 @@ namespace HalfAware.EditorTools
     /// 大きいので partial に割ってある。ここには入口・並びの寸法・地面・空と時刻・Player・道具を置く。
     /// 家と前庭と格子戸は <c>BuildVillageHouse.cs</c>、裏庭の物は <c>BuildVillageGarden.cs</c>、
     /// 花と葉の札は <c>BuildVillagePlants.cs</c>。路地の家並みと村の物と車の着く所は <c>BuildVillageLane.cs</c>、
-    /// 周りの家の庭と家並みの花は <c>BuildVillageYards.cs</c>、中の畑と遠くの書き割りは <c>BuildVillageFar.cs</c>。
+    /// 周りの家の庭と家並みの花は <c>BuildVillageYards.cs</c>、中の畑と遠くの書き割りは <c>BuildVillageFar.cs</c>、
+    /// 環境音（朝の村と麦の風の輪）は <c>BuildVillageSound.cs</c>。
     ///
     /// **組み方は場面 4 と同じ。** 面は <see cref="Bank"/> の箱で組み、素材ごとに一枚へ焼く。
     /// 空・日・霞・環境光は場面 4 の仕組み（<c>BuildDiveSky.cs</c> の <c>PaintedSky</c>）で、時刻ごとに一揃い持つ。
@@ -80,6 +81,8 @@ namespace HalfAware.EditorTools
 
             Drop("Main Camera");
             Drop("Directional Light");
+            // Rig は Player ごと作り直すので、環境音の大きさはその前に控える
+            var heard = HeardAmbience();
             Rig();
             // 案内（E  開ける）を出す画面。ほかの場面と同じ作りの Hud を置く（BuildDrive.Screen）
             Drop("Hud");
@@ -105,6 +108,7 @@ namespace HalfAware.EditorTools
             Fences(Child(root, "Bounds"));
 
             Stage(hours);
+            Ambience(hours, heard);
             Register();
 
             var scene = EditorSceneManager.GetActiveScene();

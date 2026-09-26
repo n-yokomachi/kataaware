@@ -525,8 +525,8 @@ namespace HalfAware.EditorTools
         /// <summary>格子戸を調べる対象の id。文面は <see cref="VillageScriptPath"/></summary>
         public const string GateId = "village.gate";
         const string VillageScriptPath = "Assets/Data/VillageScript.asset";
-        /// <summary>開ける音。自室の戸の音の頭（開ける所）だけを鳴らす</summary>
-        const string GateSoundPath = "Assets/Audio/DoorShut.wav";
+        /// <summary>開ける音。木の格子戸の軋み（Pixabay の Creaky Wooden Gate Opens）を頭から終わりまで鳴らす</summary>
+        const string GateSoundPath = VillageAudioImport.GatePath;
 
         /// <summary>
         /// 格子戸を調べて開ける仕掛け（設計書 7 節）。<see cref="SwingGate"/> に、調べる対象（戸の真ん中）と、
@@ -573,7 +573,8 @@ namespace HalfAware.EditorTools
             so.FindProperty("shut").objectReferenceValue = box;
             so.FindProperty("source").objectReferenceValue = src;
             so.FindProperty("clip").objectReferenceValue = clip;
-            so.FindProperty("clipLength").floatValue = 0.9f;
+            // 0 は切らずに終わりまで。開けるだけの音なので、閉める所を切り落とす要が無い
+            so.FindProperty("clipLength").floatValue = 0f;
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 

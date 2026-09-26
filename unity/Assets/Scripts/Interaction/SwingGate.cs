@@ -28,9 +28,10 @@ namespace HalfAware
         [Tooltip("閉じている間だけ効く当たり")]
         [SerializeField] Collider shut;
         [SerializeField] AudioSource source;
-        [Tooltip("開ける音。頭から clipLength 秒だけ鳴らす（開けると閉めるが一つに入った音から、開ける所だけ）")]
+        [Tooltip("開ける音。頭から clipLength 秒だけ鳴らす")]
         [SerializeField] AudioClip clip;
-        [SerializeField] float clipLength = 0.9f;
+        [Tooltip("鳴らす長さ（秒）。0 なら切らずに終わりまで（開けると閉めるが一つに入った音なら、開ける所の長さを入れる）")]
+        [SerializeField] float clipLength = 0f;
 
         readonly List<IInteractable> items = new List<IInteractable>(1);
         readonly HashSet<string> done = new HashSet<string>();
@@ -84,7 +85,7 @@ namespace HalfAware
             {
                 source.clip = clip;
                 source.Play();
-                source.SetScheduledEndTime(AudioSettings.dspTime + clipLength);
+                if (clipLength > 0f) source.SetScheduledEndTime(AudioSettings.dspTime + clipLength);
             }
         }
 
