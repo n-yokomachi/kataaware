@@ -53,7 +53,8 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 人をひとり置く。名前は一覧の <see cref="Seen.name"/> と揃える。誰かは Seen の飛び先で決まる。
-        /// pose は立ち方: 0 立つ／1 片脚に預ける／2 腕組み／3 手を後ろ／4 振り向く／5 椅子に座る／6 机に肘をつく。
+        /// pose は立ち方: 0 立つ／1 片脚に預ける／2 腕組み／3 手を後ろ／4 振り向く／5 椅子に座る／6 机に肘をつく／
+        /// 7 手すりから身を乗り出す。
         /// 0 は立ちの動きのまま
         /// </summary>
         static Transform Cast(Transform take, string name, Vector3 at, float yaw, int pose)
@@ -102,7 +103,7 @@ namespace HalfAware.EditorTools
 
         static bool IsSeated(int pose)
         {
-            return pose >= 5;
+            return pose == 5 || pose == 6;
         }
 
         static void DressFigure(Transform root, Person person, int pose, string takeName)
@@ -442,6 +443,17 @@ namespace HalfAware.EditorTools
                         HumanBodyBones.Spine, HumanBodyBones.Chest, HumanBodyBones.Neck, HumanBodyBones.Head,
                         HumanBodyBones.RightUpperArm, HumanBodyBones.RightLowerArm, HumanBodyBones.LeftUpperArm,
                     };
+                case 7:
+                    // 背を倒すと腿が背骨ごと前へ振れるので、脚も据える（LeanOnDesk と同じ）
+                    return new[]
+                    {
+                        HumanBodyBones.Spine, HumanBodyBones.Chest, HumanBodyBones.UpperChest, HumanBodyBones.Neck, HumanBodyBones.Head,
+                        HumanBodyBones.LeftUpperLeg, HumanBodyBones.RightUpperLeg,
+                        HumanBodyBones.LeftLowerLeg, HumanBodyBones.RightLowerLeg,
+                        HumanBodyBones.LeftFoot, HumanBodyBones.RightFoot,
+                        HumanBodyBones.LeftUpperArm, HumanBodyBones.LeftLowerArm, HumanBodyBones.LeftHand,
+                        HumanBodyBones.RightUpperArm, HumanBodyBones.RightLowerArm, HumanBodyBones.RightHand,
+                    };
                 case 0:
                     return new HumanBodyBones[0];
                 default:
@@ -518,9 +530,74 @@ namespace HalfAware.EditorTools
                 case 3: HandsBehind(an, skin); break;
                 case 4: BuildAlleyCrowd.Apply(an, BuildAlleyCrowd.Pose.Turn); break;
                 case 6: LeanOnDesk(an); break;
+                case 7: LeanOverRail(an); break;
                 default:
                     if (IsSeated(pose)) BuildAlleyCrowd.Apply(an, BuildAlleyCrowd.Pose.SitChair);
                     break;
+            }
+        }
+
+        /// <summary>
+        /// 手すりの上の面の高さ。公営住宅のデッキの手すり（<c>EstateRail</c>、デッキの床から 1.11 m）。
+        /// 身を乗り出す形（pose 7）は、立つ所から <see cref="RailAhead"/> 先のこの高さに手すりがある前提で組む
+        /// </summary>
+        public const float RailHigh = 1.11f;
+        /// <summary>
+        /// 身を乗り出す人の立つ所（根）から、手すりの線まで。m。
+        /// デッキの床は手すりの線の 0.075 m 手前（腰壁の内の面）で終わるので、爪先が腰壁に埋まらないだけ離す
+        /// </summary>
+        public const float RailAhead = 0.23f;
+        /// <summary>身を乗り出すときに背を倒す角。度。背骨・胸・胸の上に分けて掛ける</summary>
+        const float RailLean = 70f;
+        /// <summary>そこからさらに首と頭を下へ向ける角。度。下の庭を覗き込む</summary>
+        const float RailLook = 20f;
+
+        /// <summary>
+        /// 手すりから身を乗り出す（pose 7）。立った形から背を前へ倒して胸から上を手すりの外へ出し、
+        /// 首と頭をさらに下へ向けて庭を覗き込み、両手を手すりの上に掛ける（<see cref="BodyPoser.Arm"/>）。
+        ///
+        /// **記憶 1 の母が、庭から見上げて誰か分かるように。** 手すりの内に立たせただけでは、
+        /// 庭から見上げても手すりの上に頭の天辺が点で出るだけだった（2026-09-26 の差し戻し）。
+        /// 背を倒すと Rocketbox（Biped）は腿が背骨ごと前へ振れるので、脚は足首の元の所へ解き直す（<see cref="LeanOnDesk"/> と同じ）
+        /// </summary>
+        static void LeanOverRail(Animator an)
+        {
+            System.Func<HumanBodyBones, Transform> B = an.GetBoneTransform;
+            var right = Vector3.right;
+            var legs = new[]
+            {
+                new[] { HumanBodyBones.LeftUpperLeg, HumanBodyBones.LeftLowerLeg, HumanBodyBones.LeftFoot },
+                new[] { HumanBodyBones.RightUpperLeg, HumanBodyBones.RightLowerLeg, HumanBodyBones.RightFoot },
+            };
+            var ankles = new Vector3[2];
+            var feet = new Quaternion[2];
+            var knees = new Vector3[2];
+            for (var i = 0; i < 2; i++)
+            {
+                ankles[i] = B(legs[i][2]).position;
+                feet[i] = B(legs[i][2]).rotation;
+                knees[i] = B(legs[i][1]).position + Vector3.forward * 0.6f;
+            }
+            FigureTurnBone(B(HumanBodyBones.Spine), right, RailLean * 0.40f);
+            FigureTurnBone(B(HumanBodyBones.Chest), right, RailLean * 0.35f);
+            FigureTurnBone(B(HumanBodyBones.UpperChest), right, RailLean * 0.25f);
+            FigureTurnBone(B(HumanBodyBones.Neck), right, RailLook * 0.4f);
+            FigureTurnBone(B(HumanBodyBones.Head), right, RailLook * 0.6f);
+            for (var i = 0; i < 2; i++)
+            {
+                ArmReach.Solve(B(legs[i][0]), B(legs[i][1]), B(legs[i][2]), ankles[i], knees[i], 1f);
+                B(legs[i][2]).rotation = feet[i];
+            }
+            // 両手を手すりの上に。肩より少し外、手すりの線の上に手首を置き、肘は外の後ろへ逃がす。
+            // 両腕を広げて掛けると、見上げたときに肩から腕までの形が手すりの上に出る
+            for (var i = 0; i < 2; i++)
+            {
+                var left = i == 0;
+                var sign = left ? -1f : 1f;
+                var shoulder = B(left ? HumanBodyBones.LeftUpperArm : HumanBodyBones.RightUpperArm).position;
+                var wrist = new Vector3(shoulder.x + sign * 0.16f, RailHigh + 0.04f, RailAhead + 0.02f);
+                var elbow = new Vector3(shoulder.x + sign * 0.34f, shoulder.y - 0.10f, (shoulder.z + wrist.z) * 0.5f - 0.12f);
+                BodyPoser.Arm(an, left, wrist, elbow, new Vector3(sign * 0.2f, -0.3f, 1f).normalized, Vector3.down);
             }
         }
 

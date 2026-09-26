@@ -89,6 +89,13 @@ namespace HalfAware
         /// </summary>
         public int NextCue { get { return nextCue; } }
 
+        /// <summary>
+        /// 一本目を動き出したか。最後に置き直した秒で見る。
+        /// 手すりから身を乗り出していた人が歩き出したら、据えた形を解くのに使う（<see cref="PersonMotion"/>）
+        /// </summary>
+        public bool Started { get { return started; } }
+        bool started;
+
         /// <summary>頭から流し直すので、有効になった瞬間は開始位置に戻しておく</summary>
         void OnEnable()
         {
@@ -108,6 +115,7 @@ namespace HalfAware
         /// </summary>
         public void Play(float t, float after)
         {
+            started = t >= at;
             transform.localPosition = nextCue < 0 ? Where(t) : Where(t, after);
             // **根の向きは一息に替える。** 模型は PersonMotion がこまの頭ごとに根の向きへ寄せるので
             // （TurnPerTick）、振り向きはそちらで段々に回って見える

@@ -25,14 +25,16 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// 組み終えた直後に立っている場所。記憶 0 の頭と同じ点。
         ///
-        /// **階段の前の庭。上り口から 4 m ほど、三階の手すりの真下から 3.5 m。** 庭の真ん中（z 2.4）から始めていた頃は、
+        /// **階段の塔の前の庭。** 塔の北東の角から 3 m ほど北で、三階の手すりから身を乗り出す母まで横に 7 m、
+        /// 母の胸を見上げる角が 40° ほど。庭の真ん中（z 2.4）から始めていた頃は、
         /// 潜った直後に何も無い地面を 15.8 m 歩かされてから、ようやく一段目に着いた。
         /// 上り口のすぐ手前（デッキの下）から始めていた頃は、三階の手すりから呼ぶ母が
-        /// デッキの床に遮られて見えず、「えーなにー？」と見上げて返す相手を選べなかった（設計書 7 節の 1）
+        /// デッキの床に遮られて見えず、「えーなにー？」と見上げて返す相手を選べなかった（設計書 7 節の 1）。
+        /// 手すりの真下へ寄せると、見上げる角がきつくなって首が折れる
         /// </summary>
-        static readonly Vector3 FirstStand = new Vector3(3.0f, 0f, WalkFront + 3.5f);
-        /// <summary>始まりの向き。棟の方（南）を向く。見上げれば三階の手すりに母がいる</summary>
-        const float FirstYaw = 174f;
+        static readonly Vector3 FirstStand = new Vector3(1.6f, 0f, WalkFront + 6.6f);
+        /// <summary>始まりの向き。棟の方（南南東）を向く。見上げれば三階の手すりから母が身を乗り出している</summary>
+        const float FirstYaw = 172f;
 
         static Transform Takes(Transform root, DiveRoster roster)
         {
@@ -360,6 +362,16 @@ namespace HalfAware.EditorTools
             Face(who, Toward(from, hall), Toward(hall, step), Toward(hall, step));
         }
 
+        /// <summary>据えた形（身を乗り出すなど）を、Mover で歩き出したら解く</summary>
+        static void LetGo(Transform who)
+        {
+            var motion = who != null ? who.GetComponent<PersonMotion>() : null;
+            if (motion == null) return;
+            var so = new SerializedObject(motion);
+            so.FindProperty("letsGo").boolValue = true;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         /// <summary>from から to を向く向き。+z を 0 とした度</summary>
         static float Toward(Vector3 from, Vector3 to)
         {
@@ -465,21 +477,23 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Mei(Transform take)
         {
-            // **母は初め三階のデッキの手すりから庭を見下ろして呼ぶ。** 階段の下のメイが見上げて
-            // 「えーなにー？」と返す相手なので（設計書 7 節の 1）、庭から見えなければならない。
-            // デッキの下（階段の上り口）からはデッキの床に遮られて見えないので、メイは階段の前の庭で
-            // 靴紐を結んでいたことにして、そこから見上げる。手すり（高さ 1.1 m）に胸を付けるほど寄せ（面から 0.15 m）、
-            // 庭の z -8〜-10 から胸まで見える。0.25 m 奥に立たせると、頭の天辺しか手すりの上に出なかった
-            // **「いいから上がっておいで」が出たら戸口へ戻る。** 三階の戸口で区切りの後の会話をする。
-            // 戸口では敷居に立ち、デッキの西（階段の側）を向く。メイは階段を上がり切ると
-            // デッキを東へ駆けてくるので、そちらへ顔を向けておく。
+            // **母は初め三階のデッキの手すりから身を乗り出して、庭を覗き込んで呼ぶ**（pose 7）。
+            // 階段の前の庭のメイが見上げて「えーなにー？」と返す相手なので（設計書 7 節の 1）、庭から誰か分からなければならない。
+            // 手すりの内に立たせただけでは、庭から見上げても手すりの上に頭の天辺が点で出るだけだった（2026-09-26 の差し戻し）。
+            // 胸から上を手すりの外へ出し、両手を手すりに掛ける。手すりの線（デッキの面から 0.075 m 外、z -12.875）から
+            // RailAhead だけ内に立ち、庭の方（真北）を向いて身を乗り出す。メイの方へは首と頭を向ける（PersonMotion.Watch）。
+            // x は階段の塔のすぐ東。庭のメイからほぼ正面に見上げる所。
+            // **「いいから上がっておいで」が出たら戸口へ戻る。** 歩き出したら身を乗り出した形を解く（PersonMotion の letsGo）。
+            // 三階の戸口で区切りの後の会話をする。戸口では敷居に立ち、デッキの西（階段の側）を向く。
+            // メイは階段を上がり切るとデッキを東へ駆けてくるので、そちらへ顔を向けておく。
             // 顔が影になるのは向きではなく、背にした玄関の灯り（RoomAHall）と四階の張り出しのせい。
             // 穴の奥（面から内）へ入れると、デッキの西からは戸口の東の縁に隠れて選べない
-            var rail = new Vector3(3.4f, EstateTop, WalkFront - 0.15f);
+            var rail = new Vector3(2.5f, EstateTop, -12.875f - RailAhead);
             var sill = new Vector3(DoorA, EstateTop, EstateFace + 0.05f);
-            var mother = Cast(take, "Mother", rail, 354f, 0);
+            var mother = Cast(take, "Mother", rail, 0f, 7);
+            LetGo(mother);
             // 五行目（ハンナ「投げません。いいから上がっておいで」）が出たら戸口へ戻る
-            Move(mother, rail, sill, 0.6f, 2.4f, true, true, 5);
+            Move(mother, rail, sill, 0.6f, 3.2f, true, true, 5);
             Face(mother, Toward(rail, sill), 320f);
             // 区切りの行き先は、A の戸口の前のデッキ
             Stop(4.60f, EstateTop, EstateWalk);

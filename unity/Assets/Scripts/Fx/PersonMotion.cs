@@ -111,6 +111,8 @@ namespace HalfAware
         [Tooltip("向きを据える骨。座った脚、組んだ腕。模型の根から見た向き")]
         [SerializeField] Transform[] held = new Transform[0];
         [SerializeField] Quaternion[] holds = new Quaternion[0];
+        [Tooltip("据えた形は、歩き出したら解く（Mover が動き出したら）。手すりから身を乗り出していて、呼んだあと戸口へ戻る人")]
+        [SerializeField] bool letsGo;
         [Tooltip("足首を脛の先へ付け直す骨。足が脛の子でない模型（Quaternius）のためで、Rocketbox の人には入れない")]
         [SerializeField] Transform[] feet = new Transform[0];
         [SerializeField] Transform[] ankles = new Transform[0];
@@ -479,8 +481,9 @@ namespace HalfAware
                 for (var i = 0; i < bent.Length && i < bends.Length; i++)
                     if (bent[i] != null) bent[i].rotation = Quaternion.AngleAxis(bends[i], right) * bent[i].rotation;
                 var frame = body.rotation;
-                for (var i = 0; i < held.Length && i < holds.Length; i++)
-                    if (held[i] != null) held[i].rotation = frame * holds[i];
+                if (!LetGo())
+                    for (var i = 0; i < held.Length && i < holds.Length; i++)
+                        if (held[i] != null) held[i].rotation = frame * holds[i];
             }
             for (var i = 0; i < feet.Length && i < ankles.Length; i++)
                 if (feet[i] != null && ankles[i] != null) feet[i].position = ankles[i].position;
@@ -491,6 +494,14 @@ namespace HalfAware
                 if (carried[i] == null || carriers[i] == null) continue;
                 carried[i].SetPositionAndRotation(carriers[i].TransformPoint(carryAt[i]), carriers[i].rotation * carryTurn[i]);
             }
+        }
+
+        /// <summary>据えた形を解いているか。letsGo の人が、Mover で歩き出したあと</summary>
+        bool LetGo()
+        {
+            if (!letsGo) return false;
+            var mover = GetComponent<Mover>();
+            return mover != null && mover.Started;
         }
 
         /// <summary>

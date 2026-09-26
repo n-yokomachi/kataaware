@@ -434,6 +434,7 @@ namespace HalfAware.EditorTools
                 sb.AppendLine("記憶 " + which + " " + caption.text);
                 S(0.1f, false); sb.AppendLine("[入った直後] " + state());
                 UnityEngine.Vector3? stopAt = null;
+                var fromStart = false;
                 System.Func<UnityEngine.Transform, System.Collections.Generic.List<UnityEngine.Vector3>> spots = w => {
                     var all = new System.Collections.Generic.List<UnityEngine.Vector3>();
                     // 〔区切り〕の行き先があれば、そのまわりを先に当たる
@@ -449,6 +450,8 @@ namespace HalfAware.EditorTools
                     foreach (var k in tk.Keys) all.Add(place.TransformPoint(k.position));
                     // 鍵打ちの点は、相手に近い順に当たる
                     all.Sort((a, b) => (a - w.position).sqrMagnitude.CompareTo((b - w.position).sqrMagnitude));
+                    // 一つ目の会話は、始めの立ち位置（鍵打ちの頭）から先に当たる。名を呼ぶ声に振り向いて選べるか
+                    if (fromStart && tk.Keys.Length > 0) all.Insert(0, place.TransformPoint(tk.Keys[0].position));
                     foreach (var r in new[]{1.2f, 1.8f, 2.6f})
                         for (var a = 0; a < 12; a++) {
                             var ang = a * 30f * UnityEngine.Mathf.Deg2Rad;
@@ -480,7 +483,9 @@ namespace HalfAware.EditorTools
                         stopAt = place.TransformPoint(goal);
                         sb.AppendLine("   区切り " + talks[k].stop + " の行き先 " + goal.ToString("F2"));
                     } else stopAt = null;
+                    fromStart = k == 0;
                     if (!standIf(w, canTalk)) { sb.AppendLine("会話 " + k + " の相手が選べない"); break; }
+                    fromStart = false;
                     for (var i = 0; i < 7; i++) S(0.1f, false);
                     sb.AppendLine("[会話 " + k + " " + w.name + " を留める] " + state());
                     HalfAware.EditorTools.CheckDiveSky.Pair(eye.position, eye.eulerAngles.y, pitchOf(), clear, psky.flat, System.IO.Path.Combine(shotDir, "m" + which + "_talk" + k + "_" + w.name));
