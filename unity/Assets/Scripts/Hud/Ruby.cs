@@ -8,60 +8,122 @@ namespace HalfAware
     /// 小さくした字を持ち上げて先に置き、進んだぶんちょうど戻してから親字を重ねる。
     /// 戻す量を「親字の幅」ではなく「実際に進んだ幅」にするのが肝で、
     /// ここを取り違えるとルビの長さ次第で親字がずれる。
+    /// ルビの真ん中は親字の真ん中に揃える（広いルビは両脇の字の上へ掛ける、<see cref="Hang"/>）。
     ///
     /// 幅は ListFormat.Units（半角いくつぶん）で測る。全角 1 字 = 2、半角 1 字 = 1。
     /// em になおすと半分なので、ルビの進む幅は Units / 2 × Scale
     /// </summary>
     public static class Ruby
     {
-        /// <summary>ルビの大きさ。親字に対する割合</summary>
-        public const float Scale = 0.5f;
+        /// <summary>
+        /// ルビの大きさ。親字に対する割合。
+        ///
+        /// **粗い画面の中で読める大きさにする。** 字幕の台詞は粗い画面（<see cref="UiLens"/>、0.75）の中で 13 画素。
+        /// 半分（6.5 画素）では仮名が潰れて読めなかった（オーナー、2026-09-27）。
+        /// 0.7 で 9 画素。字の下限（10 画素ほど、設計書 2.5 節）の少し下だが、親字より一回り小さいことは保つ
+        /// </summary>
+        public const float Scale = 0.7f;
+
+        // ---- TMP に並べさせて測った Noto Sans JP の寸法（em）---------------------
+        //
+        // 字の形の外枠（characterInfo の上下）をベースラインから測った。2026-09-27
+
+        /// <summary>漢字の上の端。ベースラインから</summary>
+        public const float BaseTop = 0.862f;
+        /// <summary>漢字の下の端。ベースラインから下へ</summary>
+        public const float BaseBottom = 0.103f;
+        /// <summary>仮名の上の端。ルビの字の em で</summary>
+        public const float RubyTop = 0.843f;
+        /// <summary>小さい仮名（ィ）の下の端が、ベースラインから下へ出るぶん。ルビの字の em で</summary>
+        public const float RubyDip = 0.1f;
+        /// <summary>ルビと親字、ルビと上の行の親字のあいだに空ける隙間</summary>
+        public const float Gap = 0.06f;
+        /// <summary>素の行送り</summary>
+        public const float Advance = 1.448f;
 
         /// <summary>
         /// 持ち上げる高さ。親字の em に対する割合。
-        ///
-        /// Noto の漢字はベースラインから 1.15 em まで伸びている。
-        /// ルビの字は自分のベースラインから 0.24 em 上から始まるので、
-        /// 1.15 + 隙間 0.06 - 0.24 = 0.97 持ち上げないと親字にかぶる。
-        /// 値は TMP に実際に並べさせて測ったもの
+        /// 漢字の上の端（<see cref="BaseTop"/>）に隙間を空け、ルビの字がベースラインの下へ出るぶん（<see cref="RubyDip"/>）を足す
         /// </summary>
-        public const float Lift = 0.97f;
+        public const float Lift = BaseTop + Gap + RubyDip * Scale;
 
         /// <summary>
         /// ルビのある文に足す行間。字の大きさに対する百分率。
         ///
-        /// 素の行送りは 1.45 em。ルビの上端はベースラインから 1.68 em になるので、
-        /// このままだと下の行のルビが上の行の親字（下端 0.19 em）にかぶる。
-        /// 1.55 em 以上送る必要があるので、余裕を見て 12 %分足す
+        /// ルビの上の端はベースラインから <see cref="Lift"/> + <see cref="RubyTop"/> × <see cref="Scale"/> em になる。
+        /// 素の行送り（<see cref="Advance"/>）のままだと、下の行のルビが上の行の親字（下の端 <see cref="BaseBottom"/>）にかぶる。
+        /// かぶらずに隙間が空くまで送る
         /// </summary>
-        public const float ExtraLineSpacing = 12f;
+        public const float ExtraLineSpacing = (Lift + RubyTop * Scale + BaseBottom + Gap - Advance) * 100f;
+
+        /// <summary>
+        /// ルビが親字より広いとき、両脇の字の上へ掛けてよい幅。em（親字の）。片側の値。
+        ///
+        /// ルビは親字の上の端より上に浮いているので、両脇の字の上へ掛けてもかぶらない。
+        /// はみ出すぶんを全部、親字の後ろの空きにしていた頃は、ルビを大きくすると「千葉市　　や」「羅府　　　に」と
+        /// 親字の後ろにだけ大きな穴が空いた。ルビは親字の真ん中に揃え、掛けきれないぶんだけ親字の前後を同じだけ空ける
+        /// </summary>
+        public const float Hang = 0.5f;
 
         /// <summary>
         /// text にルビを振る。どちらかが空なら text をそのまま返す。
-        /// ルビが親字より広いときは、はみ出すぶんを後ろへ足して次の字と重ならないようにする
+        /// ルビの真ん中を親字の真ん中に揃える。ルビが親字より広いときは、両脇の字の上へ <see cref="Hang"/> まで掛け、
+        /// それでもはみ出すぶんだけ親字の前後を空けて、次の字のルビと重ならないようにする
         /// </summary>
         public static string Over(string text, string ruby)
         {
+            return Over(text, ruby, Scale, Lift, false);
+        }
+
+        /// <summary>
+        /// 大きさ scale と持ち上げる高さ lift を渡して振る。大きさを比べて撮るときに使う。
+        ///
+        /// lineStart は、親字が行の頭にあるか。**行の頭では、広いルビを前へ掛けない。** 前に字が無いので、
+        /// 掛けるとルビだけが行の頭より左へ出て、名前の行や上の行と頭が揃わなくなる。
+        /// そのときはルビの頭を親字の頭に揃え、後ろの字の上へだけ掛ける
+        /// </summary>
+        public static string Over(string text, string ruby, float scale, float lift, bool lineStart)
+        {
             if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(ruby)) return text ?? string.Empty;
+            if (scale <= 0f) return text;
 
             var baseEm = ListFormat.Units(text) * 0.5f;
-            var rubyEm = ListFormat.Units(ruby) * 0.5f * Scale;
+            var rubyEm = ListFormat.Units(ruby) * 0.5f * scale;
             if (baseEm <= 0f || rubyEm <= 0f) return text;
 
-            var lead = Mathf.Max(0f, (baseEm - rubyEm) * 0.5f);   // 親字の真ん中へ寄せる
-            var back = lead + rubyEm;                             // ルビで進んだぶん
-            var trail = Mathf.Max(0f, rubyEm - baseEm);           // 親字からはみ出したぶん
+            float pre, start, post;
+            if (rubyEm <= baseEm)
+            {
+                // 狭いルビは親字の真ん中へ寄せる
+                pre = 0f;
+                start = (baseEm - rubyEm) * 0.5f;
+                post = 0f;
+            }
+            else if (lineStart)
+            {
+                pre = 0f;
+                start = 0f;
+                post = Mathf.Max(0f, rubyEm - baseEm - Hang);
+            }
+            else
+            {
+                var over = (rubyEm - baseEm) * 0.5f;    // ルビが親字から片側へはみ出すぶん
+                pre = Mathf.Max(0f, over - Hang);       // 掛けきれず、親字の前後に空けるぶん
+                post = pre;
+                start = pre - over;                     // ルビの頭（負なら前の字の上へ掛かる）
+            }
+            var back = start + rubyEm - pre;            // ルビの尻から親字の頭まで戻すぶん
 
             var made = new System.Text.StringBuilder();
-            made.Append(Tag("<voffset=", Lift, "em>"));
-            made.Append("<size=").Append(Num(Scale * 100f)).Append("%>");
-            // この <space> は小さくした側の em で効くので、親字の em になおして渡す
-            if (lead > 0.001f) made.Append(Tag("<space=", lead / Scale, "em>"));
+            // ルビの外に置く <space> は親字の em で効く
+            if (Mathf.Abs(start) > 0.001f) made.Append(Tag("<space=", start, "em>"));
+            made.Append(Tag("<voffset=", lift, "em>"));
+            made.Append("<size=").Append(Num(scale * 100f)).Append("%>");
             made.Append(ruby);
             made.Append("</size></voffset>");
             made.Append(Tag("<space=", -back, "em>"));
             made.Append(text);
-            if (trail > 0.001f) made.Append(Tag("<space=", trail, "em>"));
+            if (post > 0.001f) made.Append(Tag("<space=", post, "em>"));
             return made.ToString();
         }
 
@@ -91,6 +153,12 @@ namespace HalfAware
         /// </summary>
         public static string Expand(string text)
         {
+            return Expand(text, Scale, Lift);
+        }
+
+        /// <summary>大きさ scale と持ち上げる高さ lift を渡して直す。大きさを比べて撮るときに使う</summary>
+        public static string Expand(string text, float scale, float lift)
+        {
             if (string.IsNullOrEmpty(text) || text.IndexOf(Head) < 0) return text;
             var made = new System.Text.StringBuilder(text.Length + 64);
             var i = 0;
@@ -103,8 +171,9 @@ namespace HalfAware
                     i++;
                     continue;
                 }
+                var lineStart = i == 0 || text[i - 1] == '\n';
                 made.Append(Over(text.Substring(baseFrom, baseTo - baseFrom),
-                                 text.Substring(rubyFrom, rubyTo - rubyFrom)));
+                                 text.Substring(rubyFrom, rubyTo - rubyFrom), scale, lift, lineStart));
                 i = rubyTo + 1;
             }
             return made.ToString();
