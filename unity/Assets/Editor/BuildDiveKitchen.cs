@@ -191,6 +191,8 @@ namespace HalfAware.EditorTools
             /// <summary>黒。廊下の黒いタイル・暖炉・天火の戸・電子レンジの窓</summary>
             public readonly Bank Black = new Bank { Texel = 0.5f };
             public readonly Bank Cloth = new Bank { Texel = 0.5f };
+            /// <summary>玄関に掛けた上着。Cloth より沈めた紺</summary>
+            public readonly Bank Coat = new Bank { Texel = 0.5f };
             public readonly Bank Blue = new Bank { Texel = 0.5f };
             public readonly Bank Yellow = new Bank { Texel = 0.5f };
             public readonly Bank Moss = new Bank { Texel = 0.5f };
@@ -254,6 +256,7 @@ namespace HalfAware.EditorTools
             EstateEmit(place, "KitchenRunner", b.Runner, KitchenShared("EstateRed"), false);
             EstateEmit(place, "KitchenBlack", b.Black, Mat("Ceiling"), false);
             EstateEmit(place, "KitchenCloth", b.Cloth, Mat("Cloth"), false);
+            EstateEmit(place, "KitchenCoat", b.Coat, Mat("Coat"), false);
             EstateEmit(place, "KitchenBlue", b.Blue, KitchenShared("EstateBlue"), false);
             EstateEmit(place, "KitchenYellow", b.Yellow, KitchenShared("EstateYellow"), false);
             EstateEmit(place, "KitchenMoss", b.Moss, KitchenShared("EstateMoss"), false);
@@ -461,14 +464,11 @@ namespace HalfAware.EditorTools
             b.Treads.Box(new Vector3(-1.75f, 1.66f, hz - 0.015f), new Vector3(0.95f, 0.09f, 0.03f));
             for (var i = 0; i < 4; i++)
                 b.Brass.Box(new Vector3(-2.10f + i * 0.24f, 1.66f, hz - 0.05f), new Vector3(0.025f, 0.03f, 0.07f));
-            // 長いコート・青い上着・襟巻き・鞄
-            b.Cloth.Box(new Vector3(-2.10f, 1.18f, hz - 0.14f), new Vector3(0.40f, 0.92f, 0.18f));
-            b.Cloth.Box(new Vector3(-2.10f, 1.58f, hz - 0.12f), new Vector3(0.28f, 0.12f, 0.14f));
-            b.Blue.Box(new Vector3(-1.72f, 1.30f, hz - 0.15f), new Vector3(0.44f, 0.66f, 0.20f));
-            b.Blue.Box(new Vector3(-1.72f, 1.60f, hz - 0.12f), new Vector3(0.24f, 0.10f, 0.12f));
+            // 長いコート・紺の上着・襟巻き・鞄。掛けた形に見せる作りは KitchenGarment・KitchenBag に任せる
+            KitchenGarment(b.Cloth, -2.10f, hz, 1.63f, 0.95f, 0.32f, 0.44f);
+            KitchenGarment(b.Coat, -1.86f, hz, 1.59f, 0.52f, 0.24f, 0.32f);
             b.Runner.Box(new Vector3(-1.52f, 1.22f, hz - 0.07f), new Vector3(0.10f, 0.80f, 0.03f));
-            b.Moss.Box(new Vector3(-1.34f, 1.40f, hz - 0.10f), new Vector3(0.28f, 0.36f, 0.14f));
-            b.Moss.Box(new Vector3(-1.34f, 1.60f, hz - 0.04f), new Vector3(0.03f, 0.10f, 0.03f));
+            KitchenBag(b.Treads, b.Brass, -1.38f, -1.34f, hz);
             // 靴。コートの下に二足、踵を壁へ向けて脱いだまま
             KitchenShoe(b.Black, new Vector3(-2.18f, 0f, hz - 0.30f), 8f);
             KitchenShoe(b.Black, new Vector3(-2.02f, 0f, hz - 0.28f), -4f);
@@ -509,6 +509,64 @@ namespace HalfAware.EditorTools
             var rot = Quaternion.Euler(0f, yaw, 0f);
             bank.Box(at + rot * new Vector3(0f, 0.035f, 0f), new Vector3(0.10f, 0.07f, 0.28f), rot);
             bank.Box(at + rot * new Vector3(0f, 0.085f, -0.08f), new Vector3(0.09f, 0.05f, 0.11f), rot);
+        }
+
+        /// <summary>
+        /// コート掛けに掛けた上着ひとつ。鉤に掛かって盛り上がる肩・両袖・裾の広がり・前身頃の皺を
+        /// 箱を重ねて表す。単純な直方体のままだと近くで見たときに平たい板にしか見えない。
+        /// hx は鉤の x、hz は壁の z、top は肩の峰の高さ、drop は峰から裾までの丈、
+        /// chestWide は胸の幅、hemWide は裾の幅（chestWide より広く取ると裾が広がって見える）
+        /// </summary>
+        static void KitchenGarment(Bank cloth, float hx, float hz, float top, float drop, float chestWide, float hemWide)
+        {
+            var chestY = top - drop * 0.34f;
+            var hemY = top - drop;
+            // 肩の峰と、袖口へ落ちる傾き
+            cloth.Box(new Vector3(hx, top, hz - 0.08f), new Vector3(chestWide * 0.66f, 0.08f, 0.13f));
+            cloth.Box(new Vector3(hx - chestWide * 0.34f, top - 0.06f, hz - 0.08f),
+                new Vector3(chestWide * 0.34f, 0.08f, 0.12f), Quaternion.Euler(0f, 0f, 30f));
+            cloth.Box(new Vector3(hx + chestWide * 0.34f, top - 0.06f, hz - 0.08f),
+                new Vector3(chestWide * 0.34f, 0.08f, 0.12f), Quaternion.Euler(0f, 0f, -30f));
+            // 胸から裾。裾のほうを一段前へ出して広げる
+            cloth.Box(new Vector3(hx, chestY, hz - 0.12f), new Vector3(chestWide, drop * 0.44f, 0.15f));
+            cloth.Box(new Vector3(hx, hemY + drop * 0.14f, hz - 0.16f), new Vector3(hemWide, drop * 0.34f, 0.19f));
+            // 両袖。上腕と前腕の二段に割って、外へ振れながら垂れる
+            cloth.Box(new Vector3(hx - chestWide * 0.52f, chestY + drop * 0.02f, hz - 0.11f),
+                new Vector3(chestWide * 0.26f, drop * 0.30f, 0.12f), Quaternion.Euler(0f, 0f, 9f));
+            cloth.Box(new Vector3(hx - chestWide * 0.58f, hemY + drop * 0.18f, hz - 0.08f),
+                new Vector3(chestWide * 0.22f, drop * 0.24f, 0.10f), Quaternion.Euler(0f, 0f, 15f));
+            cloth.Box(new Vector3(hx + chestWide * 0.52f, chestY + drop * 0.01f, hz - 0.11f),
+                new Vector3(chestWide * 0.26f, drop * 0.28f, 0.12f), Quaternion.Euler(0f, 0f, -8f));
+            cloth.Box(new Vector3(hx + chestWide * 0.58f, hemY + drop * 0.16f, hz - 0.08f),
+                new Vector3(chestWide * 0.22f, drop * 0.22f, 0.10f), Quaternion.Euler(0f, 0f, -14f));
+            // 前身頃の皺。裾寄りの面から二筋、浮かせて立てる
+            cloth.Box(new Vector3(hx - chestWide * 0.20f, hemY + drop * 0.30f, hz - 0.24f),
+                new Vector3(0.05f, drop * 0.26f, 0.02f), Quaternion.Euler(0f, 0f, 8f));
+            cloth.Box(new Vector3(hx + chestWide * 0.16f, hemY + drop * 0.18f, hz - 0.25f),
+                new Vector3(0.05f, drop * 0.22f, 0.02f), Quaternion.Euler(0f, 0f, -6f));
+        }
+
+        /// <summary>
+        /// コート掛けに掛けた鞄。肩紐で鉤から下げた形にする。革の色は階段の <see cref="KitchenBanks.Treads"/> と同じ
+        /// （落ち着いた濃い茶）。留め金だけ真鍮
+        /// </summary>
+        static void KitchenBag(Bank leather, Bank brass, float hookX, float bodyX, float hz)
+        {
+            var hook = new Vector3(hookX, 1.64f, hz - 0.06f);
+            var body = new Vector3(bodyX, 0.98f, hz - 0.13f);
+            leather.Box(body, new Vector3(0.30f, 0.32f, 0.15f));
+            leather.Box(body + new Vector3(0f, 0.15f, -0.05f), new Vector3(0.32f, 0.14f, 0.05f)); // 蓋
+            brass.Box(body + new Vector3(0f, 0.02f, -0.075f), new Vector3(0.05f, 0.045f, 0.02f)); // 留め金
+            // 肩紐。鉤から鞄の両肩の点まで、向きを合わせた細い箱で結ぶ
+            foreach (var side in new[] { -1f, 1f })
+            {
+                var corner = body + new Vector3(side * 0.14f, 0.17f, 0.01f);
+                var mid = (hook + corner) * 0.5f;
+                var dir = (corner - hook).normalized;
+                var rot = Quaternion.FromToRotation(Vector3.up, dir);
+                var len = Vector3.Distance(hook, corner);
+                leather.Box(mid, new Vector3(0.035f, len, 0.035f), rot);
+            }
         }
 
         // ---- 階段 ----------------------------------------------------------------

@@ -1047,6 +1047,8 @@ namespace HalfAware.EditorTools
                 case "Rail": col = new Color(0.205f, 0.215f, 0.230f); smooth = 0.45f; break;
                 case "Timber": col = new Color(0.185f, 0.142f, 0.098f); smooth = 0.12f; break;
                 case "Cloth": col = new Color(0.142f, 0.132f, 0.155f); smooth = 0.06f; break;
+                // 台所の玄関に掛けた上着。Cloth より青みを落として沈めた紺
+                case "Coat": col = new Color(0.082f, 0.098f, 0.118f); smooth = 0.05f; break;
                 case "Ground": col = new Color(0.150f, 0.163f, 0.122f); smooth = 0.04f; break;
                 case "Leaf": col = new Color(0.062f, 0.078f, 0.056f); smooth = 0.02f; break;
                 case "Board": col = new Color(0.082f, 0.112f, 0.092f); smooth = 0.10f; break;
