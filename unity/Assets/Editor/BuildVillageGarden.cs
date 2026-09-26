@@ -88,6 +88,9 @@ namespace HalfAware.EditorTools
             Shed(b);
             Veg(b);
             Oddments(b);
+            LawnThings(b);
+            LawnEdge(b);
+            SteppingStones(b);
             AppleTrunk(b);
             Espalier(b);
             GardenBounds(Child(parent, "Bounds"));
@@ -506,8 +509,8 @@ namespace HalfAware.EditorTools
             p.Box(new Vector3(xm - doorHalf, (0.05f + eaves) * 0.5f, z0 + 0.08f), new Vector3(0.06f, eaves, 0.06f));
             p.Box(new Vector3(xm + doorHalf, (0.05f + eaves) * 0.5f, z0 + 0.08f), new Vector3(0.06f, eaves, 0.06f));
             p.Box(new Vector3(xm, ridge + 0.03f, (z0 + z1) * 0.5f), new Vector3(0.08f, 0.08f, z1 - z0));
-            // 棟の飾りの縁と、両端の尖り
-            var crest = Mathf.RoundToInt((z1 - z0) / 0.16f);
+            // 棟の飾りの縁と、両端の尖り。縁の飾りの間は 0.3 m（320×180 では細かく並べても一本の線にしか見えない）
+            var crest = Mathf.RoundToInt((z1 - z0) / 0.3f);
             for (var i = 0; i <= crest; i++)
             {
                 var z = Mathf.Lerp(z0 + 0.05f, z1 - 0.05f, i / (float)crest);
@@ -746,6 +749,329 @@ namespace HalfAware.EditorTools
             Face(b, p + Vector3.down * drop, q + Vector3.down * drop, q, p, -n);
         }
 
+        // ---- アーチの横の芝の小物 ---------------------------------------------------------
+
+        /// <summary>
+        /// アーチの横の芝の小物（オーナー、2026-09-27）。タイトルの背景（東屋の側からアーチを正面に見る画角）で、
+        /// アーチの左に見える芝の西の縁に寄せて、少しごちゃごちゃと置く。
+        /// ふつうの家庭の庭の手触りにする（お手本: 実在の小さなコテージガーデンの写真。鉢の寄せ植えと重ねた空の鉢、
+        /// じょうろ、古い手押し車、木のベンチ、支柱に這わせたスイートピー、鳥の餌台）。
+        /// 豪邸の飾り（彫像・噴水・整形の花壇）は置かない。
+        ///
+        /// **画角から見える所に置く。** アーチの脇の芝の西の縁（真ん中の花の縁の裏）は、その画角では手前の花の縁と
+        /// アーチの柱の陰になり、置いた物がほとんど隠れた。アーチの左に芝が見えるのは、目から 4〜8 m 先の芝の西寄りなので、
+        /// そこに芝の奥（東屋の側）を向いたベンチ、その東の端に鉢の寄せ植えと重ねた鉢、前にじょうろ、
+        /// 南に鉢のオベリスク、東の飛び石の上に停めた手押し車を寄せる。画角の左の三分の一に、手前から奥へ重なって見える。
+        /// 鳥の餌入れは、芝の真ん中に柱を立てるとテラスからの眺めを縦に割ったので、リンゴの枝から吊る
+        /// </summary>
+        static void LawnThings(Banks b)
+        {
+            LawnPots.Clear();
+            // 鉢の寄せ植え。大・中・小を寄せる。土の上の札は BuildVillagePlants.Pots が載せる
+            LawnPot(b, new Vector3(0.32f, 0f, 23.22f), 0.25f, 0.44f, Kind.PotMix);
+            LawnPot(b, new Vector3(0.62f, 0f, 23.56f), 0.17f, 0.30f, Kind.Pelargonium);
+            LawnPot(b, new Vector3(0.20f, 0f, 23.64f), 0.12f, 0.20f, Kind.Lavender);
+            // 重ねた空の鉢
+            var stack = new Vector3(-0.02f, 0f, 24.05f);
+            for (var i = 0; i < 3; i++)
+                ClayPot(b.Clay, stack + new Vector3(0.006f * i, 0.055f * i, -0.004f * i), 0.13f, 0.20f, Quaternion.Euler(0f, 0f, i * 1.2f));
+            // じょうろ。ベンチの前の芝に
+            WateringCan(b.Swatch, new Vector3(-0.42f, 0f, 23.95f), 75f);
+            // ベンチ。芝の奥（東屋と、その先の麦畑の丘）を向く
+            GardenBench(b, GardenBenchAt, 0f);
+            // 手押し車と、刺した園芸のフォーク
+            Wheelbarrow(b, WheelbarrowAt, WheelbarrowYaw);
+            // 鉢のオベリスク。スイートピーの札は BuildVillagePlants.Pots
+            Obelisk(b, ObeliskAt);
+            // 鳥の餌入れ。リンゴの木の枝から吊る
+            Feeder(b.Swatch, FeederAt);
+            // ベンチの西の肘掛けに立てかけた熊手
+            Tool(b.Swatch, GardenBenchAt + new Vector3(-0.95f, 0f, 0.25f), GardenBenchAt + new Vector3(-0.68f, 0.84f, 0.05f), false);
+        }
+
+        /// <summary>ベンチ・手押し車・オベリスク・鳥の餌台の立つ所</summary>
+        static readonly Vector3 GardenBenchAt = new Vector3(-0.55f, 0f, 23.35f);
+        static readonly Vector3 WheelbarrowAt = new Vector3(2.05f, 0f, 22.55f);
+        const float WheelbarrowYaw = 250f;
+        static readonly Vector3 ObeliskAt = new Vector3(0.95f, 0f, 21.55f);
+        /// <summary>鳥の餌入れを吊る、リンゴの南の枝の先の鉤</summary>
+        static readonly Vector3 FeederAt = new Vector3(0.35f, 2.05f, 31.75f);
+
+        /// <summary>芝の鉢の土の高さの中心と、植える物</summary>
+        static readonly List<KeyValuePair<Vector3, Kind>> LawnPots = new List<KeyValuePair<Vector3, Kind>>();
+
+        /// <summary>芝に置く植えた鉢。テラコッタの胴に縁、土の面</summary>
+        static void LawnPot(Banks b, Vector3 foot, float r, float high, Kind kind)
+        {
+            Prism(b.Clay, foot, r * 0.78f, high, 8, r * 0.95f);
+            Prism(b.Clay, foot + Vector3.up * (high - 0.05f), r, 0.06f, 8);
+            b.Soil.FanY(foot + Vector3.up * (high - 0.02f), Ring(foot, r * 0.86f, 8));
+            LawnPots.Add(new KeyValuePair<Vector3, Kind>(foot + Vector3.up * (high - 0.02f), kind));
+        }
+
+        /// <summary>
+        /// 空のテラコッタの鉢を一つ。foot は底の中心、rot で傾ける（重ねた鉢と倒れた鉢）。
+        /// 上は開けたまま（縁の輪と、内の暗い面）
+        /// </summary>
+        static void ClayPot(Bank b, Vector3 foot, float r, float high, Quaternion rot)
+        {
+            const int sides = 8;
+            var rb = r * 0.74f;
+            for (var i = 0; i < sides; i++)
+            {
+                var a0 = Mathf.PI * 2f * i / sides;
+                var a1 = Mathf.PI * 2f * (i + 1) / sides;
+                var o0 = new Vector3(Mathf.Cos(a0), 0f, Mathf.Sin(a0));
+                var o1 = new Vector3(Mathf.Cos(a1), 0f, Mathf.Sin(a1));
+                var om = (o0 + o1).normalized;
+                Face(b, foot + rot * (o0 * rb), foot + rot * (o1 * rb), foot + rot * (o1 * r + Vector3.up * high), foot + rot * (o0 * r + Vector3.up * high), rot * om);
+                // 縁の帯
+                var y0 = high - 0.045f;
+                Face(b, foot + rot * (o0 * (r + 0.015f) + Vector3.up * y0), foot + rot * (o1 * (r + 0.015f) + Vector3.up * y0),
+                    foot + rot * (o1 * (r + 0.015f) + Vector3.up * high), foot + rot * (o0 * (r + 0.015f) + Vector3.up * high), rot * om);
+                // 内の面（口から覗く）
+                Face(b, foot + rot * (o0 * (r - 0.012f) + Vector3.up * high), foot + rot * (o1 * (r - 0.012f) + Vector3.up * high),
+                    foot + rot * (o1 * rb * 0.9f + Vector3.up * 0.03f), foot + rot * (o0 * rb * 0.9f + Vector3.up * 0.03f), -(rot * om));
+            }
+        }
+
+        /// <summary>
+        /// 升の色で塗る多角柱。foot は底の中心、rot で向きを変える。top は上の半径（負なら r と同じ）。
+        /// 上の面を張るかは cap で選ぶ
+        /// </summary>
+        static void TintPrism(Bank b, Vector3 foot, float r, float high, int sides, Quaternion rot, int swatch, float top = -1f, bool cap = true)
+        {
+            var rt = top < 0f ? r : top;
+            for (var i = 0; i < sides; i++)
+            {
+                var a0 = Mathf.PI * 2f * i / sides;
+                var a1 = Mathf.PI * 2f * (i + 1) / sides;
+                var o0 = new Vector3(Mathf.Cos(a0), 0f, Mathf.Sin(a0));
+                var o1 = new Vector3(Mathf.Cos(a1), 0f, Mathf.Sin(a1));
+                TintFace(b, foot + rot * (o0 * r), foot + rot * (o1 * r), foot + rot * (o1 * rt + Vector3.up * high), foot + rot * (o0 * rt + Vector3.up * high),
+                    rot * (o0 + o1), swatch);
+                if (cap)
+                {
+                    var c = foot + rot * (Vector3.up * high);
+                    TintFace(b, c, foot + rot * (o1 * rt + Vector3.up * high), foot + rot * (o0 * rt + Vector3.up * high), c, rot * Vector3.up, swatch);
+                }
+            }
+        }
+
+        /// <summary>亜鉛引きのじょうろ。丸い胴、長い注ぎ口と先の蓮口、頭の持ち手と後ろの持ち手。yaw は注ぎ口の向き</summary>
+        static void WateringCan(Bank b, Vector3 foot, float yaw)
+        {
+            var rot = Quaternion.Euler(0f, yaw, 0f);
+            TintPrism(b, foot, 0.12f, 0.25f, 8, rot, SwGalv, 0.11f);
+            // 注ぎ口。胴の下の前から斜めに上げる
+            var s0 = foot + rot * new Vector3(0f, 0.06f, 0.10f);
+            var s1 = foot + rot * new Vector3(0f, 0.34f, 0.42f);
+            Tint(b, (s0 + s1) * 0.5f, new Vector3(0.028f, 0.028f, Vector3.Distance(s0, s1)), Quaternion.LookRotation(s1 - s0, Vector3.up), SwGalv);
+            Tint(b, s1 + rot * new Vector3(0f, 0.01f, 0.03f), new Vector3(0.07f, 0.07f, 0.04f), rot * Quaternion.Euler(-40f, 0f, 0f), SwGalv);
+            // 頭の持ち手（前から後ろへ弓なりに）と、後ろの持ち手
+            var h0 = foot + rot * new Vector3(0f, 0.25f, 0.07f);
+            var h1 = foot + rot * new Vector3(0f, 0.36f, 0f);
+            var h2 = foot + rot * new Vector3(0f, 0.25f, -0.08f);
+            Tint(b, (h0 + h1) * 0.5f, new Vector3(0.02f, 0.02f, Vector3.Distance(h0, h1)), Quaternion.LookRotation(h1 - h0, Vector3.up), SwGalv);
+            Tint(b, (h1 + h2) * 0.5f, new Vector3(0.02f, 0.02f, Vector3.Distance(h1, h2)), Quaternion.LookRotation(h2 - h1, Vector3.up), SwGalv);
+            var b0 = foot + rot * new Vector3(0f, 0.22f, -0.12f);
+            var b1 = foot + rot * new Vector3(0f, 0.14f, -0.19f);
+            var b2 = foot + rot * new Vector3(0f, 0.05f, -0.12f);
+            Tint(b, (b0 + b1) * 0.5f, new Vector3(0.02f, 0.02f, Vector3.Distance(b0, b1)), Quaternion.LookRotation(b1 - b0, Vector3.up), SwGalv);
+            Tint(b, (b1 + b2) * 0.5f, new Vector3(0.02f, 0.02f, Vector3.Distance(b1, b2)), Quaternion.LookRotation(b2 - b1, Vector3.up), SwGalv);
+        }
+
+        /// <summary>
+        /// 木のベンチ。日に焼けて銀色になったチークの、背と肘掛けのある二人掛け。yaw は座る人の向き
+        /// </summary>
+        static void GardenBench(Banks b, Vector3 at, float yaw)
+        {
+            var rot = Quaternion.Euler(0f, yaw, 0f);
+            const float len = 1.3f;
+            const float seat = 0.44f;
+            System.Func<float, float, float, Vector3> p = (x, y, z) => at + rot * new Vector3(x, y, z);
+            // 座面の板三枚
+            for (var i = 0; i < 3; i++)
+                Tint(b.Swatch, p(0f, seat, 0.14f - i * 0.13f), new Vector3(len, 0.035f, 0.11f), rot, SwSilver);
+            // 背の板三枚。少し後ろへ倒す
+            var lean = rot * Quaternion.Euler(-12f, 0f, 0f);
+            for (var i = 0; i < 3; i++)
+                Tint(b.Swatch, p(0f, 0.62f + i * 0.14f, -0.22f - i * 0.03f), new Vector3(len - 0.08f, 0.09f, 0.025f), lean, SwSilver);
+            // 脚と肘掛け。左右の端に
+            foreach (var sx in new[] { -1f, 1f })
+            {
+                var x = sx * (len * 0.5f - 0.03f);
+                Tint(b.Swatch, p(x, seat * 0.5f, 0.17f), new Vector3(0.05f, seat, 0.05f), rot, SwSilver);
+                Tint(b.Swatch, p(x, 0.45f, -0.22f), new Vector3(0.05f, 0.9f, 0.05f), lean, SwSilver);
+                Tint(b.Swatch, p(x, 0.64f, 0.19f), new Vector3(0.05f, 0.40f, 0.045f), rot, SwSilver);
+                Tint(b.Swatch, p(x, 0.66f, -0.02f), new Vector3(0.06f, 0.035f, 0.46f), rot, SwSilver);
+                Tint(b.Swatch, p(x, 0.12f, -0.02f), new Vector3(0.04f, 0.04f, 0.40f), rot, SwSilver);
+            }
+            // 座面の下の前の横木
+            Tint(b.Swatch, p(0f, seat - 0.06f, 0.17f), new Vector3(len, 0.06f, 0.035f), rot, SwSilver);
+        }
+
+        /// <summary>
+        /// 手押し車。緑に塗った鉄の箱、前の一輪、後ろの二本の脚と木の柄。中に刈った草と土、園芸のフォークを刺す。
+        /// yaw は輪の向き（前）
+        /// </summary>
+        static void Wheelbarrow(Banks b, Vector3 at, float yaw)
+        {
+            var rot = Quaternion.Euler(0f, yaw, 0f);
+            System.Func<float, float, float, Vector3> p = (x, y, z) => at + rot * new Vector3(x, y, z);
+            // 箱。上の縁は広く、底は狭い。前の面は大きく寝かせる
+            var t0 = p(-0.32f, 0.58f, -0.40f); var t1 = p(0.32f, 0.58f, -0.40f); var t2 = p(0.32f, 0.58f, 0.46f); var t3 = p(-0.32f, 0.58f, 0.46f);
+            var d0 = p(-0.18f, 0.30f, -0.30f); var d1 = p(0.18f, 0.30f, -0.30f); var d2 = p(0.18f, 0.30f, 0.12f); var d3 = p(-0.18f, 0.30f, 0.12f);
+            var up = rot * Vector3.up;
+            var sw = SwBarrow;
+            TintFace(b.Swatch, d0, d1, d2, d3, -up, sw);
+            TintFace(b.Swatch, d0, d1, d2, d3, up, sw);
+            foreach (var n in new[] { 1f, -1f })
+            {
+                TintFace(b.Swatch, d1, d2, t2, t1, rot * Vector3.right * n, sw);
+                TintFace(b.Swatch, d3, d0, t0, t3, rot * Vector3.left * n, sw);
+                TintFace(b.Swatch, d2, d3, t3, t2, rot * new Vector3(0f, 0.5f, 1f) * n, sw);
+                TintFace(b.Swatch, d0, d1, t1, t0, rot * Vector3.back * n, sw);
+            }
+            // 縁の巻き
+            Tint(b.Swatch, (t0 + t1) * 0.5f, new Vector3(0.66f, 0.03f, 0.03f), rot, sw);
+            Tint(b.Swatch, (t2 + t3) * 0.5f, new Vector3(0.66f, 0.03f, 0.03f), rot, sw);
+            Tint(b.Swatch, (t1 + t2) * 0.5f, new Vector3(0.03f, 0.03f, 0.88f), rot, sw);
+            Tint(b.Swatch, (t0 + t3) * 0.5f, new Vector3(0.03f, 0.03f, 0.88f), rot, sw);
+            // 中身。刈った草と土の山
+            b.Soil.Box(p(0f, 0.47f, 0.0f), new Vector3(0.40f, 0.14f, 0.52f), rot);
+            // 輪（黒いタイヤ）と軸
+            var wheel = rot * Quaternion.Euler(0f, 0f, 90f);
+            TintPrism(b.Swatch, p(0.045f, 0.19f, 0.52f), 0.19f, 0.09f, 8, wheel, SwTyre);
+            Tint(b.Swatch, p(0f, 0.19f, 0.52f), new Vector3(0.30f, 0.03f, 0.03f), rot, SwTyre);
+            // 前の支え（輪から箱へ）
+            foreach (var sx in new[] { -1f, 1f })
+            {
+                var a = p(sx * 0.12f, 0.19f, 0.52f);
+                var c = p(sx * 0.20f, 0.36f, -0.05f);
+                Tint(b.Swatch, (a + c) * 0.5f, new Vector3(0.03f, 0.03f, Vector3.Distance(a, c)), Quaternion.LookRotation(c - a, Vector3.up), SwBlack);
+                // 後ろの脚
+                var l0 = p(sx * 0.22f, 0.36f, -0.28f);
+                var l1 = p(sx * 0.24f, 0f, -0.36f);
+                Tint(b.Swatch, (l0 + l1) * 0.5f, new Vector3(0.03f, 0.03f, Vector3.Distance(l0, l1)), Quaternion.LookRotation(l1 - l0, Vector3.up), SwBlack);
+                // 木の柄
+                var h0 = p(sx * 0.22f, 0.40f, 0.10f);
+                var h1 = p(sx * 0.29f, 0.58f, -1.02f);
+                Tint(b.Swatch, (h0 + h1) * 0.5f, new Vector3(0.04f, 0.04f, Vector3.Distance(h0, h1)), Quaternion.LookRotation(h1 - h0, Vector3.up), SwBench);
+            }
+            // 刺した園芸のフォーク
+            Tool(b.Swatch, p(0.06f, 0.47f, 0.10f), p(0.20f, 1.25f, 0.30f), true);
+        }
+
+        /// <summary>
+        /// 立てかけた園芸の道具。from（先）から to（柄の頭）へ。fork なら四本の歯のフォーク、でなければ熊手
+        /// </summary>
+        static void Tool(Bank b, Vector3 from, Vector3 to, bool fork)
+        {
+            var d = (to - from).normalized;
+            var side = Vector3.Cross(d, Vector3.up).normalized;
+            if (side.sqrMagnitude < 0.01f) side = Vector3.right;
+            var neck = from + d * 0.26f;
+            Tint(b, (neck + to) * 0.5f, new Vector3(0.028f, 0.028f, Vector3.Distance(neck, to)), Quaternion.LookRotation(to - neck, Vector3.up), SwLog);
+            Tint(b, to + d * 0.02f, new Vector3(0.10f, 0.03f, 0.03f), Quaternion.LookRotation(side, d), SwLog);
+            if (fork)
+            {
+                Tint(b, neck, new Vector3(0.17f, 0.03f, 0.03f), Quaternion.LookRotation(side, d), SwGalv);
+                for (var i = 0; i < 4; i++)
+                {
+                    var t = neck + side * (-0.075f + i * 0.05f);
+                    Tint(b, t - d * 0.13f, new Vector3(0.016f, 0.016f, 0.26f), Quaternion.LookRotation(d, Vector3.up), SwGalv);
+                }
+            }
+            else
+            {
+                // 熊手の頭。歯は一本ずつ組まず、歯の並びを一枚の細い板にする（320×180 では歯の一本は見分けられない）
+                Tint(b, from + d * 0.02f, new Vector3(0.40f, 0.03f, 0.03f), Quaternion.LookRotation(side, d), SwGalv);
+                Tint(b, from - d * 0.02f, new Vector3(0.38f, 0.012f, 0.06f), Quaternion.LookRotation(side, d), SwGalv);
+            }
+        }
+
+        /// <summary>
+        /// 鉢のオベリスク。大きなテラコッタの鉢に、セージ色に塗った木の四本脚の尖塔を立て、横の輪を三段。
+        /// スイートピーを這わせる（札は BuildVillagePlants.Pots）
+        /// </summary>
+        static void Obelisk(Banks b, Vector3 at)
+        {
+            const float potHigh = 0.40f;
+            Prism(b.Clay, at, 0.24f, potHigh, 8, 0.29f);
+            Prism(b.Clay, at + Vector3.up * (potHigh - 0.05f), 0.31f, 0.06f, 8);
+            b.Soil.FanY(at + Vector3.up * (potHigh - 0.02f), Ring(at, 0.26f, 8));
+            var top = at + Vector3.up * 1.95f;
+            var feet = new Vector3[4];
+            for (var i = 0; i < 4; i++)
+            {
+                var a = Mathf.PI * 0.5f * i + Mathf.PI * 0.25f;
+                feet[i] = at + new Vector3(Mathf.Cos(a) * 0.22f, potHigh - 0.02f, Mathf.Sin(a) * 0.22f);
+                var dir = top - feet[i];
+                Tint(b.Swatch, (feet[i] + top) * 0.5f, new Vector3(0.035f, 0.035f, dir.magnitude), Quaternion.LookRotation(dir, Vector3.up), SwSage);
+            }
+            foreach (var f in new[] { 0.34f, 0.68f })
+                for (var i = 0; i < 4; i++)
+                {
+                    var p = Vector3.Lerp(feet[i], top, f);
+                    var q = Vector3.Lerp(feet[(i + 1) % 4], top, f);
+                    Tint(b.Swatch, (p + q) * 0.5f, new Vector3(0.025f, 0.025f, Vector3.Distance(p, q) + 0.03f), Quaternion.LookRotation(q - p, Vector3.up), SwSage);
+                }
+            Tint(b.Swatch, top + Vector3.up * 0.05f, new Vector3(0.07f, 0.07f, 0.07f), Quaternion.Euler(45f, 0f, 45f), SwSage);
+        }
+
+        /// <summary>鳥の餌入れ。枝の鉤（at）から細い鎖で、網の筒を吊る。緑の蓋と底、網の胴は餌の色</summary>
+        static void Feeder(Bank b, Vector3 at)
+        {
+            Tint(b, at + Vector3.down * 0.12f, new Vector3(0.012f, 0.24f, 0.012f), Quaternion.identity, SwBlack);
+            TintPrism(b, at + Vector3.down * 0.56f, 0.045f, 0.28f, 6, Quaternion.identity, SwSeed);
+            TintPrism(b, at + Vector3.down * 0.28f, 0.055f, 0.03f, 6, Quaternion.identity, SwBarrow, 0.02f);
+            TintPrism(b, at + Vector3.down * 0.58f, 0.06f, 0.025f, 6, Quaternion.identity, SwBarrow);
+        }
+
+        /// <summary>
+        /// 芝と花の縁の境の、煉瓦を平らに敷いた見切り（mowing strip）。芝の西（真ん中の花の縁との境）と東の花の縁の前に。
+        /// 煉瓦は芝の面と揃え、縁の花が上へ倒れかかる。刈り込みの車輪が煉瓦の上を走るので、芝の縁が真っすぐに保てる
+        /// （お手本: 煉瓦の見切りの手引き）
+        /// </summary>
+        static void LawnEdge(Banks b)
+        {
+            const float w = 0.22f;
+            const float y = 0.018f;
+            b.Brick.FaceY(y, LawnWest, LawnWest + w, LawnSouth + 0.35f, LawnNorth - 0.1f, 1);
+            b.Brick.FaceY(y, LawnEast - w, LawnEast, LawnSouth + 0.35f, 27.2f - 0.05f, 1);
+        }
+
+        /// <summary>
+        /// 芝を渡る飛び石。テラスの段の東の端から、東の花の縁に沿って物干しの脇を通り、温室の戸へ。
+        /// 平たい敷石を少しずつ回して並べる。**芝の真ん中を通さない。** テラスの段から温室へ真っすぐ通したら、
+        /// 灰色の板が芝を縦に割る滑走路に見えた
+        /// </summary>
+        static void SteppingStones(Banks b)
+        {
+            var line = new[] { new Vector2(1.55f, 19.80f), new Vector2(2.75f, 21.4f), new Vector2(2.85f, 27.6f), new Vector2(2.95f, 30.85f) };
+            var pts = new List<Vector2>();
+            for (var k = 0; k + 1 < line.Length; k++)
+            {
+                var m = Mathf.Max(1, Mathf.RoundToInt(Vector2.Distance(line[k], line[k + 1]) / 0.68f));
+                for (var i = 0; i < m; i++) pts.Add(Vector2.Lerp(line[k], line[k + 1], i / (float)m));
+            }
+            pts.Add(line[line.Length - 1]);
+            for (var i = 0; i < pts.Count; i++)
+            {
+                var c = pts[i] + new Vector2((Hash(431, i) - 0.5f) * 0.12f, 0f);
+                // 物干しの柱の根元は避ける
+                if (Vector2.Distance(c, new Vector2(AirerAt.x, AirerAt.z)) < 0.35f) c.x += 0.32f;
+                var a = (Hash(433, i) - 0.5f) * 0.6f;
+                var hw = 0.17f + Hash(435, i) * 0.04f;
+                var hd = 0.13f + Hash(437, i) * 0.03f;
+                var ax = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+                var az = new Vector3(-Mathf.Sin(a), 0f, Mathf.Cos(a));
+                var p = new Vector3(c.x, 0.022f, c.y);
+                Face(b.Flag, p - ax * hw - az * hd, p + ax * hw - az * hd, p + ax * hw + az * hd, p - ax * hw + az * hd, Vector3.up);
+            }
+        }
+
         // ---- 果樹 -----------------------------------------------------------------------
 
         /// <summary>リンゴの木の幹と枝。樹冠の札は BuildVillagePlants.Trees</summary>
@@ -787,7 +1113,8 @@ namespace HalfAware.EditorTools
         // ---- 当たり ---------------------------------------------------------------------
 
         /// <summary>
-        /// 裏庭の当たり。塀と生け垣、東屋の腰と腰掛け、温室と物置、菜園と堆肥箱、卓と椅子、樽、水盤、物干しの柱。
+        /// 裏庭の当たり。塀と生け垣、東屋の腰と腰掛け、温室と物置、菜園と堆肥箱、卓と椅子、樽、水盤、物干しの柱、
+        /// アーチの横の芝の小物（ベンチ・鉢・手押し車・オベリスク・鳥の餌台）。
         /// 花の縁の当たりは札の側で線を引く（BuildVillagePlants.BorderBounds）
         /// </summary>
         static void GardenBounds(Transform parent)
@@ -815,6 +1142,11 @@ namespace HalfAware.EditorTools
             Block(parent, "Bath", BathAt + Vector3.up * 0.5f, new Vector3(0.6f, 1f, 0.6f));
             Block(parent, "Airer", AirerAt + Vector3.up * 1f, new Vector3(0.2f, 2f, 0.2f));
             Block(parent, "Apple", AppleAt + Vector3.up * 1f, new Vector3(0.4f, 2f, 0.4f));
+            // アーチの横の芝の小物
+            Block(parent, "Bench", GardenBenchAt + new Vector3(0f, 0.5f, -0.05f), new Vector3(1.4f, 1f, 0.6f));
+            Block(parent, "LawnPots", new Vector3(0.28f, 0.5f, 23.62f), new Vector3(1.0f, 1f, 1.1f));
+            Block(parent, "Wheelbarrow", WheelbarrowAt + Quaternion.Euler(0f, WheelbarrowYaw, 0f) * new Vector3(0f, 0.5f, -0.25f), new Vector3(1.55f, 1f, 1.0f));
+            Block(parent, "Obelisk", ObeliskAt + Vector3.up * 1f, new Vector3(0.65f, 2f, 0.65f));
         }
     }
 }

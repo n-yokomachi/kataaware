@@ -27,6 +27,8 @@ namespace HalfAware.EditorTools
         const int SwOxblood = 0, SwNavy = 1, SwBlueGrey = 2, SwOchre = 3, SwRed = 4, SwBlack = 5, SwWhite = 6, SwYellow = 7;
         const int SwCarPaint = 8, SwCarGlass = 9, SwTyre = 10, SwChrome = 11, SwBench = 12, SwGalv = 13, SwPane = 14, SwGold = 15;
         const int SwToyBlue = 16, SwToyRed = 17, SwLog = 18, SwPlastic = 19, SwSheet = 20, SwShirt = 21, SwPink = 22, SwLogEnd = 23;
+        // 片割れの庭のアーチの横の小物（2026-09-27）。日に焼けたチークのベンチ、セージ色のオベリスク、手押し車の緑、鳥の餌
+        const int SwSilver = 24, SwSage = 25, SwBarrow = 26, SwSeed = 27;
 
         /// <summary>升の色。sRGB。並びは上の番号と同じ</summary>
         static readonly Color[] Swatches =
@@ -37,6 +39,7 @@ namespace HalfAware.EditorTools
             new Color(0.44f, 0.33f, 0.22f), new Color(0.56f, 0.57f, 0.55f), new Color(0.30f, 0.36f, 0.38f), new Color(0.76f, 0.60f, 0.24f),
             new Color(0.12f, 0.32f, 0.70f), new Color(0.86f, 0.30f, 0.12f), new Color(0.40f, 0.28f, 0.18f), new Color(0.22f, 0.46f, 0.24f),
             new Color(0.93f, 0.93f, 0.90f), new Color(0.46f, 0.62f, 0.80f), new Color(0.92f, 0.62f, 0.70f), new Color(0.70f, 0.56f, 0.38f),
+            new Color(0.60f, 0.57f, 0.51f), new Color(0.50f, 0.58f, 0.50f), new Color(0.20f, 0.36f, 0.27f), new Color(0.62f, 0.50f, 0.30f),
         };
 
         const int SwatchCell = 8;

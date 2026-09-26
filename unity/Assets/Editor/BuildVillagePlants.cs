@@ -618,7 +618,10 @@ namespace HalfAware.EditorTools
             across = Vector3.Cross(Vector3.up, ahead).normalized;
         }
 
-        /// <summary>鉢物。テラスの鉢と窓の花箱と吊り鉢のペラルゴニウム、温室のトマト、菜園のレタス</summary>
+        /// <summary>
+        /// 鉢物。テラスの鉢と窓の花箱と吊り鉢のペラルゴニウム、アーチの横の芝の鉢の寄せ植えとオベリスクのスイートピー、
+        /// 手押し車の抜いた草、温室のトマト、菜園のレタス
+        /// </summary>
         static void Pots(Transform parent, Material mat)
         {
             var f = FloraBank();
@@ -629,6 +632,20 @@ namespace HalfAware.EditorTools
                 Clump(f, Kind.Pelargonium, at + new Vector3(0.05f, 0f, -0.04f), 0.9f, 45f + Hash(303, i) * 180f, Vector3.zero);
                 i++;
             }
+            // アーチの横の芝の鉢。寄せ植えは縁から垂れる分だけ根を鉢の縁より下げる
+            foreach (var kv in LawnPots)
+            {
+                var drop = kv.Value == Kind.PotMix ? 0.16f : 0f;
+                var scale = kv.Value == Kind.Lavender ? 0.45f : kv.Value == Kind.PotMix ? 1.0f : 0.95f;
+                Clump(f, kv.Value, kv.Key + Vector3.down * drop, scale, Hash(309, i) * 180f, Vector3.zero);
+                i++;
+            }
+            // 鉢のオベリスクのスイートピー
+            Clump(f, Kind.ObeliskVine, ObeliskAt + Vector3.up * 0.38f, 1.0f, 20f, Vector3.zero);
+            // 手押し車の中の抜いた草
+            var barrow = Quaternion.Euler(0f, WheelbarrowYaw, 0f);
+            Clump(f, Kind.Filler, WheelbarrowAt + barrow * new Vector3(-0.08f, 0.50f, -0.12f), 0.42f, 30f, Vector3.zero);
+            Clump(f, Kind.Filler, WheelbarrowAt + barrow * new Vector3(0.10f, 0.50f, 0.12f), 0.36f, 100f, Vector3.zero);
             // 窓の花箱。外へ向けた札を並べ、交差の札を足す
             foreach (var w in FrontWindows)
             {
