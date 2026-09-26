@@ -9,7 +9,12 @@ namespace HalfAware
     /// 鳴らす物は時刻（<see cref="VillageHour.Current"/>）で決める。時刻が替わったら <see cref="follow"/> 秒かけて入れ替える。
     /// 場面の頭は寄せずに、その時刻の大きさから始める。
     ///
-    /// 大きさはインスペクターで変える。オーナーが耳で決めるので、組み直しても書き戻さない
+    /// **朝の麦の風は、路地を村の中へ歩くと薄れて消える**（オーナー、2026-09-27）。車を降りた所は麦畑の間の
+    /// 未舗装路で風が鳴っているが、最初の家（家 C）を通り過ぎるあたりから薄くし、家並みの中では聞こえない。
+    /// 立ち位置（東西の x）だけで決めるので、西へ戻れば、また聞こえる（<see cref="Reach"/>）。
+    /// 朝の村の鳥の声は残す。夕方（場面 6 の庭）の風は立ち位置によらず今のまま。
+    ///
+    /// 大きさと薄れ始め・消えきる位置はインスペクターで変える。オーナーが耳で決めるので、組み直しても書き戻さない
     /// （<c>BuildVillage.Rig</c> が前の値を引き継ぐ）
     /// </summary>
     public sealed class VillageAmbience : MonoBehaviour
@@ -17,6 +22,13 @@ namespace HalfAware
         public const float DefaultMorningVillage = 0.6f;
         public const float DefaultMorningWheat = 0.5f;
         public const float DefaultEveningWheat = 0.6f;
+        /// <summary>
+        /// 朝の麦の風が薄れ始める x。家 C（路地の南、x -52.6〜-42.4）の中ほど。
+        /// 車を降りた所（x -76）から 29 m、歩いて 20 秒ほど
+        /// </summary>
+        public const float DefaultWheatFadeFrom = -47f;
+        /// <summary>朝の麦の風が消えきる x。家 C を過ぎ、電話ボックス（x -35.4）の前。薄れ始めから 12 m、歩いて 9 秒ほど</summary>
+        public const float DefaultWheatFadeTo = -35f;
 
         [Tooltip("いまの時刻を持つ物")]
         [SerializeField] VillageHour hour;
@@ -34,6 +46,12 @@ namespace HalfAware
         [SerializeField, Range(0f, 1f)] float eveningWheat = DefaultEveningWheat;
         [Tooltip("時刻が替わったとき、入れ替えにかける秒数")]
         [SerializeField] float follow = 2f;
+
+        [Header("朝の麦の風を、路地の途中から薄くする")]
+        [Tooltip("薄れ始める東西の位置（世界の x）。ここより西（車の着く所の側）は朝の麦の風の大きさのまま")]
+        [SerializeField] float wheatFadeFrom = DefaultWheatFadeFrom;
+        [Tooltip("消えきる東西の位置（世界の x）。ここより東（家並みと片割れの家の側）では朝の麦の風を鳴らさない")]
+        [SerializeField] float wheatFadeTo = DefaultWheatFadeTo;
 
         float villageLevel = -1f;
         float wheatLevel = -1f;
@@ -56,6 +74,19 @@ namespace HalfAware
             }
         }
 
+        /// <summary>
+        /// 立ち位置 x での朝の麦の風の残り。from より西は 1、to より東は 0、その間はなめらかに（smoothstep）下がる。
+        /// 位置だけで決まるので、戻れば同じ大きさに戻る。from と to が逆でも、同じ向き（西が 1）で読む
+        /// </summary>
+        public static float Reach(float x, float from, float to)
+        {
+            var a = Mathf.Min(from, to);
+            var b = Mathf.Max(from, to);
+            if (b - a < 1e-4f) return x < a ? 1f : 0f;
+            var t = Mathf.Clamp01((x - a) / (b - a));
+            return 1f - t * t * (3f - 2f * t);
+        }
+
         /// <summary>今の大きさ level を target へ寄せる。0 から 1 までを seconds 秒で動ききる速さ。seconds が 0 以下ならその場で</summary>
         public static float Ease(float level, float target, float dt, float seconds)
         {
@@ -67,6 +98,9 @@ namespace HalfAware
         {
             var h = hour != null ? hour.Current : VillageHour.Hour.Morning;
             Mix(h, morningVillage, morningWheat, eveningWheat, out var v, out var w);
+            // 朝の麦の風は立ち位置で薄くする。耳は Player の頭上にあるので、その x で見る。
+            // 寄せ（follow）の前に掛けるので、時刻の入れ替えと同じ速さで追う。歩く速さでは遅れない
+            if (h == VillageHour.Hour.Morning) w *= Reach(transform.position.x, wheatFadeFrom, wheatFadeTo);
             // 場面の頭は寄せずに、その大きさから始める
             villageLevel = villageLevel < 0f ? v : Ease(villageLevel, v, Time.deltaTime, follow);
             wheatLevel = wheatLevel < 0f ? w : Ease(wheatLevel, w, Time.deltaTime, follow);

@@ -11,7 +11,7 @@ namespace HalfAware.EditorTools
         public const string AmbienceName = "Ambience";
 
         /// <summary>インスペクターで決める値の名。組み直しても前の値を引き継ぐ</summary>
-        static readonly string[] AmbienceKnobs = { "morningVillage", "morningWheat", "eveningWheat", "follow" };
+        static readonly string[] AmbienceKnobs = { "morningVillage", "morningWheat", "eveningWheat", "follow", "wheatFadeFrom", "wheatFadeTo" };
 
         /// <summary>
         /// 前に置いた環境音の大きさを控える。**Player を落とす前に呼ぶ。**

@@ -29,6 +29,30 @@ namespace HalfAware.Tests
         }
 
         [Test]
+        public void TheMorningWheatFadesAlongTheLaneAndComesBack()
+        {
+            const float from = VillageAmbience.DefaultWheatFadeFrom;
+            const float to = VillageAmbience.DefaultWheatFadeTo;
+            Assert.AreEqual(1f, VillageAmbience.Reach(-76.3f, from, to), 1e-6f, "車を降りた所はそのまま");
+            Assert.AreEqual(1f, VillageAmbience.Reach(from, from, to), 1e-6f, "薄れ始めまではそのまま");
+            Assert.AreEqual(0.5f, VillageAmbience.Reach((from + to) * 0.5f, from, to), 1e-5f, "間の真ん中で半分");
+            Assert.AreEqual(0f, VillageAmbience.Reach(to, from, to), 1e-6f, "消えきる所から先は鳴らさない");
+            Assert.AreEqual(0f, VillageAmbience.Reach(-4.2f, from, to), 1e-6f, "片割れの家の前でも鳴らさない");
+            var there = VillageAmbience.Reach(-40f, from, to);
+            VillageAmbience.Reach(-10f, from, to);
+            Assert.AreEqual(there, VillageAmbience.Reach(-40f, from, to), 1e-6f, "立ち位置だけで決まる。戻れば同じ大きさ");
+            Assert.AreEqual(VillageAmbience.Reach(-40f, from, to), VillageAmbience.Reach(-40f, to, from), 1e-6f, "端の順が逆でも同じ向き");
+        }
+
+        [Test]
+        public void TheFadeStartsAroundTheFirstHouse()
+        {
+            // 最初の家（家 C、路地の南の x -52.6〜-42.4）の脇で薄れ始め、電話ボックス（x -35.4）の前で消えきる
+            Assert.That(VillageAmbience.DefaultWheatFadeFrom, Is.InRange(-52.6f, -42.4f));
+            Assert.That(VillageAmbience.DefaultWheatFadeTo, Is.InRange(-42.4f, -34f));
+        }
+
+        [Test]
         public void EasesAcrossInFollowSeconds()
         {
             // 0 から 1 までを 2 秒で動ききる速さ。0.6 から 0 へは 1.2 秒
