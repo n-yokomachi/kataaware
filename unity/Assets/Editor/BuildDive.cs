@@ -1091,6 +1091,11 @@ namespace HalfAware.EditorTools
             l.intensity = power;
             l.range = range;
             l.shadows = LightShadows.None;
+            // AddComponent<Light> だけでは URP の付属データが付かない。
+            // 通常はエディタで Light の Inspector を開いた瞬間に LightEditor が付け足すが、
+            // ここはコードで組むだけで Inspector を開かないので、自分で付ける
+            // （カメラの GetUniversalAdditionalCameraData と同じ理屈）
+            l.GetUniversalAdditionalLightData();
             return l;
         }
 
