@@ -4,7 +4,11 @@ namespace HalfAware
 {
     /// <summary>
     /// 足音。進んだ距離を測って、一歩ぶん進むたびに鳴らす。
-    /// 動作の再生位置ではなく距離で数えるので、速さを変えても歩幅どおりに鳴る
+    /// 動作の再生位置ではなく距離で数えるので、速さを変えても歩幅どおりに鳴る。
+    ///
+    /// **一歩ごとに足元を見る。** 足元の当たりに <see cref="StepGround"/> が付いていれば、その地面の音で鳴らす
+    /// （村の未舗装の路地は砂利、庭の煉瓦の小路とテラスは硬い音）。付いていない床（場面 1・2・4・8）では
+    /// 今までどおり <see cref="clips"/>（<see cref="Use"/> で取り替える既定の音）で鳴らす
     /// </summary>
     [DefaultExecutionOrder(20)]
     public sealed class Footsteps : MonoBehaviour
@@ -22,8 +26,14 @@ namespace HalfAware
         [Tooltip("音の高さの振れ")]
         [SerializeField] float pitchJitter = 0.09f;
 
+        /// <summary>足元を探る線の始まりの高さ（体の足元から）と長さ。m。段（0.3 m）を上り下りしても床に届く</summary>
+        const float ProbeFrom = 0.4f;
+        const float ProbeReach = 1.0f;
+
         float walked;
         int last = -1;
+        /// <summary>直前に鳴らした音の並び。地面が替わったら直前の番号を忘れる</summary>
+        AudioClip[] playing;
 
         /// <summary>これまでに鳴らした歩数。動作確認から読む</summary>
         public int Steps { get; private set; }
@@ -77,16 +87,37 @@ namespace HalfAware
             for (var i = 0; i < steps; i++) Play();
         }
 
+        /// <summary>
+        /// 足元の地面の音。足元の当たりに <see cref="StepGround"/> が付いていて、その点の音が空でなければそれ。
+        /// ほかは既定の音（<see cref="clips"/>）
+        /// </summary>
+        AudioClip[] Underfoot()
+        {
+            if (body == null) return clips;
+            var foot = body.transform.position;
+            // 始まりは体の当たりの中。中から出る線は自分の当たりを拾わない
+            if (!Physics.Raycast(foot + Vector3.up * ProbeFrom, Vector3.down, out var hit, ProbeReach,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)) return clips;
+            var ground = hit.collider.GetComponent<StepGround>();
+            if (ground == null) return clips;
+            var own = ground.ClipsAt(hit.point);
+            return own.Length > 0 ? own : clips;
+        }
+
         /// <summary>直前と同じ音は避ける。繰り返しが耳につくので</summary>
         void Play()
         {
             Steps++;
-            if (source == null || clips.Length == 0) return;
-            var pick = clips.Length == 1 ? 0 : Random.Range(0, clips.Length);
-            if (clips.Length > 1 && pick == last) pick = (pick + 1) % clips.Length;
+            if (source == null) return;
+            var set = Underfoot();
+            if (set == null || set.Length == 0) return;
+            // 地面が替わったら、直前の番号は別の音を指している
+            if (set != playing) { playing = set; last = -1; }
+            var pick = set.Length == 1 ? 0 : Random.Range(0, set.Length);
+            if (set.Length > 1 && pick == last) pick = (pick + 1) % set.Length;
             last = pick;
             source.pitch = 1f + Random.Range(-pitchJitter, pitchJitter);
-            source.PlayOneShot(clips[pick], 1f + Random.Range(-volumeJitter, volumeJitter));
+            source.PlayOneShot(set[pick], 1f + Random.Range(-volumeJitter, volumeJitter));
         }
     }
 }

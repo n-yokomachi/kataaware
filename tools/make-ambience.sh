@@ -2,6 +2,7 @@
 # HALF AWARE 音素材の生成スクリプト（ffmpeg 8.0.1 のみで完結）
 # 使い方: bash make-ambience.sh           （全部）
 #         bash make-ambience.sh village   （5 節の村と麦畑の 3 つだけ）
+#         bash make-ambience.sh gravel    （6 節の未舗装の路地の足音だけ）
 # 出力先は OUT_DIR 直下。中間ファイルは OUT_DIR/tmp に置く。
 set -euo pipefail
 
@@ -20,6 +21,9 @@ SRC_PIXABAY_DIR="${SRC_PIXABAY_DIR:-$SCRIPT_DIR/../unity/RawAssets/audio/pixabay
 SRC_WHICHFORD="$SRC_PIXABAY_DIR/freesound_community-030510whichford-18349.mp3"
 SRC_WHEAT="$SRC_PIXABAY_DIR/freesound_community-wheat-in-the-wind-7159.mp3"
 SRC_GATE="$SRC_PIXABAY_DIR/dobcommunications-creaky-wooden-gate-opens-170210.mp3"
+SRC_GRAVEL="$SRC_PIXABAY_DIR/freesound_community-walking-on-a-road-with-gravel-01-30100.mp3"
+# 6 節で大きさを揃える相手（村の芝と庭で鳴らしている柔らかい足音）
+STEPS_DIR="${STEPS_DIR:-$SCRIPT_DIR/../unity/Assets/Audio}"
 
 OUT_DIR="${OUT_DIR:-./out-ambience}"   # 出来た物を unity/Assets/Audio/ と unity/Assets/Audio/Music/ へ写す
 TMP_DIR="$OUT_DIR/tmp"
@@ -175,6 +179,9 @@ process_bgm "CopperHeart"     "$SRC_OST_DIR/Copper Heart.mp3"
 
 fi   # PART=all
 
+# 5 節は PART=all か village のとき（字下げはせず、5 節の末尾で閉じる）
+if [ "$PART" = "all" ] || [ "$PART" = "village" ]; then
+
 # ---------------------------------------------------------------------------
 # 5. 村と麦畑の 3 つ（VillageMorning.wav / WheatWind.wav / GateCreak.wav）
 #    輪の 2 つはモノラル 22.05kHz / 16bit。末尾 2 秒を頭に重ねる等パワー(qsin)
@@ -250,5 +257,79 @@ GATE_PEAK=$(ffmpeg -hide_banner -i "$TMP_DIR/gate_trim.wav" -af "astats=metadata
 GATE_GAIN=$(awk "BEGIN{print -6 - ($GATE_PEAK)}")
 echo "GateCreak: measured peak=${GATE_PEAK}dB, applying gain=${GATE_GAIN}dB"
 ffmpeg -y -v error -i "$TMP_DIR/gate_trim.wav" -af "volume=${GATE_GAIN}dB" -ar 44100 -ac 1 -c:a pcm_s16le "$OUT_DIR/GateCreak.wav"
+
+fi   # PART=all か village
+
+# ---------------------------------------------------------------------------
+# 6. Gravel1〜6.wav — 未舗装の路地の足音（Walking on a road with gravel 01）
+#    元は 61.99 秒、24kHz のステレオ mp3。砂利道を一定の歩調（0.53 秒ほどの間）で
+#    歩いた録音で、一歩は 500Hz〜4.5kHz の砂利の擦れの塊が 0.15〜0.2 秒続き、
+#    床の雑音（-55dB 前後）まで落ちてから次の一歩が来る。
+#    10ms と 5ms の窓の実効値で一歩ずつの立ち上がりを拾い、次の物を避けた:
+#    - 次の一歩が 0.35 秒より早く来る所（足の重なり。2.35〜3.0 秒・13.1 秒・24.3 秒・
+#      31.9〜32.2 秒・47.2〜47.8 秒・48.5〜49.2 秒ほか）
+#    - 立ち上がりの前に弱い擦りが 0.1〜0.2 秒続く所（踵を引きずった足。10.1 秒・
+#      20.8 秒・21.3 秒・29.5 秒・46.75 秒）と、一歩の塊が 0.3 秒を超えて平たく続く所（54.7 秒）
+#    - 一歩の後ろに二つ目の当たりが続く所（1.3 秒・12.3 秒）
+#    - 周りより 10dB 以上突き出た単発の当たり（2.97 秒・13.19 秒・27.99 秒・37.75 秒。小石を蹴った音か）
+#    残った中から、一つの塊で終わる六つを採用。切り出しは立ち上がりの 15ms 前から 0.34 秒:
+#      5.540 / 6.055 / 7.650 / 16.650 / 17.295 / 20.245 秒
+#    左右を平均してモノラルに畳み、44.1kHz へ。100Hz より下の唸りを落とし、頭 4ms を
+#    なだらかにして、0.20 秒から 0.14 秒かけて消す（qsin）。
+#    大きさは村の柔らかい足音（Step1〜5）と一歩あたりの大きさで揃える。どちらも 0.5 秒に
+#    伸ばして 10 回繰り返した物の integrated loudness（ebur128）を測り、Step1〜5 の
+#    平均（電力の平均）に合わせる。頂点が -3dB を超えるなら、そこで止める。
+#    輪にはしない。一歩ずつの単発で、Footsteps が一歩ごとに一つ選んで鳴らす。
+# ---------------------------------------------------------------------------
+if [ "$PART" = "all" ] || [ "$PART" = "gravel" ]; then
+
+GRAVEL_STARTS="5.540 6.055 7.650 16.650 17.295 20.245"
+GRAVEL_LEN=0.34
+GRAVEL_FADE_AT=0.20
+GRAVEL_FADE=0.14
+GRAVEL_CEIL=-3
+
+# 一歩あたりの大きさ。0.5 秒に伸ばして 10 回繰り返した物の integrated loudness（LUFS）
+step_loudness () {
+  ffmpeg -hide_banner -nostats -i "$1" -af "aresample=44100,apad=whole_dur=0.5,aloop=loop=9:size=22050,ebur128" -f null - 2>&1 \
+    | grep -E "^\s+I:" | tail -1 | grep -oE '[-0-9.]+' | head -1
+}
+
+STEP_SUM=0
+for s in 1 2 3 4 5; do
+  l=$(step_loudness "$STEPS_DIR/Step$s.wav")
+  echo "Step$s: ${l} LUFS"
+  STEP_SUM=$(awk "BEGIN{print $STEP_SUM + 10^($l/10)}")
+done
+GRAVEL_TARGET=$(awk "BEGIN{printf \"%.2f\", 10*log($STEP_SUM/5)/log(10)}")
+echo "Gravel: target ${GRAVEL_TARGET} LUFS（Step1〜5 の電力の平均）"
+
+n=0
+for st in $GRAVEL_STARTS; do
+  n=$((n+1))
+  name="Gravel$n"
+  echo "=== ${name}.wav（${st} 秒から）==="
+  ffmpeg -y -v error -ss "$st" -t 0.40 -i "$SRC_GRAVEL" \
+    -af "pan=mono|c0=0.5*c0+0.5*c1,aresample=44100,highpass=f=100:poles=2,atrim=0:${GRAVEL_LEN},afade=t=in:st=0:d=0.004,afade=t=out:st=${GRAVEL_FADE_AT}:d=${GRAVEL_FADE}:curve=qsin" \
+    -c:a pcm_s16le "$TMP_DIR/${name}_cut.wav"
+  l=$(step_loudness "$TMP_DIR/${name}_cut.wav")
+  pk=$(ffmpeg -hide_banner -i "$TMP_DIR/${name}_cut.wav" -af "astats=metadata=0" -f null - 2>&1 | grep "Peak level dB" | tail -1 | grep -oE '[-0-9.]+$')
+  gain=$(awk "BEGIN{g=$GRAVEL_TARGET - ($l); c=$GRAVEL_CEIL - ($pk); printf \"%.2f\", (g < c ? g : c)}")
+  echo "${name}: measured ${l} LUFS, peak ${pk}dB, applying gain=${gain}dB"
+  ffmpeg -y -v error -i "$TMP_DIR/${name}_cut.wav" -af "volume=${gain}dB" -ar 44100 -ac 1 -c:a pcm_s16le "$OUT_DIR/${name}.wav"
+done
+
+# 確かめ用に、六つを 0.45 秒ずつ並べた波形とスペクトルを書き出す
+ffmpeg -y -v error -i "$OUT_DIR/Gravel1.wav" -i "$OUT_DIR/Gravel2.wav" -i "$OUT_DIR/Gravel3.wav" \
+  -i "$OUT_DIR/Gravel4.wav" -i "$OUT_DIR/Gravel5.wav" -i "$OUT_DIR/Gravel6.wav" -filter_complex "
+[0:a]apad=whole_dur=0.45[a0];[1:a]apad=whole_dur=0.45[a1];[2:a]apad=whole_dur=0.45[a2];
+[3:a]apad=whole_dur=0.45[a3];[4:a]apad=whole_dur=0.45[a4];[5:a]apad=whole_dur=0.45[a5];
+[a0][a1][a2][a3][a4][a5]concat=n=6:v=0:a=1,asplit=2[w][s];
+[w]showwavespic=s=1600x300:colors=0x3070c0[wv];
+[s]showspectrumpic=s=1600x420:fscale=lin:legend=0:color=intensity:gain=2:stop=12000[sp];
+[wv][sp]vstack=inputs=2[out]
+" -map "[out]" -frames:v 1 "$ANALYSIS_DIR/Gravel_sheet.png"
+
+fi   # PART=all か gravel
 
 echo "=== done ==="

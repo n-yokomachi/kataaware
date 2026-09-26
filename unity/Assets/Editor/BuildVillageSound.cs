@@ -53,6 +53,90 @@ namespace HalfAware.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        // ---- 足音の地面 -------------------------------------------------------------------
+
+        /// <summary>
+        /// 未舗装の路地の足音。砂利道を歩いた録音から一歩ずつ切り出した単発
+        /// （`tools/make-ambience.sh` の 6 節。出どころは Assets/Audio/LICENSES.md）
+        /// </summary>
+        static readonly string[] GravelSteps =
+        {
+            "Assets/Audio/Gravel1.wav", "Assets/Audio/Gravel2.wav", "Assets/Audio/Gravel3.wav",
+            "Assets/Audio/Gravel4.wav", "Assets/Audio/Gravel5.wav", "Assets/Audio/Gravel6.wav",
+        };
+
+        /// <summary>庭の煉瓦の小路とテラスの敷石。場面 8 の車庫と同じ硬い打音（`tools/make-steps.py`）</summary>
+        static readonly string[] HardSteps =
+        {
+            "Assets/Audio/Concrete1.wav", "Assets/Audio/Concrete2.wav",
+            "Assets/Audio/Concrete3.wav", "Assets/Audio/Concrete4.wav",
+        };
+
+        /// <summary>
+        /// 床の当たりに足音の地面（<see cref="StepGround"/>）を付ける。
+        /// 路地（未舗装路と門の前の砂利の溜まりを含む一枚）は砂利。芝の路肩は付けない（既定の柔らかい足音）。
+        /// 片割れの敷地（芝も小路もテラスも一枚の当たり）は芝の柔らかい足音のまま、煉瓦の小路・玄関の小路・
+        /// テラスと芝へ下りる段だけを硬い音にする。形は見た目の小路と同じ線（<see cref="PathSamples"/>）から取る
+        /// </summary>
+        static void StepGrounds(Transform road, Transform plot)
+        {
+            var hard = StepClips(HardSteps);
+            if (road != null)
+            {
+                var gravel = StepClips(GravelSteps);
+                var so = new SerializedObject(road.gameObject.AddComponent<StepGround>());
+                WriteClips(so.FindProperty("clips"), gravel);
+                so.ApplyModifiedPropertiesWithoutUndo();
+            }
+            if (plot != null)
+            {
+                var parts = new[]
+                {
+                    // 煉瓦の小路。縁取りの煉瓦の分だけ半幅を広げる
+                    new StepGround.Patch { name = "BrickPath", line = PathSamples().ToArray(), half = PathWide * 0.5f + 0.06f, clips = hard },
+                    new StepGround.Patch { name = "FrontPath", box = Rect.MinMaxRect(FrontDoorX - PathWide * 0.5f, NorthEdge, FrontDoorX + PathWide * 0.5f, HouseFront), clips = hard },
+                    // テラスと、芝へ下りる段
+                    new StepGround.Patch { name = "Terrace", box = Rect.MinMaxRect(TerraceWest, HouseRear, HouseEast, TerraceNorth), clips = hard },
+                    new StepGround.Patch { name = "TerraceStep", box = Rect.MinMaxRect(StepWest, TerraceNorth, StepEast, TerraceNorth + 0.4f), clips = hard },
+                };
+                var so = new SerializedObject(plot.gameObject.AddComponent<StepGround>());
+                var list = so.FindProperty("patches");
+                list.arraySize = parts.Length;
+                for (var i = 0; i < parts.Length; i++)
+                {
+                    var p = list.GetArrayElementAtIndex(i);
+                    p.FindPropertyRelative("name").stringValue = parts[i].name;
+                    var line = p.FindPropertyRelative("line");
+                    var pts = parts[i].line ?? new Vector2[0];
+                    line.arraySize = pts.Length;
+                    for (var k = 0; k < pts.Length; k++) line.GetArrayElementAtIndex(k).vector2Value = pts[k];
+                    p.FindPropertyRelative("half").floatValue = parts[i].half;
+                    p.FindPropertyRelative("box").rectValue = parts[i].box;
+                    WriteClips(p.FindPropertyRelative("clips"), parts[i].clips);
+                }
+                so.ApplyModifiedPropertiesWithoutUndo();
+            }
+        }
+
+        /// <summary>足音の素材を読む。無い物は飛ばして知らせる</summary>
+        static AudioClip[] StepClips(string[] paths)
+        {
+            var all = new System.Collections.Generic.List<AudioClip>();
+            foreach (var path in paths)
+            {
+                var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(path);
+                if (clip == null) { Debug.LogWarning("足音の素材が無い: " + path); continue; }
+                all.Add(clip);
+            }
+            return all.ToArray();
+        }
+
+        static void WriteClips(SerializedProperty at, AudioClip[] clips)
+        {
+            at.arraySize = clips.Length;
+            for (var i = 0; i < clips.Length; i++) at.GetArrayElementAtIndex(i).objectReferenceValue = clips[i];
+        }
+
         /// <summary>輪で流す 2D の音を一つ。鳴らし始めと大きさは VillageAmbience が決める</summary>
         static AudioSource Loop(Transform parent, string name, string path)
         {

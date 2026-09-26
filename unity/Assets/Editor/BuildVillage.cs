@@ -183,7 +183,8 @@ namespace HalfAware.EditorTools
         {
             var road = new Bank { Texel = 1f };
             Road(road);
-            NoShadow(Emit(parent, "VillageRoad", road, Pictured("VillageRoad", "VillageRoad.png", Color.white, 0.06f), true));
+            var roadMade = Emit(parent, "VillageRoad", road, Pictured("VillageRoad", "VillageRoad.png", Color.white, 0.06f), true);
+            NoShadow(roadMade);
 
             // 芝の路肩。路地の縁から、家並みの垣と畑の塀の手前まで
             var verge = new Bank { Texel = 0.3f };
@@ -196,7 +197,10 @@ namespace HalfAware.EditorTools
             plot.Patch(new Vector3(PicWest, 0f, PicNorth), new Vector3(PicEast, 0f, PicNorth),
                 new Vector3(PicEast, 0f, PicSouth), new Vector3(PicWest, 0f, PicSouth),
                 new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(1f, 0f), new Vector2(0f, 0f));
-            NoShadow(Emit(parent, "VillagePlot", plot, GroundMat(), true));
+            var plotMade = Emit(parent, "VillagePlot", plot, GroundMat(), true);
+            NoShadow(plotMade);
+            // 足音の地面。路地は砂利、片割れの敷地は芝の中に煉瓦の小路とテラスの硬い所（BuildVillageSound.StepGrounds）
+            StepGrounds(roadMade, plotMade);
 
             // 周りの家の庭の芝。村の帯（南の家の裏の生け垣から北の家の奥の生け垣まで）の下に一枚
             var rest = new Bank { Texel = 0.2f };
@@ -405,7 +409,10 @@ namespace HalfAware.EditorTools
             body.enabled = true;
         }
 
-        /// <summary>場面 1・2 の柔らかい足音。路地の舗装も芝も煉瓦も、これで通す</summary>
+        /// <summary>
+        /// 場面 1・2 の柔らかい足音。芝の路肩と庭の芝で鳴らす既定の音。
+        /// 未舗装の路地と、庭の煉瓦の小路とテラスは、床の当たりの <see cref="StepGround"/> が替える（BuildVillageSound.StepGrounds）
+        /// </summary>
         static readonly string[] SoftSteps =
         {
             "Assets/Audio/Step1.wav", "Assets/Audio/Step2.wav", "Assets/Audio/Step3.wav",
