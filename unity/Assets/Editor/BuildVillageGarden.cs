@@ -761,7 +761,8 @@ namespace HalfAware.EditorTools
         /// **画角から見える所に置く。** アーチの脇の芝の西の縁（真ん中の花の縁の裏）は、その画角では手前の花の縁と
         /// アーチの柱の陰になり、置いた物がほとんど隠れた。アーチの左に芝が見えるのは、目から 4〜8 m 先の芝の西寄りなので、
         /// そこに芝の奥（東屋の側）を向いたベンチ、その東の端に鉢の寄せ植えと重ねた鉢、前にじょうろ、
-        /// 南に鉢のオベリスク、東の飛び石の上に停めた手押し車を寄せる。画角の左の三分の一に、手前から奥へ重なって見える。
+        /// 南に鉢のオベリスクを寄せる。画角の左の三分の一に、手前から奥へ重なって見える。
+        /// 手押し車は東の飛び石の上、画角の外に停める（<see cref="WheelbarrowAt"/>）。
         /// 鳥の餌入れは、芝の真ん中に柱を立てるとテラスからの眺めを縦に割ったので、リンゴの枝から吊る
         /// </summary>
         static void LawnThings(Banks b)
@@ -791,8 +792,13 @@ namespace HalfAware.EditorTools
 
         /// <summary>ベンチ・手押し車・オベリスク・鳥の餌台の立つ所</summary>
         static readonly Vector3 GardenBenchAt = new Vector3(-0.55f, 0f, 23.35f);
-        static readonly Vector3 WheelbarrowAt = new Vector3(2.05f, 0f, 22.55f);
-        const float WheelbarrowYaw = 250f;
+        /// <summary>
+        /// 手押し車。飛び石の上に、輪を南（テラスの側）へ向けて停める。
+        /// **タイトルの画角に入れない。** 画角の左の縁に横向きで掛かったら、脚の付いた卓に見えた（親の差し戻し）。
+        /// テラスと夕日の庭の全体からは、輪を手前にして手押し車と読める
+        /// </summary>
+        static readonly Vector3 WheelbarrowAt = new Vector3(2.76f, 0f, 24.55f);
+        const float WheelbarrowYaw = 180f;
         static readonly Vector3 ObeliskAt = new Vector3(0.95f, 0f, 21.55f);
         /// <summary>鳥の餌入れを吊る、リンゴの南の枝の先の鉤</summary>
         static readonly Vector3 FeederAt = new Vector3(0.35f, 2.05f, 31.75f);
@@ -1145,7 +1151,11 @@ namespace HalfAware.EditorTools
             // アーチの横の芝の小物
             Block(parent, "Bench", GardenBenchAt + new Vector3(0f, 0.5f, -0.05f), new Vector3(1.4f, 1f, 0.6f));
             Block(parent, "LawnPots", new Vector3(0.28f, 0.5f, 23.62f), new Vector3(1.0f, 1f, 1.1f));
-            Block(parent, "Wheelbarrow", WheelbarrowAt + Quaternion.Euler(0f, WheelbarrowYaw, 0f) * new Vector3(0f, 0.5f, -0.25f), new Vector3(1.55f, 1f, 1.0f));
+            // 手押し車の当たり。向きに合わせて、幅 1.0 m・長さ 1.55 m の箱の軸の揃った外形を取る
+            var barrowYaw = WheelbarrowYaw * Mathf.Deg2Rad;
+            var barrowSize = new Vector3(Mathf.Abs(Mathf.Cos(barrowYaw)) * 1.0f + Mathf.Abs(Mathf.Sin(barrowYaw)) * 1.55f, 1f,
+                Mathf.Abs(Mathf.Sin(barrowYaw)) * 1.0f + Mathf.Abs(Mathf.Cos(barrowYaw)) * 1.55f);
+            Block(parent, "Wheelbarrow", WheelbarrowAt + Quaternion.Euler(0f, WheelbarrowYaw, 0f) * new Vector3(0f, 0.5f, -0.25f), barrowSize);
             Block(parent, "Obelisk", ObeliskAt + Vector3.up * 1f, new Vector3(0.65f, 2f, 0.65f));
         }
     }
