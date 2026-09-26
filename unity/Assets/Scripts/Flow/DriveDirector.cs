@@ -24,10 +24,15 @@ namespace HalfAware
     ///
     /// 帯の並びは Awake で写し取る。秒数は bands から毎フレーム直に読むので、
     /// 再生しながら Inspector で触れば効く。ただし配列の長さを再生中に変えると、
-    /// route の数え方（Count・IsLast・BandOf）は古いまま取り残される
+    /// route の数え方（Count・IsLast・BandOf）は古いまま取り残される。
+    ///
+    /// **記憶するは、走っている帯を残す**（<see cref="ISceneMemory"/>、設計書 5 節）。区切りは、その帯を走っていて
+    /// きっかけの対象をまだ調べていない間（帯の時計が Running で、字幕も止まりも無い間）。独白・余韻・暗転の途中で記憶した時は、
+    /// その帯のきっかけを調べる前へ戻る。思い出した時は、乗り込みの一連（ドア・イグニッション）を出さずに運転席に座った形にし、
+    /// その帯を頭から並べて走らせる。ガレージにいる間は、ほかの場面と同じく立ち位置と調べ済みの物だけを残す
     /// </summary>
     [DefaultExecutionOrder(-5)]
-    public sealed class DriveDirector : MonoBehaviour
+    public sealed class DriveDirector : MonoBehaviour, ISceneMemory
     {
         [SerializeField] SceneFlow flow;
         [SerializeField] HudView hud;
@@ -913,6 +918,84 @@ namespace HalfAware
         void Arms(int which)
         {
             if (body != null) body.UseAlternate = which >= 0 && which == drivenBand;
+        }
+
+        // ---- 記憶する・思い出す ------------------------------------------------
+
+        /// <summary>残す形。乗り込んだ後か、走っている帯</summary>
+        [System.Serializable]
+        public sealed class Memo
+        {
+            public bool aboard;
+            public int band = -1;
+        }
+
+        public string MemoryKey { get { return "drive.band"; } }
+
+        /// <summary>
+        /// 乗り込みの一連の間は残さない。乗った後は、帯を走っている間（Running）だけ。
+        /// 独白・余韻・暗転・明け、村へ着く一連の間は残さない（その帯のきっかけを調べる前へ戻る）
+        /// </summary>
+        public bool Settled
+        {
+            get
+            {
+                if (boarding) return false;
+                if (!aboard) return true;
+                return clock.Beat == DriveBeat.Running && !arrival.Underway && !handedOver;
+            }
+        }
+
+        public string Capture()
+        {
+            return aboard && band >= 0 ? JsonUtility.ToJson(new Memo { aboard = true, band = band }) : null;
+        }
+
+        /// <summary>乗った後なら、乗り込みの一連を出さずに運転席に座った形にし、その帯を頭から並べて走らせる</summary>
+        public void Restore(string data)
+        {
+            if (string.IsNullOrEmpty(data)) return;
+            var memo = JsonUtility.FromJson<Memo>(data);
+            // エディタで当てて撮る時は Awake が鳴らないので、帯の並びをここで写す
+            if (route == null) route = new DriveRoute(bands);
+            if (memo == null || !memo.aboard || memo.band < 0 || memo.band >= route.Count) return;
+            SitNow(memo.band);
+        }
+
+        /// <summary>
+        /// 乗り込みの一連（<see cref="Boarding"/>）の終わりの形へ一度に置く。ドア・イグニッションの音も、動き出しの暗転も出さない。
+        /// 目の高さを足元へ写し（目を足元に置く）、体の根を下げ、運転席の正面に据えて首だけ振れるようにする。
+        /// 向きは、あとで残した向きへ置き直される
+        /// </summary>
+        void SitNow(int which)
+        {
+            flow.Held = true;
+            if (sound != null) sound.Shut();
+            Drift(false);
+            if (garageOnly != null) garageOnly.SetActive(false);
+            if (feet != null) feet.enabled = false;
+            var motion = body != null ? body.GetComponent<BodyMotion>() : null;
+            if (motion != null) motion.enabled = false;
+            player.CanMove = false;
+            if (carDoor != null) carDoor.Set(0f);
+            if (body != null) body.transform.localPosition += Vector3.down * player.EyeHeight;
+            var sit = seat != null ? seat.position : player.transform.position + Vector3.up * player.EyeHeight;
+            var seatYaw = seat != null ? seat.eulerAngles.y : player.Yaw;
+            player.PlaceAt(sit, seatYaw, seatedYawLimit, 0f, 0f, 0f);
+            if (body != null) body.Seated = true;
+            if (garage != null) garage.SetActive(false);
+            world.Rolling = true;
+            world.Idling = 0f;
+            Dress(which);
+            band = which;
+            clock.Reset();
+            boarding = false;
+            aboard = true;
+            // 走行音と雨は帯の状態なので鳴らしておく（乗り込みの一連の音とは違う）。エディタで当てて撮る時は鳴らさない
+            if (sound == null || !Application.isPlaying) return;
+            sound.Idle(false);
+            sound.Road(At(which).gravel);
+            sound.Weather(At(which).rain);
         }
     }
 }

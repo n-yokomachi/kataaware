@@ -17,7 +17,7 @@ namespace HalfAware
     /// 椅子に合わせて書く。後からインスペクタで直せる
     /// </summary>
     [DefaultExecutionOrder(25)]
-    public sealed class JackPull : MonoBehaviour
+    public sealed class JackPull : MonoBehaviour, ISceneMemory
     {
         [SerializeField] SceneFlow flow;
         [Tooltip("座った形。これが骨を当てた後に腕を曲げ直す")]
@@ -466,6 +466,28 @@ namespace HalfAware
             tookLook = false;
             var player = flow != null ? flow.Player : null;
             if (player != null) player.CanLook = true;
+        }
+
+        // ---- 記憶する・思い出す ------------------------------------------------
+
+        public string MemoryKey { get { return "room.jack"; } }
+
+        /// <summary>抜いている最中は残さない</summary>
+        public bool Settled { get { return !Pulling; } }
+
+        /// <summary>抜いたかは調べ済みの印（jack）から決まるので、自分では残さない</summary>
+        public string Capture() { return null; }
+
+        /// <summary>ジャックを調べ済みなら、音も腕の動きも無しに、抜いて肘掛けの置き場へ置いた形にする</summary>
+        public void Restore(string data)
+        {
+            if (flow == null || flow.Progress == null || !flow.Progress.Done.Contains(id)) return;
+            Bind();
+            elapsed = PullTimeline.Total;
+            held = true;
+            sounded = true;
+            Park();
+            Pulled = true;
         }
 
         /// <summary>エディタで流れを頭からやり直すための戻し。ジャックを手首へ戻し、掴む・置くの印を消す。再生中は使わない</summary>

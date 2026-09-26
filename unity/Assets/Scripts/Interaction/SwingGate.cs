@@ -12,9 +12,12 @@ namespace HalfAware
     /// 開けたら、ほかの場面で調べたときと同じく目を戸へ向け（<see cref="PlayerController.Face"/>）、開き切るまで見回しを封じる。
     ///
     /// **場面の進行（SceneFlow）には繋がない。** 必須や出来事はまだ入れない（設計書 4 節）。
-    /// 場面の流れが入ったら、この案内と SceneFlow の案内がぶつからないよう、どちらかへまとめる
+    /// 場面の流れが入ったら、この案内と SceneFlow の案内がぶつからないよう、どちらかへまとめる。
+    ///
+    /// **開けたかを記憶する**（<see cref="ISceneMemory"/>、設計書 5 節）。開いている途中で記憶しても開けた後として残し、
+    /// 思い出した時は音を出さずに開き切った形に置く
     /// </summary>
-    public sealed class SwingGate : MonoBehaviour
+    public sealed class SwingGate : MonoBehaviour, ISceneMemory
     {
         [SerializeField] PlayerController player;
         [SerializeField] HudView hud;
@@ -109,6 +112,36 @@ namespace HalfAware
             Remember();
             var k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(amount));
             leaf.localRotation = closed * Quaternion.Euler(0f, openYaw * k, 0f);
+        }
+
+        // ---- 記憶する・思い出す ------------------------------------------------
+
+        /// <summary>残す形。開けたか</summary>
+        [System.Serializable]
+        public sealed class Memo
+        {
+            public bool open;
+        }
+
+        public string MemoryKey { get { return "gate." + name; } }
+
+        /// <summary>開いている途中でも残してよい（開けた後として残す）</summary>
+        public bool Settled { get { return true; } }
+
+        public string Capture()
+        {
+            return open ? JsonUtility.ToJson(new Memo { open = true }) : null;
+        }
+
+        /// <summary>開けた後なら、音を出さずに開き切った形にし、閉じている間のコライダーを切る</summary>
+        public void Restore(string data)
+        {
+            if (string.IsNullOrEmpty(data)) return;
+            var memo = JsonUtility.FromJson<Memo>(data);
+            if (memo == null || !memo.open) return;
+            Set(true);
+            prompting = false;
+            if (player != null) player.FreeLook(this);
         }
 
         /// <summary>閉じた向きを一度だけ覚える。エディタでは Awake が鳴らないので、使う所で覚える</summary>

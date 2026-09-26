@@ -79,6 +79,13 @@ namespace HalfAware
             booted = 0f;
         }
 
+        /// <summary>瞬かずに、灯りきった形にする。思い出した時に、挿した後の画面へ一度に置く</summary>
+        public void LightNow()
+        {
+            booted = ScreenBoot.Total;
+            Paint(ScreenBoot.Level(booted));
+        }
+
         /// <summary>文字を流すか</summary>
         public void Scroll(bool on) { scrolling = on; }
 

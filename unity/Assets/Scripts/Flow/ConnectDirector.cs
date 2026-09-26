@@ -19,9 +19,13 @@ namespace HalfAware
     /// しか見ないので、座る演出と挿す演出は調べた後に数秒かかる。after だけだと
     /// その途中で次の対象が拾えてしまう。演出の終わりで開けば、開く時刻が演出の終わりと一致する。
     /// SceneFlow.Awake は切ってある対象も数えるので、伏せて始めても必須の数え上げは狂わない
+    ///
+    /// **思い出した時**（<see cref="ISceneMemory"/>）は、ドアを閉める音を鳴らさず、調べ済みの印から段を戻す。
+    /// コートハンガーの後ならジャケットを掛けた形、椅子の後なら座った形（ジャックを開く）、ジャックの後なら画面を灯しきった形
+    /// （モニターを開く。挿さった形は <see cref="JackPlug"/> が戻す）、リストの後なら画面を流す
     /// </summary>
     [DefaultExecutionOrder(-5)]
-    public sealed class ConnectDirector : MonoBehaviour
+    public sealed class ConnectDirector : MonoBehaviour, ISceneMemory
     {
         /// <summary>停止に足す余裕。停止が先に切れて、演出の途中で調べられるのを防ぐ</summary>
         public const float FreezeMargin = 0.25f;
@@ -117,7 +121,7 @@ namespace HalfAware
         /// </summary>
         void Start()
         {
-            if (doorShut == null) return;
+            if (doorShut == null || resumed) return;
             var clip = doorShut.clip;
             // DoorShut.wav は先読みしない設定（場面 1 では出がけにしか鳴らない）。途中から鳴らすので、鳴らす前に読み終えておく
             if (clip != null && clip.loadState != AudioDataLoadState.Loaded) clip.LoadAudioData();
@@ -282,6 +286,58 @@ namespace HalfAware
                 sitting = false;
                 if (player != null) player.CanLook = true;
             }
+            Open(jackItem);
+        }
+
+        // ---- 記憶する・思い出す ------------------------------------------------
+
+        bool resumed;
+
+        public string MemoryKey { get { return "connect.steps"; } }
+
+        /// <summary>掛けている間と、腰を下ろしている間は残さない</summary>
+        public bool Settled { get { return !hanging && !sitting; } }
+
+        /// <summary>どの段まで来たかは調べ済みの印から決まるので、自分では残さない</summary>
+        public string Capture() { return null; }
+
+        /// <summary>ドアを閉める音を鳴らさない。調べ済みの印から、音も動きも無しに段を戻す</summary>
+        public void Restore(string data)
+        {
+            resumed = true;
+            if (flow == null || flow.Progress == null) return;
+            var done = flow.Progress.Done;
+            if (done.Contains(ConnectIds.Coat)) TakeOff();
+            if (done.Contains(ConnectIds.Chair)) SitNow();
+            if (done.Contains(ConnectIds.Jack))
+            {
+                booted = true;
+                opened = true;
+                if (screen != null) screen.LightNow();
+                Open(monitorItem);
+            }
+            if (done.Contains(ConnectIds.List))
+            {
+                scrolling = true;
+                paused = true;
+                if (screen != null) screen.Scroll(true);
+            }
+        }
+
+        /// <summary>座り終えた形へ一度に置く（<see cref="Sitting"/> の終わりと同じ）。立ち位置と向きは、あとで残した形に置き直される</summary>
+        void SitNow()
+        {
+            var player = flow.Player;
+            if (player != null)
+            {
+                player.CanMove = false;
+                player.transform.position = seatSpot;
+                player.EyeHeight = seatEyeHeight;
+                player.HeadYawLimit = HeadTurn.DefaultLimit;
+            }
+            if (chairBlocker != null) chairBlocker.SetActive(false);
+            if (pose != null) pose.Seated = true;
+            seated = true;
             Open(jackItem);
         }
 

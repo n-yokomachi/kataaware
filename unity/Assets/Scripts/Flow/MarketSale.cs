@@ -122,6 +122,17 @@ namespace HalfAware
             return i >= 0 && i < buyers.Length ? buyers[i].smokes : 0;
         }
 
+        /// <summary>
+        /// i 人目が来る前に、卓に出ている煙草の数。前の買い手が置いていった物は、売り切れるまで卓に残る。
+        /// 思い出して i 人目から続ける時に、卓をその形にするのに使う
+        /// </summary>
+        public static int SmokesBefore(int i)
+        {
+            var most = 0;
+            for (var j = 0; j < i && j < buyers.Length; j++) most = System.Math.Max(most, buyers[j].smokes);
+            return most;
+        }
+
         /// <summary>i 人目が持っていく枚数</summary>
         public static int Took(int i)
         {

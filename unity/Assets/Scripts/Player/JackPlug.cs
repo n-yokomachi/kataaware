@@ -13,7 +13,7 @@ namespace HalfAware
     /// ジャックを移すので跳ねない
     /// </summary>
     [DefaultExecutionOrder(25)]
-    public sealed class JackPlug : MonoBehaviour
+    public sealed class JackPlug : MonoBehaviour, ISceneMemory
     {
         [SerializeField] SceneFlow flow;
         [Tooltip("座った形。これが骨を当てた後に腕を曲げ直す")]
@@ -152,6 +152,28 @@ namespace HalfAware
                 startRotation = jack.localRotation;
                 startScale = jack.localScale;
             }
+        }
+
+        // ---- 記憶する・思い出す ------------------------------------------------
+
+        public string MemoryKey { get { return "connect.jack"; } }
+
+        /// <summary>挿している最中は残さない</summary>
+        public bool Settled { get { return !Plugging; } }
+
+        /// <summary>挿したかは調べ済みの印（jack）から決まるので、自分では残さない</summary>
+        public string Capture() { return null; }
+
+        /// <summary>ジャックを調べ済みなら、音も腕の動きも無しに、右手首の差込口へ挿さった形にする</summary>
+        public void Restore(string data)
+        {
+            if (flow == null || flow.Progress == null || !flow.Progress.Done.Contains(id)) return;
+            Bind();
+            elapsed = PlugTimeline.Total;
+            held = true;
+            sounded = true;
+            Seat();
+            Done = true;
         }
 
         /// <summary>エディタで流れを頭からやり直すための戻し。ジャックを置き場へ戻し、掴む・挿さるの印を消す。再生中は使わない</summary>

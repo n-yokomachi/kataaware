@@ -7,7 +7,7 @@ namespace HalfAware
     /// 調べた結果が部屋の見た目に残るところに使う。
     /// 消す物と、代わりに現れる物と、色を替えるマテリアルを挙げておく
     /// </summary>
-    public sealed class Taken : MonoBehaviour
+    public sealed class Taken : MonoBehaviour, ISceneMemory
     {
         [Tooltip("調べ終わりを受け取る")]
         [SerializeField] SceneFlow flow;
@@ -56,6 +56,23 @@ namespace HalfAware
             taken = true;
             Apply();
             if (source != null && sound != null) source.PlayOneShot(sound);
+        }
+
+        // ---- 記憶する・思い出す ------------------------------------------------
+
+        public string MemoryKey { get { return "taken." + id; } }
+
+        public bool Settled { get { return true; } }
+
+        /// <summary>持っていったかは調べ済みの印から決まるので、自分では残さない</summary>
+        public string Capture() { return null; }
+
+        /// <summary>調べ済みなら、音を出さずに持っていった後の形にする</summary>
+        public void Restore(string data)
+        {
+            if (flow == null || flow.Progress == null || !flow.Progress.Done.Contains(id)) return;
+            taken = true;
+            Apply();
         }
 
         void Apply()

@@ -15,9 +15,12 @@ namespace HalfAware
     /// **眩暈も SceneFlow ではなくここが掛ける。** SceneFlow の <c>ReleaseDaze</c> は
     /// <c>dazeUntil</c> が空だと最初の Update で自分の秒数に上書きしてしまい、
     /// 何人渡ってきたかが消える。組み立ては SceneFlow の daze を繋がない
+    ///
+    /// **思い出した時**（<see cref="ISceneMemory"/>）は、入った時の眩暈も一服も出さず、吸い終わってモニターを開いた形から始める。
+    /// 吸い終わって一行を読むまでは自由に動ける所が無いので、手動のセーブが場面の中の状態を持つのは、いつも吸い終わった後
     /// </summary>
     [DefaultExecutionOrder(-5)]
-    public sealed class RestDirector : MonoBehaviour
+    public sealed class RestDirector : MonoBehaviour, ISceneMemory
     {
         /// <summary>停止に加える余裕。停止が先に切れて、吸っている途中で調べられるのを防ぐ</summary>
         public const float FreezeMargin = 0.25f;
@@ -67,7 +70,9 @@ namespace HalfAware
                 yield break;
             }
             Seat();
-            if (daze != null)
+            // 思い出した時は、入った時の眩暈を出さない（Restore が消してある）。吸い終わった後なら一服も出さない
+            if (resumed && Smoked) yield break;
+            if (daze != null && !resumed)
             {
                 // 渡ってきた人数はまだ使っていない。濃さを段で変えるなら DiveHandoff.Hops をここへ
                 var deep = DiveHandoff.FromDive ? fromDive : alone;
@@ -132,5 +137,37 @@ namespace HalfAware
 
         /// <summary>吸っている最中か。動作確認から読む</summary>
         public bool Smoking { get { return smoking; } }
+
+        // ---- 記憶する・思い出す ------------------------------------------------
+
+        bool resumed;
+
+        /// <summary>残す形。吸い終わったか</summary>
+        [System.Serializable]
+        public sealed class Memo
+        {
+            public bool smoked;
+        }
+
+        public string MemoryKey { get { return "rest.smoke"; } }
+
+        /// <summary>吸っている間は残さない</summary>
+        public bool Settled { get { return !smoking; } }
+
+        public string Capture()
+        {
+            return JsonUtility.ToJson(new Memo { smoked = Smoked });
+        }
+
+        /// <summary>入った時の眩暈と一服を出さない。吸い終わった後なら、モニターを開いた形にする</summary>
+        public void Restore(string data)
+        {
+            resumed = true;
+            var memo = string.IsNullOrEmpty(data) ? null : JsonUtility.FromJson<Memo>(data);
+            // 残した形が読めなくても、手動のセーブは吸い終わった後にしか中身を持たない
+            Smoked = memo == null || memo.smoked;
+            if (daze != null) daze.Clear();
+            if (diveItem != null) diveItem.SetActive(Smoked);
+        }
     }
 }

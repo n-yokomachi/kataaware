@@ -16,10 +16,15 @@ namespace HalfAware
     /// 場面を閉じる判定は SceneFlow が持っている。止め方は二つ使い分ける。
     /// 売り買いのあいだは通して `flow.Held` で閉じるのを押さえ、暗転のあいだだけ
     /// `flow.Freeze` で操作も止める。Freeze は字幕送りまで止めてしまうので、
-    /// 台詞のあいだに使うと読み進められなくなる
+    /// 台詞のあいだに使うと読み進められなくなる。
+    ///
+    /// **売り買いの途中は、買い手と買い手の間を区切りにする**（<see cref="ISceneMemory"/>、設計書 5 節）。
+    /// 売り買いの間は歩けず、字幕か暗転がずっと続くので、自由に動けるフレームが無い。
+    /// 次の買い手を出す直前に <see cref="SceneFlow.Checkpoint"/> で写しを取り、思い出した時は
+    /// 露店の内側に立ち、卓のチップと煙草をその買い手が来る前の数にして、その買い手から続ける
     /// </summary>
     [DefaultExecutionOrder(-5)]
-    public sealed class AlleyDirector : MonoBehaviour
+    public sealed class AlleyDirector : MonoBehaviour, ISceneMemory
     {
         [SerializeField] SceneFlow flow;
         [SerializeField] HudView hud;
@@ -112,9 +117,18 @@ namespace HalfAware
             Show(MarketSale.Chips);
             yield return new WaitForSeconds(blackSeconds);
             yield return Black(false);
+            yield return Buyers(0);
+        }
 
-            for (var i = 0; i < MarketSale.Count; i++)
+        /// <summary>
+        /// from 人目の買い手から売り切れるまで。買い手を出す直前を区切りにして写しを取る（思い出すとそこから続く）
+        /// </summary>
+        IEnumerator Buyers(int from)
+        {
+            for (var i = from; i < MarketSale.Count; i++)
             {
+                next = i;
+                flow.Checkpoint();
                 ShowBuyer(i);
                 StartCoroutine(Appear(i, buyerFade));
                 flow.Say(MarketSale.Lines(i));
@@ -128,10 +142,64 @@ namespace HalfAware
             }
 
             Show(0);
+            next = -1;
             flow.Say(MarketSale.Closing);
             // 締めの文は積んである。読み終えたところで場面が閉じてよい
             flow.Held = false;
             selling = false;
+        }
+
+        // ---- 記憶する・思い出す ------------------------------------------------
+
+        /// <summary>売り買いの途中で、次に来る買い手。売り買いの外なら -1</summary>
+        int next = -1;
+
+        /// <summary>残す形。次に来る買い手（売り買いの外なら -1）</summary>
+        [System.Serializable]
+        public sealed class Memo
+        {
+            public int buyer = -1;
+        }
+
+        public string MemoryKey { get { return "alley.sale"; } }
+
+        /// <summary>売り買いの間は自由に動ける所ではない（区切りは <see cref="Buyers"/> が自分で取る）</summary>
+        public bool Settled { get { return !selling; } }
+
+        public string Capture()
+        {
+            return selling && next >= 0 ? JsonUtility.ToJson(new Memo { buyer = next }) : null;
+        }
+
+        /// <summary>
+        /// 売り買いの途中なら、暗転も音も無しに露店の内側へ立たせ、卓をその買い手が来る前の形にして、
+        /// 黒から明けきってからその買い手を出す
+        /// </summary>
+        public void Restore(string data)
+        {
+            if (string.IsNullOrEmpty(data)) return;
+            var memo = JsonUtility.FromJson<Memo>(data);
+            if (memo == null || memo.buyer < 0 || memo.buyer >= MarketSale.Count) return;
+            selling = true;
+            next = memo.buyer;
+            player.CanMove = false;
+            flow.Held = true;
+            Seat();
+            Show(MarketSale.Left(memo.buyer - 1));
+            ShowSmokes(MarketSale.SmokesBefore(memo.buyer));
+            ShowBuyer(-1);
+            if (Application.isPlaying) StartCoroutine(Resume(memo.buyer));
+        }
+
+        /// <summary>黒から明けきるのを待ってから、その買い手から続ける。待つ間は調べさせない</summary>
+        IEnumerator Resume(int from)
+        {
+            for (var t = 0f; t < SceneFlow.FadeInSeconds; t += Time.deltaTime)
+            {
+                flow.Freeze(0.25f);
+                yield return null;
+            }
+            yield return Buyers(from);
         }
 
         /// <summary>

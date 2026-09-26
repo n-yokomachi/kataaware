@@ -10,9 +10,12 @@ namespace HalfAware
     /// 覆っているあいだにクレジットとタイトルのカードを出し、戻ると消えている。
     /// 吸い終わったら、座ったまま椅子の右の卓に置いたジャケットを着る。着る音を鳴らし、正面へ向き直してから、
     /// 音の終わりの少し前に体へ着せて卓のジャケットを消す（着る動きは作らない）。着た後の独白で締め、読み終えたら立ち上がる（SceneFlow の standAfter）。
-    /// SceneFlow とは Examined / Say / Freeze だけで繋ぐ
+    /// SceneFlow とは Examined / Say / Freeze だけで繋ぐ。
+    ///
+    /// **思い出した時**（<see cref="ISceneMemory"/>）は、最初の独白を出さず、ジャケットを着た後なら着た形に置く。
+    /// 煙草は場に残る物が無いので、調べ済みの印だけでよい
     /// </summary>
-    public sealed class RoomIntroDirector : MonoBehaviour
+    public sealed class RoomIntroDirector : MonoBehaviour, ISceneMemory
     {
         /// <summary>停止に足す余裕。停止が先に切れて、演出の途中で調べられるのを防ぐ</summary>
         public const float FreezeMargin = 0.25f;
@@ -96,12 +99,34 @@ namespace HalfAware
             if (cigarette != null) cigarette.Stop();
         }
 
-        /// <summary>最初の独白は場面の始めに 1 度だけ。切って入れ直してもやり直さない</summary>
+        /// <summary>最初の独白は場面の始めに 1 度だけ。切って入れ直してもやり直さない。思い出した時は出さない</summary>
         void Start()
         {
-            if (!enabled) return;
+            if (!enabled || resumed) return;
             if (flow.Player != null) seatedYaw = flow.Player.Yaw;
             flow.Say(firstLines);
+        }
+
+        // ---- 記憶する・思い出す ------------------------------------------------
+
+        bool resumed;
+
+        public string MemoryKey { get { return "room.intro"; } }
+
+        /// <summary>吸っている間と、着ている間は残さない</summary>
+        public bool Settled { get { return !smoking && !dressing; } }
+
+        /// <summary>着たかは調べ済みの印（jacket）から決まるので、自分では残さない</summary>
+        public string Capture() { return null; }
+
+        /// <summary>最初の独白を出さない。ジャケットを調べ済みなら、音も向き直しも無しに着た形へ置く</summary>
+        public void Restore(string data)
+        {
+            resumed = true;
+            if (flow == null) return;
+            // 座って始めた向きは、残した向きへ置き直す前に拾う（着る時に正面へ戻す先）
+            if (flow.Player != null) seatedYaw = flow.Player.Yaw;
+            if (flow.Progress != null && flow.Progress.Done.Contains(jacketId)) Dress();
         }
 
         void OnExamined(IInteractable item)
