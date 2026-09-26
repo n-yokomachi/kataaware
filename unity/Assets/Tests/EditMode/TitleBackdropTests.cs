@@ -155,8 +155,23 @@ namespace HalfAware.Tests
         {
             Assert.AreEqual(0, TitleBackdrops.SoundsOf(TitleBackdrop.Dive).Length);
             Assert.AreEqual(0, TitleBackdrops.SoundsOf(TitleBackdrop.Drive).Length);
-            Assert.AreEqual(1, TitleBackdrops.SoundsOf(TitleBackdrop.VillageMorning).Length);
-            Assert.AreEqual(1, TitleBackdrops.SoundsOf(TitleBackdrop.VillageEvening).Length);
+        }
+
+        [Test]
+        public void TheVillageSoundsAsInTheGardenOfTheVillage()
+        {
+            // 朝の庭（アーチのトンネルの先）では、麦の風は路地の途中で消えきっている。鳥の声の朝の村の輪だけ
+            Assert.AreEqual(0f, VillageAmbience.Reach(TitleBackdrops.VillageEyeX,
+                VillageAmbience.DefaultWheatFadeFrom, VillageAmbience.DefaultWheatFadeTo), 1e-6f);
+            var morning = TitleBackdrops.SoundsOf(TitleBackdrop.VillageMorning);
+            Assert.AreEqual(1, morning.Length);
+            Assert.AreEqual("VillageMorning", morning[0].File);
+            Assert.AreEqual(VillageAmbience.DefaultMorningVillage, morning[0].Volume, 1e-6f);
+            // 夕方は麦の風だけ
+            var evening = TitleBackdrops.SoundsOf(TitleBackdrop.VillageEvening);
+            Assert.AreEqual(1, evening.Length);
+            Assert.AreEqual("WheatWind", evening[0].File);
+            Assert.AreEqual(VillageAmbience.DefaultEveningWheat, evening[0].Volume, 1e-6f);
         }
 
         // ---- 起動の表示の日時と場所 ------------------------------------------------

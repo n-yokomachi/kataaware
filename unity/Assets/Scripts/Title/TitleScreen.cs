@@ -140,11 +140,16 @@ namespace HalfAware
             public TitleBackdrop backdrop;
             public AudioClip clip;
             [Range(0f, 1f)] public float volume;
+            /// <summary>
+            /// 組み立てが入れた既定の大きさ。volume がこれと違えば、オーナーが耳で変えた値として組み直しでも残す。
+            /// 同じなら、組み直しで新しい既定（場面の中の大きさ）に付いていく
+            /// </summary>
+            [HideInInspector] public float preset;
         }
 
         [Tooltip("背景の絵。TitleBackdrop の並び（自室・路地裏・潜る・車内・村の朝・村の夕方）")]
         [SerializeField] Texture2D[] backdrops = new Texture2D[TitleBackdrops.Count];
-        [Tooltip("背景の場所の環境音。背景が同じ物はみな重ねて流す。大きさはその場面の中と同じ（組み直しても前の値を引き継ぐ）")]
+        [Tooltip("背景の場所の環境音。背景が同じ物はみな重ねて流す。大きさはその場面の中と同じ（インスペクターで変えた値は、組み直しても引き継ぐ）")]
         [SerializeField] Ambience[] ambience = new Ambience[0];
         [Tooltip("環境音を流す口。二本目からは、遊び始めにこの横へ同じ設定の口を足す")]
         [SerializeField] AudioSource sound;

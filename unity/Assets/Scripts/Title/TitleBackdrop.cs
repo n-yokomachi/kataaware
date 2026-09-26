@@ -84,14 +84,19 @@ namespace HalfAware
         /// <summary>路地裏の雨の大きさ。場面 2 の Player/RainSound と同じ値（BuildAlley の RainSound）</summary>
         public const float AlleyRain = 0.30f;
 
-        /// <summary>村の環境音の大きさ。場面の中より小さく流す（村の背景を作った時の値のまま）</summary>
-        public const float VillageQuiet = 0.3f;
+        /// <summary>
+        /// 村の背景（<c>village_a1</c>）の目の東西の位置（世界の x）。裏庭のアーチのトンネルの北の端の先
+        /// （設計書 5 節の表、<c>CheckVillage.GardenViews</c> の g1_title）。朝の麦の風の残りをここで見る
+        /// </summary>
+        public const float VillageEyeX = -2.889f;
 
         /// <summary>
         /// 背景の場所の環境音。その場面で流している輪を、その場面の中と同じ大きさで重ねて流す（オーナー、2026-09-27）。
         /// 自室は部屋の空気（Player/RoomTone、<see cref="RoomTone.DefaultVolume"/>）。
         /// 路地裏は、場面 2 の通りの所の釣り合い（雑踏 <see cref="CrowdNoise.StreetDefault"/> と雨 <see cref="AlleyRain"/>）。
-        /// 村は前からの小さめの値。潜る・車内（ガレージ）は無音。
+        /// 村は <see cref="VillageAmbience"/> と同じ。朝は朝の村の輪と麦の風の輪を重ねるが、麦の風は背景の目の位置
+        /// （<see cref="VillageEyeX"/>）での残り（<see cref="VillageAmbience.Reach"/>）を掛け、消えていれば流さない。
+        /// 夕方は麦の風だけ。潜る・車内（ガレージ）は無音。
         /// 音のファイルは <c>Assets/Audio/</c> の <c>名.wav</c>
         /// </summary>
         public static TitleSound[] SoundsOf(TitleBackdrop b)
@@ -101,9 +106,14 @@ namespace HalfAware
                 case TitleBackdrop.Room: return new[] { new TitleSound("RoomTone", RoomTone.DefaultVolume) };
                 case TitleBackdrop.Alley:
                     return new[] { new TitleSound("CrowdLoop", CrowdNoise.StreetDefault), new TitleSound("RainLoop", AlleyRain) };
-                case TitleBackdrop.VillageMorning: return new[] { new TitleSound("VillageMorning", VillageQuiet) };
-                // 夕方の村は麦の風だけ（VillageAmbience と同じ）
-                case TitleBackdrop.VillageEvening: return new[] { new TitleSound("WheatWind", VillageQuiet) };
+                case TitleBackdrop.VillageMorning:
+                    {
+                        var village = new TitleSound("VillageMorning", VillageAmbience.DefaultMorningVillage);
+                        var wheat = VillageAmbience.DefaultMorningWheat * VillageAmbience.Reach(VillageEyeX,
+                            VillageAmbience.DefaultWheatFadeFrom, VillageAmbience.DefaultWheatFadeTo);
+                        return wheat > 0f ? new[] { village, new TitleSound("WheatWind", wheat) } : new[] { village };
+                    }
+                case TitleBackdrop.VillageEvening: return new[] { new TitleSound("WheatWind", VillageAmbience.DefaultEveningWheat) };
                 default: return new TitleSound[0];
             }
         }

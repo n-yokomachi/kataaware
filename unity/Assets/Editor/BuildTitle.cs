@@ -17,7 +17,7 @@ namespace HalfAware.EditorTools
     ///
     /// 開いている場面には触らない。Title.unity を横に開いて組み、保存して閉じる（同じエディタで別の担当が場面を開いていても崩さない）。
     /// 環境音の大きさは、はじめは <see cref="TitleBackdrops.SoundsOf"/> の値（その場面の中と同じ）。
-    /// オーナーが耳で決めるので、組み直しても前の値（背景と音の名が同じ物）を引き継ぐ
+    /// オーナーが耳で決めるので、インスペクターで変えた値（組み立てが入れた既定と違う物）は、組み直しても引き継ぐ（背景と音の名が同じ物）
     /// </summary>
     public static class BuildTitle
     {
@@ -107,7 +107,11 @@ namespace HalfAware.EditorTools
             go.AddComponent<AudioListener>();
         }
 
-        /// <summary>前に組んだ物の環境音の大きさ（オーナーがインスペクターで変えた値）を、背景と音の名で拾う</summary>
+        /// <summary>
+        /// 前に組んだ物の環境音の大きさのうち、オーナーがインスペクターで変えた物（組み立てが入れた既定 preset と違う物）を、
+        /// 背景と音の名で拾う。既定のままの物は拾わず、組み直しで新しい既定に付いていく。
+        /// preset を持たない前の形（0）は、変えていない物として扱う
+        /// </summary>
         static void Heard(TitleScreen old, Dictionary<string, float> heard)
         {
             var list = new SerializedObject(old).FindProperty("ambience");
@@ -117,8 +121,10 @@ namespace HalfAware.EditorTools
                 var e = list.GetArrayElementAtIndex(i);
                 var clip = e.FindPropertyRelative("clip").objectReferenceValue as AudioClip;
                 if (clip == null) continue;
-                heard[Key((TitleBackdrop)e.FindPropertyRelative("backdrop").enumValueIndex, clip.name)] =
-                    e.FindPropertyRelative("volume").floatValue;
+                var volume = e.FindPropertyRelative("volume").floatValue;
+                var preset = e.FindPropertyRelative("preset");
+                if (preset == null || preset.floatValue <= 0f || Mathf.Approximately(preset.floatValue, volume)) continue;
+                heard[Key((TitleBackdrop)e.FindPropertyRelative("backdrop").enumValueIndex, clip.name)] = volume;
             }
         }
 
@@ -129,7 +135,7 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 背景の絵・環境音・明朝・潜るの日時と場所を繋ぐ。撮るとき（<see cref="TitleShots"/>）にも使う。
-        /// 環境音の大きさは <see cref="TitleBackdrops.SoundsOf"/> の値で、heard に前の値があればそちらを残す。
+        /// 環境音の大きさは <see cref="TitleBackdrops.SoundsOf"/> の値で、heard にオーナーが変えた値があればそちらを残す。
         /// 何が欠けているかを返す
         /// </summary>
         public static string Wire(TitleScreen screen, AudioSource sound, Dictionary<string, float> heard = null)
@@ -161,6 +167,7 @@ namespace HalfAware.EditorTools
                 e.FindPropertyRelative("backdrop").enumValueIndex = (int)b;
                 e.FindPropertyRelative("clip").objectReferenceValue = clip;
                 e.FindPropertyRelative("volume").floatValue = volume;
+                e.FindPropertyRelative("preset").floatValue = s.Volume;
             }
             var mincho = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(BuildDrive.MinchoPath);
             if (mincho == null) missing.Add("明朝");
