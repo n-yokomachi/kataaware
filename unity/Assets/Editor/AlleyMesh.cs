@@ -33,6 +33,11 @@ namespace HalfAware.EditorTools
         public float RootY;
         /// <summary>その物の背。割合を出すのに使う。0 以下なら割合は 0</summary>
         public float RootHigh = 1f;
+        /// <summary>
+        /// 根の値を決め打ちする。値があれば、Rooted のあいだ uv1 にこれをそのまま入れる。
+        /// 村の庭のアーチの弧に並べる帯の札のように、揺らさず根元の陰りも付けない札に (0, 1) を使う
+        /// </summary>
+        public Vector2? RootFixed;
 
         /// <summary>
         /// 札の法線を上へ倒す割合。麦だけが使う。
@@ -148,6 +153,11 @@ namespace HalfAware.EditorTools
         void Root(Vector3 v)
         {
             if (!Rooted) return;
+            if (RootFixed.HasValue)
+            {
+                roots.Add(RootFixed.Value);
+                return;
+            }
             var up = v.y - RootY;
             roots.Add(new Vector2(up, RootHigh > 0f ? Mathf.Clamp01(up / RootHigh) : 0f));
         }

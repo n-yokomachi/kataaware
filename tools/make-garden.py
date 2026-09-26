@@ -15,11 +15,12 @@
 小さな花を細かく散らすと色の点の雑音にしか見えないので、花は大きめの塊で置き、
 同じ色の花を寄せて描く。葉は花より暗く沈め、花の色が葉の上に浮くようにする。
 
-アトラスの割り付けは 128 画素を一つの升にした 8×8 升。札の縦横の比に合わせて、
-升を 1×3（背の高い物）、1×2（中くらい）、2×1（低い塊）、2×2（つると木）で使う。
+アトラスの割り付けは 128 画素を一つの升にした 8×16 升（1024×2048）。札の縦横の比に合わせて、
+升を 1×3（背の高い物）、1×2（中くらい）、2×1（低い塊）、2×2（つると木）、4×1（アーチの帯）で使う。
 **割り付けを変えたら BuildVillagePlants.cs の Cells も直す。**
 
-    python tools/make-garden.py
+    python tools/make-garden.py          # 全部
+    python tools/make-garden.py flora    # 花と葉のアトラスだけ
 """
 
 import importlib.util
@@ -46,6 +47,8 @@ D = _drive()
 
 UNIT = 128
 ATLAS = 1024
+# アトラスの縦。上の 1024 が初めの 8×8 升、下の 1024 に 2026-09-27 からの升を足していく
+ATLAS_H = 2048
 
 
 # ---- 札を描く筆 --------------------------------------------------------------
@@ -257,10 +260,12 @@ def bush_with(flower, seed, leaf_top=0.45, count=9, lo=0.08, hi=0.55, stem=(58, 
 def dahlia(petal, seed):
     """
     ダリア。茎の先の大きな花。一枚の円で描くと茸の傘に見えたので、
-    外の花びらの輪と内の輪を重ね、芯へ向かって暗くする
+    外の花びらの輪と内の輪を重ね、芯へ向かって暗くする。
+    **花を大きくしすぎない。** 半径 10 画素の花を 14 輪にしたら、近くで淡いピンクの皿が並んで見えた。
+    一回り小さな花を多めに付け、株として読ませる
     """
     def one(b, rng, x, y):
-        r = rng.uniform(9, 11.5)
+        r = rng.uniform(7, 9)
         dark = mix(petal, (0, 0, 0), 0.35)
         b.ell(x, y, r, r * 0.92, dark)
         for k in range(10):
@@ -271,7 +276,7 @@ def dahlia(petal, seed):
             b.ell(x + math.cos(a) * r * 0.3, y + math.sin(a) * r * 0.28, r * 0.26, r * 0.22,
                   mix(jitter(petal, rng, 8), (255, 255, 255), 0.18))
         b.ell(x, y, r * 0.16, r * 0.15, mix(petal, (60, 40, 20), 0.5))
-    return bush_with(one, seed, 0.40, 14, 0.08, 0.48)
+    return bush_with(one, seed, 0.40, 19, 0.08, 0.50)
 
 
 def rudbeckia():
@@ -383,13 +388,19 @@ def mound(seed, dark, light, count=90, size=12):
 
 
 def catmint():
-    """キャットミント。灰緑の株が外へ倒れ、薄紫の穂が霞のように乗る"""
-    b, rng = mound(281, GREY_DARK, GREY_LIGHT, 110, 11)
-    for _ in range(220):
-        x = rng.uniform(12, 244)
+    """
+    キャットミント。灰緑の株が外へ倒れ、薄紫の穂が霞のように乗る。
+    **穂で株を塗りつぶさない。** 太い濃い紫の穂を詰めたら、芝の縁に沿って濃い青紫の帯が一本通り、
+    日陰では紺の塊に沈んだ。穂は細く疎らに、色は灰みの淡い青紫にして、下の灰緑を透かす
+    """
+    b, rng = mound(281, GREY_DARK, GREY_LIGHT, 120, 11)
+    for _ in range(175):
+        x = rng.uniform(14, 242)
         t = (x - 128) / 128.0
-        y = rng.uniform(h_top(t, 14), 96)
-        b.line([(x, y + 14), (x + rng.uniform(-3, 3), y)], jitter((138, 136, 206), rng, 12), 6)
+        y = rng.uniform(h_top(t, 16), 92)
+        lean = (x - 128) * 0.05
+        col = jitter(mix((138, 138, 210), (166, 168, 214), rng.random()), rng, 10)
+        b.line([(x - lean, y + 16), (x + rng.uniform(-2, 2), y)], col, 4)
     return b.done()
 
 
@@ -414,13 +425,17 @@ def lavender():
     w, h = UNIT * 2, UNIT
     rng = random.Random(293)
     b = Brush(w, h)
-    for _ in range(200):
-        x = rng.uniform(8, 248)
+    # **穂は細く、間を空ける。** 太い穂を 200 本詰めたら、テラスの縁の手前で紫の塗り壁になり、
+    # 札の四角が透けて見えた。灰緑の株を半分の高さまで盛り、その上に細い穂を立てて、穂の間から株を見せる
+    foliage(b, rng, 12, 244, h * 0.36, h - 2, 130, 10, GREY_DARK, GREY_LIGHT)
+    for _ in range(190):
+        x = rng.uniform(12, 244)
         t = (x - 128) / 128.0
-        top = 6 + 40 * t * t + rng.uniform(0, 14)
-        b.line([(128 + (x - 128) * 0.7, h - 30), (x, top + 14)], (104, 118, 92), 1)
-        b.line([(x, top + 16), (x, top)], jitter((112, 82, 170), rng, 14), 4)
-    foliage(b, rng, 10, 246, h * 0.55, h - 2, 90, 10, GREY_DARK, GREY_LIGHT)
+        top = 6 + 36 * t * t + rng.uniform(0, 14)
+        foot = 128 + (x - 128) * 0.8
+        b.line([(foot, h * 0.6), (x, top + 18)], (116, 130, 100), 1)
+        col = jitter(mix((98, 76, 164), (128, 104, 188), rng.random()), rng, 10)
+        b.line([(x, top + 20), (x, top)], col, 3)
     return b.done()
 
 
@@ -517,26 +532,47 @@ def ivy():
 
 # ---- つると木（2×2 升、256×256） ---------------------------------------------
 
-def tangle(seed, count=160, size=14, dark=LEAF_DARK, light=LEAF_LIGHT):
+def tangle(seed, count=160, size=14, dark=LEAF_DARK, light=LEAF_LIGHT, spread=None):
+    """
+    つるの葉の塊（2×2 升）。
+    **枝も葉も塊の外へ散らさない。** 輪郭の外に葉を疎らに撒き、枝を塊の外まで引いたら、
+    アーチの頭や柱の肩から細い枝が突き出して見えた（オーナーの指摘、2026-09-27）。
+    輪郭は円を幾つか重ねた丸い凸凹にし、枝は輪郭より内にだけ引く。
+    spread は輪郭の円の中心の散らばり（画素）
+    """
     w, h = UNIT * 2, UNIT * 2
     rng = random.Random(seed)
     b = Brush(w, h)
-    for _ in range(14):
-        x0, y0 = rng.uniform(20, 236), rng.uniform(20, 236)
+    spread = 40 if spread is None else spread
+    blobs = [(128, 128, 98)]
+    for _ in range(6):
+        blobs.append((128 + rng.uniform(-spread, spread), 128 + rng.uniform(-spread, spread), rng.uniform(46, 62)))
+
+    def room(x, y):
+        """輪郭の内への深さ（画素）。負なら外"""
+        return max(br - math.hypot(x - bx, y - by) for bx, by, br in blobs)
+
+    for _ in range(12):
+        x0, y0 = rng.uniform(70, 186), rng.uniform(70, 186)
         pts = [(x0, y0)]
         for _k in range(5):
-            x0 += rng.uniform(-26, 26)
-            y0 += rng.uniform(-26, 26)
+            nx, ny = x0 + rng.uniform(-22, 22), y0 + rng.uniform(-22, 22)
+            if room(nx, ny) < size * 1.4:
+                break
+            x0, y0 = nx, ny
             pts.append((x0, y0))
-        b.line(pts, (72, 60, 42), 2)
-    for _ in range(int(count * 3)):
-        x = rng.uniform(10, 246)
-        y = rng.uniform(10, 246)
-        d = math.hypot(x - 128, y - 128) / 128.0
-        if d > 1.02 and rng.random() < 0.7:
+        if len(pts) > 1:
+            b.line(pts, (72, 60, 42), 2)
+    for _ in range(int(count * 3.4)):
+        x = rng.uniform(8, 248)
+        y = rng.uniform(8, 248)
+        r = room(x, y)
+        if r < size * 0.9:
             continue
+        d = math.hypot(x - 128, y - 128) / 128.0
         col = jitter(mix(light, dark, min(1.0, d * 0.6 + rng.uniform(0, 0.5))), rng, 10)
-        b.leaf(x, y, size * rng.uniform(0.8, 1.2), rng.uniform(0, 360), size * 0.4, col)
+        b.leaf(x, y, size * rng.uniform(0.7, 1.0), rng.uniform(0, 360), size * 0.4, col)
+    b.room = room
     return b, rng
 
 
@@ -546,7 +582,7 @@ def roses():
     for _ in range(44):
         x = rng.uniform(24, 232)
         y = rng.uniform(24, 232)
-        if math.hypot(x - 128, y - 128) > 118:
+        if b.room(x, y) < 12:
             continue
         base = rng.choice([(238, 186, 196), (244, 214, 214), (246, 240, 232), (238, 186, 196), (214, 120, 150)])
         for _k in range(rng.randint(2, 4)):
@@ -564,7 +600,7 @@ def clematis():
     for _ in range(48):
         x = rng.uniform(20, 236)
         y = rng.uniform(20, 236)
-        if math.hypot(x - 128, y - 128) > 118:
+        if b.room(x, y) < 12:
             continue
         base = rng.choice([(104, 58, 150), (126, 76, 176), (88, 44, 126)])
         r = rng.uniform(9, 11)
@@ -582,7 +618,7 @@ def honeysuckle():
     for _ in range(36):
         x = rng.uniform(24, 232)
         y = rng.uniform(24, 232)
-        if math.hypot(x - 128, y - 128) > 116:
+        if b.room(x, y) < 13:
             continue
         for k in range(7):
             a = 2 * math.pi * k / 7 + rng.uniform(-0.2, 0.2)
@@ -599,12 +635,181 @@ def apple():
     for _ in range(34):
         x = rng.uniform(26, 230)
         y = rng.uniform(40, 236)
-        if math.hypot(x - 128, y - 128) > 108:
+        if b.room(x, y) < 10:
             continue
         r = rng.uniform(5, 6.5)
         b.ell(x, y, r, r, (150, 30, 24))
         b.ell(x - 1.5, y - 1.5, r * 0.65, r * 0.6, (200, 54, 38))
         b.ell(x - 2, y - 2.5, 1.4, 1.2, (240, 170, 120))
+    return b.done()
+
+
+def rose_head(b, rng, cx, cy, base, r):
+    """花びらの詰まったバラの花を一つ。影の輪、花、明るい芯"""
+    b.ell(cx, cy, r, r, mix(base, (80, 40, 50), 0.22))
+    b.ell(cx - 1, cy - 1, r * 0.8, r * 0.78, base)
+    b.ell(cx - 2, cy - 2, r * 0.35, r * 0.35, mix(base, (255, 255, 255), 0.4))
+
+
+def star(b, rng, x, y, r, base):
+    """クレマチスの平たい星形の花"""
+    spin = rng.uniform(0, 1)
+    for k in range(6):
+        a = 2 * math.pi * (k + spin) / 6
+        b.leaf(x, y, r, math.degrees(a), r * 0.36, jitter(base, rng, 10))
+    b.ell(x, y, 2.5, 2.5, (230, 220, 170))
+
+
+def garland():
+    """
+    アーチの弧に沿わせるバラとクレマチスの帯（4×1 升、512×128）。
+    札の下の辺を弧の内の縁、上の辺を外の縁に当てて、弧に沿って並べる（BuildVillagePlants.ArchPlants）。
+    **上の縁は丸い凸凹で止め、枝も葉も外へ突き出さない。** 弧の形が読めるように、帯の厚みを揃える。
+    下の縁からは短い房を垂らす（アーチの内へ垂れる）。横に繋げて使うので、左右の端まで葉で埋める。
+    誘引した枝は弧に沿って横に這わせる（RHS の誘引の手引き: 枝を支柱に巻き、なるべく横に寝かせる）
+    """
+    w, h = UNIT * 4, UNIT
+    rng = random.Random(367)
+    b = Brush(w, h)
+
+    def top(x):
+        return 22 + 7 * math.sin(x / 21.0 + 0.7) + 5 * math.sin(x / 8.5 + 2.1)
+
+    def bottom(x):
+        return 100 + 4 * math.sin(x / 17.0 + 1.3)
+
+    # 横に這う枝。帯の真ん中あたりを弧に沿って
+    for k in range(4):
+        y0 = rng.uniform(50, 80)
+        pts = []
+        for x in range(-8, w + 9, 16):
+            pts.append((x, y0 + 8 * math.sin(x / 40.0 + k * 1.7)))
+        b.line(pts, (78, 64, 44), 2)
+    # 葉。縁の内に収まる所にだけ
+    for _ in range(1500):
+        x = rng.uniform(-6, w + 6)
+        size = rng.uniform(9, 12)
+        y = rng.uniform(top(x) + size * 0.9, bottom(x))
+        d = abs(y - 62) / 44.0
+        col = jitter(mix(LEAF_LIGHT, LEAF_DARK, min(1.0, d * 0.5 + rng.uniform(0, 0.5))), rng, 10)
+        b.leaf(x, y, size, rng.uniform(0, 360), size * 0.4, col)
+    # 下の縁から垂れる房
+    for _ in range(16):
+        x0 = rng.uniform(14, w - 14)
+        length = rng.uniform(10, 22)
+        for k in range(5):
+            y = bottom(x0) + length * k / 4.0
+            b.leaf(x0 + rng.uniform(-4, 4), y - 6, 9, 180 + rng.uniform(-40, 40), 3.6, jitter(LEAF_MID, rng, 10))
+        if rng.random() < 0.6:
+            rose_head(b, rng, x0 + rng.uniform(-3, 3), bottom(x0) + length * 0.7, (244, 214, 214), 6)
+    # 花。バラ（淡いピンクと白、少し濃いピンク）を房に、クレマチス（紫）を散らす
+    # 花は房に寄せ、房のあいだに葉を見せる。敷き詰めると、花の輪の飾りに見えた
+    for _ in range(44):
+        x = rng.uniform(8, w - 8)
+        y = rng.uniform(top(x) + 12, bottom(x) - 6)
+        base = rng.choice([(238, 186, 196), (244, 214, 214), (246, 240, 232), (238, 186, 196), (214, 120, 150)])
+        for _k in range(rng.randint(2, 3)):
+            rose_head(b, rng, x + rng.uniform(-8, 8), y + rng.uniform(-6, 6), base, rng.uniform(6.5, 8.5))
+    for _ in range(18):
+        x = rng.uniform(8, w - 8)
+        y = rng.uniform(top(x) + 12, bottom(x) - 4)
+        star(b, rng, x, y, rng.uniform(8, 10), rng.choice([(104, 58, 150), (126, 76, 176), (88, 44, 126)]))
+    return b.done()
+
+
+def potmix():
+    """
+    鉢の寄せ植え（1×1 升）。丸い葉の塊にペラルゴニウムの房、縁から白いバコパと青いロベリアを垂らす。
+    札の下の 3 割が鉢の縁から外へ垂れる分（BuildVillagePlants.Pots が鉢の縁より下に根を置く）
+    """
+    w, h = UNIT, UNIT
+    rng = random.Random(373)
+    b = Brush(w, h)
+    rim = h * 0.66
+    # 垂れる茎
+    for _ in range(16):
+        x0 = rng.uniform(14, 114)
+        side = -1 if x0 < 64 else 1
+        pts = [(x0, rim - 4)]
+        for k in range(4):
+            pts.append((pts[-1][0] + side * rng.uniform(1, 4), pts[-1][1] + rng.uniform(6, 10)))
+        b.line(pts, (70, 96, 50), 2)
+        for (px, py) in pts[1:]:
+            b.ell(px, py, 3, 2.6, jitter((80, 112, 56), rng, 10))
+            col = (246, 244, 236) if rng.random() < 0.55 else (74, 88, 196)
+            b.ell(px + rng.uniform(-3, 3), py + rng.uniform(-2, 3), 2.4, 2.4, jitter(col, rng, 8))
+    # 葉の塊
+    for _ in range(70):
+        x = rng.uniform(16, 112)
+        t = (x - 64) / 64.0
+        y = rng.uniform(26 + 18 * t * t, rim + 2)
+        b.ell(x, y, rng.uniform(7, 10), rng.uniform(6, 8), jitter((58, 90, 42), rng, 12))
+    # 花の房
+    for _ in range(9):
+        x = rng.uniform(24, 104)
+        t = (x - 64) / 64.0
+        y = rng.uniform(22 + 16 * t * t, rim - 12)
+        base = rng.choice([(222, 60, 86), (236, 120, 150), (246, 236, 236), (196, 40, 52)])
+        for _k in range(8):
+            b.ell(x + rng.uniform(-6, 6), y + rng.uniform(-5, 4), 3.6, 3.6, jitter(base, rng, 10))
+    return b.done()
+
+
+def obelisk_vine():
+    """
+    オベリスクに這わせたスイートピー（1×2 升）。先の細い葉の柱に、桃・紫・白の小さな花の房。
+    支柱は形（BuildVillageGarden.Obelisk）が持つので、絵には描かない
+    """
+    w, h = UNIT, UNIT * 2
+    rng = random.Random(379)
+    b = Brush(w, h)
+
+    def half(y):
+        """y での柱の半幅。上ほど細く"""
+        return 12 + 44 * (y / float(h)) ** 0.9
+
+    for _ in range(420):
+        y = rng.uniform(10, h - 4)
+        x = 64 + rng.uniform(-1, 1) * half(y)
+        b.leaf(x, y, rng.uniform(8, 11), rng.uniform(-80, 80), 3.5, jitter(mix(LEAF_MID, LEAF_DARK, rng.random() * 0.6), rng, 12))
+    cols = [(236, 150, 186), (170, 60, 130), (246, 240, 240), (150, 120, 210), (224, 110, 130)]
+    for _ in range(38):
+        y = rng.uniform(14, h * 0.86)
+        x = 64 + rng.uniform(-0.8, 0.8) * half(y)
+        col = rng.choice(cols)
+        for k in range(3):
+            b.ell(x + rng.uniform(-3, 3), y + k * 4.5, 4.6, 3.8, jitter(col, rng, 8))
+    return b.done()
+
+
+def oak():
+    """
+    畑の生け垣の並木の楢の樹冠（2×2 升）。丸い塊を幾つか重ねた輪郭に、下ほど暗く上ほど明るい葉を詰め、
+    ところどころ空を透かす。**箱を重ねた樹冠をやめる。** 葉の玉を箱三つで組んだら、庭の奥の生け垣の上に
+    緑の立方体が並んで見えた（2026-09-27）
+    """
+    w, h = UNIT * 2, UNIT * 2
+    rng = random.Random(389)
+    b = Brush(w, h)
+    blobs = [(128, 142, 92)]
+    for _ in range(8):
+        blobs.append((128 + rng.uniform(-70, 70), 120 + rng.uniform(-62, 38), rng.uniform(40, 54)))
+
+    def room(x, y):
+        return max(br - math.hypot(x - bx, (y - by) * 1.08) for bx, by, br in blobs)
+
+    # 空の透ける穴
+    holes = [(rng.uniform(50, 206), rng.uniform(50, 200), rng.uniform(6, 11)) for _ in range(7)]
+    for _ in range(3400):
+        x = rng.uniform(4, 252)
+        y = rng.uniform(4, 252)
+        if room(x, y) < 8:
+            continue
+        if any(math.hypot(x - hx, y - hy) < hr for hx, hy, hr in holes):
+            continue
+        t = y / 256.0
+        col = jitter(mix((104, 132, 62), (38, 58, 30), min(1.0, t * 0.9 + rng.uniform(0, 0.35))), rng, 8)
+        b.leaf(x, y, rng.uniform(9, 13), rng.uniform(0, 360), 4.6, col)
     return b.done()
 
 
@@ -617,7 +822,7 @@ CELLS = [
     (2, 0, 1, 3, delphinium),                                              # 2 デルフィニウム（花の終わった穂）
     (3, 0, 1, 3, foxglove),                                                # 3 ジギタリスとルピナスの葉の株
     (4, 0, 1, 2, lambda: dahlia((150, 18, 40), 227)),                      # 4 ダリア（濃い赤）
-    (5, 0, 1, 2, lambda: dahlia((236, 194, 188), 229)),                    # 5 ダリア（淡いピンク）
+    (5, 0, 1, 2, lambda: dahlia((234, 182, 192), 229)),                    # 5 ダリア（淡いピンク）
     (6, 0, 1, 2, rudbeckia),                                               # 6 ルドベキア
     (7, 0, 1, 2, lambda: echinacea((220, 118, 168), (170, 90, 40), 233)),  # 7 エキナセア（ピンク）
     (0, 3, 1, 2, lambda: echinacea((240, 238, 226), (196, 146, 52), 239)),  # 8 エキナセア（白）
@@ -638,11 +843,16 @@ CELLS = [
     (2, 6, 2, 2, clematis),                                                # 23 クレマチス
     (4, 6, 2, 2, honeysuckle),                                             # 24 ハニーサックル
     (6, 6, 2, 2, apple),                                                   # 25 リンゴ
+    # 下の半分（2026-09-27 に縦を 2048 へ広げた）
+    (0, 8, 4, 1, garland),                                                 # 26 アーチの弧のバラとクレマチスの帯
+    (4, 8, 1, 1, potmix),                                                  # 27 鉢の寄せ植え
+    (5, 8, 1, 2, obelisk_vine),                                            # 28 オベリスクのスイートピー
+    (6, 8, 2, 2, oak),                                                     # 29 畑の並木の楢の樹冠
 ]
 
 
 def atlas():
-    im = Image.new('RGBA', (ATLAS, ATLAS), (60, 84, 40, 0))
+    im = Image.new('RGBA', (ATLAS, ATLAS_H), (60, 84, 40, 0))
     for (ux, uy, uw, uh, draw) in CELLS:
         cell = draw()
         assert cell.size == (uw * UNIT, uh * UNIT), (ux, uy, cell.size)
@@ -927,9 +1137,12 @@ def save(im, name):
 
 
 def main():
+    import sys
     if not os.path.isdir(OUT):
         os.makedirs(OUT)
     save(atlas(), 'VillageFlora')
+    if 'flora' in sys.argv[1:]:
+        return
     save(stone(), 'VillageStone')
     save(slate(), 'VillageSlate')
     save(brick(), 'VillageBrick')

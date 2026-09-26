@@ -25,9 +25,13 @@ namespace HalfAware.EditorTools
     {
         // ---- アトラス -------------------------------------------------------------------
 
-        /// <summary>アトラスの升の大きさ（画素）と、アトラスの一辺</summary>
+        /// <summary>
+        /// アトラスの升の大きさ（画素）と、アトラスの横と縦。縦は 2026-09-27 に 2048 へ広げ、
+        /// 下の半分に升を足していく（make-garden.py の ATLAS_H）
+        /// </summary>
         const int AtlasUnit = 128;
-        const int AtlasSize = 1024;
+        const int AtlasWide = 1024;
+        const int AtlasHigh = 2048;
 
         /// <summary>植物の種類。並びはアトラスの割り付け（make-garden.py の CELLS）と同じ</summary>
         enum Kind
@@ -35,6 +39,7 @@ namespace HalfAware.EditorTools
             HollyPink, HollyWhite, Delph, Foxglove, DahliaRed, DahliaPink, Rudbeckia, EchPink, EchWhite, Aster,
             Allium, Rosemary, SweetPea, Pelargonium, Catmint, Geranium, Lavender, Mantle, Sage, Hydrangea,
             Filler, Ivy, Roses, Clematis, Honeysuckle, Apple,
+            Garland, PotMix, ObeliskVine, Oak,
         }
 
         /// <summary>升の (x, y, 幅, 高さ)。make-garden.py の CELLS と同じ値。y は絵の上から数える</summary>
@@ -46,6 +51,7 @@ namespace HalfAware.EditorTools
             { 4, 2, 2, 1 }, { 6, 2, 2, 1 }, { 6, 3, 2, 1 }, { 6, 4, 2, 1 }, { 0, 5, 2, 1 }, { 2, 5, 2, 1 },
             { 4, 5, 2, 1 }, { 6, 5, 2, 1 },
             { 0, 6, 2, 2 }, { 2, 6, 2, 2 }, { 4, 6, 2, 2 }, { 6, 6, 2, 2 },
+            { 0, 8, 4, 1 }, { 4, 8, 1, 1 }, { 5, 8, 1, 2 }, { 6, 8, 2, 2 },
         };
 
         /// <summary>
@@ -61,20 +67,23 @@ namespace HalfAware.EditorTools
             new Vector3(0.48f, 0.95f, 3), new Vector3(0.42f, 0.85f, 3), new Vector3(0.55f, 0.95f, 3), new Vector3(0.36f, 0.75f, 3),
             new Vector3(0.42f, 0.80f, 3), new Vector3(1.05f, 1.60f, 3), new Vector3(0.45f, 0.90f, 3), new Vector3(0.60f, 1.20f, 1),
             new Vector3(1.00f, 1.00f, 1), new Vector3(1.00f, 1.00f, 1), new Vector3(1.00f, 1.00f, 1), new Vector3(3.00f, 3.20f, 3),
+            new Vector3(0.24f, 1.00f, 1), new Vector3(0.62f, 0.62f, 3), new Vector3(1.45f, 0.62f, 3), new Vector3(6.0f, 7.0f, 3),
         };
 
         /// <summary>升の uv。左下と右上。縁を 1.5 画素内へ寄せて、隣の升の滲みを拾わない</summary>
         static void CellUv(Kind k, out Vector2 min, out Vector2 max)
         {
             var i = (int)k;
-            const float inset = 1.5f / AtlasSize;
-            const float u = (float)AtlasUnit / AtlasSize;
+            const float insetU = 1.5f / AtlasWide;
+            const float insetV = 1.5f / AtlasHigh;
+            const float u = (float)AtlasUnit / AtlasWide;
+            const float v = (float)AtlasUnit / AtlasHigh;
             var x0 = Cells[i, 0] * u;
             var x1 = (Cells[i, 0] + Cells[i, 2]) * u;
-            var y1 = 1f - Cells[i, 1] * u;
-            var y0 = 1f - (Cells[i, 1] + Cells[i, 3]) * u;
-            min = new Vector2(x0 + inset, y0 + inset);
-            max = new Vector2(x1 - inset, y1 - inset);
+            var y1 = 1f - Cells[i, 1] * v;
+            var y0 = 1f - (Cells[i, 1] + Cells[i, 3]) * v;
+            min = new Vector2(x0 + insetU, y0 + insetV);
+            max = new Vector2(x1 - insetU, y1 - insetV);
         }
 
         static Material FloraMat()
@@ -95,6 +104,8 @@ namespace HalfAware.EditorTools
             m.SetFloat("_Wrap", 0.5f);
             m.SetFloat("_Glow", 0.25f);
             m.SetFloat("_Shade", 0.35f);
+            // 日陰の花の縁の明るみ（2026-09-27）。塀と生け垣の長い影の中で、青紫の花が紺の塊に沈んだ
+            m.SetFloat("_SkyLift", 0.35f);
             // 風の揺れ（設計書 7 節）。背 1 m の株の先が 7 cm ほど、4.8 秒ほどの周期で
             m.SetFloat("_Sway", 0.07f);
             m.SetFloat("_SwayRate", 1.3f);
@@ -464,31 +475,8 @@ namespace HalfAware.EditorTools
         {
             var f = FloraBank();
             f.CardLift = 0.8f;
-            // アーチ。両脇の柱に三段、頭の弧に沿って
-            Vector3 centre, across, ahead;
-            ArchPose(out centre, out across, out ahead);
-            // 柱に沿って五段。横の格子の面に一枚、柱を巻くように交差の札をもう二枚。
-            // 骨の白が見えすぎると、花のアーチではなく園芸店の売り物に見える
-            for (var s = -1; s <= 1; s += 2)
-            {
-                for (var k = 0; k < 5; k++)
-                {
-                    var root = centre + across * (0.78f * s) + Vector3.up * (k * 0.45f);
-                    var kind = (k + (s > 0 ? 1 : 0)) % 3 == 1 ? Kind.Clematis : Kind.Roses;
-                    Flat(f, kind, root + across * (0.04f * s) - ahead * 0.05f, ahead * 0.48f, Vector3.up * 0.8f);
-                    Flat(f, kind, root + ahead * 0.22f, across * 0.26f, Vector3.up * 0.75f);
-                    Flat(f, kind, root - ahead * 0.22f, across * 0.26f, Vector3.up * 0.75f);
-                }
-            }
-            for (var k = 0; k < 9; k++)
-            {
-                var a = Mathf.PI * (k + 0.5f) / 9f;
-                var p = centre + across * (Mathf.Cos(a) * 0.78f) + Vector3.up * (2.1f + Mathf.Sin(a) * 0.7f);
-                var tangent = (across * -Mathf.Sin(a) + Vector3.up * Mathf.Cos(a) * 0.9f).normalized;
-                var outward = (across * Mathf.Cos(a) + Vector3.up * Mathf.Sin(a)).normalized;
-                Flat(f, k % 3 == 1 ? Kind.Clematis : Kind.Roses, p - outward * 0.25f, ahead * 0.55f, outward * 0.6f);
-                Flat(f, Kind.Roses, p - tangent * 0.28f, ahead * 0.5f, tangent * 0.56f);
-            }
+            // アーチ
+            ArchPlants(f);
 
             // 玄関のまわりのバラ。戸の両脇から庇の上へ
             WallRose(f, new Vector3(FrontDoorX, 0f, HouseFront - 0.07f), Vector3.right, 1f, Kind.Roses);
@@ -543,6 +531,83 @@ namespace HalfAware.EditorTools
                 for (var k = 0; k < 2; k++)
                     Flat(f, kind, door + along * (s * 0.82f) + Vector3.up * (0.05f + k * 1.0f), along * 0.30f, Vector3.up * 1.05f * scale);
             Flat(f, kind, door + Vector3.up * 2.05f, along * 0.95f, Vector3.up * 0.7f);
+        }
+
+        /// <summary>
+        /// アーチのバラとクレマチス。柱は根元から肩（弧の始まり）まで交差の札で包み、
+        /// 弧は帯の札（<see cref="Kind.Garland"/>）を弧に沿って前と後ろの面に並べる。
+        ///
+        /// **頭の上へはみ出させない**（オーナーの指摘、2026-09-27）。以前は弧の上に外向きの札を立てていたので、
+        /// 正面（タイトルの背景の画角）から見ると札が縁の線になり、頂と肩から枝が放射状に突き出して見えた。
+        /// 実際のアーチでも、枝は支柱に巻いて弧に沿って横へ寝かせ、はみ出た枝は切る（RHS の誘引の手引き）。
+        /// 帯は枠の内へ 0.10 m、外へ 0.10〜0.18 m の厚みにし、前から見て弧の形がそのまま読めるようにする。
+        /// 弧の札は揺らさない（揺らすと、隣の札と別々に動いて帯が千切れる）
+        /// </summary>
+        static void ArchPlants(Bank f)
+        {
+            Vector3 centre, across, ahead;
+            ArchPose(out centre, out across, out ahead);
+            // 枠の寸法（BuildVillageGarden.ArchFrame と同じ）
+            const float half = 0.78f;
+            const float legs = 2.1f;
+            const float depth = 0.26f;
+            const float rise = 0.9f;
+            // 柱。根元から肩まで四段。横の格子の面に一枚、柱を巻くように前後の面に一枚ずつ。
+            // 前後の札は柱の外（depth より前）に置く。柱の内に置いたら、白い柱が札の手前に丸見えになった。
+            // 頭は肩（2.1 m）で止め、その上は弧の帯に任せる
+            for (var s = -1; s <= 1; s += 2)
+            {
+                for (var k = 0; k < 4; k++)
+                {
+                    var root = centre + across * (half * s) + Vector3.up * (k * 0.45f);
+                    var kind = (k + (s > 0 ? 1 : 0)) % 3 == 1 ? Kind.Clematis : Kind.Roses;
+                    var high = k == 3 ? 0.74f : 0.8f;
+                    Flat(f, kind, root + across * (0.04f * s) - ahead * 0.04f, ahead * 0.40f, Vector3.up * high);
+                    Flat(f, kind, root + ahead * (depth + 0.05f) + across * (0.02f * s), across * 0.30f, Vector3.up * high);
+                    Flat(f, kind, root - ahead * (depth + 0.05f) + across * (0.02f * s), across * 0.30f, Vector3.up * high);
+                }
+            }
+            // 弧の帯。前と後ろの面に、弧を 12 に割って札を並べる。端は肩より少し下から始めて柱の札に重ねる
+            System.Func<float, float, Vector3> onArc = (a, r) =>
+                centre + across * (Mathf.Cos(a) * r) + Vector3.up * (legs + Mathf.Sin(a) * r * rise);
+            Vector2 min, max;
+            CellUv(Kind.Garland, out min, out max);
+            const int pieces = 12;
+            // 厚みは札ごとに少し揺らす。揃えすぎると、花の輪の飾りに見えた
+            const float inner = 0.10f;
+            f.RootFixed = new Vector2(0f, 1f);
+            for (var face = -1; face <= 1; face += 2)
+            {
+                for (var k = 0; k < pieces; k++)
+                {
+                    var a0 = Mathf.Lerp(-0.14f, Mathf.PI + 0.14f, k / (float)pieces);
+                    var a1 = Mathf.Lerp(-0.14f, Mathf.PI + 0.14f, (k + 1f) / pieces);
+                    var am = (a0 + a1) * 0.5f;
+                    var normal = (across * (Mathf.Cos(am) * rise) + Vector3.up * Mathf.Sin(am)).normalized;
+                    var tangent = (onArc(a1, half) - onArc(a0, half));
+                    var span = tangent.magnitude;
+                    tangent /= span;
+                    var outer = 0.10f + Hash(409 + face, k) * 0.08f;
+                    var root = onArc(am, half) - normal * inner + ahead * (face * (depth + 0.035f));
+                    // 帯の絵は横に 4 升。札ごとに 1 升ぶんを、ずらして切り出す
+                    var u0 = Mathf.Lerp(min.x, max.x, Hash(401 + face, k) * 0.75f);
+                    var u1 = u0 + (max.x - min.x) * 0.25f;
+                    // 前の面は外から見て左から右へ、後ろの面は裏返しに並ぶので、絵の向きを揃える
+                    var side = tangent * (span * 0.5f * 1.35f) * face;
+                    f.AtlasCard(root, side, normal * (inner + outer), new Vector2(u0, min.y), new Vector2(u1, max.y));
+                }
+            }
+            // 弧の頭の面。下から見上げたときに枠の白い桟が抜けて見えないよう、弧の上に寝かせた札を並べる。
+            // 札の面は弧の接線と進む向きに張るので、正面からは縁の線になり、外へは突き出さない
+            for (var k = 0; k < 9; k++)
+            {
+                var a = Mathf.PI * (k + 0.5f) / 9f;
+                var normal = (across * (Mathf.Cos(a) * rise) + Vector3.up * Mathf.Sin(a)).normalized;
+                var tangent = (across * -Mathf.Sin(a) + Vector3.up * (Mathf.Cos(a) * rise)).normalized;
+                var p = onArc(a, half) + normal * 0.03f;
+                Flat(f, k % 3 == 1 ? Kind.Clematis : Kind.Roses, p - tangent * 0.26f, ahead * (depth + 0.08f), tangent * 0.52f);
+            }
+            f.RootFixed = null;
         }
 
         /// <summary>アーチの芯と、小路を横切る向きと、進む向き（BuildVillageGarden.ArchFrame と同じ値）</summary>
@@ -605,13 +670,15 @@ namespace HalfAware.EditorTools
             f.RootHigh = 3f;
             f.AtlasCard(crown + new Vector3(0f, 1.6f, -1.5f), new Vector3(1.5f, 0f, 0f), new Vector3(0f, 0f, 3.0f), min, max);
 
-            // エスパリエ。段ごとに、塀に沿った平らな札を四枚
+            // エスパリエ。段ごとに、塀に沿った平らな札を四枚。
+            // **段の間を空ける。** 札の丈を段の間（0.45 m）いっぱいに取ったら、塀に葉の板を一枚貼ったように見えた。
+            // 丈を詰めて、水平に伸びた枝の段と、その間の塀の板が見えるようにする
             var x = PlotWest + 0.2f;
             foreach (var y in EspalierTiers)
                 for (var k = 0; k < 4; k++)
                 {
                     var z = EspalierZ - EspalierHalf + (k + 0.5f) * EspalierHalf * 0.5f;
-                    Flat(f, Kind.Apple, new Vector3(x, y - 0.2f, z), new Vector3(0f, 0f, EspalierHalf * 0.27f), Vector3.up * 0.44f, 0.30f + 0.08f * (k % 3), 0.58f + 0.08f * (k % 3));
+                    Flat(f, Kind.Apple, new Vector3(x, y - 0.11f, z), new Vector3(0f, 0f, EspalierHalf * 0.27f), Vector3.up * 0.27f, 0.36f + 0.08f * (k % 3), 0.53f + 0.08f * (k % 3));
                 }
             Emit(parent, "FloraTrees", f, mat, false);
         }

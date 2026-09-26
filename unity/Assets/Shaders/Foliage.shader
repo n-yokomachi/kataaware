@@ -5,7 +5,9 @@
 // 札の継ぎ目が見える。法線は組み立て（Bank.AtlasCard）が上へ倒して渡すので、そのまま使う。
 //
 // 光は日（影を受ける）と環境光だけ。回り込み（_Wrap）で日の裏も沈みきらないようにし、
-// 夕方の低い日に透ける花びらの明るみを _Glow で足す。霧は URP の霧（ExponentialSquared）を掛ける。
+// 夕方の低い日に透ける花びらの明るみを _Glow で足す。日陰の葉は空の光を透かして地面や壁ほど暗くならないので、
+// 環境光を _SkyLift の分だけ足す（低い朝日と夕日の長い影の中で、花の縁が紺の塊に沈まないように）。
+// 霧は URP の霧（ExponentialSquared）を掛ける。
 // 影を落とす pass も持つ。低い日の長い影が芝に落ちないと、花の縁が芝の上に浮いて見える
 //
 // **風に揺れる**（村の設計書 7 節）。札の頂点を、根からの高さ（uv1。Bank.Rooted）に応じて横へずらす。
@@ -26,6 +28,7 @@ Shader "HalfAware/Foliage"
         _Shade ("根元の陰り。uv1.y が 0 の所でこれだけ暗くする", Range(0, 1)) = 0.35
         _Sway ("揺れの幅。背 1 m の株の先が振れる距離（m）", Range(0, 0.3)) = 0.07
         _SwayRate ("ゆっくりした揺れの速さ（ラジアン/秒）", Range(0, 6)) = 1.3
+        _SkyLift ("日陰の葉に透ける空の明るみ。環境光をこれだけ足す", Range(0, 1)) = 0
     }
 
     SubShader
@@ -47,6 +50,7 @@ Shader "HalfAware/Foliage"
             half _Shade;
             half _Sway;
             half _SwayRate;
+            half _SkyLift;
         CBUFFER_END
 
         // 全体の時刻のずらし。撮り比べの道具が Shader.SetGlobalFloat で書く
@@ -130,7 +134,7 @@ Shader "HalfAware/Foliage"
                 half3 albedo = tex.rgb * _BaseColor.rgb;
                 // 根元ほど暗い。株の中へ光が届かない
                 half deep = lerp(1.0 - _Shade, 1.0, saturate(i.high));
-                half3 col = albedo * deep * (SampleSH(n) + sun.color * lit * (wrapped + _Glow * (1.0 - wrapped)));
+                half3 col = albedo * deep * (SampleSH(n) * (1.0 + _SkyLift) + sun.color * lit * (wrapped + _Glow * (1.0 - wrapped)));
                 col = MixFog(col, i.fogCoord);
                 return half4(col, 1.0);
             }

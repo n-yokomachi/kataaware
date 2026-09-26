@@ -628,7 +628,8 @@ namespace HalfAware.EditorTools
                 Debug.LogWarning("絵が無い。python tools/make-garden.py を走らせる: " + path);
                 return null;
             }
-            var sign = cutout ? "flora1" : "tile1";
+            // 花と葉のアトラスは 1024×2048（2026-09-27 に縦を広げた）。上限を 1024 のままにすると半分に縮む
+            var sign = cutout ? "flora2" : "tile1";
             if (importer.userData != sign)
             {
                 importer.textureType = TextureImporterType.Default;
@@ -641,7 +642,7 @@ namespace HalfAware.EditorTools
                 importer.alphaIsTransparency = cutout;
                 importer.mipMapsPreserveCoverage = cutout;
                 importer.alphaTestReferenceValue = 0.5f;
-                importer.maxTextureSize = 1024;
+                importer.maxTextureSize = cutout ? 2048 : 1024;
                 importer.userData = sign;
                 importer.SaveAndReimport();
             }
