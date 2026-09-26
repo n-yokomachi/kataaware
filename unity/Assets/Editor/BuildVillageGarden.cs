@@ -23,14 +23,38 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 煉瓦の小路の芯。前庭の石垣の口から格子戸を抜け、テラスの西を通り、ゆるく S を描いて奥の東屋へ入る。
-        /// 間を <see cref="PathSamples"/> で滑らかに補う
+        /// 間を <see cref="PathSamples"/> で滑らかに補う。
+        ///
+        /// **トンネルの中はまっすぐ通す**（2026-09-27）。トンネルの軸（<see cref="TunnelAt"/> と <see cref="TunnelAxis"/>）の上に、
+        /// トンネルの両端から 0.45 m 先まで点を並べる。Catmull-Rom は前後の点も一直線なら直線を引くので、
+        /// z 22.0 から 26.0 までが真っすぐになり、曲がりはその外で付く。小路の曲がる芯にアーチを沿わせたら、
+        /// タイトルの背景の画角でトンネルの奥が右へ振れて、口の額の中が左右で揃わなかった
         /// </summary>
         static readonly Vector2[] PathLine =
         {
             new Vector2(SidePathX, NorthEdge), new Vector2(SidePathX, GateZ), new Vector2(SidePathX, HouseRear),
-            new Vector2(-4.25f, 18.6f), new Vector2(-4.00f, 21.0f), new Vector2(-3.50f, 23.2f), new Vector2(-3.25f, 25.3f),
-            new Vector2(-3.30f, 27.5f), new Vector2(-3.70f, 29.5f), new Vector2(-4.40f, 31.1f), new Vector2(-5.10f, 32.0f),
+            new Vector2(-4.25f, 18.6f),
+            OnAxis(21.5f), OnAxis(22.0f), OnAxis(23.0f), OnAxis(24.0f), OnAxis(25.0f), OnAxis(26.0f), OnAxis(26.5f),
+            // トンネルを出てから東屋へ、ゆるく西へ曲げる。曲がりの強さはもとの小路の東屋の前（1 m あたり 17 度ほど）を超えない
+            new Vector2(-2.99f, 27.4f), new Vector2(-3.10f, 28.4f), new Vector2(-3.45f, 29.4f), new Vector2(-4.00f, 30.4f),
+            new Vector2(-4.60f, 31.3f), new Vector2(-5.10f, 32.0f),
         };
+
+        /// <summary>
+        /// トンネルの北の端のアーチの芯（上から見て）と、トンネルの軸の向き（北へ）。
+        /// 軸は、トンネルの掛かる所の小路の平均の向き（北から東へ 8.3 度）に合わせる。
+        /// タイトルの背景の画角（yaw 188.3、目は北の端のアーチの芯から軸の上を北へ 2.5 m）は、この軸を真っすぐ見る。
+        /// 小路の点（<see cref="PathLine"/>）がこれを読むので、静的な値の初期化の順に左右されないよう、式で返す
+        /// </summary>
+        static Vector2 TunnelAt { get { return new Vector2(-3.25f, 25.3f); } }
+        static Vector2 TunnelAxis { get { return new Vector2(Mathf.Sin(TunnelYaw * Mathf.Deg2Rad), Mathf.Cos(TunnelYaw * Mathf.Deg2Rad)); } }
+        const float TunnelYaw = 8.3f;
+
+        /// <summary>トンネルの軸の上で、z にある点</summary>
+        static Vector2 OnAxis(float z)
+        {
+            return new Vector2(TunnelAt.x + TunnelAxis.x / TunnelAxis.y * (z - TunnelAt.y), z);
+        }
 
         /// <summary>テラスの広がり。裏口の前の敷石。西の縁は小路の東の縁</summary>
         const float TerraceWest = SidePathX + PathWide * 0.5f;
@@ -54,8 +78,7 @@ namespace HalfAware.EditorTools
         /// <summary>東の花の縁の奥の縁。その先が菜園</summary>
         const float EastBorderBack = 4.65f;
 
-        /// <summary>アーチの立つ所（小路の上）</summary>
-        const float ArchZ = 25.3f;
+
 
         /// <summary>東屋。奥の西の角。四方が開き、北に腰掛け</summary>
         public static readonly Vector3 GazeboAt = new Vector3(-5.3f, 0f, 33.45f);
@@ -352,13 +375,13 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// トンネルの k 番目のアーチの芯・小路を横切る向き・進む向き（北へ）。0 が北の端（もとのアーチ）で、
-        /// k が増えるほど南（家の側）へ <see cref="TunnelStep"/> ずつ下がる。小路の芯に沿うので、輪ごとに少し向きが変わる
+        /// k が増えるほど南（家の側）へ <see cref="TunnelStep"/> ずつ下がる。四つとも一本の軸（<see cref="TunnelAxis"/>）の上に、
+        /// 同じ向きで並ぶ
         /// </summary>
         static void HoopPose(int k, out Vector3 centre, out Vector3 across, out Vector3 ahead)
         {
-            var z = ArchZ - k * TunnelStep;
-            centre = new Vector3(PathX(z), 0f, z);
-            ahead = (new Vector3(PathX(z + 0.3f), 0f, z + 0.3f) - new Vector3(PathX(z - 0.3f), 0f, z - 0.3f)).normalized;
+            ahead = new Vector3(TunnelAxis.x, 0f, TunnelAxis.y);
+            centre = new Vector3(TunnelAt.x, 0f, TunnelAt.y) - ahead * (k * TunnelStep);
             across = Vector3.Cross(Vector3.up, ahead).normalized;
         }
 

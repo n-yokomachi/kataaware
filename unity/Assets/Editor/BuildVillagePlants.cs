@@ -840,7 +840,7 @@ namespace HalfAware.EditorTools
         const float PicNorth = PlotNorth + 1.0f;
         const string GroundPath = Textures + "VillageGround.png";
         /// <summary>描き方の版。花の縁や芝の寸法を変えたら上げる。上げないと前の絵のまま貼られる</summary>
-        const string GroundSign = "ground3|512x1024";
+        const string GroundSign = "ground4|512x1024";
 
         static Material GroundMat()
         {

@@ -85,7 +85,8 @@ namespace HalfAware.EditorTools
         {
             return new[]
             {
-                new View("g1_title", new Vector3(-3.25f + 0.048f * 2.5f, 1.6f, 25.30f + 0.999f * 2.5f), 182.75f, 0f),
+                // タイトルの背景。トンネルの北の端のアーチの芯から、軸（北から東へ 8.3 度）の上を北へ 2.5 m、目 1.6 m で軸を真っすぐ見る
+                new View("g1_title", new Vector3(-3.25f + 0.1444f * 2.5f, 1.6f, 25.30f + 0.9895f * 2.5f), 188.3f, 0f),
                 new View("g2_gate", new Vector3(-4.2f, 1.6f, 12.9f), 4f, 3f),
                 new View("g3_terrace", new Vector3(1.2f, 1.7f, 17.8f), 352f, 6f),
                 new View("g4_gazebo", new Vector3(-1.3f, 1.6f, 27.4f), 322f, 5f),
