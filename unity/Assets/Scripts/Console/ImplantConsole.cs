@@ -28,14 +28,15 @@ namespace HalfAware
     {
         // ---- 見た目 ------------------------------------------------------------
         //
-        // 案 A の CSS を手本にしているが、寸法は粗い画面（UiLens、既定で画面の 0.6）の 1 画素 = Dot で決める。
+        // 案 A の CSS を手本にしているが、寸法は粗い画面（UiLens、既定で画面の 0.75）の 1 画素 = Dot で決める。
         // CSS の px のまま縮めると、札や名前の字が粗い画面の中で縦 5〜6 画素になって読めない。
         // **字はいちばん小さいものでも 11 Dot**（粗い画面の中で縦 10 画素ほど）、線は 1 Dot 以上にする。
-        // 余白は案 A より一回り広く取る。詰めると端末の画面ではなく表計算に見える（2026-09-27 オーナー）。
+        // 余白は案 A より二回りほど広く取る。詰まって見える所を作らない（2026-09-27 オーナー、二度の指摘）。
+        // 字は 11 Dot のまま、粗さを上げて（Dot を小さくして）画面の上では小さく見せる。
         // 色は CSS のまま。薄い色の重ねはリニアの色空間だと明るく出るので、Tint・Veil で濃さを合わせる
 
-        /// <summary>粗い画面の 1 画素。1280×720 のキャンバスで、既定の粗さ（0.6 で 576×324 相当）のとき</summary>
-        const float Dot = 1280f / 576f;
+        /// <summary>粗い画面の 1 画素。1280×720 のキャンバスで、既定の粗さ（0.75 で 720×405 相当）のとき</summary>
+        const float Dot = 1280f / 720f;
         public const int SortingOrder = 500;
 
         static readonly Color Accent = Rgb(0x7f, 0xe3, 0xec, 1f);
@@ -53,59 +54,59 @@ namespace HalfAware
         static readonly Color Clear = new Color(0f, 0f, 0f, 0f);
 
         /// <summary>画面の縁から枠まで（上下・左右）。画面に対する割合</summary>
-        const float InsetY = 0.08f;
-        const float InsetX = 0.10f;
+        const float InsetY = 0.12f;
+        const float InsetX = 0.14f;
         const float Line = 1f * Dot;
-        const float HookSize = 10f * Dot;
+        const float HookSize = 12f * Dot;
         const float HookLine = 2f * Dot;
 
         /// <summary>枠の内側の余白。頭の行・ボタン・ログの枠の左右と、頭の行の上</summary>
-        const float Inner = 14f * Dot;
-        const float HeadTop = 10f * Dot;
+        const float Inner = 22f * Dot;
+        const float HeadTop = 16f * Dot;
         const float HeadSide = Inner;
         const float HeadFont = 11f * Dot;
         const float HeadHeight = 14f * Dot;
         /// <summary>頭の行の字の間。0.08 em</summary>
         const float HeadSpacing = 8f;
 
-        const float ButtonTop = HeadTop + HeadHeight + 10f * Dot;
-        const float ButtonHeight = 26f * Dot;
-        const float ButtonGap = 10f * Dot;
+        const float ButtonTop = HeadTop + HeadHeight + 16f * Dot;
+        const float ButtonHeight = 28f * Dot;
+        const float ButtonGap = 16f * Dot;
         const float ButtonFont = 11f * Dot;
         const float ButtonSpacing = 12f;
 
-        const float LogTop = ButtonTop + ButtonHeight + 14f * Dot;
+        const float LogTop = ButtonTop + ButtonHeight + 20f * Dot;
         const float LogSide = Inner;
         const float LogBottom = Inner;
-        const float PadTop = 10f * Dot;
-        const float PadRight = 18f * Dot;
-        const float PadBottom = 10f * Dot;
-        const float PadLeft = 12f * Dot;
+        const float PadTop = 16f * Dot;
+        const float PadRight = 26f * Dot;
+        const float PadBottom = 16f * Dot;
+        const float PadLeft = 18f * Dot;
         /// <summary>枠の上のこの割合で、古い行が薄れて消える</summary>
         const float FadeBand = 0.22f;
 
         const float RowFont = 11f * Dot;
         const float RowLine = 17f * Dot;
-        const float RowGap = 6f * Dot;
+        const float RowGap = 10f * Dot;
         /// <summary>行の送り。TMP の Noto は素で 1.45 em。折り返した行のあいだも少し開ける</summary>
         const float RowSpacing = 8f;
         const float TagFont = 11f * Dot;
         const float TagHeight = 15f * Dot;
-        const float TagPad = 4f * Dot;
-        const float CellGap = 12f * Dot;
-        const float WhoMin = 4f * 11f * Dot;
+        const float TagPad = 5f * Dot;
+        const float CellGap = 18f * Dot;
+        const float WhoMin = 4.5f * 11f * Dot;
 
         /// <summary>スクロールバーの溝。ログの枠の右の余白の中に立てる</summary>
-        const float BarRight = LogSide + 8f * Dot;
+        const float BarRight = LogSide + 12f * Dot;
         const float BarTop = LogTop + PadTop;
         const float BarBottom = LogBottom + PadBottom;
         const float BarWidth = 2f * Dot;
         /// <summary>つまみを掴める幅。見える溝は細いので、当たりだけ太くする</summary>
-        const float BarGrip = 12f * Dot;
+        const float BarGrip = 16f * Dot;
 
-        const float BoxWidth = 170f * Dot;
-        const float BoxRow = 19f * Dot;
-        const float BoxPad = 9f * Dot;
+        const float BoxWidth = 210f * Dot;
+        const float BoxRow = 22f * Dot;
+        const float BoxPad = 12f * Dot;
 
         public const string CloseHint = "TAB　閉じる";
         public const string ListTitle = "場面　　数字・E で飛ぶ";

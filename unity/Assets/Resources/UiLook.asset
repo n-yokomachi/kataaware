@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 99460312847c38c4cb41e151eaa3eb3c, type: 3}
   m_Name: UiLook
   m_EditorClassIdentifier: HalfAware::HalfAware.UiLook
-  scale: 0.6
+  scale: 0.75
   show: {fileID: 2100000, guid: 8a483e3b7a9240c4aa62813cc0f0a419, type: 2}
   renderer: {fileID: 11400000, guid: 954560227d866ea438d30367d93d19fb, type: 2}
