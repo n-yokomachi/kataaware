@@ -111,32 +111,51 @@ namespace HalfAware.Tests
             }
         }
 
-        // 団地の四本（設計書 7 節の 1・2・9・16）は、二行目から全部に相手を持つ。
-        // オーナーが「まずはマンションのシーンを作りこんで」と決めた四本
+        // 十六本とも、二行目から全部に相手を持つ。相手の無い行は流れないので、
+        // 一つでも欠けると設計書 7 節の会話が最後まで聞けない
         [Test]
-        public void TheEstateFourTalkFromTheSecondLine()
+        public void EveryMemoryTalksFromTheSecondLine()
         {
             var roster = Load();
-            foreach (var i in new[] { 0, 1, 8, 15 })
+            for (var i = 0; i < roster.Count; i++)
             {
                 var said = roster[i].said;
+                Assert.That(said.Length, Is.GreaterThan(1), i + " 番に会話が無い");
                 for (var k = 1; k < said.Length; k++)
                     Assert.That(said[k].Partnered, Is.True, i + " 番の " + k + " 行目に相手が無い");
             }
         }
 
-        // メイは母と、ジョルジョは妻と、エレナは夫と、一つの会話だけを交わす
+        // ジョルジョは妻と、エレナは夫と、エミリーとプリヤは互いと、一つの会話だけを交わす
         [Test]
-        public void MeiGiorgioAndElenaEachHaveOneTalk()
+        public void GiorgioElenaEmilyAndPriyaEachHaveOneTalk()
         {
             var roster = Load();
-            One(roster, 0, "Mother");
+            One(roster, 4, "Junior");
             One(roster, 8, "Wife");
+            One(roster, 11, "Senior");
             One(roster, 15, "Husband");
         }
 
-        // ハンナは隣の老人と三行、次に娘と四行。娘は老人との最後の行
-        // （四行目、ハンナ「ええ、午後からで」）が出たら階段を上がり始める（Mover の合図 4）。
+        // メイは階段の下から母と四行、〔区切り〕、三階の戸口で母と六行。
+        // 区切りの前の会話を終えても、三階まで上がって話し終えるまで母に板は出ない
+        [Test]
+        public void MeiTalksToHerMotherTwiceAcrossTheCut()
+        {
+            var talks = DiveEntry.Exchanges(Load()[0].said);
+            Assert.That(talks.Length, Is.EqualTo(2));
+            Assert.That(talks[0].partner, Is.EqualTo("Mother"));
+            Assert.That(talks[0].lines, Is.EqualTo(new[] { 1, 2, 3, 4 }));
+            Assert.That(talks[0].Cut, Is.False);
+            Assert.That(talks[1].partner, Is.EqualTo("Mother"));
+            Assert.That(talks[1].lines, Is.EqualTo(new[] { 5, 6, 7, 8, 9, 10 }));
+            Assert.That(talks[1].stop, Is.EqualTo(0));
+            Assert.That(DiveEntry.MayDive(talks, 1, "Mother"), Is.False);
+            Assert.That(DiveEntry.MayDive(talks, 2, "Mother"), Is.True);
+        }
+
+        // ハンナは隣の老人と四行、次に娘と十行。娘は老人との最後の行
+        // （五行目、ジョルジョ「おや。誰か上がってくるぞ」）が出たら階段を上がり始める（Mover の合図 5）。
         // 並びが入れ替わると、まだ上がってきていない娘に話しかけることになる
         [Test]
         public void HannaTalksToTheNeighbourAndThenToTheDaughter()
@@ -144,21 +163,22 @@ namespace HalfAware.Tests
             var talks = DiveEntry.Exchanges(Load()[1].said);
             Assert.That(talks.Length, Is.EqualTo(2));
             Assert.That(talks[0].partner, Is.EqualTo("Neighbour"));
-            Assert.That(talks[0].lines, Is.EqualTo(new[] { 1, 2, 3 }));
+            Assert.That(talks[0].lines, Is.EqualTo(new[] { 1, 2, 3, 4 }));
             Assert.That(talks[1].partner, Is.EqualTo("Daughter"));
-            Assert.That(talks[1].lines, Is.EqualTo(new[] { 4, 5, 6, 7 }));
+            Assert.That(talks[1].lines, Is.EqualTo(new[] { 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 }));
         }
 
-        // 残りの十二本はまだ相手を付けていない。一行目だけ出て、板はすぐ出る
+        // 〔区切り〕の数。設計書 7 節の 1・3・4・6・7・8・10・11（二つ）・13（二つ）
         [Test]
-        public void TheOtherTwelveHaveNoTalkYet()
+        public void CutsFallWhereTheSpecPutsThem()
         {
             var roster = Load();
+            var expected = new[] { 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 2, 0, 2, 0, 0, 0 };
             for (var i = 0; i < roster.Count; i++)
             {
-                if (i == 0 || i == 1 || i == 8 || i == 15) continue;
-                var talks = DiveEntry.Exchanges(roster[i].said);
-                Assert.That(DiveEntry.AllDone(talks, 0), Is.True, i + " 番に会話が付いている");
+                var cuts = 0;
+                foreach (var t in DiveEntry.Exchanges(roster[i].said)) if (t.Cut) cuts++;
+                Assert.That(cuts, Is.EqualTo(expected[i]), i + " 番の区切りの数");
             }
         }
 
