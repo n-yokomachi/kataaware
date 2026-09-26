@@ -229,7 +229,8 @@ namespace HalfAware
         {
             var rot = Facing(pos);
             var box = new Vector3(wide * span * 0.5f, high * span * 0.5f, Thin);
-            var n = Physics.OverlapBoxNonAlloc(pos, box, caught, rot, ~0, QueryTriggerInteraction.Ignore);
+            // 記憶ごとの見えない囲い（Ignore Raycast の層）は板を押し退けない。DiveDirector の光線と同じ層だけを見る
+            var n = Physics.OverlapBoxNonAlloc(pos, box, caught, rot, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
             for (var i = 0; i < n; i++)
                 if (caught[i] != null && caught[i] != mine) return false;
 
@@ -237,7 +238,7 @@ namespace HalfAware
             var reach = away.magnitude - Thin;
             if (reach <= 0f) return true;
             RaycastHit hit;
-            if (!Physics.Raycast(eye.position, away / (reach + Thin), out hit, reach, ~0, QueryTriggerInteraction.Ignore))
+            if (!Physics.Raycast(eye.position, away / (reach + Thin), out hit, reach, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
                 return true;
             return hit.collider == mine;
         }

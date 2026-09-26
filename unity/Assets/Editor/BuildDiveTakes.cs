@@ -53,6 +53,8 @@ namespace HalfAware.EditorTools
                 Notes(so.FindProperty("keys"), keys);
                 Fill(so.FindProperty("people"), Lineup(go.transform, roster[i].seen));
                 so.ApplyModifiedPropertiesWithoutUndo();
+                // 歩ける範囲の見えない囲い（BuildDivePens）。記憶の子なので、起こした記憶の分だけが効く
+                Pen(go.transform, keys, i);
 
                 // 潜るまでは伏せる。DiveDirector が一本だけ起こす
                 go.SetActive(false);
