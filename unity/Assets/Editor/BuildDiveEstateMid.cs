@@ -98,7 +98,7 @@ namespace HalfAware.EditorTools
         /// 面を一枚。四隅は縁を回る順に渡し、<paramref name="outward"/> の側を表にする。
         /// 屋根の斜面のように、軸に揃わない面に使う
         /// </summary>
-        static void MidQuad(Bank b, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Vector3 outward)
+        internal static void MidQuad(Bank b, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Vector3 outward)
         {
             if (Vector3.Dot(Vector3.Cross(p1 - p0, p2 - p0), outward) >= 0f) b.Quad(p0, p1, p2, p3);
             else b.Quad(p3, p2, p1, p0);

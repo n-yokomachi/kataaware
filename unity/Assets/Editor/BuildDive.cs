@@ -1087,7 +1087,7 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>灯りを一つ据える</summary>
-        static Light Lamp(Transform parent, string name, LightType kind, Vector3 at, Vector3 aim,
+        internal static Light Lamp(Transform parent, string name, LightType kind, Vector3 at, Vector3 aim,
             Color col, float power, float range)
         {
             var go = new GameObject(name);

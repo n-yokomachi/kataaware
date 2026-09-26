@@ -187,7 +187,7 @@ namespace HalfAware.EditorTools
         /// 霞の色は空の地平の色（<see cref="SkyPaint.Look.horizon"/>）に揃える。
         /// <paramref name="ambientGain"/> は環境光の倍率（<see cref="SkyAmbient"/>）
         /// </summary>
-        static PlaceSky PaintedSky(Transform place, string sunName, SkyPaint.Look look, Color horizon, float haze,
+        internal static PlaceSky PaintedSky(Transform place, string sunName, SkyPaint.Look look, Color horizon, float haze,
             Color bounce, float ambientGain, string picturePath, string materialPath)
         {
             var picture = SkyPicture(picturePath, look);
