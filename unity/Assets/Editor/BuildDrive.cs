@@ -928,6 +928,8 @@ namespace HalfAware.EditorTools
             sun.transform.position = new Vector3(0f, 8f, 0f);
             var l = sun.GetComponent<Light>();
             if (l == null) l = sun.AddComponent<Light>();
+            // AddComponent<Light> だけでは URP の付属データが付かない（場面 4 の Lamp と同じ。7fffabc）
+            UnityEngine.Rendering.Universal.LightExtensions.GetUniversalAdditionalLightData(l);
             l.type = LightType.Directional;
             l.shadows = LightShadows.Soft;
             // 色・強さ・向きは帯が持つ。ここではガレージのぶんを置くだけ
@@ -1224,12 +1226,23 @@ namespace HalfAware.EditorTools
             idle.loop = true;
             idle.spatialBlend = 0f;
 
+            // 窓の外の麦畑の風。最後の景色で窓を開けたところから走行音に重ねる。
+            // 足音の入れ物（AudioReverbFilter 付き）には置かない。車庫の響きが乗る
+            var outside = new GameObject("Field");
+            outside.transform.SetParent(go.transform, false);
+            var field = outside.AddComponent<AudioSource>();
+            field.playOnAwake = false;
+            field.loop = true;
+            field.spatialBlend = 0f;
+            field.volume = 0f;
+
             var sound = go.AddComponent<DriveSound>();
             var so = new SerializedObject(sound);
             so.FindProperty("oneShot").objectReferenceValue = shots;
             so.FindProperty("road").objectReferenceValue = road;
             so.FindProperty("weather").objectReferenceValue = weather;
             so.FindProperty("motor").objectReferenceValue = idle;
+            so.FindProperty("field").objectReferenceValue = field;
             for (var i = 0; i < DriveClips.Length; i += 2)
                 so.FindProperty(DriveClips[i]).objectReferenceValue = Sound(DriveClips[i + 1]);
             so.ApplyModifiedPropertiesWithoutUndo();
@@ -1253,6 +1266,7 @@ namespace HalfAware.EditorTools
             "idle", "Assets/Audio/Idle.wav",
             "windowDown", "Assets/Audio/WindowDown.wav",
             "exhale", "Assets/Audio/Blow.wav",
+            "wheat", VillageAudioImport.WheatPath,
         };
 
         static AudioClip Sound(string path)

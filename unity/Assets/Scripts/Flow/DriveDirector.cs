@@ -301,10 +301,12 @@ namespace HalfAware
             // band を先に弾いておくのは、BandOf の「見つからない」も -1 で返るため。
             // 両方 -1 のまま比べると、どの対象を調べても通ってしまう
             if (route.BandOf(item.Id) != band) return;
-            // 窓は調べたその場で下ろす。文が出るのと同時に音が鳴り、こもりも取れる
+            // 窓は調べたその場で下ろす。文が出るのと同時に音が鳴り、こもりも取れる。
+            // 麦畑の風もここから重ねる。**窓を下ろす音はもう一か所（夜の高速の煙草）でも鳴るが、
+            // あちらには麦畑が無いので Smoking では鳴らさない**
             if (item.Id == DriveIds.Window)
             {
-                if (sound != null) { sound.WindowDown(); sound.Open(true); }
+                if (sound != null) { sound.WindowDown(); sound.Open(true); sound.Field(true); }
                 Drift(true);
             }
 

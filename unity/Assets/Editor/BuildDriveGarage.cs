@@ -741,6 +741,8 @@ namespace HalfAware.EditorTools
             // 庇の付いた灯りは前へ投げるものなので、光の出どころを前へ出しても嘘にならない
             bulb.transform.localPosition = new Vector3(boxX, lampY - 0.15f, wall - 0.45f);
             var glowLight = bulb.AddComponent<Light>();
+            // AddComponent<Light> だけでは URP の付属データが付かない（場面 4 の Lamp と同じ。7fffabc）
+            UnityEngine.Rendering.Universal.LightExtensions.GetUniversalAdditionalLightData(glowLight);
             glowLight.type = LightType.Point;
             glowLight.color = GarageLamp;
             // 弱くて近い。強くすると箱の面が飛んで、ボタンの三つが一つの白い塊になる
@@ -891,6 +893,7 @@ namespace HalfAware.EditorTools
             bulb.transform.SetParent(Child(parent, "SideDoorLamp"), false);
             bulb.transform.localPosition = new Vector3(wall - 0.38f, lampY - 0.18f, z);
             var lit = bulb.AddComponent<Light>();
+            UnityEngine.Rendering.Universal.LightExtensions.GetUniversalAdditionalLightData(lit);
             lit.type = LightType.Point;
             lit.color = GarageLamp;
             // **押しボタンの箱の灯り（1.7）より弱い。** あちらは 8 m 先から見つけさせる
@@ -1034,6 +1037,7 @@ namespace HalfAware.EditorTools
                     var bulb = new GameObject("Light");
                     bulb.transform.SetParent(lamp, false);
                     var l = bulb.AddComponent<Light>();
+                    UnityEngine.Rendering.Universal.LightExtensions.GetUniversalAdditionalLightData(l);
                     l.type = LightType.Point;
                     l.color = GarageLamp;
                     // **8.0 から下げた。** 2 本が 6 本になったので、同じ強さのままだと

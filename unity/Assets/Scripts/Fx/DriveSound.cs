@@ -8,6 +8,8 @@ namespace HalfAware
     /// **どれも 2D で鳴らす。** 耳はいつも運転席にあり、音源も同じ車の中にある。
     /// 距離で減らすと、視線を振っただけで走行音の大きさが変わる。
     ///
+    /// 最後の景色（朝靄の未舗装路と小麦畑）で窓を開けると、麦畑の風の輪（<see cref="Field"/>）を走行音に重ねる。
+    ///
     /// 走行音は舗装と未舗装の二本を持ち、帯が変わるところで入れ替える。
     /// 入れ替えは暗転の黒のあいだに呼ばれるので、切り替わる瞬間は聞こえても見えない。
     ///
@@ -25,6 +27,9 @@ namespace HalfAware
         [SerializeField] AudioSource weather;
         [Tooltip("エンジンだけ掛かっている音。止まっているあいだの輪")]
         [SerializeField] AudioSource motor;
+        [Tooltip("窓の外の麦畑の風。最後の景色で窓を開けたところから、走行音に重ねる輪。" +
+            "こもりの蓋（AudioLowPassFilter）は付けない。窓を開けてから鳴る音なので要らない")]
+        [SerializeField] AudioSource field;
 
         [Header("単発")]
         [SerializeField] AudioClip doorOpen;
@@ -46,6 +51,8 @@ namespace HalfAware
         [SerializeField] AudioClip rain;
         [Tooltip("エンジンだけ掛かっている音")]
         [SerializeField] AudioClip idle;
+        [Tooltip("麦畑の風（Wheat in the Wind）。村の夕方と同じ輪")]
+        [SerializeField] AudioClip wheat;
 
         [Header("大きさ")]
         [SerializeField] float shotVolume = 0.85f;
@@ -66,6 +73,12 @@ namespace HalfAware
         [SerializeField] float breathVolume = 0.40f;
         [Tooltip("窓を下ろす音。走行の輪の上で鳴るので単発の既定より大きく")]
         [SerializeField] float windowVolume = 1.00f;
+        // 未舗装の輪は 500Hz より下に寄っていて（実効 -19.7dB）、上は -41〜-51dB しかない。
+        // 麦の風は 500Hz より上が -29〜-31dB あるので、0.80 でも上の帯では走行音より 8dB 以上前に出る
+        [Tooltip("麦畑の風。走行音に埋もれない所から始める。上げる余地を残して 0.80")]
+        [SerializeField, Range(0f, 1f)] float wheatVolume = 0.80f;
+        [Tooltip("窓を開けてから麦畑の風が上がりきるまで。秒。窓が下りる音（4.45 秒）のうちに上がりきる")]
+        [SerializeField] float wheatRise = 3.0f;
 
         [Header("窓")]
         [Tooltip("窓を閉めているときに走行音と雨から上を削る高さ。Hz")]
@@ -79,6 +92,8 @@ namespace HalfAware
         AudioLowPassFilter weatherMuffle;
         float cut = -1f;
         float want;
+        bool fieldOn;
+        float fieldLevel;
 
         /// <summary>イグニッションの長さ。秒。鳴らし終えてから震え出すのに使う</summary>
         public float IgnitionSeconds { get { return ignition != null ? ignition.length : 0f; } }
@@ -112,6 +127,42 @@ namespace HalfAware
             want = shutCut;
             cut = shutCut;
             Apply(shutCut);
+            // 窓の外の風も景色を跨がない
+            Field(false);
+        }
+
+        /// <summary>
+        /// 窓の外の麦畑の風。**窓を開けたところで on にする**（最後の景色の窓のきっかけ）。
+        /// on は 0 から <see cref="wheatRise"/> 秒かけて上げる。off はその場で止める（窓を閉めた扱い）
+        /// </summary>
+        public void Field(bool on)
+        {
+            fieldOn = on;
+            if (field == null) return;
+            if (!on)
+            {
+                fieldLevel = 0f;
+                field.volume = 0f;
+                if (field.isPlaying) field.Stop();
+                return;
+            }
+            if (wheat == null) return;
+            if (field.clip == wheat && field.isPlaying) return;
+            fieldLevel = 0f;
+            field.volume = 0f;
+            field.clip = wheat;
+            field.loop = true;
+            field.Play();
+        }
+
+        /// <summary>
+        /// 麦畑の風の大きさを level から target へ寄せる。0 から full までを seconds 秒で上げきる速さ。
+        /// seconds が 0 以下ならその場で
+        /// </summary>
+        public static float Rise(float level, float target, float full, float dt, float seconds)
+        {
+            if (seconds <= 0f) return target;
+            return Mathf.MoveTowards(level, target, Mathf.Max(full, 0.01f) * dt / seconds);
         }
 
         void Awake()
@@ -125,6 +176,12 @@ namespace HalfAware
 
         void Update()
         {
+            // 麦畑の風はこもりの寄せより先に動かす。下の寄せは寄せ終わると return する
+            if (fieldOn && field != null && field.isPlaying)
+            {
+                fieldLevel = Rise(fieldLevel, wheatVolume, wheatVolume, Time.deltaTime, wheatRise);
+                field.volume = fieldLevel;
+            }
             if (Mathf.Approximately(cut, want)) return;
             // 対数で寄せる。Hz を線形で動かすと、聞こえ方は終わり際にしか変わらない
             var from = Mathf.Log(Mathf.Max(20f, cut));
@@ -234,6 +291,7 @@ namespace HalfAware
             if (road != null && road.isPlaying) road.Stop();
             if (weather != null && weather.isPlaying) weather.Stop();
             if (motor != null && motor.isPlaying) motor.Stop();
+            Field(false);
         }
 
         void Shot(AudioClip clip)

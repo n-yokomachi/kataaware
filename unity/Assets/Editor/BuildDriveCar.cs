@@ -220,6 +220,8 @@ namespace HalfAware.EditorTools
             backlight.localPosition = new Vector3(WheelAt.x, 1.36f, 0.555f);
             var lit = backlight.GetComponent<Light>();
             if (lit == null) lit = backlight.gameObject.AddComponent<Light>();
+            // AddComponent<Light> だけでは URP の付属データが付かない（場面 4 の Lamp と同じ。7fffabc）
+            UnityEngine.Rendering.Universal.LightExtensions.GetUniversalAdditionalLightData(lit);
             lit.type = LightType.Point;
             lit.color = new Color(1f, 0.74f, 0.42f);
             lit.intensity = 0.0059f;
