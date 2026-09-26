@@ -14,7 +14,7 @@ namespace HalfAware.EditorTools
     /// （後処理を通す）で 960×540 に撮ると、パイプラインの render scale 1/3 で中は 320×180 になる。
     /// カメラは <c>enabled = false</c>・<c>HideAndDontSave</c> で作って <c>Render()</c> で撮り、撮り終えたら捨てる。
     ///
-    /// 目の位置と向きは <see cref="Views"/> に持つ。設計書 6 節の 4〜9
+    /// 目の位置と向きは <see cref="Views"/> に持つ。設計書 6 節の 1〜9 と、路地から畑と丘を見た所
     /// </summary>
     public static class CheckVillage
     {
@@ -35,11 +35,21 @@ namespace HalfAware.EditorTools
             }
         }
 
-        /// <summary>設計書 6 節の 4〜9</summary>
+        /// <summary>設計書 6 節の 1〜9 と、路地から畑と丘を見た所</summary>
         public static View[] Views()
         {
             return new[]
             {
+                // 1. 車の着く所から、村と路地を。1b は振り返って、止まった車と麦畑の未舗装路（場面 8 の最後の帯）を
+                new View("1_arrive", new Vector3(-71.8f, 1.6f, 1.2f), 90f, 3f),
+                new View("1b_back", new Vector3(-71.8f, 1.6f, 1.2f), 262f, 3f),
+                // 2. 路地の途中。家 A の前から東へ。電話ボックスと家 B の茅葺きが見える
+                new View("2_lane", new Vector3(-44f, 1.6f, 0.4f), 80f, 2f),
+                // 3. 家 B と片割れの家のあいだ越しに、片割れの裏庭の白いパラソル
+                new View("3_parasol", new Vector3(-12.5f, 1.6f, 1.6f), 34f, -1f),
+                // 路地から畑と丘を。南は農場の門の向こうの麦畑、北は車の着く所の塀の向こう
+                new View("fields_south", new Vector3(-28.7f, 1.6f, -1.2f), 190f, 1f),
+                new View("fields_north", new Vector3(-58f, 1.6f, 1.6f), 330f, 1f),
                 // 4. 閉じた格子戸を、脇の小路の外から
                 new View("4_gate", new Vector3(BuildVillage.SidePathX + 0.3f, 1.6f, 7.4f), -4f, 4f),
                 // 5. アーチの下の煉瓦の小路。アーチの手前から、くぐった先を見通す
@@ -50,8 +60,9 @@ namespace HalfAware.EditorTools
                 new View("7_gazebo", new Vector3(-1.3f, 1.6f, 27.4f), 322f, 5f),
                 // 8. 場面 6 の目線。テラスの卓の椅子に座った目の高さで、夕方の庭を見渡す
                 new View("8_seated", new Vector3(-1.66f, 1.25f, 17.95f), 18f, 2f),
-                // 9. 全体を上から
+                // 9. 全体を上から。片割れの敷地と、村全体（霞を切って撮る）
                 new View("9_above", new Vector3(0f, 25f, 19.8f), 0f, 90f),
+                new View("9_village", new Vector3(-31f, 95f, 6f), 0f, 90f),
             };
         }
 
@@ -61,6 +72,7 @@ namespace HalfAware.EditorTools
             var main = GameObject.Find("Player/Main Camera");
             if (main == null) return "Player/Main Camera が無い";
             GameObject go = null;
+            var fog = RenderSettings.fog;
             try
             {
                 go = new GameObject("CheckVillageEye");
@@ -71,6 +83,8 @@ namespace HalfAware.EditorTools
                 cam.GetUniversalAdditionalCameraData().renderPostProcessing = true;
                 go.transform.position = v.Eye;
                 go.transform.rotation = Quaternion.Euler(v.Pitch, v.Yaw, 0f);
+                // 高い所からの見下ろしは霞を切る。95 m の上からでは村ぜんたいが霞の色に沈む
+                if (v.Eye.y > 50f) RenderSettings.fog = false;
                 var shot = CheckDiveSky.Grab(cam, 960, 540);
                 CheckDiveSky.Save(shot, path);
                 Object.DestroyImmediate(shot);
@@ -78,6 +92,7 @@ namespace HalfAware.EditorTools
             }
             finally
             {
+                RenderSettings.fog = fog;
                 if (go != null) Object.DestroyImmediate(go);
             }
         }
