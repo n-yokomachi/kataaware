@@ -454,12 +454,9 @@ namespace HalfAware.EditorTools
             so.FindProperty("fadeLayer").objectReferenceValue = fade.GetComponent<Image>();
             so.FindProperty("curtainLayer").objectReferenceValue = curtain.GetComponent<Image>();
             so.FindProperty("hazeLayer").objectReferenceValue = hazeView;
-            // 一行目の細い帯。幅は画面の七割。帯が狭くなったぶん左右の余白も詰める。
-            // 160 のままだと、一行に入る幅が七割の帯の中でさらに七割になって、二行の文が四行に割れる
-            so.FindProperty("passingInset").floatValue = 0.15f;
-            so.FindProperty("passingAlpha").floatValue = 0.35f;
-            so.FindProperty("passingPad").floatValue = 96f;
             so.ApplyModifiedPropertiesWithoutUndo();
+            // 字幕はノベルの枠に組む。一行目（名を呼ぶ声）は地を薄くし、送りの印を出さずに見分ける
+            HudStyle.Apply(hud);
             return hud;
         }
 

@@ -37,7 +37,6 @@ namespace HalfAware
         InputAction move;
         InputAction look;
         InputAction interact;
-        InputAction logToggle;
         float pitch;
 
         /// <summary>走っているときの速さ。押している間だけ上げる</summary>
@@ -79,20 +78,11 @@ namespace HalfAware
         /// <summary>このフレームで調べる操作（E か左クリック）が押されたか。ロック中だけ true になる</summary>
         public bool InteractPressed { get; private set; }
 
-        /// <summary>このフレームでログの開閉（Tab）が押されたか</summary>
-        public bool LogPressed { get; private set; }
-
         /// <summary>
-        /// ログをさかのぼる向き。1 で古い方へ、-1 で新しい方へ、0 で据え置き。
-        /// 車輪と上下の矢印の両方を見る
+        /// 上下の送り。1 で上（車輪を手前に回す・上の矢印・PageUp）、-1 で下、0 で据え置き。
+        /// 場面 4 の板の `潜る`・`切断` の選びが読む。TAB のコンソールは自分で鍵盤を読む
         /// </summary>
         public int LogStep { get; private set; }
-
-        /// <summary>
-        /// このフレームで押された数字。1〜9。押されていなければ 0。
-        /// Tab の一覧から場面を選ぶのに使う。入力の割り当ては増やさず鍵盤を直に見る
-        /// </summary>
-        public int MenuPick { get; private set; }
 
         /// <summary>
         /// 二択の左右。-1 が左、+1 が右、倒していなければ 0。
@@ -157,7 +147,6 @@ namespace HalfAware
             move = map.FindAction("Move", true);
             look = map.FindAction("Look", true);
             interact = map.FindAction("Interact", true);
-            logToggle = map.FindAction("Log", true);
         }
 
         void OnEnable() => actions.FindActionMap("Player", true).Enable();
@@ -165,8 +154,8 @@ namespace HalfAware
         void OnDisable() => actions.FindActionMap("Player", true).Disable();
 
         /// <summary>
-        /// ログをさかのぼる入力。専用の割り当ては作らず、車輪と上下の矢印を直に見る。
-        /// ログを開いている間しか使わないので、歩きの入力とは取り合わない
+        /// 上下の送りの入力。専用の割り当ては作らず、車輪と上下の矢印を直に見る。
+        /// 板を出している間しか使わないので、歩きの入力とは取り合わない
         /// </summary>
         static int ReadLogStep()
         {
@@ -187,15 +176,20 @@ namespace HalfAware
         void Update()
         {
             InteractPressed = false;
-            LogPressed = false;
-            LogStep = ReadLogStep();
-            MenuPick = 0;
+            LogStep = 0;
             ChoiceStep = 0;
+            // コンソールを開いている間は、歩く・見回す・調べる・送るを全部止める。
+            // カーソルもコンソールが預かっているので、ここでロックし直さない
+            if (ImplantConsole.IsOpen)
+            {
+                Running = false;
+                Aim();
+                return;
+            }
+            LogStep = ReadLogStep();
             if (CursorLocked)
             {
                 InteractPressed = interact.WasPressedThisFrame();
-                LogPressed = logToggle.WasPressedThisFrame();
-                MenuPick = Digit();
                 var stick = move.ReadValue<Vector2>();
                 ChoiceStep = stick.x > 0.5f ? 1 : stick.x < -0.5f ? -1 : 0;
                 if (CanLook) Look(look.ReadValue<Vector2>());
@@ -207,24 +201,18 @@ namespace HalfAware
                 Cursor.visible = true;
                 if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) Lock();
             }
-            // 目の位置と向きは、ロックの有無にかかわらず毎フレーム書き直す。
-            // 上乗せしていく形にすると、書き直されない間にずれが溜まって視界が回り続ける。
-            // 傾きをこの順で組むと、左右の傾きが親の水平面で効くので、下を向いていても画面が回らない
-            eye.localPosition = new Vector3(0f, EyeHeight, eyeLead) + EyeOffset;
-            eye.localRotation = Quaternion.Euler(pitch + EyeTilt.x, head.Yaw + EyeTilt.y, 0f);
+            Aim();
         }
 
         /// <summary>
-        /// 押された数字の鍵盤を読む。1〜9 を見る。
-        /// 場面が増えるたびにここへ足していくと、一覧に並んでいるのに押せない番号が残る
+        /// 目の位置と向きは、ロックの有無にかかわらず毎フレーム書き直す。
+        /// 上乗せしていく形にすると、書き直されない間にずれが溜まって視界が回り続ける。
+        /// 傾きをこの順で組むと、左右の傾きが親の水平面で効くので、下を向いていても画面が回らない
         /// </summary>
-        static int Digit()
+        void Aim()
         {
-            var k = Keyboard.current;
-            if (k == null) return 0;
-            for (var i = 0; i < 9; i++)
-                if (k[Key.Digit1 + i].wasPressedThisFrame) return i + 1;
-            return 0;
+            eye.localPosition = new Vector3(0f, EyeHeight, eyeLead) + EyeOffset;
+            eye.localRotation = Quaternion.Euler(pitch + EyeTilt.x, head.Yaw + EyeTilt.y, 0f);
         }
 
         static void Lock()

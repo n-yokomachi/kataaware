@@ -47,31 +47,6 @@ namespace HalfAware.Tests
             Assert.That(SceneMenu.Target(0, "Room"), Is.Null);
         }
 
-        [Test]
-        public void ListsEveryScene()
-        {
-            var text = SceneMenu.Compose("Room");
-            for (var i = 0; i < SceneMenu.Count; i++)
-            {
-                Assert.That(text, Does.Contain(SceneMenu.Titles[i]));
-                Assert.That(text, Does.Contain((i + 1).ToString()));
-            }
-        }
-
-        [Test]
-        public void MarksWhereYouAre()
-        {
-            Assert.That(SceneMenu.Compose("Alley"), Does.Contain("いま"));
-            // 一覧に無い場面から開いても落ちない。印が付かないだけ
-            Assert.That(SceneMenu.Compose("Nowhere"), Does.Not.Contain("いま"));
-        }
-
-        [Test]
-        public void TellsHowToClose()
-        {
-            Assert.That(SceneMenu.Compose("Room"), Does.Contain("Tab"));
-        }
-
         // 組み立ての一覧に入っていないシーンは SceneManager.LoadScene が読めない。
         // 数字を押した先で落ちるので、並べたものは全部入っていること
         [Test]

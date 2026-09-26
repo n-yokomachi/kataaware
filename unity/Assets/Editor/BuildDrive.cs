@@ -1408,18 +1408,6 @@ namespace HalfAware.EditorTools
             Frame(prompt.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
                 new Vector2(0f, -40f), new Vector2(800f, 40f));
 
-            var log = Layer(go.transform, "LogPanel", new Color(0.02f, 0.02f, 0.025f, 0.88f), true);
-            Frame(log, new Vector2(0.07f, 0.07f), new Vector2(0.93f, 0.93f), new Vector2(0.5f, 0.5f),
-                Vector2.zero, Vector2.zero);
-            var title = Line(log, "Title", font, 22.4f, new Color(0.62f, 0.64f, 0.68f), TextAlignmentOptions.TopLeft);
-            title.text = "ログ　　Tab で閉じる";
-            Frame(title.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0f, -22f), new Vector2(-76f, 48f));
-            var logText = Line(log, "Text", font, 24.08f, new Color(0.86f, 0.87f, 0.89f), TextAlignmentOptions.TopLeft);
-            Frame(logText.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f),
-                new Vector2(0f, -28f), new Vector2(-80f, -116f));
-            log.gameObject.SetActive(false);
-
             var fade = Layer(go.transform, "Fade", new Color(0f, 0f, 0f, 0f), false);
             Frame(fade, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
             var curtain = Layer(go.transform, "Curtain", new Color(0f, 0f, 0f, 1f), false);
@@ -1441,9 +1429,9 @@ namespace HalfAware.EditorTools
             so.FindProperty("centerText").objectReferenceValue = centre;
             so.FindProperty("fadeLayer").objectReferenceValue = fade.GetComponent<Image>();
             so.FindProperty("curtainLayer").objectReferenceValue = curtain.GetComponent<Image>();
-            so.FindProperty("logPanel").objectReferenceValue = log.gameObject;
-            so.FindProperty("logText").objectReferenceValue = logText;
             so.ApplyModifiedPropertiesWithoutUndo();
+            // 字幕はノベルの枠に組む（地・名前の行・送りの印）。ログは TAB のコンソールが持つ
+            HudStyle.Apply(hud);
             return hud;
         }
 

@@ -220,6 +220,8 @@ namespace HalfAware
         void Update()
         {
             if (cutting || chain == null || take == null) return;
+            // TAB のコンソールを開いている間は、記憶の時計も会話も止める
+            if (ImplantConsole.IsOpen) return;
             var press = player.InteractPressed || pending;
             pending = false;
             Step(Time.deltaTime, press);
@@ -287,6 +289,8 @@ namespace HalfAware
 
             if (body != null) body.Apply(entry);
             if (caption != null) caption.text = entry.row ?? "";
+            // コンソールの頭の行は「潜行中」と、この記憶の日時と場所
+            ImplantConsole.SetPlace(ConsolePlace.Dive(entry.row, entry.place));
             Wear();
             Deepen();
 
@@ -467,6 +471,7 @@ namespace HalfAware
             if (calling == null) { Hush(); return; }
             if (spoken > 0) return;
             spoken = 1;
+            ConsoleLog.Said(calling);
             if (hud != null) hud.SetPassing(calling);
         }
 
@@ -497,7 +502,8 @@ namespace HalfAware
         {
             var at = talks[done].lines[line];
             spoken = Mathf.Max(spoken, at + 1);
-            if (hud != null) hud.SetSubtitle(entry.said[at].line, SubtitleKind.Line);
+            ConsoleLog.Said(entry.said[at].line);
+            if (hud != null) hud.SetSubtitle(entry.said[at].line, SubtitleKind.Line, true);
         }
 
         /// <summary>

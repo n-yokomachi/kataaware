@@ -1,10 +1,8 @@
-using System.Text;
-
 namespace HalfAware
 {
     /// <summary>
-    /// Tab で開く一覧に並べる場面。動作確認のため、遊んでいる途中でも場面を移れる。
-    /// 並べて数字を振るだけで、読み込みそのものは呼び手が行う
+    /// TAB のコンソールのデバッグで並べる場面。動作確認のため、遊んでいる途中でも場面を移れる。
+    /// 並べて数字を振るだけで、並べて見せるのはコンソール（<see cref="ImplantConsole"/>）、読み込みは呼び手が行う
     /// </summary>
     public static class SceneMenu
     {
@@ -36,26 +34,6 @@ namespace HalfAware
         {
             var name = Pick(digit);
             return name != null && name != here ? name : null;
-        }
-
-        /// <summary>
-        /// ログの下に足す一覧。今いる場面には印を付ける。
-        /// here が一覧に無い場合も、そのまま並べるだけで落ちない
-        /// </summary>
-        public static string Compose(string here)
-        {
-            var sb = new StringBuilder();
-            sb.Append("\n\n――  場面  ――");
-            for (var i = 0; i < Scenes.Length; i++)
-            {
-                sb.Append("\n  ");
-                sb.Append(i + 1);
-                sb.Append("   ");
-                sb.Append(Titles[i]);
-                if (Scenes[i] == here) sb.Append("      ← いま");
-            }
-            sb.Append("\n  Tab   閉じる");
-            return sb.ToString();
         }
     }
 }
