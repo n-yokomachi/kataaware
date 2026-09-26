@@ -317,8 +317,8 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// タイトルの画面を、ゲームと同じ見え方で撮る（960×540）。背景の Canvas は画面の解像度で、
-        /// 枠と字の Canvas は粗い画面（UiLens）で描いて重ねる。セーブは手元の辞書（saves）に差し替えて撮る
-        /// （PlayerPrefs を汚さない）。recall で思い出すの枠を開いた形
+        /// 枠と字の Canvas は粗い画面（UiLens）で描いて重ね、その上に題と読みの Canvas を画面の解像度で重ねる。
+        /// セーブは手元の辞書（saves）に差し替えて撮る（PlayerPrefs を汚さない）。recall で思い出すの枠を開いた形
         /// </summary>
         public static string Screen(string path, bool cleared, SaveData[] saves, bool recall)
         {
@@ -330,11 +330,11 @@ namespace HalfAware.EditorTools
                     if (saves[i] != null) box.Set(SaveStore.KeyOf(SaveStore.All[i]), JsonUtility.ToJson(saves[i]));
             if (cleared) box.Set(SaveStore.ClearedKey, "1");
             var wasDirty = SceneManager.GetActiveScene().isDirty;
-            GameObject holder = null, backEye = null;
+            GameObject holder = null, backEye = null, nameEye = null;
             TitleScreen screen = null;
             UiLens lens = null;
-            RenderTexture rt = null;
-            Texture2D back = null, ui = null, shot = null;
+            RenderTexture rt = null, nameRt = null;
+            Texture2D back = null, ui = null, shot = null, named = null, final = null;
             var asset = UniversalRenderPipeline.asset;
             var keptScale = asset != null ? asset.renderScale : 1f;
             var async = ShaderUtil.allowAsyncCompilation;
@@ -365,9 +365,11 @@ namespace HalfAware.EditorTools
                 data.renderPostProcessing = false;
                 data.antialiasing = AntialiasingMode.None;
                 var look = Resources.Load<UiLook>(UiLook.Path);
+                var uiRenderer = -1;
                 if (asset != null && look != null)
                     for (var i = 0; i < asset.rendererDataList.Length; i++)
-                        if (asset.rendererDataList[i] == look.renderer) data.SetRenderer(i);
+                        if (asset.rendererDataList[i] == look.renderer) uiRenderer = i;
+                if (uiRenderer >= 0) data.SetRenderer(uiRenderer);
                 rt = new RenderTexture(w, h, 16, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
                 rt.hideFlags = HideFlags.HideAndDontSave;
                 cam.targetTexture = rt;
@@ -390,8 +392,41 @@ namespace HalfAware.EditorTools
                 lens.Draw();
                 ui = ConsoleShot.Read(lens.Target);
                 shot = ConsoleShot.Blend(back, ui, w, h);
+
+                // 題と読み。画面の解像度で、透明な地に描いてから重ねる（TMP の字は乗算済みのアルファで描かれる）
+                nameEye = new GameObject("TitleShotNameEye");
+                nameEye.hideFlags = HideFlags.HideAndDontSave;
+                nameEye.transform.position = new Vector3(0f, -7000f, 0f);
+                var nameCam = nameEye.AddComponent<Camera>();
+                nameCam.enabled = false;
+                nameCam.clearFlags = CameraClearFlags.SolidColor;
+                nameCam.backgroundColor = new Color(0f, 0f, 0f, 0f);
+                nameCam.cullingMask = 1 << UiLens.UiLayer;
+                nameCam.orthographic = true;
+                nameCam.nearClipPlane = 0.1f;
+                nameCam.farClipPlane = 20f;
+                nameCam.allowHDR = false;
+                nameCam.allowMSAA = false;
+                var nameData = nameCam.GetUniversalAdditionalCameraData();
+                nameData.renderPostProcessing = false;
+                nameData.antialiasing = AntialiasingMode.None;
+                nameData.requiresColorOption = CameraOverrideOption.Off;
+                nameData.requiresDepthOption = CameraOverrideOption.Off;
+                if (uiRenderer >= 0) nameData.SetRenderer(uiRenderer);
+                nameRt = new RenderTexture(w, h, 16, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+                nameRt.hideFlags = HideFlags.HideAndDontSave;
+                nameCam.targetTexture = nameRt;
+                ConsoleShot.Lens(screen.NameCanvas, nameCam, TitleScreen.NameOrder);
+                if (asset != null) asset.renderScale = 1f;
+                Canvas.ForceUpdateCanvases();
+                nameCam.Render();
+                if (asset != null) asset.renderScale = keptScale;
+                nameCam.targetTexture = null;
+                named = ConsoleShot.Read(nameRt);
+                final = ConsoleShot.Blend(shot, named, w, h);
+
                 Directory.CreateDirectory(Path.GetDirectoryName(path));
-                File.WriteAllBytes(path, shot.EncodeToPNG());
+                File.WriteAllBytes(path, final.EncodeToPNG());
                 return string.Format("撮った {0}（背景 {1}、UI {2}x{3}）", path, screen.Backdrop, lens.Target.width, lens.Target.height);
             }
             catch (Exception e)
@@ -420,10 +455,14 @@ namespace HalfAware.EditorTools
                         && (m.name.StartsWith("TitleHeavy") || m.name.StartsWith("TitleGlow") || m.name.StartsWith("TitleShade")))
                         Object.DestroyImmediate(m);
                 if (backEye != null) Object.DestroyImmediate(backEye);
+                if (nameEye != null) Object.DestroyImmediate(nameEye);
                 if (rt != null) { rt.Release(); Object.DestroyImmediate(rt); }
+                if (nameRt != null) { nameRt.Release(); Object.DestroyImmediate(nameRt); }
                 if (back != null) Object.DestroyImmediate(back);
                 if (ui != null) Object.DestroyImmediate(ui);
                 if (shot != null) Object.DestroyImmediate(shot);
+                if (named != null) Object.DestroyImmediate(named);
+                if (final != null) Object.DestroyImmediate(final);
                 var scene = SceneManager.GetActiveScene();
                 if (!wasDirty && scene.isDirty) ClearDirty(scene);
             }

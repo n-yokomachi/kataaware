@@ -21,7 +21,9 @@ namespace HalfAware
     /// （HalfAware/Shoot the title backgrounds）で撮り直す。
     ///
     /// 背景は画面の解像度の Canvas に最近傍で引き伸ばして敷き、暗く沈める（明るい朝の村は沈め方を弱める）。
-    /// 枠・字・ボタンはコンソールと同じ粗い画面（<see cref="UiLens"/>）で描く。
+    /// 枠・起動の表示・ボタンはコンソールと同じ粗い画面（<see cref="UiLens"/>）で描く。
+    /// **題と読みだけは粗くせず、画面の解像度でくっきり描く**（オーナー、2026-09-27）。
+    /// 場面の見出し（<see cref="HudView.Unblur"/>）と同じく、粗い画面を重ねる層の一つ上の Canvas に分け、同じ拡縮を持たせる。
     /// 見た目はここで組む（シーンに置くのはこの部品と、絵・音・書体の参照だけ）
     /// </summary>
     public sealed class TitleScreen : MonoBehaviour
@@ -60,12 +62,14 @@ namespace HalfAware
         public const int SortingOrder = 0;
         /// <summary>背景の Canvas の重なりの順。粗い画面を重ねる層（<see cref="UiLens.ShowOrder"/>）より下</summary>
         public const int BackdropOrder = -100;
+        /// <summary>題と読みの Canvas の重なりの順。粗い画面を重ねる層の一つ上（走査線も被らない）</summary>
+        public const int NameOrder = UiLens.ShowOrder + 1;
 
         const float FrameInset = 0.05f;
         const float BootLeft = 0.06f;
         const float BootTop = 0.08f;
-        const float NameTop = 0.36f;
-        const float KanaTop = 0.46f;
+        const float NameTop = 0.32f;
+        const float KanaTop = 0.455f;
         const float MenuTop = 0.60f;
         const float ListTop = 0.56f;
 
@@ -76,12 +80,17 @@ namespace HalfAware
         const float BootStep = 18f * Dot;
         /// <summary>0.06 em</summary>
         const float BootSpacing = 6f;
-        const float NameFont = 22f * Dot;
-        /// <summary>題の字間。案の 0.45 em から詰めて、朝の村の画角でアーチの口の内に収める（0.22 em）</summary>
-        public const float NameSpacing = 22f;
-        /// <summary>読みの字。明朝の細い線が粗い画面で切れないよう、いちばん小さい字（11 Dot）より一回り上げる</summary>
-        const float KanaFont = 13f * Dot;
-        const float KanaSpacing = 60f;
+        /// <summary>題の字。粗い画面で描いていた頃の 22 Dot の 1.4 倍（オーナー、2026-09-27「もう少し字を大きく」）</summary>
+        public const float NameFont = 31f * Dot;
+        /// <summary>
+        /// 題の字間。案の 0.45 em から、粗い画面の頃に 0.22 em まで詰め、字を大きくしたのに合わせてさらに詰める。
+        /// 朝の村の画角でアーチの口の内に収める
+        /// </summary>
+        public const float NameSpacing = 5f;
+        /// <summary>読みの字。粗い画面で描いていた頃の 13 Dot の 1.3 倍</summary>
+        public const float KanaFont = 17f * Dot;
+        /// <summary>読みの字間。字を大きくしたぶん、0.6 em から詰めて題の幅と釣り合わせる</summary>
+        public const float KanaSpacing = 40f;
         const float ButtonWidth = 165f * Dot;
         const float ButtonHeight = 28f * Dot;
         const float ButtonGap = 10f * Dot;
@@ -100,10 +109,13 @@ namespace HalfAware
         static Color BootText { get { return ImplantConsole.Tint(ImplantConsole.Rgb(127, 227, 236, 0.75f)); } }
         const string BootBright = "#cff7fa";
         static Color NameColor { get { return ImplantConsole.Rgb(0xe9, 0xfb, 0xfc, 1f); } }
-        static Color KanaColor { get { return ImplantConsole.Tint(ImplantConsole.Rgb(207, 247, 250, 0.7f)); } }
+        /// <summary>読みの色。題より一段淡くするが、明るい朝の花の前でも読めるよう、粗い画面の頃の 0.7 から上げる</summary>
+        static Color KanaColor { get { return ImplantConsole.Tint(ImplantConsole.Rgb(207, 247, 250, 0.9f)); } }
         static Color ButtonFill { get { return ImplantConsole.Veil(ImplantConsole.Rgb(3, 10, 14, 0.35f)); } }
+        /// <summary>題と読みの縁の青緑の淡い光</summary>
         static Color Glow { get { return ImplantConsole.Rgb(127, 227, 236, 0.35f); } }
-        static Color KanaShade { get { return ImplantConsole.Rgb(0, 0, 0, 0.8f); } }
+        /// <summary>題と読みの後ろの暗い影。明るい朝の花の前でも字の縁が溶けないように</summary>
+        static Color NameShade { get { return ImplantConsole.Rgb(0, 0, 0, 0.8f); } }
         static Color Shade { get { return ImplantConsole.Rgb(2, 8, 11, 1f); } }
         const float OffAlpha = 0.35f;
 
@@ -147,6 +159,8 @@ namespace HalfAware
 
         Canvas backCanvas;
         Canvas lensCanvas;
+        Canvas nameCanvas;
+        CanvasGroup names;
         RectTransform root;
         RawImage picture;
         Image cover;
@@ -170,8 +184,11 @@ namespace HalfAware
         /// <summary>背景を敷く Canvas。画面の解像度で描く</summary>
         public Canvas BackdropCanvas { get { return backCanvas; } }
 
-        /// <summary>枠・字・ボタンの Canvas。粗い画面で描く</summary>
+        /// <summary>枠・起動の表示・ボタンの Canvas。粗い画面で描く</summary>
         public Canvas ScreenCanvas { get { return lensCanvas; } }
+
+        /// <summary>題と読みの Canvas。画面の解像度でくっきり描き、粗い画面の上に重ねる</summary>
+        public Canvas NameCanvas { get { return nameCanvas; } }
 
         // ---- 始まり ------------------------------------------------------------
 
@@ -254,7 +271,7 @@ namespace HalfAware
         {
             phase = Phase.Boot;
             cover.color = Color.black;
-            chrome.alpha = 0f;
+            Chrome(0f);
             chrome.blocksRaycasts = false;
             menuGroup.alpha = 0f;
             for (var i = 0; i < bootLines.Count; i++) bootLines[i].gameObject.SetActive(false);
@@ -286,9 +303,16 @@ namespace HalfAware
         {
             Crop();
             cover.color = new Color(0f, 0f, 0f, 1f - t);
-            chrome.alpha = t;
+            Chrome(t);
             menuGroup.alpha = buttonsT;
             if (sound != null && sound.clip != null) sound.volume = volume * t;
+        }
+
+        /// <summary>枠と題と読みの濃さ。題と読みは別の Canvas にあるので、枠と揃えて一緒に動かす</summary>
+        void Chrome(float alpha)
+        {
+            chrome.alpha = alpha;
+            if (names != null) names.alpha = alpha;
         }
 
         /// <summary>起動を出し切って、ボタンを選べる形にする。途中でキーかクリックが来たら飛ばしてここへ</summary>
@@ -336,7 +360,7 @@ namespace HalfAware
             {
                 var t = Mathf.Clamp01((Time.unscaledTime - start) / LeaveSeconds);
                 cover.color = new Color(0f, 0f, 0f, t);
-                chrome.alpha = 1f - t;
+                Chrome(1f - t);
                 for (var i = 0; i < bootLines.Count; i++) bootLines[i].alpha = 1f - t;
                 if (sound != null) sound.volume = from * (1f - t);
                 if (t >= 1f) break;
@@ -522,6 +546,34 @@ namespace HalfAware
             cover = ImplantConsole.Fill(go.transform, "Cover", Color.black, false);
         }
 
+        /// <summary>コンソールと同じ拡縮。画面の大きさが変わっても字と余白の釣り合いが崩れない</summary>
+        static void Scale(GameObject canvas)
+        {
+            var scaler = canvas.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1280f, 720f);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 0.5f;
+        }
+
+        /// <summary>
+        /// 題と読みの Canvas。粗い画面を通さず画面の解像度で描き、粗い画面を重ねる層の一つ上に置く。
+        /// 拡縮は粗い画面の Canvas と同じにして、画面の大きさが変わっても枠やボタンとの釣り合いを保つ
+        /// </summary>
+        void BuildNames()
+        {
+            var go = new GameObject("Names", typeof(RectTransform));
+            go.transform.SetParent(transform, false);
+            nameCanvas = go.AddComponent<Canvas>();
+            nameCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            nameCanvas.sortingOrder = NameOrder;
+            Scale(go);
+            names = go.AddComponent<CanvasGroup>();
+            names.interactable = false;
+            names.blocksRaycasts = false;
+            Titles((RectTransform)go.transform);
+        }
+
         /// <summary>
         /// 背景を沈める暗さ。案の CSS の楕円のグラデーション（中心は横の真ん中、上から 55%）。
         /// u は左から、v は上から（0〜1）。light は沈め方の弱さ（<see cref="TitleBackdrops.Light"/>）で、
@@ -571,12 +623,7 @@ namespace HalfAware
             lensCanvas = go.AddComponent<Canvas>();
             lensCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
             lensCanvas.sortingOrder = SortingOrder;
-            // コンソールと同じ拡縮。画面の大きさが変わっても字と余白の釣り合いが崩れない
-            var scaler = go.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1280f, 720f);
-            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            scaler.matchWidthOrHeight = 0.5f;
+            Scale(go);
             go.AddComponent<GraphicRaycaster>();
             Materials();
 
@@ -589,9 +636,9 @@ namespace HalfAware
             ImplantConsole.Stretch(c, 0f, 0f, 0f, 0f);
             chrome = c.gameObject.AddComponent<CanvasGroup>();
             Frame(c);
-            Titles(c);
             BuildMenu(c);
             BuildList(c);
+            BuildNames();
         }
 
         /// <summary>塗りつぶしの上の暗い字を太らせる色づけと、題の淡い光</summary>
@@ -607,13 +654,18 @@ namespace HalfAware
             }
             if (mincho != null && mincho.material != null)
             {
-                // 題は青緑の淡い光、読みは暗い影（案の text-shadow）。明るい朝の花の前でも字の縁が溶けないように
-                glow = Underlaid(mincho.material, "TitleGlow", Glow, 0.8f, 0.6f);
-                shade = Underlaid(mincho.material, "TitleShade", KanaShade, 0.6f, 0.5f);
+                // 題と読みは、字の縁に青緑の淡い光、その後ろに暗い影（案の text-shadow を二つ重ねる）。
+                // 明朝のマテリアル（TMP の Mobile の SDF）は下敷きを一つしか持てないので、影は同じ字を後ろにもう一つ置いて出す（顔は透かす）
+                glow = Underlaid(mincho.material, "TitleGlow", Glow, 0.8f, 0.6f, 0f, true);
+                shade = Underlaid(mincho.material, "TitleShade", NameShade, 0.9f, 0.9f, -0.35f, false);
             }
         }
 
-        static Material Underlaid(Material from, string label, Color color, float softness, float dilate)
+        /// <summary>
+        /// 下敷き（underlay）を付けた写し。face が偽なら字の顔を透かし、下敷きだけを出す（後ろに置く影に使う）。
+        /// offsetY は下敷きを下へずらす量（負で下）
+        /// </summary>
+        static Material Underlaid(Material from, string label, Color color, float softness, float dilate, float offsetY, bool face)
         {
             var m = new Material(from);
             m.name = label;
@@ -623,6 +675,8 @@ namespace HalfAware
             m.SetColor(ShaderUtilities.ID_UnderlayColor, color);
             m.SetFloat(ShaderUtilities.ID_UnderlaySoftness, softness);
             m.SetFloat(ShaderUtilities.ID_UnderlayDilate, dilate);
+            m.SetFloat(ShaderUtilities.ID_UnderlayOffsetY, offsetY);
+            if (!face && m.HasProperty(ShaderUtilities.ID_FaceColor)) m.SetColor(ShaderUtilities.ID_FaceColor, new Color(1f, 1f, 1f, 0f));
             return m;
         }
 
@@ -709,22 +763,28 @@ namespace HalfAware
             down.sizeDelta = new Vector2(HookLine, 0f);
         }
 
-        /// <summary>題（HALF AWARE）と読み（かたあはれ）。明朝で真ん中に控えめに</summary>
+        /// <summary>題（HALF AWARE）と読み（かたあはれ）。明朝で真ん中に。後ろに同じ字の影を置く</summary>
         void Titles(RectTransform parent)
         {
-            var heading = Centered(parent, "Name", NameFont, NameColor, NameTop);
-            heading.characterSpacing = NameSpacing;
-            heading.text = Name;
-            var kana = Centered(parent, "Kana", KanaFont, KanaColor, KanaTop);
-            kana.characterSpacing = KanaSpacing;
-            kana.text = Kana;
-            if (mincho != null)
+            Title(parent, "Name", Name, NameFont, NameColor, NameTop, NameSpacing);
+            Title(parent, "Kana", Kana, KanaFont, KanaColor, KanaTop, KanaSpacing);
+        }
+
+        void Title(RectTransform parent, string label, string text, float size, Color color, float top, float spacing)
+        {
+            if (shade != null)
             {
-                heading.font = mincho;
-                kana.font = mincho;
+                var back = Centered(parent, label + "Shade", size, Color.white, top);
+                back.characterSpacing = spacing;
+                if (mincho != null) back.font = mincho;
+                back.fontSharedMaterial = shade;
+                back.text = text;
             }
-            if (glow != null) heading.fontSharedMaterial = glow;
-            if (shade != null) kana.fontSharedMaterial = shade;
+            var t = Centered(parent, label, size, color, top);
+            t.characterSpacing = spacing;
+            if (mincho != null) t.font = mincho;
+            if (glow != null) t.fontSharedMaterial = glow;
+            t.text = text;
         }
 
         static TMP_Text Centered(RectTransform parent, string label, float size, Color color, float top)
