@@ -246,6 +246,22 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
+        /// 底を張らない向きを持つ箱。地面や塀の頭に載せて底の見えない物（生け垣の箱と頭の凸凹、塀の笠石）に使う。
+        /// 面の並びは <see cref="Box(Vector3, Vector3, Quaternion)"/> から底（-y）の一枚を抜いたもの
+        /// </summary>
+        public void BoxOpenBottom(Vector3 centre, Vector3 size, Quaternion rot)
+        {
+            var h = size * 0.5f;
+            System.Func<float, float, float, Vector3> c = (sx, sy, sz) =>
+                centre + rot * new Vector3(h.x * sx, h.y * sy, h.z * sz);
+            Quad(c(1, -1, 1), c(1, -1, -1), c(1, 1, -1), c(1, 1, 1));
+            Quad(c(-1, -1, -1), c(-1, -1, 1), c(-1, 1, 1), c(-1, 1, -1));
+            Quad(c(-1, 1, 1), c(1, 1, 1), c(1, 1, -1), c(-1, 1, -1));
+            Quad(c(-1, -1, 1), c(1, -1, 1), c(1, 1, 1), c(-1, 1, 1));
+            Quad(c(1, -1, -1), c(-1, -1, -1), c(-1, 1, -1), c(1, 1, -1));
+        }
+
+        /// <summary>
         /// 穴の空いた壁。x が一定の面に、窓の抜けを避けて桟と欄間を張る。
         /// holes は (z0, z1, y0, y1) の並び
         /// </summary>

@@ -699,7 +699,8 @@ namespace HalfAware.EditorTools
             {
                 var at = from + dir * ((i + 0.5f) * len / n);
                 var tall = i % 3 == 0 ? 0.22f : 0.15f + Hash(41, i) * 0.03f;
-                b.Stone.Box(at + Vector3.up * (tall * 0.5f), new Vector3(thick, tall, len / n - 0.008f), rot);
+                // 底は塀の頭に載って見えないので張らない（三角を抑える）
+                b.Stone.BoxOpenBottom(at + Vector3.up * (tall * 0.5f), new Vector3(thick, tall, len / n - 0.008f), rot);
             }
         }
 
@@ -711,13 +712,14 @@ namespace HalfAware.EditorTools
             if (len < 0.05f) return;
             var dir = run / len;
             var rot = Quaternion.LookRotation(dir, Vector3.up);
-            b.Hedge.Box((from + to) * 0.5f + Vector3.up * (high * 0.5f), new Vector3(thick, high, len), rot);
+            // 底は地面と生け垣の頭に隠れて見えないので張らない（三角を抑える）
+            b.Hedge.BoxOpenBottom((from + to) * 0.5f + Vector3.up * (high * 0.5f), new Vector3(thick, high, len), rot);
             var n = Mathf.Max(1, Mathf.RoundToInt(len / 0.7f));
             for (var i = 0; i < n; i++)
             {
                 var at = from + dir * (len * (i + 0.5f) / n);
                 var bump = 0.06f + Hash(seed, i) * 0.14f;
-                b.Hedge.Box(at + Vector3.up * (high + bump * 0.5f - 0.02f), new Vector3(thick * 0.86f, bump, len / n * 0.9f), rot);
+                b.Hedge.BoxOpenBottom(at + Vector3.up * (high + bump * 0.5f - 0.02f), new Vector3(thick * 0.86f, bump, len / n * 0.9f), rot);
             }
         }
 
