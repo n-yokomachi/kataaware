@@ -9,6 +9,8 @@ namespace HalfAware
     /// 距離で減らすと、視線を振っただけで走行音の大きさが変わる。
     ///
     /// 最後の景色（朝靄の未舗装路と小麦畑）で窓を開けると、麦畑の風の輪（<see cref="Field"/>）を走行音に重ねる。
+    /// その景色の余韻が明けると黒のまま車を止める（<see cref="Park"/>）。走行音と麦の風は
+    /// 止まる音に合わせて <see cref="Settle"/> で下げる。止まる音が鳴り終わったら、ドアを閉める音（<see cref="DoorShut"/>）で場面を閉じる。
     ///
     /// 走行音は舗装と未舗装の二本を持ち、帯が変わるところで入れ替える。
     /// 入れ替えは暗転の黒のあいだに呼ばれるので、切り替わる瞬間は聞こえても見えない。
@@ -37,6 +39,9 @@ namespace HalfAware
         [SerializeField] AudioClip ignition;
         [Tooltip("運転席の窓を下ろす音")]
         [SerializeField] AudioClip windowDown;
+        [Tooltip("車を止めてハンドブレーキを引く音。場面 8 の終わり、黒のあいだに鳴らす。" +
+            "止まる・ハンドブレーキ・エンジンが続く、の三つが一つに入っている（Audio/LICENSES.md）")]
+        [SerializeField] AudioClip park;
         [Tooltip("煙を吐く息。**Cigarette が持つのと同じ素材。**" +
             "あちらは時刻表どおりに吸ってすぐ吐くが、ここでは窓を下ろし終えてから吐かせたいので、" +
             "吐く息だけこちらから鳴らす")]
@@ -73,6 +78,9 @@ namespace HalfAware
         [SerializeField] float breathVolume = 0.40f;
         [Tooltip("窓を下ろす音。走行の輪の上で鳴るので単発の既定より大きく")]
         [SerializeField] float windowVolume = 1.00f;
+        [Tooltip("車を止める音。頭は走行の輪の下に潜るので単発の既定より大きく。" +
+            "素材は頂点 -6dB・実効 -26dB で、走行の輪（実効 -19dB）より小さい")]
+        [SerializeField] float parkVolume = 1.00f;
         // 未舗装の輪は 500Hz より下に寄っていて（実効 -19.7dB）、上は -41〜-51dB しかない。
         // 麦の風は 500Hz より上が -29〜-31dB あるので、0.80 でも上の帯では走行音より 8dB 以上前に出る
         [Tooltip("麦畑の風。走行音に埋もれない所から始める。上げる余地を残して 0.80")]
@@ -94,9 +102,16 @@ namespace HalfAware
         float want;
         bool fieldOn;
         float fieldLevel;
+        /// <summary>今鳴らしている走行の輪の大きさ。<see cref="settle"/> を掛ける前の値</summary>
+        float roadLevel;
+        /// <summary>走行音・雨・麦の風に掛ける大きさ。場面 8 の終わりにだけ 1 から下がる</summary>
+        float settle = 1f;
 
         /// <summary>イグニッションの長さ。秒。鳴らし終えてから震え出すのに使う</summary>
         public float IgnitionSeconds { get { return ignition != null ? ignition.length : 0f; } }
+
+        /// <summary>車を止める音の長さ。秒。鳴り終わってからドアを閉める</summary>
+        public float ParkSeconds { get { return park != null ? park.length : 0f; } }
 
         /// <summary>窓を下ろす音の長さ。秒。下ろし終えてから独白を出すのに使う</summary>
         public float WindowSeconds { get { return windowDown != null ? windowDown.length : 0f; } }
@@ -180,7 +195,7 @@ namespace HalfAware
             if (fieldOn && field != null && field.isPlaying)
             {
                 fieldLevel = Rise(fieldLevel, wheatVolume, wheatVolume, Time.deltaTime, wheatRise);
-                field.volume = fieldLevel;
+                field.volume = fieldLevel * settle;
             }
             if (Mathf.Approximately(cut, want)) return;
             // 対数で寄せる。Hz を線形で動かすと、聞こえ方は終わり際にしか変わらない
@@ -206,6 +221,28 @@ namespace HalfAware
             if (had == null) had = on.gameObject.AddComponent<AudioLowPassFilter>();
             had.lowpassResonanceQ = 1f;
             return had;
+        }
+
+        /// <summary>
+        /// 車を止めてハンドブレーキを引く音。場面 8 の終わり、黒へ切り替えたその場で鳴らす。
+        /// 走行音と麦の風はこれに合わせて <see cref="Settle"/> で下げる
+        /// </summary>
+        public void Park()
+        {
+            if (oneShot == null || park == null) return;
+            oneShot.PlayOneShot(park, parkVolume);
+        }
+
+        /// <summary>
+        /// 走行音・雨・麦の風に掛ける大きさ。1 で元のまま、0 で消える。
+        /// 車が止まるにつれて下げる。**止めはしない。** 0 のまま輪は回り続け、場面が閉じるときに <see cref="Hush"/> が止める
+        /// </summary>
+        public void Settle(float level)
+        {
+            settle = Mathf.Clamp01(level);
+            if (road != null) road.volume = roadLevel * settle;
+            if (weather != null) weather.volume = rainVolume * settle;
+            if (field != null) field.volume = fieldLevel * settle;
         }
 
         public void DoorOpen() { Shot(doorOpen); }
@@ -263,7 +300,7 @@ namespace HalfAware
                 return;
             }
             if (rain == null) return;
-            weather.volume = rainVolume;
+            weather.volume = rainVolume * settle;
             if (weather.clip == rain && weather.isPlaying) return;
             weather.clip = rain;
             weather.loop = true;
@@ -276,7 +313,8 @@ namespace HalfAware
             if (road == null) return;
             var want = rough ? gravel : paved;
             if (want == null) return;
-            road.volume = rough ? gravelVolume : pavedVolume;
+            roadLevel = rough ? gravelVolume : pavedVolume;
+            road.volume = roadLevel * settle;
             // **同じ音なら触らない。** 帯が変わっても舗装のままなら、
             // 鳴らし直すと輪の頭へ戻って継ぎ目が聞こえる
             if (road.clip == want && road.isPlaying) return;

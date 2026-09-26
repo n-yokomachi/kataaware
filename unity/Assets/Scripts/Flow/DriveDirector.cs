@@ -13,6 +13,11 @@ namespace HalfAware
     /// 黒へは切り替えで入り、明けるときだけフェードする。
     /// 場面 1 のドアを閉める暗転と同じ扱い。
     ///
+    /// 最後の景色だけは明けない。余韻が明けたら黒へ切り替え、黒のまま車を止める音 → 間 →
+    /// ドアを閉める音 → 待つ、と音だけで運んでから、場面を閉じるのを許す。
+    /// 村（Village）への切り替えは SceneFlow の nextScene が受け持ち、暗転を挟まない（SceneExit.FadesOut）。
+    /// 段取りそのものは ArrivalClock が持つ
+    ///
     /// 時間帯（空・霧・日射し）も帯ごとに持っていて、Dress が黒のあいだに差し替える。
     /// RenderSettings はシーンにひとつしか無いので、組み立てで一度置くだけでは
     /// 全部の帯が同じ時間帯になり、朝の小麦畑まで夜のまま出る。
@@ -128,6 +133,15 @@ namespace HalfAware
             "景色どうしの切り替えがフェード無しなので、場面の頭もそれに揃えてある")]
         [SerializeField] float pullFade = 0f;
 
+        [Header("村へ")]
+        [Tooltip("最後の景色の余韻が明けて黒へ切り替えてから、走行音と麦の風を下げきるまで。秒。" +
+            "止まる音（CarStopHandbrake）の中で車が止まりきるのが 5.7 秒あたり。両端を緩めて下げる")]
+        [SerializeField] float settleSeconds = 5.7f;
+        [Tooltip("止まる音が鳴り終わってから、ドアを閉める音を鳴らすまで。秒。0 なら鳴り終わったその場で閉める")]
+        [SerializeField] float doorGap = 0.6f;
+        [Tooltip("ドアを閉める音を鳴らしてから、村へ切り替えるまで。秒。黒のまま待ち、切り替えは暗転を挟まない")]
+        [SerializeField] float villageHold = 2f;
+
         [Header("体")]
         [Tooltip("主人公の体。ガレージでは立って歩き、運転席に着いたら座った形になる。" +
             "座った形は腕組み、手動運転の帯だけ二つ目の形（ハンドルに手を乗せる）")]
@@ -156,6 +170,8 @@ namespace HalfAware
 
         DriveRoute route;
         readonly BandClock clock = new BandClock();
+        /// <summary>最後の景色の余韻が明けてから村へ着くまでの段取り</summary>
+        readonly ArrivalClock arrival = new ArrivalClock();
         /// <summary>段取りを刻んでいる帯。黒のあいだも、終わる側のまま置く</summary>
         int band = -1;
         /// <summary>景色を並べてある帯。黒へ入った時点で次へ進む</summary>
@@ -165,7 +181,7 @@ namespace HalfAware
         bool boarding;
         /// <summary>場面が閉じたときに走行音を止めた</summary>
         bool hushed;
-        /// <summary>最後の帯の余韻が明けた。あとは SceneFlow が閉じるのを待つだけ</summary>
+        /// <summary>村へ着く一連を終えた。あとは SceneFlow が村へ切り替えるのを待つだけ</summary>
         bool handedOver;
 
         /// <summary>
@@ -233,6 +249,11 @@ namespace HalfAware
             // 読み始めた人が読み終えたとき、閉じられないまま走り続けることになる
             if (handedOver) { flow.Held = false; return; }
 
+            // 村へ着く一連の最中。黒のまま音だけで運ぶ。**下の帯の分岐より前に置く。**
+            // 最後の帯の時計は、余韻が明けると黒と明けの 0 秒を越えて Running へ戻っているので、
+            // 下へ流すと帯の分岐を素通りして、無い次の帯を並べにいく
+            if (arrival.Underway) { Arrive(Time.deltaTime); return; }
+
             // 独白を送り切ったか。積んだ字幕が尽きたところで余韻へ移る
             if (clock.Beat == DriveBeat.Talking && !flow.Talking)
             {
@@ -255,14 +276,18 @@ namespace HalfAware
             world.Rough = At(shown).rough;
 
             // 最後の帯には次の景色が無い。ただし余韻は流す。
-            // 送り切った瞬間に場面が閉じると、窓を開けた最後の一行のあとが忙しない
+            // 送り切った瞬間に場面が閉じると、窓を開けた最後の一行のあとが忙しない。
+            // 余韻が明けたら黒へ切り替えて、村へ着く一連（Arrive）へ渡す
             if (route.IsLast(band) && clock.Beat != DriveBeat.Running && clock.Beat != DriveBeat.Talking)
             {
                 if (!flow.Talking) clock.Tick(Time.deltaTime, Now);
                 // 次の帯は無いので、入れ替えの知らせは受け取って捨てる
                 clock.TakeSwap();
-                if (clock.Beat != DriveBeat.Afterglow) handedOver = true;
-                flow.Held = !handedOver;
+                flow.Held = true;
+                if (clock.Beat == DriveBeat.Afterglow) return;
+                // 黒の頭で止まる音を鳴らす。このフレームの分の時は進めない
+                arrival.Begin();
+                Arrive(0f);
                 return;
             }
             flow.Held = true;
@@ -321,6 +346,43 @@ namespace HalfAware
             }
             clock.Trigger();
             Speak();
+        }
+
+        /// <summary>
+        /// 村へ着く一連を 1 フレーム進める。黒のまま、車を止める音 → 間 → ドアを閉める音 → 待つ。
+        /// 走行音と麦の風は、黒へ入ったところから止まる音に合わせて下げる。
+        ///
+        /// 着いたら場面を閉じるのを許す。SceneFlow が nextScene（Village）へ切り替える。
+        /// **暗転は足さない。** 次の場面へ進むときは SceneFlow が幕を触らない（SceneExit.FadesOut）ので、
+        /// ここで置いた黒が読み込みまで残り、村は明けた絵で映る。
+        ///
+        /// 秒数は毎フレーム値から読む。帯の秒数と同じく、再生しながら Inspector で触れば効く
+        /// </summary>
+        void Arrive(float dt)
+        {
+            var times = new ArrivalTimes
+            {
+                stop = sound != null ? sound.ParkSeconds : 0f,
+                settle = settleSeconds,
+                gap = doorGap,
+                hold = villageHold,
+            };
+            arrival.Tick(dt, times);
+            if (arrival.TakeStop() && sound != null) sound.Park();
+            if (arrival.TakeDoor() && sound != null) sound.DoorShut();
+            if (sound != null) sound.Settle(arrival.Level(times));
+            if (arrival.Beat == ArrivalBeat.Arrived)
+            {
+                handedOver = true;
+                flow.Held = false;
+                return;
+            }
+            flow.Held = true;
+            hud.SetFade(1f);
+            // 黒のあいだは操作を止める。**着く時刻を越えて止めない。** ほかの演出と同じく
+            // FreezeStep ずつ延ばすと、着いてから最大でその分 SceneFlow が閉じられず、
+            // ドアから村までが villageHold より延びる
+            flow.Freeze(Mathf.Min(FreezeStep, arrival.Left(times)));
         }
 
         /// <summary>

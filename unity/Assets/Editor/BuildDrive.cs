@@ -1265,6 +1265,7 @@ namespace HalfAware.EditorTools
             "rain", "Assets/Audio/RainWipers.wav",
             "idle", "Assets/Audio/Idle.wav",
             "windowDown", "Assets/Audio/WindowDown.wav",
+            "park", "Assets/Audio/CarStopHandbrake.wav",
             "exhale", "Assets/Audio/Blow.wav",
             "wheat", VillageAudioImport.WheatPath,
         };
@@ -1499,8 +1500,10 @@ namespace HalfAware.EditorTools
             // 眩暈は場面 1 のもの。車内では使わない
             so.FindProperty("daze").objectReferenceValue = null;
             so.FindProperty("maxAngle").floatValue = InteractionPicker.MaxAngle;
-            // 次の場面（場面 9）はまだ無い。必須を済ませたら「続く」で止まる
-            so.FindProperty("nextScene").stringValue = "";
+            // 次は村（場面 9）。最後の景色の余韻が明けたら、黒のまま車を止めてドアを閉め、
+            // DriveDirector が手を離したところで切り替わる。cutToBlack は立てない。
+            // 黒は DriveDirector が置いたものがそのまま残り、村は明けた絵で映る
+            so.FindProperty("nextScene").stringValue = "Village";
             so.FindProperty("openingCard").stringValue = "";
             so.FindProperty("standAfter").stringValue = "";
             so.FindProperty("standSpot").objectReferenceValue = null;
