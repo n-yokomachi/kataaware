@@ -7,6 +7,13 @@
 // 光は日（影を受ける）と環境光だけ。回り込み（_Wrap）で日の裏も沈みきらないようにし、
 // 夕方の低い日に透ける花びらの明るみを _Glow で足す。霧は URP の霧（ExponentialSquared）を掛ける。
 // 影を落とす pass も持つ。低い日の長い影が芝に落ちないと、花の縁が芝の上に浮いて見える
+//
+// **風に揺れる**（村の設計書 7 節）。札の頂点を、根からの高さ（uv1。Bank.Rooted）に応じて横へずらす。
+// 根元（uv1.y が 0）は動かさず、先ほど大きく（割合の二乗）。揺れの幅は背の高さで伸ばすが 1.4 m で頭打ちにして、
+// 木の樹冠（背 3 m 余り）が大きく振れないようにする。位相は頂点の水平の位置から引く
+// （同じ株の根と先は同じ位置なので揃い、隣の株とはずれる）。ゆっくりした揺れに、速く小さな揺れを重ねる。
+// 計算は頂点だけで、絵の読み足しは無い。影と深さの pass も同じだけずらす。
+// 時刻は _Time.y に、全体の値 _FloraShift を足す。エディタで時刻を変えて撮り比べるのに使う
 Shader "HalfAware/Foliage"
 {
     Properties
@@ -17,6 +24,8 @@ Shader "HalfAware/Foliage"
         _Wrap ("光の回り込み", Range(0, 1)) = 0.5
         _Glow ("日に透ける明るみ", Range(0, 1)) = 0.25
         _Shade ("根元の陰り。uv1.y が 0 の所でこれだけ暗くする", Range(0, 1)) = 0.35
+        _Sway ("揺れの幅。背 1 m の株の先が振れる距離（m）", Range(0, 0.3)) = 0.07
+        _SwayRate ("ゆっくりした揺れの速さ（ラジアン/秒）", Range(0, 6)) = 1.3
     }
 
     SubShader
@@ -36,7 +45,30 @@ Shader "HalfAware/Foliage"
             half _Wrap;
             half _Glow;
             half _Shade;
+            half _Sway;
+            half _SwayRate;
         CBUFFER_END
+
+        // 全体の時刻のずらし。撮り比べの道具が Shader.SetGlobalFloat で書く
+        float _FloraShift;
+
+        // 風の向き（水平）。西南西から東北東へ
+        static const float2 FloraWind = float2(0.93, 0.37);
+
+        // 札の頂点を揺らす。root は uv1（根からの高さ m、株の背に対する割合）
+        float3 FloraSway(float3 world, float2 root)
+        {
+            float f = saturate(root.y);
+            float bend = min(max(root.x, 0.0), 1.4) * f * f;
+            float t = _Time.y + _FloraShift;
+            float phase = sin(world.x * 0.83) * 2.1 + sin(world.z * 0.91 + world.x * 0.37) * 2.3;
+            float slow = sin(t * _SwayRate + phase);
+            float fast = sin(t * _SwayRate * 3.7 + phase * 1.9);
+            float along = _Sway * (slow + 0.35 * fast);
+            float across = _Sway * 0.35 * sin(t * _SwayRate * 1.7 + phase * 1.3);
+            float2 d = FloraWind * along + float2(-FloraWind.y, FloraWind.x) * across;
+            return world + float3(d.x, 0.0, d.y) * bend;
+        }
         ENDHLSL
 
         Pass
@@ -75,7 +107,7 @@ Shader "HalfAware/Foliage"
             Varyings Vert(Attributes v)
             {
                 Varyings o;
-                float3 world = TransformObjectToWorld(v.positionOS.xyz);
+                float3 world = FloraSway(TransformObjectToWorld(v.positionOS.xyz), v.root);
                 o.positionWS = world;
                 o.positionCS = TransformWorldToHClip(world);
                 o.normalWS = TransformObjectToWorldNormal(v.normalOS);
@@ -129,6 +161,7 @@ Shader "HalfAware/Foliage"
                 float4 positionOS : POSITION;
                 float3 normalOS : NORMAL;
                 float2 uv : TEXCOORD0;
+                float2 root : TEXCOORD1;
             };
 
             struct ShadowOut
@@ -140,7 +173,7 @@ Shader "HalfAware/Foliage"
             ShadowOut ShadowVert(ShadowIn v)
             {
                 ShadowOut o;
-                float3 world = TransformObjectToWorld(v.positionOS.xyz);
+                float3 world = FloraSway(TransformObjectToWorld(v.positionOS.xyz), v.root);
                 float3 normal = TransformObjectToWorldNormal(v.normalOS);
             #if _CASTING_PUNCTUAL_LIGHT_SHADOW
                 float3 toLight = normalize(_LightPosition - world);
@@ -182,6 +215,7 @@ Shader "HalfAware/Foliage"
             {
                 float4 positionOS : POSITION;
                 float2 uv : TEXCOORD0;
+                float2 root : TEXCOORD1;
             };
 
             struct DepthOut
@@ -193,7 +227,7 @@ Shader "HalfAware/Foliage"
             DepthOut DepthVert(DepthIn v)
             {
                 DepthOut o;
-                o.positionCS = TransformObjectToHClip(v.positionOS.xyz);
+                o.positionCS = TransformWorldToHClip(FloraSway(TransformObjectToWorld(v.positionOS.xyz), v.root));
                 o.uv = TRANSFORM_TEX(v.uv, _BaseMap);
                 return o;
             }

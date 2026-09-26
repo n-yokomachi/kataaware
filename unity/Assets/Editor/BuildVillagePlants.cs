@@ -95,6 +95,9 @@ namespace HalfAware.EditorTools
             m.SetFloat("_Wrap", 0.5f);
             m.SetFloat("_Glow", 0.25f);
             m.SetFloat("_Shade", 0.35f);
+            // 風の揺れ（設計書 7 節）。背 1 m の株の先が 7 cm ほど、4.8 秒ほどの周期で
+            m.SetFloat("_Sway", 0.07f);
+            m.SetFloat("_SwayRate", 1.3f);
             EditorUtility.SetDirty(m);
             return m;
         }
