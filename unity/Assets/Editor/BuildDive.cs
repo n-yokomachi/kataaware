@@ -471,8 +471,13 @@ namespace HalfAware.EditorTools
         /// </summary>
         const float HazeFrom = 0.52f;
         const float HazeUpto = 1.38f;
-        /// <summary>角での濃さ。字幕と右上の行が読めることを条件に決めた</summary>
-        const float HazeDepth = 0.34f;
+        /// <summary>
+        /// 角での濃さ。辺の真ん中はこの 0.59 倍。
+        ///
+        /// 0.34（辺の真ん中で 0.20）では四方が白く濁って見え、「記憶シーンの四方の白いフェードをもっと薄く」と差し戻された。
+        /// 半分の 0.17（辺の真ん中で 0.10）に下げた
+        /// </summary>
+        const float HazeDepth = 0.17f;
 
         static RectTransform Layer(Transform parent, string name, Color col, bool blocks)
         {

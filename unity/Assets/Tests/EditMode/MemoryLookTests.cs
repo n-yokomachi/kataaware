@@ -126,6 +126,16 @@ namespace HalfAware.Tests
         }
 
         [Test]
+        public void TheVeilStaysFaint()
+        {
+            // 角 0.34・辺の真ん中 0.20 では四方が白く濁ると差し戻され、半分に下げた
+            var haze = Fresh();
+            Assert.AreEqual(0.17f, haze.Veil(1.414f), 0.01f, "角の白が濃い");
+            Assert.AreEqual(0.10f, haze.Veil(1f), 0.01f, "辺の真ん中の白が濃い");
+            Drop(haze);
+        }
+
+        [Test]
         public void TurningItOffLeavesNothingBehind()
         {
             var haze = Fresh();

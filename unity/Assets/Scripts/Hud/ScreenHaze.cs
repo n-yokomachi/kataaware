@@ -28,7 +28,7 @@ namespace HalfAware
         [SerializeField] float upto = 1.38f;
         // Graphic に同じ名前の depth（キャンバスの重なりの深さ）があるので、名前を分ける
         [Tooltip("角での濃さの上限。0 で何も出ない")]
-        [SerializeField, Range(0f, 1f)] float corner = 0.34f;
+        [SerializeField, Range(0f, 1f)] float corner = 0.17f;
         [Tooltip("全体の強さ。DiveDirector が場面ごとに書き換える")]
         [SerializeField, Range(0f, 1f)] float amount = 1f;
 
