@@ -67,9 +67,15 @@ namespace HalfAware.EditorTools
         const float KitchenRearSkin = 0.25f;
         /// <summary>台所と廊下を分ける壁の廊下の側の面</summary>
         const float KitchenHallNorth = KitchenDoorZ - 0.1f;
-        /// <summary>台所の戸口の幅の半分と高さ。戸口の人（記憶 5 の妻・6 のリンダ・12 の母）はこの中に立つ</summary>
+        /// <summary>
+        /// 台所の戸口の幅の半分と高さ。戸口の人（記憶 5 の妻・6 のリンダ・12 の母）はこの中に立つ。
+        ///
+        /// **高さは主の体が段を上がる分まで取る。** CharacterController は一歩ごとに stepOffset（0.3 m）だけ持ち上げてから
+        /// 前へ出すので、戸口の上端は 体の高さ 1.7 + 0.3 + 肌 0.08 = 2.08 m より高くないと、床の 6 mm の敷居に触れた所で
+        /// 上端に頭を打って止まる。2.05 m では台所と廊下のあいだを行き来できなかった（居間の戸口も同じ高さ）
+        /// </summary>
         const float KitchenGap = 0.55f;
-        const float KitchenGapHigh = 2.05f;
+        const float KitchenGapHigh = 2.1f;
         /// <summary>廊下と居間を分ける壁。廊下の側と居間の側の面</summary>
         const float KitchenHallSouth = -2.75f;
         const float KitchenLoungeNorth = -2.85f;
@@ -98,10 +104,13 @@ namespace HalfAware.EditorTools
         const float KitchenWell = -1.2f;
         /// <summary>階段の井戸の天井。二階の天井の高さ</summary>
         const float KitchenVoidTop = 5.0f;
-        /// <summary>玄関の戸の開口。z の両端と戸の高さ、上の明かり取りの上端</summary>
+        /// <summary>
+        /// 玄関の戸の開口。z の両端と戸の高さ、上の明かり取りの上端。
+        /// 戸の高さは台所の戸口（<see cref="KitchenGapHigh"/>）と同じ理由で 2.08 m より高く取る。2.0 m では無目に頭を打ってポーチへ出られなかった
+        /// </summary>
         const float KitchenFront0 = -2.4f;
         const float KitchenFront1 = -1.5f;
-        const float HallDoorHigh = 2.0f;
+        const float HallDoorHigh = 2.1f;
         const float KitchenFanTop = 2.45f;
         /// <summary>
         /// 玄関の外のポーチ（奥まった戸の前）。記憶 12 の同級生（-3.15, -1.95）がここに立つ。
