@@ -51,8 +51,10 @@ namespace HalfAware.EditorTools
                 // 路地から畑と丘を。南は農場の門の向こうの麦畑、北は車の着く所の塀の向こう
                 new View("fields_south", new Vector3(-28.7f, 1.6f, -1.2f), 190f, 1f),
                 new View("fields_north", new Vector3(-58f, 1.6f, 1.6f), 330f, 1f),
-                // 路地の東の方から、屋根越しに村の教会の塔（設計書 7 節）
-                new View("church", new Vector3(-6f, 1.6f, 0.4f), 60f, -2f),
+                // 村の教会（設計書 7 節）。路地の途中、片割れの家の前、囲いの壁の手前（いちばん近づいた所）から
+                new View("church", new Vector3(-30f, 1.6f, 0.3f), 88f, -4f),
+                new View("church_front", new Vector3(2.5f, 1.6f, 1.6f), 90f, -8f),
+                new View("church_near", new Vector3(17.2f, 1.6f, 0f), 90f, -12f),
                 // 空。路地の真ん中から東を見上げる
                 new View("sky", new Vector3(-30f, 1.6f, 0f), 60f, -30f),
                 // 格子戸を内から見る所と、テラスの卓と椅子の寄り

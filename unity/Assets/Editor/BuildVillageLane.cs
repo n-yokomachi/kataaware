@@ -570,12 +570,13 @@ namespace HalfAware.EditorTools
             FrontHedge(b, bounds, "FrontD", Shrub.Beech, PlotDWest, PlotDEast, zs, 1.35f, 0.75f, dDoor, false, 0.45f);
             b.Flag.FaceY(0.03f, dDoor - 0.55f, dDoor + 0.55f, -6.6f - 1.1f + 0.2f, zs1, 1);
             Clipped(b, bounds, "HedgeDE", Shrub.Yew, new Vector3(PlotDEast, 0f, zs1), new Vector3(PlotDEast, 0f, SouthHedge), 1.9f, 0.9f, 45);
-            // 家 D の東から路地の東の端の先まで。放牧地との生け垣。路地の東の端より先は粗く
+            // 家 D の東から路地の東の端の先（教会の墓地の塀）まで。放牧地との生け垣。路地の東の端より先は粗く
             Clipped(b, bounds, "HedgeSE", Shrub.Thorn, new Vector3(PlotDEast, 0f, zs - 0.1f), new Vector3(LaneEast + 1f, 0f, zs - 0.1f), 1.5f, 0.9f, 47);
-            FieldHedge(b, new Vector3(LaneEast + 1f, 0f, zs - 0.1f), new Vector3(LaneEast + 30f, 0f, zs - 0.1f), 1.5f, 0.9f, 147);
+            // 路地の東の端から教会の墓地の塀までは低く刈る。墓地の塀と墓石を路地から見せる
+            FieldHedge(b, new Vector3(LaneEast + 1f, 0f, zs - 0.1f), new Vector3(ChurchYardWest, 0f, zs - 0.1f), 1.0f, 0.9f, 147);
             // 片割れの敷地の東から路地の東の端の先まで。北の放牧地の生け垣
             Clipped(b, bounds, "HedgeNE", Shrub.Thorn, new Vector3(PlotEast + 0.4f, 0f, zn + 0.1f), new Vector3(LaneEast + 1f, 0f, zn + 0.1f), 1.5f, 0.9f, 49);
-            FieldHedge(b, new Vector3(LaneEast + 1f, 0f, zn + 0.1f), new Vector3(LaneEast + 30f, 0f, zn + 0.1f), 1.5f, 0.9f, 149);
+            FieldHedge(b, new Vector3(LaneEast + 1f, 0f, zn + 0.1f), new Vector3(ChurchYardWest, 0f, zn + 0.1f), 1.0f, 0.9f, 149);
 
             // 南の家の裏の生け垣
             FieldHedge(b, new Vector3(PlotCWest, 0f, SouthHedge), new Vector3(PlotCEast, 0f, SouthHedge), 1.7f, 0.9f, 51);

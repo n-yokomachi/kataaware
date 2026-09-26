@@ -183,8 +183,8 @@ namespace HalfAware.EditorTools
 
             // 芝の路肩。路地の縁から、家並みの垣と畑の塀の手前まで
             var verge = new Bank { Texel = 0.3f };
-            verge.FaceY(0.01f, TrackWest, LaneEast, RoadHalf, NorthEdge, 1);
-            verge.FaceY(0.01f, TrackWest, LaneEast, -NorthEdge, -RoadHalf, 1);
+            verge.FaceY(0.01f, TrackWest, ChurchYardWest - 0.5f, RoadHalf, NorthEdge, 1);
+            verge.FaceY(0.01f, TrackWest, ChurchYardWest - 0.5f, -NorthEdge, -RoadHalf, 1);
             NoShadow(Emit(parent, "VillageVerge", verge, VergeMat(), true));
 
             // 片割れの敷地。芝と花の縁の土と菜園を一枚の絵で塗り分ける（GroundPicture）
@@ -215,9 +215,11 @@ namespace HalfAware.EditorTools
             const float y = 0.015f;
             const float u0 = 0.004f;
             const float u1 = 0.996f;
-            for (var x0 = TrackWest; x0 < LaneEast - 0.01f; x0 += 10f)
+            // 歩ける所は東の端（LaneEast）までだが、路面は教会の墓地の門まで続ける
+            var end = ChurchYardWest - 0.5f;
+            for (var x0 = TrackWest; x0 < end - 0.01f; x0 += 10f)
             {
-                var x1 = Mathf.Min(x0 + 10f, LaneEast);
+                var x1 = Mathf.Min(x0 + 10f, end);
                 b.Patch(new Vector3(x0, y, RoadHalf), new Vector3(x1, y, RoadHalf), new Vector3(x1, y, -RoadHalf), new Vector3(x0, y, -RoadHalf),
                     new Vector2(u1, x0 / RoadRepeat), new Vector2(u1, x1 / RoadRepeat), new Vector2(u0, x1 / RoadRepeat), new Vector2(u0, x0 / RoadRepeat));
             }
