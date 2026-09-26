@@ -30,6 +30,8 @@ namespace HalfAware
         [Header("売り買い")]
         [Tooltip("チップを置いたあと立つ場所。露店の内側、テーブルの向こう")]
         [SerializeField] Transform sellSpot;
+        [Tooltip("露店の内側へ回ったときの始まりの見下ろし。度（正で下を向く）。卓の上のチップと品物、卓の向こうに立つ買い手が目に入る角度")]
+        [SerializeField] float sellPitch = 8f;
         [Tooltip("テーブルの上に並べるチップ。左から順に消える")]
         [SerializeField] GameObject[] chips = new GameObject[0];
         [Tooltip("卓の向こうに立つ買い手。台詞のあいだだけ出す")]
@@ -162,13 +164,16 @@ namespace HalfAware
             if (!dark) holding = false;
         }
 
-        /// <summary>露店の内側、テーブルの向こうへ立たせる</summary>
+        /// <summary>
+        /// 露店の内側、テーブルの向こうへ立たせる。
+        /// 水平のままだと卓の上のチップが視界の下の縁に掛かって切れるので、少し見下ろして始める（<see cref="sellPitch"/>）
+        /// </summary>
         void Seat()
         {
             if (sellSpot == null) return;
             player.transform.position = sellSpot.position;
             player.Yaw = sellSpot.eulerAngles.y;
-            player.Pitch = 0f;
+            player.Pitch = sellPitch;
         }
 
         /// <summary>テーブルの上のチップを left 枚だけ見せる</summary>
