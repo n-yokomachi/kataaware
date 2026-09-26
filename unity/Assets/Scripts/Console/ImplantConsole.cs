@@ -36,22 +36,25 @@ namespace HalfAware
         // 色は CSS のまま。薄い色の重ねはリニアの色空間だと明るく出るので、Tint・Veil で濃さを合わせる
 
         /// <summary>粗い画面の 1 画素。1280×720 のキャンバスで、既定の粗さ（0.75 で 720×405 相当）のとき</summary>
-        const float Dot = 1280f / 720f;
+        internal const float Dot = 1280f / 720f;
         public const int SortingOrder = 500;
 
-        static readonly Color Accent = Rgb(0x7f, 0xe3, 0xec, 1f);
-        static readonly Color Ink = Rgb(0x06, 0x11, 0x14, 1f);
-        static readonly Color ButtonText = Rgb(0xcf, 0xf7, 0xfa, 1f);
-        static readonly Color RowText = Rgb(0xb9, 0xd9, 0xdc, 1f);
+        // 色と部品の組み方は、タイトルの画面（TitleScreen）も同じ物を使う
+        internal static readonly Color Accent = Rgb(0x7f, 0xe3, 0xec, 1f);
+        internal static readonly Color Ink = Rgb(0x06, 0x11, 0x14, 1f);
+        internal static readonly Color ButtonText = Rgb(0xcf, 0xf7, 0xfa, 1f);
+        internal static readonly Color RowText = Rgb(0xb9, 0xd9, 0xdc, 1f);
         static readonly Color Dim = Veil(Rgb(3, 10, 14, 0.74f));
-        static readonly Color Scan = Tint(Rgb(120, 230, 240, 0.035f));
+        internal static readonly Color Scan = Tint(Rgb(120, 230, 240, 0.035f));
         static readonly Color PanelLine = Tint(Rgb(120, 220, 230, 0.45f));
-        static readonly Color ButtonLine = Tint(Rgb(127, 227, 236, 0.55f));
+        internal static readonly Color ButtonLine = Tint(Rgb(127, 227, 236, 0.55f));
         static readonly Color LogLine = Tint(Rgb(127, 227, 236, 0.3f));
         static readonly Color TagFill = Tint(Rgb(127, 227, 236, 0.7f));
         static readonly Color Track = Tint(Rgb(127, 227, 236, 0.15f));
-        static readonly Color BoxFill = Veil(Rgb(3, 10, 14, 0.92f));
-        static readonly Color Clear = new Color(0f, 0f, 0f, 0f);
+        internal static readonly Color BoxFill = Veil(Rgb(3, 10, 14, 0.92f));
+        /// <summary>選べない行の字。思い出すの空き</summary>
+        internal static readonly Color Faded = Tint(Rgb(0xcf, 0xf7, 0xfa, 0.35f));
+        internal static readonly Color Clear = new Color(0f, 0f, 0f, 0f);
 
         /// <summary>画面の縁から枠まで（上下・左右）。画面に対する割合</summary>
         const float InsetY = 0.12f;
@@ -84,6 +87,8 @@ namespace HalfAware
         const float PadLeft = 18f * Dot;
         /// <summary>枠の上のこの割合で、古い行が薄れて消える</summary>
         const float FadeBand = 0.22f;
+        /// <summary>ボタンの下の枠を開いている間の、ログの濃さ</summary>
+        const float PanelBehind = 0.25f;
 
         const float RowFont = 11f * Dot;
         const float RowLine = 17f * Dot;
@@ -105,11 +110,16 @@ namespace HalfAware
         const float BarGrip = 16f * Dot;
 
         const float BoxWidth = 210f * Dot;
+        /// <summary>記憶する・思い出すの枠の幅。行に場面の名と書いた日時を並べる</summary>
+        const float SlotBoxWidth = 280f * Dot;
         const float BoxRow = 22f * Dot;
         const float BoxPad = 12f * Dot;
+        const float RowInset = 7f * Dot;
 
         public const string CloseHint = "TAB　閉じる";
         public const string ListTitle = "場面　　数字・E で飛ぶ";
+        public const string RememberTitle = "記憶する　　E で書く";
+        public const string RecallTitle = "思い出す　　E で読む";
         public const string HereMark = "いま";
 
         /// <summary>知らせを出しておく秒。unscaled</summary>
@@ -132,6 +142,10 @@ namespace HalfAware
         readonly List<RowView> rows = new List<RowView>();
         readonly List<ButtonView> buttons = new List<ButtonView>();
         readonly List<ButtonView> places = new List<ButtonView>();
+        readonly List<ButtonView> rememberRows = new List<ButtonView>();
+        readonly List<ButtonView> recallRows = new List<ButtonView>();
+        /// <summary>置き場ごとのセーブ（自動・1・2・3）。枠を開く時と書いた後に読み直す</summary>
+        readonly SaveData[] slots = new SaveData[ConsoleMenu.RecallRows];
 
         RectTransform root;
         RawImage scan;
@@ -142,6 +156,8 @@ namespace HalfAware
         RectTransform content;
         RectTransform thumb;
         RectTransform box;
+        RectTransform rememberBox;
+        RectTransform recallBox;
         Texture2D scanTexture;
         /// <summary>塗りつぶしの上に置く暗い字の書体の色づけ。線を太らせて、粗い画面でも地に溶けないようにする</summary>
         Material heavy;
@@ -156,7 +172,7 @@ namespace HalfAware
         public ConsoleMenu Menu { get { return menu; } }
         public LogScroll Scroll { get { return scroll; } }
 
-        static Color Rgb(int r, int g, int b, float a)
+        internal static Color Rgb(int r, int g, int b, float a)
         {
             return new Color(r / 255f, g / 255f, b / 255f, a);
         }
@@ -341,6 +357,8 @@ namespace HalfAware
             Log(panel);
             Bar(panel);
             List();
+            rememberBox = SlotBox("Remember", RememberTitle, ConsoleMenu.RememberRows, rememberRows);
+            recallBox = SlotBox("Recall", RecallTitle, ConsoleMenu.RecallRows, recallRows);
 
             root.gameObject.SetActive(false);
         }
@@ -477,6 +495,56 @@ namespace HalfAware
             box.gameObject.SetActive(false);
         }
 
+        /// <summary>
+        /// 記憶する・思い出すの枠。デバッグの場面の一覧と同じ出し方で、ログの枠の中の左上に重ねる。
+        /// 行は左に置き場の名と場面の名、右に書いた日時。空きは「空き」
+        /// </summary>
+        RectTransform SlotBox(string name, string heading, int count, List<ButtonView> into)
+        {
+            var frame = (RectTransform)viewport.parent;
+            var b = Rect(frame, name);
+            b.anchorMin = new Vector2(0f, 1f);
+            b.anchorMax = new Vector2(0f, 1f);
+            b.pivot = new Vector2(0f, 1f);
+            b.anchoredPosition = new Vector2(PadLeft, -PadTop);
+            b.sizeDelta = new Vector2(SlotBoxWidth, BoxPad * 2f + HeadHeight + BoxPad + BoxRow * count);
+            var bg = b.gameObject.AddComponent<Image>();
+            bg.color = BoxFill;
+            Border(b, ButtonLine, Line);
+            var title = Text(b, "Title", HeadFont, Accent, TextAlignmentOptions.TopLeft);
+            Top(title.rectTransform, BoxPad, BoxPad, BoxPad, HeadHeight);
+            title.characterSpacing = HeadSpacing;
+            title.text = heading;
+            for (var i = 0; i < count; i++)
+            {
+                var r = Rect(b, "Slot" + i);
+                Top(r, BoxPad, BoxPad, BoxPad * 2f + HeadHeight + BoxRow * i, BoxRow);
+                var view = new ButtonView();
+                view.fill = r.gameObject.AddComponent<Image>();
+                view.fill.color = Clear;
+                view.label = Text(r, "Label", RowFont, ButtonText, TextAlignmentOptions.Left);
+                Stretch(view.label.rectTransform, RowInset, RowInset, 0f, 0f);
+                view.label.fontStyle = FontStyles.Bold;
+                Heavy(view.label);
+                view.mark = Text(r, "Written", TagFont, RowText, TextAlignmentOptions.Right);
+                Stretch(view.mark.rectTransform, RowInset, RowInset, 0f, 0f);
+                view.mark.fontStyle = FontStyles.Bold;
+                Heavy(view.mark);
+                var row = i;
+                var hit = r.gameObject.AddComponent<ConsolePointer>();
+                hit.Entered = () => { menu.HoverRow(row); Paint(); };
+                hit.Clicked = () =>
+                {
+                    menu.HoverRow(row);
+                    // 空きの行は選べないので、押しても選んでいる行が替わらない。そのときは何もしない
+                    if (menu.Row == row) Act();
+                };
+                into.Add(view);
+            }
+            b.gameObject.SetActive(false);
+            return b;
+        }
+
         // ---- 開け閉め ----------------------------------------------------------
 
         /// <summary>開く。場面の秒を止め、カーソルを出してロックを外す。ログは必ず最新から</summary>
@@ -512,10 +580,17 @@ namespace HalfAware
         /// </summary>
         public void Show(float back, bool listing)
         {
+            Show(back, listing ? ConsolePanel.Scenes : ConsolePanel.None);
+        }
+
+        /// <summary>開いた形に並べ、panel の枠を開いておく。エディタで撮るときに使う</summary>
+        public void Show(float back, ConsolePanel panel)
+        {
             menu.Reset();
-            if (listing)
+            Refresh();
+            if (panel != ConsolePanel.None)
             {
-                menu.Hover((int)ConsoleAction.Debug);
+                menu.Hover((int)ActionOf(panel));
                 menu.Decide(Here);
             }
             noteUntil = 0f;
@@ -536,17 +611,18 @@ namespace HalfAware
             var keys = Keyboard.current;
             if (!IsOpen)
             {
-                if (keys != null && keys.tabKey.wasPressedThisFrame) Open();
+                // タイトルの画面では開かない。インプラントはまだ起動の途中
+                if (keys != null && keys.tabKey.wasPressedThisFrame && !SaveFlow.OnTitle) Open();
                 return;
             }
             // 開いている間に行が増えることは無いはずだが、増えたら並べ直す
             if (ConsoleLog.Here().Count != shown) Rows();
             if (keys != null && Keys(keys)) return;
             var mouse = Mouse.current;
-            if (mouse != null && !menu.Listing)
+            if (mouse != null && menu.Panel == ConsolePanel.None)
             {
                 var wheel = mouse.scroll.ReadValue().y;
-                if (wheel > 0.01f) scroll.By(Step() * WheelRows);       // 手前に回すと古い方へ
+                if (wheel > 0.01f) scroll.By(Step() * WheelRows);       // 奥へ回すと上（古い方）へ
                 else if (wheel < -0.01f) scroll.By(-Step() * WheelRows);
             }
             if (noteUntil > 0f && Time.unscaledTime > noteUntil)
@@ -571,7 +647,7 @@ namespace HalfAware
             if (keys.rightArrowKey.wasPressedThisFrame || keys.dKey.wasPressedThisFrame) menu.Move(1);
             var up = keys.upArrowKey.wasPressedThisFrame || keys.wKey.wasPressedThisFrame;
             var down = keys.downArrowKey.wasPressedThisFrame || keys.sKey.wasPressedThisFrame;
-            if (menu.Listing)
+            if (menu.Panel != ConsolePanel.None)
             {
                 if (up) menu.MoveRow(-1);
                 if (down) menu.MoveRow(1);
@@ -586,10 +662,9 @@ namespace HalfAware
             var decide = keys.eKey.wasPressedThisFrame || keys.enterKey.wasPressedThisFrame
                 || keys.numpadEnterKey.wasPressedThisFrame;
             if (!decide) return false;
-            // 一覧を出している間の決定は、選んでいる場面へ飛ぶ
-            if (menu.Listing) return Jump(menu.RowTarget(Here));
-            Press();
-            return false;
+            // 枠を出している間の決定は、選んでいる行に効く（場面へ飛ぶ・書く・読む）
+            if (menu.Panel != ConsolePanel.None) return Act();
+            return Press();
         }
 
         /// <summary>1〜9 の数字。押されていなければ 0。一覧に並んだ数字で、いつでも場面を移れる</summary>
@@ -606,17 +681,107 @@ namespace HalfAware
             return RowLine + RowGap;
         }
 
-        /// <summary>選んでいるボタンを決める。中身の無いボタンは、まだ使えないことだけ知らせる</summary>
-        void Press()
+        /// <summary>
+        /// 選んでいるボタンを決める。枠を持つボタンは枠を開け閉めし、目を閉じるはタイトルの画面へ。
+        /// 閉じたら true
+        /// </summary>
+        bool Press()
         {
+            // 思い出すの空きを飛ばして選ぶので、枠を開く前に置き場を読み直す
+            Refresh();
             var action = menu.Decide(Here);
-            var said = ConsoleMenu.Note(action);
-            if (said != null)
-            {
-                note.text = said;
-                noteUntil = Time.unscaledTime + NoteSeconds;
-            }
+            if (action == ConsoleAction.CloseEyes) return ShutEyes();
             Paint();
+            return false;
+        }
+
+        /// <summary>枠で選んでいる行に効かせる。場面の一覧なら飛び、記憶するなら書き、思い出すなら読む。閉じたら true</summary>
+        bool Act()
+        {
+            switch (menu.Panel)
+            {
+                case ConsolePanel.Scenes:
+                    return Jump(menu.RowTarget(Here));
+                case ConsolePanel.Remember:
+                {
+                    var slot = menu.RowSlot;
+                    if (slot == null) return false;
+                    var wrote = SaveFlow.Remember(slot.Value);
+                    Say(wrote != null ? ConsoleMenu.Remembered + "　―　" + SaveStore.NameOf(slot.Value) : ConsoleMenu.CannotRemember);
+                    Refresh();
+                    Paint();
+                    return false;
+                }
+                case ConsolePanel.Recall:
+                {
+                    var slot = menu.RowSlot;
+                    if (slot == null) return false;
+                    if (!SaveFlow.CanResume(slot.Value))
+                    {
+                        Say(ConsoleMenu.CannotRecall);
+                        Paint();
+                        return false;
+                    }
+                    // 閉じて秒とカーソルを戻してから読む
+                    Close();
+                    SaveFlow.Resume(slot.Value);
+                    return true;
+                }
+                default:
+                    return false;
+            }
+        }
+
+        /// <summary>目を閉じる。閉じて秒とカーソルを戻してから、タイトルの画面へ</summary>
+        bool ShutEyes()
+        {
+            if (!SaveFlow.CanReachTitle)
+            {
+                Say(ConsoleMenu.NoTitle);
+                Paint();
+                return false;
+            }
+            Close();
+            SaveFlow.ToTitle();
+            return true;
+        }
+
+        /// <summary>頭の行の真ん中に、少しのあいだ知らせを出す</summary>
+        void Say(string said)
+        {
+            note.text = said;
+            noteUntil = Time.unscaledTime + NoteSeconds;
+        }
+
+        static ConsoleAction ActionOf(ConsolePanel panel)
+        {
+            switch (panel)
+            {
+                case ConsolePanel.Remember: return ConsoleAction.Remember;
+                case ConsolePanel.Recall: return ConsoleAction.Recall;
+                default: return ConsoleAction.Debug;
+            }
+        }
+
+        /// <summary>置き場を読み直し、行の字と、思い出すで選べる行を入れ直す</summary>
+        void Refresh()
+        {
+            for (var i = 0; i < slots.Length; i++)
+            {
+                var slot = SaveStore.All[i];
+                slots[i] = SaveStore.Read(slot);
+                menu.Fill(slot, slots[i] != null);
+            }
+            for (var i = 0; i < rememberRows.Count; i++) Write(rememberRows[i], SaveStore.Manual[i], slots[(int)SaveStore.Manual[i]]);
+            for (var i = 0; i < recallRows.Count; i++) Write(recallRows[i], SaveStore.All[i], slots[i]);
+        }
+
+        /// <summary>行の字。左に置き場の名と場面の名、右に書いた日時。空きは「空き」</summary>
+        static void Write(ButtonView view, SaveSlot slot, SaveData data)
+        {
+            var title = data != null ? StageMap.TitleOf(data.stage) : SaveStore.Empty;
+            view.label.text = Mono(SaveStore.NameOf(slot)) + "　" + title;
+            view.mark.text = data != null ? Mono(data.written) : string.Empty;
         }
 
         /// <summary>場面へ飛ぶ。閉じて秒を戻してから読む。移り先が無ければ何もしない</summary>
@@ -637,7 +802,7 @@ namespace HalfAware
         }
 
         /// <summary>英数字の並びだけ等幅にする。Noto Sans JP の数字は幅が揃わない</summary>
-        static string Mono(string text)
+        internal static string Mono(string text)
         {
             if (string.IsNullOrEmpty(text)) return string.Empty;
             return Regex.Replace(text, @"[0-9A-Za-z][0-9A-Za-z/:\. ]*[0-9A-Za-z]|[0-9A-Za-z]",
@@ -704,13 +869,15 @@ namespace HalfAware
             for (var i = 0; i < buttons.Count; i++) buttons[i].Paint(i == menu.Index);
             content.anchoredPosition = new Vector2(0f, -scroll.Back);
             var view = scroll.View;
+            // 枠（記憶する・思い出す・デバッグ）を開いている間は、ログを沈める。枠の地から後ろの字が透けて、行の字と混ざる
+            var sunk = menu.Panel != ConsolePanel.None ? PanelBehind : 1f;
             for (var k = 0; k < shown && k < rows.Count; k++)
             {
                 var row = rows[k];
                 // 枠の上の縁からどれだけ下にあるか。上の FadeBand のあいだで薄れて消える
                 var middle = row.bottom + row.height * 0.5f - scroll.Back;
                 var fromTop = view > 0f ? (view - middle) / view : 1f;
-                row.group.alpha = Mathf.Clamp01(fromTop / FadeBand);
+                row.group.alpha = Mathf.Clamp01(fromTop / FadeBand) * sunk;
             }
             thumb.anchorMin = new Vector2(0f, scroll.ThumbBottom);
             thumb.anchorMax = new Vector2(1f, scroll.ThumbBottom + scroll.Thumb);
@@ -724,6 +891,12 @@ namespace HalfAware
                     places[i].mark.color = i == menu.Row ? Ink : Accent;
                 }
             }
+            rememberBox.gameObject.SetActive(menu.Panel == ConsolePanel.Remember);
+            recallBox.gameObject.SetActive(menu.Panel == ConsolePanel.Recall);
+            var slotRows = menu.Panel == ConsolePanel.Remember ? rememberRows
+                : menu.Panel == ConsolePanel.Recall ? recallRows : null;
+            if (slotRows != null)
+                for (var i = 0; i < slotRows.Count; i++) slotRows[i].PaintSlot(i == menu.Row, menu.Usable(i));
             var size = root.rect.size;
             if (size.x > 0f && size.y > 0f) scan.uvRect = new Rect(0f, 0f, 1f, size.y / (3f * Dot));
         }
@@ -742,6 +915,14 @@ namespace HalfAware
             {
                 fill.color = on ? Accent : Clear;
                 label.color = on ? Ink : ButtonText;
+            }
+
+            /// <summary>記憶する・思い出すの行。選べない行（思い出すの空き）は薄くする</summary>
+            public void PaintSlot(bool on, bool usable)
+            {
+                fill.color = on ? Accent : Clear;
+                label.color = on ? Ink : usable ? ButtonText : Faded;
+                mark.color = on ? Ink : usable ? RowText : Faded;
             }
         }
 
@@ -793,7 +974,7 @@ namespace HalfAware
             if (heavy != null) text.fontSharedMaterial = heavy;
         }
 
-        static RectTransform Rect(Transform parent, string name)
+        internal static RectTransform Rect(Transform parent, string name)
         {
             var go = new GameObject(name, typeof(RectTransform));
             go.layer = 5;
@@ -802,7 +983,7 @@ namespace HalfAware
         }
 
         /// <summary>親いっぱいから、左・右・上・下をそれだけ引いた形</summary>
-        static void Stretch(RectTransform r, float left, float right, float top, float bottom)
+        internal static void Stretch(RectTransform r, float left, float right, float top, float bottom)
         {
             r.anchorMin = Vector2.zero;
             r.anchorMax = Vector2.one;
@@ -812,7 +993,7 @@ namespace HalfAware
         }
 
         /// <summary>親の上の縁から top 下げた、高さ height の帯。左右は left・right だけ引く</summary>
-        static void Top(RectTransform r, float left, float right, float top, float height)
+        internal static void Top(RectTransform r, float left, float right, float top, float height)
         {
             r.anchorMin = new Vector2(0f, 1f);
             r.anchorMax = new Vector2(1f, 1f);
@@ -821,7 +1002,7 @@ namespace HalfAware
             r.offsetMax = new Vector2(-right, -top);
         }
 
-        static Image Fill(Transform parent, string name, Color color, bool blocks)
+        internal static Image Fill(Transform parent, string name, Color color, bool blocks)
         {
             var r = Rect(parent, name);
             Stretch(r, 0f, 0f, 0f, 0f);
@@ -831,7 +1012,7 @@ namespace HalfAware
             return img;
         }
 
-        static TMP_Text Text(Transform parent, string name, float size, Color color, TextAlignmentOptions align)
+        internal static TMP_Text Text(Transform parent, string name, float size, Color color, TextAlignmentOptions align)
         {
             var r = Rect(parent, name);
             var t = r.gameObject.AddComponent<TextMeshProUGUI>();
@@ -846,7 +1027,7 @@ namespace HalfAware
         }
 
         /// <summary>内側に引く細い線。上・下・左・右の 4 本</summary>
-        static Image[] Border(RectTransform r, Color color, float width)
+        internal static Image[] Border(RectTransform r, Color color, float width)
         {
             var lines = new Image[4];
             for (var i = 0; i < 4; i++)

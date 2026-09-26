@@ -18,12 +18,24 @@ namespace HalfAware
         Debug,
     }
 
+    /// <summary>ボタンの下に開く枠。ログの枠の中の左上に重ねる</summary>
+    public enum ConsolePanel
+    {
+        None,
+        /// <summary>記憶する。手動の 3 つから書く所を選ぶ</summary>
+        Remember,
+        /// <summary>思い出す。自動と手動の 4 つから読む物を選ぶ。空きは選べない</summary>
+        Recall,
+        /// <summary>デバッグの場面の一覧</summary>
+        Scenes,
+    }
+
     /// <summary>
-    /// コンソールのボタンの選ぶ・決めると、デバッグの場面の一覧の選び。見せ方は持たない（<see cref="ImplantConsole"/>）。
+    /// コンソールのボタンの選ぶ・決めると、ボタンの下に開く枠（記憶する・思い出す・デバッグ）の行の選び。
+    /// 見せ方は持たない（<see cref="ImplantConsole"/>）。
     ///
-    /// 左右で選び、決めると <see cref="ConsoleAction"/> を返す。デバッグを決めると場面の一覧を開き、
-    /// もう一度決めるか、ほかのボタンへ移ると閉じる。
-    /// 記憶する・思い出す・目を閉じるは、ボタンだけ先に置いてある。中身は設計書 5 節が決まってから
+    /// 左右で選び、決めると <see cref="ConsoleAction"/> を返す。枠を持つボタンを決めると枠を開き、
+    /// もう一度決めるか、ほかのボタンへ左右で移ると閉じる。枠を開いている間は、上下で行を選ぶ
     /// </summary>
     public sealed class ConsoleMenu
     {
@@ -36,70 +48,149 @@ namespace HalfAware
         /// <summary>ボタンの字。<see cref="ConsoleAction"/> と同じ並び</summary>
         public static readonly string[] Labels = { Remember, Recall, CloseEyes, DebugLabel };
 
-        /// <summary>中身がまだ無いボタンを押したときに添える字</summary>
-        public const string NotYet = "まだ使えない";
+        /// <summary>記憶する・思い出すの行の数</summary>
+        public const int RememberRows = 3;
+        public const int RecallRows = 4;
+
+        // ---- 知らせ（頭の行の真ん中に少し出す） -----------------------------
+
+        public const string Remembered = "記憶した";
+        /// <summary>場面の頭が無い所（タイトルの画面や、表に無い場面）</summary>
+        public const string CannotRemember = "ここでは記憶できない";
+        public const string CannotRecall = "思い出せない";
+        public const string NoTitle = "タイトルの画面が無い";
 
         /// <summary>いま選んでいるボタン</summary>
         public int Index { get; private set; }
 
         public ConsoleAction Selected { get { return (ConsoleAction)Index; } }
 
-        /// <summary>デバッグの場面の一覧を出しているか</summary>
-        public bool Listing { get; private set; }
+        /// <summary>いま開いている枠</summary>
+        public ConsolePanel Panel { get; private set; }
 
-        /// <summary>場面の一覧で選んでいる行。<see cref="SceneMenu.Scenes"/> の番号（0 始まり）</summary>
+        /// <summary>デバッグの場面の一覧を出しているか</summary>
+        public bool Listing { get { return Panel == ConsolePanel.Scenes; } }
+
+        /// <summary>
+        /// 枠で選んでいる行（0 始まり）。場面の一覧なら <see cref="SceneMenu.Scenes"/> の番号、
+        /// 記憶するなら手動の 1〜3、思い出すなら自動・1・2・3。選べる行が無ければ -1
+        /// </summary>
         public int Row { get; private set; }
 
-        /// <summary>開いたときの形。いちばん左を選び、一覧は閉じておく</summary>
+        readonly bool[] filled = new bool[RecallRows];
+
+        /// <summary>思い出すの行（自動・1・2・3）のうち、読める物。コンソールが枠を開く前に入れる</summary>
+        public void Fill(SaveSlot slot, bool usable)
+        {
+            var i = (int)slot;
+            if (i >= 0 && i < filled.Length) filled[i] = usable;
+        }
+
+        public bool Filled(int row)
+        {
+            return row >= 0 && row < filled.Length && filled[row];
+        }
+
+        /// <summary>開いたときの形。いちばん左を選び、枠は閉じておく</summary>
         public void Reset()
         {
             Index = 0;
-            Listing = false;
+            Panel = ConsolePanel.None;
             Row = 0;
         }
 
-        /// <summary>左右の入力。-1 で左、+1 で右。両端で止まる。デバッグから離れたら一覧を閉じる</summary>
+        /// <summary>左右の入力。-1 で左、+1 で右。両端で止まる。枠のボタンから離れたら枠を閉じる</summary>
         public void Move(int step)
         {
             if (step == 0) return;
             Index = Mathf.Clamp(Index + step, 0, Labels.Length - 1);
-            if (Selected != ConsoleAction.Debug) Listing = false;
+            if (PanelOf(Selected) != Panel) Panel = ConsolePanel.None;
         }
 
-        /// <summary>カーソルが重なったボタンを選ぶ。一覧は閉じない（一覧へ手を運ぶ途中で消えると困る）</summary>
+        /// <summary>カーソルが重なったボタンを選ぶ。枠は閉じない（枠へ手を運ぶ途中で消えると困る）</summary>
         public void Hover(int index)
         {
             if (index < 0 || index >= Labels.Length) return;
             Index = index;
         }
 
+        /// <summary>ボタンが開く枠。枠を持たないボタンは None</summary>
+        public static ConsolePanel PanelOf(ConsoleAction action)
+        {
+            switch (action)
+            {
+                case ConsoleAction.Remember: return ConsolePanel.Remember;
+                case ConsoleAction.Recall: return ConsolePanel.Recall;
+                case ConsoleAction.Debug: return ConsolePanel.Scenes;
+                default: return ConsolePanel.None;
+            }
+        }
+
         /// <summary>
-        /// 決める。デバッグなら一覧を開け閉めし、開いたときは here の場面の行を選んでおく。
-        /// ほかのボタンなら一覧を閉じる
+        /// 決める。枠を持つボタンなら枠を開け閉めする。開いたときは、場面の一覧なら here の場面の行、
+        /// 記憶するなら 1、思い出すならいちばん上の読める行を選んでおく。枠を持たないボタンなら枠を閉じる
         /// </summary>
         public ConsoleAction Decide(string here)
         {
             var action = Selected;
-            if (action == ConsoleAction.Debug)
+            var want = PanelOf(action);
+            if (want == ConsolePanel.None || want == Panel)
             {
-                Listing = !Listing;
-                if (Listing) Row = Mathf.Max(0, System.Array.IndexOf(SceneMenu.Scenes, here));
+                Panel = ConsolePanel.None;
+                return action;
             }
-            else Listing = false;
+            Panel = want;
+            switch (want)
+            {
+                case ConsolePanel.Scenes: Row = Mathf.Max(0, System.Array.IndexOf(SceneMenu.Scenes, here)); break;
+                case ConsolePanel.Recall: Row = Next(-1, 1); break;
+                default: Row = 0; break;
+            }
             return action;
         }
 
-        /// <summary>一覧の上下。-1 で上、+1 で下。両端で止まる</summary>
-        public void MoveRow(int step)
+        /// <summary>いま開いている枠の行の数</summary>
+        public int Rows
         {
-            if (!Listing || step == 0) return;
-            Row = Mathf.Clamp(Row + step, 0, SceneMenu.Count - 1);
+            get
+            {
+                switch (Panel)
+                {
+                    case ConsolePanel.Scenes: return SceneMenu.Count;
+                    case ConsolePanel.Remember: return RememberRows;
+                    case ConsolePanel.Recall: return RecallRows;
+                    default: return 0;
+                }
+            }
         }
 
-        /// <summary>カーソルが重なった一覧の行を選ぶ</summary>
+        /// <summary>その行を選べるか。思い出すの空きは選べない</summary>
+        public bool Usable(int row)
+        {
+            if (row < 0 || row >= Rows) return false;
+            return Panel != ConsolePanel.Recall || Filled(row);
+        }
+
+        /// <summary>from から step の向きで、次に選べる行。無ければ from（from が選べない行なら -1）</summary>
+        int Next(int from, int step)
+        {
+            for (var r = from + step; r >= 0 && r < Rows; r += step)
+                if (Usable(r)) return r;
+            return Usable(from) ? from : -1;
+        }
+
+        /// <summary>枠の上下。-1 で上、+1 で下。両端で止まる。思い出すでは空きを飛ばす</summary>
+        public void MoveRow(int step)
+        {
+            if (Panel == ConsolePanel.None || step == 0) return;
+            var n = Mathf.Abs(step);
+            for (var i = 0; i < n; i++) Row = Next(Row, step > 0 ? 1 : -1);
+        }
+
+        /// <summary>カーソルが重なった枠の行を選ぶ。選べない行なら何もしない</summary>
         public void HoverRow(int row)
         {
-            if (!Listing || row < 0 || row >= SceneMenu.Count) return;
+            if (!Usable(row)) return;
             Row = row;
         }
 
@@ -109,19 +200,24 @@ namespace HalfAware
             return Listing ? SceneMenu.Target(Row + 1, here) : null;
         }
 
-        /// <summary>一段戻る。一覧を出していれば閉じて true。出していなければ false（コンソールを閉じる）</summary>
-        public bool Back()
+        /// <summary>記憶する・思い出すで選んでいる置き場。選んでいなければ null</summary>
+        public SaveSlot? RowSlot
         {
-            if (!Listing) return false;
-            Listing = false;
-            return true;
+            get
+            {
+                if (!Usable(Row)) return null;
+                if (Panel == ConsolePanel.Remember) return (SaveSlot)(Row + 1);
+                if (Panel == ConsolePanel.Recall) return (SaveSlot)Row;
+                return null;
+            }
         }
 
-        /// <summary>中身がまだ無いボタンを押したときの知らせ。デバッグなら null</summary>
-        public static string Note(ConsoleAction action)
+        /// <summary>一段戻る。枠を出していれば閉じて true。出していなければ false（コンソールを閉じる）</summary>
+        public bool Back()
         {
-            if (action == ConsoleAction.Debug) return null;
-            return Labels[(int)action] + "　―　" + NotYet;
+            if (Panel == ConsolePanel.None) return false;
+            Panel = ConsolePanel.None;
+            return true;
         }
     }
 }

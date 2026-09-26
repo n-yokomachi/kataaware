@@ -32,6 +32,12 @@ namespace HalfAware.EditorTools
         /// </summary>
         public static string Shoot(string path, int w, int h, float uiScale, bool console, float back, bool listing, Stage stage)
         {
+            return Shoot(path, w, h, uiScale, console, back, listing ? ConsolePanel.Scenes : ConsolePanel.None, stage);
+        }
+
+        /// <summary>コンソールを開いて、ボタンの下の枠（記憶する・思い出す・デバッグ）を開いた形で撮る</summary>
+        public static string Shoot(string path, int w, int h, float uiScale, bool console, float back, ConsolePanel open, Stage stage)
+        {
             var cam = Eye();
             if (cam == null) return "カメラが無い";
             var hud = UnityEngine.Object.FindFirstObjectByType<HudView>(FindObjectsInactive.Include);
@@ -66,7 +72,7 @@ namespace HalfAware.EditorTools
                     hud.SetPrompt(null);
                 }
                 if (stage != null) stage(hud, panel);
-                if (panel != null) panel.Show(back, listing);
+                if (panel != null) panel.Show(back, open);
                 lens.Draw();
                 ui = Read(lens.Target);
                 shot = Blend(scene, ui, w, h);
@@ -103,7 +109,7 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>canvas を UiLens のカメラで描く向きにする。当たりの付け替えはしない（撮るだけなので）</summary>
-        static void Lens(Canvas canvas, Camera eye, int order)
+        internal static void Lens(Canvas canvas, Camera eye, int order)
         {
             canvas.renderMode = RenderMode.ScreenSpaceCamera;
             canvas.worldCamera = eye;
@@ -121,7 +127,7 @@ namespace HalfAware.EditorTools
             for (var i = 0; i < t.childCount; i++) Layer(t.GetChild(i));
         }
 
-        static Texture2D Read(RenderTexture rt)
+        internal static Texture2D Read(RenderTexture rt)
         {
             var keep = RenderTexture.active;
             try
@@ -142,7 +148,7 @@ namespace HalfAware.EditorTools
         /// 粗い UI を最近傍で引き伸ばし、3D の絵に重ねる。どちらも sRGB で入っているので、
         /// リニアへ直して乗算済みのアルファで重ね、sRGB へ戻す（ゲームで GPU がしているのと同じ）
         /// </summary>
-        static Texture2D Blend(Texture2D scene, Texture2D ui, int w, int h)
+        internal static Texture2D Blend(Texture2D scene, Texture2D ui, int w, int h)
         {
             var lin = new float[256];
             for (var i = 0; i < 256; i++) lin[i] = Mathf.GammaToLinearSpace(i / 255f);
