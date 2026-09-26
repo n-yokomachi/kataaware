@@ -16,10 +16,10 @@ namespace HalfAware.EditorTools
     /// - 送れる時だけ右下に「E　送る ▼」
     /// - Tab の字のログ（LogPanel）は外す。ログは TAB のコンソール（<see cref="ImplantConsole"/>）が持つ
     ///
-    /// **寸法は粗さ 1/2 のときの粗い画面（<see cref="UiLens"/>）の 1 画素 = Dot で決めた。**
-    /// 字はいちばん小さいものでも 11 Dot（粗い画面の中で縦 10 画素ほど）。印（E　調べる）と
-    /// 場面 4 の右上の行も同じ粗い画面で描くので、同じ下限まで上げる。
-    /// 粗さを 0.75 に上げた今も、字幕の字の大きさ（キャンバスの単位）は変えていないので、画面の上の大きさは同じ（粗い画面の中では 1.5 倍の画素で描かれる）
+    /// **字幕の寸法は粗い画面（<see cref="UiLens"/>、既定の粗さ 0.75）の 1 画素 = Dot で決める。**
+    /// 字はいちばん小さいものでも 11 Dot（粗い画面の中で縦 10 画素ほど）。台詞は 13 Dot。
+    /// 地の高さと余白も字に合わせて詰め、字だけ小さくて地が大きく余る形にしない。左右の余白はコンソールの枠（画面の 14%）に揃える。
+    /// 印（E　調べる）と場面 4 の右上の行は、粗さ 1/2 のときの 11 画素（キャンバスで 29.3）のまま。
     /// 中央の文字（冒頭のカード・「続く」）は粗くしないので触らない。
     ///
     /// 場面の組み立て（<see cref="BuildDrive.Screen"/>・BuildDive の Screen）が Hud を作った後にこれを通す。
@@ -29,26 +29,28 @@ namespace HalfAware.EditorTools
     {
         public const string ShadePath = "Assets/Textures/Hud/SubtitleShade.png";
 
-        /// <summary>粗い画面の 1 画素。1280×720 のキャンバスで、既定の粗さ（1/2）のとき</summary>
-        const float Dot = 1280f / 480f;
+        /// <summary>粗い画面の 1 画素。1280×720 のキャンバスで、既定の粗さ（0.75 で 720×405 相当）のとき</summary>
+        const float Dot = 1280f / 720f;
 
-        const float TextFont = 12f * Dot;
+        /// <summary>台詞の字。画面の上で、前（粗さ 1/2 の 12 画素）より 3 割ほど小さい</summary>
+        const float TextFont = 13f * Dot;
         const float NameFont = 11f * Dot;
         const float HintFont = 11f * Dot;
-        const float PromptFont = 11f * Dot;
-        const float CaptionFont = 11f * Dot;
+        /// <summary>印と右上の行は今回変えない。粗さ 1/2 のときの 11 画素</summary>
+        const float PromptFont = 11f * 1280f / 480f;
+        const float CaptionFont = 11f * 1280f / 480f;
 
         /// <summary>地の上の縁から名前の行まで</summary>
-        const float Top = 10f * Dot;
-        const float NameHeight = 14f * Dot;
-        const float NameGap = 3f * Dot;
-        /// <summary>台詞 1 行の高さ。12 Dot の字の素の行送り（1.45 em）</summary>
-        const float Row = 17.5f * Dot;
-        const float Bottom = 9f * Dot;
-        /// <summary>左右の余白。画面の幅に対する割合</summary>
-        const float Side = 0.12f;
-        const float HintRight = 0.11f;
-        const float HintBottom = 6f * Dot;
+        const float Top = 12f * Dot;
+        const float NameHeight = 16f * Dot;
+        const float NameGap = 4f * Dot;
+        /// <summary>台詞 1 行の高さ。13 Dot の字の素の行送り（1.45 em）</summary>
+        const float Row = 19f * Dot;
+        const float Bottom = 14f * Dot;
+        /// <summary>左右の余白。画面の幅に対する割合。コンソールの枠と揃える</summary>
+        const float Side = 0.14f;
+        const float HintRight = 0.13f;
+        const float HintBottom = 8f * Dot;
 
         /// <summary>E で送る字幕の地より薄い、流れる行の地の濃さ</summary>
         const float PassingAlpha = 0.45f;
@@ -136,7 +138,7 @@ namespace HalfAware.EditorTools
             hr.anchorMax = new Vector2(1f - HintRight, 0f);
             hr.pivot = new Vector2(1f, 0f);
             hr.anchoredPosition = new Vector2(0f, HintBottom);
-            hr.sizeDelta = new Vector2(120f * Dot, NameHeight);
+            hr.sizeDelta = new Vector2(160f * Dot, NameHeight);
             hint.fontSize = HintFont;
             hint.color = ImplantConsole.Tint(new Color(1f, 1f, 1f, 0.6f));
             hint.alignment = TextAlignmentOptions.BottomRight;
@@ -147,7 +149,7 @@ namespace HalfAware.EditorTools
             {
                 prompt.fontSize = PromptFont;
                 var pr = prompt.rectTransform;
-                pr.sizeDelta = new Vector2(pr.sizeDelta.x, Mathf.Max(pr.sizeDelta.y, 16f * Dot));
+                pr.sizeDelta = new Vector2(pr.sizeDelta.x, Mathf.Max(pr.sizeDelta.y, PromptFont * 1.45f));
             }
             // 場面 4 の右上の行（いま潜っている人）
             var caption = root.Find("Caption");
@@ -158,7 +160,7 @@ namespace HalfAware.EditorTools
                 {
                     ct.fontSize = CaptionFont;
                     var cr = ct.rectTransform;
-                    cr.sizeDelta = new Vector2(Mathf.Max(cr.sizeDelta.x, 300f * Dot), Mathf.Max(cr.sizeDelta.y, 16f * Dot));
+                    cr.sizeDelta = new Vector2(Mathf.Max(cr.sizeDelta.x, 800f), Mathf.Max(cr.sizeDelta.y, CaptionFont * 1.45f));
                 }
             }
 

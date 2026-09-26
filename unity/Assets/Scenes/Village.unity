@@ -294,10 +294,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 628899275}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.12, y: 1}
-  m_AnchorMax: {x: 0.88, y: 1}
-  m_AnchoredPosition: {x: 0, y: -26.666668}
-  m_SizeDelta: {x: 0, y: 37.333336}
+  m_AnchorMin: {x: 0.14, y: 1}
+  m_AnchorMax: {x: 0.86, y: 1}
+  m_AnchoredPosition: {x: 0, y: -21.333334}
+  m_SizeDelta: {x: 0, y: 28.444445}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!222 &38872649
 CanvasRenderer:
@@ -354,8 +354,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 29.333334
-  m_fontSizeBase: 29.333334
+  m_fontSize: 19.555555
+  m_fontSizeBase: 19.555555
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -1711,8 +1711,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 29.333334
-  m_fontSizeBase: 29.333334
+  m_fontSize: 19.555555
+  m_fontSizeBase: 19.555555
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -1778,10 +1778,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 628899275}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.89, y: 0}
-  m_AnchorMax: {x: 0.89, y: 0}
-  m_AnchoredPosition: {x: 0, y: 16}
-  m_SizeDelta: {x: 320, y: 37.333336}
+  m_AnchorMin: {x: 0.87, y: 0}
+  m_AnchorMax: {x: 0.87, y: 0}
+  m_AnchoredPosition: {x: 0, y: 14.222222}
+  m_SizeDelta: {x: 284.44446, y: 28.444445}
   m_Pivot: {x: 1, y: 0}
 --- !u!1 &192478152
 GameObject:
@@ -6024,7 +6024,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 0}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 189.33334}
+  m_SizeDelta: {x: 0, y: 149.33333}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!114 &628899276
 MonoBehaviour:
@@ -9478,9 +9478,9 @@ MonoBehaviour:
   subtitleText: {fileID: 1772554503}
   subtitleName: {fileID: 38872650}
   subtitleHint: {fileID: 192241630}
-  subtitleRowHeight: 46.666668
-  subtitlePadding: 96
-  subtitleHead: 72
+  subtitleRowHeight: 33.77778
+  subtitlePadding: 81.77778
+  subtitleHead: 56.88889
   promptText: {fileID: 2070464501}
   centerText: {fileID: 723752953}
   fadeLayer: {fileID: 1147211463}
@@ -17918,8 +17918,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32
-  m_fontSizeBase: 32
+  m_fontSize: 23.11111
+  m_fontSizeBase: 23.11111
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -17985,10 +17985,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 628899275}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.12, y: 1}
-  m_AnchorMax: {x: 0.88, y: 1}
-  m_AnchoredPosition: {x: 0, y: -72}
-  m_SizeDelta: {x: 0, y: 93.333336}
+  m_AnchorMin: {x: 0.14, y: 1}
+  m_AnchorMax: {x: 0.86, y: 1}
+  m_AnchoredPosition: {x: 0, y: -56.88889}
+  m_SizeDelta: {x: 0, y: 67.55556}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!1 &1774347606
 GameObject:
