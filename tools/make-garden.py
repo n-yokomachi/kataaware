@@ -836,6 +836,69 @@ def oak():
     return b.done()
 
 
+def pinnate(b, rng, x, y, length, angle, leaflets=11, size=6.5):
+    """羽状の複葉を一枚。(x, y) から angle（上向き 0 度）へ軸を伸ばし、左右に小葉を対に付け、先に一枚"""
+    a = math.radians(angle)
+    dx, dy = math.sin(a), -math.cos(a)
+    px, py = -dy, dx
+    b.line([(x, y), (x + dx * length, y + dy * length)], (84, 104, 50), 1)
+    pairs = leaflets // 2
+    for k in range(pairs):
+        t = (k + 1) / float(pairs + 1)
+        cx, cy = x + dx * length * t, y + dy * length * t
+        for sgn in (-1, 1):
+            col = jitter(mix((104, 140, 60), (58, 88, 40), rng.random() * 0.7), rng, 8)
+            b.leaf(cx, cy, size, angle + sgn * 62, size * 0.36, col)
+    b.leaf(x + dx * length, y + dy * length, size, angle, size * 0.36, jitter((96, 128, 56), rng, 8))
+
+
+def wisteria(seed, petal, deep):
+    """
+    藤の花房を一本（1×2 升、128×256）。札の上の辺が棚の横木に吊る所、下の辺が房の先。
+    上に羽状の葉を広げて房の付け根を隠し、花だけが宙に浮かないようにする。
+    房は付け根が太く先ほど細い。小花は付け根から咲くので、付け根は開いた花の淡い色、先は蕾の濃い色にする
+    """
+    w, h = UNIT, UNIT * 2
+    rng = random.Random(seed)
+    b = Brush(w, h)
+    sway = rng.uniform(-6, 6)
+
+    def axis(y):
+        t = y / float(h)
+        return 64 + sway * t * t
+
+    # 房の軸
+    b.line([(axis(y), y) for y in range(10, h - 4, 12)], (96, 92, 70), 2)
+    # 小花。先から付け根へ（付け根の開いた花を上に重ねる）
+    for y in range(h - 8, 18, -2):
+        t = (y - 18) / float(h - 26)
+        half = 4 + 22 * (1 - t) ** 0.75
+        for _ in range(3):
+            x = axis(y) + rng.uniform(-half, half)
+            col = jitter(mix(petal, deep, min(1.0, t * 1.1 + rng.uniform(-0.1, 0.1))), rng, 8)
+            r = 3.2 + 1.6 * (1 - t)
+            b.ell(x, y, r, r * 0.8, col)
+            if rng.random() < 0.35 and t < 0.7:
+                b.ell(x - 1, y - 1, r * 0.45, r * 0.4, mix(col, (255, 255, 255), 0.4))
+    # 付け根の葉
+    for k in range(4):
+        pinnate(b, rng, 64 + rng.uniform(-6, 6), 4, rng.uniform(34, 48), rng.choice((-1, 1)) * rng.uniform(110, 160), 9, 6)
+    return b.done()
+
+
+def wisteria_leaf():
+    """藤の葉の房（1×2 升）。羽状の複葉が棚から垂れる。花房のあいだに混ぜて、棚の下を葉で繋ぐ"""
+    w, h = UNIT, UNIT * 2
+    rng = random.Random(409)
+    b = Brush(w, h)
+    for k in range(9):
+        x = 64 + rng.uniform(-30, 30)
+        pinnate(b, rng, x, 2, rng.uniform(110, 230), 180 + rng.uniform(-22, 22), 13, rng.uniform(10, 12))
+    for k in range(4):
+        pinnate(b, rng, 64 + rng.uniform(-10, 10), 2, rng.uniform(50, 80), rng.choice((-1, 1)) * rng.uniform(120, 150), 9, 8)
+    return b.done()
+
+
 def yew():
     """
     教会の墓地のイチイの樹冠（2×2 升）。葉の房を重ねた丸い樹冠を、暗く青みの緑で。
@@ -881,6 +944,9 @@ CELLS = [
     (5, 8, 1, 2, obelisk_vine),                                            # 28 オベリスクのスイートピー
     (6, 8, 2, 2, oak),                                                     # 29 畑の並木の楢の樹冠
     (6, 10, 2, 2, yew),                                                    # 30 教会の墓地のイチイの樹冠
+    (0, 10, 1, 2, lambda: wisteria(401, (196, 176, 228), (118, 92, 176))),  # 31 藤の花房（薄紫）
+    (1, 10, 1, 2, lambda: wisteria(403, (246, 244, 248), (196, 196, 170))),  # 32 藤の花房（白）
+    (2, 10, 1, 2, wisteria_leaf),                                          # 33 藤の葉の房
 ]
 
 

@@ -39,7 +39,7 @@ namespace HalfAware.EditorTools
             HollyPink, HollyWhite, Delph, Foxglove, DahliaRed, DahliaPink, Rudbeckia, EchPink, EchWhite, Aster,
             Allium, Rosemary, SweetPea, Pelargonium, Catmint, Geranium, Lavender, Mantle, Sage, Hydrangea,
             Filler, Ivy, Roses, Clematis, Honeysuckle, Apple,
-            Garland, PotMix, ObeliskVine, Oak, Yew,
+            Garland, PotMix, ObeliskVine, Oak, Yew, WisteriaLilac, WisteriaWhite, WisteriaLeaf,
         }
 
         /// <summary>升の (x, y, 幅, 高さ)。make-garden.py の CELLS と同じ値。y は絵の上から数える</summary>
@@ -52,6 +52,7 @@ namespace HalfAware.EditorTools
             { 4, 5, 2, 1 }, { 6, 5, 2, 1 },
             { 0, 6, 2, 2 }, { 2, 6, 2, 2 }, { 4, 6, 2, 2 }, { 6, 6, 2, 2 },
             { 0, 8, 4, 1 }, { 4, 8, 1, 1 }, { 5, 8, 1, 2 }, { 6, 8, 2, 2 }, { 6, 10, 2, 2 },
+            { 0, 10, 1, 2 }, { 1, 10, 1, 2 }, { 2, 10, 1, 2 },
         };
 
         /// <summary>
@@ -68,6 +69,7 @@ namespace HalfAware.EditorTools
             new Vector3(0.42f, 0.80f, 3), new Vector3(1.05f, 1.60f, 3), new Vector3(0.45f, 0.90f, 3), new Vector3(0.60f, 1.20f, 1),
             new Vector3(1.00f, 1.00f, 1), new Vector3(1.00f, 1.00f, 1), new Vector3(1.00f, 1.00f, 1), new Vector3(3.00f, 3.20f, 3),
             new Vector3(0.24f, 1.00f, 1), new Vector3(0.62f, 0.62f, 3), new Vector3(1.45f, 0.62f, 3), new Vector3(6.0f, 7.0f, 3), new Vector3(5.6f, 4.4f, 3),
+            new Vector3(0.5f, 0.22f, 2), new Vector3(0.5f, 0.22f, 2), new Vector3(0.5f, 0.30f, 2),
         };
 
         /// <summary>升の uv。左下と右上。縁を 1.5 画素内へ寄せて、隣の升の滲みを拾わない</summary>
@@ -475,8 +477,8 @@ namespace HalfAware.EditorTools
         {
             var f = FloraBank();
             f.CardLift = 0.8f;
-            // アーチ
-            ArchPlants(f);
+            // アーチのトンネルと藤
+            TunnelPlants(f);
 
             // 玄関のまわりのバラ。戸の両脇から庇の上へ
             WallRose(f, new Vector3(FrontDoorX, 0f, HouseFront - 0.07f), Vector3.right, 1f, Kind.Roses);
@@ -543,15 +545,15 @@ namespace HalfAware.EditorTools
         /// 帯は枠の内へ 0.10 m、外へ 0.10〜0.18 m の厚みにし、前から見て弧の形がそのまま読めるようにする。
         /// 弧の札は揺らさない（揺らすと、隣の札と別々に動いて帯が千切れる）
         /// </summary>
-        static void ArchPlants(Bank f)
+        static void ArchPlants(Bank f, int hoop)
         {
             Vector3 centre, across, ahead;
-            ArchPose(out centre, out across, out ahead);
-            // 枠の寸法（BuildVillageGarden.ArchFrame と同じ）
-            const float half = 0.78f;
-            const float legs = 2.1f;
-            const float depth = 0.26f;
-            const float rise = 0.9f;
+            HoopPose(hoop, out centre, out across, out ahead);
+            // 枠の寸法（BuildVillageGarden の ArchHalf など）。北の端のアーチは前後二本の弧、中ほどの輪は一本の弧
+            const float half = ArchHalf;
+            var depth = hoop == 0 ? ArchDepth : 0.035f;
+            const float rise = ArchRise;
+            var seed = 409 + hoop * 13;
             // 柱。根元から肩まで四段。横の格子の面に一枚、柱を巻くように前後の面に一枚ずつ。
             // 前後の札は柱の外（depth より前）に置く。柱の内に置いたら、白い柱が札の手前に丸見えになった。
             // 頭は肩（2.1 m）で止め、その上は弧の帯に任せる
@@ -560,7 +562,7 @@ namespace HalfAware.EditorTools
                 for (var k = 0; k < 4; k++)
                 {
                     var root = centre + across * (half * s) + Vector3.up * (k * 0.45f);
-                    var kind = (k + (s > 0 ? 1 : 0)) % 3 == 1 ? Kind.Clematis : Kind.Roses;
+                    var kind = (k + hoop + (s > 0 ? 1 : 0)) % 3 == 1 ? Kind.Clematis : Kind.Roses;
                     var high = k == 3 ? 0.74f : 0.8f;
                     Flat(f, kind, root + across * (0.04f * s) - ahead * 0.04f, ahead * 0.40f, Vector3.up * high);
                     Flat(f, kind, root + ahead * (depth + 0.05f) + across * (0.02f * s), across * 0.30f, Vector3.up * high);
@@ -568,8 +570,6 @@ namespace HalfAware.EditorTools
                 }
             }
             // 弧の帯。前と後ろの面に、弧を 12 に割って札を並べる。端は肩より少し下から始めて柱の札に重ねる
-            System.Func<float, float, Vector3> onArc = (a, r) =>
-                centre + across * (Mathf.Cos(a) * r) + Vector3.up * (legs + Mathf.Sin(a) * r * rise);
             Vector2 min, max;
             CellUv(Kind.Garland, out min, out max);
             const int pieces = 12;
@@ -584,38 +584,144 @@ namespace HalfAware.EditorTools
                     var a1 = Mathf.Lerp(-0.14f, Mathf.PI + 0.14f, (k + 1f) / pieces);
                     var am = (a0 + a1) * 0.5f;
                     var normal = (across * (Mathf.Cos(am) * rise) + Vector3.up * Mathf.Sin(am)).normalized;
-                    var tangent = (onArc(a1, half) - onArc(a0, half));
+                    var tangent = OnArc(centre, across, a1, half) - OnArc(centre, across, a0, half);
                     var span = tangent.magnitude;
                     tangent /= span;
-                    var outer = 0.10f + Hash(409 + face, k) * 0.08f;
-                    var root = onArc(am, half) - normal * inner + ahead * (face * (depth + 0.035f));
+                    var outer = 0.10f + Hash(seed + face, k) * 0.08f;
+                    var root = OnArc(centre, across, am, half) - normal * inner + ahead * (face * (depth + 0.035f));
                     // 帯の絵は横に 4 升。札ごとに 1 升ぶんを、ずらして切り出す
-                    var u0 = Mathf.Lerp(min.x, max.x, Hash(401 + face, k) * 0.75f);
+                    var u0 = Mathf.Lerp(min.x, max.x, Hash(seed - 8 + face, k) * 0.75f);
                     var u1 = u0 + (max.x - min.x) * 0.25f;
                     // 前の面は外から見て左から右へ、後ろの面は裏返しに並ぶので、絵の向きを揃える
                     var side = tangent * (span * 0.5f * 1.35f) * face;
                     f.AtlasCard(root, side, normal * (inner + outer), new Vector2(u0, min.y), new Vector2(u1, max.y));
                 }
             }
-            // 弧の頭の面。下から見上げたときに枠の白い桟が抜けて見えないよう、弧の上に寝かせた札を並べる。
-            // 札の面は弧の接線と進む向きに張るので、正面からは縁の線になり、外へは突き出さない
-            for (var k = 0; k < 9; k++)
+            // 北の端のアーチの頭の面。下から見上げたときに枠の白い桟が抜けて見えないよう、弧の上に寝かせた札を並べる。
+            // 札の面は弧の接線と進む向きに張るので、正面からは縁の線になり、外へは突き出さない。
+            // 中ほどの輪の頭は、輪の間の屋根の札（SpanPlants）が覆う
+            if (hoop == 0)
+                for (var k = 0; k < 9; k++)
+                {
+                    var a = Mathf.PI * (k + 0.5f) / 9f;
+                    var normal = (across * (Mathf.Cos(a) * rise) + Vector3.up * Mathf.Sin(a)).normalized;
+                    var tangent = (across * -Mathf.Sin(a) + Vector3.up * (Mathf.Cos(a) * rise)).normalized;
+                    var p = OnArc(centre, across, a, half) + normal * 0.03f;
+                    Flat(f, k % 3 == 1 ? Kind.Clematis : Kind.Roses, p - tangent * 0.26f, ahead * (depth + 0.08f), tangent * 0.52f);
+                }
+            f.RootFixed = null;
+        }
+
+        /// <summary>
+        /// トンネルのつると藤（2026-09-27、オーナー「藤棚とバラのアーチを両立してみて」）。
+        /// 四つのアーチのそれぞれにバラとクレマチスを這わせ、アーチの間の脇と上を札で覆って一続きにする。
+        /// そのうえで上の横木から藤の花房を垂らす（<see cref="Wisteria"/>）
+        /// </summary>
+        static void TunnelPlants(Bank f)
+        {
+            for (var k = 0; k < TunnelHoops; k++) ArchPlants(f, k);
+            for (var k = 0; k + 1 < TunnelHoops; k++) SpanPlants(f, k);
+            Wisteria(f);
+        }
+
+        /// <summary>k 番目と k+1 番目のアーチの間の両端の芯と、北への向きと、小路を横切る向き</summary>
+        static void SpanPose(int k, out Vector3 c0, out Vector3 c1, out Vector3 north, out Vector3 across)
+        {
+            Vector3 x0, a0, x1, a1;
+            HoopPose(k, out c0, out x0, out a0);
+            HoopPose(k + 1, out c1, out x1, out a1);
+            if (k == 0) c0 -= a0 * ArchDepth;
+            north = (c0 - c1).normalized;
+            across = Vector3.Cross(Vector3.up, north).normalized;
+        }
+
+        /// <summary>
+        /// アーチの間の脇と上。脇は外からも内からも見える縦の札を三段、上は弧に沿って寝かせた札を十三枚（二重）。
+        /// 上の札は揺らさない（揺らすと、アーチの帯と別々に動いて屋根が千切れる）
+        /// </summary>
+        static void SpanPlants(Bank f, int k)
+        {
+            Vector3 c0, c1, north, across;
+            SpanPose(k, out c0, out c1, out north, out across);
+            var mid = (c0 + c1) * 0.5f;
+            var len = Vector3.Distance(c0, c1);
+            for (var s = -1; s <= 1; s += 2)
+                for (var j = 0; j < 3; j++)
+                {
+                    var kind = (j + k + (s > 0 ? 1 : 0)) % 3 == 2 ? Kind.Clematis : Kind.Roses;
+                    Flat(f, kind, mid + across * ((ArchHalf + 0.05f) * s) + Vector3.up * (0.02f + j * 0.66f), north * (len * 0.5f + 0.12f), Vector3.up * 0.8f);
+                }
+            // 上は二重に。一重では、中から見上げると札の丸い塊の間から空が大きく抜けた
+            f.RootFixed = new Vector2(0f, 1f);
+            for (var j = 0; j < 13; j++)
             {
-                var a = Mathf.PI * (k + 0.5f) / 9f;
-                var normal = (across * (Mathf.Cos(a) * rise) + Vector3.up * Mathf.Sin(a)).normalized;
-                var tangent = (across * -Mathf.Sin(a) + Vector3.up * (Mathf.Cos(a) * rise)).normalized;
-                var p = onArc(a, half) + normal * 0.03f;
-                Flat(f, k % 3 == 1 ? Kind.Clematis : Kind.Roses, p - tangent * 0.26f, ahead * (depth + 0.08f), tangent * 0.52f);
+                var a = Mathf.Lerp(0.24f, Mathf.PI - 0.24f, j / 12f);
+                var normal = (across * (Mathf.Cos(a) * ArchRise) + Vector3.up * Mathf.Sin(a)).normalized;
+                var tangent = (across * -Mathf.Sin(a) + Vector3.up * (Mathf.Cos(a) * ArchRise)).normalized;
+                var p = OnArc(mid, across, a, ArchHalf) + normal * (j % 2 == 0 ? 0.03f : 0.08f) + north * ((j % 2 == 0 ? 0.12f : -0.12f) * len);
+                Flat(f, (j + k) % 3 == 1 ? Kind.Clematis : Kind.Roses, p - tangent * 0.26f, north * (len * 0.42f + 0.1f), tangent * 0.52f);
             }
             f.RootFixed = null;
         }
 
-        /// <summary>アーチの芯と、小路を横切る向きと、進む向き（BuildVillageGarden.ArchFrame と同じ値）</summary>
-        static void ArchPose(out Vector3 centre, out Vector3 across, out Vector3 ahead)
+        /// <summary>
+        /// 藤の花房。アーチの間の上の横木から、薄紫を主に白を少し混ぜて垂らし、葉の房を添えて花だけが浮かないようにする。
+        /// **房の先は 1.92 m より上で止める**（トンネルの中を歩く頭に当たらない）。長さは 0.3〜0.8 m でばらつかせ、
+        /// 北の端（タイトルの背景の画角が見るトンネルの口）のすぐ内は短くして、口の額の中を房でうるさくしない。
+        /// 両肩の外にも短い房を垂らし、外から見ると上の縁から房が覗くようにする。
+        /// 札は吊る所を根に取り（<see cref="Bank.Hanging"/>）、先だけ風で小さく揺れる。
+        /// 藤の盛りは 5〜6 月で、8 月は返り咲きが少しある頃。ここは絵づくりのために盛りの房を下げる（設計書 8 節）
+        /// </summary>
+        static void Wisteria(Bank f)
         {
-            centre = new Vector3(PathX(ArchZ), 0f, ArchZ);
-            ahead = (new Vector3(PathX(ArchZ + 0.3f), 0f, ArchZ + 0.3f) - new Vector3(PathX(ArchZ - 0.3f), 0f, ArchZ - 0.3f)).normalized;
-            across = Vector3.Cross(Vector3.up, ahead).normalized;
+            f.Hanging = true;
+            for (var k = 0; k + 1 < TunnelHoops; k++)
+            {
+                Vector3 c0, c1, north, across;
+                SpanPose(k, out c0, out c1, out north, out across);
+                for (var j = 0; j < 11; j++)
+                {
+                    var t = 0.08f + 0.84f * Hash(501 + k, j);
+                    var a = Mathf.Lerp(0.6f, Mathf.PI - 0.6f, Hash(503 + k, j));
+                    var top = OnArc(Vector3.Lerp(c1, c0, t), across, a, ArchHalf - 0.05f);
+                    var len = Mathf.Lerp(0.30f, 0.80f, Hash(505 + k, j));
+                    // 口に近い二つの間は短く。タイトルの背景の画角で、口の額の中が房の幕で塞がらないように
+                    if (k == 0) len *= t > 0.35f ? 0.45f : 0.7f;
+                    else if (k == 1) len *= 0.8f;
+                    len = Mathf.Min(len, top.y - 1.92f);
+                    if (len < 0.15f) continue;
+                    var pick = Hash(507 + k, j);
+                    var kind = pick < 0.74f ? Kind.WisteriaLilac : pick < 0.88f ? Kind.WisteriaWhite : Kind.WisteriaLeaf;
+                    var yaw = Hash(509 + k, j) * 180f;
+                    Raceme(f, kind, top, len, yaw);
+                    if (kind != Kind.WisteriaLeaf) Raceme(f, Kind.WisteriaLeaf, top + north * 0.07f, len * 0.75f, yaw + 50f);
+                }
+                // 両肩の外へ覗く房
+                for (var s = -1; s <= 1; s += 2)
+                {
+                    var a = s > 0 ? 0.42f : Mathf.PI - 0.42f;
+                    var top = OnArc(Vector3.Lerp(c1, c0, 0.3f + 0.4f * Hash(511 + k, s + 1)), across, a, ArchHalf + 0.10f);
+                    var len = Mathf.Lerp(0.25f, 0.5f, Hash(513 + k, s + 1));
+                    Raceme(f, Hash(515 + k, s + 1) < 0.8f ? Kind.WisteriaLilac : Kind.WisteriaWhite, top, len, Hash(517 + k, s + 1) * 180f);
+                    Raceme(f, Kind.WisteriaLeaf, top + north * 0.1f, len * 0.9f, 40f);
+                }
+            }
+            f.Hanging = false;
+        }
+
+        /// <summary>吊り下がる房を一つ。top は吊る所、len は房の長さ。札を二枚、yaw から直角に交差させる</summary>
+        static void Raceme(Bank f, Kind kind, Vector3 top, float len, float yaw)
+        {
+            Vector2 min, max;
+            CellUv(kind, out min, out max);
+            f.RootY = top.y;
+            f.RootHigh = len;
+            var wide = kind == Kind.WisteriaLeaf ? len * 0.30f : len * 0.22f;
+            for (var c = 0; c < 2; c++)
+            {
+                var a = (yaw + 90f * c) * Mathf.Deg2Rad;
+                f.AtlasCard(top + Vector3.down * len, new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * wide, Vector3.up * len, min, max);
+            }
         }
 
         /// <summary>

@@ -38,6 +38,11 @@ namespace HalfAware.EditorTools
         /// 村の庭のアーチの弧に並べる帯の札のように、揺らさず根元の陰りも付けない札に (0, 1) を使う
         /// </summary>
         public Vector2? RootFixed;
+        /// <summary>
+        /// 吊り下がる物。根（RootY）を上の吊る所に取り、そこから下への隔たりを根からの高さとして uv1 に入れる。
+        /// 揺れは吊る所で 0、先ほど大きくなる（村の庭のトンネルの藤の花房）
+        /// </summary>
+        public bool Hanging;
 
         /// <summary>
         /// 札の法線を上へ倒す割合。麦だけが使う。
@@ -158,7 +163,7 @@ namespace HalfAware.EditorTools
                 roots.Add(RootFixed.Value);
                 return;
             }
-            var up = v.y - RootY;
+            var up = Hanging ? RootY - v.y : v.y - RootY;
             roots.Add(new Vector2(up, RootHigh > 0f ? Mathf.Clamp01(up / RootHigh) : 0f));
         }
 

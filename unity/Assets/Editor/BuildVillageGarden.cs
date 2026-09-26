@@ -322,24 +322,89 @@ namespace HalfAware.EditorTools
         // ---- アーチ ---------------------------------------------------------------------
 
         /// <summary>
-        /// 小路に掛けるアーチ。白く塗った細い柱を片側二本ずつ、頭は半円の弧を前後二本、その間に桟。
-        /// 横は格子。バラとクレマチスは札の側（BuildVillagePlants.ArchPlants）が這わせる
+        /// 小路に掛けるトンネル。**アーチを小路に沿って四つ連ね、上を横木で繋いだ一本のトンネルにする**
+        /// （オーナー、2026-09-27「アーチ自体をもう少し長くしてみて」「藤棚みたいに吊り物がある場合も」「両立してみて」）。
+        /// 北の端（東屋の側、タイトルの背景の画角が正面に見る面）は、もとのアーチ（前後二本の弧と横の格子）のまま置き、
+        /// 南（家の側）へ白く塗った細い輪を <see cref="TunnelStep"/> ごとに三つ足す。長さは 3.1 m ほどで、
+        /// ふつうの家庭の庭に収まる（豪邸の長い回廊にしない）。輪は小路の芯に沿って立て、小路はトンネルの中を真っすぐ抜ける。
+        /// つるバラとクレマチスを脇と上に絡ませ、上の横木から藤の花房を垂らす（札の側、BuildVillagePlants.TunnelPlants）
         /// </summary>
         static void Arch(Banks b)
         {
             ArchFrame(b.Paint, out _, out _);
+            for (var k = 1; k < TunnelHoops; k++)
+            {
+                Vector3 c, across, ahead;
+                HoopPose(k, out c, out across, out ahead);
+                Hoop(b.Paint, c, across, ahead);
+            }
+            for (var k = 0; k + 1 < TunnelHoops; k++) Rails(b.Paint, k);
         }
 
-        /// <summary>アーチの芯・横の向き・進む向きを返しつつ骨を組む</summary>
+        /// <summary>トンネルのアーチの数と、小路に沿った間（m）</summary>
+        const int TunnelHoops = 4;
+        const float TunnelStep = 0.95f;
+        /// <summary>アーチの枠の寸法。半幅・肩の高さ・北の端のアーチの前後の弧の隔たりの半分・弧の縦の潰れ</summary>
+        const float ArchHalf = 0.78f;
+        const float ArchLegs = 2.1f;
+        const float ArchDepth = 0.26f;
+        const float ArchRise = 0.9f;
+
+        /// <summary>
+        /// トンネルの k 番目のアーチの芯・小路を横切る向き・進む向き（北へ）。0 が北の端（もとのアーチ）で、
+        /// k が増えるほど南（家の側）へ <see cref="TunnelStep"/> ずつ下がる。小路の芯に沿うので、輪ごとに少し向きが変わる
+        /// </summary>
+        static void HoopPose(int k, out Vector3 centre, out Vector3 across, out Vector3 ahead)
+        {
+            var z = ArchZ - k * TunnelStep;
+            centre = new Vector3(PathX(z), 0f, z);
+            ahead = (new Vector3(PathX(z + 0.3f), 0f, z + 0.3f) - new Vector3(PathX(z - 0.3f), 0f, z - 0.3f)).normalized;
+            across = Vector3.Cross(Vector3.up, ahead).normalized;
+        }
+
+        /// <summary>アーチの弧の上の点。a は弧の角（0 が across の側の肩、π が反対の肩）、r は芯からの半径</summary>
+        static Vector3 OnArc(Vector3 centre, Vector3 across, float a, float r)
+        {
+            return centre + across * (Mathf.Cos(a) * r) + Vector3.up * (ArchLegs + Mathf.Sin(a) * r * ArchRise);
+        }
+
+        /// <summary>トンネルの中ほどの輪。細い柱を二本と、頭の半円の弧を一本。横の格子は付けず、つるに任せる</summary>
+        static void Hoop(Bank b, Vector3 c, Vector3 across, Vector3 ahead)
+        {
+            foreach (var s in new[] { -1f, 1f })
+                b.Box(c + across * (ArchHalf * s) + Vector3.up * (ArchLegs * 0.5f), new Vector3(0.05f, ArchLegs, 0.05f), Quaternion.LookRotation(ahead));
+            const int seg = 7;
+            for (var k = 0; k < seg; k++)
+                Beam(b, OnArc(c, across, Mathf.PI * k / seg, ArchHalf), OnArc(c, across, Mathf.PI * (k + 1) / seg, ArchHalf), 0.045f, 0.045f);
+        }
+
+        /// <summary>
+        /// k 番目と k+1 番目のアーチを繋ぐ横木。弧の上の五か所（両肩・斜め・頂）と、両脇の柱の中ほど。
+        /// 北の端のアーチは前後二本の弧なので、その南の弧から繋ぐ
+        /// </summary>
+        static void Rails(Bank b, int k)
+        {
+            Vector3 c0, x0, a0, c1, x1, a1;
+            HoopPose(k, out c0, out x0, out a0);
+            HoopPose(k + 1, out c1, out x1, out a1);
+            if (k == 0) c0 -= a0 * ArchDepth;
+            for (var j = 0; j <= 4; j++)
+            {
+                var a = Mathf.PI * j / 4f;
+                Beam(b, OnArc(c0, x0, a, ArchHalf), OnArc(c1, x1, a, ArchHalf), 0.035f, 0.035f);
+            }
+            foreach (var s in new[] { -1f, 1f })
+                Beam(b, c0 + x0 * (ArchHalf * s) + Vector3.up * 1.05f, c1 + x1 * (ArchHalf * s) + Vector3.up * 1.05f, 0.03f, 0.03f);
+        }
+
+        /// <summary>北の端のアーチ（もとのアーチ）の骨を組む。芯と横の向きを返す</summary>
         static void ArchFrame(Bank b, out Vector3 centre, out Vector3 across)
         {
-            centre = new Vector3(PathX(ArchZ), 0f, ArchZ);
-            var ahead3 = new Vector3(PathX(ArchZ + 0.3f), 0f, ArchZ + 0.3f) - new Vector3(PathX(ArchZ - 0.3f), 0f, ArchZ - 0.3f);
-            ahead3.Normalize();
-            across = Vector3.Cross(Vector3.up, ahead3).normalized;
-            const float half = 0.78f;
-            const float legs = 2.1f;
-            const float depth = 0.26f;
+            Vector3 ahead3;
+            HoopPose(0, out centre, out across, out ahead3);
+            const float half = ArchHalf;
+            const float legs = ArchLegs;
+            const float depth = ArchDepth;
             for (var f = -1; f <= 1; f += 2)
             {
                 var fo = ahead3 * (depth * f);
