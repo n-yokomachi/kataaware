@@ -101,6 +101,8 @@ namespace HalfAware.EditorTools
             Lane(Child(root, "Lane"), banks);
             Yards(Child(root, "Yards"), banks);
             Fields(Child(root, "Fields"), banks);
+            // 公衆電話の後ろの菜園。野菜の札は LanePlants が南の家並みの花と一緒に焼く
+            Allotment(banks);
             // 家並みの花の縁の下の土を入れ物へ足すので、焼く前に植える
             LanePlants(Child(root, "LanePlants"), banks);
             banks.Emit(Child(root, "Built"), "Village");

@@ -147,7 +147,7 @@ namespace HalfAware.EditorTools
             new Vector4(-131f, LaneWest - 0.5f, -98f, -RoadHalf - 1.0f),
             new Vector4(LaneWest, PlotCWest - 0.6f, -98f, -NorthEdge - 0.9f),
             new Vector4(PlotCWest, 40f, -98f, SouthHedge - 0.8f),
-            new Vector4(PlotCEast + 0.6f, PlotDWest - 0.6f, SouthHedge - 0.4f, -NorthEdge - 0.9f),
+            // 農場の門の奥（家 C と家 D の間）は麦畑をやめて菜園にした（2026-09-27、BuildVillageAllotment）
         };
 
         /// <summary>牧草地。片割れの東と、家 D の東</summary>

@@ -908,6 +908,295 @@ def yew():
     return b.done()
 
 
+# ---- 菜園の野菜（2026-09-27、公衆電話の後ろの麦畑を菜園にした） --------------------
+#
+# 路地から 5〜15 m 先で見るので、畝一つが 10〜30 画素ほどにしかならない。
+# 葉の形を細かく描き分けても読めないので、野菜ごとに色と輪郭の塊で分ける:
+# レタスは明るい黄緑の低い玉、赤いレタスは赤褐色、キャベツは粉を吹いた青緑の広い外葉に淡い玉、
+# ケールは濃い青緑の縮れた扇、玉ねぎは倒れて黄ばんだ細い葉と金茶の玉、ジャガイモはこんもりした茂み、
+# ズッキーニは大きな濃い葉と黄色い花、ビーツは赤い茎の濃い葉、フダンソウは色とりどりの茎、
+# ランナービーンは葉の壁に赤い花の点、ヒマワリは黄の輪と焦げ茶の芯
+
+def blade(b, x, y, length, angle, width, col, round_=0.6):
+    """
+    丸みのある広い葉を一枚。根が (x, y)、angle は上向きを 0 とした度。
+    Brush.leaf は菱形なので、大きな葉（キャベツの外葉・ヒマワリ・ズッキーニ）は角が立って紙を切ったように見えた。
+    縁を楕円の弧でなぞる。round_ が小さいほど根と先が細る
+    """
+    a = math.radians(angle)
+    dx, dy = math.sin(a), -math.cos(a)
+    px, py = -dy, dx
+    left, right = [], []
+    for k in range(13):
+        t = k / 12.0
+        half = width * (math.sin(math.pi * t) ** round_)
+        cx, cy = x + dx * length * t, y + dy * length * t
+        left.append((cx + px * half, cy + py * half))
+        right.append((cx - px * half, cy - py * half))
+    b.poly(left + right[::-1], col)
+
+
+def runner_bean():
+    """
+    ランナービーンの葉の壁（1×2 升）。竹の支柱を合掌に組んだ斜面に這わせる札。
+    三出の広い葉を詰め、緋色の花の房と垂れた莢を散らす。上の縁は蔓の先が支柱の頭を越えて揺れる。
+    支柱は形（BuildVillageAllotment）が持つので、絵には描かない
+    """
+    w, h = UNIT, UNIT * 2
+    rng = random.Random(421)
+    b = Brush(w, h)
+    for x in (20, 64, 108):
+        pts = [(x + math.sin(y * 0.09 + x) * 4, y) for y in range(h - 2, 10, -8)]
+        b.line(pts, (74, 98, 44), 2)
+    for _ in range(130):
+        x = rng.uniform(6, 122)
+        top = 16 + 9 * math.sin(x * 0.11) + rng.uniform(0, 10)
+        y = rng.uniform(top, h - 6)
+        col = jitter(mix(LEAF_LIGHT, LEAF_DARK, rng.random() * 0.85), rng, 10)
+        a = rng.uniform(-40, 40)
+        for k in (-58, 0, 58):
+            blade(b, x, y, rng.uniform(11, 15), a + k, 5.6, col)
+    for _ in range(26):
+        x = rng.uniform(10, 118)
+        y = rng.uniform(h * 0.3, h * 0.85)
+        b.line([(x, y), (x + rng.uniform(-2, 2), y + rng.uniform(16, 26))], jitter((104, 138, 54), rng, 10), 3)
+    # 花は房を小さく疎らに。多く大きくすると、葉の壁が赤い実の生ったトマトやバラの垣に見えた
+    for _ in range(9):
+        x = rng.uniform(8, 120)
+        y = rng.uniform(18, h * 0.75)
+        for k in range(3):
+            b.ell(x + rng.uniform(-2, 2), y + k * 3.5, 2.8, 2.4, jitter((218, 46, 30), rng, 12))
+    return b.done()
+
+
+def sunflower():
+    """
+    ヒマワリ（1×3 升）。太い茎にハート形の大きな葉を互い違いに、頭に黄の花びらの輪と焦げ茶の芯。
+    札は交差させるので、どちらから見ても花の顔が見える
+    """
+    w, h = UNIT, UNIT * 3
+    rng = random.Random(431)
+    b = Brush(w, h)
+    b.line([(66, h - 2), (62, h * 0.55), (66, 96)], (84, 112, 48), 7)
+    b.line([(64, h * 0.42), (92, 150), (98, 132)], (84, 112, 48), 3)
+    y = h - 22
+    side = 1
+    while y > 108:
+        size = 20 + (y / float(h)) * 14
+        col = jitter(LEAF_MID if y < h * 0.6 else mix(LEAF_MID, LEAF_DARK, 0.5), rng, 10)
+        # 葉は柄の先に垂れ気味に。大きなハート形
+        blade(b, 64, y, size * 1.6, side * rng.uniform(95, 125), size * 0.62, col, 0.45)
+        side = -side
+        y -= rng.uniform(20, 26)
+
+    def head(cx, cy, r, turn):
+        for k in range(22):
+            a = 2 * math.pi * k / 22 + rng.uniform(-0.05, 0.05) + turn
+            b.leaf(cx + math.cos(a) * r * 0.5, cy + math.sin(a) * r * 0.46, r * 0.62, math.degrees(a) + 90, r * 0.17,
+                   jitter((240, 186, 30), rng, 12))
+        b.ell(cx, cy, r * 0.55, r * 0.5, (90, 56, 24))
+        b.ell(cx - r * 0.1, cy - r * 0.1, r * 0.32, r * 0.29, (120, 80, 36))
+
+    head(98, 128, 15, 0.1)
+    head(66, 64, 30, 0.0)
+    return b.done()
+
+
+def cabbage():
+    """キャベツ（1×1 升）。粉を吹いた青緑の外葉を大きく広げ、真ん中に淡い緑の固い玉。外葉に白い葉脈"""
+    w, h = UNIT, UNIT
+    rng = random.Random(433)
+    b = Brush(w, h)
+    # 外葉。玉を包むように斜め上へ開く。横へ寝かせすぎると、皿に載った玉に見えた
+    for k in range(10):
+        a = -70 + k * 15.5 + rng.uniform(-6, 6)
+        length = rng.uniform(52, 64)
+        col = jitter(mix((80, 118, 112), (124, 158, 140), rng.random()), rng, 8)
+        x0 = 64 + rng.uniform(-8, 8)
+        blade(b, x0, h - 4, length, a, length * 0.42, col, 0.5)
+        ar = math.radians(a)
+        b.line([(x0, h - 4), (x0 + math.sin(ar) * length * 0.8, h - 4 - math.cos(ar) * length * 0.8)], (168, 194, 176), 1)
+    b.ell(64, h - 42, 33, 30, (130, 166, 110))
+    b.ell(57, h - 50, 19, 15, (166, 194, 138))
+    b.ell(74, h - 34, 13, 9, (112, 146, 98))
+    # 手前の外葉の縁を、玉の裾に一二枚重ねる
+    for a in (-38, 30):
+        blade(b, 64, h - 2, 40, a, 17, jitter((96, 134, 122), rng, 8), 0.5)
+    return b.done()
+
+
+def kale():
+    """ケール（1×1 升）。立った茎の先に、縮れた濃い青緑の葉を扇に広げる"""
+    w, h = UNIT, UNIT
+    rng = random.Random(439)
+    b = Brush(w, h)
+    for k in range(9):
+        a = -66 + k * 16.5 + rng.uniform(-6, 6)
+        length = rng.uniform(78, 106)
+        ar = math.radians(a)
+        dx, dy = math.sin(ar), -math.cos(ar)
+        b.line([(64, h - 2), (64 + dx * length * 0.5, h - 2 + dy * length * 0.5)], (104, 126, 96), 3)
+        for t in range(14):
+            s = 0.36 + 0.64 * t / 13.0
+            px, py = 64 + dx * length * s, h - 2 + dy * length * s
+            rr = 5 + 6 * math.sin(math.pi * s)
+            for _k in range(3):
+                col = jitter(mix((36, 62, 54), (78, 108, 88), rng.random()), rng, 8)
+                b.ell(px + rng.uniform(-rr, rr) * 0.8, py + rng.uniform(-rr, rr) * 0.8, rr * 0.56, rr * 0.5, col)
+    return b.done()
+
+
+def lettuce(seed, outer, inner):
+    """レタス（1×1 升）。地面に低く広がる丸い葉のロゼット。外の葉は濃く、芯へ明るく"""
+    w, h = UNIT, UNIT
+    rng = random.Random(seed)
+    b = Brush(w, h)
+    cx, cy = 64, 92
+    for ring, (n, r) in enumerate(((10, 58), (8, 42), (6, 26))):
+        col0 = mix(outer, inner, ring / 2.0)
+        for k in range(n):
+            a = 2 * math.pi * k / n + rng.uniform(-0.2, 0.2) + ring * 0.3
+            x = cx + math.cos(a) * r * 0.62
+            y = cy + math.sin(a) * r * 0.36 - ring * 10
+            b.ell(x, y, r * 0.42, r * 0.34, jitter(col0, rng, 8))
+            b.ell(x - r * 0.08, y - r * 0.1, r * 0.22, r * 0.16, jitter(mix(col0, (255, 255, 200), 0.18), rng, 6))
+    return b.done()
+
+
+def onions():
+    """
+    玉ねぎの列（2×1 升）。8 月は葉が倒れて黄ばみ、土の上に金茶の玉が半分出る。
+    立ったままの葉も少し残す
+    """
+    w, h = UNIT * 2, UNIT
+    rng = random.Random(443)
+    b = Brush(w, h)
+    for i in range(6):
+        x = 22 + i * 42 + rng.uniform(-5, 5)
+        y = h - 14
+        for _k in range(9):
+            flop = rng.random() < 0.72
+            col = mix((92, 128, 92), (184, 172, 92), rng.uniform(0.35, 0.9) if flop else rng.uniform(0.0, 0.3))
+            if flop:
+                side = rng.choice((-1, 1))
+                reach = rng.uniform(26, 40)
+                pts = [(x, y - 8), (x + side * reach * 0.4, y - rng.uniform(20, 32)), (x + side * reach, y - rng.uniform(0, 8))]
+            else:
+                pts = [(x, y - 8), (x + rng.uniform(-6, 6), y - rng.uniform(44, 70))]
+            b.line(pts, jitter(col, rng, 8), 4)
+        b.ell(x, y, 13, 11, (170, 118, 52))
+        b.ell(x - 3, y - 3, 7, 5, (216, 172, 96))
+        b.ell(x, y + 8, 12, 4, (98, 74, 50))
+    return b.done()
+
+
+def potatoes():
+    """
+    ジャガイモの畝（2×1 升）。複葉の茂みがこんもりと畝を覆い、白と薄紫の花を少し。
+    8 月は下の葉が黄ばみ始める
+    """
+    w, h = UNIT * 2, UNIT
+    rng = random.Random(449)
+    b = Brush(w, h)
+    foliage(b, rng, 6, 250, h * 0.16, h - 2, 110, 13, (46, 72, 34), (106, 140, 60))
+    for _ in range(46):
+        x = rng.uniform(14, 242)
+        y = rng.uniform(h * 0.7, h - 6)
+        b.leaf(x, y, rng.uniform(9, 13), rng.uniform(-80, 80), 4, jitter((176, 166, 82), rng, 12))
+    # 8 月は花がほとんど終わっている。多く描くと、畝が白い花の絨毯に見えた
+    for _ in range(4):
+        x = rng.uniform(24, 232)
+        t = (x - 128) / 128.0
+        y = rng.uniform(h_top(t, 12), h * 0.45)
+        base = (236, 234, 226) if rng.random() < 0.6 else (190, 172, 214)
+        for _k in range(3):
+            b.ell(x + rng.uniform(-4, 4), y + rng.uniform(-3, 3), 2.8, 2.6, jitter(base, rng, 6))
+        b.ell(x, y, 1.4, 1.4, (236, 200, 60))
+    return b.done()
+
+
+def courgette():
+    """
+    ズッキーニ（2×1 升）。長い柄の先の、切れ込みのある大きな葉（濃い緑に銀の斑）を低く広げ、
+    株元に黄色い筒の花と、濃い緑の実
+    """
+    w, h = UNIT * 2, UNIT
+    rng = random.Random(457)
+    b = Brush(w, h)
+    leaves = []
+    for k in range(13):
+        a = -82 + k * 13.7 + rng.uniform(-6, 6)
+        length = rng.uniform(62, 96)
+        ar = math.radians(a)
+        tip = (128 + math.sin(ar) * length * 1.15, h - 4 - math.cos(ar) * length * 0.78)
+        b.line([(128, h - 4), tip], (122, 146, 84), 3)
+        leaves.append((tip, rng.uniform(28, 36)))
+    for (x, y), r in sorted(leaves, key=lambda l: l[0][1]):
+        col = jitter(mix((40, 72, 36), (62, 98, 48), rng.random()), rng, 6)
+        # 五つに裂けた掌の形。裂片を柄の先から放射に
+        for k in range(5):
+            blade(b, x, y + r * 0.35, r * 0.95, (k - 2) * 34 + rng.uniform(-6, 6), r * 0.3, col, 0.55)
+        for _k in range(8):
+            b.ell(x + rng.uniform(-r, r) * 0.55, y + rng.uniform(-r, r) * 0.4, 3, 2, jitter((150, 170, 144), rng, 8))
+    for _ in range(4):
+        x = 128 + rng.uniform(-60, 60)
+        y = h - rng.uniform(10, 26)
+        for k in range(5):
+            a = -math.pi / 2 + (k - 2) * 0.5
+            b.leaf(x, y, 12, math.degrees(a) + 90, 4.5, jitter((246, 190, 30), rng, 8))
+        b.ell(x, y, 3, 3, (214, 150, 20))
+    for _ in range(3):
+        x = 128 + rng.uniform(-70, 70)
+        y = h - rng.uniform(4, 10)
+        b.leaf(x - 18, y, 36, 90 + rng.uniform(-12, 12), 6.5, (38, 70, 34))
+    return b.done()
+
+
+def beetroot():
+    """ビーツの列（2×1 升）。赤い茎と赤い葉脈の、艶のある濃い緑の葉。株元に赤紫の玉の肩"""
+    w, h = UNIT * 2, UNIT
+    rng = random.Random(461)
+    b = Brush(w, h)
+    for i in range(7):
+        x = 18 + i * 37 + rng.uniform(-4, 4)
+        for _k in range(6):
+            a = rng.uniform(-52, 52)
+            length = rng.uniform(46, 70)
+            ar = math.radians(a)
+            dx, dy = math.sin(ar), -math.cos(ar)
+            mid = (x + dx * length * 0.42, h - 10 + dy * length * 0.42)
+            b.line([(x, h - 10), mid], (176, 38, 62), 2)
+            b.leaf(mid[0], mid[1], length * 0.62, a, length * 0.2, jitter((50, 76, 44), rng, 8))
+            b.line([mid, (x + dx * length * 0.95, h - 10 + dy * length * 0.95)], (156, 40, 60), 1)
+        b.ell(x, h - 8, 10, 8, (118, 28, 58))
+        b.ell(x - 3, h - 11, 4, 3, (158, 56, 88))
+    return b.done()
+
+
+def chard():
+    """フダンソウ（虹色、1×1 升）。赤・黄・橙・桃・白の太い茎を扇に立て、先に縮れた艶のある濃い緑の大きな葉"""
+    w, h = UNIT, UNIT
+    rng = random.Random(467)
+    b = Brush(w, h)
+    cols = [(206, 40, 50), (236, 196, 40), (234, 130, 40), (226, 110, 150), (236, 230, 210)]
+    stalks = []
+    for k in range(10):
+        a = -62 + k * 13.8 + rng.uniform(-5, 5)
+        length = rng.uniform(84, 116)
+        ar = math.radians(a)
+        dx, dy = math.sin(ar), -math.cos(ar)
+        stalks.append((a, length, dx, dy, cols[k % len(cols)]))
+    for a, length, dx, dy, col in stalks:
+        blade(b, 64 + dx * length * 0.38, h - 2 + dy * length * 0.38, length * 0.64, a, length * 0.2, jitter((40, 72, 34), rng, 8), 0.5)
+        for _k in range(5):
+            s = rng.uniform(0.5, 0.95)
+            b.ell(64 + dx * length * s + rng.uniform(-4, 4), h - 2 + dy * length * s, 4, 3, jitter((70, 104, 52), rng, 8))
+    for a, length, dx, dy, col in stalks:
+        b.line([(64, h - 2), (64 + dx * length * 0.55, h - 2 + dy * length * 0.55)], col, 4)
+        b.line([(64 + dx * length * 0.55, h - 2 + dy * length * 0.55), (64 + dx * length * 0.9, h - 2 + dy * length * 0.9)], col, 1)
+    return b.done()
+
+
 # ---- アトラス -----------------------------------------------------------------
 
 # (升の x, 升の y, 幅の升, 高さの升, 描く関数)。BuildVillagePlants.cs の Cells と同じ並び
@@ -947,6 +1236,18 @@ CELLS = [
     (0, 10, 1, 2, lambda: wisteria(401, (196, 176, 228), (118, 92, 176))),  # 31 藤の花房（薄紫）
     (1, 10, 1, 2, lambda: wisteria(403, (246, 244, 248), (196, 196, 170))),  # 32 藤の花房（白）
     (2, 10, 1, 2, wisteria_leaf),                                          # 33 藤の葉の房
+    # 公衆電話の後ろの菜園（2026-09-27）
+    (3, 10, 1, 2, runner_bean),                                            # 34 ランナービーンの葉の壁
+    (0, 12, 1, 3, sunflower),                                              # 35 ヒマワリ
+    (0, 9, 1, 1, cabbage),                                                 # 36 キャベツ
+    (1, 9, 1, 1, kale),                                                    # 37 ケール
+    (2, 9, 1, 1, lambda: lettuce(471, (104, 150, 50), (190, 214, 110))),   # 38 レタス
+    (3, 9, 1, 1, lambda: lettuce(473, (126, 44, 50), (150, 150, 70))),     # 39 赤いレタス
+    (4, 9, 1, 1, chard),                                                   # 40 フダンソウ
+    (1, 12, 2, 1, onions),                                                 # 41 玉ねぎの列
+    (3, 12, 2, 1, potatoes),                                               # 42 ジャガイモの畝
+    (5, 12, 2, 1, courgette),                                              # 43 ズッキーニ
+    (1, 13, 2, 1, beetroot),                                               # 44 ビーツの列
 ]
 
 

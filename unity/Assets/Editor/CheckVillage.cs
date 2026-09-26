@@ -48,9 +48,13 @@ namespace HalfAware.EditorTools
                 new View("2_lane", new Vector3(-44f, 1.6f, 0.4f), 80f, 2f),
                 // 3. 家 B と片割れの家のあいだ越しに、片割れの裏庭の白いパラソル
                 new View("3_parasol", new Vector3(-12.5f, 1.6f, 1.6f), 34f, -1f),
-                // 路地から畑と丘を。南は農場の門の向こうの麦畑、北は車の着く所の塀の向こう
+                // 路地から畑と丘を。南は農場の門の向こうの菜園（2026-09-27 に麦畑から替えた）、北は車の着く所の塀の向こう
                 new View("fields_south", new Vector3(-28.7f, 1.6f, -1.2f), 190f, 1f),
                 new View("fields_north", new Vector3(-58f, 1.6f, 1.6f), 330f, 1f),
+                // 公衆電話の後ろの菜園（BuildVillageAllotment）。電話ボックスの東の路肩から、ボックスを右に菜園を左に見る所と、
+                // 電話ボックスの脇で低い生け垣越しに畝を見下ろす所
+                new View("veg_phone", new Vector3(-31.0f, 1.6f, -1.6f), 225f, 8f),
+                new View("veg_hedge", new Vector3(-33.6f, 1.6f, -2.9f), 200f, 10f),
                 // 村の教会（設計書 7 節）。路地の途中、片割れの家の前、囲いの壁の手前（いちばん近づいた所）から
                 new View("church", new Vector3(-30f, 1.6f, 0.3f), 88f, -4f),
                 new View("church_front", new Vector3(2.5f, 1.6f, 1.6f), 90f, -8f),

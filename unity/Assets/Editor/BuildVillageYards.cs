@@ -439,6 +439,8 @@ namespace HalfAware.EditorTools
                     var z1 = border.AlongZ ? border.To : Mathf.Max(border.Front(border.From), border.Back(border.From));
                     b.Soil.FaceY(0.008f, x0, x1, z0, z1, 1);
                 }
+                // 公衆電話の後ろの菜園の野菜。南の家並みの花と同じ入れ物に溜めて、描く回数を増やさない
+                if (pair.Key == "South") AllotmentPlants(f);
                 Emit(parent, "FloraLane" + pair.Key, f, mat, false);
             }
 

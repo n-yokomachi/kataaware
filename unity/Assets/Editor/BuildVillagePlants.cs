@@ -40,6 +40,8 @@ namespace HalfAware.EditorTools
             Allium, Rosemary, SweetPea, Pelargonium, Catmint, Geranium, Lavender, Mantle, Sage, Hydrangea,
             Filler, Ivy, Roses, Clematis, Honeysuckle, Apple,
             Garland, PotMix, ObeliskVine, Oak, Yew, WisteriaLilac, WisteriaWhite, WisteriaLeaf,
+            // 公衆電話の後ろの菜園（2026-09-27、BuildVillageAllotment）
+            RunnerBean, Sunflower, Cabbage, Kale, Lettuce, LettuceRed, Chard, Onion, Potato, Courgette, Beetroot,
         }
 
         /// <summary>升の (x, y, 幅, 高さ)。make-garden.py の CELLS と同じ値。y は絵の上から数える</summary>
@@ -53,6 +55,8 @@ namespace HalfAware.EditorTools
             { 0, 6, 2, 2 }, { 2, 6, 2, 2 }, { 4, 6, 2, 2 }, { 6, 6, 2, 2 },
             { 0, 8, 4, 1 }, { 4, 8, 1, 1 }, { 5, 8, 1, 2 }, { 6, 8, 2, 2 }, { 6, 10, 2, 2 },
             { 0, 10, 1, 2 }, { 1, 10, 1, 2 }, { 2, 10, 1, 2 },
+            { 3, 10, 1, 2 }, { 0, 12, 1, 3 }, { 0, 9, 1, 1 }, { 1, 9, 1, 1 }, { 2, 9, 1, 1 }, { 3, 9, 1, 1 }, { 4, 9, 1, 1 },
+            { 1, 12, 2, 1 }, { 3, 12, 2, 1 }, { 5, 12, 2, 1 }, { 1, 13, 2, 1 },
         };
 
         /// <summary>
@@ -70,6 +74,10 @@ namespace HalfAware.EditorTools
             new Vector3(1.00f, 1.00f, 1), new Vector3(1.00f, 1.00f, 1), new Vector3(1.00f, 1.00f, 1), new Vector3(3.00f, 3.20f, 3),
             new Vector3(0.24f, 1.00f, 1), new Vector3(0.62f, 0.62f, 3), new Vector3(1.45f, 0.62f, 3), new Vector3(6.0f, 7.0f, 3), new Vector3(5.6f, 4.4f, 3),
             new Vector3(0.5f, 0.22f, 2), new Vector3(0.5f, 0.22f, 2), new Vector3(0.5f, 0.30f, 2),
+            // 菜園。ランナービーンの葉の壁は斜面に這わせる平らな札（Flat）で使う。低い玉（レタス・キャベツ）は札を三枚
+            new Vector3(1.9f, 0.95f, 1), new Vector3(2.1f, 0.70f, 2), new Vector3(0.42f, 0.42f, 3), new Vector3(0.62f, 0.62f, 3),
+            new Vector3(0.28f, 0.28f, 3), new Vector3(0.28f, 0.28f, 3), new Vector3(0.55f, 0.55f, 3),
+            new Vector3(0.36f, 0.72f, 2), new Vector3(0.62f, 1.24f, 3), new Vector3(0.55f, 1.10f, 3), new Vector3(0.36f, 0.72f, 2),
         };
 
         /// <summary>升の uv。左下と右上。縁を 1.5 画素内へ寄せて、隣の升の滲みを拾わない</summary>

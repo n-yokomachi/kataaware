@@ -556,10 +556,11 @@ namespace HalfAware.EditorTools
             Clipped(b, bounds, "SideCW", Shrub.Yew, new Vector3(PlotCWest, 0f, zs - 0.4f), new Vector3(PlotCWest, 0f, SouthHedge), 1.8f, 0.9f, 17);
             b.Flag.FaceY(0.03f, cDoor - 0.55f, cDoor + 0.55f, -7.2f + 0.7f, zs1, 1);
 
-            // 農場の門の畑。電話ボックスの後ろに、郵便ポストを埋めた野石の塀を一区切りだけ残し、その先はサンザシの生け垣
+            // 農場の門の奥の菜園（BuildVillageAllotment）。電話ボックスの後ろに、郵便ポストを埋めた野石の塀を一区切りだけ残し、その先はサンザシの生け垣。
+            // 生け垣は低く刈る（AllotHedgeHigh）。路地から垣越しに畝が見えるように
             FieldWall(b, bounds, "WallPost", new Vector3(PlotCEast, 0f, (zs0 + zs1) * 0.5f), new Vector3(-36.1f, 0f, (zs0 + zs1) * 0.5f));
-            Clipped(b, bounds, "HedgeFarm0", Shrub.Thorn, new Vector3(-36.1f, 0f, zs - 0.1f), new Vector3(FarmGateWest - 0.4f, 0f, zs - 0.1f), 1.4f, 0.9f, 19);
-            Clipped(b, bounds, "HedgeFarm1", Shrub.Thorn, new Vector3(FarmGateEast + 0.4f, 0f, zs - 0.1f), new Vector3(PlotDWest, 0f, zs - 0.1f), 1.4f, 0.9f, 29);
+            Clipped(b, bounds, "HedgeFarm0", Shrub.Thorn, new Vector3(-36.1f, 0f, zs - 0.1f), new Vector3(FarmGateWest - 0.4f, 0f, zs - 0.1f), AllotHedgeHigh, 0.9f, 19);
+            Clipped(b, bounds, "HedgeFarm1", Shrub.Thorn, new Vector3(FarmGateEast + 0.4f, 0f, zs - 0.1f), new Vector3(PlotDWest, 0f, zs - 0.1f), AllotHedgeHigh, 0.9f, 29);
             FieldGate(b, bounds, "GateFarm", FarmGateWest, FarmGateEast, (zs0 + zs1) * 0.5f, false);
             // 家 C と畑の境、畑と家 D の境
             Clipped(b, bounds, "HedgeCE", Shrub.Thorn, new Vector3(PlotCEast, 0f, zs1), new Vector3(PlotCEast, 0f, SouthHedge), 1.8f, 0.9f, 41);
