@@ -5,6 +5,7 @@
 #         bash make-ambience.sh gravel    （6 節の未舗装の路地の足音だけ）
 #         bash make-ambience.sh grass     （7 節の芝の足音だけ）
 #         bash make-ambience.sh garden    （8 節の場面 6 の庭の 4 つだけ）
+#         bash make-ambience.sh bgm       （9 節の場面ごとの BGM の 7 曲だけ）
 # 出力先は OUT_DIR 直下。中間ファイルは OUT_DIR/tmp に置く。
 set -euo pipefail
 
@@ -30,6 +31,14 @@ SRC_HOSE="$SRC_PIXABAY_DIR/freesound_community-watering-62546.mp3"
 SRC_HOSE_STOP="$SRC_PIXABAY_DIR/freesound_community-hose-sounds-24388.mp3"
 SRC_GLITCH="$SRC_PIXABAY_DIR/freesound_community-computer-glitch-corrupted-file-96176.mp3"
 SRC_CUT="$SRC_PIXABAY_DIR/freesound_community-glitch-49142.mp3"
+# 9 節（場面ごとの BGM）の素材。Pixabay の Music の頁から落とした物
+SRC_MELANCHOLIC="$SRC_PIXABAY_DIR/universfield-melancholic-ambient-background-351787.mp3"
+SRC_PARKSIDE="$SRC_PIXABAY_DIR/blairellair-parkside-114970.mp3"
+SRC_MELLOW="$SRC_PIXABAY_DIR/sharvarion-mellow-ambient-piano-pad-guitar-strings-138801.mp3"
+SRC_REMEMBRANCE="$SRC_PIXABAY_DIR/joelfazhari-remembrance-dreamy-emotional-and-melancholic-music-loopable-13943.mp3"
+SRC_APPROACH="$SRC_PIXABAY_DIR/leberch-ambient-580528.mp3"
+SRC_REUNION="$SRC_PIXABAY_DIR/leberch-ambient-578724.mp3"
+SRC_CINEMATIC="$SRC_PIXABAY_DIR/leberch-cinematic-586317.mp3"
 # 6 節で大きさを揃える相手（村の芝と庭で鳴らしている柔らかい足音）
 STEPS_DIR="${STEPS_DIR:-$SCRIPT_DIR/../unity/Assets/Audio}"
 
@@ -558,5 +567,186 @@ garden_peak_to SignalCut "$TMP_DIR/signal_cut_cut.wav" -6
 garden_report SignalCut
 
 fi   # PART=all か garden
+
+# ---------------------------------------------------------------------------
+# 9. 場面ごとの BGM（音楽の設計書 5 節）。場の外から鳴る曲で、MusicBed が 2D で流す
+#    7 曲とも Pixabay の Music（Pixabay Content License）。頁に AI generated の表示もタグも無く、歌も無い
+#    （頁のタグとジャンルで確かめた。耳では確かめていない）。
+#    - MelancholicAmbient.ogg — 場面 4 の前半（Melancholic Ambient Background、Universfield）
+#    - Parkside.ogg           — 場面 4 の切断が押せるようになってから（Parkside、blairellair）
+#    - MellowAmbient.ogg      — 場面 6 の庭の記憶（Mellow Ambient (Piano Pad, Guitar, Strings)、sharvarion）
+#    - Remembrance.ogg        — 場面 8 のチップの独白から（Remembrance (Loopable)、JoelFazhari。Content ID に登録あり）
+#    - Ambient580528.ogg      — 場面 9 の村に近づく所（Ambient、leberch。Content ID に登録あり）
+#    - Ambient578724.ogg      — 場面 10 の対面（Ambient、leberch。Content ID に登録あり）
+#    - Cinematic586317.ogg    — 場面 7 の気づき（Cinematic、leberch。Content ID に登録あり）
+#
+#    どれもステレオ 44.1kHz のまま（場の外の曲なので畳まない）。元の mp3 を 32bit の浮動小数へ全部展開し、
+#    切り口は atrim で標本単位に合わせる。
+#
+#    **輪の作りは曲ごとに三つ。** どれも AudioSource の loop で、クリップの尻から頭へそのまま戻る:
+#    - 前へ重ねる（bgm_preroll）: S から P 秒を切り、末尾 F 秒を S の直前 F 秒へ渡す。P は曲の周期の倍数にし、
+#      末尾と S の直前が同じ所になるようにする。尻から頭へ戻る所で鳴るのは S の直前の続き（素のまま）なので段が付かない。
+#      クリップの頭は S の素のまま（MusicBed がそこからフェードインする）
+#    - 尻を頭へ重ねる（bgm_headcross）: 5 節の輪と同じ作り。頭の F 秒に尻の F 秒が重なる
+#    - 頭から弾き直す（bgm_restart）: 尻を消して、無音から曲の頭へ戻る。頭が曲の入りそのものである曲に使う
+#    周期と継ぎ目の位置は、numpy で 12 音の色（chroma）と 24 帯の大きさの自己相似を取り、
+#    最後は 44.1kHz の波形の相互相関で標本単位まで詰めた（手元の作業。ここには結果の秒だけを書く）。
+#    重ねる二つの相関が高い（0.9 を超える、同じ素材の繰り返し）ときは足して 1 になる hsin、
+#    中くらい（0.5 前後）のときは電力を保つ qsin で渡す。
+#
+#    **大きさは積分ラウドネス（輪にしたクリップ一つ分）を −22 LUFS に揃える。** 頂点（true peak）が −1.5dBTP を
+#    超えるなら、そこで止める。4 節のヤードの曲（−18 LUFS）より 4dB 下: Parkside は波の幅が広く（LRA 11.7）、
+#    −18 まで上げると頂点が +2dBTP になって、圧縮なしでは揃えられないため。村・麦・雑踏の輪の素材（−22〜−23 LUFS）と同じ所に置き、
+#    台詞と環境音の下に敷く大きさは MusicBed の曲ごとの音量（MusicTable）で決める。
+#    書き出しは Ogg Vorbis（-q:a 6）。Unity が取り込みで作り直す（Web では AAC）。
+#    継ぎ目の確かめ用に、尻 3 秒 + 頭 3 秒をつないだ波形とスペクトルを ANALYSIS_DIR に書き出す
+# ---------------------------------------------------------------------------
+if [ "$PART" = "all" ] || [ "$PART" = "bgm" ]; then
+
+BGM_TARGET=-22
+BGM_CEIL=-1.5
+
+# 元の mp3 を 44.1kHz ステレオの 32bit 浮動小数へ全部展開する
+bgm_decode () {
+  local name="$1" src="$2"
+  echo "=== ${name}.ogg ==="
+  ffmpeg -y -v error -i "$src" -ar 44100 -ac 2 -c:a pcm_f32le "$TMP_DIR/${name}_full.wav"
+}
+
+# 前へ重ねる。S から P 秒。末尾 F 秒を S の直前 F 秒へ curve（hsin か qsin）で渡す。長さは P
+bgm_preroll () {
+  local name="$1" s="$2" p="$3" f="$4" curve="$5"
+  local pre end
+  pre=$(awk "BEGIN{printf \"%.6f\", $s-$f}")
+  end=$(awk "BEGIN{printf \"%.6f\", $s+$p}")
+  ffmpeg -y -v error -i "$TMP_DIR/${name}_full.wav" -filter_complex "
+[0:a]asplit=2[a][b];
+[a]atrim=start=${s}:end=${end},asetpts=PTS-STARTPTS[main];
+[b]atrim=start=${pre}:end=${s},asetpts=PTS-STARTPTS[pre];
+[main][pre]acrossfade=d=${f}:c1=${curve}:c2=${curve}[out]
+" -map "[out]" -c:a pcm_f32le "$TMP_DIR/${name}_loop.wav"
+}
+
+# 尻を頭へ重ねる。S から E。末尾 F 秒を頭の F 秒へ等電力（qsin）で重ねる。長さは E - S - F
+bgm_headcross () {
+  local name="$1" s="$2" e="$3" f="$4"
+  local bodyend
+  bodyend=$(awk "BEGIN{printf \"%.6f\", $e-$f}")
+  ffmpeg -y -v error -i "$TMP_DIR/${name}_full.wav" -filter_complex "
+[0:a]asplit=2[a][b];
+[a]atrim=start=${s}:end=${bodyend},asetpts=PTS-STARTPTS[body];
+[b]atrim=start=${bodyend}:end=${e},asetpts=PTS-STARTPTS[tail];
+[tail][body]acrossfade=d=${f}:c1=qsin:c2=qsin[out]
+" -map "[out]" -c:a pcm_f32le "$TMP_DIR/${name}_loop.wav"
+}
+
+# 頭から弾き直す。S から E。頭 10ms をなだらかにし、尻を D 秒で消す（qsin）。長さは E - S
+bgm_restart () {
+  local name="$1" s="$2" e="$3" d="$4"
+  local st
+  st=$(awk "BEGIN{printf \"%.6f\", $e-$s-$d}")
+  ffmpeg -y -v error -i "$TMP_DIR/${name}_full.wav" \
+    -af "atrim=start=${s}:end=${e},asetpts=PTS-STARTPTS,afade=t=in:st=0:d=0.01,afade=t=out:st=${st}:d=${d}:curve=qsin" \
+    -c:a pcm_f32le "$TMP_DIR/${name}_loop.wav"
+}
+
+# 積分ラウドネスと true peak（ebur128）。"I TP" の形で返す
+bgm_measure () {
+  ffmpeg -hide_banner -nostats -i "$1" -af "ebur128=peak=true" -f null - 2>&1 | sed -n '/Summary/,$p' \
+    | awk '/ I:/{i=$2} /Peak:/{p=$2} END{print i, p}'
+}
+
+# 大きさを揃えて Ogg Vorbis へ。継ぎ目の確かめ用の絵も書く
+bgm_level () {
+  local name="$1"
+  local m mi mtp gain
+  m=$(bgm_measure "$TMP_DIR/${name}_loop.wav")
+  mi=${m% *}; mtp=${m#* }
+  gain=$(awk "BEGIN{g=$BGM_TARGET - ($mi); c=$BGM_CEIL - ($mtp); printf \"%.2f\", (g < c ? g : c)}")
+  echo "${name}: loop I=${mi} LUFS, TP=${mtp} dBTP, applying gain=${gain}dB"
+  ffmpeg -y -v error -i "$TMP_DIR/${name}_loop.wav" -af "volume=${gain}dB" -c:a libvorbis -q:a 6 -ar 44100 -ac 2 "$OUT_DIR/${name}.ogg"
+  local dur o
+  dur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$OUT_DIR/${name}.ogg")
+  o=$(bgm_measure "$OUT_DIR/${name}.ogg")
+  echo "${name}.ogg: ${dur}s, I=${o% *} LUFS, TP=${o#* } dBTP"
+  # 継ぎ目: 尻 3 秒のあとに頭 3 秒（loop で鳴らしたときと同じ並び）
+  local tailst
+  tailst=$(awk "BEGIN{print $dur-3}")
+  ffmpeg -y -v error -i "$OUT_DIR/${name}.ogg" -filter_complex "
+[0:a]aformat=channel_layouts=mono,asplit=2[a][b];
+[a]atrim=start=${tailst},asetpts=PTS-STARTPTS[t];
+[b]atrim=end=3,asetpts=PTS-STARTPTS[h];
+[t][h]concat=n=2:v=0:a=1,asplit=2[w][s];
+[w]showwavespic=s=1600x300:colors=0x3070c0[wv];
+[s]showspectrumpic=s=1600x420:fscale=lin:legend=0:color=intensity:gain=2:stop=8000:win_func=hann[sp];
+[wv][sp]vstack=inputs=2[out]
+" -map "[out]" -frames:v 1 "$ANALYSIS_DIR/${name}_seam.png"
+}
+
+# 9-1. MelancholicAmbient.ogg — 場面 4 の前半。元は 132.07 秒、48kHz のステレオ mp3、−17.6 LUFS、LRA 2.0（ほぼ平らに続く）。
+#    頭 12 秒ほどがフェードイン、124.5 秒からフェードアウトと残響の尾。その間は同じ素材の繰り返しで、
+#    波形の相関が 95.94 秒おきに 0.92〜0.94（9.6 秒ほどの型が 10 回）。
+#    S = 23.70 秒から P = 95.94245 秒（19.70〜23.70 秒と 115.64245〜119.64245 秒の相関が 0.922 で最大になる所）、
+#    F = 4 秒を hsin で渡す。尻 119.64 秒はフェードアウトの手前。輪は 95.94 秒
+bgm_decode MelancholicAmbient "$SRC_MELANCHOLIC"
+bgm_preroll MelancholicAmbient 23.70 95.94245 4 hsin
+bgm_level MelancholicAmbient
+
+# 9-2. Parkside.ogg — 場面 4 の切断が押せるようになってから。元は 238.03 秒、44.1kHz のステレオ mp3、−26.8 LUFS、LRA 11.7。
+#    決まった周期の無い曲（色の自己相似に 0.6 を超える山が無い）。頭 3.96 秒が無音で、3.8 秒から 1.4 秒かけて立ち上がる。
+#    214 秒からは −41dB の持続音だけになり、228.0 秒過ぎで録音の側が 0.5 秒ほどで断ち、229.07 秒から無音。
+#    3.80〜228.00 秒を使い、尻 3 秒（持続音）を頭の立ち上がりへ重ねる。輪は 221.2 秒。
+#    MusicBed はここへ前の曲からクロスフェードで入るので、頭に持続音が 3 秒重なっていても前の曲の尾に紛れる
+bgm_decode Parkside "$SRC_PARKSIDE"
+bgm_headcross Parkside 3.80 228.00 3
+bgm_level Parkside
+
+# 9-3. MellowAmbient.ogg — 場面 6 の庭の記憶。元は 270.89 秒、44.1kHz のステレオ mp3、−24.6 LUFS、LRA 12.9。
+#    まばらなピアノから始まり、28 秒・52 秒・67 秒・82 秒で層が増え、90.0 秒で次の区切り（色と帯の新しさが最大）。後半ほど大きい。
+#    **場面 6 は 1 分ほどで途切れる**（名を呼ぶ行を送ってから 70 秒で必ず切れる）ので、頭の 0.80〜90.00 秒だけを使う。
+#    まるごとだと Web で展開して 100MB を超える（48kHz の浮動小数で 1 秒 384KB）。記憶の頭は曲の入りそのものにしたいので、
+#    輪は頭から弾き直す作りにし、尻の 6 秒を消す。場面 6 を 84 秒より長く引き延ばした時だけ、曲が頭へ戻る。輪は 89.2 秒
+bgm_decode MellowAmbient "$SRC_MELLOW"
+bgm_restart MellowAmbient 0.80 90.00 6
+bgm_level MellowAmbient
+
+# 9-4. Remembrance.ogg — 場面 8 のチップの独白から村へ着くまで。元は 65.49 秒、44.1kHz のステレオ mp3、−15.7 LUFS。
+#    「Loopable」の曲だが、そのまま loop に掛けると継ぎ目で段が付く: 頭に 918 標本（21ms）の無音があり、
+#    頭 1 秒は前の周の残響が無いので尻より 4〜6dB 小さい。
+#    曲は前半と後半が同じ物（32.72728 秒ずれた波形の相関が 0.989〜0.993）。そこで後半だけを輪にする:
+#    後半の頭 S = 32.748096 秒（前半の頭 0.020816 秒 + 32.72728 秒）から P = 32.72728 秒、末尾 F = 2 秒を
+#    前半の尻（S の直前 2 秒、相関 0.99）へ hsin で渡す。頭には前半からの残響が乗っていて、聞こえる曲は元と同じ。輪は 32.73 秒
+bgm_decode Remembrance "$SRC_REMEMBRANCE"
+bgm_preroll Remembrance 32.748096 32.72728 2 hsin
+bgm_level Remembrance
+
+# 9-5. Ambient580528.ogg — 場面 9 の村に近づく所。元は 140.04 秒、44.1kHz のステレオ mp3、−19.8 LUFS、LRA 7.6。
+#    ピアノの句が鳴っては −50dB 前後まで減衰して次の句が来る、息継ぎのある曲。69.4 秒で頭の形へ戻る二部の形
+#    （69.4 秒ずれた色の相似 0.83）。頭 0.45 秒が無音、尻は 137.3 秒から減衰し 138.75 秒で −60dB。
+#    尻の減衰から頭の句の入りへ戻るのは、曲の中の息継ぎ（6.4〜8.9 秒、74.2〜78.4 秒）と同じ形なので、
+#    輪は頭から弾き直す作りにする。0.40〜138.80 秒、尻 0.30 秒を消す（もう −55dB を切っている）。輪は 138.4 秒
+bgm_decode Ambient580528 "$SRC_APPROACH"
+bgm_restart Ambient580528 0.40 138.80 0.30
+bgm_level Ambient580528
+
+# 9-6. Ambient578724.ogg — 場面 10 の対面。元は 152.03 秒、44.1kHz のステレオ mp3、−20.5 LUFS、LRA 3.5。
+#    8.889 秒おき（108 BPM の 4 小節）に句の頭の打ちがあり、35.56 秒（その 4 回）で色が揃う（0.86）。142 秒からフェードアウト。
+#    S = 13.75 秒から P = 106.7542 秒（12 回ぶん。9.75〜13.75 秒と 116.5042〜120.5042 秒の波形の相関が 0.50 で最大、色の相似 0.88）、
+#    F = 4 秒を qsin で渡す。71.11 秒（8 回ぶん）の方が色は揃う（0.90）が、対面の場面は長い会話なので、繰り返しの目立たない長い方にした。
+#    輪は 106.75 秒。MusicBed は村の曲からクロスフェードで入る
+bgm_decode Ambient578724 "$SRC_REUNION"
+bgm_preroll Ambient578724 13.75 106.7542 4 qsin
+bgm_level Ambient578724
+
+# 9-7. Cinematic586317.ogg — 場面 7 の気づき。元は 146.05 秒、44.1kHz のステレオ mp3、−18.3 LUFS、LRA 15.2（波の幅がいちばん広い）。
+#    頭 0.61 秒が無音、0.7 秒の打ちから始まるまばらな入り（30 秒まで）、31〜111 秒が厚い所（−14〜−17dB）、112 秒からまたまばらになり、
+#    尻は 141 秒から減衰して 145.25 秒で −60dB。場面 7 は独白の頭から入るので、曲の入りはそのまま使いたい。
+#    尻の減衰から頭のまばらな入りへ戻るのは、曲の終わりと始まりの形そのものなので、輪は頭から弾き直す作りにする。
+#    0.55〜145.80 秒、尻 0.30 秒を消す（もう −70dB を切っている）。輪は 145.25 秒
+bgm_decode Cinematic586317 "$SRC_CINEMATIC"
+bgm_restart Cinematic586317 0.55 145.80 0.30
+bgm_level Cinematic586317
+
+fi   # PART=all か bgm
 
 echo "=== done ==="

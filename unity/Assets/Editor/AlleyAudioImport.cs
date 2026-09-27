@@ -37,9 +37,16 @@ namespace HalfAware.EditorTools
         /// <summary>取り込みの設定を替えたら数を上げる（替えた設定で取り込み直させるため）</summary>
         public override uint GetVersion() { return 2; }
 
+        /// <summary>
+        /// ラジオの 4 曲か。**曲の置き場の全部ではない。** 同じ置き場に、場面ごとの BGM（<see cref="MusicAudioImport"/>）も置いてある。
+        /// あちらはステレオで質を高く取るので、この設定を掛けない
+        /// </summary>
         static bool IsMusic(string path)
         {
-            return !string.IsNullOrEmpty(path) && path.StartsWith(MusicFolder, StringComparison.OrdinalIgnoreCase);
+            if (string.IsNullOrEmpty(path)) return false;
+            foreach (var track in Tracks)
+                if (string.Equals(path, track, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
         }
 
         void OnPreprocessAudio()

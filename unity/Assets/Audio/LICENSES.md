@@ -66,6 +66,26 @@ https://pixabay.com/service/license-summary/
 | `Music/TheOnesWhoStayed.ogg` | 「The Ones Who Stayed」 | 同上 | 同上 |
 | `Music/CopperHeart.ogg` | 「Copper Heart」 | 同上 | 同上 |
 
+## 場面ごとの BGM
+
+オーナーが Pixabay の Music から選んだ、歌の無い曲（`docs/superpowers/specs/2026-09-24-music-design.md` の 5 節）。場の外から鳴る曲で、`MusicBed` が 2D で流す。
+7 曲とも Pixabay Content License（上の節）。取り込む前に頁で、AI generated の表示もタグも無いこと、タグとジャンルに歌が無いことを確かめた（耳では確かめていない）。
+どれもステレオ 44.1kHz のまま、輪にしたクリップ一つ分の積分ラウドネスを −22 LUFS に揃え（true peak −1.5dBTP まで）、Ogg Vorbis（q6）で書き出した。
+切り出しと輪の作りは `tools/make-ambience.sh` の 9 節（`bash make-ambience.sh bgm`）。元の mp3 は `unity/RawAssets/audio/pixabay/` に Pixabay の元の名前で置く（git には入れない）。
+
+**Content ID に登録のある曲がある**（表の「Content ID」の列）。許諾の上では使ってよいが、遊んでいる所を撮った YouTube の動画に自動の申し立てが付くことがある。
+申し立ては Pixabay の許諾の頁を添えて異議を出せる。登録のある曲は、Pixabay の頁（要ログイン）から許諾の証書を落とせる。
+
+| ファイル | 出典 | Content ID | 加工 |
+|---|---|---|---|
+| `Music/MelancholicAmbient.ogg` | Pixabay `universfield-melancholic-ambient-background-351787`（「Melancholic Ambient Background」。作者 Universfield。https://pixabay.com/music/ambient-melancholic-ambient-background-351787/） | 無し | 元は 132.07 秒、48kHz。頭 12 秒ほどのフェードインと 124.5 秒からのフェードアウトを避け、23.70 秒から 95.94245 秒を輪にした（同じ素材が 95.94 秒おきに繰り返す。波形の相関 0.92）。尻の 4 秒を一周前の同じ所（19.70〜23.70 秒）へ hsin で渡す。−4.7dB。95.94 秒。場面 4 の前半 |
+| `Music/Parkside.ogg` | Pixabay `blairellair-parkside-114970`（「Parkside」。作者 blairellair。https://pixabay.com/music/ambient-parkside-114970/） | 無し | 元は 238.03 秒。頭 3.96 秒の無音と、228 秒過ぎに録音の側で断たれる所を避けて 3.80〜228.00 秒。尻の持続音 3 秒を頭の立ち上がりへ qsin で重ねて輪にした。+4.7dB（true peak −2.1dBTP）。221.2 秒。場面 4 の後半（`切断` が押せるようになってから） |
+| `Music/MellowAmbient.ogg` | Pixabay `sharvarion-mellow-ambient-piano-pad-guitar-strings-138801`（「Mellow Ambient (Piano Pad, Guitar, Strings)」。作者 sharvarion。https://pixabay.com/music/ambient-mellow-ambient-piano-pad-guitar-strings-138801/） | 無し | 元は 270.89 秒。場面 6 は 1 分ほどで途切れるので、頭の 0.80〜90.00 秒だけ（90.0 秒は次の区切り）。尻を 6 秒で消し、頭から弾き直す輪。+8.8dB（頭の 90 秒は −30.8 LUFS と静か）。89.2 秒。場面 6 の庭の記憶 |
+| `Music/Remembrance.ogg` | Pixabay `joelfazhari-remembrance-dreamy-emotional-and-melancholic-music-loopable-13943`（「Remembrance - Dreamy Emotional and Melancholic Music (Loopable)」。作者 JoelFazhari。https://pixabay.com/music/ambient-remembrance-dreamy-emotional-and-melancholic-music-loopable-13943/） | **有り** | 元は 65.49 秒。前半と後半が同じ物（32.72728 秒ずれた波形の相関 0.99）なので、後半の頭 32.748096 秒から 32.72728 秒を輪にし、尻の 2 秒を前半の尻へ hsin で渡した（そのままだと頭の 21ms の無音と、残響の無い頭 1 秒で継ぎ目に段が付く）。−6.4dB。32.73 秒。場面 8（チップの独白から村へ着くまで） |
+| `Music/Ambient580528.ogg` | Pixabay `leberch-ambient-580528`（「Ambient」。作者 leberch。https://pixabay.com/music/ambient-ambient-580528/） | **有り** | 元は 140.04 秒。0.40〜138.80 秒（頭の無音と尻の −60dB より下を落とす）、尻 0.30 秒を消して頭から弾き直す輪（尻の減衰から頭の句へ戻るのは、曲の中の息継ぎと同じ形）。−2.2dB。138.4 秒。場面 9 の村に近づく所 |
+| `Music/Ambient578724.ogg` | Pixabay `leberch-ambient-578724`（「Ambient」。作者 leberch。https://pixabay.com/music/ambient-ambient-578724/） | **有り** | 元は 152.03 秒、142 秒からフェードアウト。8.889 秒おき（108 BPM の 4 小節）の句の打ち 12 回ぶん、13.75 秒から 106.7542 秒を輪にし、尻の 4 秒を一周前（9.75〜13.75 秒）へ qsin で渡した（色の相似 0.88、波形の相関 0.50）。−1.5dB。106.75 秒。場面 10 の対面 |
+| `Music/Cinematic586317.ogg` | Pixabay `leberch-cinematic-586317`（「Cinematic」。作者 leberch。https://pixabay.com/music/suspense-cinematic-586317/） | **有り** | 元は 146.05 秒。0.55〜145.80 秒（頭の無音と尻の −70dB より下を落とす）、尻 0.30 秒を消して頭から弾き直す輪（曲の終わりの減衰と始まりのまばらな入りがそのままつながる）。−3.7dB。145.25 秒。場面 7 の気づき |
+
 雑踏の輪と曲の加工は `tools/make-ambience.sh` で作り直せる（村の朝・麦の風・格子戸は同じ中の 5 節。`bash make-ambience.sh village` でそれだけ作り直す。
 未舗装の路地の足音は 6 節で、`bash make-ambience.sh gravel`。芝の足音は 7 節で、`bash make-ambience.sh grass`。
 場面 6 の庭の 4 つ（ホースの輪・水を止める音・途切れ・断ち切れ）は 8 節で、`bash make-ambience.sh garden`。
