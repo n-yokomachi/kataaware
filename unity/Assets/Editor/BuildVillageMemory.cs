@@ -190,6 +190,7 @@ namespace HalfAware.EditorTools
             BodyPoser.Stand(an);
             BodyPoser.Pose(an, HostSit(chair, BuildRocketboxProtagonist.Twin == BuildRocketboxProtagonist.TwinMode.MirrorWhole));
             LiftToes(an, HumanBodyBones.RightFoot, HumanBodyBones.RightToes, ToeLift);
+            RestHands(an, BuildRocketboxProtagonist.Twin == BuildRocketboxProtagonist.TwinMode.MirrorWhole);
             // **動きを止めると骨が素の形へ戻る**（controller を外す・Animator を切ると、Unity が骨を既定の値へ書き戻す）。
             // 座った形の骨の値を持っておき、止めてから書き戻す
             var bones = her.GetComponentsInChildren<Transform>(true);
@@ -220,6 +221,79 @@ namespace HalfAware.EditorTools
         /// </summary>
         const float ToeLift = 20f;
 
+        /// <summary>手首を置く所（腿の付け根から膝への割合と、腿の骨の芯からの高さ m。布の載る丸の半径に手の厚みの半分を足した値）と、指を腿の向きから下げる割合</summary>
+        const float HandAlong = 0.33f, HandLift = 0.11f, HandDip = 0.05f;
+
+        /// <summary>
+        /// 両手を腿の上に楽に置く。手首を腿の上の面に下ろし、指を腿に沿って前へ少し下げ、手の甲を上へ向け、指を揃えて軽く曲げる。
+        /// 座らせる形（<see cref="HostSit"/>）の手首は腿より 8 cm ほど浮いていて、指が下へ垂れて開き、見下ろすと鉤爪のように見えた。
+        /// mirror なら、BodyPoser が指の並びから出す手のひらの向きが上下逆になる（片割れの模型は根の x を裏返してある）
+        /// </summary>
+        public static void RestHands(Animator an, bool mirror)
+        {
+            var hips = an.GetBoneTransform(HumanBodyBones.Hips).position;
+            foreach (var left in new[] { true, false })
+            {
+                var hip = an.GetBoneTransform(left ? HumanBodyBones.LeftUpperLeg : HumanBodyBones.RightUpperLeg).position;
+                var knee = an.GetBoneTransform(left ? HumanBodyBones.LeftLowerLeg : HumanBodyBones.RightLowerLeg).position;
+                var along = (knee - hip).normalized;
+                var wrist = Vector3.Lerp(hip, knee, HandAlong) + Vector3.up * HandLift;
+                var outward = hip - hips;
+                outward.y = 0f;
+                outward = outward.sqrMagnitude > 1e-6f ? outward.normalized : Vector3.zero;
+                var back = new Vector3(-along.x, 0f, -along.z).normalized;
+                var pole = hip + outward * 0.45f + back * 0.2f + Vector3.up * 0.15f;
+                var fingers = (along + Vector3.down * HandDip).normalized;
+                var palm = mirror ? Vector3.up : Vector3.down;
+                BodyPoser.Arm(an, left, wrist, pole, fingers, palm);
+            }
+            RelaxFingers(an);
+        }
+
+        /// <summary>指の曲げ（Stretched の筋肉の値。1 で伸び切り、負で握る）と開き（Spread。負で閉じる）。四本の指と親指。中指の開きは 0 のまま</summary>
+        const float FingerStretch = 0.1f, FingerSpread = -1f, ThumbStretch = 0f, ThumbSpread = -1f;
+
+        /// <summary>
+        /// 両手の指を、揃えて軽く曲げた形にする。Humanoid の指の筋肉の値で決め（関節の限りと曲げの面は骨組みに任せる）、指の骨の向きだけを書き換える。
+        /// 体のほかの骨は触らない（筋肉の値を通すと、座らせた脚や腕の形が限りへ寄せられて崩れるので、指の骨の外は元へ戻す）
+        /// </summary>
+        public static void RelaxFingers(Animator an)
+        {
+            if (an == null || an.avatar == null || !an.avatar.isHuman) return;
+            var keep = new List<(Transform, Vector3, Quaternion)>();
+            var fingerBones = new HashSet<Transform>();
+            for (var b = HumanBodyBones.LeftThumbProximal; b <= HumanBodyBones.RightLittleDistal; b++)
+            {
+                var t = an.GetBoneTransform(b);
+                if (t != null) fingerBones.Add(t);
+            }
+            foreach (var t in an.GetComponentsInChildren<Transform>(true))
+                if (!fingerBones.Contains(t)) keep.Add((t, t.localPosition, t.localRotation));
+            var handler = new HumanPoseHandler(an.avatar, an.transform);
+            try
+            {
+                var pose = new HumanPose();
+                handler.GetHumanPose(ref pose);
+                var names = HumanTrait.MuscleName;
+                for (var m = 0; m < names.Length; m++)
+                {
+                    var name = names[m];
+                    if (!name.StartsWith("Left ") && !name.StartsWith("Right ")) continue;
+                    var thumb = name.Contains(" Thumb ");
+                    var finger = thumb || name.Contains(" Index ") || name.Contains(" Middle ") || name.Contains(" Ring ") || name.Contains(" Little ");
+                    if (!finger) continue;
+                    if (name.EndsWith("Stretched")) pose.muscles[m] = thumb ? ThumbStretch : FingerStretch;
+                    else if (name.EndsWith("Spread")) pose.muscles[m] = thumb ? ThumbSpread : name.Contains(" Middle ") ? 0f : FingerSpread;
+                }
+                handler.SetHumanPose(ref pose);
+            }
+            finally
+            {
+                handler.Dispose();
+                foreach (var k in keep) { k.Item1.localPosition = k.Item2; k.Item1.localRotation = k.Item3; }
+            }
+        }
+
         /// <summary>足の骨を、足首を中心に爪先が上がる向きへ degrees 度回す（足の向きに直交する水平の軸で）</summary>
         static void LiftToes(Animator an, HumanBodyBones foot, HumanBodyBones toes, float degrees)
         {
@@ -238,25 +312,94 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 座った時のワンピースの裾の上げ方。裾の段の切り替え（膝の少し下）から下の布を、この割合の長さへ詰める。
-        /// 0.08 で、裾が膝のすぐ下の脛に掛かり、脛と足首から先とサンダルが裾の外に出る（0.28 では、目から見下ろして裾が膝の向こうの足の上半分を塞いだ）
+        /// 裾は膝の先で脛へ垂れ、脛の中ほどで終わる。その先の脛と足首とサンダルは裾の外に出る
         /// </summary>
-        const float SeatedHem = 0.08f;
+        const float SeatedHem = 0.3f;
 
         /// <summary>
-        /// 座った体のワンピースの裾を脛の上へ上げ、足首から先とサンダルを裾の外へ出す。
-        ///
-        /// くるぶし丈のワンピースは、裾の布が脚の骨に付いて脛のまわりに輪で立つ。座ると、上から見下ろす目には、
-        /// その輪が足を囲んで隠し、下を向いてもサンダルが見えなかった（脚を前へ投げ出しても隠れた）。
-        /// 主は歩かないので、座った形の体を一枚のメッシュにベイクして置き（<see cref="HostSeatedPath"/>）、
-        /// 裾の下の段（膝の少し下から裾まで）の布を、同じ縦の列の上の方の布の所へ寄せて短くする（<see cref="SeatedHem"/>）。
-        /// 列と段は布の絵の置き方（UV）で分かる。表と裏の布は別々に寄せる。骨で動く元の体は切り、頭の影（HeadShadow）はそのまま残す
+        /// 座った体のワンピースを、座った形の布に作り直してベイクし（<see cref="SeatedMesh"/>）、骨で動く体の代わりに置く。
+        /// 主は歩かないので、座った形の体を一枚のメッシュにして置く（<see cref="HostSeatedPath"/>）。骨で動く元の体は切り、頭の影（HeadShadow）はそのまま残す
         /// </summary>
         static void SeatedDrape(GameObject her, StringBuilder note)
+        {
+            var body = SeatedBody(her);
+            if (body == null) { note.AppendLine("座った体の mesh が見つからない。裾を上げられない"); return; }
+            var mesh = SeatedMesh(her, body, note);
+            RocketboxCompose.Save(mesh, HostSeatedPath);
+            Object.DestroyImmediate(mesh);
+            var saved = AssetDatabase.LoadAssetAtPath<Mesh>(HostSeatedPath);
+
+            // 骨で動く体と同じ所に、ベイクした体を置く
+            var go = new GameObject("Seated");
+            go.transform.SetParent(body.transform.parent, false);
+            go.transform.localPosition = body.transform.localPosition;
+            go.transform.localRotation = body.transform.localRotation;
+            go.transform.localScale = body.transform.localScale;
+            go.AddComponent<MeshFilter>().sharedMesh = saved;
+            var r = go.AddComponent<MeshRenderer>();
+            var mats = body.sharedMaterials;
+            // ワンピースは座った主だけの複製にして、陰を少し持ち上げる（SeatedDressFill）
+            mats[mats.Length - 1] = SeatedDressMat(mats[mats.Length - 1]);
+            r.sharedMaterials = mats;
+            r.shadowCastingMode = body.shadowCastingMode;
+            r.receiveShadows = body.receiveShadows;
+            body.enabled = false;
+        }
+
+        const string SeatedDressPath = "Assets/Materials/Village/HostSeatedDress.mat";
+
+        /// <summary>
+        /// 座った主のワンピースに足す、陰を持ち上げる明るさ（放射の強さ。布の絵の色に掛ける）。
+        /// 夕方の庭で見下ろすと、空の光だけを受ける膝の上の布が青みの灰色に沈み、日の当たる胸元だけが黄色く浮いて、
+        /// 白いワンピースに見えなかった。テラスから返る光の見立てで、陰の側を少しだけ明るくする
+        /// </summary>
+        public const float SeatedDressFill = 0.2f;
+
+        /// <summary>座った主のワンピースのマテリアル。元のワンピース（片割れのもの）を写し、放射で陰を持ち上げる</summary>
+        public static Material SeatedDressMat(Material dress)
+        {
+            var m = AssetDatabase.LoadAssetAtPath<Material>(SeatedDressPath);
+            if (m == null)
+            {
+                m = new Material(dress) { name = "HostSeatedDress" };
+                AssetDatabase.CreateAsset(m, SeatedDressPath);
+            }
+            else m.CopyPropertiesFromMaterial(dress);
+            FillDress(m, dress.GetTexture("_BaseMap"));
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// <summary>ワンピースのマテリアル m に、布の絵の色で陰を持ち上げる放射を掛ける</summary>
+        public static void FillDress(Material m, Texture map)
+        {
+            m.SetTexture("_EmissionMap", map);
+            m.SetColor("_EmissionColor", new Color(1f, 0.98f, 0.95f) * SeatedDressFill);
+            m.EnableKeyword("_EMISSION");
+            // None にすると、URP のマテリアルの見直し（取り込みのたびや、場面を撮る前に走る）が _EMISSION を落とし、光らなくなった（BuildAlleyCrowd と同じ）
+            m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+        }
+
+        /// <summary>座った体の、服を着た体の皮（頭の影でない、面の組が五つ以上のもの）</summary>
+        public static SkinnedMeshRenderer SeatedBody(GameObject her)
         {
             SkinnedMeshRenderer body = null;
             foreach (var smr in her.GetComponentsInChildren<SkinnedMeshRenderer>(true))
                 if (smr.name != "HeadShadow" && smr.sharedMesh != null && smr.sharedMesh.subMeshCount >= 5) body = smr;
-            if (body == null) { note.AppendLine("座った体の mesh が見つからない。裾を上げられない"); return; }
+            return body;
+        }
+
+        /// <summary>
+        /// 座った形の体を一枚のメッシュにベイクし、ワンピースのスカートを座った形の布に作り直して返す（保存しない。確かめの道具からも呼ぶ）。
+        ///
+        /// くるぶし丈のスカートは、骨に付いたままだと脛のまわりに輪で立ち、座ると上から足を隠す。
+        /// 1. 裾の下の段（膝の少し下から裾まで）の布を、同じ縦の列の上の方の布の所へ寄せて短くする（<see cref="SeatedHem"/>）。
+        ///    列と段は布の絵の置き方（UV）で分かる。表と裏の布は別々に寄せる
+        /// 2. 腰より前の布を、腿の上に沿わせて下ろし、膝の先では脛へ垂らし、脚の脇では回り込ませ、二本の脚のあいだでは少し沈める（<see cref="LayOnLegs"/>）
+        /// 3. 動かした布の法線を、面の形から出し直す（陰の側が沈んで、布の起伏が見える）
+        /// </summary>
+        public static Mesh SeatedMesh(GameObject her, SkinnedMeshRenderer body, StringBuilder note)
+        {
             var mesh = new Mesh { name = "HostSeated" };
             // 体の Transform のローカル空間でベイクする（useScale）。片割れの模型は根の x を裏返してあり、scale を外してベイクすると、
             // 同じ所に置いた時にもう一度裏返り、脚の左右が骨と入れ違った（伸ばした足が反対の側に出た）
@@ -313,78 +456,99 @@ namespace HalfAware.EditorTools
                 v = nv;
                 n = nn;
             }
-            var laid = LayOnLegs(her, body.transform, uv, v, n);
+            var laid = LayOnLegs(her, body.transform, uv, v, n, dress);
             mesh.vertices = v;
             mesh.normals = n;
             mesh.RecalculateBounds();
-            RocketboxCompose.Save(mesh, HostSeatedPath);
-            Object.DestroyImmediate(mesh);
-            var saved = AssetDatabase.LoadAssetAtPath<Mesh>(HostSeatedPath);
-
-            // 骨で動く体と同じ所に、ベイクした体を置く
-            var go = new GameObject("Seated");
-            go.transform.SetParent(body.transform.parent, false);
-            go.transform.localPosition = body.transform.localPosition;
-            go.transform.localRotation = body.transform.localRotation;
-            go.transform.localScale = body.transform.localScale;
-            go.AddComponent<MeshFilter>().sharedMesh = saved;
-            var r = go.AddComponent<MeshRenderer>();
-            r.sharedMaterials = body.sharedMaterials;
-            r.shadowCastingMode = body.shadowCastingMode;
-            r.receiveShadows = body.receiveShadows;
-            body.enabled = false;
-            note.AppendFormat("座った体をベイクした: 裾の下の段を {0:0.00} の長さへ詰めた頂点 {1}（段の切り替えは UV {2:0.000}）、脚の上へ下ろした頂点 {3}", SeatedHem, moved, vTier, laid).AppendLine();
+            if (note != null)
+                note.AppendFormat("座った体をベイクした: 裾の下の段を {0:0.00} の長さへ詰めた頂点 {1}（段の切り替えは UV {2:0.000}）、脚の上へ下ろした頂点 {3}", SeatedHem, moved, vTier, laid).AppendLine();
+            return mesh;
         }
 
-        /// <summary>腿・膝・脛の上の面から、布を浮かせておく高さ（m）。脚の骨の芯からの高さで、脚の太さを含む</summary>
-        const float ThighTop = 0.085f, KneeTop = 0.07f, ShinTop = 0.06f;
+        /// <summary>腿・膝・脛の、骨の芯から布の載る面までの半径（m）。脚の太さに布の厚みを足した値</summary>
+        const float ThighTop = 0.085f, KneeTop = 0.085f, ShinTop = 0.06f;
+
+        /// <summary>二本の脚のあいだで、布が脚の上の面を結んだ線より沈む深さ（m、あいだの真ん中で）。脚が寄った腿の所では、この 4 割</summary>
+        const float LapSag = 0.045f;
+
+        /// <summary>膝より先の二本の脚のあいだで、前へ出るほど布が深く沈む割合（前へ 1 m ごとに沈む m）。膝と膝のあいだの布は脛の方へ垂れる</summary>
+        const float FrontSag = 1.2f;
+
+        /// <summary>脚の芯から、布を出しておく隙（m）。布の載る丸の半径に足す。脚が布を突き抜けないように押し出す所まで</summary>
+        const float LegClear = 0.008f;
+
+        /// <summary>脚の脇の、回り込んだ先で布が垂れる傾き（横へ 1 m 出るごとに下がる m）</summary>
+        const float SideFall = 3f;
 
         /// <summary>
-        /// 座った体のスカートの布を、腿と膝と脛の上へ下ろす（重さで脚の上に載った形）。
+        /// 座った体のスカートの布を、脚の上に載った形へ下ろす。腰より前の布の頂点を、その所での布の載る面より上へ出さない。
         ///
-        /// くるぶし丈のスカートの筒は、座ると膝のまわりに大きな輪で立ち、輪の上の縁が膝より 20 cm ほど上へ膨らむ。
-        /// 目から見下ろすと、その膨らみが膝の向こうの脛と足を塞いだ（布を外すと足とサンダルが見えた）。
-        /// 腰より前の布の頂点を、その所での脚の上の面（腰から膝、膝から足首を結んだ骨の芯に、脚の太さを足した高さ。二本のあいだは横の位置で繋ぐ）より上へ出さない。
-        /// 脇に垂れた布は元から低いので動かない。v と n は体の mesh の中の位置と法線で、書き換える。下ろした頂点の数を返す
+        /// 布の載る面は、腿から膝、膝から足首を結んだ骨の芯のまわりの丸（半径は <see cref="ThighTop"/> など）の上の縁。
+        /// - 脚の上では丸の上の縁に沿う。脚の脇では丸に沿って回り込み、その先は下へ垂れる（<see cref="SideFall"/>）。角の立った板にしない
+        /// - 二本の脚のあいだでは、二本の上の縁を結んだ線から少し沈む（<see cref="LapSag"/>）
+        /// - 膝の先では、脛の上の縁に沿って下がる。布は膝から脛へ垂れる
+        ///
+        /// 脚より低い所の布（脇に垂れた布や腿の下の布）は動かさない。動かした布の法線は、面の形から出し直す（上へ向け揃えると、白い板に見えた）。
+        /// v と n は体のメッシュの中の位置と法線で、書き換える。tris はワンピースの面（前半が表、後半が裏）。下ろした頂点の数を返す
         /// </summary>
-        static int LayOnLegs(GameObject her, Transform body, Vector2[] uv, Vector3[] v, Vector3[] n)
+        static int LayOnLegs(GameObject her, Transform body, Vector2[] uv, Vector3[] v, Vector3[] n, int[] tris)
         {
             var an = her.GetComponent<Animator>();
             System.Func<HumanBodyBones, Vector3> B = b => an.GetBoneTransform(b).position;
             var ahead = her.transform.forward;
             ahead.y = 0f;
             ahead.Normalize();
+            var side = Vector3.Cross(Vector3.up, ahead);
             var legs = new[]
             {
                 new[] { B(HumanBodyBones.LeftUpperLeg), B(HumanBodyBones.LeftLowerLeg), B(HumanBodyBones.LeftFoot) },
                 new[] { B(HumanBodyBones.RightUpperLeg), B(HumanBodyBones.RightLowerLeg), B(HumanBodyBones.RightFoot) },
             };
             var hipAhead = Vector3.Dot(B(HumanBodyBones.Hips), ahead);
-            var side = Vector3.Cross(Vector3.up, ahead);
-            // 前後の位置 f での、一本の脚の上の面の高さと、脚の芯の横の位置
-            System.Func<Vector3[], float, Vector2> legAt = (leg, f) =>
+            // 二本の膝の前後の位置の、近い方（手前の膝）
+            var kneeNear = Mathf.Min(Vector3.Dot(legs[0][1], ahead), Vector3.Dot(legs[1][1], ahead));
+            // 前後の位置 f での、一本の脚の骨の芯の高さ（x）・横の位置（y）・布の載る丸の半径（z）
+            System.Func<Vector3[], float, Vector3> legAt = (leg, f) =>
             {
                 float fh = Vector3.Dot(leg[0], ahead), fk = Vector3.Dot(leg[1], ahead), fa = Vector3.Dot(leg[2], ahead);
+                Vector3 p;
+                float r;
                 if (f <= fk)
                 {
                     var t = Mathf.InverseLerp(fh, fk, f);
-                    return new Vector2(Mathf.Lerp(leg[0].y + ThighTop, leg[1].y + KneeTop, t), Vector3.Dot(Vector3.Lerp(leg[0], leg[1], t), side));
+                    p = Vector3.Lerp(leg[0], leg[1], t);
+                    r = Mathf.Lerp(ThighTop, KneeTop, t);
                 }
-                var u = Mathf.InverseLerp(fk, fa, f);
-                return new Vector2(Mathf.Lerp(leg[1].y + KneeTop, leg[2].y + ShinTop, u), Vector3.Dot(Vector3.Lerp(leg[1], leg[2], u), side));
+                else
+                {
+                    var t = Mathf.InverseLerp(fk, fa, f);
+                    p = Vector3.Lerp(leg[1], leg[2], t);
+                    r = Mathf.Lerp(KneeTop, ShinTop, t);
+                }
+                return new Vector3(p.y, Vector3.Dot(p, side), r);
             };
-            // 布の頂点 w の所での、脚の上の面の高さ。二本の脚のあいだは、横の位置で二本の高さを繋ぐ（布は高い方の脚から低い方の脚へ斜めに渡る）。
-            // 二本の高い方で一枚の板にすると、片脚を伸ばして低くした時に、その脚の上に布の板が浮いて脛と足を隠した
+            // 一本の脚の丸から、横へ e 離れた所で布が載る高さ
+            System.Func<Vector3, float, float> over = (leg, e) =>
+                e <= leg.z ? leg.x + Mathf.Sqrt(leg.z * leg.z - e * e) : leg.x - (e - leg.z) * SideFall;
             System.Func<Vector3, float> top = w =>
             {
                 var f = Vector3.Dot(w, ahead);
                 var a = legAt(legs[0], f);
                 var b = legAt(legs[1], f);
-                var t = Mathf.Abs(b.y - a.y) < 1e-4f ? 0.5f : Mathf.Clamp01((Vector3.Dot(w, side) - a.y) / (b.y - a.y));
-                return Mathf.Lerp(a.x, b.x, t);
+                if (a.y > b.y) { var c = a; a = b; b = c; }
+                var s = Vector3.Dot(w, side);
+                if (s <= a.y) return over(a, a.y - s);
+                if (s >= b.y) return over(b, s - b.y);
+                // あいだ。二本の上の縁を結ぶ線から沈める。脚が寄った所では浅く、膝より先では前へ出るほど深く
+                var t = (s - a.y) / Mathf.Max(b.y - a.y, 1e-4f);
+                var gap = Mathf.Lerp(0.4f, 1f, Mathf.Clamp01((b.y - a.y - a.z - b.z) / 0.06f));
+                var dip = (LapSag + Mathf.Max(0f, f - kneeNear) * FrontSag) * gap * Mathf.Sin(Mathf.PI * t);
+                var bridge = Mathf.Lerp(a.x + a.z, b.x + b.z, t) - dip;
+                return Mathf.Max(bridge, over(a, s - a.y), over(b, b.y - s));
             };
             var toWorld = body.localToWorldMatrix;
             var toLocal = body.worldToLocalMatrix;
+            var weight = new float[v.Length];
             var laid = 0;
             for (var i = 0; i < v.Length; i++)
             {
@@ -392,16 +556,83 @@ namespace HalfAware.EditorTools
                 var w = toWorld.MultiplyPoint3x4(v[i]);
                 var f = Vector3.Dot(w, ahead);
                 if (f < hipAhead + 0.08f) continue;
-                var cap = top(w);
-                if (w.y <= cap) continue;
                 // 腰の近くは少しずつ効かせる（腰の布との継ぎ目に段を作らない）
                 var k = Mathf.Clamp01((f - hipAhead - 0.08f) / 0.12f);
+                weight[i] = k;
+                var cap = top(w);
+                if (w.y <= cap) continue;
                 w.y = Mathf.Lerp(w.y, cap, k);
                 v[i] = toLocal.MultiplyPoint3x4(w);
-                // 載った布は上を向く
-                var up = toLocal.MultiplyVector(Vector3.up).normalized;
-                n[i] = Vector3.Slerp(n[i], Vector3.Dot(n[i], up) >= 0f ? up : -up, k).normalized;
                 laid++;
+            }
+
+            // 膝の先で垂れた布の中から脛が前へ出ないよう、脛の前の面より奥にある布を前へ出す。前へだけ動かす
+            // （脚の丸の外へ四方へ押し出すと、布の面が裏返って穴が開き、脚の肌が覗いた）
+            for (var i = 0; i < v.Length; i++)
+            {
+                if (weight[i] <= 0f) continue;
+                var w = toWorld.MultiplyPoint3x4(v[i]);
+                var moved = false;
+                foreach (var leg in legs)
+                {
+                    var knee = leg[1];
+                    var ankle = leg[2];
+                    // 立った脛（曲げた脚）だけ。前へ伸ばした脚の脛には、布が上から載っている
+                    if ((knee.y - ankle.y) < 0.9f * Vector3.Distance(knee, ankle)) continue;
+                    if (w.y > knee.y || w.y < ankle.y) continue;
+                    // その高さでの脛の芯
+                    var t = Mathf.InverseLerp(knee.y, ankle.y, w.y);
+                    var core = Vector3.Lerp(knee, ankle, t);
+                    var r = Mathf.Lerp(KneeTop, ShinTop, t) + LegClear;
+                    var off = w - core;
+                    var across = Vector3.Dot(off, side);
+                    var fore = Vector3.Dot(off, ahead);
+                    if (Mathf.Abs(across) >= r || fore >= r || fore < -r * 0.5f) continue;
+                    // 脛の丸の前の縁まで出す（横へずれている所は丸の縁の前後の深さまで）
+                    var want = Mathf.Sqrt(r * r - across * across);
+                    if (fore >= want) continue;
+                    w += ahead * ((want - fore) * weight[i]);
+                    moved = true;
+                }
+                if (!moved) continue;
+                v[i] = toLocal.MultiplyPoint3x4(w);
+            }
+
+            // 法線を面の形から出し直す。表と裏の組ごとに、同じ所にある頂点（布の絵の継ぎ目で分かれた頂点）はまとめて滑らかにする
+            var half = tris.Length / 2;
+            System.Func<Vector3, Vector3Int> key = p => new Vector3Int(Mathf.RoundToInt(p.x * 2000f), Mathf.RoundToInt(p.y * 2000f), Mathf.RoundToInt(p.z * 2000f));
+            foreach (var range in new[] { new Vector2Int(0, half), new Vector2Int(half, tris.Length) })
+            {
+                var sum = new Dictionary<Vector3Int, Vector3>();
+                var used = new HashSet<int>();
+                for (var t = range.x; t + 2 < range.y; t += 3)
+                {
+                    int i0 = tris[t], i1 = tris[t + 1], i2 = tris[t + 2];
+                    var face = Vector3.Cross(v[i1] - v[i0], v[i2] - v[i0]);
+                    foreach (var i in new[] { i0, i1, i2 })
+                    {
+                        if (weight[i] <= 0f) continue;
+                        used.Add(i);
+                        var kk = key(v[i]);
+                        Vector3 acc;
+                        sum.TryGetValue(kk, out acc);
+                        sum[kk] = acc + face;
+                    }
+                }
+                // 面の巻きの向きと法線の向きの取り決めは、元の法線と比べて決める（組ごとに一つ）
+                var agree = 0f;
+                foreach (var i in used)
+                {
+                    Vector3 acc;
+                    if (sum.TryGetValue(key(v[i]), out acc) && acc.sqrMagnitude > 1e-12f) agree += Vector3.Dot(acc.normalized, n[i]);
+                }
+                var sign = agree >= 0f ? 1f : -1f;
+                foreach (var i in used)
+                {
+                    Vector3 acc;
+                    if (!sum.TryGetValue(key(v[i]), out acc) || acc.sqrMagnitude < 1e-12f) continue;
+                    n[i] = Vector3.Slerp(n[i], acc.normalized * sign, weight[i]).normalized;
+                }
             }
             return laid;
         }
@@ -428,15 +659,15 @@ namespace HalfAware.EditorTools
                 // 背は少し前へ倒す（膝の上へ目が出て、膝の向こうの足が見える。頭は立てたまま）
                 lean = 14f,
                 headKeep = 1f,
-                // 右の脚（模型の +x。裏返した片割れでは体の左、卓の脇の空いたテラスの側）を斜め前へ楽に伸ばし、左は膝を曲げて足を引く。
+                // 右の脚（模型の +x。裏返した片割れでは体の左、卓の脇の空いたテラスの側）を斜め前へ楽に伸ばし、左は膝を曲げて足を膝より奥へ引く（膝から垂れた裾の中に脛が収まる。膝の前へ出すと、脛が裾の前から覗いた）。
                 // 両足とも膝の少し前（足首 0.62・0.66 m）に置くと、目から見て膝と裾の向こうに隠れ、爪先しか見えなかった。
                 // 右を真っすぐ前（0.71 m）へ伸ばしても、膝の上の裾の向こうに足の甲が細く覗くだけだった。斜めに開くと、裾の脇に脛と足首とサンダルが出る
-                ankleL = P(-0.10f, 0.085f, 0.50f),
+                ankleL = P(-0.10f, 0.085f, 0.32f),
                 ankleR = P(0.38f, 0.085f, 0.62f),
                 kneePoleL = P(-0.10f, 0.9f, 1.2f),
                 kneePoleR = P(0.34f, 0.9f, 1.2f),
                 footPoint = 0f,
-                // 手は腿の中ほど。膝に置くと指が膝の先へ出て、その向こうの足を隠した
+                // 手の初めの形。この後で RestHands が腿の上に置き直す
                 wristL = P(-0.14f, 0.61f, 0.13f),
                 wristR = P(0.14f, 0.61f, 0.13f),
                 elbowPoleL = P(-0.45f, 0.62f, -0.2f),

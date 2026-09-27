@@ -53,6 +53,9 @@ namespace HalfAware.EditorTools
                 run.Until(() => run.D.Garden >= 12f, false);
                 run.Hold(0f, run.PitchDown, 0.3f);
                 sb.AppendLine(run.Note("3 下") + " → " + run.Shot(dir + "/g6_3_down.png"));
+                // 3a. ほかの場面の限り（40 度）まで下を向いた所。膝と両手
+                run.Hold(0f, PlayerController.PitchDownLimit, 0.3f);
+                sb.AppendLine(run.Note("3a 下 40 度") + " → " + run.Shot(dir + "/g6_3_down40.png"));
                 // 3b. 庭を見回す（女性と花の縁とトンネルの口）
                 run.Hold(-10f, 2f, 0.3f);
                 sb.AppendLine(run.Note("3b 庭") + " → " + run.Shot(dir + "/g6_3b_garden.png"));
@@ -201,7 +204,7 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// スカートがシャツの裾から突き抜けていないかを数で見る。女性を立ちの動きの頭の一こまに置いて皮を焼き、
+        /// スカートがシャツの裾から突き抜けていないかを数で見る。女性を立ちの動きの頭の一こまに置いて皮をベイクし、
         /// スカートの三角の重心と辺の中点ごとに、腰の縦の軸から外へ向けた線でシャツ（胴と裾）の面までの半径を測り、それより外にある点を数える
         /// </summary>
         public static string Pokes()
@@ -294,18 +297,23 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 主（片割れ）の座った体を撮る。主の目から下を向いた所（首は正面と左へ 25 度、下は場面 6 で向けられる限り＝演出の pitchDown）と、脚を左の横（卓の側）から見た所
+        /// 主（片割れ）の座った体を撮る。主の目から正面の下を向いた所（下は場面 6 で向けられる限り＝演出の pitchDown と、ほかの場面の限りの 40 度）と、
+        /// 脚を左の横（卓の側）から見た所。hires なら粗くしない（render scale 1）で撮り、前から見た所も足す（布と手の形を見る）
         /// </summary>
-        public static string Host(string dir)
+        public static string Host(string dir, bool hires = false)
         {
             for (var i = 0; i < SceneManager.sceneCount; i++)
                 if (SceneManager.GetSceneAt(i).isDirty) return "未保存の変更がある: " + SceneManager.GetSceneAt(i).path;
             var sb = new StringBuilder();
+            var urp = UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline as UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset;
+            var scale = urp != null ? urp.renderScale : 1f;
             EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
             var async = ShaderUtil.allowAsyncCompilation;
             ShaderUtil.allowAsyncCompilation = false;
             try
             {
+                if (hires && urp != null) urp.renderScale = 1f;
+                var tag = hires ? "_hi" : "";
                 var d = Object.FindFirstObjectByType<GardenMemoryDirector>(FindObjectsInactive.Include);
                 var so = new SerializedObject(d);
                 var memory = (GameObject)so.FindProperty("memory").objectReferenceValue;
@@ -318,8 +326,11 @@ namespace HalfAware.EditorTools
                 var down = so.FindProperty("pitchDown").floatValue;
                 var seat = (Transform)so.FindProperty("seat").objectReferenceValue;
                 var eye = seat.position + Vector3.up * so.FindProperty("seatEyeHeight").floatValue + seat.forward * 0.22f;
-                foreach (var head in new[] { 0f, -25f })
-                    sb.AppendLine(CheckVillage.Game(new CheckVillage.View("host_down_" + head, eye, seat.eulerAngles.y + head, down), dir + "/host_down_" + head + ".png"));
+                foreach (var pitch in new[] { down, PlayerController.PitchDownLimit })
+                {
+                    var name = "host_down_" + Mathf.RoundToInt(pitch) + tag;
+                    sb.AppendLine(CheckVillage.Game(new CheckVillage.View(name, eye, seat.eulerAngles.y, pitch), dir + "/" + name + ".png"));
+                }
                 var an = memory.transform.Find("Host").GetComponent<Animator>();
                 var knee = an.GetBoneTransform(HumanBodyBones.LeftLowerLeg).position;
                 var foot = an.GetBoneTransform(HumanBodyBones.LeftFoot).position;
@@ -327,7 +338,15 @@ namespace HalfAware.EditorTools
                 var side = Quaternion.Euler(0f, seat.eulerAngles.y - 90f, 0f) * Vector3.forward;
                 var from = mid + side * 1.2f + Vector3.up * 0.15f;
                 var look = mid - from;
-                sb.AppendLine(CheckVillage.Game(new CheckVillage.View("host_legs", from, Mathf.Atan2(look.x, look.z) * Mathf.Rad2Deg, 6f), dir + "/host_legs.png"));
+                sb.AppendLine(CheckVillage.Game(new CheckVillage.View("host_legs" + tag, from, Mathf.Atan2(look.x, look.z) * Mathf.Rad2Deg, 6f), dir + "/host_legs" + tag + ".png"));
+                if (hires)
+                {
+                    // 前から、膝の高さの少し上から見上げずに
+                    var lap = seat.position + Vector3.up * 0.6f + seat.forward * 0.35f;
+                    var front = lap + seat.forward * 1.4f + Vector3.up * 0.35f;
+                    var fl = lap - front;
+                    sb.AppendLine(CheckVillage.Game(new CheckVillage.View("host_front" + tag, front, Mathf.Atan2(fl.x, fl.z) * Mathf.Rad2Deg, -Mathf.Atan2(fl.y, new Vector2(fl.x, fl.z).magnitude) * Mathf.Rad2Deg), dir + "/host_front" + tag + ".png"));
+                }
                 var other = an.GetBoneTransform(HumanBodyBones.RightFoot).position;
                 sb.AppendLine("足: 左 " + foot.ToString("F3") + "、目から前へ " + Vector3.Dot(foot - eye, seat.forward).ToString("F2") + " m・下へ " + (eye.y - foot.y).ToString("F2") + " m。右 " + other.ToString("F3") + "（足首の骨の高さはテラスから左 " + (foot.y - seat.position.y).ToString("F3") + "・右 " + (other.y - seat.position.y).ToString("F3") + " m）");
             }
@@ -337,6 +356,7 @@ namespace HalfAware.EditorTools
             }
             finally
             {
+                if (urp != null) urp.renderScale = scale;
                 ShaderUtil.allowAsyncCompilation = async;
                 EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
             }
