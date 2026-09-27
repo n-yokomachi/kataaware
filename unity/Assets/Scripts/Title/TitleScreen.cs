@@ -726,6 +726,9 @@ namespace HalfAware
             m.name = label;
             m.hideFlags = HideFlags.DontSave;
             if (!m.HasProperty(ShaderUtilities.ID_UnderlayColor)) return m;
+            // 書き出しでは、ビルドに入るマテリアルのどれも使っていないシェーダーのバリアント（キーワードの組み合わせ）は落とされる。
+            // UNDERLAY_ON だけのバリアントは Assets/Resources/MinchoUnderlay.mat に持たせて残している。
+            // あのマテリアルを消すと、書き出した物でだけ題の光と影が消える（エディタでは消えない）
             m.EnableKeyword(ShaderUtilities.Keyword_Underlay);
             m.SetColor(ShaderUtilities.ID_UnderlayColor, color);
             m.SetFloat(ShaderUtilities.ID_UnderlaySoftness, softness);
