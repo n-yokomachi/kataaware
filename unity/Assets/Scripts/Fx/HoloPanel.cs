@@ -23,6 +23,17 @@ namespace HalfAware
         public const string Dive = "潜る";
         public const string Cut = "切断";
 
+        /// <summary>
+        /// 板を描く層。**板は後処理（記憶ごとのぼやけ・色味・光のにじみ）の後に描く**（2026-09-27）。
+        /// 板は主の端末が描くもので、借りた目の出来には従わない（設計書 5 節）。景色と一緒に描いていた頃は、
+        /// 年寄りの近くぼやけ（1.6 m から）と目の疲れのぼやけが、板の字まで溶かした。板は透けるので深さを書かず、
+        /// ぼやけは板の後ろの景色の深さで掛かっていた。
+        /// この層は描き手（PC_Renderer・Mobile_Renderer）の不透明と半透明の描画から外し、
+        /// RenderObjects の「Holo」が後処理の後・減色（Ps1）の前に描く。後処理の後には深さが無いので、板は景色の上に出る。
+        /// 眩暈（Daze、後処理の前）も板には掛からない
+        /// </summary>
+        public const string LayerName = "Holo";
+
         /// <summary>押せないあいだの `切断` の色。端末の緑から彩りを抜いたもの</summary>
         static readonly Color Dead = new Color(0.46f, 0.50f, 0.47f);
 

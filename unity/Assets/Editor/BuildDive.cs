@@ -559,6 +559,11 @@ namespace HalfAware.EditorTools
             so.FindProperty("actionText").objectReferenceValue = action;
             so.ApplyModifiedPropertiesWithoutUndo();
 
+            // 板はぼやけの外に描く（HoloPanel.LayerName）。後処理の後に描く層へ、板と字をまとめて移す
+            var layer = LayerMask.NameToLayer(HoloPanel.LayerName);
+            if (layer < 0) Debug.LogError("板の層が無い（Project Settings の Tags and Layers に " + HoloPanel.LayerName + "）。板がぼやける");
+            else foreach (var t in go.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = layer;
+
             // 目を留めた相手が決まるまで出さない。DiveDirector が Show で起こす
             go.SetActive(false);
         }
