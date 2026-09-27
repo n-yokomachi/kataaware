@@ -45,7 +45,8 @@ namespace HalfAware
         [SerializeField] float least = 0.45f;
         // **上限はそのまま「見かけの大きさが揃う距離」。** 2.20 だと 2.7 m から先は
         // 板ごと縮んで字が潰れ、部屋の向こう側の人が読めなかった。2.60 で 3.2 m まで伸びる。
-        // これ以上伸ばすと板の実寸が 2.5 m を超えて、廊下の壁を突き抜けたところが欠ける
+        // これ以上伸ばすと板の実寸が 2.5 m を超えて、廊下の壁を突き抜けたところが欠ける。
+        // それより遠い人の板は、同じ向きのまま目の側へ引いて、この大きさで置く（Beside）
         [SerializeField] float most = 2.60f;
 
         Transform host;
@@ -161,10 +162,6 @@ namespace HalfAware
             var at = host.position + Vector3.up * (tall * shoulder);
             var away = at - eye.position;
             if (away.sqrMagnitude < 1e-6f) return;
-            // **見かけの大きさを揃える。** 寄られると画面の半分を覆い、
-            // 離れると行が読めなくなる。目からの距離に比例させれば、どちらも起きない。
-            // 測るのは肩までの距離。板の位置から測ると、寄せ幅と大きさが互いを押し合う
-            var span = Mathf.Clamp(away.magnitude * perMetre, least, most);
             // 寄せるのは目から見た真横。
             // 相手の向きで寄せる側を決めると、横を向いた人では板が顔の前か後ろへ回り込み、
             // 相手の周りを歩くと左右が入れ替わる瞬間に板が飛ぶ
@@ -175,20 +172,39 @@ namespace HalfAware
 
             // **いま出している側を先に試す。** 毎フレーム左右を選び直すと、
             // 壁際を歩くあいだ板が右と左を行き来して読めない
-            if (Settle(at, flat, span, side)) return;
-            if (Settle(at, flat, span, -side)) { side = -side; return; }
-            Pull(at, flat, span);
+            if (Settle(at, flat, side)) return;
+            if (Settle(at, flat, -side)) { side = -side; return; }
+            Pull(at, flat);
         }
 
         /// <summary>
-        /// その側へ出せるなら出して true。
+        /// 肩 at の which の側の置き場と大きさ。
         ///
-        /// 板の内側の縁が体に掛からないところまで出す。
-        /// 体の幅は相手ごとに、板の幅は遠近で変わるので、どちらも数に入れる
+        /// **見かけの大きさを揃える。** 寄られると画面の半分を覆い、
+        /// 離れると行が読めなくなる。目からの距離に比例させれば、どちらも起きない。
+        /// 測るのは肩までの距離。板の位置から測ると、寄せ幅と大きさが互いを押し合う。
+        /// 板の内側の縁が体に掛からないところまで出す。体の幅は相手ごとに、板の幅は遠近で変わるので、どちらも数に入れる。
+        ///
+        /// **遠い人の板も縮めない。** 上限（<see cref="most"/>、3.2 m）より遠い人の脇にそのまま置くと、板は距離なりに縮み、
+        /// 7 m 先の公園の少女では粗い画面で数画素になって、街灯の陰で読めなかった（2026-09-27、「ソフィアから次の人に飛ぶことができない」）。
+        /// 遠い人の脇の置き場を、目から見た向きのまま目の側へ引き、上限の大きさで置く。画面の上では同じ所（相手の肩の脇）に、
+        /// 3.2 m の人と同じ見かけの大きさで出る
         /// </summary>
-        bool Settle(Vector3 at, Vector3 flat, float span, float which)
+        void Beside(Vector3 at, Vector3 flat, float which, out Vector3 pos, out float span)
         {
-            var pos = at + flat * which * (half + gap + wide * span * 0.5f);
+            var want = Mathf.Max(least, (at - eye.position).magnitude * perMetre);
+            span = Mathf.Min(want, most);
+            pos = at + flat * which * (half + gap + wide * want * 0.5f);
+            if (want <= most) return;
+            pos = eye.position + (pos - eye.position) * (most / want);
+        }
+
+        /// <summary>その側へ出せるなら出して true</summary>
+        bool Settle(Vector3 at, Vector3 flat, float which)
+        {
+            Vector3 pos;
+            float span;
+            Beside(at, flat, which, out pos, out span);
             if (!Clear(pos, span)) return false;
             Put(pos, span);
             return true;
@@ -201,9 +217,11 @@ namespace HalfAware
         /// 肩の脇に出した板が壁や箪笥に食い込んで、行が半分欠けた（オーナーの差し戻し）。
         /// 引いた先で距離に合わせて大きさを取り直すので、見かけの大きさは変わらない
         /// </summary>
-        void Pull(Vector3 at, Vector3 flat, float span)
+        void Pull(Vector3 at, Vector3 flat)
         {
-            var want = at + flat * side * (half + gap + wide * span * 0.5f);
+            Vector3 want;
+            float span;
+            Beside(at, flat, side, out want, out span);
             var back = eye.position - want;
             var reach = back.magnitude;
             if (reach > 1e-4f)
