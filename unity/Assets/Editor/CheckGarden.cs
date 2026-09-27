@@ -49,7 +49,7 @@ namespace HalfAware.EditorTools
                 run.Until(() => run.D.Current == GardenMemoryDirector.Beat.Garden && run.D.Garden >= 7f, false);
                 run.Until(() => run.D.Showing || run.D.Garden >= 9f, true);
                 sb.AppendLine(run.Note("2 板") + " → " + run.Shot(dir + "/g6_2_board.png"));
-                // 3. 下を向く（首は体の正面、下は向けられる限り）。脚とサンダル
+                // 3. 下を向く（首は体の向きのまま、下は向けられる限り）。膝の先に裾から出た足首とサンダル
                 run.Until(() => run.D.Garden >= 12f, false);
                 run.Hold(0f, PlayerController.PitchDownLimit, 0.3f);
                 sb.AppendLine(run.Note("3 下") + " → " + run.Shot(dir + "/g6_3_down.png"));
@@ -57,9 +57,11 @@ namespace HalfAware.EditorTools
                 run.Hold(-10f, 2f, 0.3f);
                 sb.AppendLine(run.Note("3b 庭") + " → " + run.Shot(dir + "/g6_3b_garden.png"));
                 // 4. 近づいて、途切れる直前
-                run.Until(() => run.D.Garden >= BuildVillage.WalkAt && run.D.Apart <= 3.0f || run.D.Current == GardenMemoryDirector.Beat.Cut, true);
+                // 途切れる隔たり（演出の cutDistance）の少し手前
+                var cutAt = new SerializedObject(run.D).FindProperty("cutDistance").floatValue;
+                run.Until(() => run.D.Garden >= BuildVillage.WalkAt && run.D.Apart <= cutAt + 0.12f || run.D.Current == GardenMemoryDirector.Beat.Cut, true);
                 sb.AppendLine(run.Note("4 途切れる直前") + " → " + run.Shot(dir + "/g6_4_near.png"));
-                run.Until(() => run.D.Current == GardenMemoryDirector.Beat.Cut || run.D.Garden >= 60f, true);
+                run.Until(() => run.D.Current == GardenMemoryDirector.Beat.Cut || run.D.Garden >= 75f, true);
                 sb.AppendLine(run.Note("5 途切れ"));
                 sb.AppendLine(run.Timeline());
             }
@@ -292,7 +294,7 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 主（片割れ）の座った体を撮る。主の目から下を向いた所（首は正面と右へ 20 度、下は向けられる限り）と、脚を横から見た所
+        /// 主（片割れ）の座った体を撮る。主の目から下を向いた所（首は正面と左へ 25 度、下は向けられる限り）と、脚を左の横（卓の側）から見た所
         /// </summary>
         public static string Host(string dir)
         {
@@ -311,17 +313,18 @@ namespace HalfAware.EditorTools
                 memory.SetActive(true);
                 var seat = (Transform)so.FindProperty("seat").objectReferenceValue;
                 var eye = seat.position + Vector3.up * so.FindProperty("seatEyeHeight").floatValue + seat.forward * 0.22f;
-                foreach (var head in new[] { 0f, 20f })
+                foreach (var head in new[] { 0f, -25f })
                     sb.AppendLine(CheckVillage.Game(new CheckVillage.View("host_down_" + head, eye, seat.eulerAngles.y + head, PlayerController.PitchDownLimit), dir + "/host_down_" + head + ".png"));
                 var an = memory.transform.Find("Host").GetComponent<Animator>();
                 var knee = an.GetBoneTransform(HumanBodyBones.LeftLowerLeg).position;
                 var foot = an.GetBoneTransform(HumanBodyBones.LeftFoot).position;
                 var mid = (knee + foot) * 0.5f;
-                var side = Quaternion.Euler(0f, seat.eulerAngles.y + 90f, 0f) * Vector3.forward;
+                var side = Quaternion.Euler(0f, seat.eulerAngles.y - 90f, 0f) * Vector3.forward;
                 var from = mid + side * 1.2f + Vector3.up * 0.15f;
                 var look = mid - from;
                 sb.AppendLine(CheckVillage.Game(new CheckVillage.View("host_legs", from, Mathf.Atan2(look.x, look.z) * Mathf.Rad2Deg, 6f), dir + "/host_legs.png"));
-                sb.AppendLine("足: 左 " + foot.ToString("F3") + "、目から前へ " + Vector3.Dot(foot - eye, seat.forward).ToString("F2") + " m・下へ " + (eye.y - foot.y).ToString("F2") + " m");
+                var other = an.GetBoneTransform(HumanBodyBones.RightFoot).position;
+                sb.AppendLine("足: 左 " + foot.ToString("F3") + "、目から前へ " + Vector3.Dot(foot - eye, seat.forward).ToString("F2") + " m・下へ " + (eye.y - foot.y).ToString("F2") + " m。右 " + other.ToString("F3") + "（足首の骨の高さはテラスから左 " + (foot.y - seat.position.y).ToString("F3") + "・右 " + (other.y - seat.position.y).ToString("F3") + " m）");
             }
             catch (System.Exception e)
             {
@@ -343,6 +346,7 @@ namespace HalfAware.EditorTools
             PersonMotion motion;
             GardenHose hose;
             ParticleSystem spray;
+            HoloPanel panel;
             Transform face;
             float played;
             readonly List<string> marks = new List<string>();
@@ -358,6 +362,7 @@ namespace HalfAware.EditorTools
                 motion = (PersonMotion)so.FindProperty("womanMotion").objectReferenceValue;
                 hose = (GardenHose)so.FindProperty("hose").objectReferenceValue;
                 spray = (ParticleSystem)so.FindProperty("spray").objectReferenceValue;
+                panel = (HoloPanel)so.FindProperty("panel").objectReferenceValue;
                 GardenHandoff.Pending = true;
                 if (!GardenHandoff.Take()) return false;
                 D.Begin();
@@ -440,6 +445,14 @@ namespace HalfAware.EditorTools
                     var on = D.Spraying;
                     spray.Simulate(0.9f, true, true);
                     if (!on) spray.Clear(true);
+                }
+                // 板は LateUpdate で置き直すので、撮る前に今の目の所へ置く（撮る時と同じ 16:9 で測る）
+                if (panel != null && panel.Showing)
+                {
+                    var cam = player.Eye.GetComponent<Camera>();
+                    cam.aspect = 960f / 540f;
+                    panel.PlaceNow();
+                    cam.ResetAspect();
                 }
                 return ConsoleShot.Shoot(path, 960, 540, UiLens.Scale, false, 0f, false, null);
             }

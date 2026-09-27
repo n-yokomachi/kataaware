@@ -256,14 +256,23 @@ namespace HalfAware.EditorTools
                 Beam(b.Paint, at + Vector3.up * 0.64f + o * 0.06f, at + Vector3.up * 0.30f + o * 0.22f, 0.03f, 0.03f);
                 Beam(b.Paint, at + Vector3.up * 0.30f + o * 0.22f, at + o * 0.34f, 0.03f, 0.03f);
             }
-            // 椅子。卓を囲んで三脚、卓へ向ける。白
-            foreach (var deg in new[] { 200f, 320f, 80f })
+            // 椅子。卓を囲んで三脚、卓へ向ける。白。
+            // 北の一脚（TurnedChairDeg）だけは卓に背を向け、西北西の夕日の方（小路と西の花の縁）へ向ける。
+            // 場面 6 の主（片割れ）がここに座り、夕日を背にして水を撒く女性を見る（BuildVillageMemory）
+            foreach (var deg in new[] { 200f, 320f, TurnedChairDeg })
             {
                 var a = deg * Mathf.Deg2Rad;
                 var foot = at + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * 0.82f;
-                Chair(b.Paint, foot, Quaternion.LookRotation(at - foot, Vector3.up));
+                var face = deg == TurnedChairDeg ? Quaternion.Euler(0f, TurnedChairYaw, 0f) : Quaternion.LookRotation(at - foot, Vector3.up);
+                Chair(b.Paint, foot, face);
             }
         }
+
+        /// <summary>卓から見た、夕日の方へ向けた椅子の向き（度。卓の東から北回り）</summary>
+        public const float TurnedChairDeg = 80f;
+
+        /// <summary>その椅子の向き。度（+z が 0 で東回り）。西北西（日は方位 290 度）の少し北、小路の上で水を撒く女性の方</summary>
+        public const float TurnedChairYaw = 305f;
 
         /// <summary>
         /// 白い鉄のビストロの椅子。丸い座面、四本の脚、背。rot の +z が前（卓の側）。

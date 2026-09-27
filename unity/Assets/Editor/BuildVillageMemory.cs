@@ -18,55 +18,62 @@ namespace HalfAware.EditorTools
     /// - Hud に、角の白い膜と右上の見出し（場面 4 と同じ物）
     ///
     /// 並び（世界の値。+x が東、+z が北）:
-    /// - 主はテラスの白いパラソルの卓の、北西寄りの椅子（卓から 320 度、<see cref="HostChair"/>）に、芝の方へ少し体を開いて座る（<see cref="HostYaw"/>）
-    /// - 女性は芝の西の縁、小路のトンネルの南の口の脇（<see cref="WomanAt"/>）で、西の花の縁に水を撒いている。主から北へ 5 m ほど。
-    ///   夕日（方位 290 度）は女性の背の左から当たり、主の目から見た顔の側は影になる
-    /// - 歩く道: 芝を南東へ横切ってテラスの段の北（<see cref="WalkBend"/>）へ、段を上がって卓の方（<see cref="WalkEnd"/>）へ。
-    ///   テラスと芝の境はラベンダーの縁で塞がっていて、抜けられるのは東の段だけ
+    /// - 主はテラスの白いパラソルの卓の、北の椅子（卓から 80 度、<see cref="HostChair"/>）に座る。この椅子だけは卓に背を向け、
+    ///   西北西の夕日の方へ向けてある（<see cref="TurnedChairYaw"/>、卓の組み立て <c>Parasol</c>）
+    /// - 女性は、テラスの西の脇から北へ抜ける煉瓦の小路の西の縁（<see cref="WomanAt"/>）で、西の塀の下の花の縁に水を撒いている。主の目から 3.6 m、
+    ///   方位 305 度（主の体の向きの真正面）。日（方位 290 度、仰角 11 度）はその左上にあり、女性の後ろに低い夕日と明るい空が来る。夕日を背にするので、顔の側は影
+    /// - 歩く道: 小路を南へテラスの西の脇（<see cref="WalkBend"/>）まで下り、テラスへ上がって主の方（<see cref="WalkEnd"/>）へ。
+    ///   女性はずっと夕日を背にしている。あいだに卓と椅子は入らない（どれも主の後ろ）
     /// </summary>
     public static partial class BuildVillage
     {
         // ---- 並び -----------------------------------------------------------------------
 
-        /// <summary>主の座る椅子の、卓から見た向き（度。卓の組み立て <c>Parasol</c> の椅子の並び 200・320・80 のうちの一つ）</summary>
-        const float HostChairDeg = 320f;
+        /// <summary>主の座る椅子の、卓から見た向き（度）。夕日の方へ向けた北の一脚（<see cref="TurnedChairDeg"/>）</summary>
+        const float HostChairDeg = TurnedChairDeg;
 
-        /// <summary>主の体の向き。度（+z が 0 で東回り）。椅子は卓（310 度）を向くが、芝の方へ少し体を開いて座る</summary>
-        public const float HostYaw = 345f;
+        /// <summary>主の体の向き。度（+z が 0 で東回り）。椅子の向きのまま、夕日の方</summary>
+        public const float HostYaw = TurnedChairYaw;
 
-        /// <summary>女性が水を撒く立ち位置。芝の西の縁（x -2.0）の少し内、トンネルの南の口の脇</summary>
-        public static readonly Vector3 WomanAt = new Vector3(-1.6f, 0f, 21.6f);
+        /// <summary>
+        /// 女性が水を撒く立ち位置。テラスの西の脇から北へ抜ける煉瓦の小路の西の縁（z 19.75 で芯は x -4.1 ほど、幅 1.1 m）。西の花の縁の前。
+        /// 主の目から 3.5〜4 m に置く（z 19.3 では 3.4 m で近すぎた）
+        /// </summary>
+        public static readonly Vector3 WomanAt = new Vector3(-4.62f, 0f, 19.75f);
 
-        /// <summary>水を撒くときに向く向き。西の花の縁</summary>
-        public const float FlowerYaw = 268f;
+        /// <summary>水を撒くときに向く向き。西の塀の下の花の縁（夕日の方）</summary>
+        public const float FlowerYaw = 262f;
 
-        /// <summary>歩く道の曲がり角。テラスの段（x 0.3〜1.7）の北の芝</summary>
-        public static readonly Vector3 WalkBend = new Vector3(0.95f, 0f, 19.95f);
+        /// <summary>歩く道の曲がり角。小路の、テラスの北西の角の脇</summary>
+        public static readonly Vector3 WalkBend = new Vector3(-4.15f, 0f, 18.35f);
 
-        /// <summary>歩く道の終わり。段を上がったテラスの上、卓の方。ここへ着く前に途切れる</summary>
-        public static readonly Vector3 WalkEnd = new Vector3(0.55f, TerraceTopY, 17.75f);
+        /// <summary>歩く道の終わり。テラスの上、主の前。ここへ着く前に途切れる</summary>
+        public static readonly Vector3 WalkEnd = new Vector3(-2.45f, TerraceTopY, 17.95f);
 
         /// <summary>テラスの上面の高さ（<c>BuildVillageGarden.TerraceTop</c> と同じ）</summary>
         const float TerraceTopY = 0.1f;
 
         /// <summary>歩く速さ。m/s。ゆっくり歩いてくる</summary>
-        public const float WalkSpeed = 0.5f;
+        public const float WalkSpeed = 0.4f;
 
         /// <summary>歩き出す、送ってからの秒（庭の時計）。ホースを止めて、こちらを向いてから</summary>
-        public const float WalkAt = 33f;
+        public const float WalkAt = 52f;
 
-        /// <summary>ホースの出どころ。西の花の縁の奥の地面（花に隠れる）</summary>
-        static readonly Vector3 HoseSource = new Vector3(-2.65f, 0.02f, 20.35f);
-        /// <summary>ホースが芝を這う途中の点</summary>
+        /// <summary>ホースの出どころ。西の花の縁の奥の地面（花に隠れる。塀の際の水栓から来ている見立て）</summary>
+        static readonly Vector3 HoseSource = new Vector3(-5.7f, 0.02f, 18.6f);
+        /// <summary>ホースが花の縁の前と小路を這う途中の点</summary>
         static readonly Vector3[] HoseRun =
         {
-            new Vector3(-2.02f, 0.02f, 20.55f),
-            new Vector3(-1.72f, 0.02f, 20.95f),
+            new Vector3(-5.1f, 0.02f, 19.1f),
+            new Vector3(-4.8f, 0.02f, 19.4f),
         };
 
         /// <summary>主の体の置き場の名</summary>
         public const string MemoryName = "GardenMemory";
         public const string DirectorName = "GardenMemoryDirector";
+
+        /// <summary>途切れた後に読む場面。場面 7（自室・気づき）</summary>
+        public const string NextScene = "Notice";
 
         const string HoseClipPath = "Assets/Audio/GardenHose.wav";
         const string HoseStopClipPath = "Assets/Audio/GardenHoseStop.wav";
@@ -84,7 +91,6 @@ namespace HalfAware.EditorTools
                 return TableAt + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * 0.82f;
             }
         }
-
 
         // ---- 組み立て -------------------------------------------------------------------
 
@@ -136,6 +142,8 @@ namespace HalfAware.EditorTools
             so.FindProperty("noise").objectReferenceValue = noise;
             so.FindProperty("glitch").objectReferenceValue = Clip(GlitchClipPath, note);
             so.FindProperty("cut").objectReferenceValue = Clip(CutClipPath, note);
+            // 途切れた次のフレームに場面 7（自室・気づき）へ
+            so.FindProperty("nextScene").stringValue = NextScene;
             so.ApplyModifiedPropertiesWithoutUndo();
 
             // 場面 9 では伏せたまま。起こすのは場面 6 の演出
@@ -186,6 +194,7 @@ namespace HalfAware.EditorTools
             an.enabled = false;
             for (var i = 0; i < bones.Length; i++) { bones[i].localPosition = at[i]; bones[i].localRotation = turn[i]; }
             foreach (var smr in her.GetComponentsInChildren<SkinnedMeshRenderer>(true)) smr.updateWhenOffscreen = true;
+            SeatedDrape(her, note);
 
             var eyes = BodyPoser.Eyes(an);
             var ahead = chair.forward;
@@ -199,10 +208,173 @@ namespace HalfAware.EditorTools
             return chair;
         }
 
+        /// <summary>座った体をベイクして置くメッシュ</summary>
+        const string HostSeatedPath = Generated + "HostSeated.asset";
+
+        /// <summary>
+        /// 座った時のワンピースの裾の上げ方。裾の段の切り替え（膝の少し下）から下の布を、この割合の長さへ詰める。
+        /// 0.08 で、裾が膝のすぐ下の脛に掛かり、脛と足首から先とサンダルが裾の外に出る（0.28 では、目から見下ろして裾が膝の向こうの足の上半分を塞いだ）
+        /// </summary>
+        const float SeatedHem = 0.08f;
+
+        /// <summary>
+        /// 座った体のワンピースの裾を脛の上へ上げ、足首から先とサンダルを裾の外へ出す。
+        ///
+        /// くるぶし丈のワンピースは、裾の布が脚の骨に付いて脛のまわりに輪で立つ。座ると、上から見下ろす目には、
+        /// その輪が足を囲んで隠し、下を向いてもサンダルが見えなかった（脚を前へ投げ出しても隠れた）。
+        /// 主は歩かないので、座った形の体を一枚のメッシュにベイクして置き（<see cref="HostSeatedPath"/>）、
+        /// 裾の下の段（膝の少し下から裾まで）の布を、同じ縦の列の上の方の布の所へ寄せて短くする（<see cref="SeatedHem"/>）。
+        /// 列と段は布の絵の置き方（UV）で分かる。表と裏の布は別々に寄せる。骨で動く元の体は切り、頭の影（HeadShadow）はそのまま残す
+        /// </summary>
+        static void SeatedDrape(GameObject her, StringBuilder note)
+        {
+            SkinnedMeshRenderer body = null;
+            foreach (var smr in her.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+                if (smr.name != "HeadShadow" && smr.sharedMesh != null && smr.sharedMesh.subMeshCount >= 5) body = smr;
+            if (body == null) { note.AppendLine("座った体の mesh が見つからない。裾を上げられない"); return; }
+            var mesh = new Mesh { name = "HostSeated" };
+            body.BakeMesh(mesh);
+            var v = mesh.vertices;
+            var n = mesh.normals;
+            var uv = mesh.uv;
+            var dress = mesh.GetTriangles(mesh.subMeshCount - 1);
+            var front = new HashSet<int>();
+            var lining = new HashSet<int>();
+            for (var t = 0; t < dress.Length; t++) (t < dress.Length / 2 ? front : lining).Add(dress[t]);
+
+            // 裾の段の切り替え（膝の少し下）の UV の高さ。ワンピースの UV は、腰で 0.5、裾で 0（RocketboxDress.Skirt）
+            var twin = BuildRocketboxProtagonist.Chosen.TwinPerson;
+            var bodySmr = AssetDatabase.LoadAssetAtPath<GameObject>(twin.BodyFrom.Model).GetComponentInChildren<SkinnedMeshRenderer>();
+            var frame = RocketboxDress.Frame.Of(bodySmr);
+            var yTop = frame.waistY + 0.012f;
+            var vTier = 0.5f * (1f - (yTop - RocketboxDress.TierY) / (yTop - RocketboxDress.HemY));
+
+            var moved = 0;
+            foreach (var set in new[] { front, lining })
+            {
+                // 縦の列ごとに、下の段の頂点を UV の高さで並べる
+                var columns = new Dictionary<int, List<int>>();
+                foreach (var i in set)
+                {
+                    if (uv[i].y >= 0.5f || uv[i].y > vTier + 0.02f) continue;
+                    var key = Mathf.RoundToInt(uv[i].x * 1000f);
+                    List<int> col;
+                    if (!columns.TryGetValue(key, out col)) columns[key] = col = new List<int>();
+                    col.Add(i);
+                }
+                var nv = (Vector3[])v.Clone();
+                var nn = (Vector3[])n.Clone();
+                foreach (var col in columns.Values)
+                {
+                    col.Sort((a, b) => uv[a].y.CompareTo(uv[b].y));
+                    var top = uv[col[col.Count - 1]].y;
+                    foreach (var i in col)
+                    {
+                        // 段の切り替えの所はそのまま、裾は切り替えから SeatedHem の所へ
+                        var want = top - (top - uv[i].y) * SeatedHem;
+                        var k = 0;
+                        while (k < col.Count - 2 && uv[col[k + 1]].y < want) k++;
+                        var a = col[k];
+                        var b = col[k + 1];
+                        var span = uv[b].y - uv[a].y;
+                        var s = span > 1e-6f ? Mathf.Clamp01((want - uv[a].y) / span) : 0f;
+                        nv[i] = Vector3.Lerp(v[a], v[b], s);
+                        nn[i] = Vector3.Slerp(n[a], n[b], s).normalized;
+                        moved++;
+                    }
+                }
+                v = nv;
+                n = nn;
+            }
+            var laid = LayOnLegs(her, body.transform, uv, v, n);
+            mesh.vertices = v;
+            mesh.normals = n;
+            mesh.RecalculateBounds();
+            RocketboxCompose.Save(mesh, HostSeatedPath);
+            Object.DestroyImmediate(mesh);
+            var saved = AssetDatabase.LoadAssetAtPath<Mesh>(HostSeatedPath);
+
+            // 骨で動く体と同じ所に、ベイクした体を置く
+            var go = new GameObject("Seated");
+            go.transform.SetParent(body.transform.parent, false);
+            go.transform.localPosition = body.transform.localPosition;
+            go.transform.localRotation = body.transform.localRotation;
+            go.transform.localScale = body.transform.localScale;
+            go.AddComponent<MeshFilter>().sharedMesh = saved;
+            var r = go.AddComponent<MeshRenderer>();
+            r.sharedMaterials = body.sharedMaterials;
+            r.shadowCastingMode = body.shadowCastingMode;
+            r.receiveShadows = body.receiveShadows;
+            body.enabled = false;
+            note.AppendFormat("座った体をベイクした: 裾の下の段を {0:0.00} の長さへ詰めた頂点 {1}（段の切り替えは UV {2:0.000}）、脚の上へ下ろした頂点 {3}", SeatedHem, moved, vTier, laid).AppendLine();
+        }
+
+        /// <summary>腿・膝・脛の上の面から、布を浮かせておく高さ（m）。脚の骨の芯からの高さで、脚の太さを含む</summary>
+        const float ThighTop = 0.085f, KneeTop = 0.07f, ShinTop = 0.06f;
+
+        /// <summary>
+        /// 座った体のスカートの布を、腿と膝と脛の上へ下ろす（重さで脚の上に載った形）。
+        ///
+        /// くるぶし丈のスカートの筒は、座ると膝のまわりに大きな輪で立ち、輪の上の縁が膝より 20 cm ほど上へ膨らむ。
+        /// 目から見下ろすと、その膨らみが膝の向こうの脛と足を塞いだ（布を外すと足とサンダルが見えた）。
+        /// 腰より前の布の頂点を、その前後の位置での脚の上の面（腰から膝、膝から足首を結んだ骨の芯に、脚の太さを足した高さ）より上へ出さない。
+        /// 脇に垂れた布は元から低いので動かない。v と n は体の mesh の中の位置と法線で、書き換える。下ろした頂点の数を返す
+        /// </summary>
+        static int LayOnLegs(GameObject her, Transform body, Vector2[] uv, Vector3[] v, Vector3[] n)
+        {
+            var an = her.GetComponent<Animator>();
+            System.Func<HumanBodyBones, Vector3> B = b => an.GetBoneTransform(b).position;
+            var ahead = her.transform.forward;
+            ahead.y = 0f;
+            ahead.Normalize();
+            var legs = new[]
+            {
+                new[] { B(HumanBodyBones.LeftUpperLeg), B(HumanBodyBones.LeftLowerLeg), B(HumanBodyBones.LeftFoot) },
+                new[] { B(HumanBodyBones.RightUpperLeg), B(HumanBodyBones.RightLowerLeg), B(HumanBodyBones.RightFoot) },
+            };
+            var hipAhead = Vector3.Dot(B(HumanBodyBones.Hips), ahead);
+            // 前後の位置 f での脚の上の面の高さ（二本のうち高い方）
+            System.Func<float, float> top = f =>
+            {
+                var best = float.MinValue;
+                foreach (var leg in legs)
+                {
+                    float fh = Vector3.Dot(leg[0], ahead), fk = Vector3.Dot(leg[1], ahead), fa = Vector3.Dot(leg[2], ahead);
+                    float h;
+                    if (f <= fk) h = Mathf.Lerp(leg[0].y + ThighTop, leg[1].y + KneeTop, Mathf.InverseLerp(fh, fk, f));
+                    else h = Mathf.Lerp(leg[1].y + KneeTop, leg[2].y + ShinTop, Mathf.InverseLerp(fk, fa, f));
+                    best = Mathf.Max(best, h);
+                }
+                return best;
+            };
+            var toWorld = body.localToWorldMatrix;
+            var toLocal = body.worldToLocalMatrix;
+            var laid = 0;
+            for (var i = 0; i < v.Length; i++)
+            {
+                if (uv[i].y >= 0.5f) continue;
+                var w = toWorld.MultiplyPoint3x4(v[i]);
+                var f = Vector3.Dot(w, ahead);
+                if (f < hipAhead + 0.08f) continue;
+                var cap = top(f);
+                if (w.y <= cap) continue;
+                // 腰の近くは少しずつ効かせる（腰の布との継ぎ目に段を作らない）
+                var k = Mathf.Clamp01((f - hipAhead - 0.08f) / 0.12f);
+                w.y = Mathf.Lerp(w.y, cap, k);
+                v[i] = toLocal.MultiplyPoint3x4(w);
+                // 載った布は上を向く
+                var up = toLocal.MultiplyVector(Vector3.up).normalized;
+                n[i] = Vector3.Slerp(n[i], Vector3.Dot(n[i], up) >= 0f ? up : -up, k).normalized;
+                laid++;
+            }
+            return laid;
+        }
+
         /// <summary>
         /// 白い鉄のビストロの椅子（座面 0.45 m、丸く肘掛けは無い）に座った形。値は椅子の足元から見た位置で、+z が体の前。
-        /// 腿は座面に乗せ、脚は前へ下ろしてサンダルをテラスに置く。手は膝の上。下を向くと、膝の上の白いワンピースと両手が見える。
-        /// サンダルは、くるぶしまでの長い裾の輪（脚の骨に付いて脛のまわりに立つ）に上から隠れる（脚を前へ投げ出しても、裾の輪が足を囲んで隠れた）
+        /// 腿は座面に乗せ、脚は前へ伸ばして左（卓の脇の空いたテラスの側）へ少し流し、サンダルをテラスに置く。手は腿の上。
+        /// 足は膝の脇へ出す。真っすぐ前だと、目から見て膝と手と裾の向こうに隠れる（脚は座面から 0.73 m ほどしか前へ届かないので、膝より前へ出しきれない）。
+        /// 裾は座った形で脛の中ほどまで上げる（<see cref="SeatedDrape"/>）。下を向くと、膝の上の白いワンピースと両手、その先に脛とサンダルが見える
         /// mirror なら左右を入れ替える（片割れの模型は根の x を裏返してあり、左の骨が世界の右に来る）
         /// </summary>
         static BodyPoser.Sit HostSit(Transform chair, bool mirror)
@@ -218,13 +390,16 @@ namespace HalfAware.EditorTools
                 pelvis = 0f,
                 lean = 6f,
                 headKeep = 1f,
-                ankleL = P(-0.12f, 0.085f, 0.55f),
-                ankleR = P(0.08f, 0.085f, 0.62f),
-                kneePoleL = P(-0.12f, 0.9f, 1.2f),
-                kneePoleR = P(0.12f, 0.9f, 1.2f),
-                footPoint = 18f,
-                wristL = P(-0.13f, 0.63f, 0.25f),
-                wristR = P(0.13f, 0.63f, 0.25f),
+                // 足は模型の右（+x。裏返した片割れでは世界の左、卓の脇の空いたテラスの側）へ流して置く。
+                // 真っすぐ前へ出すと、目から見て膝と手と裾の向こうに隠れる。世界の右（北）はすぐテラスの縁のラベンダーで、足が埋もれる
+                ankleL = P(0.14f, 0.085f, 0.70f),
+                ankleR = P(0.34f, 0.085f, 0.64f),
+                kneePoleL = P(0.14f, 0.9f, 1.2f),
+                kneePoleR = P(0.34f, 0.9f, 1.2f),
+                footPoint = 0f,
+                // 手は腿の中ほど。膝に置くと指が膝の先へ出て、その向こうの足を隠した
+                wristL = P(-0.14f, 0.61f, 0.13f),
+                wristR = P(0.14f, 0.61f, 0.13f),
                 elbowPoleL = P(-0.45f, 0.62f, -0.2f),
                 elbowPoleR = P(0.45f, 0.62f, -0.2f),
                 fingersL = D(0.1f, -0.35f, 1f),
@@ -550,13 +725,13 @@ namespace HalfAware.EditorTools
             main.duration = 1f;
             main.startLifetime = new ParticleSystem.MinMaxCurve(0.55f, 0.75f);
             main.startSpeed = new ParticleSystem.MinMaxCurve(2.5f, 2.9f);
-            main.startSize = new ParticleSystem.MinMaxCurve(0.06f, 0.10f);
-            main.startColor = new ParticleSystem.MinMaxGradient(new Color(1f, 0.90f, 0.72f, 0.85f), new Color(0.95f, 0.97f, 1f, 0.55f));
+            main.startSize = new ParticleSystem.MinMaxCurve(0.07f, 0.12f);
+            main.startColor = new ParticleSystem.MinMaxGradient(new Color(1f, 0.88f, 0.66f, 1f), new Color(1f, 0.97f, 0.9f, 0.7f));
             main.gravityModifier = 1f;
             main.simulationSpace = ParticleSystemSimulationSpace.World;
             main.maxParticles = 400;
             var emission = ps.emission;
-            emission.rateOverTime = 260f;
+            emission.rateOverTime = 300f;
             var shape = ps.shape;
             shape.shapeType = ParticleSystemShapeType.Cone;
             shape.angle = 5f;
