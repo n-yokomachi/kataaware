@@ -9,7 +9,8 @@ namespace HalfAware.EditorTools
     ///
     /// **形は姿勢ごとに一枚ずつ焼く。** 立つ・首を引く・首を突き出す・ついばむ・首を傾げる・羽を震わせる・
     /// 羽ばたきの三枚（上げ・水平・下げ）の九枚。<see cref="Pigeon"/> がこまの頭ごとに差し替える。
-    /// 丸い胴（六角の輪を六つ）・小さな頭とくちばし・たたんだ翼・尾羽・赤い脚で、三角形は一枚 140〜170。
+    /// 丸い胴（六角の輪を六つ）・小さな頭とくちばし・たたんだ翼・尾羽・赤い脚で、三角形は地面の形が一枚 168、羽ばたきの形が 182。
+    /// 広げた翼は付け根が幅広く、手首で後ろへ折れて先へ細り、後ろの縁を風切り羽の段で刻む（<see cref="PigeonSpan"/>）。
     /// 面は一枚ずつ頂点を持たせて、PS1 のように面ごとに陰影が折れて見える作りにする。
     ///
     /// **色は升の絵（<see cref="PigeonAtlasPath"/>）で塗る。** 村の升（<c>VillageSwatch</c>）と同じ流儀で、
@@ -45,28 +46,28 @@ namespace HalfAware.EditorTools
                 C(0.38f, 0.41f, 0.47f), C(0.42f, 0.45f, 0.50f), C(0.31f, 0.33f, 0.39f), C(0.22f, 0.44f, 0.32f),
                 C(0.44f, 0.27f, 0.47f), C(0.48f, 0.51f, 0.56f), C(0.07f, 0.07f, 0.09f), C(0.22f, 0.23f, 0.26f),
                 C(0.36f, 0.39f, 0.45f), C(0.08f, 0.08f, 0.10f), C(0.58f, 0.60f, 0.63f), C(0.15f, 0.14f, 0.14f),
-                C(0.92f, 0.45f, 0.10f), C(0.80f, 0.30f, 0.30f), C(0.66f, 0.67f, 0.70f), C(0.50f, 0.42f, 0.50f),
+                C(0.92f, 0.45f, 0.10f), C(0.80f, 0.30f, 0.30f), C(0.52f, 0.54f, 0.58f), C(0.50f, 0.42f, 0.50f),
             },
             new[]
             {
                 C(0.24f, 0.25f, 0.28f), C(0.28f, 0.29f, 0.32f), C(0.17f, 0.18f, 0.21f), C(0.16f, 0.36f, 0.25f),
                 C(0.34f, 0.19f, 0.38f), C(0.30f, 0.31f, 0.34f), C(0.05f, 0.05f, 0.06f), C(0.12f, 0.12f, 0.14f),
                 C(0.22f, 0.23f, 0.26f), C(0.06f, 0.06f, 0.07f), C(0.28f, 0.29f, 0.32f), C(0.11f, 0.10f, 0.10f),
-                C(0.88f, 0.40f, 0.10f), C(0.74f, 0.26f, 0.26f), C(0.46f, 0.47f, 0.50f), C(0.27f, 0.23f, 0.29f),
+                C(0.88f, 0.40f, 0.10f), C(0.74f, 0.26f, 0.26f), C(0.34f, 0.35f, 0.38f), C(0.27f, 0.23f, 0.29f),
             },
             new[]
             {
                 C(0.54f, 0.56f, 0.60f), C(0.76f, 0.76f, 0.75f), C(0.76f, 0.76f, 0.74f), C(0.26f, 0.46f, 0.34f),
                 C(0.48f, 0.33f, 0.50f), C(0.74f, 0.74f, 0.73f), C(0.30f, 0.30f, 0.33f), C(0.76f, 0.76f, 0.74f),
                 C(0.46f, 0.48f, 0.52f), C(0.12f, 0.12f, 0.14f), C(0.76f, 0.76f, 0.75f), C(0.60f, 0.53f, 0.50f),
-                C(0.90f, 0.42f, 0.10f), C(0.82f, 0.34f, 0.34f), C(0.78f, 0.78f, 0.77f), C(0.70f, 0.70f, 0.70f),
+                C(0.90f, 0.42f, 0.10f), C(0.82f, 0.34f, 0.34f), C(0.70f, 0.70f, 0.69f), C(0.70f, 0.70f, 0.70f),
             },
             new[]
             {
                 C(0.48f, 0.43f, 0.41f), C(0.53f, 0.48f, 0.46f), C(0.42f, 0.36f, 0.35f), C(0.28f, 0.42f, 0.30f),
                 C(0.46f, 0.29f, 0.40f), C(0.56f, 0.50f, 0.46f), C(0.44f, 0.22f, 0.14f), C(0.44f, 0.34f, 0.29f),
                 C(0.46f, 0.41f, 0.39f), C(0.34f, 0.21f, 0.16f), C(0.60f, 0.56f, 0.53f), C(0.38f, 0.30f, 0.28f),
-                C(0.92f, 0.48f, 0.12f), C(0.80f, 0.32f, 0.30f), C(0.78f, 0.75f, 0.73f), C(0.54f, 0.42f, 0.42f),
+                C(0.92f, 0.48f, 0.12f), C(0.80f, 0.32f, 0.30f), C(0.58f, 0.54f, 0.51f), C(0.54f, 0.42f, 0.42f),
             },
         };
 
@@ -394,51 +395,105 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 広げた翼。肩から手首まで（腕）と手首から先（手）の二枚を、肩を軸に上げ下げする。
-        /// 上の面は灰に二本の黒い帯と濃い後ろの縁、手の先は濃い風切り。下の面は白っぽい
+        /// 広げた翼の輪郭。付け根から翼の先へ、(付け根からの隔たり u, 前の縁の z, 後ろの縁の z)。m。
+        /// 付け根は幅広く（0.14 m）、手首（<see cref="PigeonWrist"/> 番目）で前の縁が後ろへ折れて先へ細る。
+        /// 手の後ろの縁は、風切り羽の先と羽の間を交互に置いて段に刻む。
+        /// 長い四角の板を胴と十字に組んだ形では、飛ぶ鳩が飛行機の模型に見えた（2026-09-27 の差し戻し）
+        /// </summary>
+        static readonly Vector3[] PigeonSpan =
+        {
+            new Vector3(0.000f, 0.060f, -0.080f),
+            new Vector3(0.120f, 0.040f, -0.090f),
+            new Vector3(0.155f, 0.020f, -0.110f),
+            new Vector3(0.190f, -0.004f, -0.093f),
+            new Vector3(0.225f, -0.027f, -0.110f),
+            new Vector3(0.258f, -0.050f, -0.094f),
+            new Vector3(0.290f, -0.082f, -0.082f),
+        };
+        const int PigeonWrist = 1;
+
+        /// <summary>
+        /// 広げた翼。肩から手首まで（腕）の一枚と、手首から先（手）の五枚。
+        /// 腕は肩を軸に上げ下げし（<c>lift</c>）、手は手首でさらに折って（<c>bend</c>）、後ろへ畳む（<c>fold</c>）。
+        /// 羽ばたきの上げでは手を畳んで先を高く、下げでは先を下へ振り、滑る所（水平）でも浅い V にして、水平の一枚板にしない。
+        /// 上の面は灰に黒い帯二本（後ろの帯は後ろの縁）と、手の後ろ半分から先の濃い風切り。
+        /// 下の面は灰に後ろの縁の濃い帯と、濃い風切りの先。一枚 38 三角
         /// </summary>
         static void PigeonSpread(Plumage b, Stance st, float side)
         {
-            float lift, bend, sweep;
+            float lift, bend, fold;
             switch (st.wings)
             {
-                case 2: lift = 62f; bend = 22f; sweep = -0.01f; break;
-                case 4: lift = -48f; bend = -18f; sweep = 0.035f; break;
-                default: lift = 6f; bend = -4f; sweep = 0f; break;
+                case 2: lift = 50f; bend = 28f; fold = 28f; break;
+                case 4: lift = -38f; bend = -22f; fold = -6f; break;
+                default: lift = 14f; bend = -10f; fold = 8f; break;
             }
-            var shoulder = new Vector3(side * 0.040f, 0.160f, 0f);
+            var shoulder = new Vector3(side * 0.036f, 0.160f, 0f);
             var arm = Quaternion.AngleAxis(side * lift, Vector3.forward);
             var hand = Quaternion.AngleAxis(side * (lift + bend), Vector3.forward);
-            // 手首
-            var wrist = shoulder + arm * new Vector3(side * 0.13f, 0f, 0f);
-            System.Func<float, float, Vector3> onArm = (u, z) => shoulder + arm * new Vector3(side * u, 0f, 0f) + new Vector3(0f, 0f, z + sweep * u / 0.13f);
-            System.Func<float, float, Vector3> onHand = (u, z) => wrist + hand * new Vector3(side * u, 0f, 0f) + new Vector3(0f, 0f, z + sweep);
+            var tuck = Quaternion.AngleAxis(side * fold, Vector3.up);
+            var uw = PigeonSpan[PigeonWrist].x;
+            var wrist = shoulder + arm * new Vector3(side * uw, 0f, 0f);
+            // i 番目の断面の、前の縁から後ろの縁へ k の所
+            System.Func<int, float, Vector3> at = (i, k) =>
+            {
+                var sp = PigeonSpan[i];
+                var z = Mathf.Lerp(sp.y, sp.z, k);
+                if (i == 0) return shoulder + new Vector3(0f, 0f, z);
+                return wrist + hand * (tuck * new Vector3(side * (sp.x - uw), 0f, z));
+            };
             var upArm = arm * Vector3.up;
             var upHand = hand * Vector3.up;
-
-            // 腕。前の縁から後ろの縁へ、灰・黒い帯・灰・黒い帯・濃い縁
-            float[] cut = { 0f, 0.5f, 0.62f, 0.76f, 0.88f, 1f };
-            Plume[] parts = { Plume.Wing, Plume.Bar, Plume.Wing, Plume.Bar, Plume.Tips };
-            System.Func<float, float, Vector3> armAt = (u, k) =>
+            for (var i = 0; i + 1 < PigeonSpan.Length; i++)
             {
-                var lead = Mathf.Lerp(0.050f, 0.045f, u / 0.13f);
-                var trail = Mathf.Lerp(-0.070f, -0.085f, u / 0.13f);
-                return onArm(u, Mathf.Lerp(lead, trail, k));
-            };
-            for (var i = 0; i + 1 < cut.Length; i++)
-                b.Quad(armAt(0f, cut[i]), armAt(0.13f, cut[i]), armAt(0.13f, cut[i + 1]), armAt(0f, cut[i + 1]), upArm, parts[i]);
-            b.Quad(armAt(0f, 0f), armAt(0.13f, 0f), armAt(0.13f, 1f), armAt(0f, 1f), -upArm, Plume.Under);
+                var up = i < PigeonWrist ? upArm : upHand;
+                float[] top, bottom;
+                Plume[] topParts, bottomParts;
+                if (i < PigeonWrist)
+                {
+                    // 腕。灰・黒い帯・灰・黒い帯（後ろの縁）。下は灰と後ろの縁の濃い帯
+                    top = new[] { 0f, 0.48f, 0.62f, 0.78f, 1f };
+                    topParts = new[] { Plume.Wing, Plume.Bar, Plume.Wing, Plume.Bar };
+                    bottom = new[] { 0f, 0.78f, 1f };
+                    bottomParts = new[] { Plume.Under, Plume.Bar };
+                }
+                else if (i < PigeonWrist + 2)
+                {
+                    // 手の付け根の側。前半分は灰、後ろ半分は濃い風切り
+                    top = new[] { 0f, 0.5f, 1f };
+                    topParts = new[] { Plume.Wing, Plume.Tips };
+                    bottom = top;
+                    bottomParts = new[] { Plume.Under, Plume.Tips };
+                }
+                else
+                {
+                    // 翼の先。濃い風切りだけ
+                    top = new[] { 0f, 1f };
+                    topParts = new[] { Plume.Tips };
+                    bottom = top;
+                    bottomParts = topParts;
+                }
+                Strip(b, at, i, top, topParts, up);
+                Strip(b, at, i, bottom, bottomParts, -up);
+            }
+        }
 
-            // 手。手首から半ばまで灰、先は濃い風切り
-            var w0 = onHand(0f, 0.045f);
-            var w1 = onHand(0f, -0.085f);
-            var m0 = onHand(0.07f, 0.030f);
-            var m1 = onHand(0.07f, -0.090f);
-            var t0 = onHand(0.17f, -0.015f);
-            var t1 = onHand(0.16f, -0.070f);
-            b.Quad(w0, m0, m1, w1, upHand, Plume.Wing);
-            b.Quad(m0, t0, t1, m1, upHand, Plume.Tips);
-            b.Quad(w0, t0, t1, w1, -upHand, Plume.Under);
+        /// <summary>
+        /// 広げた翼の、i 番目と次の断面のあいだの帯。前の縁から後ろの縁へ <paramref name="cut"/> で割り、区切りごとに色を替える。
+        /// 次の断面が翼の先（前の縁と後ろの縁が一つの点）なら三角にする
+        /// </summary>
+        static void Strip(Plumage b, System.Func<int, float, Vector3> at, int i, float[] cut, Plume[] parts, Vector3 face)
+        {
+            var tip = Mathf.Approximately(PigeonSpan[i + 1].y, PigeonSpan[i + 1].z);
+            for (var c = 0; c + 1 < cut.Length; c++)
+            {
+                var a0 = at(i, cut[c]);
+                var a1 = at(i, cut[c + 1]);
+                var b0 = at(i + 1, cut[c]);
+                var b1 = at(i + 1, cut[c + 1]);
+                if (tip) b.Tri(a0, b0, a1, face, parts[c]);
+                else b.Quad(a0, b0, b1, a1, face, parts[c]);
+            }
         }
 
         /// <summary>尾羽。腰から後ろへ少し下がる板で、先に濃い帯。飛ぶときは扇に開く</summary>
