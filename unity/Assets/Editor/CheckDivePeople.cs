@@ -793,9 +793,11 @@ namespace HalfAware.EditorTools
         /// 動く人は、記憶の時計で動く人も合図で動く人も <paramref name="at"/> 秒の所（負なら動き終えた所）に置く。
         /// 相手をしている人は、首と頭をこのカメラ（主の目）へ向け切った形で撮る（<see cref="PersonMotion.Watch"/>。watch を切れば向けない）。
         /// 画面の角の白い膜と字幕は HUD の Canvas なので写らない。
-        /// 抜けるときに、動く人の置き場・一時の Volume とカメラ・空を全部戻す
+        /// <paramref name="board"/> なら、その人の脇に板（<see cref="HoloPanel"/>）を出して撮る。板は主の目（Player/Main Camera）へ表を向けて置かれるので、
+        /// 撮るあいだは主の体と目をこのカメラと同じ所へ運ぶ。
+        /// 抜けるときに、動く人の置き場・一時の Volume とカメラ・空・主の体と目・板を全部戻す
         /// </summary>
-        public static string Game(int which, Vector3 foot, string target, string path, float strain = 1f, float at = -1f, float lift = 0f, bool watch = true)
+        public static string Game(int which, Vector3 foot, string target, string path, float strain = 1f, float at = -1f, float lift = 0f, bool watch = true, bool board = false)
         {
             var take = TakeAt(which);
             if (take == null) return "記憶 " + which + " が無い";
@@ -809,6 +811,19 @@ namespace HalfAware.EditorTools
             foreach (var m in take.GetComponentsInChildren<Mover>(true)) { kept[m.transform] = m.transform.localPosition; turned[m.transform] = m.transform.localRotation; }
             GameObject eyeGo = null, volGo = null;
             VolumeProfileHolder hold = null;
+            // 板を出すときに動かす物。主の体・目・板
+            var panel = board ? Object.FindFirstObjectByType<HoloPanel>(FindObjectsInactive.Include) : null;
+            var body = main.transform.parent;
+            var hull = body != null ? body.GetComponent<CharacterController>() : null;
+            var bodyPos = body != null ? body.position : Vector3.zero;
+            var bodyRot = body != null ? body.rotation : Quaternion.identity;
+            var eyePos = main.transform.localPosition;
+            var eyeRot = main.transform.localRotation;
+            var panelActive = panel != null && panel.gameObject.activeSelf;
+            var panelPos = panel != null ? panel.transform.position : Vector3.zero;
+            var panelRot = panel != null ? panel.transform.rotation : Quaternion.identity;
+            var panelScale = panel != null ? panel.transform.localScale : Vector3.one;
+            var boardNote = "";
             try
             {
                 using (var stage = new CheckDiveSky.Stage(placeId, which))
@@ -858,12 +873,27 @@ namespace HalfAware.EditorTools
                     volGo.hideFlags = HideFlags.HideAndDontSave;
                     hold = new VolumeProfileHolder(volGo, entry, strain);
 
+                    if (panel != null && body != null)
+                    {
+                        if (hull != null) hull.enabled = false;
+                        body.SetPositionAndRotation(footWorld, Quaternion.Euler(0f, yaw, 0f));
+                        if (hull != null) hull.enabled = true;
+                        main.transform.SetPositionAndRotation(eye, eyeGo.transform.rotation);
+                        Physics.SyncTransforms();
+                        var goes = -1;
+                        foreach (var s in entry.seen) if (s.name == target) goes = s.target;
+                        panel.Show(who, entry.row, goes >= 0 && goes < roster.Count ? roster[goes].row : "");
+                        var pt = panel.transform;
+                        boardNote = string.Format("、板は目から {0:F2} m・大きさ {1:F2}・見かけの丈 {2:F1} 度", Vector3.Distance(eye, pt.position), pt.localScale.x,
+                            2f * Mathf.Atan(0.30f * pt.localScale.x * 0.5f / Mathf.Max(0.01f, Vector3.Distance(eye, pt.position))) * Mathf.Rad2Deg);
+                    }
+
                     var shot = CheckDiveSky.Grab(cam, 960, 540);
                     CheckDiveSky.Save(shot, path);
                     Object.DestroyImmediate(shot);
-                    return string.Format("記憶 {0}: {1} を {2:F2} m 先に、目 {3:F2} m・向き {4:F0}°・俯き {5:F0}°、色味 {6}、ぼやけ {7} {8:F1}（疲れ {9:F1}） → {10}",
+                    return string.Format("記憶 {0}: {1} を {2:F2} m 先に、目 {3:F2} m・向き {4:F0}°・俯き {5:F0}°、色味 {6}、ぼやけ {7} {8:F1}（疲れ {9:F1}）{10} → {11}",
                         which, target, Vector3.Distance(eye, aim), entry.eyeHeight, yaw, pitch,
-                        ColorUtility.ToHtmlStringRGB(entry.tint), entry.blur, entry.blurAmount, strain, path);
+                        ColorUtility.ToHtmlStringRGB(entry.tint), entry.blur, entry.blurAmount, strain, boardNote, path);
                 }
             }
             finally
@@ -874,6 +904,21 @@ namespace HalfAware.EditorTools
                 foreach (var kv in kept) if (kv.Key != null) kv.Key.localPosition = kv.Value;
                 foreach (var kv in turned) if (kv.Key != null) kv.Key.localRotation = kv.Value;
                 foreach (var motion in take.GetComponentsInChildren<PersonMotion>(true)) motion.Watch(null);
+                if (panel != null)
+                {
+                    panel.Hide();
+                    panel.gameObject.SetActive(panelActive);
+                    panel.transform.SetPositionAndRotation(panelPos, panelRot);
+                    panel.transform.localScale = panelScale;
+                }
+                if (board && body != null)
+                {
+                    if (hull != null) hull.enabled = false;
+                    body.SetPositionAndRotation(bodyPos, bodyRot);
+                    if (hull != null) hull.enabled = true;
+                    main.transform.localPosition = eyePos;
+                    main.transform.localRotation = eyeRot;
+                }
             }
         }
 
