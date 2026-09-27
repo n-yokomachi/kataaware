@@ -1,7 +1,7 @@
 # 音の出典
 
-出どころは 2 つ。足音とジッポとチップは CC0 1.0（パブリックドメインの献呈）、
-煙草の 3 つ（吸う・吐く・火）と雨と扉は Pixabay。
+出どころは 2 つ。村の既定の足音（`Step1`〜`Step5`）とジッポとチップは CC0 1.0（パブリックドメインの献呈）、
+ほかの足音と煙草の 3 つ（吸う・吐く・火）と雨と扉ほかは Pixabay。
 
 ## Pixabay Content License
 
@@ -22,7 +22,9 @@ https://pixabay.com/service/license-summary/
 | ファイル | 出典 | 許諾 | 加工 |
 |---|---|---|---|
 | `Step1`〜`Step5.wav` | Kenney RPG Audio（https://kenney.nl/assets/rpg-audio）の `footstep00/02/04/06/08.ogg` | CC0 1.0 | モノラル 44.1kHz へ、末尾を落として頂点を −6dB に揃えた |
-| `Concrete1`〜`Concrete4.wav` | 同上（`Step2` / `Step5` / `Step1` / `Step3` から作り直し） | CC0 1.0 | `tools/make-steps.py`。360Hz より下を落とし、1.2kHz より上を 2.6 倍に持ち上げ、時定数 48ms で尾を詰めて 0.165 秒へ切り、頂点 −6dB |
+| `Concrete1`〜`Concrete4.wav` | Pixabay `freesound_community-concrete-footsteps-1-6265`（「concrete footsteps 1」。freesound_community。https://pixabay.com/sound-effects/film-special-effects-concrete-footsteps-1-6265/） | Pixabay Content License | 元は 7.58 秒、24kHz のステレオ mp3。硬い靴でコンクリートを歩いた録音から、一つの当たりで終わる一歩を四つ（0.287〜0.969 / 3.181〜3.669 / 4.127〜4.555 / 6.078〜6.420 秒。0.34〜0.68 秒）。14 歩のうちほかは、0.07〜0.16 秒後に二つ目の当たりがあるか、ほかより 12〜25dB 弱くて外した。左右を平均してモノラル 44.1kHz へ、50Hz より下を落とした。切り出しは、頭を一歩の立ち上がり（窓の実効値が頂点の 20dB 下を越える所）の 10ms ほど手前に、尻を次の一歩の立ち上がりの 15ms 手前（その前に擦りが来る物はその手前）に取り、余韻を残して尻 8ms だけなだらかに消した。大きさは一歩あたりの大きさ（0.5 秒おきに 10 回重ねて鳴らした物の integrated loudness。余韻が次の一歩に重なる分まで数える。0.5 秒に収まる `Step`・`Grass` では前の測り方と同じ値）を `Step1`〜`Step5` の平均（−28.5 LUFS）に、頂点 −1dB の天井を添えて揃えた。頂点 −1.8〜−4.9dB。前の `Concrete1`〜`4`（Kenney の `Step` から `tools/make-steps.py` で作り直した物）を置き替えた（`tools/make-ambience.sh steps`） |
+| `HardFloor1`〜`HardFloor7.wav` | Pixabay `oxidvideos-footsteps-on-hard-floor-356919`（「Footsteps on hard floor」。作者 OxidVideos。https://pixabay.com/sound-effects/film-special-effects-footsteps-on-hard-floor-356919/） | Pixabay Content License | 元は 13.80 秒、48kHz のステレオ mp3。硬い床を歩いた録音から一歩を七つ（0.229 / 1.391 / 3.215 / 4.484 / 7.012 / 10.674 / 11.290 秒から、次の一歩の手前まで。0.53〜0.63 秒）。二つ目の当たり・擦り・尾の物音のある一歩は外した。左右を平均してモノラル 44.1kHz へ、50Hz より下を落とした。切り出しと大きさは `Concrete` と同じ。頂点 −1.2〜−3.5dB（`tools/make-ambience.sh steps`） |
+| `Room1`〜`Room6.wav` | Pixabay `freesound_community-step_soundwav-14903`（「step_sound.wav」。freesound_community。https://pixabay.com/sound-effects/film-special-effects-step-soundwav-14903/） | Pixabay Content License | 元は 15.50 秒、24kHz のステレオ mp3（左右は同じ）。部屋の床を歩いた録音から一歩を六つ（1.656 / 4.117 / 8.111 / 9.245 / 11.001 / 11.524 秒から。0.52〜0.67 秒）。40Hz より下に −44dB の揺れがずっと乗っているので、100Hz より下を 24dB/oct で落とした。雑音の除去はしていないので、尾の床は頂点より 30〜40dB 下とほかの組より近い。切り出しと大きさは `Concrete` と同じ。頂点 −1.2〜−5.2dB（`tools/make-ambience.sh steps`） |
 | `LighterClick.wav` | OpenGameArt「Zippo click sound」（https://opengameart.org/content/zippo-click-sound）作者 dawith | CC0 1.0 | 金属音の当たりだけを 0.060〜0.320 秒で切り出し、頂点 −3dB |
 | `Drag.wav` | Pixabay の `crackle`。作品名と作者は未記入 | Pixabay Content License | 前後の無音を落として頂点 −8dB |
 | `Blow.wav` | Pixabay の `blow`。作品名と作者は未記入 | Pixabay Content License | 同上 |
@@ -47,7 +49,7 @@ https://pixabay.com/service/license-summary/
 | `VillageMorning.wav` | Pixabay `freesound_community-030510whichford-18349`（「030510whichford」。作者 lunasound（Freesound）。イギリスの村の夜明けの鳥の声） | Pixabay Content License | 元は 309.2 秒。60.5〜122.5 秒の 62 秒を切り出し、モノラル 22.05kHz へ。末尾 2 秒を頭に重ねて輪にし、実効値を −24dBFS に揃えた。60.0 秒。避けたのは、録り始めの低い揺れ（0〜4 秒）、大きなしわがれた鳴き声（48.5〜53 秒・56〜60 秒）、150Hz より下の唸りが続く所（124〜234 秒。風か遠くの車か見分けられない。218 秒に低い衝撃音）、520〜560Hz の小さな音が 2.5 秒おきに続く所（186〜200 秒。遠くのカッコウか鳩の候補）、倍音のそろった鳴き声（256〜259 秒・302〜304 秒）、教会の鐘（268〜300 秒）。カッコウらしい「高→低」の二音の繰り返しは全体で見つからなかった。区間の中には 106.8〜109 秒に倍音のある鳴き声が 3〜4 回残る。村の朝 |
 | `WheatWind.wav` | Pixabay `freesound_community-wheat-in-the-wind-7159`（「Wheat in the Wind」。作者 bdvictor（Freesound）） | Pixabay Content License | 元は 137.7 秒。37.8〜105.8 秒の 68 秒を切り出し（37.0 秒と 106.0 秒の乾いたクリックを避けた）、モノラル 22.05kHz へ。末尾 2 秒を頭に重ねて輪にし、実効値を −24dBFS に揃えた。66.0 秒。約 10 秒おきに入る 5.2kHz の虫の声は残してある（オーナーの了承済み）。村の朝と夕方、場面 8 の麦畑 |
 | `GateCreak.wav` | Pixabay `dobcommunications-creaky-wooden-gate-opens-170210`（「Creaky Wooden Gate Opens」。作者 DOBCommunications） | Pixabay Content License | モノラル 44.1kHz へ、前後の −60dB 未満を落とし、頂点を −6dB に揃えた。2.19 秒。村の片割れの家の格子戸を開ける音 |
-| `Gravel1`〜`Gravel6.wav` | Pixabay `freesound_community-walking-on-a-road-with-gravel-01-30100`（「Walking on a road with gravel 01」。freesound_community） | Pixabay Content License | 元は 61.99 秒、24kHz のステレオ mp3。砂利道を歩いた録音から、一つの塊で終わる一歩を六つ切り出した（5.540 / 6.055 / 7.650 / 16.650 / 17.295 / 20.245 秒から 0.34 秒ずつ。足の重なり、立ち上がりの前の長い擦り、二つ目の当たり、小石を蹴ったような単発の当たりのある所は避けた）。左右を平均してモノラル 44.1kHz へ、100Hz より下を落とし、頭 4ms をなだらかにして 0.20 秒から 0.14 秒かけて消した。大きさは一歩あたりの大きさ（0.5 秒に伸ばして 10 回繰り返した物の integrated loudness）を `Step1`〜`Step5` の平均（−28.5 LUFS）に揃えた。頂点は −4.7〜−10.3dB。村の未舗装の路地の足音 |
+| `Gravel1`〜`Gravel6.wav` | Pixabay `freesound_community-going-on-a-forest-road-gravel-and-grass-6404`（「Going on a forest road gravel and grass」。freesound_community。https://pixabay.com/sound-effects/nature-going-on-a-forest-road-gravel-and-grass-6404/） | Pixabay Content License | 元は 31.32 秒、48kHz のモノラル mp3。林道の砂利と草の上を歩いた録音。**切り出す前に、全体に乗っている広い帯域の雑音を除いた**（ffmpeg の afftdn。足音の間の雑音だけの所 12 か所から型を取り、nf −42 / nr 24。型に使っていない別の 12 か所で測って、床が −45.6 → −64.9dB、足音の芯（塊の立ち上がりから 0.1 秒の 200Hz〜4kHz の実効値）の削れは 0.0〜0.9dB、頂点の削れは 0.2〜0.7dB）。44.1kHz へ、100Hz より下を落とし、一つの塊で終わる一歩を六つ（0.675 / 4.125 / 23.360 / 24.980 / 26.050 / 29.860 秒から。0.36〜0.53 秒）。二つ目の塊のある一歩、塊の前に長い擦りのある一歩、草に入って小さい 14〜22 秒は外した。切り出しと大きさは `Concrete` と同じ。頂点 −1.0〜−5.1dB。前の `Gravel1`〜`6`（「Walking on a road with gravel 01」から切った物）を置き替えた。村の未舗装の道の足音（`tools/make-ambience.sh gravel`） |
 | `Grass1`〜`Grass6.wav` | Pixabay `freesound_community-walking-through-grass-80308`（「Walking through grass」。freesound_community、オーナーの許諾済み） | Pixabay Content License | 元は 12.38 秒、44.1kHz のモノラル mp3。一歩ずつ録った単発が並ぶ録音から、一つの塊で終わる一歩を六つ切り出した（1.790 / 2.490 / 5.110 / 5.770 / 8.910 / 10.010 秒から 0.34 秒ずつ。numpy が無いので ffmpeg で 16bit PCM に落とし、素の Python で 4ms 窓・2ms 送りの実効値を積んで塊を見た。次の塊まで 0.34 秒の余白が無い三つ（9.405 秒はほぼ天井の頂点で二歩の重なりの疑い、10.465 秒は塊の長さ自体が 0.40 秒で長すぎる、11.345 秒は残り一つで数が増えないので見送り）は避けた）。100Hz より下を落とし、頭 4ms をなだらかにして 0.20 秒から 0.14 秒かけて消した。大きさは `Gravel` と同じ揃え方で `Step1`〜`Step5` の平均（−28.5 LUFS）に、頂点 −3dB の天井を添えた。頂点は −3.0〜−10.5dB。村の芝の足音（`tools/make-ambience.sh grass`） |
 | `GardenHose.wav` | Pixabay `freesound_community-watering-62546`（「Watering」。作者 elittle13（Freesound）。早朝に自分の庭のホースで植木に水をやった録音） | Pixabay Content License | 元は 25.22 秒、24kHz のステレオ mp3（左右はほぼ同じ）。1.15〜14.50 秒の 13.35 秒を切り出し（出し始めの 0.25〜1.1 秒、14.55 秒の何かに当たった低い音、24.5 秒からのフェードアウトを避けた）、左右を平均してモノラル 44.1kHz へ（いちばん強いのが 6〜11kHz の帯なので 22.05kHz にしない）。末尾 2 秒を頭に重ねて輪にし、実効値を −24dBFS に揃えた。11.35 秒、頂点 −5.3dB。場面 6 で女性がホースで花に水を撒く音（`tools/make-ambience.sh garden`） |
 | `GardenHoseStop.wav` | Pixabay `freesound_community-hose-sounds-24388`（「Hose Sounds」。作者 JazzyBay（Freesound）。よく軋む栓を開け、吹きさらしの車庫でホースからコンクリートに水を撒いた録音） | Pixabay Content License | 元は 128.93 秒、48kHz のモノラル mp3。短く出しては止めた所のうち、ノズルを離して 0.2 秒で 18dB 落ちる 101.35 秒の止まりを使った。101.22〜102.32 秒の 1.10 秒（止まる前の噴きは 0.13 秒だけ。101.86 秒で噴き残りが止みきり、あとは滴り）。120Hz より下の車庫の唸りを落とし、頭 50ms をなだらかに入れ、0.80 秒から 0.30 秒かけて消した。モノラル 44.1kHz、頂点 −6dB、実効 −33.2dB。場面 6 で水を止める音 |
@@ -87,7 +89,8 @@ https://pixabay.com/service/license-summary/
 | `Music/Cinematic586317.ogg` | Pixabay `leberch-cinematic-586317`（「Cinematic」。作者 leberch。https://pixabay.com/music/suspense-cinematic-586317/） | **有り** | 元は 146.05 秒。0.55〜145.80 秒（頭の無音と尻の −70dB より下を落とす）、尻 0.30 秒を消して頭から弾き直す輪（曲の終わりの減衰と始まりのまばらな入りがそのままつながる）。−3.7dB。145.25 秒。場面 7 の気づき |
 
 雑踏の輪と曲の加工は `tools/make-ambience.sh` で作り直せる（村の朝・麦の風・格子戸は同じ中の 5 節。`bash make-ambience.sh village` でそれだけ作り直す。
-未舗装の路地の足音は 6 節で、`bash make-ambience.sh gravel`。芝の足音は 7 節で、`bash make-ambience.sh grass`。
+村の未舗装の道の足音は 6 節で、`bash make-ambience.sh gravel`。芝の足音は 7 節で、`bash make-ambience.sh grass`。
+足音の三つの組（硬い床・コンクリート・自室）は 11 節で、`bash make-ambience.sh steps`。
 場面 6 の庭の 4 つ（ホースの輪・水を止める音・途切れ・断ち切れ）は 8 節で、`bash make-ambience.sh garden`。
 素材の mp3 は `unity/RawAssets/audio/pixabay/` に Pixabay の元の名前で置く。git には入れない）。WebGL では Unity のオーディオのフィルターが効かないので、
 スピーカーらしさと響きはファイルに焼き込んである。
@@ -99,13 +102,19 @@ https://pixabay.com/service/license-summary/
 
 ## 使うところ
 
-- 足音は `Footsteps`。進んだ距離を積んで 0.88 メートルごとに 1 つ鳴らす。直前と同じ物は選ばず、音量と高さを少し振る
-- 場面 2（小道）と場面 1（自室）は `Step1`〜`Step5`、場面 8（共用ガレージ）は `Concrete1`〜`Concrete4`。
-  同じ足音を裸のコンクリートの上で鳴らすと床が土に聞こえるので、場面 8 だけ作り直してある。
-  ガレージの反響は素材に焼かず、足元の `AudioReverbFilter` に持たせる
+- 足音は `Footsteps`。進んだ距離を積んで 0.88 メートルごとに 1 つ鳴らす。直前と同じ物は選ばず、音量と高さを少し振る。
+  一歩ずつの単発は余韻を次の一歩の手前まで残してあり（0.34〜0.68 秒）、歩き（1.4 m/s で 0.63 秒おき）でも次の一歩が前の余韻に重なることがある。
+  `PlayOneShot` は鳴っている音を切らずに別の声で重ねるので、余韻は途切れない（高さの振れは足元の AudioSource に一つなので、
+  次の一歩を鳴らすと前の余韻の高さも替わる。そのときの余韻は床の空気だけで、頂点（5ms 窓の実効値）より 28〜50dB 下。自室の組が 28〜38dB でいちばん近い）
+- 自室（場面 1・3・5・7）は `Room1`〜`Room6`、場面 2（通り・小道・ヤード）は `Concrete1`〜`Concrete4`、場面 8（共用ガレージ）は `HardFloor1`〜`HardFloor7`
+  （オーナーの指定、2026-09-28。組の表は `StepSets`、差し替えは `HalfAware/Put the footsteps in the scene`）。
+  ガレージと小道の反響は素材に焼かず、足元の `AudioReverbFilter` に持たせる
+- 場面 4（潜る）は場所ごとに既定の組を替え（`DiveDirector` の placeSteps。`BuildDive.PlaceStepPaths`）、一つの場所で床の違う所は床の当たりの `StepGround` で分ける。
+  公営住宅は `Concrete`（外階段・踊り場・デッキ・地面の小径）で、住戸の絨毯は `Room`、台所と浴室の陶板は `HardFloor`。公園は `Grass`（芝）で、小径と門の外の歩道は `Concrete`。
+  電車と教室は `HardFloor`。台所の家は `Room`（居間の板と階段）で、台所のリノリウムと廊下・玄関先の陶板は `HardFloor`
 - 村（`Village.unity`）の足音は地面で替える。`Footsteps` が一歩ごとに足元の当たりを見て、`StepGround` が付いていればその音で鳴らす。
   未舗装の路地（車の着く所の未舗装路と門の前の砂利の溜まりを含む）は `Gravel1`〜`Gravel6`、庭の煉瓦の小路・玄関の小路・テラスは `Concrete1`〜`Concrete4`、
-  芝の路肩と庭の芝は `Grass1`〜`Grass6`（`BuildVillageSound.StepGrounds`）。`StepGround` の無い場面 1・2・4・8 は今までどおり `Step1`〜`Step5`
+  芝の路肩と庭の芝は `Grass1`〜`Grass6`（`BuildVillageSound.StepGrounds`）。村で `StepGround` の無い所は `Step1`〜`Step5`（村の既定）
 - 自室の空気の音は `RoomTone`。自室が舞台の場面 1・3・5 で、プレイヤーの頭上で 2D の輪にして小さく流す（`RoomTone`。大きさはインスペクターで変える）。場面を終えて暗転するときは、その暗転に合わせて絞る
 - 村（`Village.unity`）の環境音は `VillageAmbience`（Player/Ambience）。プレイヤーの頭上で 2D の輪にして流し、時刻（`VillageHour`）で鳴らす物を替える。
   朝は `VillageMorning`（0.4）と `WheatWind`（0.5）を重ね、夕方は `WheatWind`（0.6）だけ。時刻が替わると 2 秒で入れ替える。
@@ -155,24 +164,18 @@ WebGL 書き出しなので、走行の輪と雨とエンジンは取り込み�
 - ライターと息は `Cigarette`。`SmokeBeats` の時刻表に沿って、蓋 → 火 → 吸う → 吐く、の順に鳴らす
 - 吐く息の頭で `SmokePuffs.Blow()` を呼び、煙をひと息ぶん足す。音と煙は同じ時刻表から出るのでずれない
 
-## コンクリートの足音の作り直し
+## 足音の差し替え（2026-09-28）
 
-Kenney の足音はどれも柔らかい地面のもので、2.5kHz 以上が 700Hz 以下より
-10.9〜15.5dB 弱い。裸のコンクリートは逆に高い打ちつけが勝つ。
-`tools/make-steps.py` で唸りを抜いて打音を持ち上げ、偏りを +2.5 / −0.3 / −3.0 / −7.7dB へ寄せた。
+オーナーの指示で、自室・場面 2・場面 8・村の未舗装の道の足音を Pixabay の録音から切り出した物に替え、
+場面 4 も場所ごとにそこから選ぶようにした。どれも録音の中で何歩も鳴っている物を一歩ずつに切り分け、
+`Footsteps` が組の中からランダムに選ぶ。余韻は次の一歩が鳴る手前まで残してある。
 
-**重さを足そうとして二度失敗し、素に戻してある。** 「軽い」と言われて落とす端を下げ、
-さらに 92Hz の低い打ちを合成して重ねたが、三度目は「足音そのものが良く聞こえない」
-「反響音が先になっている」「ぶつ切り」と差し戻された。軽く聞こえていた本当の原因は
-素材ではなく反響の掛け方で、直の音を −140 まで削ったうえに大きく遅らせた尾を
-重ねていたこと。素材は素のまま（360Hz / 2.6 倍 / 0.165 秒）へ戻し、
-反響は場面 2 の小道と同じ値に揃えてある。
+前の `Concrete1`〜`4` は Kenney の柔らかい足音から唸りを抜いて打音を持ち上げた物（`tools/make-steps.py`）で、
+使う所が無くなったので中身を新しいコンクリートの録音に置き替え、`make-steps.py` は消した（走らせると新しい `Concrete` を上書きするため）。
+そのとき分かった**反響の掛け方**はそのまま生きている: 軽く聞こえた本当の原因は素材ではなく、直の音を −140 まで削ったうえに
+大きく遅らせた尾を重ねていたことだった。場面 2 と 8 の足元の `AudioReverbFilter` は、直の音を削らず遅れも触らない値にしてある。
 
-**5 つ全部は使っていない。** `Step4` は元から高域がいちばん少なく、持ち上げても
-素材に無いものは出てこないので落とした。4 つ目（`Step3` 由来）だけ鈍いのはわざとで、
-毎歩きれいに踏まない一歩が混じっていた方が繰り返しに聞こえにくい。
-
-**採否はオーナーが聴いて決める。** こちらでは音を聴けないので、判断できるのは帯域の偏りだけ。
+**採否はオーナーが聴いて決める。** こちらでは音を聴けないので、判断できるのは帯域の偏りと包絡だけ。
 
 ## 息の選び分け
 
@@ -187,6 +190,7 @@ Kenney の足音はどれも柔らかい地面のもので、2.5kHz 以上が 70
 ## 音量
 
 効果音は AudioSource 側で絞ってある。口元 0.40、足元 0.28。素材そのものは頂点を揃えたまま置く。
+足音だけは頂点ではなく一歩あたりの大きさ（−28.5 LUFS）で揃えてある（組と組を替えても同じ大きさに聞こえるように）。
 
 ## 差し替えた経緯
 

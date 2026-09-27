@@ -2,8 +2,9 @@
 # HALF AWARE 音素材の生成スクリプト（ffmpeg 8.0.1 のみで完結）
 # 使い方: bash make-ambience.sh           （全部）
 #         bash make-ambience.sh village   （5 節の村と麦畑の 3 つだけ）
-#         bash make-ambience.sh gravel    （6 節の未舗装の路地の足音だけ）
+#         bash make-ambience.sh gravel    （6 節の村の未舗装の道の足音だけ）
 #         bash make-ambience.sh grass     （7 節の芝の足音だけ）
+#         bash make-ambience.sh steps     （11 節の足音の三つの組（硬い床・コンクリート・自室）だけ）
 #         bash make-ambience.sh garden    （8 節の場面 6 の庭の 4 つだけ）
 #         bash make-ambience.sh bgm       （9 節の場面ごとの BGM の 7 曲だけ）
 # 出力先は OUT_DIR 直下。中間ファイルは OUT_DIR/tmp に置く。
@@ -24,8 +25,12 @@ SRC_PIXABAY_DIR="${SRC_PIXABAY_DIR:-$SCRIPT_DIR/../unity/RawAssets/audio/pixabay
 SRC_WHICHFORD="$SRC_PIXABAY_DIR/freesound_community-030510whichford-18349.mp3"
 SRC_WHEAT="$SRC_PIXABAY_DIR/freesound_community-wheat-in-the-wind-7159.mp3"
 SRC_GATE="$SRC_PIXABAY_DIR/dobcommunications-creaky-wooden-gate-opens-170210.mp3"
-SRC_GRAVEL="$SRC_PIXABAY_DIR/freesound_community-walking-on-a-road-with-gravel-01-30100.mp3"
+SRC_GRAVEL="$SRC_PIXABAY_DIR/freesound_community-going-on-a-forest-road-gravel-and-grass-6404.mp3"
 SRC_GRASS="$SRC_PIXABAY_DIR/freesound_community-walking-through-grass-80308.mp3"
+# 11 節（足音の三つの組）の素材
+SRC_HARD_FLOOR="$SRC_PIXABAY_DIR/oxidvideos-footsteps-on-hard-floor-356919.mp3"
+SRC_CONCRETE="$SRC_PIXABAY_DIR/freesound_community-concrete-footsteps-1-6265.mp3"
+SRC_ROOM_STEP="$SRC_PIXABAY_DIR/freesound_community-step_soundwav-14903.mp3"
 # 8 節（場面 6 の庭の記憶）の素材
 SRC_HOSE="$SRC_PIXABAY_DIR/freesound_community-watering-62546.mp3"
 SRC_HOSE_STOP="$SRC_PIXABAY_DIR/freesound_community-hose-sounds-24388.mp3"
@@ -39,7 +44,7 @@ SRC_REMEMBRANCE="$SRC_PIXABAY_DIR/joelfazhari-remembrance-dreamy-emotional-and-m
 SRC_APPROACH="$SRC_PIXABAY_DIR/leberch-ambient-580528.mp3"
 SRC_REUNION="$SRC_PIXABAY_DIR/leberch-ambient-578724.mp3"
 SRC_CINEMATIC="$SRC_PIXABAY_DIR/leberch-cinematic-586317.mp3"
-# 6 節で大きさを揃える相手（村の芝と庭で鳴らしている柔らかい足音）
+# 6・7・11 節の足音の大きさを揃える相手（Step1〜5。Kenney RPG Audio の柔らかい足音）
 STEPS_DIR="${STEPS_DIR:-$SCRIPT_DIR/../unity/Assets/Audio}"
 
 OUT_DIR="${OUT_DIR:-./out-ambience}"   # 出来た物を unity/Assets/Audio/ と unity/Assets/Audio/Music/ へ写す
@@ -52,6 +57,67 @@ mkdir -p "$TMP_DIR" "$ANALYSIS_DIR"
 step_loudness () {
   ffmpeg -hide_banner -nostats -i "$1" -af "aresample=44100,apad=whole_dur=0.5,aloop=loop=9:size=22050,ebur128" -f null - 2>&1 \
     | grep -E "^\s+I:" | tail -1 | grep -oE '[-0-9.]+' | head -1
+}
+
+# 一歩あたりの大きさ（余韻の長い足音の分）。0.5 秒おきに 10 回重ねて鳴らした物の integrated loudness（LUFS）。
+# 0.5 秒に収まる音なら step_loudness と同じ値になる（Step1〜5・Gravel・Grass で差 0.1 LU 以内）。
+# 0.5 秒を越える音は、step_loudness では 0.5 秒で打ち切って繰り返すので余韻が数えられない。
+# 重ねて鳴らせば、余韻が次の一歩に重なって鳴る分まで数える（6 節の砂利と 11 節の三つの組が使う）
+step_loudness_ola () {
+  local fc="[0:a]aresample=44100,asplit=10[s0][s1][s2][s3][s4][s5][s6][s7][s8][s9];" mix="[s0]" k
+  for k in 1 2 3 4 5 6 7 8 9; do fc="$fc[s$k]adelay=$((k*500)):all=1[d$k];"; mix="$mix[d$k]"; done
+  ffmpeg -hide_banner -nostats -i "$1" -filter_complex "${fc}${mix}amix=inputs=10:normalize=0:duration=longest,ebur128[o]" -map "[o]" -f null - 2>&1 \
+    | grep -E "^\s+I:" | tail -1 | grep -oE '[-0-9.]+' | head -1
+}
+
+# Step1〜5 の一歩あたりの大きさの電力の平均（6 節と 11 節の足音を揃える相手）。Step1〜5 が無ければ前に測った値
+steps_target () {
+  local sum=0 s l
+  if [ ! -f "$STEPS_DIR/Step1.wav" ]; then echo "-28.47"; return; fi
+  for s in 1 2 3 4 5; do
+    l=$(step_loudness "$STEPS_DIR/Step$s.wav")
+    sum=$(awk "BEGIN{print $sum + 10^($l/10)}")
+  done
+  awk "BEGIN{printf \"%.2f\", 10*log($sum/5)/log(10)}"
+}
+
+# 一歩ずつ切り出して大きさを揃え、OUT_DIR/<名前><番号>.wav に書き出す（6 節と 11 節）。
+#   $1 名前  $2 下ごしらえの済んだ 44.1kHz モノラルの wav  $3 "頭-尻 頭-尻 ..."（秒）  $4 目標（LUFS）  $5 頂点の天井（dB）
+# 頭 3ms をなだらかに入れ、尻 8ms だけなだらかに消す（余韻はそのまま残す）
+cut_steps () {
+  local name="$1" src="$2" cuts="$3" target="$4" ceil="$5"
+  local n=0 c s e len fo l pk gain out
+  for c in $cuts; do
+    n=$((n+1)); s=${c%-*}; e=${c#*-}
+    len=$(awk "BEGIN{printf \"%.3f\", $e-$s}")
+    fo=$(awk "BEGIN{printf \"%.3f\", $len-0.008}")
+    ffmpeg -y -v error -ss "$s" -t "$len" -i "$src" \
+      -af "afade=t=in:st=0:d=0.003,afade=t=out:st=${fo}:d=0.008" -c:a pcm_f32le "$TMP_DIR/${name}${n}_cut.wav"
+    l=$(step_loudness_ola "$TMP_DIR/${name}${n}_cut.wav")
+    pk=$(ffmpeg -hide_banner -i "$TMP_DIR/${name}${n}_cut.wav" -af "astats=metadata=0" -f null - 2>&1 | grep "Peak level dB" | tail -1 | grep -oE '[-0-9.]+$')
+    gain=$(awk "BEGIN{g=$target - ($l); c=$ceil - ($pk); printf \"%.2f\", (g < c ? g : c)}")
+    out="$OUT_DIR/${name}${n}.wav"
+    ffmpeg -y -v error -i "$TMP_DIR/${name}${n}_cut.wav" -af "volume=${gain}dB" -ar 44100 -ac 1 -c:a pcm_s16le "$out"
+    ffmpeg -y -v error -sseof -0.1 -i "$out" -c:a pcm_f32le "$TMP_DIR/${name}${n}_end.wav"
+    printf "  %-11s %7.3f〜%7.3f 秒  %.3f 秒  切り出し %6s LUFS / 頂点 %6.1f dB → %+6.2f dB → %6s LUFS / 頂点 %6.1f dB / 尻 0.1 秒 %6.1f dB\n" \
+      "${name}${n}" "$s" "$e" "$len" "$l" "$pk" "$gain" "$(step_loudness_ola "$out")" \
+      "$(ffmpeg -hide_banner -i "$out" -af "astats=metadata=0" -f null - 2>&1 | grep "Peak level dB" | tail -1 | grep -oE '[-0-9.]+$')" \
+      "$(band_rms "$TMP_DIR/${name}${n}_end.wav")"
+  done
+  # 確かめ用に、組の全部を 0.1 秒の間を挟んで並べた波形（線形と対数）とスペクトルを書き出す
+  local ins="" fc="" k
+  for k in $(seq 1 $n); do ins="$ins -i $OUT_DIR/${name}${k}.wav"; fc="$fc[$((k-1)):a]apad=pad_dur=0.1[p$k];"; done
+  local cat=""; for k in $(seq 1 $n); do cat="$cat[p$k]"; done
+  # shellcheck disable=SC2086
+  ffmpeg -y -v error $ins -filter_complex "${fc}${cat}concat=n=$n:v=0:a=1,asplit=3[a][b][c];
+[a]showwavespic=s=1600x200:colors=0x3070c0[w1];[b]showwavespic=s=1600x200:colors=0xc07030:scale=log[w2];
+[c]showspectrumpic=s=1600x360:fscale=lin:legend=0:color=intensity:gain=2:stop=16000[sp];[w1][w2][sp]vstack=inputs=3[o]" \
+    -map "[o]" -frames:v 1 "$ANALYSIS_DIR/${name}_sheet.png"
+}
+
+# 帯域ごとの実効値（dB）。$1 ファイル  $2 フィルター（空なら全帯域）
+band_rms () {
+  ffmpeg -hide_banner -i "$1" -af "${2:+$2,}astats=metadata=0" -f null - 2>&1 | grep "RMS level dB" | tail -1 | grep -oE '[-0-9.]+$'
 }
 
 # 1〜4 節は PART=all のときだけ（字下げはせず、4 節の末尾で閉じる）
@@ -285,68 +351,99 @@ ffmpeg -y -v error -i "$TMP_DIR/gate_trim.wav" -af "volume=${GATE_GAIN}dB" -ar 4
 fi   # PART=all か village
 
 # ---------------------------------------------------------------------------
-# 6. Gravel1〜6.wav — 未舗装の路地の足音（Walking on a road with gravel 01）
-#    元は 61.99 秒、24kHz のステレオ mp3。砂利道を一定の歩調（0.53 秒ほどの間）で
-#    歩いた録音で、一歩は 500Hz〜4.5kHz の砂利の擦れの塊が 0.15〜0.2 秒続き、
-#    床の雑音（-55dB 前後）まで落ちてから次の一歩が来る。
-#    10ms と 5ms の窓の実効値で一歩ずつの立ち上がりを拾い、次の物を避けた:
-#    - 次の一歩が 0.35 秒より早く来る所（足の重なり。2.35〜3.0 秒・13.1 秒・24.3 秒・
-#      31.9〜32.2 秒・47.2〜47.8 秒・48.5〜49.2 秒ほか）
-#    - 立ち上がりの前に弱い擦りが 0.1〜0.2 秒続く所（踵を引きずった足。10.1 秒・
-#      20.8 秒・21.3 秒・29.5 秒・46.75 秒）と、一歩の塊が 0.3 秒を超えて平たく続く所（54.7 秒）
-#    - 一歩の後ろに二つ目の当たりが続く所（1.3 秒・12.3 秒）
-#    - 周りより 10dB 以上突き出た単発の当たり（2.97 秒・13.19 秒・27.99 秒・37.75 秒。小石を蹴った音か）
-#    残った中から、一つの塊で終わる六つを採用。切り出しは立ち上がりの 15ms 前から 0.34 秒:
-#      5.540 / 6.055 / 7.650 / 16.650 / 17.295 / 20.245 秒
-#    左右を平均してモノラルに畳み、44.1kHz へ。100Hz より下の唸りを落とし、頭 4ms を
-#    なだらかにして、0.20 秒から 0.14 秒かけて消す（qsin）。
-#    大きさは村の柔らかい足音（Step1〜5）と一歩あたりの大きさで揃える。どちらも 0.5 秒に
-#    伸ばして 10 回繰り返した物の integrated loudness（ebur128）を測り、Step1〜5 の
-#    平均（電力の平均）に合わせる。頂点が -3dB を超えるなら、そこで止める。
-#    輪にはしない。一歩ずつの単発で、Footsteps が一歩ごとに一つ選んで鳴らす。
+# 6. Gravel1〜6.wav — 村の未舗装の道の足音（Going on a forest road gravel and grass、freesound_community）
+#    元は 31.32 秒、48kHz のモノラル mp3。林道の砂利と草の上を 0.45〜0.6 秒の歩調で歩いた録音で、
+#    0〜14 秒と 22〜31 秒が砂利を踏む大きな一歩、14〜22 秒は草に入って小さい。
+#    一歩は 0.3〜16kHz に広がる砂利の擦れの塊が 0.05〜0.15 秒続き、塊の前に小さな擦りが来ることが多い。
+#    （前は「Walking on a road with gravel 01」から切っていた。オーナーの指示で素材ごと替えた）
+#
+#    **切り出す前に、全体に乗っている広い帯域の雑音（シャーという音）を除く。**
+#    足音の間の床は −45dB 前後で、0.5〜16kHz の各オクターブが −51〜−54dB とほぼ平らに並ぶ。
+#    44.1kHz へ落として 100Hz より下を切り（元から −90dB 台でほぼ何も無いが、前の砂利と同じ下ごしらえ）、
+#    ffmpeg の afftdn（FFT の雑音除去）に、雑音だけの所から雑音の型を取らせてから掛ける:
+#    - 雑音だけの所は、5ms 窓の実効値が下から 2 割の値 +2dB に収まって 0.09 秒以上続く所。24 か所あり、
+#      一つおきに二組に分けた。A 組（12 か所、1.61 秒）をつないで録音の頭に置き、そこを sample_noise で
+#      覚えさせる。B 組（12 か所、1.77 秒）は型に使わず、除いた後の床を測り直すのにだけ使う
+#      （型を取った所で測ると、その所だけ深く効いて甘く出る）
+#    - 強さは nf（雑音の床の見積もり）で決める。nr（一つの帯で落とす量の上限）は 24dB で、nf を
+#      −50 / −45 / −42 / −40 / −38 と振ると、B 組の床は 7.1 / 14.7 / 19.3 / 21.7 / 23.1dB 下がり、
+#      足音の芯（使う六つの、塊の立ち上がりから 0.1 秒の 200Hz〜4kHz の実効値）は最大で 0.1 / 0.5 / 0.9 / 1.3 / 1.8dB、
+#      頂点は最大で 0.1 / 0.3 / 0.7 / 1.0 / 1.4dB 削れる。芯が 1dB より削れない −42 で止めた。
+#      −42 の床は −45.6 → −64.9dB。オクターブごとに 250Hz〜4kHz は 22dB 前後、8kHz は 19dB、16kHz は 14dB 下がる
+#    - afftdn は 44.1kHz で 1102 サンプル（25ms）遅れて出す（ffmpeg 8.0.1。クリックを通して測った）。
+#      頭に置いた A 組の分と合わせて切り落とし、元の秒と揃える（除いた後の頂点の位置が元と同じ標本に来るのを確かめた）
+#    除いた後で、一つの塊で終わる一歩を六つ切り出す（切り出しの決まりは 11 節と同じ。頭は塊の前の擦りの 10ms ほど手前、
+#    尻は次の一歩の前の擦りの手前まで取り、余韻を残す）。採った六つ（秒）: 0.675〜1.035 / 4.125〜4.540 / 23.360〜23.850 /
+#    24.980〜25.380 / 26.050〜26.580 / 29.860〜30.340（0.36〜0.53 秒）。避けた物:
+#    - 一歩の後ろに二つ目の塊が続く所（2.20・3.62・8.43・8.93・13.25・13.73・22.32・22.84 秒）
+#    - 塊の前に 0.1 秒を越える擦りが続く所（5.18・6.85 秒）
+#    - 草に入って小さい 14〜22 秒（床との差が 10〜15dB しかなく、雑音を除いても芯が細る）
+#    大きさは 11 節と同じ（0.5 秒おきに 10 回重ねた一歩あたりの大きさを Step1〜5 の平均へ、頂点 −1dB の天井）。輪にはしない単発
 # ---------------------------------------------------------------------------
 if [ "$PART" = "all" ] || [ "$PART" = "gravel" ]; then
 
-GRAVEL_STARTS="5.540 6.055 7.650 16.650 17.295 20.245"
-GRAVEL_LEN=0.34
-GRAVEL_FADE_AT=0.20
-GRAVEL_FADE=0.14
-GRAVEL_CEIL=-3
+echo "=== Gravel1〜6.wav（未舗装の道）==="
+GRAVEL_CUTS="0.675-1.035 4.125-4.540 23.360-23.850 24.980-25.380 26.050-26.580 29.860-30.340"
+# 塊の立ち上がり（芯を測る所。切り出しの頭の擦りより後）
+GRAVEL_CORE="0.713 4.141 23.412 25.018 26.106 29.882"
+# 雑音だけの所。A 組は型を取る、B 組は測る
+GRAVEL_NOISE_A="0.229-0.419 2.424-2.519 11.978-12.102 17.750-17.944 19.321-19.416 19.915-20.064 22.110-22.210 25.153-25.248 26.884-27.068 28.410-28.590 29.219-29.323 30.271-30.371"
+GRAVEL_NOISE_B="1.811-2.025 2.963-3.078 16.093-16.188 18.847-18.992 19.421-19.576 21.022-21.127 24.669-24.769 26.470-26.600 27.971-28.091 29.064-29.194 30.122-30.256 30.585-30.915"
+GRAVEL_NR=24
+GRAVEL_NF=-42
+AFFTDN_LAG=1102
 
-STEP_SUM=0
-for s in 1 2 3 4 5; do
-  l=$(step_loudness "$STEPS_DIR/Step$s.wav")
-  echo "Step$s: ${l} LUFS"
-  STEP_SUM=$(awk "BEGIN{print $STEP_SUM + 10^($l/10)}")
+ffmpeg -y -v error -i "$SRC_GRAVEL" -af "aresample=44100,highpass=f=100:poles=2" -ac 1 -c:a pcm_f32le "$TMP_DIR/gravel_src.wav"
+
+# 区間の並びをつないで一つの wav にする（継ぎ目は 5ms ずつなだらかに）
+join_spans () {
+  local src="$1" spans="$2" out="$3" fc="" lab="" n=0 r s e
+  for r in $spans; do
+    s=${r%-*}; e=${r#*-}
+    fc="$fc[0:a]atrim=$s:$e,asetpts=PTS-STARTPTS,afade=t=in:d=0.005,afade=t=out:st=$(awk "BEGIN{print $e-$s-0.005}"):d=0.005[q$n];"
+    lab="$lab[q$n]"; n=$((n+1))
+  done
+  ffmpeg -y -v error -i "$src" -filter_complex "${fc}${lab}concat=n=$n:v=0:a=1[o]" -map "[o]" -c:a pcm_f32le "$out"
+}
+join_spans "$TMP_DIR/gravel_src.wav" "$GRAVEL_NOISE_A" "$TMP_DIR/gravel_noiseA.wav"
+GRAVEL_NA=$(ffprobe -v error -show_entries stream=duration_ts -of csv=p=0 "$TMP_DIR/gravel_noiseA.wav")
+GRAVEL_NA_SEC=$(awk "BEGIN{printf \"%.4f\", ($GRAVEL_NA-1)/44100}")
+ffmpeg -y -v error -i "$TMP_DIR/gravel_noiseA.wav" -i "$TMP_DIR/gravel_src.wav" -filter_complex "
+[0:a][1:a]concat=n=2:v=0:a=1,apad=pad_len=${AFFTDN_LAG},
+asendcmd=c='0.0 afftdn@dn sn start; ${GRAVEL_NA_SEC} afftdn@dn sn stop',
+afftdn@dn=nr=${GRAVEL_NR}:nf=${GRAVEL_NF},
+atrim=start_sample=$((GRAVEL_NA + AFFTDN_LAG)),asetpts=PTS-STARTPTS[o]
+" -map "[o]" -c:a pcm_f32le "$TMP_DIR/gravel_clean.wav"
+
+# 除く前と後の数。B 組の床（全帯域とオクターブごと）と、使う六つの足音の芯（塊の立ち上がりから 0.1 秒の
+# 200Hz〜4kHz の実効値）・切り出し全体の頂点・一歩あたりの大きさ
+join_spans "$TMP_DIR/gravel_src.wav" "$GRAVEL_NOISE_B" "$TMP_DIR/gravel_noiseB_before.wav"
+join_spans "$TMP_DIR/gravel_clean.wav" "$GRAVEL_NOISE_B" "$TMP_DIR/gravel_noiseB_after.wav"
+for w in before after; do
+  printf "  床（B 組）%-6s 全帯域 %6.1f dB |" "$w" "$(band_rms "$TMP_DIR/gravel_noiseB_$w.wav")"
+  for b in 250 500 1000 2000 4000 8000 16000; do
+    printf " %s:%.1f" "$b" "$(band_rms "$TMP_DIR/gravel_noiseB_$w.wav" "bandpass=f=$b:width_type=o:w=1")"
+  done
+  echo
 done
-GRAVEL_TARGET=$(awk "BEGIN{printf \"%.2f\", 10*log($STEP_SUM/5)/log(10)}")
-echo "Gravel: target ${GRAVEL_TARGET} LUFS（Step1〜5 の電力の平均）"
-
-n=0
-for st in $GRAVEL_STARTS; do
-  n=$((n+1))
-  name="Gravel$n"
-  echo "=== ${name}.wav（${st} 秒から）==="
-  ffmpeg -y -v error -ss "$st" -t 0.40 -i "$SRC_GRAVEL" \
-    -af "pan=mono|c0=0.5*c0+0.5*c1,aresample=44100,highpass=f=100:poles=2,atrim=0:${GRAVEL_LEN},afade=t=in:st=0:d=0.004,afade=t=out:st=${GRAVEL_FADE_AT}:d=${GRAVEL_FADE}:curve=qsin" \
-    -c:a pcm_s16le "$TMP_DIR/${name}_cut.wav"
-  l=$(step_loudness "$TMP_DIR/${name}_cut.wav")
-  pk=$(ffmpeg -hide_banner -i "$TMP_DIR/${name}_cut.wav" -af "astats=metadata=0" -f null - 2>&1 | grep "Peak level dB" | tail -1 | grep -oE '[-0-9.]+$')
-  gain=$(awk "BEGIN{g=$GRAVEL_TARGET - ($l); c=$GRAVEL_CEIL - ($pk); printf \"%.2f\", (g < c ? g : c)}")
-  echo "${name}: measured ${l} LUFS, peak ${pk}dB, applying gain=${gain}dB"
-  ffmpeg -y -v error -i "$TMP_DIR/${name}_cut.wav" -af "volume=${gain}dB" -ar 44100 -ac 1 -c:a pcm_s16le "$OUT_DIR/${name}.wav"
+k=0
+for c in $GRAVEL_CUTS; do
+  k=$((k+1)); s=${c%-*}; e=${c#*-}; core=$(echo $GRAVEL_CORE | cut -d' ' -f$k)
+  for w in src clean; do
+    ffmpeg -y -v error -ss "$core" -t 0.1 -i "$TMP_DIR/gravel_$w.wav" -c:a pcm_f32le "$TMP_DIR/gravel_core_$w.wav"
+    ffmpeg -y -v error -ss "$s" -t "$(awk "BEGIN{print $e-$s}")" -i "$TMP_DIR/gravel_$w.wav" -c:a pcm_f32le "$TMP_DIR/gravel_step_$w.wav"
+  done
+  printf "  %7.3f〜%7.3f 秒  芯 %6.1f → %6.1f dB  頂点 %6.1f → %6.1f dB  一歩 %6s → %6s LUFS\n" "$s" "$e" \
+    "$(band_rms "$TMP_DIR/gravel_core_src.wav" "highpass=f=200,lowpass=f=4000")" \
+    "$(band_rms "$TMP_DIR/gravel_core_clean.wav" "highpass=f=200,lowpass=f=4000")" \
+    "$(ffmpeg -hide_banner -i "$TMP_DIR/gravel_step_src.wav" -af "astats=metadata=0" -f null - 2>&1 | grep "Peak level dB" | tail -1 | grep -oE '[-0-9.]+$')" \
+    "$(ffmpeg -hide_banner -i "$TMP_DIR/gravel_step_clean.wav" -af "astats=metadata=0" -f null - 2>&1 | grep "Peak level dB" | tail -1 | grep -oE '[-0-9.]+$')" \
+    "$(step_loudness_ola "$TMP_DIR/gravel_step_src.wav")" "$(step_loudness_ola "$TMP_DIR/gravel_step_clean.wav")"
 done
 
-# 確かめ用に、六つを 0.45 秒ずつ並べた波形とスペクトルを書き出す
-ffmpeg -y -v error -i "$OUT_DIR/Gravel1.wav" -i "$OUT_DIR/Gravel2.wav" -i "$OUT_DIR/Gravel3.wav" \
-  -i "$OUT_DIR/Gravel4.wav" -i "$OUT_DIR/Gravel5.wav" -i "$OUT_DIR/Gravel6.wav" -filter_complex "
-[0:a]apad=whole_dur=0.45[a0];[1:a]apad=whole_dur=0.45[a1];[2:a]apad=whole_dur=0.45[a2];
-[3:a]apad=whole_dur=0.45[a3];[4:a]apad=whole_dur=0.45[a4];[5:a]apad=whole_dur=0.45[a5];
-[a0][a1][a2][a3][a4][a5]concat=n=6:v=0:a=1,asplit=2[w][s];
-[w]showwavespic=s=1600x300:colors=0x3070c0[wv];
-[s]showspectrumpic=s=1600x420:fscale=lin:legend=0:color=intensity:gain=2:stop=12000[sp];
-[wv][sp]vstack=inputs=2[out]
-" -map "[out]" -frames:v 1 "$ANALYSIS_DIR/Gravel_sheet.png"
+GRAVEL_TARGET=$(steps_target)
+echo "  目標 ${GRAVEL_TARGET} LUFS（Step1〜5 の電力の平均）"
+cut_steps Gravel "$TMP_DIR/gravel_clean.wav" "$GRAVEL_CUTS" "$GRAVEL_TARGET" -1
 
 fi   # PART=all か gravel
 
@@ -748,5 +845,80 @@ bgm_restart Cinematic586317 0.55 145.80 0.30
 bgm_level Cinematic586317
 
 fi   # PART=all か bgm
+
+# ---------------------------------------------------------------------------
+# 11. 足音の三つの組（HardFloor1〜7.wav / Concrete1〜4.wav / Room1〜6.wav）
+#    三つとも Pixabay の、同じ人が同じ床を何歩も歩いた録音。一歩ずつ切り出して単発にし、
+#    Footsteps が組の中から直前と違う物を選び、音量と高さを少し振って鳴らす（足音のランダムさはそちらで出す）。
+#    どれもモノラル 44.1kHz / 16bit。中間は 32bit の浮動小数で持つ。
+#
+#    **切り出しの決まり（6 節の砂利も同じ）**
+#    - 一歩の立ち上がりは、2ms と 5ms の窓の実効値で、頂点の 20dB 下を越える所。numpy が無いので、ffmpeg で
+#      16bit の生 PCM に落としてから素の Python で包絡を積んで見た（窓の送りは窓の長さの標本数で数える。
+#      5ms を 0.005 秒として数えると、30 秒の録音の尻で 70ms ずれる）
+#    - 頭は立ち上がりの 10ms ほど手前（踵が先に当たる一歩は、その当たりの手前）。頭 3ms をなだらかに入れる
+#    - 尻は次の一歩の立ち上がりの 15ms 手前まで取り、余韻（床の響きと部屋の空気）を残す。尻 8ms だけなだらかに消す。
+#      次の一歩の前に擦りや小さな当たりが先に来る物は、その手前で切る
+#    - 外す物: 一歩の 0.06〜0.2 秒後に頂点の 20dB 以内の二つ目の当たりが来る物、塊の前に長い擦りが続く物、
+#      尾の中に頂点の 30dB 以内の物音が混じる物、床との差が小さい弱い一歩（揃えると雑音まで持ち上がる）
+#    **大きさ**: 0.5 秒おきに 10 回重ねて鳴らした物の integrated loudness（step_loudness_ola）を、
+#    Step1〜5 の平均（電力の平均、−28.5 LUFS）に揃える。頂点が −1dB を越えるならそこで止める（前の足音は −3dB。
+#    硬い床の鋭い当たりは頂点と大きさの差が 25〜30dB あり、−3dB では目標に届かない物が組の半分出た。
+#    鳴らす側の音量は 0.28〜0.55 で、振れを足しても 0.62 倍なので、鳴った所では −5dB より下）。
+#    今までの足音（Step・前の Gravel・Grass）は 0.5 秒に伸ばして繰り返して測っていたが、余韻が 0.5 秒を越えると
+#    尻が数えられない。重ねて鳴らす測り方は、0.5 秒に収まる音では前と同じ値になり（差 0.1 LU 以内）、
+#    越える音は余韻が次の一歩の頭に重なって鳴る分まで数える。余韻は頂点（5ms 窓の実効値）より 28〜50dB 低いので、数えても 0.1 LU ほどしか変わらない
+#    確かめ用に、組ごとに並べた波形（線形と対数）とスペクトルを ANALYSIS_DIR に書き出す
+# ---------------------------------------------------------------------------
+if [ "$PART" = "all" ] || [ "$PART" = "steps" ]; then
+
+STEPS_TARGET=$(steps_target)
+echo "=== 足音の三つの組（目標 ${STEPS_TARGET} LUFS、Step1〜5 の電力の平均）==="
+
+# 11-1. HardFloor1〜7.wav — 場面 8 の共用ガレージ、場面 4 の電車・教室・台所の床（Footsteps on hard floor、OxidVideos）
+#    元は 13.80 秒、48kHz のステレオ mp3。左右の差は和より 19dB 低いので、平均してモノラルに畳む。
+#    硬い床を 0.55〜0.65 秒の歩調で歩いた録音。一歩は 10ms ほどの鋭い当たりに 250〜500Hz の胴が付き、
+#    0.1 秒ほどで床（頂点より 40〜45dB 下、−68dB 前後）まで落ちる。床には部屋の空気が残る。
+#    40Hz より下はほぼ無い（−85dB）が、念のため 50Hz より下を落とす（2 次）。
+#    採った七つ（秒）: 0.229 / 1.391 / 3.215 / 4.484 / 7.012 / 10.674 / 11.290 から、それぞれ次の一歩の 15ms 手前まで。
+#    避けた物: 0.80 秒（弱い。床との差が小さい）、1.95〜2.9 秒（1.95 の一歩のあと 2.19 に擦り、2.54 と 2.73 に二つ当たる）、
+#    3.85 秒（4.03 に二つ目）、5.13 秒（5.25 に二つ目）、5.78 秒（尾の 6.16・6.28 に物音）、6.37 秒（6.49 に二つ目）、
+#    7.56 秒（7.63・7.71 に二つ目）、8.20 秒（尾の 8.63 に次の一歩の擦り）、8.76 秒（8.88 に擦り）、9.39・10.03 秒（擦りが続く）、
+#    11.92 秒から後（12.25 の擦りと、12.79 の二つ目、13.3 からは録音の尻）
+echo "--- HardFloor ---"
+ffmpeg -y -v error -i "$SRC_HARD_FLOOR" -af "pan=mono|c0=0.5*c0+0.5*c1,aresample=44100,highpass=f=50:poles=2" -c:a pcm_f32le "$TMP_DIR/hard_src.wav"
+cut_steps HardFloor "$TMP_DIR/hard_src.wav" \
+  "0.229-0.787 1.391-1.937 3.215-3.838 4.484-5.115 7.012-7.544 10.674-11.285 11.290-11.906" "$STEPS_TARGET" -1
+
+# 11-2. Concrete1〜4.wav — 場面 2 の通りと路地裏、村の庭の煉瓦の小路とテラス、場面 4 の公営住宅の外階段とデッキ・公園の小径
+#    （concrete footsteps 1、freesound_community）。前の Concrete1〜4（Kenney の Step から tools/make-steps.py で作った物。make-steps.py は消した）を置き替える。
+#    元は 7.58 秒、24kHz のステレオ mp3（12kHz より上は無い）。左は右より 6dB 大きく、左右の差は和より 7dB 低い。
+#    平均してモノラルに畳む（片方だけにすると胴が痩せる）。硬い靴でコンクリートを 0.45〜0.7 秒の歩調で歩いた録音。
+#    一歩は 250〜500Hz の胴の厚い当たりで、0.1 秒ほどで床（頂点より 45〜50dB 下）まで落ちる。50Hz より下を落とす（2 次）。
+#    採った四つ（秒）: 0.287 / 3.181 / 4.127 / 6.078。6.078 は尾の 6.44 に小さな物音があり、6.60 から次の一歩の擦りが始まるので 6.420 で切る。
+#    **四つしか採れなかった。** 7.58 秒に 14 歩あるが、ほかは 0.98・1.64・2.62・4.58・6.71・7.20 秒（0.07〜0.16 秒後に
+#    頂点の 5〜14dB 下の二つ目）、2.105 秒（0.10 秒後に 17dB 下の二つ目。しかも ほかより 12dB 弱く、揃えると床の雑音が
+#    12dB 持ち上がる）、5.41・5.77 秒（ほかより 25dB 弱い）。村の庭（BuildVillageSound.HardSteps）が 1〜4 を指しているので、数もそのまま
+echo "--- Concrete ---"
+ffmpeg -y -v error -i "$SRC_CONCRETE" -af "pan=mono|c0=0.5*c0+0.5*c1,aresample=44100,highpass=f=50:poles=2" -c:a pcm_f32le "$TMP_DIR/concrete_src.wav"
+cut_steps Concrete "$TMP_DIR/concrete_src.wav" \
+  "0.287-0.969 3.181-3.669 4.127-4.555 6.078-6.420" "$STEPS_TARGET" -1
+
+# 11-3. Room1〜6.wav — 自室（場面 1・3・5・7）、場面 4 の公営住宅の部屋の中と台所の家の板と階段（step_sound.wav、freesound_community）
+#    元は 15.50 秒、24kHz のステレオ mp3（左右は同じ。12kHz より上は無い）。部屋の床を 0.55〜0.65 秒の歩調で歩いた録音。
+#    **40Hz より下に −44dB の揺れがずっと乗っている**（マイクの揺れか空調。60〜160Hz も足音の頭と 4〜10dB しか違わない）。
+#    足音の芯は 160Hz〜2kHz にあるので、100Hz より下を 24dB/oct で落とす（2 次を二段）。落とした後の床は −60dB 前後で、
+#    頂点より 30〜40dB 下（三つの組の中でいちばん床が近い。雑音の除去はしていない）。
+#    採った六つ（秒）: 1.656 / 4.117 / 8.111 / 9.245 / 11.001 / 11.524。8.111 と 9.245 は踵が 15〜35ms 先に当たるので、その手前から。
+#    4.117 は 4.66 から次の一歩の擦りが始まるのでその手前で切る。
+#    避けた物: 9.84 秒（鋭い当たりが突き出て、頂点の天井で目標より 2dB 足りない）、0.24 秒（0.09 秒後に 8dB 下の二つ目）、1.01 秒（0.2 秒後に二つ目）、2.34・2.94・3.53・5.80 秒（0.07〜0.1 秒後に
+#    二つ目か擦り）、5.28 秒（塊が 60ms 続けて擦れる）、4.73・6.45・7.01・7.64・12.09・12.64 秒（弱いか、頭の前に当たり）、
+#    13.2 秒から後（歩調が乱れ、録音の尻へ向けて弱まる）
+echo "--- Room ---"
+ffmpeg -y -v error -i "$SRC_ROOM_STEP" -af "pan=mono|c0=0.5*c0+0.5*c1,aresample=44100,highpass=f=100:poles=2,highpass=f=100:poles=2" -c:a pcm_f32le "$TMP_DIR/room_step_src.wav"
+cut_steps Room "$TMP_DIR/room_step_src.wav" \
+  "1.656-2.326 4.117-4.660 8.111-8.747 9.245-9.835 11.001-11.519 11.524-12.078" "$STEPS_TARGET" -1
+
+fi   # PART=all か steps
 
 echo "=== done ==="
