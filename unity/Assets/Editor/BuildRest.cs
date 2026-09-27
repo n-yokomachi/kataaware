@@ -21,6 +21,8 @@ namespace HalfAware.EditorTools
         public const string ConnectPath = "Assets/Scenes/Connect.unity";
         public const string ScenePath = "Assets/Scenes/Rest.unity";
         public const string ScriptPath = "Assets/Data/RestScript.asset";
+        /// <summary>モニターの「潜る」の行き先。庭（場面 6）は村のシーンの夕方</summary>
+        public const string GardenScene = "Village";
 
         [MenuItem("HalfAware/Build the rest", false, 251)]
         public static void BuildMenu()
@@ -107,7 +109,8 @@ namespace HalfAware.EditorTools
         // ---- 戻ってきた状態に置き直す -----------------------------------------
 
         /// <summary>
-        /// 場面 5 の SceneFlow。庭（場面 6）はまだ無いので「（仮）続く」で止める。
+        /// 場面 5 の SceneFlow。モニターの「潜る」を調べると庭（場面 6、村の夕方）へ移る。
+        /// 村は場面 9 と同じシーンなので、夕方の庭の記憶として開く印は RestDirector が調べた時に立てる（GardenHandoff）。
         ///
         /// **眩暈は繋がない。** <c>dazeUntil</c> が空でも <c>ReleaseDaze</c> は最初の Update で
         /// 自分の秒数の <c>Decay</c> を呼ぶので、繋いだままだと
@@ -121,7 +124,7 @@ namespace HalfAware.EditorTools
             // 立ち上がらない。空にしておくと Awake が座位の仕度を飛ばすので、
             // 座らせるのは RestDirector の仕事になる
             so.FindProperty("standAfter").stringValue = "";
-            so.FindProperty("nextScene").stringValue = "";
+            so.FindProperty("nextScene").stringValue = GardenScene;
             so.FindProperty("openingCard").stringValue = "";
             so.FindProperty("cutToBlack").boolValue = false;
             so.FindProperty("exitSound").objectReferenceValue = null;
@@ -321,8 +324,8 @@ namespace HalfAware.EditorTools
                 var so = new SerializedObject(flow);
                 if (so.FindProperty("daze").objectReferenceValue != null)
                     Debug.LogWarning("見直し: SceneFlow に眩暈が繋がっている。RestDirector の濃さが上書きされる");
-                if (so.FindProperty("nextScene").stringValue.Length > 0)
-                    Debug.LogWarning("見直し: 庭はまだ無いのに nextScene が入っている");
+                if (so.FindProperty("nextScene").stringValue != GardenScene)
+                    Debug.LogWarning("見直し: モニターの行き先（nextScene）が庭（" + GardenScene + "）でない");
             }
             if (Object.FindFirstObjectByType<JackPlug>(FindObjectsInactive.Include) != null)
                 Debug.LogWarning("見直し: JackPlug が残っている");

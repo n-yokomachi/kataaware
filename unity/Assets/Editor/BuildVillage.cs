@@ -111,6 +111,10 @@ namespace HalfAware.EditorTools
 
             Stage(hours);
             Ambience(hours, heard);
+            // 場面 6（庭の記憶）の女性・主の体・ホースと、その進行。伏せて置き、場面 6 で入った時だけ起こす
+            var memoryNote = new System.Text.StringBuilder();
+            Memory(root, hours, memoryNote);
+            if (memoryNote.Length > 0) Debug.Log("庭の記憶の物を置いた。\n" + memoryNote);
             Register();
 
             var scene = EditorSceneManager.GetActiveScene();

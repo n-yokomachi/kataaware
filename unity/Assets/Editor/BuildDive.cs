@@ -38,7 +38,7 @@ namespace HalfAware.EditorTools
         public const string FontPath = "Assets/Fonts/NotoSansJP-Regular SDF.asset";
 
         /// <summary>右上の行の色。場面 3 の端末と同じ緑</summary>
-        static readonly Color Terminal = new Color(0.32f, 0.80f, 0.46f);
+        internal static readonly Color Terminal = new Color(0.32f, 0.80f, 0.46f);
 
         /// <summary>場所どうしの間隔。m。どの場所より広く取って、隣の灯りが届かないようにする</summary>
         public const float PlaceStride = 100f;
@@ -466,15 +466,15 @@ namespace HalfAware.EditorTools
         /// 立ち上がりを 0.52 に置くのは、画面の真ん中の半分を素のまま残すため。
         /// ここを下げると、見ている物の上にまで白が乗って、記憶の絵ではなく曇りに見える
         /// </summary>
-        const float HazeFrom = 0.52f;
-        const float HazeUpto = 1.38f;
+        internal const float HazeFrom = 0.52f;
+        internal const float HazeUpto = 1.38f;
         /// <summary>
         /// 角での濃さ。辺の真ん中はこの 0.59 倍。
         ///
         /// 0.34（辺の真ん中で 0.20）では四方が白く濁って見え、「記憶シーンの四方の白いフェードをもっと薄く」と差し戻された。
         /// 半分の 0.17（辺の真ん中で 0.10）に下げた
         /// </summary>
-        const float HazeDepth = 0.17f;
+        internal const float HazeDepth = 0.17f;
 
         static RectTransform Layer(Transform parent, string name, Color col, bool blocks)
         {
@@ -531,7 +531,7 @@ namespace HalfAware.EditorTools
         /// 目から離れる向きへ forward を置くので、板も字もそのまま読める側を向く。
         /// 字だけ 180 度回して揃えようとすると鏡文字になる（一度やって撮って気づいた）
         /// </summary>
-        static void Panel(Transform root)
+        internal static void Panel(Transform root)
         {
             var had = root.Find("HoloPanel");
             if (had != null) Object.DestroyImmediate(had.gameObject);

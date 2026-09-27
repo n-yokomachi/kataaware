@@ -349,7 +349,7 @@ namespace HalfAware.EditorTools
         /// 着いている足（いちばん低い所から 1.5 cm 以内の足首）が人の根から見て後ろへ流れる速さを測る。
         /// その速さで根を運べば、着いている足は床に止まって見える
         /// </summary>
-        static float FigureStride(Transform root, GameObject model, PersonMotion motion,
+        internal static float FigureStride(Transform root, GameObject model, PersonMotion motion,
             AnimationClip stand, AnimationClip clip, float reach, Transform[] feet, bool running = false)
         {
             if (clip == null) return running ? 2.4f : 1.8f;
