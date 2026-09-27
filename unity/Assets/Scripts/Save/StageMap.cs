@@ -61,6 +61,7 @@ namespace HalfAware
             new Row(3, "Connect", ""),
             new Row(4, "Dive", ""),
             new Row(5, "Rest", ""),
+            new Row(7, "Notice", ""),
             new Row(8, "Drive", ""),
             new Row(9, "Village", Morning),
         };

@@ -20,6 +20,7 @@ namespace HalfAware.Tests
             Assert.AreEqual(3, StageMap.StageOf("Connect", ""));
             Assert.AreEqual(4, StageMap.StageOf("Dive", ""));
             Assert.AreEqual(5, StageMap.StageOf("Rest", ""));
+            Assert.AreEqual(7, StageMap.StageOf("Notice", ""));
             Assert.AreEqual(8, StageMap.StageOf("Drive", ""));
             Assert.AreEqual(9, StageMap.StageOf("Village", StageMap.Morning));
         }
@@ -32,9 +33,8 @@ namespace HalfAware.Tests
             // 夕方の村は場面 6。まだ作っていないので、表に無い
             Assert.AreEqual(0, StageMap.StageOf("Village", StageMap.Evening));
             Assert.IsNull(StageMap.SceneOf(6));
-            Assert.IsNull(StageMap.SceneOf(7));
             Assert.IsNull(StageMap.SceneOf(10));
-            Assert.IsFalse(StageMap.Playable(7));
+            Assert.IsFalse(StageMap.Playable(10));
         }
 
         [Test]

@@ -19,8 +19,11 @@ namespace HalfAware.Tests
             Assert.That(SceneMenu.Pick(3), Is.EqualTo("Connect"));
             Assert.That(SceneMenu.Pick(4), Is.EqualTo("Dive"));
             Assert.That(SceneMenu.Pick(5), Is.EqualTo("Rest"));
-            Assert.That(SceneMenu.Pick(6), Is.EqualTo("Drive"));
-            Assert.That(SceneMenu.Pick(7), Is.EqualTo("Village"));
+            // 小休止より後ろは、場面を足すと番号がずれる。物語の順に並んでいるかを前後で見る
+            var order = new System.Collections.Generic.List<string>(SceneMenu.Scenes);
+            Assert.That(order.IndexOf("Notice"), Is.GreaterThan(order.IndexOf("Rest")), "自室・気づきは小休止の後");
+            Assert.That(order.IndexOf("Drive"), Is.GreaterThan(order.IndexOf("Notice")), "車内は自室・気づきの後");
+            Assert.That(SceneMenu.Pick(SceneMenu.Count), Is.EqualTo("Village"), "終わりは村");
         }
 
         // 数字は鍵盤から直に読んでいて、読んでいるのは 1〜9。

@@ -156,12 +156,14 @@ namespace HalfAware.Tests
             var m = new ConsoleMenu();
             m.Hover(3);
             m.Decide("Room");
-            m.HoverRow(6);
+            // 一覧の終わりは村。行の数は場面を足すたびに増えるので、数えて引く
+            var last = SceneMenu.Count - 1;
+            m.HoverRow(last);
             Assert.AreEqual("Village", m.RowTarget("Room"));
             m.MoveRow(1);
-            Assert.AreEqual(6, m.Row);
+            Assert.AreEqual(last, m.Row);
             m.HoverRow(99);
-            Assert.AreEqual(6, m.Row);
+            Assert.AreEqual(last, m.Row);
             m.MoveRow(-10);
             Assert.AreEqual(0, m.Row);
             Assert.IsNull(m.RowTarget("Room"));
