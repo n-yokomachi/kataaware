@@ -81,6 +81,11 @@ namespace HalfAware.EditorTools.Rocketbox
         /// <summary>一から作るワンピースを着せる（<see cref="RocketboxDress"/>）。体の人の面は袖口より先の腕と手だけを残す</summary>
         public bool MadeDress;
         /// <summary>
+        /// 一から作るシャツと長いスカート（<see cref="RocketboxGardenWear"/>）を、ワンピースの代わりに着せる。<see cref="MadeDress"/> も立てて使う
+        /// （体の人の面の残し方・頭の面の切り方・服の面の組の名は、ワンピースと同じ流れを通る）
+        /// </summary>
+        public bool GardenWear;
+        /// <summary>
         /// 一から作る革のライダースジャケット（<see cref="RocketboxJacket"/>）を着せる。組み立てで体の根の子の Jacket に付け、
         /// 着る・脱ぐは <see cref="HalfAware.Garment"/> で切り替える（体の面はそのまま残す）
         /// </summary>
@@ -371,6 +376,33 @@ namespace HalfAware.EditorTools.Rocketbox
             return p;
         }
 
+        /// <summary>
+        /// 場面 6（庭の記憶）で水を撒く女性（過去の主人公）: 片割れと同じ体（女大 18 の腕と手、膝から下は女大 19 の素足と紐のサンダル、華奢「強」）に、
+        /// 女大 14 の顔と髪（黒）と、一から作ったオリーブ色の半袖のシャツと生成りの長いスカート（<see cref="RocketboxGardenWear"/>）。
+        /// 模型は裏返さない（黒子は本人の左、口元の左下）。上着は着ない（シナリオ設計書 1 節）
+        /// </summary>
+        public static readonly RocketboxPerson Face14Hair14GardenWear =
+            Legs(GardenWearOn(Dress(Compose("Face14_Hair14_GardenWear", "女大 14 の顔と髪（黒）、一から作ったシャツと長いスカート（場面 6 の過去の主人公）", Adult14, Party01), OutfitGardenWear)), Party02, 0.50f);
+
+        static RocketboxPerson GardenWearOn(RocketboxPerson p)
+        {
+            p.MadeDress = true;
+            p.GardenWear = true;
+            p.Slim = true;
+            return p;
+        }
+
+        /// <summary>場面 6 の女性の服: 胸元（女大 14 の頭の面の中のトップスとネックレス）は肌で塗り、腕と脚の肌を頭の肌に揃える。髪は主人公と同じ黒。サンダルは茶</summary>
+        static void OutfitGardenWear(RocketboxPaint.Look k)
+        {
+            k.blackenKnit = false;
+            k.shirt = false;
+            k.chestSkin = true;
+            k.matchSkinAll = true;
+            k.naturalHair = false;
+            k.brownShoes = true;
+        }
+
         static RocketboxPerson JacketOn(RocketboxPerson p)
         {
             p.Jacket = true;
@@ -483,7 +515,7 @@ namespace HalfAware.EditorTools.Rocketbox
         /// <summary>手を入れて撮り比べる人の全部（決まった二人と候補）。描き直しとメッシュの組み直しのメニューが回す</summary>
         public static readonly RocketboxPerson[] All = { Adult14, Adult08, Head08Body14, Face14Hair08, Face14Hair08Body03, Face14Hair08Body02, Face14Hair08Body11, Face14Hair08Body11Legs22,
             Face14Hair08BodySports02, FaceSports02Hair08, FaceSports02Hair08Body14, Face14Hair14, Face14Hair14BodySports02, FaceSports02Hair14,
-            Face14Hair14Body18Robe10, Face14Hair14MadeDress, Face14Hair14BodySports02Slim };
+            Face14Hair14Body18Robe10, Face14Hair14MadeDress, Face14Hair14BodySports02Slim, Face14Hair14GardenWear };
 
         /// <summary>取り込んだ一人（元の FBX とテクスチャを持つ人）</summary>
         public static readonly RocketboxPerson[] Sources = { Adult14, Adult08, Adult03, Adult02, Adult11, Party02, Sports02, Adult10, Party01 };

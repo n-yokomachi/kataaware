@@ -175,8 +175,13 @@ namespace HalfAware.EditorTools.Rocketbox
                 templ.AddRange(bm.GetTriangles(bodySkinSub));
                 var bnw = new Vector3[bNorm.Length];
                 for (var i = 0; i < bnw.Length; i++) bnw[i] = bodyToWorld.MultiplyVector(bNorm[i]).normalized;
-                dressOut = RocketboxDress.Build(bodySmr, templ.ToArray(), bw, bnw, bWeights, verts, norms, uvs, weights, out dressNote);
-                bodyAll = RocketboxDress.KeepArms(RocketboxDress.Frame.Of(bodySmr), bodyAll, bw);
+                // 場面 6 の女性（過去の主人公）はシャツと長いスカート（RocketboxGardenWear）。形の作り方はワンピースと同じ
+                dressOut = who.GardenWear
+                    ? RocketboxGardenWear.Build(bodySmr, templ.ToArray(), bw, bnw, bWeights, verts, norms, uvs, weights, out dressNote)
+                    : RocketboxDress.Build(bodySmr, templ.ToArray(), bw, bnw, bWeights, verts, norms, uvs, weights, out dressNote);
+                bodyAll = who.GardenWear
+                    ? RocketboxGardenWear.KeepArms(RocketboxDress.Frame.Of(bodySmr), bodyAll, bw)
+                    : RocketboxDress.KeepArms(RocketboxDress.Frame.Of(bodySmr), bodyAll, bw);
             }
             var bodyTris = Pack(bodyAll, i => bv[i], i => bNorm[i], i => bUv[i], i => bWeights[i], verts, norms, uvs, weights);
             Func<int, BoneWeight> hwOf = i =>
@@ -215,7 +220,7 @@ namespace HalfAware.EditorTools.Rocketbox
                 for (var t = 0; t < headAllTris.Length; t += 3)
                 {
                     var c = (moved[headAllTris[t]] + moved[headAllTris[t + 1]] + moved[headAllTris[t + 2]]) / 3f;
-                    if (RocketboxDress.UnderDress(df, c)) continue;
+                    if (who.GardenWear ? RocketboxGardenWear.UnderDress(df, c) : RocketboxDress.UnderDress(df, c)) continue;
                     keepTris.Add(headAllTris[t]);
                     keepTris.Add(headAllTris[t + 1]);
                     keepTris.Add(headAllTris[t + 2]);

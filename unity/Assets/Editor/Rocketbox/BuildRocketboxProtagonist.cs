@@ -79,7 +79,9 @@ namespace HalfAware.EditorTools.Rocketbox
             var src = AssetDatabase.LoadAssetAtPath<GameObject>(who.Model);
             if (src == null) throw new InvalidOperationException("模型が無い: " + who.Model);
             var her = (GameObject)Object.Instantiate(src, parent);
-            her.name = twin ? "Twin" : "Protagonist";
+            // 差込口の mesh は模型の名前で残す（BuildProps.WristPort）。場面 6 の水を撒く女性（過去の主人公）は体が主人公と違うので、
+            // 主人公の名で組むと主人公の差込口の mesh を女性の前腕の形で上書きしてしまう。別の名にする
+            her.name = twin ? "Twin" : who.GardenWear ? "Woman" : "Protagonist";
             her.transform.localPosition = Vector3.zero;
             her.transform.localRotation = Quaternion.identity;
             her.transform.localScale = twin && mode == TwinMode.MirrorWhole ? new Vector3(-1f, 1f, 1f) : Vector3.one;
@@ -520,8 +522,8 @@ namespace HalfAware.EditorTools.Rocketbox
             if (who.MadeDress)
             {
                 string dressNote;
-                WritePainted(RocketboxDress.PaintSmall(who, out dressNote), 512, dir + "Dress.png", false, 512);
-                SaveMaterial(RocketboxDress.Textured(Load(dir + "Dress.png")), dir + "Dress.mat");
+                WritePainted(who.GardenWear ? RocketboxGardenWear.PaintSmall(who, out dressNote) : RocketboxDress.PaintSmall(who, out dressNote), 512, dir + "Dress.png", false, 512);
+                SaveMaterial(who.GardenWear ? RocketboxGardenWear.Textured(Load(dir + "Dress.png")) : RocketboxDress.Textured(Load(dir + "Dress.png")), dir + "Dress.mat");
                 sb.AppendLine(dressNote);
             }
             if (who.ChestFromBody)
@@ -750,7 +752,9 @@ namespace HalfAware.EditorTools.Rocketbox
                 if (who.MadeDress)
                 {
                     string dressNote;
-                    skin.Dress = Keep(skin, RocketboxDress.Textured(Keep(skin, Tex(RocketboxDress.PaintSmall(who, out dressNote), 512, false, 512))));
+                    var dressPx = who.GardenWear ? RocketboxGardenWear.PaintSmall(who, out dressNote) : RocketboxDress.PaintSmall(who, out dressNote);
+                    var dressTex = Keep(skin, Tex(dressPx, 512, false, 512));
+                    skin.Dress = Keep(skin, who.GardenWear ? RocketboxGardenWear.Textured(dressTex) : RocketboxDress.Textured(dressTex));
                 }
                 if (who.ChestFromBody)
                 {
