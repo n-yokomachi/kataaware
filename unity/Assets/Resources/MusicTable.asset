@@ -1,0 +1,64 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 47b6f082fce54c344a94081dc5099176, type: 3}
+  m_Name: MusicTable
+  m_EditorClassIdentifier: HalfAware::HalfAware.MusicTable
+  tracks:
+  - cue: 1
+    clip: {fileID: 8300000, guid: 262ed96274f04a5488d536aa7fcf0f67, type: 3}
+    volume: 0.5
+    fadeIn: 3
+    crossFade: 6
+    loop: 1
+  - cue: 2
+    clip: {fileID: 8300000, guid: c51d4b4db4a7dab4bbd05034cc2b7b32, type: 3}
+    volume: 0.5
+    fadeIn: 3
+    crossFade: 6
+    loop: 1
+  - cue: 3
+    clip: {fileID: 8300000, guid: 4873a5764f4879442bd5b74acda7d086, type: 3}
+    volume: 0.5
+    fadeIn: 0.6
+    crossFade: 6
+    loop: 1
+  - cue: 4
+    clip: {fileID: 8300000, guid: 85f11c89767c4a3449a35b714700bc84, type: 3}
+    volume: 0.5
+    fadeIn: 3
+    crossFade: 6
+    loop: 1
+  - cue: 5
+    clip: {fileID: 8300000, guid: c50c32784420b2744baeca908c365435, type: 3}
+    volume: 0.5
+    fadeIn: 4
+    crossFade: 6
+    loop: 1
+  - cue: 6
+    clip: {fileID: 8300000, guid: 81df0e5d14539c845a4f5130cb43b8f7, type: 3}
+    volume: 0.5
+    fadeIn: 4
+    crossFade: 6
+    loop: 1
+  - cue: 7
+    clip: {fileID: 8300000, guid: 8a52f3c3c6c51804e95aedabd41688b9, type: 3}
+    volume: 0.5
+    fadeIn: 4
+    crossFade: 6
+    loop: 1
+  - cue: 8
+    clip: {fileID: 0}
+    volume: 0.5
+    fadeIn: 3
+    crossFade: 6
+    loop: 1
+  villageScene: Village
