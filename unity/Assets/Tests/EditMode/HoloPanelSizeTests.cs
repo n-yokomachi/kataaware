@@ -61,5 +61,39 @@ namespace HalfAware.Tests
             // 画面の上では、相手の脇に出る（相手から離れて宙に浮かない）
             Assert.That(farAngle, Is.EqualTo(nearAngle).Within(6f), "遠くても相手の脇に出る");
         }
+
+        // ---- 画面の真ん中の下の案内を避ける --------------------------------------------
+
+        [Test]
+        public void ABoardOverThePromptIsLiftedAboveIt()
+        {
+            var band = HoloPanel.PromptBand;
+            // 二行目が案内の帯に掛かる板
+            var board = Rect.MinMaxRect(0.55f, band.yMin + 0.01f, 0.75f, band.yMax + 0.05f);
+            var lift = HoloPanel.Lift(board, band, HoloPanel.PromptMargin);
+            Assert.That(lift, Is.GreaterThan(0f));
+            Assert.That(board.yMin + lift, Is.EqualTo(band.yMax + HoloPanel.PromptMargin).Within(1e-5f), "持ち上げた板の下の縁は、帯の上の縁と余白の上");
+        }
+
+        [Test]
+        public void ABoardClearOfThePromptStays()
+        {
+            var band = HoloPanel.PromptBand;
+            // 帯より上
+            Assert.AreEqual(0f, HoloPanel.Lift(Rect.MinMaxRect(0.55f, band.yMax + 0.05f, 0.75f, band.yMax + 0.15f), band, HoloPanel.PromptMargin));
+            // 帯より下
+            Assert.AreEqual(0f, HoloPanel.Lift(Rect.MinMaxRect(0.55f, 0.1f, 0.75f, band.yMin - 0.05f), band, HoloPanel.PromptMargin));
+            // 帯の横（画面の端）
+            Assert.AreEqual(0f, HoloPanel.Lift(Rect.MinMaxRect(band.xMax + 0.01f, band.yMin, 0.99f, band.yMax), band, HoloPanel.PromptMargin));
+        }
+
+        [Test]
+        public void ThePromptBandSitsJustBelowTheMiddle()
+        {
+            var band = HoloPanel.PromptBand;
+            Assert.That(band.center.x, Is.EqualTo(0.5f).Within(1e-5f));
+            Assert.That(band.yMax, Is.LessThan(0.5f));
+            Assert.That(band.yMin, Is.GreaterThan(0.35f));
+        }
     }
 }

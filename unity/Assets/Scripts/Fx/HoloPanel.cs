@@ -16,7 +16,10 @@ namespace HalfAware
     /// 表を向けるつもりで目の方へ forward を向けると、板も字もまとめて裏になって消える
     /// （場面 3 の窓で踏んだ）。
     ///
-    /// いつ出していつ消すかは DiveDirector が決める。板は言われたとおりに出るだけ
+    /// いつ出していつ消すかは DiveDirector が決める。板は言われたとおりに出るだけ。
+    ///
+    /// **潜れない人の板**（<see cref="Lock"/>、場面 6 の女性）は、二行目を薄い色の「潜れない」一つにする。
+    /// **画面の真ん中の下の案内を避ける**（<see cref="AvoidPrompt"/>）。案内の帯に掛かれば、帯の上へ持ち上げる
     /// </summary>
     public sealed class HoloPanel : MonoBehaviour
     {
@@ -105,6 +108,7 @@ namespace HalfAware
         public void Show(Transform beside, string row, string targetRow)
         {
             host = beside;
+            locked = null;
             Measure(beside);
             line = Brief(string.IsNullOrEmpty(targetRow) ? row : targetRow);
             if (!gameObject.activeSelf) gameObject.SetActive(true);
@@ -116,6 +120,7 @@ namespace HalfAware
         {
             host = null;
             index = 0;
+            locked = null;
             if (gameObject.activeSelf) gameObject.SetActive(false);
         }
 
@@ -137,8 +142,33 @@ namespace HalfAware
             Paint();
         }
 
+        /// <summary>
+        /// 潜れない人の板にする。二行目を、潜る・切断の代わりに薄い色の text（<see cref="Locked"/>）一つにする。▶ は付けない。
+        /// 次に <see cref="Show"/> か <see cref="Hide"/> を呼ぶまで続く
+        /// </summary>
+        public void Lock(string text)
+        {
+            locked = text;
+            index = 0;
+            Paint();
+        }
+
+        /// <summary>潜れない人の板の二行目（場面 6 の庭の記憶の女性。記憶を失くした主人公なので潜れない）</summary>
+        public const string Locked = "潜れない";
+
+        /// <summary>潜れない板にしているか</summary>
+        public bool IsLocked { get { return !string.IsNullOrEmpty(locked); } }
+
+        string locked;
+
         /// <summary>人が動けば板も一緒に動くので、人を動かし終えた後に置き直す</summary>
         void LateUpdate()
+        {
+            Place();
+        }
+
+        /// <summary>いま置き直す。再生せずに撮るときに呼ぶ（LateUpdate が回らないので）</summary>
+        public void PlaceNow()
         {
             Place();
         }
@@ -183,9 +213,10 @@ namespace HalfAware
 
             // **いま出している側を先に試す。** 毎フレーム左右を選び直すと、
             // 壁際を歩くあいだ板が右と左を行き来して読めない
-            if (Settle(at, flat, side)) return;
-            if (Settle(at, flat, -side)) { side = -side; return; }
+            if (Settle(at, flat, side)) { AvoidPrompt(); return; }
+            if (Settle(at, flat, -side)) { side = -side; AvoidPrompt(); return; }
             Pull(at, flat);
+            AvoidPrompt();
         }
 
         /// <summary>
@@ -279,6 +310,59 @@ namespace HalfAware
             transform.localScale = Vector3.one * span;
         }
 
+        // ---- 画面の下の案内を避ける ------------------------------------------------
+        //
+        // 板は肩の脇に浮くので、目を留めた人を画面の真ん中に置くと、板の二行目がちょうど画面の真ん中の下の案内
+        // （「E/(左クリック)　この人の記憶へ潜る」など、HudView の Prompt）の高さに来て、字が重なって読めなかった（2026-09-28）。
+        // 置いた後で板の画面の上の四角を測り、案内の出る帯に掛かれば、帯の上の縁の上まで目から見た上へ持ち上げる
+
+        /// <summary>
+        /// 案内の出る帯。画面の割合（左下が 0）。HudView の案内（Prompt）は、基準 1280×720 の真ん中から 40 下に、幅 800・高さ 40 で置く
+        /// </summary>
+        public static readonly Rect PromptBand = new Rect(0.5f - 400f / 1280f, 0.5f - 60f / 720f, 800f / 1280f, 40f / 720f);
+
+        /// <summary>帯から離す余白。画面の高さの割合</summary>
+        public const float PromptMargin = 0.012f;
+
+        /// <summary>
+        /// 板の画面の上の四角 board が帯 band に掛かっていれば、板を上へどれだけ持ち上げれば帯の上の縁（と余白）を越えるか。画面の高さの割合。
+        /// 掛かっていなければ 0
+        /// </summary>
+        public static float Lift(Rect board, Rect band, float margin)
+        {
+            if (board.xMax <= band.xMin || board.xMin >= band.xMax) return 0f;
+            if (board.yMax <= band.yMin - margin || board.yMin >= band.yMax + margin) return 0f;
+            return band.yMax + margin - board.yMin;
+        }
+
+        /// <summary>置いた板が案内の帯に掛かっていれば、目から見た上へ持ち上げる</summary>
+        void AvoidPrompt()
+        {
+            if (lens == null && eye != null) lens = eye.GetComponent<Camera>();
+            if (lens == null) return;
+            var span = transform.localScale.x;
+            var half = new Vector2(wide * span * 0.5f, high * span * 0.5f);
+            var min = new Vector2(float.MaxValue, float.MaxValue);
+            var max = new Vector2(float.MinValue, float.MinValue);
+            for (var i = 0; i < 4; i++)
+            {
+                var corner = transform.position + transform.right * (i % 2 == 0 ? -half.x : half.x) + transform.up * (i < 2 ? -half.y : half.y);
+                var v = lens.WorldToViewportPoint(corner);
+                if (v.z <= 0f) return;
+                min = Vector2.Min(min, v);
+                max = Vector2.Max(max, v);
+            }
+            var lift = Lift(Rect.MinMaxRect(min.x, min.y, max.x, max.y), PromptBand, PromptMargin);
+            if (lift <= 0f) return;
+            // 画面の高さの割合を、板の所の深さでの長さへ
+            var depth = Vector3.Dot(transform.position - lens.transform.position, lens.transform.forward);
+            var tall = 2f * depth * Mathf.Tan(lens.fieldOfView * 0.5f * Mathf.Deg2Rad);
+            transform.position += lens.transform.up * (lift * tall);
+            transform.rotation = Facing(transform.position);
+        }
+
+        Camera lens;
+
         /// <summary>目から離れる向きへ forward を置く。Quad も 3D の字も -z から見て表だから</summary>
         Quaternion Facing(Vector3 pos)
         {
@@ -314,6 +398,7 @@ namespace HalfAware
 
         string Compose()
         {
+            if (IsLocked) return "<color=#" + ColorUtility.ToHtmlStringRGB(Dead) + ">" + locked + "</color>";
             var cut = "<size=" + Mathf.RoundToInt(Mathf.Clamp01(size) * 100f) + "%>"
                 + (index == 1 ? Choice.Cursor : "") + Cut + "</size>";
             if (!Ready) cut = "<color=#" + ColorUtility.ToHtmlStringRGB(Dead) + ">" + cut + "</color>";
