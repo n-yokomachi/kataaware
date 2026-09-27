@@ -22,22 +22,33 @@ namespace HalfAware.EditorTools
         public const string ReunionName = "Reunion";
         public const string ReunionDirectorName = "ReunionDirector";
 
-        /// <summary>卓の前（場面 10 の頭）の足元。テラスの西の縁、小路から上がった所。卓の芯から 1.55 m</summary>
-        public static readonly Vector3 ReunionHead = new Vector3(-3.35f, StandLift, 16.75f);
+        /// <summary>
+        /// 卓の前（場面 10 の頭）の足元。卓の東、テラスの上（卓の芯から 2.0 m）。区画に入るとここへ歩かせる。
+        /// ここから卓を向くと、パラソルの卓と椅子の奥に西の花の縁。裏口は左の後ろで、戸が開くと目がそちらへ向き、裏口は画面の中ほどに斜めに見える（パラソルの傘は後ろ）。
+        /// 戸口を出た所まで 4 m ほどで、片割れは戸口を出てすぐ立ち止まる。テラスの西の縁（前の立ち位置）からは、裏口は真横の奥で、傘が画面の上半分を塞いだ
+        /// </summary>
+        public static readonly Vector3 ReunionHead = new Vector3(0.15f, TerraceTopY + StandLift, 17.6f);
 
         /// <summary>
         /// Player の足元を床から浮かせる高さ。組み立ての置き場（<c>Rig</c> の ArriveAt の 0.06 m 上）と同じ。
-        /// 当たりの肌の厚みのぶん、立った Player の根は床より少し上に落ち着く。
-        /// **テラスの敷石には当たりが無い**（歩く床は敷地の地面 <c>VillagePlot</c>、高さ 0）。Player はテラスの上でも地面の高さを歩き、
-        /// 敷石の上面（<see cref="TerraceTopY"/>）に立つ片割れより 0.1 m 低い。頬の手の形は、この低い目で作る
+        /// 当たりの肌の厚みのぶん、立った Player の根は床より少し上に落ち着く。テラスの敷石には当たりがある（<c>Garden/Bounds/TerraceFloor</c>）
         /// </summary>
         const float StandLift = 0.06f;
 
-        /// <summary>頬に触れる時の、片割れの足元（テラスの上面）から見たプレイヤーの目の高さ</summary>
-        const float TouchEyeAbove = 1.6f + StandLift - TerraceTopY;
+        /// <summary>頬に触れる時の、片割れの足元（テラスの上面）から見たプレイヤーの目の高さ。二人ともテラスの敷石の上に立つ</summary>
+        const float TouchEyeAbove = 1.6f + StandLift;
 
-        /// <summary>そこでの体の向き。卓を正面に、その奥の右に裏口</summary>
-        public const float ReunionHeadYaw = 95f;
+        /// <summary>そこでの体の向き。卓を向く</summary>
+        public static float ReunionHeadYaw
+        {
+            get { var d = TableAt - ReunionHead; return Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg; }
+        }
+
+        /// <summary>卓の前へ歩かせる時に避ける、卓と椅子の広がり（卓の当たり 1.9 m 角に、Player の太さ 0.3 m と余り）。x の小・大、z の小・大</summary>
+        static Vector4 TableBox
+        {
+            get { return new Vector4(TableAt.x - 1.4f, TableAt.x + 1.4f, TableAt.z - 1.4f, TableAt.z + 1.4f); }
+        }
 
         /// <summary>片割れが戸の開く前に立つ所。戸口の奥の暗がりの西の奥（戸の板は東の丁番から内へ回るので、その外）</summary>
         public static readonly Vector3 TwinInside = new Vector3(BackDoorX - 0.30f, 0.01f, HouseRear - 0.95f);
@@ -75,7 +86,10 @@ namespace HalfAware.EditorTools
             var scene = UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene();
             if (scene.path != ScenePath) return "村が開いていない: " + scene.path;
             if (save && scene.isDirty) return "村に未保存の変更がある。捨ててからもう一度";
-            var root = GameObject.Find("Village");
+            // 根の Village を探す。GameObject.Find は同じ名の子（Player の頭上の環境音の Village）を返すことがある
+            GameObject root = null;
+            foreach (var g in scene.GetRootGameObjects())
+                if (g.name == "Village") root = g;
             if (root == null) return "Village が無い";
             var before = save ? ConsoleShot.Dump("reunion_before") : "";
             var old = root.transform.Find(ReunionName);
@@ -152,6 +166,7 @@ namespace HalfAware.EditorTools
             so.FindProperty("zoneRadius").floatValue = ReunionZone;
             so.FindProperty("headSpot").vector3Value = ReunionHead;
             so.FindProperty("headYaw").floatValue = ReunionHeadYaw;
+            so.FindProperty("tableBox").vector4Value = TableBox;
             so.FindProperty("doorSound").objectReferenceValue = doorSound;
             so.FindProperty("twinInside").vector3Value = TwinInside;
             so.FindProperty("twinOut").vector3Value = TwinOut;
@@ -301,8 +316,10 @@ namespace HalfAware.EditorTools
                 var cheek = eye + CheekFromEye;
                 fingers = CheekFingers.normalized;
                 wrist = cheek - fingers * HandToPalm;
-                BodyPoser.Arm(an, true, wrist, shoulder + CheekElbow, fingers, MirrorPalm(CheekPalm));
-                RelaxFingers(an);
+                // 手のひらはプレイヤーの目の方へ（寄せていく手の内が見える）
+                BodyPoser.Arm(an, true, wrist, shoulder + CheekElbow, fingers, MirrorPalm((eye - cheek).normalized));
+                // 指は揃えてほぼ伸ばし、頬に沿って少しだけ曲げる。親指も人差し指の脇へ寄せて伸ばす（親指だけが前へ突き出ないように）
+                ShapeFingers(an, CheekFingerStretch, -1f, CheekThumbStretch, CheekThumbSpread);
                 for (var i = 0; i < n; i++) all[n + i] = inverse * an.GetBoneTransform(ReachBones[i]).rotation;
                 note.AppendFormat("頬の手首 {0}（プレイヤーの目 {1}）", wrist.ToString("F3"), eye.ToString("F3")).AppendLine();
                 return all;
@@ -325,15 +342,58 @@ namespace HalfAware.EditorTools
         static readonly Vector3 MouthElbow = new Vector3(0.18f, -0.35f, 0.15f);
 
         /// <summary>
-        /// プレイヤーの目から、手のひらを寄せる所（プレイヤーの左の頬の前、片割れの右）。目の脇の少し下、目より 8 cm 手前。
-        /// 頬そのもの（目とほぼ同じ奥行き）まで寄せると、手は目のカメラの縁の外と手前に出て、画面には前腕の根元しか残らなかった。
-        /// 手前に留めて、手のひらと指が画面の左の縁から入る形にする
+        /// プレイヤーの目から、手のひらの真ん中を寄せる所（プレイヤーの左の頬の前、片割れの右）。目の脇の下、目より 13 cm 手前。
+        /// 目のカメラは頭の芯にあるので、頬に当てた手はほとんど画面の外と手前に出る。頬へ寄せていく手のひらと揃えた指を、画面の左の縁に見せる。
+        /// 指先は縁の外へ、頬の側へ回り込む。
+        /// 頬そのものに当てた形は、手のひらの内の縁の親指が目の前を横切り、顔を隠した。手を下から上げた形は、親指の目立つ肌色の塊に見えた
         /// </summary>
-        static readonly Vector3 CheekFromEye = new Vector3(0.12f, -0.04f, -0.07f);
-        /// <summary>頬へ寄せる指の向き（上へ、耳の方へ）と、手のひらの向き（頬の方）と、肘を寄せる所（肩から）</summary>
-        static readonly Vector3 CheekFingers = new Vector3(0.1f, 0.7f, 0.7f);
-        static readonly Vector3 CheekPalm = new Vector3(-0.7f, 0f, 0.7f);
-        static readonly Vector3 CheekElbow = new Vector3(0.45f, -0.4f, 0f);
+        static readonly Vector3 CheekFromEye = new Vector3(0.12f, -0.05f, -0.13f);
+        /// <summary>頬へ寄せる指の向き（上へ、外へ、耳の方へ）と、肘を寄せる所（肩から。外と下）。手のひらはプレイヤーの目の方へ向ける（<see cref="TwinPoses"/>）</summary>
+        static readonly Vector3 CheekFingers = new Vector3(0.5f, 0.7f, 0.5f);
+        static readonly Vector3 CheekElbow = new Vector3(0.35f, -0.35f, 0f);
+        /// <summary>頬の手の指の曲げ（Humanoid の筋肉の Stretched。1 で伸び切り）と、親指の曲げと開き（Stretched を負にして手のひらへ折り、開きを負にして人差し指の脇へ寄せる）</summary>
+        const float CheekFingerStretch = 0.6f, CheekThumbStretch = -0.6f, CheekThumbSpread = -1f;
+
+        /// <summary>
+        /// 両手の指の形を Humanoid の筋肉の値で決める（<see cref="RelaxFingers"/> と同じ作り。指の骨の外は元へ戻す）。
+        /// fingerStretch・fingerSpread は四本の指（中指の開きは 0 のまま）、thumbStretch・thumbSpread は親指
+        /// </summary>
+        static void ShapeFingers(Animator an, float fingerStretch, float fingerSpread, float thumbStretch, float thumbSpread)
+        {
+            if (an == null || an.avatar == null || !an.avatar.isHuman) return;
+            var keep = new List<(Transform, Vector3, Quaternion)>();
+            var fingerBones = new HashSet<Transform>();
+            for (var b = HumanBodyBones.LeftThumbProximal; b <= HumanBodyBones.RightLittleDistal; b++)
+            {
+                var t = an.GetBoneTransform(b);
+                if (t != null) fingerBones.Add(t);
+            }
+            foreach (var t in an.GetComponentsInChildren<Transform>(true))
+                if (!fingerBones.Contains(t)) keep.Add((t, t.localPosition, t.localRotation));
+            var handler = new HumanPoseHandler(an.avatar, an.transform);
+            try
+            {
+                var pose = new HumanPose();
+                handler.GetHumanPose(ref pose);
+                var names = HumanTrait.MuscleName;
+                for (var m = 0; m < names.Length; m++)
+                {
+                    var name = names[m];
+                    if (!name.StartsWith("Left ") && !name.StartsWith("Right ")) continue;
+                    var thumb = name.Contains(" Thumb ");
+                    var finger = thumb || name.Contains(" Index ") || name.Contains(" Middle ") || name.Contains(" Ring ") || name.Contains(" Little ");
+                    if (!finger) continue;
+                    if (name.EndsWith("Stretched")) pose.muscles[m] = thumb ? thumbStretch : fingerStretch;
+                    else if (name.EndsWith("Spread")) pose.muscles[m] = thumb ? thumbSpread : name.Contains(" Middle ") ? 0f : fingerSpread;
+                }
+                handler.SetHumanPose(ref pose);
+            }
+            finally
+            {
+                handler.Dispose();
+                foreach (var k in keep) { k.Item1.localPosition = k.Item2; k.Item1.localRotation = k.Item3; }
+            }
+        }
 
         /// <summary>片割れの模型は根の x を裏返してあり、BodyPoser が指の並びから出す手のひらの向きが逆になる（<see cref="HostSit"/> と同じ）</summary>
         static Vector3 MirrorPalm(Vector3 palm)

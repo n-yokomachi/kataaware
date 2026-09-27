@@ -10,18 +10,20 @@ namespace HalfAware
     /// 場面 9 の終わりと場面 10（対面）の段の進行（シナリオ設計書 12 節）。村（<c>Village.unity</c>）の朝で、読み込みを挟まずに続ける。
     ///
     /// **場面 9 の終わり**
-    /// - 卓のまわりの区画（<see cref="table"/> から <see cref="zoneRadius"/>）に入ると、歩きを封じて独白を一行出す。E で送ると場面 10 に替わる
-    ///   （<see cref="SaveFlow.EnterStage"/> で 10。ここが場面 10 の頭）
+    /// - 卓のまわりの区画（<see cref="table"/> から <see cref="zoneRadius"/>）に入ると、歩きと見回しを封じて卓の前（<see cref="headSpot"/>、卓の東）まで歩かせ、
+    ///   卓へ向かせて独白を一行出す。E で送ると場面 10 に替わる（<see cref="SaveFlow.EnterStage"/> で 10。ここが場面 10 の頭。場面 10 の曲へ渡る）
     ///
     /// **場面 10**
-    /// 1. 裏口が開く。戸の音、戸の板が内へ回る。目が片割れの顔へゆっくり向き（<see cref="PlayerController.Follow"/>）、片割れが戸口の暗がりから出てくる
+    /// 1. 裏口が開く。戸の音、戸の板が内へ回る。目が片割れの顔へゆっくり向き（<see cref="PlayerController.Follow"/>）、片割れが戸口の暗がりから出てきて、
+    ///    プレイヤーから <see cref="stopApart"/> の所で立ち止まる
     /// 2. 片割れが手で口元を覆い（<see cref="PersonMotion.Pose"/> の <see cref="MouthPose"/>）、一歩踏み出す。このあいだ見回しと歩きは封じる
     /// 3. 封じを解く。プレイヤーが歩み寄る。片割れもゆっくり寄る（テラスの上だけ、<see cref="twinReach"/> まで）
     /// 4. 目と顔が <see cref="meetDistance"/> まで近づくと、歩きと見回しを封じ、片割れがもう半歩寄って、手を頬へ伸ばす（<see cref="CheekPose"/>）。手は画面の縁から入る
-    /// 5. モンタージュ。暗転を挟まない直の切り替えで、(a) 場面 1 の端末の黒い画面に映った自分、(b) 場面 6 の続きで振り返った女性の顔、(c) 目の前の片割れの顔（その場の絵）
+    /// 5. モンタージュ。暗転を挟まない直の切り替えで、(a) 場面 1 の端末の黒い画面に映った自分、(b) 場面 6 の続きで振り返った女性の顔、
+    ///    (c) 目の前の片割れの顔（その場の絵。頬の手はこの一枚だけ外す）
     /// 6. 庭で聞き取れなかった言葉が、崩れずに字幕に出る（<see cref="Reunion.Voice"/>）
     /// 7. 片割れが言う（<see cref="Reunion.TwinSays"/>）
-    /// 8. 最後の独白（<see cref="Reunion.LastLine"/>）→ 暗転（環境音も絞る）
+    /// 8. 最後の独白（<see cref="Reunion.LastLine"/>）→ 暗転（環境音と場面 10 の曲も同じ秒で絞る）
     /// 9. クリアの印を付け（<see cref="SaveStore.MarkCleared"/>）、エンディング（<see cref="nextScene"/>、片割れを乗せたドライブとクレジット。
     ///    シナリオ設計書 13 節、別の場面）を読む。エンディングがまだ組み立ての一覧に無い間は、タイトルの画面へ戻る
     ///    （タイトルのカード・終わりのクレジット・エンディングの曲は、エンディングの場面が受け持つ）
@@ -45,6 +47,8 @@ namespace HalfAware
             Off,
             /// <summary>場面 9。卓のまわりの区画に入るのを待つ</summary>
             Waiting,
+            /// <summary>場面 9 の終わり。区画に入った所から、卓の前（<see cref="headSpot"/>）へ歩かせ、卓へ向かせる</summary>
+            Arriving,
             /// <summary>場面 9 の終わり。卓の前の独白を E で送るのを待つ</summary>
             Musing,
             /// <summary>場面 10 の頭から、裏口が開いて片割れが出てきて、口元を覆い、一歩踏み出すまで。見回しと歩きは封じる</summary>
@@ -93,10 +97,15 @@ namespace HalfAware
         [SerializeField] Vector3 table;
         [Tooltip("卓のまわりの区画。卓の芯から、上から見てこの内に入ると場面 9 が終わる。m")]
         [SerializeField] float zoneRadius = 2.2f;
-        [Tooltip("場面 10 の頭（卓の前）。セーブを思い出した時とデバッグの一覧から入った時に立たせる足元")]
+        [Tooltip("卓の前（場面 10 の頭）の足元。区画に入るとここへ歩かせる。セーブを思い出した時とデバッグの一覧から入った時もここに立たせる。" +
+            "卓の東、裏口の側。ここから裏口は斜め前に見え、パラソルの傘は後ろになる")]
         [SerializeField] Vector3 headSpot;
-        [Tooltip("その時の体の向き。度（+z が 0 で東回り）")]
-        [SerializeField] float headYaw = 95f;
+        [Tooltip("そこでの体の向き。度（+z が 0 で東回り）。卓を向く")]
+        [SerializeField] float headYaw = 250f;
+        [Tooltip("卓の前へ歩かせる速さ。m/s")]
+        [SerializeField] float arriveSpeed = 1.2f;
+        [Tooltip("卓の前へ歩かせる時に避ける、卓と椅子の広がり（上から見て）。x の小・大、z の小・大")]
+        [SerializeField] Vector4 tableBox = new Vector4(-3.2f, -0.4f, 15.5f, 18.3f);
         [Tooltip("場面 10 の頭から入った時に、黒から明ける秒")]
         [SerializeField] float openSeconds = 1.2f;
 
@@ -115,8 +124,9 @@ namespace HalfAware
         [SerializeField] Vector3 twinInside;
         [Tooltip("戸口を出た所。踏み石の先、テラスの上")]
         [SerializeField] Vector3 twinOut;
-        [Tooltip("戸口を出てから、そのまま卓の方（プレイヤーの方）へ歩いて立ち止まるまで。m。戸口のすぐ外で立ち止まると、卓の前から 7 m 余りあって顔が見分けられない")]
-        [SerializeField] float outWalk = 1.6f;
+        [Tooltip("戸口を出て立ち止まる所の、プレイヤーの目からの隔たり（上から見て）。m。戸口を出た所がこれより遠ければ、そこからプレイヤーの方へ歩いてここで立ち止まる。" +
+            "口元を覆う仕草が粗い画面でも読める近さ")]
+        [SerializeField] float stopApart = 3.75f;
         [Tooltip("出てくる速さ。m/s（ならした速さ。歩き出しと立ち止まりはなめらかに）")]
         [SerializeField] float outSpeed = 0.6f;
         [Tooltip("一歩踏み出す長さ。m")]
@@ -125,8 +135,8 @@ namespace HalfAware
         [SerializeField] float stepSeconds = 1.0f;
         [Tooltip("歩み寄る速さ。m/s。ゆっくり")]
         [SerializeField] float twinSpeed = 0.35f;
-        [Tooltip("歩み寄るのはここまで（戸口の外から）。プレイヤーが寄らなければ待つ。m")]
-        [SerializeField] float twinReach = 2.2f;
+        [Tooltip("歩み寄るのはここまで（一歩踏み出した所から）。プレイヤーが寄らなければ待つ。m。プレイヤーが自分の足で 1 m 余りは歩く長さを残す")]
+        [SerializeField] float twinReach = 0.8f;
         [Tooltip("片割れが歩ける所（テラスの上）。x の小・大、z の小・大")]
         [SerializeField] Vector4 walkArea = new Vector4(-3.3f, 6.1f, 15.55f, 18.3f);
         [Tooltip("テラスの上面の高さ")]
@@ -193,7 +203,7 @@ namespace HalfAware
         bool attending;
         bool doorOpened;
         bool steppedOut;
-        bool walkedOut;
+        /// <summary>片割れが立ち止まる所（<see cref="StopPoint"/>）。場面 10 を始める時に決める</summary>
         Vector3 stopAt;
         Quaternion doorClosed;
         bool doorKnown;
@@ -209,6 +219,12 @@ namespace HalfAware
         readonly List<AudioSource> quieted = new List<AudioSource>();
         readonly List<float> quietFrom = new List<float>();
         bool cleared;
+        /// <summary>卓の前へ歩かせる道（歩き出す所は入れない）と、その長さ・歩き出す所・向き</summary>
+        readonly List<Vector3> route = new List<Vector3>();
+        Vector3 routeFrom;
+        float routeLength;
+        float yawFrom;
+        float pitchFrom;
 
         /// <summary>いまの段。動作確認から読む</summary>
         public Beat Current { get { return beat; } }
@@ -360,7 +376,10 @@ namespace HalfAware
             switch (beat)
             {
                 case Beat.Waiting:
-                    if (InZone()) Muse();
+                    if (InZone()) Arrive();
+                    break;
+                case Beat.Arriving:
+                    Arriving();
                     break;
                 case Beat.Musing:
                     if (!press) break;
@@ -411,12 +430,141 @@ namespace HalfAware
             return new Vector2(at.x - table.x, at.z - table.z).magnitude <= radius;
         }
 
-        /// <summary>卓の前に立った。歩きを封じて、独白を一行（E で送る）</summary>
+        /// <summary>
+        /// 卓のまわりに入った。歩きと見回しを封じ、卓の前（<see cref="headSpot"/>）まで歩かせる（卓と椅子は回り込む）。
+        /// どこから卓に来ても、場面 10 は同じ所から見る（裏口が斜め前に見え、パラソルの傘が視界を塞がない所）。
+        /// 端末の前へ座らせる動き（<see cref="TerminalSeat"/>）と同じく、演出が足を運ぶ
+        /// </summary>
+        void Arrive()
+        {
+            beat = Beat.Arriving;
+            beatClock = 0f;
+            if (hud != null) hud.SetPrompt(null);
+            route.Clear();
+            if (player == null) { Muse(); return; }
+            player.HoldMove(this);
+            player.HoldLook(this);
+            player.StopFacing();
+            route.AddRange(Route(player.transform.position, headSpot, tableBox));
+            routeFrom = player.transform.position;
+            routeLength = 0f;
+            var at = routeFrom;
+            foreach (var p in route) { routeLength += Vector3.Distance(Flat(at), Flat(p)); at = p; }
+            yawFrom = player.Yaw;
+            pitchFrom = player.Pitch;
+        }
+
+        /// <summary>卓の前へ歩かせる一歩。道の上を運び、歩く向きへ体を回し、着いたら卓へ向ける</summary>
+        void Arriving()
+        {
+            if (player == null) { Muse(); return; }
+            var span = routeLength / Mathf.Max(0.1f, arriveSpeed);
+            var turn = ArriveTurn;
+            var k = span > 0f ? Mathf.Clamp01(beatClock / span) : 1f;
+            var p = Along(Gaze.Ease(k));
+            p.y = Mathf.Lerp(routeFrom.y, headSpot.y, k);
+            // 歩くあいだは進む先へ、着く前の turn 秒で卓の向き（headYaw）へ、上下は水平へ
+            var ahead = Along(Mathf.Min(1f, Gaze.Ease(k) + 0.08f)) - p;
+            ahead.y = 0f;
+            var walkYaw = ahead.sqrMagnitude > 1e-6f ? Mathf.Atan2(ahead.x, ahead.z) * Mathf.Rad2Deg : headYaw;
+            var settle = span > 0f ? Mathf.Clamp01((beatClock - Mathf.Max(0f, span - turn)) / turn) : 1f;
+            var intoWalk = Mathf.Clamp01(beatClock / Mathf.Max(0.05f, turn));
+            var yaw = Mathf.LerpAngle(Mathf.LerpAngle(yawFrom, walkYaw, Gaze.Ease(intoWalk)), headYaw, Gaze.Ease(settle));
+            var hull = player.GetComponent<CharacterController>();
+            var was = hull != null && hull.enabled;
+            if (was) hull.enabled = false;
+            player.transform.SetPositionAndRotation(p, Quaternion.Euler(0f, yaw, 0f));
+            if (was) hull.enabled = true;
+            player.Pitch = Mathf.Lerp(pitchFrom, 0f, Gaze.Ease(intoWalk));
+            if (beatClock >= span + turn * 0.2f) Muse();
+        }
+
+        /// <summary>卓の前で卓へ向き直る秒</summary>
+        const float ArriveTurn = 0.9f;
+
+        /// <summary>道の上の、0（歩き出す所）〜 1（卓の前）の所</summary>
+        Vector3 Along(float t)
+        {
+            if (route.Count == 0) return routeFrom;
+            var want = routeLength * Mathf.Clamp01(t);
+            var at = routeFrom;
+            foreach (var p in route)
+            {
+                var leg = Vector3.Distance(Flat(at), Flat(p));
+                if (want <= leg && leg > 1e-5f) return Vector3.Lerp(at, p, want / leg);
+                want -= leg;
+                at = p;
+            }
+            return route[route.Count - 1];
+        }
+
+        /// <summary>
+        /// from から to へ、卓と椅子の広がり box（上から見て。x の小・大、z の小・大）を避けて歩く道の点（from は入れない）。
+        /// まっすぐ行けなければ、卓の北の二つの角（テラスの北の縁の側。南は家の壁との間が狭い）を回る
+        /// </summary>
+        public static List<Vector3> Route(Vector3 from, Vector3 to, Vector4 box)
+        {
+            var path = new List<Vector3>();
+            var y = to.y;
+            var nw = new Vector3(box.x, y, box.w);
+            var ne = new Vector3(box.y, y, box.w);
+            var at = from;
+            for (var i = 0; i < 3 && Crosses(at, to, box); i++)
+            {
+                // 角のうち、いまの所からまっすぐ行ける物で、行き先に近い方
+                Vector3? next = null;
+                foreach (var c in new[] { ne, nw })
+                {
+                    if (Flat(c - at).sqrMagnitude < 1e-6f || Crosses(at, c, box)) continue;
+                    if (next == null || Flat(c - to).sqrMagnitude < Flat(next.Value - to).sqrMagnitude) next = c;
+                }
+                if (next == null) break;
+                path.Add(next.Value);
+                at = next.Value;
+            }
+            path.Add(to);
+            return path;
+        }
+
+        /// <summary>上から見て、a から b への線が広がり box の内を通るか（縁をなぞるのは通らない）</summary>
+        public static bool Crosses(Vector3 a, Vector3 b, Vector4 box)
+        {
+            const float Skin = 1e-3f;
+            float t0 = 0f, t1 = 1f;
+            var d = new Vector2(b.x - a.x, b.z - a.z);
+            var lo = new Vector2(box.x + Skin, box.z + Skin);
+            var hi = new Vector2(box.y - Skin, box.w - Skin);
+            for (var axis = 0; axis < 2; axis++)
+            {
+                var p = axis == 0 ? a.x : a.z;
+                var q = axis == 0 ? d.x : d.y;
+                var min = axis == 0 ? lo.x : lo.y;
+                var max = axis == 0 ? hi.x : hi.y;
+                if (Mathf.Abs(q) < 1e-8f)
+                {
+                    if (p < min || p > max) return false;
+                    continue;
+                }
+                var u0 = (min - p) / q;
+                var u1 = (max - p) / q;
+                if (u0 > u1) { var s = u0; u0 = u1; u1 = s; }
+                t0 = Mathf.Max(t0, u0);
+                t1 = Mathf.Min(t1, u1);
+                if (t0 > t1) return false;
+            }
+            return true;
+        }
+
+        /// <summary>卓の前に着いた。独白を一行（E で送る）。見回しは返す（歩きは封じたまま）</summary>
         void Muse()
         {
             beat = Beat.Musing;
             beatClock = 0f;
-            if (player != null) player.HoldMove(this);
+            if (player != null)
+            {
+                player.HoldMove(this);
+                player.FreeLook(this);
+            }
             if (hud != null)
             {
                 hud.SetPrompt(null);
@@ -438,7 +586,6 @@ namespace HalfAware
             beatClock = 0f;
             doorOpened = false;
             steppedOut = false;
-            walkedOut = false;
             walked = 0f;
             frame = -1;
             cleared = false;
@@ -461,10 +608,13 @@ namespace HalfAware
             face = null;
             leftEye = null;
             rightEye = null;
+            stopAt = StopPoint();
+            // 場面 10 の曲。卓の前に立って場面 10 に替わった所で、村の曲から渡る（思い出した時とデバッグの一覧から入った時も、ここを通る）
+            MusicBed.Play(MusicCue.Reunion);
         }
 
         /// <summary>
-        /// 裏口が開き、片割れが出てきて、卓の方へ少し歩いて立ち止まり、口元を覆い、一歩踏み出す。見回しと歩きは封じたまま、目は片割れの顔を追う
+        /// 裏口が開き、片割れが出てきて、プレイヤーの方へ歩いて立ち止まり、口元を覆い、一歩踏み出す。見回しと歩きは封じたまま、目は片割れの顔を追う
         /// </summary>
         void Door()
         {
@@ -481,13 +631,8 @@ namespace HalfAware
             if (!attending && clock >= lookAt) Attend(PlayerController.FaceSeconds);
             if (twin == null) { if (clock >= ReleaseAt) Free(); return; }
 
-            // 戸口の奥から戸口の外へ出て、そのまま卓の方（プレイヤーの方）へ歩いて立ち止まる。
+            // 戸口の奥から戸口の外へ出て、プレイヤーから stopApart の所まで歩いて立ち止まる（立ち止まる所は Begin で決めてある）。
             // 二本の線を一続きの道にして、歩き出しと立ち止まりだけをなめらかにする
-            if (!walkedOut)
-            {
-                walkedOut = true;
-                stopAt = Clamp(twinOut + TowardEye(twinOut) * outWalk);
-            }
             var first = Vector3.Distance(Flat(twinInside), Flat(twinOut));
             var second = Vector3.Distance(Flat(twinOut), Flat(stopAt));
             var k = OutSpan > 0f ? Mathf.Clamp01((clock - comeOutAt) / OutSpan) : 1f;
@@ -528,7 +673,24 @@ namespace HalfAware
         /// <summary>戸口の奥から、立ち止まる所まで歩く秒</summary>
         float OutSpan
         {
-            get { return (Vector3.Distance(Flat(twinInside), Flat(twinOut)) + Mathf.Max(0f, outWalk)) / Mathf.Max(0.05f, outSpeed); }
+            get { return (Vector3.Distance(Flat(twinInside), Flat(twinOut)) + Vector3.Distance(Flat(twinOut), Flat(stopAt))) / Mathf.Max(0.05f, outSpeed); }
+        }
+
+        /// <summary>目は体の前へ出ている（PlayerController の eyeLead）。立ち止まる所を体の芯から測るときの足し</summary>
+        const float EyeLead = 0.22f;
+
+        /// <summary>
+        /// 片割れが立ち止まる所。戸口を出た所から、プレイヤーの目まで上から見て <see cref="stopApart"/> になる所までプレイヤーの方へ歩く。
+        /// 戸口を出た所の方が近ければ、そこで立ち止まる。目は裏口の方へ向くと体の前へ出るので、体の芯から測って eyeLead ぶん足す
+        /// </summary>
+        public Vector3 StopPoint()
+        {
+            if (player == null) return twinOut;
+            var d = Flat(player.transform.position - twinOut);
+            var far = d.magnitude;
+            var want = stopApart + EyeLead;
+            if (far <= want || far < 1e-4f) return twinOut;
+            return Clamp(twinOut + d / far * (far - want));
         }
 
         /// <summary>立ち止まる秒（場面 10 の頭から）</summary>
@@ -633,6 +795,8 @@ namespace HalfAware
             if (n >= 3)
             {
                 Show(null);
+                // (c) の間だけ外していた頬の手を戻す（触れたまま、聞こえた言葉へ）
+                Hand(true);
                 beat = Beat.Voice;
                 beatClock = 0f;
                 frame = -1;
@@ -643,6 +807,16 @@ namespace HalfAware
             if (n == frame) return;
             frame = n;
             Show(n == 0 ? mirrorShot : n == 1 ? gardenShot : null);
+            // (c) は目の前の片割れの顔だけ。頬の手を外す（画面の縁から入る手が顔の脇に掛からないように）
+            if (n == 2) Hand(false);
+        }
+
+        /// <summary>頬の手を掛ける・外す。次のこまの頭を待たず、その場で骨を置き直す（直の切り替えの一枚目から替える）</summary>
+        void Hand(bool on)
+        {
+            if (twin == null) return;
+            twin.Pose(on ? CheekPose : -1, on ? 1f : 0f);
+            twin.Refresh();
         }
 
         /// <summary>モンタージュの絵を出す。null で伏せる（その場の絵に戻る）</summary>
@@ -698,6 +872,8 @@ namespace HalfAware
             beat = Beat.Closing;
             beatClock = 0f;
             if (hud != null) hud.SetSubtitle(null);
+            // 場面 10 の曲も、黒へ落とすのと同じ秒で消す。エンディングの曲はエンディングの場面が鳴らす
+            MusicBed.FadeOut(blackSeconds);
             // 環境音は黒へ落とすのに合わせて絞る。村の環境音は毎フレーム大きさを書くので止める
             if (ambience != null) ambience.enabled = false;
             quieted.Clear();
@@ -814,7 +990,7 @@ namespace HalfAware
         public string MemoryKey { get { return "reunion"; } }
 
         /// <summary>場面 9 の間は邪魔しない。場面 10 を流している間は残さない（記憶するは場面 10 の頭を書く）</summary>
-        public bool Settled { get { return beat == Beat.Off || beat == Beat.Waiting || beat == Beat.Musing; } }
+        public bool Settled { get { return beat == Beat.Off || beat == Beat.Waiting || beat == Beat.Arriving || beat == Beat.Musing; } }
 
         public string Capture() { return null; }
 

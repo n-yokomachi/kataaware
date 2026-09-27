@@ -121,6 +121,81 @@ namespace HalfAware.Tests
             Assert.IsTrue(ReunionDirector.Within(new Vector3(-1.8f, 5f, 16.9f), table, 2.2f));
         }
 
+        /// <summary>卓と椅子の広がり（卓の当たり 1.9 m 角に Player の太さと余り）と、卓の前（卓の東）</summary>
+        static readonly Vector4 TableBox = new Vector4(-3.2f, -0.4f, 15.5f, 18.3f);
+        static readonly Vector3 Head = new Vector3(0.15f, 0.16f, 17.6f);
+
+        [Test]
+        public void FromTheWestTheWalkToTheTableGoesRoundItsNorthSide()
+        {
+            var from = new Vector3(-3.9f, 0.06f, 16.9f);
+            Assert.IsTrue(ReunionDirector.Crosses(from, Head, TableBox), "まっすぐ行くと卓を抜ける");
+            var path = ReunionDirector.Route(from, Head, TableBox);
+            Assert.Greater(path.Count, 1, "角を回る");
+            Assert.AreEqual(Head, path[path.Count - 1]);
+            var at = from;
+            foreach (var p in path)
+            {
+                Assert.IsFalse(ReunionDirector.Crosses(at, p, TableBox), at + " から " + p + " が卓を抜ける");
+                at = p;
+            }
+            // 回るのは北（テラスの北の縁の側）。南は家の壁との間が狭い
+            foreach (var p in path) Assert.GreaterOrEqual(p.z, TableBox.z - 1e-4f);
+            Assert.IsTrue(path.Exists(p => Mathf.Abs(p.z - TableBox.w) < 1e-4f));
+        }
+
+        [Test]
+        public void FromTheEastTheWalkToTheTableIsStraight()
+        {
+            var from = new Vector3(1.2f, 0.16f, 16.3f);
+            var path = ReunionDirector.Route(from, Head, TableBox);
+            Assert.AreEqual(1, path.Count);
+            Assert.AreEqual(Head, path[0]);
+        }
+
+        // ---- 場面 10 の曲 ------------------------------------------------------------
+
+        [Test]
+        public void TheReunionMusicStartsAtTheHeadAndFadesWithTheBlack()
+        {
+            var clip = AudioClip.Create("TestReunion", 44100, 2, 44100, false);
+            var table = ScriptableObject.CreateInstance<MusicTable>();
+            table.tracks = new[] { new MusicTable.Track { cue = MusicCue.Reunion, clip = clip, volume = 0.5f, fadeIn = 3f, crossFade = 6f } };
+            var bed = MusicBed.Make(table);
+            var go = new GameObject("ReunionDirector");
+            try
+            {
+                var d = go.AddComponent<ReunionDirector>();
+                // 卓の前で独白を送った時（場面 10 の頭）
+                d.Begin();
+                Assert.AreEqual(MusicCue.Reunion, MusicBed.Current);
+                // 思い出した時とデバッグの一覧から入った時（卓の前に立たせて頭から）も鳴らす
+                bed.Mix.Stop();
+                Assert.AreEqual(MusicCue.None, MusicBed.Current);
+                d.OpenAtTable();
+                Assert.AreEqual(MusicCue.Reunion, MusicBed.Current);
+                // 最後の独白を送ると、黒へ落とすのと同じ秒で消える
+                d.Step(d.ReleaseAt + 0.1f, false);
+                d.Step(0.1f, false);
+                d.Step(5f, false);
+                d.Step(5f, false);
+                d.Step(0.1f, true);
+                d.Step(0.1f, true);
+                d.Step(0.1f, true);
+                Assert.AreEqual(ReunionDirector.Beat.Closing, d.Current);
+                Assert.AreEqual(MusicCue.None, MusicBed.Current, "消え始めた曲は、いま流している曲に数えない");
+                Assert.IsTrue(bed.Mix.Front.Fading);
+                Assert.AreEqual(2.2f, bed.Mix.Front.Left, 0.05f, "暗転の秒");
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+                bed.Dispose();
+                Object.DestroyImmediate(table);
+                Object.DestroyImmediate(clip);
+            }
+        }
+
         [Test]
         public void WithoutTheHandoffTheDirectorDoesNotGetInTheWay()
         {

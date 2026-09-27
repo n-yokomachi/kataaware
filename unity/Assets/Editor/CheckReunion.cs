@@ -32,6 +32,7 @@ namespace HalfAware.EditorTools
                 if (SceneManager.GetSceneAt(i).isDirty) return "未保存の変更がある: " + SceneManager.GetSceneAt(i).path;
             var sb = new StringBuilder();
             sb.AppendLine("RenderTexture（どのアセットにも属さない）: 始め " + CheckVillage.LooseRenderTextures());
+            var setup = EditorSceneManager.GetSceneManagerSetup();
             EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
             var async = ShaderUtil.allowAsyncCompilation;
             ShaderUtil.allowAsyncCompilation = false;
@@ -49,6 +50,10 @@ namespace HalfAware.EditorTools
                 // 場面 9 の終わり。区画の外（小路の上）から卓の方へ歩いて入る
                 run.Place(new Vector3(-4.2f, 0.06f, 16.6f), 95f);
                 run.WalkTo(BuildVillage.ReunionHead, () => run.D.Current != ReunionDirector.Beat.Waiting);
+                // 区画に入ると、演出が卓の前まで歩かせる（卓の北を回る）
+                var from = run.Where();
+                run.Until(() => run.D.Current == ReunionDirector.Beat.Musing, false);
+                sb.AppendLine("区画に入った所 " + from + " から卓の前 " + run.Where() + " へ（秒は段の移りの Arriving から Musing）");
                 run.Hold(0.3f);
                 sb.AppendLine(run.Note("1 卓の前") + " → " + run.Shot(dir + "/r10_1_table.png"));
                 // 独白を送ると場面 10。戸が開いて片割れが出てきて立ち止まった所
@@ -87,7 +92,11 @@ namespace HalfAware.EditorTools
                 run.Until(() => run.D.BeatClock >= 1.1f, false);
                 sb.AppendLine(run.Note("9 暗転の半ば") + " → " + run.Shot(dir + "/r10_9_black.png"));
                 run.Until(() => run.D.Current == ReunionDirector.Beat.Done, false);
-                sb.AppendLine(run.Note("10 終わり") + "・クリアの印 " + SaveStore.Cleared + "・次に読むシーン " + (run.D.Next ?? "（無い。タイトルの画面へ戻る）"));
+                // 読めるかはエディタで遊んでいない間は分からない（Application.CanStreamedLevelBeLoaded がいつも false）。組み立ての一覧を見る
+                var ending = false;
+                foreach (var e in EditorBuildSettings.scenes)
+                    if (e.enabled && System.IO.Path.GetFileNameWithoutExtension(e.path) == ReunionDirector.EndingScene) ending = true;
+                sb.AppendLine(run.Note("10 終わり") + "・クリアの印 " + SaveStore.Cleared + "・次に読むシーン " + (ending ? ReunionDirector.EndingScene + "（組み立ての一覧にある）" : "（エンディングが組み立ての一覧に無い。タイトルの画面へ戻る）"));
                 sb.AppendLine(run.Timeline());
             }
             catch (System.Exception e)
@@ -100,7 +109,9 @@ namespace HalfAware.EditorTools
                 SaveStore.Box = null;
                 ShaderUtil.allowAsyncCompilation = async;
                 ReunionHandoff.Clear();
+                // 撮る前に開いていた場面へ戻す（書き換えた村は捨てる）。同じエディタでほかの場面を扱っている者の邪魔をしない
                 EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+                TitleShots.Back(setup);
                 sb.AppendLine("クリアの印（PlayerPrefs）: 撮る前 " + cleared + "・後 " + SaveStore.Cleared);
                 sb.AppendLine("RenderTexture（どのアセットにも属さない）: 終わり " + CheckVillage.LooseRenderTextures());
             }
@@ -118,6 +129,7 @@ namespace HalfAware.EditorTools
                 if (SceneManager.GetSceneAt(i).isDirty) return "未保存の変更がある: " + SceneManager.GetSceneAt(i).path;
             var sb = new StringBuilder();
             sb.AppendLine("RenderTexture（どのアセットにも属さない）: 始め " + CheckVillage.LooseRenderTextures());
+            var setup = EditorSceneManager.GetSceneManagerSetup();
             EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
             var async = ShaderUtil.allowAsyncCompilation;
             ShaderUtil.allowAsyncCompilation = false;
@@ -137,8 +149,8 @@ namespace HalfAware.EditorTools
                 var at = new Vector3(0.9f, 0.1f, 16.4f);
                 twin.transform.SetPositionAndRotation(at, Quaternion.Euler(0f, 270f, 0f));
                 var eyeFoot = at + twin.transform.forward * BuildVillage.TouchApart;
-                // Player はテラスの上でも地面（高さ 0）を歩く。組み立ての置き場と同じく 0.06 m 浮かせる
-                player.PlaceAt(new Vector3(eyeFoot.x, 0.06f, eyeFoot.z) - Quaternion.Euler(0f, 90f, 0f) * Vector3.forward * 0.22f, 90f, 0f, 0f, 0f, PlayerController.StandingEyeHeight);
+                // Player もテラスの敷石の上に立つ。組み立ての置き場と同じく 0.06 m 浮かせる
+                player.PlaceAt(new Vector3(eyeFoot.x, 0.16f, eyeFoot.z) - Quaternion.Euler(0f, 90f, 0f) * Vector3.forward * 0.22f, 90f, 0f, 0f, 0f, PlayerController.StandingEyeHeight);
                 twin.Watch(player.Eye);
                 twin.Pose(pose, 1f);
                 twin.Sample(twin.Idle, 0.3f);
@@ -166,7 +178,9 @@ namespace HalfAware.EditorTools
             {
                 if (twin != null) twin.Close();
                 ShaderUtil.allowAsyncCompilation = async;
+                // 撮る前に開いていた場面へ戻す（書き換えた村は捨てる）。同じエディタでほかの場面を扱っている者の邪魔をしない
                 EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+                TitleShots.Back(setup);
                 sb.AppendLine("RenderTexture（どのアセットにも属さない）: 終わり " + CheckVillage.LooseRenderTextures());
             }
             return sb.ToString();
@@ -201,6 +215,9 @@ namespace HalfAware.EditorTools
                 last = D.Current;
                 return true;
             }
+
+            /// <summary>Player の足元</summary>
+            public string Where() { return player.transform.position.ToString("F2"); }
 
             /// <summary>片割れの動きの図を捨てる（エディタで Restart すると作られ、伏せても残る）</summary>
             public void Close()

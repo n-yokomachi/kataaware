@@ -210,6 +210,15 @@ namespace HalfAware
             poseWeight = Mathf.Clamp01(weight);
         }
 
+        /// <summary>
+        /// 次のこまの頭を待たずに、いまの歩き方と周期のまま骨を置き直す。演出が形を外した・掛けたのを、その場で絵に出す時に使う
+        /// （モンタージュの切り替えのように、直の切り替えの一枚目から形を替えたい時）
+        /// </summary>
+        public void Refresh()
+        {
+            if (graph.IsValid()) Evaluate();
+        }
+
         /// <summary>その人の自然な歩きの速さ。m/s。歩きの動きのままの歩幅で一周期に進む m と、一周期の秒の比</summary>
         public float Natural
         {
