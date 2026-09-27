@@ -601,15 +601,22 @@ namespace HalfAware.EditorTools
             DovesEarly(take, 0.2f, 6, new Vector2(-0.9f, 4.2f));
             // 区切りの行き先は池の縁
             Stop(-0.9f, 0f, 4.2f);
-            // 通りすがり。イヤホンをした少女（記憶 11 のプリヤ）が、小径の東の芝生の奥を北から南へ横切り、
-            // 三脚目のベンチの北東で止まる。公園から電車へ出る口はここ一つ（設計書 6 節）。
-            // ソフィアがしゃがんでいた所から東を向けば、植え込みの南の端より手前を通って見える。
+            // 通りすがり。イヤホンをした少女（記憶 11 のプリヤ）が、北の柵の切れ目から入って芝生を斜めに横切り、
+            // 水飲み場の脇で止まる。公園から電車へ出る口はここ一つ（設計書 6 節）。
+            // **池の縁から 3.7 m の所で止める**（2026-09-27）。芝生の奥（6.4, 2.4）で止めていた頃は、会話を終えた池の縁から
+            // 7 m 離れて粗い画面で背が 20 画素ほどになり、暗い服が柵と街灯に紛れて「ソフィアから次の人に飛ぶことができない」と差し戻された。
+            // **線は二本。** 柵の切れ目（x 7.4 前後）から水飲み場へ一直線に結ぶと、北の柵（z 9.4）を突き抜ける。
+            // 切れ目を抜けてから斜めに進む。一本目の終わりで止まらないよう、端は滑らかにしない（歩きの揺れは PersonMotion が持つ）。
             // 会話とは関わらないので記憶の時計で動く
-            var stop = new Vector3(6.4f, 0f, 2.4f);
-            var teen = Cast(take, "Passerby", stop, 188f, 0);
+            var stop = new Vector3(2.8f, 0f, 3.0f);
+            var outside = new Vector3(7.6f, 0f, 10.5f);
+            var gap = new Vector3(7.3f, 0f, 8.4f);
+            var teen = Cast(take, "Passerby", stop, Toward(outside, gap), 0);
             Aside(teen);
             Earphones(teen);
-            Move(teen, new Vector3(7.6f, 0f, 10.5f), stop, 3f, 9f, true);
+            Move(teen, outside, gap, 3f, 2.4f, false);
+            Then(teen, stop, 5.4f, 7.6f);
+            Face(teen, Toward(outside, gap), Toward(outside, gap), Toward(gap, stop));
             return new[]
             {
                 K(0f,  -0.9f, 0f, 0.9f, 200f,  55f, 0.55f),  // しゃがんで白い石を拾っている
@@ -765,9 +772,11 @@ namespace HalfAware.EditorTools
             // デッキの戸口の前からは見えないので、会話は新聞を持って居間まで入ってから（設計書 7 節の 9）。
             // 椅子の真ん中（記憶 16 の主の立ち位置、x 9.62）に置くと、座面の前の縁に浅く掛けて背から離れるので、12 cm 背の側へ寄せる
             Cast(take, "Wife", new Vector3(9.50f, EstateTop, -22.10f), 100f, 5);
-            // 隣の母親は A の戸の前で娘を抱き上げているところ。記憶 1 でハンナが立っていた所。
-            // こちらではなく西の娘を見ている
-            Aside(Cast(take, "Mother", new Vector3(5.05f, EstateTop, EstateWalk - 0.35f), 270f, 1));
+            // 隣の母親は A の戸の前で娘を抱き上げているところ。こちらではなく西の娘を見ている。
+            // **A の戸の東の脇（x 6.3、A の住まいの前の端）に立たせる**（2026-09-27）。記憶 1 でハンナが立っていた戸の西（x 5.05）では、
+            // 居間の会話を終えてデッキへ戻った所（B の戸口の前）から 6 m 離れ、板も人も見落とした。東の脇なら 4.8 m。
+            // 居間からは壁の向こうなので、デッキへ戻って見る
+            Aside(Cast(take, "Mother", new Vector3(6.3f, EstateTop, EstateWalk - 0.35f), 270f, 1));
             // 隣は鍵を掛けて出てきたところなので、戸は閉まっている。自分の戸は開けて出てきた
             Shut(take, "ShutA", DoorA);
             Ajar(take, "AjarB", DoorB);
@@ -894,9 +903,17 @@ namespace HalfAware.EditorTools
         /// </summary>
         static HostKey[] Daniel(Transform take)
         {
-            // **母は台所の戸口から、階段を降りてくるダニエルの方を向く。** 昼食の袋を渡す相手なので（設計書 6 節の 13）。
-            // 300° では台所の奥を向き、ダニエルに背を向けていた。階段の下（8 秒）と袋を受け取る所（12 秒）のあいだへ向ける
-            Cast(take, "Mother", new Vector3(0.1f, 0f, 0.2f), 150f, 1);
+            // **母は名を呼ぶ時、台所の戸口の東の脇の廊下に立ち、階段の途中のダニエルを見上げる**（2026-09-27）。
+            // 記憶の頭で名を呼ぶ人へ目を向けるようにしたら、台所の中の母は階段の途中から壁の向こうで、壁しか映らなかった。
+            // 廊下の (0.95, -0.9) は、階段の途中の目から顔も胸も通って見える（台所の戸口そのものと、戸口にすぐ寄った所は壁の陰）。
+            // 返事（二行目、ダニエル「分かってる」）が出たら、戸口を抜けて台所へ戻り、階段を降りてくるダニエルの方を向く。
+            // 昼食の袋を渡す相手なので（設計書 6 節の 13）。300° では台所の奥を向き、ダニエルに背を向けていた。
+            // 歩くので片脚に預ける形（pose 1）は使わない
+            var calling = new Vector3(0.95f, 0f, -0.9f);
+            var kitchen = new Vector3(0.1f, 0f, 0.2f);
+            var mother = Cast(take, "Mother", calling, Toward(calling, new Vector3(StairX, 0f, -3.3f)), 0);
+            Move(mother, calling, kitchen, 0.3f, 1.4f, true, true, 2);
+            Face(mother, Toward(calling, kitchen), 150f);
             // **父は「行ってくる」で、息子より先に玄関から出ていく**（設計書 6 節の 13）。
             // 九行目（マーク「行ってくる」）が出たら、台所の戸口を抜けて玄関へ歩き、開いた戸の外の段で止まる
             var father = Cast(take, "Father", new Vector3(-1.05f, 0f, 2.2f), 350f, 0);
