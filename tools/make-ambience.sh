@@ -3,6 +3,7 @@
 # 使い方: bash make-ambience.sh           （全部）
 #         bash make-ambience.sh village   （5 節の村と麦畑の 3 つだけ）
 #         bash make-ambience.sh gravel    （6 節の未舗装の路地の足音だけ）
+#         bash make-ambience.sh grass     （7 節の芝の足音だけ）
 # 出力先は OUT_DIR 直下。中間ファイルは OUT_DIR/tmp に置く。
 set -euo pipefail
 
@@ -22,6 +23,7 @@ SRC_WHICHFORD="$SRC_PIXABAY_DIR/freesound_community-030510whichford-18349.mp3"
 SRC_WHEAT="$SRC_PIXABAY_DIR/freesound_community-wheat-in-the-wind-7159.mp3"
 SRC_GATE="$SRC_PIXABAY_DIR/dobcommunications-creaky-wooden-gate-opens-170210.mp3"
 SRC_GRAVEL="$SRC_PIXABAY_DIR/freesound_community-walking-on-a-road-with-gravel-01-30100.mp3"
+SRC_GRASS="$SRC_PIXABAY_DIR/freesound_community-walking-through-grass-80308.mp3"
 # 6 節で大きさを揃える相手（村の芝と庭で鳴らしている柔らかい足音）
 STEPS_DIR="${STEPS_DIR:-$SCRIPT_DIR/../unity/Assets/Audio}"
 
@@ -29,6 +31,13 @@ OUT_DIR="${OUT_DIR:-./out-ambience}"   # 出来た物を unity/Assets/Audio/ と
 TMP_DIR="$OUT_DIR/tmp"
 ANALYSIS_DIR="$OUT_DIR/analysis"
 mkdir -p "$TMP_DIR" "$ANALYSIS_DIR"
+
+# 一歩あたりの大きさ。0.5 秒に伸ばして 10 回繰り返した物の integrated loudness（LUFS）。
+# 6 節（砂利）と 7 節（芝）のどちらからも呼ぶので、PART の分岐の外に置く
+step_loudness () {
+  ffmpeg -hide_banner -nostats -i "$1" -af "aresample=44100,apad=whole_dur=0.5,aloop=loop=9:size=22050,ebur128" -f null - 2>&1 \
+    | grep -E "^\s+I:" | tail -1 | grep -oE '[-0-9.]+' | head -1
+}
 
 # 1〜4 節は PART=all のときだけ（字下げはせず、4 節の末尾で閉じる）
 if [ "$PART" = "all" ]; then
@@ -289,12 +298,6 @@ GRAVEL_FADE_AT=0.20
 GRAVEL_FADE=0.14
 GRAVEL_CEIL=-3
 
-# 一歩あたりの大きさ。0.5 秒に伸ばして 10 回繰り返した物の integrated loudness（LUFS）
-step_loudness () {
-  ffmpeg -hide_banner -nostats -i "$1" -af "aresample=44100,apad=whole_dur=0.5,aloop=loop=9:size=22050,ebur128" -f null - 2>&1 \
-    | grep -E "^\s+I:" | tail -1 | grep -oE '[-0-9.]+' | head -1
-}
-
 STEP_SUM=0
 for s in 1 2 3 4 5; do
   l=$(step_loudness "$STEPS_DIR/Step$s.wav")
@@ -331,5 +334,68 @@ ffmpeg -y -v error -i "$OUT_DIR/Gravel1.wav" -i "$OUT_DIR/Gravel2.wav" -i "$OUT_
 " -map "[out]" -frames:v 1 "$ANALYSIS_DIR/Gravel_sheet.png"
 
 fi   # PART=all か gravel
+
+# ---------------------------------------------------------------------------
+# 7. Grass1〜6.wav — 芝と草むらの足音（Walking through grass、freesound_community、Pixabay Content License）
+#    元は 12.38 秒、44.1kHz のモノラル mp3。歩調は一定でなく、一歩ごとに録った単発が並ぶ
+#    （足の重なりや長い擦りが無い代わりに、一歩の中でも草を踏む音の強さがまちまち）。
+#    numpy が無いので、ffmpeg で 16bit の生 PCM に落としてから素の Python（wave の実効値を
+#    4ms 窓・2ms 送りで自前に積む）で包絡線を追った。実効値が -28dBFS を上回ってから
+#    16ms 途切れず下回るまでを一つの塊とし、次の九つを見つけた（秒、塊の長さ、頂点）:
+#      1.805(0.03s,-6.1dB) 2.505(0.06s,-7.4dB) 5.125(0.19s,-4.9dB) 5.785(0.06s,-10.8dB)
+#      8.925(0.05s,-8.9dB) 9.405(0.18s,-1.1dB) 10.025(0.19s,-8.5dB) 10.465(0.40s,-6.3dB) 11.345(0.09s,-14.3dB)
+#    このうち、次の塊まで 0.34 秒の切り出しが届かない三つは避けた:
+#    - 9.405（頂点が -1.1dB とほぼ天井で、直前の 8.925 と直後の 10.025 のどちらとも間が狭く、
+#      二歩分が重なった塊の疑い）
+#    - 10.465（塊の長さ自体が 0.40 秒あり、一歩には長すぎる。二歩の重なりの疑い）
+#    - 11.345（残り一つだけ採っても数が増えないので、前の六つで足りるとして見送った）
+#    残った六つを採用。切り出しは塊の頭の 15ms 前から 0.34 秒（砂利と同じ切り出しの型）。
+#    左右は最初からモノラルなので畳まず、100Hz より下の唸りを落とし、頭 4ms をなだらかにして、
+#    0.20 秒から 0.14 秒かけて消す（qsin）。大きさは砂利と同じ揃え方（Step1〜5 の一歩あたりの
+#    大きさの電力平均に、頂点 -3dB の天井を添えて）。輪にはしない単発
+# ---------------------------------------------------------------------------
+if [ "$PART" = "all" ] || [ "$PART" = "grass" ]; then
+
+GRASS_STARTS="1.790 2.490 5.110 5.770 8.910 10.010"
+GRASS_LEN=0.34
+GRASS_FADE_AT=0.20
+GRASS_FADE=0.14
+GRASS_CEIL=-3
+
+GRASS_SUM=0
+for s in 1 2 3 4 5; do
+  l=$(step_loudness "$STEPS_DIR/Step$s.wav")
+  GRASS_SUM=$(awk "BEGIN{print $GRASS_SUM + 10^($l/10)}")
+done
+GRASS_TARGET=$(awk "BEGIN{printf \"%.2f\", 10*log($GRASS_SUM/5)/log(10)}")
+echo "Grass: target ${GRASS_TARGET} LUFS（Step1〜5 の電力の平均）"
+
+n=0
+for st in $GRASS_STARTS; do
+  n=$((n+1))
+  name="Grass$n"
+  echo "=== ${name}.wav（${st} 秒から）==="
+  ffmpeg -y -v error -ss "$st" -t 0.40 -i "$SRC_GRASS" \
+    -af "aresample=44100,highpass=f=100:poles=2,atrim=0:${GRASS_LEN},afade=t=in:st=0:d=0.004,afade=t=out:st=${GRASS_FADE_AT}:d=${GRASS_FADE}:curve=qsin" \
+    -c:a pcm_s16le "$TMP_DIR/${name}_cut.wav"
+  l=$(step_loudness "$TMP_DIR/${name}_cut.wav")
+  pk=$(ffmpeg -hide_banner -i "$TMP_DIR/${name}_cut.wav" -af "astats=metadata=0" -f null - 2>&1 | grep "Peak level dB" | tail -1 | grep -oE '[-0-9.]+$')
+  gain=$(awk "BEGIN{g=$GRASS_TARGET - ($l); c=$GRASS_CEIL - ($pk); printf \"%.2f\", (g < c ? g : c)}")
+  echo "${name}: measured ${l} LUFS, peak ${pk}dB, applying gain=${gain}dB"
+  ffmpeg -y -v error -i "$TMP_DIR/${name}_cut.wav" -af "volume=${gain}dB" -ar 44100 -ac 1 -c:a pcm_s16le "$OUT_DIR/${name}.wav"
+done
+
+# 確かめ用に、六つを 0.45 秒ずつ並べた波形とスペクトルを書き出す
+ffmpeg -y -v error -i "$OUT_DIR/Grass1.wav" -i "$OUT_DIR/Grass2.wav" -i "$OUT_DIR/Grass3.wav" \
+  -i "$OUT_DIR/Grass4.wav" -i "$OUT_DIR/Grass5.wav" -i "$OUT_DIR/Grass6.wav" -filter_complex "
+[0:a]apad=whole_dur=0.45[a0];[1:a]apad=whole_dur=0.45[a1];[2:a]apad=whole_dur=0.45[a2];
+[3:a]apad=whole_dur=0.45[a3];[4:a]apad=whole_dur=0.45[a4];[5:a]apad=whole_dur=0.45[a5];
+[a0][a1][a2][a3][a4][a5]concat=n=6:v=0:a=1,asplit=2[w][s];
+[w]showwavespic=s=1600x300:colors=0x3070c0[wv];
+[s]showspectrumpic=s=1600x420:fscale=lin:legend=0:color=intensity:gain=2:stop=12000[sp];
+[wv][sp]vstack=inputs=2[out]
+" -map "[out]" -frames:v 1 "$ANALYSIS_DIR/Grass_sheet.png"
+
+fi   # PART=all か grass
 
 echo "=== done ==="

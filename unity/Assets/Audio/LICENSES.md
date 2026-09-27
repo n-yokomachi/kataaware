@@ -48,6 +48,7 @@ https://pixabay.com/service/license-summary/
 | `WheatWind.wav` | Pixabay `freesound_community-wheat-in-the-wind-7159`（「Wheat in the Wind」。作者 bdvictor（Freesound）） | Pixabay Content License | 元は 137.7 秒。37.8〜105.8 秒の 68 秒を切り出し（37.0 秒と 106.0 秒の乾いたクリックを避けた）、モノラル 22.05kHz へ。末尾 2 秒を頭に重ねて輪にし、実効値を −24dBFS に揃えた。66.0 秒。約 10 秒おきに入る 5.2kHz の虫の声は残してある（オーナーの了承済み）。村の朝と夕方、場面 8 の麦畑 |
 | `GateCreak.wav` | Pixabay `dobcommunications-creaky-wooden-gate-opens-170210`（「Creaky Wooden Gate Opens」。作者 DOBCommunications） | Pixabay Content License | モノラル 44.1kHz へ、前後の −60dB 未満を落とし、頂点を −6dB に揃えた。2.19 秒。村の片割れの家の格子戸を開ける音 |
 | `Gravel1`〜`Gravel6.wav` | Pixabay `freesound_community-walking-on-a-road-with-gravel-01-30100`（「Walking on a road with gravel 01」。freesound_community） | Pixabay Content License | 元は 61.99 秒、24kHz のステレオ mp3。砂利道を歩いた録音から、一つの塊で終わる一歩を六つ切り出した（5.540 / 6.055 / 7.650 / 16.650 / 17.295 / 20.245 秒から 0.34 秒ずつ。足の重なり、立ち上がりの前の長い擦り、二つ目の当たり、小石を蹴ったような単発の当たりのある所は避けた）。左右を平均してモノラル 44.1kHz へ、100Hz より下を落とし、頭 4ms をなだらかにして 0.20 秒から 0.14 秒かけて消した。大きさは一歩あたりの大きさ（0.5 秒に伸ばして 10 回繰り返した物の integrated loudness）を `Step1`〜`Step5` の平均（−28.5 LUFS）に揃えた。頂点は −4.7〜−10.3dB。村の未舗装の路地の足音 |
+| `Grass1`〜`Grass6.wav` | Pixabay `freesound_community-walking-through-grass-80308`（「Walking through grass」。freesound_community、オーナーの許諾済み） | Pixabay Content License | 元は 12.38 秒、44.1kHz のモノラル mp3。一歩ずつ録った単発が並ぶ録音から、一つの塊で終わる一歩を六つ切り出した（1.790 / 2.490 / 5.110 / 5.770 / 8.910 / 10.010 秒から 0.34 秒ずつ。numpy が無いので ffmpeg で 16bit PCM に落とし、素の Python で 4ms 窓・2ms 送りの実効値を積んで塊を見た。次の塊まで 0.34 秒の余白が無い三つ（9.405 秒はほぼ天井の頂点で二歩の重なりの疑い、10.465 秒は塊の長さ自体が 0.40 秒で長すぎる、11.345 秒は残り一つで数が増えないので見送り）は避けた）。100Hz より下を落とし、頭 4ms をなだらかにして 0.20 秒から 0.14 秒かけて消した。大きさは `Gravel` と同じ揃え方で `Step1`〜`Step5` の平均（−28.5 LUFS）に、頂点 −3dB の天井を添えた。頂点は −3.0〜−10.5dB。村の芝の足音（`tools/make-ambience.sh grass`） |
 
 ## 曲
 
@@ -62,7 +63,7 @@ https://pixabay.com/service/license-summary/
 | `Music/CopperHeart.ogg` | 「Copper Heart」 | 同上 | 同上 |
 
 雑踏の輪と曲の加工は `tools/make-ambience.sh` で作り直せる（村の朝・麦の風・格子戸は同じ中の 5 節。`bash make-ambience.sh village` でそれだけ作り直す。
-未舗装の路地の足音は 6 節で、`bash make-ambience.sh gravel`。
+未舗装の路地の足音は 6 節で、`bash make-ambience.sh gravel`。芝の足音は 7 節で、`bash make-ambience.sh grass`。
 素材の mp3 は `unity/RawAssets/audio/pixabay/` に Pixabay の元の名前で置く。git には入れない）。WebGL では Unity のオーディオのフィルターが効かないので、
 スピーカーらしさと響きはファイルに焼き込んである。
 
@@ -79,11 +80,11 @@ https://pixabay.com/service/license-summary/
   ガレージの反響は素材に焼かず、足元の `AudioReverbFilter` に持たせる
 - 村（`Village.unity`）の足音は地面で替える。`Footsteps` が一歩ごとに足元の当たりを見て、`StepGround` が付いていればその音で鳴らす。
   未舗装の路地（車の着く所の未舗装路と門の前の砂利の溜まりを含む）は `Gravel1`〜`Gravel6`、庭の煉瓦の小路・玄関の小路・テラスは `Concrete1`〜`Concrete4`、
-  芝の路肩と庭の芝は `Step1`〜`Step5`（`BuildVillageSound.StepGrounds`）。`StepGround` の無い場面 1・2・4・8 は今までどおり
+  芝の路肩と庭の芝は `Grass1`〜`Grass6`（`BuildVillageSound.StepGrounds`）。`StepGround` の無い場面 1・2・4・8 は今までどおり `Step1`〜`Step5`
 - 自室の空気の音は `RoomTone`。自室が舞台の場面 1・3・5 で、プレイヤーの頭上で 2D の輪にして小さく流す（`RoomTone`。大きさはインスペクターで変える）。場面を終えて暗転するときは、その暗転に合わせて絞る
 - 村（`Village.unity`）の環境音は `VillageAmbience`（Player/Ambience）。プレイヤーの頭上で 2D の輪にして流し、時刻（`VillageHour`）で鳴らす物を替える。
-  朝は `VillageMorning`（0.6）と `WheatWind`（0.5）を重ね、夕方は `WheatWind`（0.6）だけ。時刻が替わると 2 秒で入れ替える。
-  朝の `WheatWind` は立ち位置で薄くする。車を降りて路地を歩き、最初の家（家 C）の脇の x −47 から薄れ始め、電話ボックスの前の x −35 で消えきる。戻ればまた聞こえる。
+  朝は `VillageMorning`（0.4）と `WheatWind`（0.5）を重ね、夕方は `WheatWind`（0.6）だけ。時刻が替わると 2 秒で入れ替える。
+  朝の `WheatWind` は立ち位置で薄くする。車を降りて路地を歩き出してすぐ（x −70）から薄れ始め、いちばん手前の家（家 C の西の端、x −52.6）にたどり着く頃には消えきる。戻ればまた聞こえる。
   大きさはインスペクターで変える。組み直しても前の値を引き継ぐ
 - 格子戸は `GateCreak`。`SwingGate` が開けるときに頭から終わりまで 1 度鳴らす（以前は自室の扉の `DoorShut` の頭を借りていた）
 - 場面 8 の最後の景色（朝靄の未舗装路と小麦畑）で窓を調べて開けると、`WindowDown` と同時に `WheatWind` を走行音に重ね始める（`DriveSound.Field`、Motor/Field）。
