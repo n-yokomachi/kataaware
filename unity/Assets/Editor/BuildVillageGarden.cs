@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 
 namespace HalfAware.EditorTools
@@ -1231,6 +1232,33 @@ namespace HalfAware.EditorTools
         // ---- 当たり ---------------------------------------------------------------------
 
         /// <summary>
+        /// テラスの敷石の床の当たりと、芝へ下りる段の当たり。どちらも上面は敷石の上面（<see cref="TerraceTop"/>）。
+        /// 前は敷地の地面（VillagePlot、高さ 0）の一枚だけで、Player はテラスの上でも敷石の 0.1 m 下を歩き、
+        /// 敷石の上に立つ片割れ（場面 10）より目が 0.1 m 低かった。
+        /// 足音は敷石の硬い音（<see cref="HardSteps"/>）。敷地の地面の当たりの区画（BuildVillageSound.StepGrounds の Terrace）と同じ音
+        /// </summary>
+        static void TerraceFloor(Transform parent)
+        {
+            var hard = StepClips(HardSteps);
+            Floor(parent, "TerraceFloor", new Vector3((TerraceWest + HouseEast) * 0.5f, TerraceTop - 0.05f, (HouseRear + TerraceNorth) * 0.5f),
+                new Vector3(HouseEast - TerraceWest, 0.1f, TerraceNorth - HouseRear), hard);
+            Floor(parent, "TerraceStepFloor", new Vector3((StepWest + StepEast) * 0.5f, TerraceTop - 0.05f, TerraceNorth + 0.2f),
+                new Vector3(StepEast - StepWest, 0.1f, 0.4f), hard);
+        }
+
+        /// <summary>歩ける床の見えない箱と、その上の足音</summary>
+        static void Floor(Transform parent, string name, Vector3 centre, Vector3 size, AudioClip[] clips)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = centre;
+            go.AddComponent<BoxCollider>().size = size;
+            var so = new SerializedObject(go.AddComponent<StepGround>());
+            WriteClips(so.FindProperty("clips"), clips);
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>
         /// 裏庭の当たり。塀と生け垣、東屋の腰と腰掛け、温室と物置、菜園と堆肥箱、卓と椅子、樽、水盤、物干しの柱、
         /// アーチの横の芝の小物（ベンチ・鉢・手押し車・オベリスク・鳥の餌台）。
         /// 花の縁の当たりは札の側で線を引く（BuildVillagePlants.BorderBounds）
@@ -1256,6 +1284,7 @@ namespace HalfAware.EditorTools
                 Block(parent, "Veg" + i, new Vector3(VegBeds[i].center.x, 0.5f, VegBeds[i].center.y), new Vector3(VegBeds[i].width, 1f, VegBeds[i].height));
             Block(parent, "Compost", new Vector3(6.12f, 0.5f, 28.5f), new Vector3(1.6f, 1f, 1.3f));
             Block(parent, "Table", TableAt + Vector3.up * 0.5f, new Vector3(1.9f, 1f, 1.9f));
+            TerraceFloor(parent);
             Block(parent, "Butt", new Vector3(HouseEast - 0.40f, 0.6f, HouseRear + 0.50f), new Vector3(0.8f, 1.2f, 0.8f));
             Block(parent, "Bath", BathAt + Vector3.up * 0.5f, new Vector3(0.6f, 1f, 0.6f));
             Block(parent, "Airer", AirerAt + Vector3.up * 1f, new Vector3(0.2f, 2f, 0.2f));
