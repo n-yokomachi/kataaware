@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e4fd6f1d280049246aff9c3b341f71fb, type: 3}
+  m_Name: NoticeScript
+  m_EditorClassIdentifier: HalfAware::HalfAware.RoomScript
+  entries:
+  - id: log
+    label: "\u30A2\u30AF\u30BB\u30B9\u30ED\u30B0\u3092\u898B\u308B"
+    lines:
+    - "\u8A18\u61B6\u306E\u65E5\u6642\u30002163\u5E748\u670816\u65E519\u664245\u5206\n\u7AEF\u672B\u306E\u5834\u6240\u3000\u30ED\u30A6\u30A2\u30FC\u30FB\u30CF\u30B6\u30FC\u30A6\u30A3\u30C3\u30AF\uFF08\u30B0\u30ED\u30B9\u30BF\u30FC\u30B7\u30E3\u30FC\uFF09\n\u5207\u65AD\u3000\u63A5\u7D9A\u5148\u306E\u5074\u304B\u3089"
+    - "\u3084\u306F\u308A\u7530\u820E\u306E\u6751\u3060\u3002\u540D\u524D\u306B\u899A\u3048\u306F\u306A\u3044"
+    hints: []
+    choice:
+      question: 
+      afterYes: []
+  - id: jack
+    label: "\u30A4\u30F3\u30D7\u30E9\u30F3\u30C8\u30B8\u30E3\u30C3\u30AF\u3092\u629C\u304F"
+    lines: []
+    hints: []
+    choice:
+      question: 
+      afterYes: []
+  - id: coat
+    label: "\u30B8\u30E3\u30B1\u30C3\u30C8\u3092\u7740\u308B"
+    lines: []
+    hints: []
+    choice:
+      question: 
+      afterYes: []
+  - id: door
+    label: "\u30C9\u30A2"
+    lines: []
+    hints: []
+    choice:
+      question: "\u90E8\u5C4B\u3092\u51FA\u308B"
+      afterYes: []
