@@ -7,6 +7,7 @@
 #         bash make-ambience.sh steps     （11 節の足音の三つの組（硬い床・コンクリート・自室）だけ）
 #         bash make-ambience.sh garden    （8 節の場面 6 の庭の 4 つだけ）
 #         bash make-ambience.sh bgm       （9 節の場面ごとの BGM の 7 曲だけ）
+#         bash make-ambience.sh ending    （10 節のエンディングの曲「HALF AWARE」の二つの版だけ）
 # 出力先は OUT_DIR 直下。中間ファイルは OUT_DIR/tmp に置く。
 set -euo pipefail
 
@@ -44,6 +45,8 @@ SRC_REMEMBRANCE="$SRC_PIXABAY_DIR/joelfazhari-remembrance-dreamy-emotional-and-m
 SRC_APPROACH="$SRC_PIXABAY_DIR/leberch-ambient-580528.mp3"
 SRC_REUNION="$SRC_PIXABAY_DIR/leberch-ambient-578724.mp3"
 SRC_CINEMATIC="$SRC_PIXABAY_DIR/leberch-cinematic-586317.mp3"
+# 10 節（エンディングの曲）の素材。オーナーが Suno の Pro プランで生成した曲（repo に置かない）
+SRC_SONG="${SRC_SONG:-D:/Music/HALF_AWARE_OST/HALF AWARE.mp3}"
 # 6・7・11 節の足音の大きさを揃える相手（Step1〜5。Kenney RPG Audio の柔らかい足音）
 STEPS_DIR="${STEPS_DIR:-$SCRIPT_DIR/../unity/Assets/Audio}"
 
@@ -845,6 +848,108 @@ bgm_restart Cinematic586317 0.55 145.80 0.30
 bgm_level Cinematic586317
 
 fi   # PART=all か bgm
+
+# 10 節は PART=all か ending のとき（字下げはせず、10 節の末尾で閉じる）
+if [ "$PART" = "all" ] || [ "$PART" = "ending" ]; then
+
+# ---------------------------------------------------------------------------
+# 10. エンディングの曲の二つの版（Music/HalfAware.ogg / Music/HalfAwareCar.ogg）
+#
+#    エンディング（シナリオ設計 13 節）は、黒から明けると車のオーディオから流れているような音で始まり、
+#    曲のドロップで走行音が消えて、素の曲へ切り替わる。二つの版は同じ頭（元の 0 秒）から切り出してあり、
+#    EndingDirector が同じ時刻に鳴らし始めて、ドロップの手前で大きさを入れ替える。
+#
+#    元は 215.43 秒、44.1kHz のステレオ mp3、integrated −10.2 LUFS、true peak +0.7dBTP。
+#
+#    **ドロップの時刻（波形から）**
+#    元をモノラルに落とし、全帯域・150Hz より下・3kHz より上の実効値を 50ms と 4ms の窓で並べた。
+#    - 35.18 秒で低音が抜ける（150Hz 以下が −15 → −54dB）。そこから 36.0 秒まで、低音の無い溜め（0.2 秒おきの軽い打ち）
+#    - **36.012 秒でドロップの頭の打ち**（頂点が −17 → −0.4dBFS、150Hz 以下の実効値が −50 → −8dB へ 50ms で立つ。
+#      書き出した ogg を読み戻すと 36.018 秒）
+#    - 切り替えは溜めの中（35.90〜35.96 秒）で済ませ、頭の打ちは素の版で鳴らす。値は EndingClock の DropAt と SwitchFrom
+#
+#    **曲の終わり**: 最後の打ちが 207.4 秒。そこから尾が下がり、212.5 秒で −60dB。213 秒から先は無音。
+#    絵のフェードアウトは尾に合わせる（EndingClock の FadeOutFrom と FadeOutTo）
+#
+#    **頭は切らない**: 元の 0〜1.4 秒はほぼ無音（−50dB 以下）で、曲は 1.5 秒から鳴る。
+#    オーナーが「36 秒前後」と元の曲の秒で言っているので、秒をずらさない
+#
+#    素の版: 0〜213.0 秒（尾の後の無音を落とし、尻 0.5 秒をなだらかに）。ステレオ 44.1kHz のまま、
+#            線形の増減だけで integrated −18 LUFS（−7.8dB。true peak は −7dBTP ほど）、Ogg Vorbis（q6）。
+#            ほかの BGM（−22 LUFS、鳴らす大きさ 0.5）より前に出す。場面の最後の主役なので
+#    車の版: 0〜40.0 秒（ドロップの 4 秒後まで。尻 0.5 秒をなだらかに）。**素の版と同じ長さにはしない。**
+#            ドロップの後は鳴らさないので、Web で展開した時の重さ（モノラル 48kHz の浮動小数で 1 分 11 MB）を切る。
+#            同じ長さにしたいときは CAR_END を 213.0 にする。
+#            車の古いスピーカーの音: モノラルに畳み、160Hz より下と 5.5kHz より上を 24dB/oct で落とし、
+#            1.5kHz を +4dB、350Hz を −2dB。軽く圧縮して軽く歪ませ、車内の短い響き（cabin_ir。初期反射 5 本 0.9〜5.6ms と、
+#            0.12 秒で消える尾）を原音より 9dB ほど下で足した。
+#            0〜36 秒の大きさを素の版の同じ所（−21.3 LUFS）に揃え、頂点を −1.5dB で止めて、22.05kHz の Ogg Vorbis（q5）
+#    響きの雑音は種を決めてある（組み直しても同じ物になる）。
+#    WebGL では Unity のオーディオのフィルターが効かないので、スピーカーらしさと響きはファイルに焼く（4 節のヤードの曲と同じ）
+# ---------------------------------------------------------------------------
+SONG_END="${SONG_END:-213.0}"
+CAR_END="${CAR_END:-40.0}"
+# 素の版の積分ラウドネス（曲の全体）と、車の版を揃える区間（ドロップの前）
+SONG_LUFS=-18
+SONG_MATCH=36.0
+
+song_loudness () {   # $1: ファイル, $2: 頭から測る長さ（秒。空なら全体）
+  local lim=()
+  if [ -n "${2:-}" ]; then lim=(-t "$2"); fi
+  ffmpeg -hide_banner -nostats "${lim[@]}" -i "$1" -af ebur128 -f null - 2>&1 \
+    | grep -E "^\s+I:" | tail -1 | grep -oE '[-0-9.]+' | head -1
+}
+
+echo "=== cabin_ir.wav（車内の短い響き）==="
+ffmpeg -y -v error -filter_complex "
+anoisesrc=d=0.25:c=pink:r=44100:a=1:seed=1001,volume=eval=frame:volume='pow(10,-3.0*t/0.12)',adelay=2|2:all=1,volume=0.35[tail];
+anoisesrc=d=0.002:c=white:r=44100:a=1:seed=1002[a1];[a1]adelay=0.9|0.9:all=1,volume=0.9[t1];
+anoisesrc=d=0.002:c=white:r=44100:a=1:seed=1003[a2];[a2]adelay=1.8|1.8:all=1,volume=0.7[t2];
+anoisesrc=d=0.002:c=white:r=44100:a=1:seed=1004[a3];[a3]adelay=2.9|2.9:all=1,volume=0.55[t3];
+anoisesrc=d=0.002:c=white:r=44100:a=1:seed=1005[a4];[a4]adelay=4.1|4.1:all=1,volume=0.4[t4];
+anoisesrc=d=0.002:c=white:r=44100:a=1:seed=1006[a5];[a5]adelay=5.6|5.6:all=1,volume=0.3[t5];
+[tail][t1][t2][t3][t4][t5]amix=inputs=6:normalize=0,atrim=0:0.25,asetpts=PTS-STARTPTS,lowpass=f=6000,alimiter=limit=0.95[ir]
+" -map "[ir]" -c:a pcm_f32le "$TMP_DIR/cabin_ir.wav"
+
+echo "=== HalfAware.ogg（素の版）==="
+song_i=$(song_loudness "$SRC_SONG")
+song_gain=$(awk -v a="$SONG_LUFS" -v b="$song_i" 'BEGIN{printf "%.2f", a-b}')
+echo "  元 ${song_i} LUFS → ${song_gain} dB"
+song_fade=$(awk -v e="$SONG_END" 'BEGIN{printf "%.3f", e-0.5}')
+ffmpeg -y -v error -i "$SRC_SONG" -af "atrim=0:${SONG_END},asetpts=PTS-STARTPTS,volume=${song_gain}dB,afade=t=out:st=${song_fade}:d=0.5" \
+  -ar 44100 -ac 2 -c:a pcm_s16le "$TMP_DIR/HalfAware_norm.wav"
+ffmpeg -y -v error -i "$TMP_DIR/HalfAware_norm.wav" -c:a libvorbis -q:a 6 "$OUT_DIR/HalfAware.ogg"
+song_head=$(song_loudness "$TMP_DIR/HalfAware_norm.wav" "$SONG_MATCH")
+echo "  全体 $(song_loudness "$TMP_DIR/HalfAware_norm.wav") LUFS、頭 ${SONG_MATCH} 秒 ${song_head} LUFS"
+
+echo "=== HalfAwareCar.ogg（車のスピーカーの版）==="
+ffmpeg -y -v error -i "$SRC_SONG" -filter_complex "
+[0:a]atrim=0:${CAR_END},asetpts=PTS-STARTPTS,pan=mono|c0=0.5*c0+0.5*c1,
+highpass=f=160:poles=2,highpass=f=160:poles=2,lowpass=f=5500:poles=2,lowpass=f=5500:poles=2,
+equalizer=f=1500:t=q:w=1.2:g=4,equalizer=f=350:t=q:w=1.0:g=-2,
+acompressor=threshold=0.125:ratio=3:attack=5:release=90:makeup=1.2,asoftclip=type=tanh:threshold=0.85[d]
+" -map "[d]" -c:a pcm_f32le "$TMP_DIR/HalfAwareCar_dry.wav"
+# 畳み込みだけ afir に任せ、響きの量は外で決める（4 節と同じ。afir の dry/wet は正規化が読めない）。
+# 響きは畳んだままだと原音より 22dB ほど低いので、+13dB で原音の 9dB 下へ
+ffmpeg -y -v error -i "$TMP_DIR/HalfAwareCar_dry.wav" -i "$TMP_DIR/cabin_ir.wav" -filter_complex "
+[0:a]asplit=2[dryA][dryB];
+[dryB][1:a]afir[wet0];
+[wet0]volume=13dB[wet];
+[dryA][wet]amix=inputs=2:duration=first:normalize=0[fx]
+" -map "[fx]" -c:a pcm_f32le "$TMP_DIR/HalfAwareCar_fx.wav"
+car_head=$(song_loudness "$TMP_DIR/HalfAwareCar_fx.wav" "$SONG_MATCH")
+car_gain=$(awk -v a="$song_head" -v b="$car_head" 'BEGIN{printf "%.2f", a-b}')
+echo "  頭 ${SONG_MATCH} 秒 ${car_head} LUFS → ${car_gain} dB（素の版の同じ所に揃える）"
+car_fade=$(awk -v e="$CAR_END" 'BEGIN{printf "%.3f", e-0.5}')
+ffmpeg -y -v error -i "$TMP_DIR/HalfAwareCar_fx.wav" -af "volume=${car_gain}dB,alimiter=limit=0.84:level=false,afade=t=out:st=${car_fade}:d=0.5" \
+  -ar 22050 -ac 1 -c:a pcm_s16le "$TMP_DIR/HalfAwareCar_norm.wav"
+ffmpeg -y -v error -i "$TMP_DIR/HalfAwareCar_norm.wav" -c:a libvorbis -q:a 5 -ar 22050 -ac 1 "$OUT_DIR/HalfAwareCar.ogg"
+echo "  頭 ${SONG_MATCH} 秒 $(song_loudness "$TMP_DIR/HalfAwareCar_norm.wav" "$SONG_MATCH") LUFS"
+for f in HalfAware HalfAwareCar; do
+  printf "  %s.ogg %s 秒\n" "$f" "$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$OUT_DIR/$f.ogg")"
+done
+
+fi   # PART=all か ending
 
 # ---------------------------------------------------------------------------
 # 11. 足音の三つの組（HardFloor1〜7.wav / Concrete1〜4.wav / Room1〜6.wav）

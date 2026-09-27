@@ -67,6 +67,8 @@ https://pixabay.com/service/license-summary/
 | `Music/PeachLight.ogg` | 「Peach Light」 | 同上 | 同上 |
 | `Music/TheOnesWhoStayed.ogg` | 「The Ones Who Stayed」 | 同上 | 同上 |
 | `Music/CopperHeart.ogg` | 「Copper Heart」 | 同上 | 同上 |
+| `Music/HalfAware.ogg` | 「HALF AWARE」（エンディングの曲。元は 215.43 秒、44.1kHz のステレオ mp3、integrated −10.2 LUFS） | 同上 | エンディングの素の版。元の 0〜213.0 秒（尾の後の無音を落とし、尻 0.5 秒をなだらかに。頭は切らず、秒は元のまま）。ステレオ 44.1kHz のまま、線形の増減（−7.8dB）だけで integrated −18 LUFS（true peak −7dBTP ほど）、Ogg Vorbis（q6）。ドロップ（36.012 秒の頭の打ち）から後はこちらだけが鳴る |
+| `Music/HalfAwareCar.ogg` | 同上 | 同上 | エンディングの車の版。車の古いスピーカーから鳴って、車内で聞いている音にした。元の 0〜40.0 秒（ドロップの 4 秒後まで。後は鳴らさないので切る）。モノラルに畳み、160Hz より下と 5.5kHz より上を 24dB/oct で落とし、1.5kHz を +4dB、350Hz を −2dB。軽く圧縮して軽く歪ませ、ffmpeg で作ったインパルス応答（車内の初期反射 5 本 0.9〜5.6ms と、0.12 秒で消える尾）の響きを原音より 9dB ほど下で足した。0〜36 秒の大きさを素の版の同じ所（−21.3 LUFS）に揃え、頂点を −1.5dB で止め、22.05kHz の Ogg Vorbis（q5）へ。素の版と同じ頭から切り出してあり、同じ時刻に鳴らし始めてドロップの手前で入れ替える |
 
 ## 場面ごとの BGM
 
@@ -92,6 +94,7 @@ https://pixabay.com/service/license-summary/
 村の未舗装の道の足音は 6 節で、`bash make-ambience.sh gravel`。芝の足音は 7 節で、`bash make-ambience.sh grass`。
 足音の三つの組（硬い床・コンクリート・自室）は 11 節で、`bash make-ambience.sh steps`。
 場面 6 の庭の 4 つ（ホースの輪・水を止める音・途切れ・断ち切れ）は 8 節で、`bash make-ambience.sh garden`。
+エンディングの曲の二つの版（素の版と車の版。ドロップの時刻の調べ方もここ）は 10 節で、`bash make-ambience.sh ending`（元の mp3 は `SRC_SONG`）。
 素材の mp3 は `unity/RawAssets/audio/pixabay/` に Pixabay の元の名前で置く。git には入れない）。WebGL では Unity のオーディオのフィルターが効かないので、
 スピーカーらしさと響きはファイルに焼き込んである。
 
