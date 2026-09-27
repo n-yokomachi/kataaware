@@ -147,6 +147,19 @@ namespace HalfAware.EditorTools
         /// </summary>
         const string Cut = "〔区切り〕";
 
+        /// <summary>目を向ける先の印の頭。<see cref="Glance"/> が付ける</summary>
+        const string GlanceMark = "&";
+
+        /// <summary>
+        /// 次の一行が出ているあいだ、目を相手でなく what（Take の下の名前）へ向ける印（<see cref="Said.look"/>）。
+        /// 記憶 2・3 の「見て！　鳩がいっせいに飛んだ」は、飛び立つ鳩の群れ（Doves）を見上げて追う。
+        /// 話している間は相手の顔に目が留まるので、印が無いと鳩が空へ散る所を見られない（2026-09-27）
+        /// </summary>
+        static string Glance(string what)
+        {
+            return GlanceMark + what;
+        }
+
         /// <summary>
         /// 相手を替える印。設計書 7 節の「**相手: ○○**」。後ろに続く行を、この人と交わす。
         /// 名前は <c>BuildDive</c> が記憶に置く人の名前（<c>Cast(take, "Mother", ...)</c> の一つ目の文字列）と一字も違えない
@@ -169,12 +182,15 @@ namespace HalfAware.EditorTools
             var said = new List<Said>();
             var partner = "";
             var cut = false;
+            var look = "";
             foreach (var t in talk)
             {
                 if (t == Cut) { cut = true; continue; }
                 if (t.StartsWith(PartnerMark)) { partner = t.Substring(PartnerMark.Length); continue; }
-                said.Add(new Said { line = t, partner = said.Count == 0 ? "" : partner, cut = cut });
+                if (t.StartsWith(GlanceMark)) { look = t.Substring(GlanceMark.Length); continue; }
+                said.Add(new Said { line = t, partner = said.Count == 0 ? "" : partner, cut = cut, look = look });
                 cut = false;
+                look = "";
             }
             return said.ToArray();
         }
@@ -244,6 +260,7 @@ namespace HalfAware.EditorTools
                 "アルベルト「助かるよ」",
                 Cut,  // 池の縁まで歩く
                 With("Granddaughter"),  // ソフィア
+                Glance("Doves"),  // 飛び立つ鳩を見上げて追う
                 "ソフィア「見て！　鳩がいっせいに飛んだ」",
                 "アルベルト「見えた見えた。すごい数だ」",
                 "ソフィア「手出して。いいものあげる」",
@@ -268,6 +285,7 @@ namespace HalfAware.EditorTools
                 "アルベルト「助かるよ」",
                 Cut,  // 池の縁まで歩く
                 With("Grandfather"),  // アルベルト
+                Glance("Doves"),  // 飛び立つ鳩を見上げて追う
                 "ソフィア「見て！　鳩がいっせいに飛んだ」",
                 "アルベルト「見えた見えた。すごい数だ」",
                 "ソフィア「手出して。いいものあげる」",
@@ -626,6 +644,7 @@ namespace HalfAware.EditorTools
                 p.FindPropertyRelative("line").stringValue = said[i].line;
                 p.FindPropertyRelative("partner").stringValue = said[i].partner ?? "";
                 p.FindPropertyRelative("cut").boolValue = said[i].cut;
+                p.FindPropertyRelative("look").stringValue = said[i].look ?? "";
             }
         }
 

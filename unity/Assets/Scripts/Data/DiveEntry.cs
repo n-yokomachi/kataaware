@@ -35,6 +35,8 @@ namespace HalfAware
         public string partner;
         [Tooltip("この行の前に〔区切り〕がある。同じ相手でもここで会話を切る。次の会話は主が行き先まで歩いてから始まる")]
         public bool cut;
+        [Tooltip("この行が出ているあいだ、目を相手でなくこちらへ向ける。Take の下の GameObject の名前（鳩の群れの Doves）。空なら相手の顔")]
+        public string look;
 
         /// <summary>相手を持つか。持たない行は会話に数えず、流さない</summary>
         public bool Partnered { get { return !string.IsNullOrEmpty(partner); } }

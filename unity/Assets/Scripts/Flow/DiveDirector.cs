@@ -163,6 +163,12 @@ namespace HalfAware
         bool leading;
         /// <summary>記憶の頭で名を呼んだ人。いなければ null</summary>
         Transform caller;
+        /// <summary>いま出している行が目を向ける先（<see cref="Said.look"/>、鳩の群れ）。向けていなければ null</summary>
+        Transform glanced;
+        /// <summary>glanced の下の鳩。群れの真ん中を測るのに使う</summary>
+        Pigeon[] flock = new Pigeon[0];
+        /// <summary>群れの真ん中を追う点。目はこれを追う（<see cref="PlayerController.Follow"/>）。初めて要る時に作り、シーンには残さない</summary>
+        Transform flockPoint;
         /// <summary>いま目を向けて見回しを封じている相手。向けていなければ null</summary>
         Transform attending;
         /// <summary>記憶の頭で、声の主へ目を回し始める記憶の時計の秒。場面の頭は暗転から明けるのを待つ</summary>
@@ -296,6 +302,7 @@ namespace HalfAware
             // 速さを掛けると設計書の秒数で書かれたその二つが早回しになる
             clock += dt;
             Drift();
+            Track();
             Voice();
             // 記憶の頭の、名を呼ぶ声。目を声の主へ回し、E で送る
             if (leading)
@@ -347,6 +354,7 @@ namespace HalfAware
             foreach (var person in take.GetComponentsInChildren<PersonMotion>(true)) person.Watch(eye);
             // 同じ人へ戻れば頭から流し直す。Mover は有効になった瞬間に開始位置へ戻る
             movers = take.GetComponentsInChildren<Mover>(true);
+            moverNames = Names(take.transform, movers);
             handed = take.GetComponentsInChildren<Handed>(true);
             cued = new float[movers.Length];
             cued2 = new float[movers.Length];
@@ -377,6 +385,7 @@ namespace HalfAware
             pending = false;
             leading = false;
             caller = null;
+            glanced = null;
             Unattend();
             if (panel != null) panel.Hide();
             if (hud != null) { hud.SetSubtitle(null); hud.SetPrompt(null); }
@@ -476,8 +485,9 @@ namespace HalfAware
             player.HoldMove(this);
             if (attending == who && player.Facing) return;
             attending = who;
-            Vector3 offset;
-            var aim = FaceAnchor(who, out offset);
+            // 群れの真ん中を追う点は、顔ではなくその点そのものへ向ける
+            var offset = Vector3.zero;
+            var aim = who == flockPoint ? who : FaceAnchor(who, out offset);
             player.Follow(aim, offset, seconds);
         }
 
@@ -678,6 +688,65 @@ namespace HalfAware
             spoken = Mathf.Max(spoken, at + 1);
             ConsoleLog.Said(entry.said[at].line);
             if (hud != null) hud.SetSubtitle(entry.said[at].line, SubtitleKind.Line, true);
+            Glance(entry.said[at].look);
+        }
+
+        /// <summary>
+        /// 行が目を向ける先（<see cref="Said.look"/>）へ、相手の顔から目を移す。空なら相手の顔へ戻す。
+        ///
+        /// **「見て！　鳩がいっせいに飛んだ」では群れを見上げて追う**（記憶 2・3）。話している間は相手の顔に目が留まるので、
+        /// 鳩が空へ散る所を見られなかった（2026-09-27）。この行が出たら目を 1 秒かけて群れの真ん中へ上げ、飛ぶのに付いて追い、
+        /// 次の行で相手の顔へ戻す。群れはこの行で飛び立つ（鳩の Mover の合図）
+        /// </summary>
+        void Glance(string what)
+        {
+            var group = string.IsNullOrEmpty(what) || take == null ? null : take.transform.Find(what);
+            if (group == null)
+            {
+                if (glanced == null) return;
+                glanced = null;
+                var who = Partner(done);
+                if (who != null) Attend(who, PlayerController.FaceSeconds);
+                return;
+            }
+            glanced = group;
+            flock = group.GetComponentsInChildren<Pigeon>(true);
+            if (flockPoint == null)
+            {
+                var go = new GameObject("DiveFlockPoint");
+                go.hideFlags = HideFlags.HideAndDontSave;
+                flockPoint = go.transform;
+            }
+            Track();
+            Attend(flockPoint, PlayerController.FaceSeconds);
+        }
+
+        /// <summary>
+        /// 群れの真ん中を追う点を、まだ見えている鳩の真ん中へ置く。みな消えたら（<see cref="Pigeon.Gone"/>）最後の所に留める。
+        /// 鳩が無ければ群れの子の真ん中
+        /// </summary>
+        void Track()
+        {
+            if (glanced == null || flockPoint == null) return;
+            var sum = Vector3.zero;
+            var n = 0;
+            for (var i = 0; i < flock.Length; i++)
+            {
+                var bird = flock[i];
+                if (bird == null || bird.Gone || !bird.gameObject.activeInHierarchy) continue;
+                sum += bird.transform.position;
+                n++;
+            }
+            if (flock.Length == 0)
+                foreach (Transform child in glanced) { sum += child.position; n++; }
+            if (n > 0) flockPoint.position = sum / n;
+        }
+
+        void OnDestroy()
+        {
+            if (flockPoint == null) return;
+            if (Application.isPlaying) Destroy(flockPoint.gameObject);
+            else DestroyImmediate(flockPoint.gameObject);
         }
 
         /// <summary>
@@ -693,6 +762,7 @@ namespace HalfAware
             if (line < talks[done].lines.Length) { Say(); return; }
             line = -1;
             done++;
+            glanced = null;
             if (hud != null) hud.SetSubtitle(null);
             Unattend();
             Drop();
@@ -1182,6 +1252,57 @@ namespace HalfAware
             public float[] cued = new float[0];
             /// <summary>二本目の合図を数え始めた秒。人ごと、まだなら負</summary>
             public float[] cued2 = new float[0];
+            /// <summary>cued・cued2 の並びの、動く物の名前（記憶の下の道筋。<see cref="Names"/>）。思い出した時はこれで合わせる</summary>
+            public string[] names = new string[0];
+        }
+
+        /// <summary>movers の並びの名前。記憶の下の道筋（<see cref="Names"/>）</summary>
+        string[] moverNames = new string[0];
+
+        /// <summary>
+        /// 動く物の名前。記憶（root）の下の道筋（「Doves/Pigeon3」）で、同じ道筋が二つあれば二つ目から「#1」を付ける。
+        /// 記憶するは合図の秒をこの名前と並べて残し、思い出した時は名前で当てる（<see cref="Match"/>）
+        /// </summary>
+        public static string[] Names(Transform root, Mover[] all)
+        {
+            var names = new string[all.Length];
+            var seen = new System.Collections.Generic.Dictionary<string, int>();
+            for (var i = 0; i < all.Length; i++)
+            {
+                var path = "";
+                for (var t = all[i] != null ? all[i].transform : null; t != null && t != root; t = t.parent)
+                    path = path.Length == 0 ? t.name : t.name + "/" + path;
+                int n;
+                seen.TryGetValue(path, out n);
+                seen[path] = n + 1;
+                names[i] = n == 0 ? path : path + "#" + n;
+            }
+            return names;
+        }
+
+        /// <summary>
+        /// 残した合図の秒 saved（名前 savedNames の並び）を、今の並び（名前 nowNames）の into へ名前で当てる。合わない物は触らない。
+        ///
+        /// **数が合わなくても捨てない。** 並びの番号で当てていた頃は、記憶を組み直して動く物の数が変わると（公園の記憶に鳩を足した、
+        /// 2026-09-27）全部を捨て、残した時刻の所にいるはずの人が動き出す前の所へ戻った。
+        /// 名前を持たない古い写しは、数が同じ時だけ並びのまま当てる
+        /// </summary>
+        public static void Match(string[] savedNames, float[] saved, string[] nowNames, float[] into)
+        {
+            if (saved == null || into == null) return;
+            if (savedNames == null || savedNames.Length != saved.Length || nowNames == null || nowNames.Length != into.Length)
+            {
+                if (saved.Length == into.Length) System.Array.Copy(saved, into, into.Length);
+                return;
+            }
+            var at = new System.Collections.Generic.Dictionary<string, int>();
+            for (var i = 0; i < savedNames.Length; i++)
+                if (savedNames[i] != null && !at.ContainsKey(savedNames[i])) at[savedNames[i]] = i;
+            for (var j = 0; j < nowNames.Length; j++)
+            {
+                int i;
+                if (nowNames[j] != null && at.TryGetValue(nowNames[j], out i)) into[j] = saved[i];
+            }
         }
 
         /// <summary>頭を借りた順。最初の一人から、板で渡った先を足していく</summary>
@@ -1246,6 +1367,8 @@ namespace HalfAware
             System.Array.Copy(cued, into.cued, cued.Length);
             if (into.cued2 == null || into.cued2.Length != cued2.Length) into.cued2 = new float[cued2.Length];
             System.Array.Copy(cued2, into.cued2, cued2.Length);
+            if (into.names == null || into.names.Length != moverNames.Length) into.names = new string[moverNames.Length];
+            System.Array.Copy(moverNames, into.names, moverNames.Length);
         }
 
         /// <summary>
@@ -1296,8 +1419,9 @@ namespace HalfAware
             done = Mathf.Clamp(m.talked, 0, talks.Length);
             called = true;
             hushed = true;
-            if (m.cued != null && m.cued.Length == cued.Length) System.Array.Copy(m.cued, cued, cued.Length);
-            if (m.cued2 != null && m.cued2.Length == cued2.Length) System.Array.Copy(m.cued2, cued2, cued2.Length);
+            // 動く物は名前で合わせる。記憶を組み直して数が変わっても（鳩を足した、など）、合う物には当たる
+            Match(m.names, m.cued, moverNames, cued);
+            Match(m.names, m.cued2, moverNames, cued2);
             Drift();
             // 手すりから身を起こす母のような、動き出してから据えた形を解く人は、解き終えた形から
             foreach (var person in take.GetComponentsInChildren<PersonMotion>(true)) person.SkipLetGo();

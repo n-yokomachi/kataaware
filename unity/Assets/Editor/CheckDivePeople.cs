@@ -494,7 +494,10 @@ namespace HalfAware.EditorTools
                 System.Func<UnityEngine.Transform, bool> canTalk = w => (bool)talkable.Invoke(d, new object[] { w });
                 System.Func<UnityEngine.Transform, bool> isWalking = w => (bool)walking.Invoke(d, new object[] { w });
                 System.Func<UnityEngine.Transform, System.Func<UnityEngine.Transform, bool>, bool> standIf = (w, ok) => {
-                    foreach (var at in spots(w)) { standWorld(at); aim(w); if (seen(w) && ok(w)) { sb.AppendLine("   立ち位置 " + place.InverseTransformPoint(at).ToString("F2") + " から " + sight(w)); return true; } }
+                    foreach (var at in spots(w)) {
+                        // 人の中や鼻先には立たない。0.6 m より寄ると、見下ろす角が下の限り（40 度）を越えて顔を画面に入れられない
+                        if (new UnityEngine.Vector2(at.x - w.position.x, at.z - w.position.z).magnitude < 0.6f) continue;
+                        standWorld(at); aim(w); if (seen(w) && ok(w)) { sb.AppendLine("   立ち位置 " + place.InverseTransformPoint(at).ToString("F2") + " から " + sight(w)); return true; } }
                     sb.AppendLine("   " + w.name + " の見える所が無い"); return false;
                 };
                 System.Func<UnityEngine.Transform, bool> stand = w => standIf(w, _ => true);
@@ -502,11 +505,19 @@ namespace HalfAware.EditorTools
                 // 記憶の頭は流す。名を呼ぶ声の主へ目を回すのを、再生中と同じに一フレームずつ回して（PlayerController.Steer）、
                 // 向き終えた所で顔が画面の真ん中に来ているか測って撮る。そのあと E で送る。
                 // 最初の会話が声の主とのもので今始められれば、そのまま送り切る。相手は選ばない
+                var PT = typeof(HalfAware.PlayerController);
+                var steer = PT.GetMethod("Steer", flags);
+                var aimEye = PT.GetMethod("Aim", flags);
+                player.EyeHeight = entry.eyeHeight;
+                // 目を向ける動きを、再生中と同じに一フレームずつ回す
+                System.Action<int> turn = frames => {
+                    for (var i = 0; i < frames; i++) {
+                        S(1f / 60f, false);
+                        steer.Invoke(player, new object[] { 1f / 60f });
+                        aimEye.Invoke(player, null);
+                        UnityEngine.Physics.SyncTransforms();
+                    } };
                 if (d.Leading) {
-                    var PT = typeof(HalfAware.PlayerController);
-                    var steer = PT.GetMethod("Steer", flags);
-                    var aimEye = PT.GetMethod("Aim", flags);
-                    player.EyeHeight = entry.eyeHeight;
                     var turned = 0f;
                     for (var i = 0; i < 90; i++) {
                         S(1f / 60f, false);
@@ -545,7 +556,33 @@ namespace HalfAware.EditorTools
                     HalfAware.EditorTools.CheckDiveSky.Pair(eye.position, eye.eulerAngles.y, pitchOf(), clear, psky.flat, System.IO.Path.Combine(shotDir, "m" + which + "_talk" + k + "_" + w.name));
                     S(0.02f, true); sb.AppendLine("   E: " + state());
                     var guard = 0;
-                    while (d.Talking && guard++ < 20) { S(0.02f, true); }
+                    // 行が目を向ける先（鳩の群れ）へ目が移ったら、1.5 秒回して、群れが画面に入るかを測って撮る
+                    System.Func<bool> glance = () => {
+                        var looked = d.Attending;
+                        if (looked == null || looked.name != "DiveFlockPoint") return false;
+                        turn(45);
+                        var mid = UnityEngine.Vector3.Angle(eye.forward, looked.position - eye.position);
+                        HalfAware.EditorTools.CheckDiveSky.Pair(eye.position, eye.eulerAngles.y, pitchOf(), clear, psky.flat, System.IO.Path.Combine(shotDir, "m" + which + "_glance_mid"));
+                        turn(45);
+                        var off = UnityEngine.Vector3.Angle(eye.forward, looked.position - eye.position);
+                        var inView = 0; var birds = 0;
+                        var cam = eye.GetComponent<UnityEngine.Camera>();
+                        foreach (var p in take.Find("Doves").GetComponentsInChildren<HalfAware.Pigeon>(true)) {
+                            if (p.Gone) continue; birds++;
+                            var v = cam.WorldToViewportPoint(p.transform.position);
+                            if (v.z > 0f && v.x > 0f && v.x < 1f && v.y > 0f && v.y < 1f) inView++;
+                        }
+                        sb.AppendLine("   [鳩を見上げる] 0.75 秒で群れの真ん中から " + mid.ToString("F1") + " 度、1.5 秒で " + off.ToString("F1") + " 度、見上げ " + pitchOf().ToString("F0") + " 度、画面の中の鳩 " + inView + "/" + birds);
+                        HalfAware.EditorTools.CheckDiveSky.Pair(eye.position, eye.eulerAngles.y, pitchOf(), clear, psky.flat, System.IO.Path.Combine(shotDir, "m" + which + "_glance"));
+                        S(0.02f, true);
+                        turn(60);
+                        sb.AppendLine("   [次の行] 目=" + (d.Attending != null ? d.Attending.name : "-") + "、相手の顔から " + (d.Attending != null ? UnityEngine.Vector3.Angle(eye.forward, headOf(d.Attending) - eye.position).ToString("F1") : "-") + " 度");
+                        return true; };
+                    glance();
+                    while (d.Talking && guard++ < 20) {
+                        S(0.02f, true);
+                        glance();
+                    }
                     sb.AppendLine("   送り終え（" + guard + " 回）: " + state());
                 }
                 sb.AppendLine("会話 済 " + d.Done + "/" + talks.Length);
@@ -642,7 +679,10 @@ namespace HalfAware.EditorTools
                 player.CanMove = true; player.SpeedScale = 1f;
                 // 話す相手へ向けた目と、封じた見回しを解く（再生していないので目は動いていないが、封じた者は PlayerController に残る）
                 player.StopFacing(); player.FreeLook(d); player.FreeMove(d);
-                F("leading").SetValue(d, false); F("attending").SetValue(d, null); F("caller").SetValue(d, null);
+                F("leading").SetValue(d, false); F("attending").SetValue(d, null); F("caller").SetValue(d, null); F("glanced").SetValue(d, null);
+                var flockPoint = (UnityEngine.Transform)F("flockPoint").GetValue(d);
+                if (flockPoint != null) UnityEngine.Object.DestroyImmediate(flockPoint.gameObject);
+                F("flockPoint").SetValue(d, null);
                 F("chain").SetValue(d, null); F("take").SetValue(d, null); F("place").SetValue(d, null);
                 sky.Write();
                 UnityEngine.Physics.SyncTransforms();

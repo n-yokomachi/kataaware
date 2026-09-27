@@ -62,6 +62,22 @@ namespace HalfAware.Tests
             Assert.That(roster[0].approach, Is.False);
         }
 
+        // 「見て！　鳩がいっせいに飛んだ」の行だけ、目を相手でなく鳩の群れ（Doves）へ向ける（記憶 2・3）
+        [Test]
+        public void OnlyTheDoveLinesLookAtTheFlock()
+        {
+            var roster = Load();
+            var found = 0;
+            for (var i = 0; i < roster.Count; i++)
+                foreach (var s in roster[i].said)
+                {
+                    var doves = s.line == "ソフィア「見て！　鳩がいっせいに飛んだ」";
+                    Assert.That(s.look ?? "", Is.EqualTo(doves ? "Doves" : ""), "記憶 " + i + " の " + s.line);
+                    if (doves) { found++; Assert.That(i == 2 || i == 3, Is.True); }
+                }
+            Assert.That(found, Is.EqualTo(2));
+        }
+
         // 最初の会話を相手のそばまで歩いてからにするのは、記憶 8（ジョルジョは居間まで入ってから、設計書 7 節）だけ
         [Test]
         public void OnlyGiorgioWalksInBeforeTheFirstTalk()
