@@ -110,6 +110,8 @@ namespace HalfAware
         const float BarGrip = 16f * Dot;
 
         const float BoxWidth = 210f * Dot;
+        /// <summary>場面の一覧の一段に並べる行の数。これを超えたら二段にする（ログの枠の高さに収める）</summary>
+        const int ListColumn = 5;
         /// <summary>記憶する・思い出すの枠の幅。行に場面の名と書いた日時を並べる</summary>
         const float SlotBoxWidth = 280f * Dot;
         const float BoxRow = 22f * Dot;
@@ -238,8 +240,8 @@ namespace HalfAware
             return c;
         }
 
-        /// <summary>いまいる場面の、デバッグの一覧での名。村で場面 6 を流していれば庭の記憶の行（<see cref="SceneMenu.Here"/>）</summary>
-        static string Here { get { return SceneMenu.Here(SceneManager.GetActiveScene().name, GardenHandoff.Active); } }
+        /// <summary>いまいる場面の、デバッグの一覧での名。村で場面 6 を流していれば庭の記憶、場面 10 なら対面の行（<see cref="SceneMenu.Here(string, bool, bool)"/>）</summary>
+        static string Here { get { return SceneMenu.Here(SceneManager.GetActiveScene().name, GardenHandoff.Active, ReunionHandoff.Active); } }
 
         // ---- 作る ------------------------------------------------------------
 
@@ -625,9 +627,13 @@ namespace HalfAware
             box.anchorMax = new Vector2(0f, 1f);
             box.pivot = new Vector2(0f, 1f);
             var count = SceneMenu.Count;
-            var height = BoxPad * 2f + HeadHeight + BoxPad + BoxRow * count;
+            // 行が多いと枠がログの枠の下へはみ出す（9 行でもはみ出していた）。ListColumn 行を超えたら二段に分けて並べる（左の段から上から下へ）
+            var columns = count > ListColumn ? 2 : 1;
+            var perColumn = Mathf.CeilToInt(count / (float)columns);
+            var inner = BoxWidth - BoxPad * 2f;
+            var height = BoxPad * 2f + HeadHeight + BoxPad + BoxRow * perColumn;
             box.anchoredPosition = new Vector2(PadLeft, -PadTop);
-            box.sizeDelta = new Vector2(BoxWidth, height);
+            box.sizeDelta = new Vector2(BoxPad * 2f + inner * columns + BoxPad * (columns - 1), height);
             var bg = box.gameObject.AddComponent<Image>();
             bg.color = BoxFill;
             Border(box, ButtonLine, Line);
@@ -638,13 +644,16 @@ namespace HalfAware
             for (var i = 0; i < count; i++)
             {
                 var r = Rect(box, "Scene" + (i + 1));
-                Top(r, BoxPad, BoxPad, BoxPad * 2f + HeadHeight + BoxRow * i, BoxRow);
+                var column = i / perColumn;
+                var left = BoxPad + column * (inner + BoxPad);
+                var right = BoxPad + (columns - 1 - column) * (inner + BoxPad);
+                Top(r, left, right, BoxPad * 2f + HeadHeight + BoxRow * (i % perColumn), BoxRow);
                 var view = new ButtonView();
                 view.fill = r.gameObject.AddComponent<Image>();
                 view.fill.color = Clear;
                 view.label = Text(r, "Label", RowFont, ButtonText, TextAlignmentOptions.Left);
                 Stretch(view.label.rectTransform, 7f * Dot, 7f * Dot, 0f, 0f);
-                view.label.text = Mono((i + 1).ToString()) + "　" + SceneMenu.Titles[i];
+                view.label.text = Mono(SceneMenu.KeyOf(i)) + "　" + SceneMenu.Titles[i];
                 view.label.fontStyle = FontStyles.Bold;
                 Heavy(view.label);
                 view.mark = Text(r, "Here", TagFont, Accent, TextAlignmentOptions.Right);
@@ -863,13 +872,14 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// 1〜9 の数字。押されていなければ 0。一覧に並んだ数字で、いつでも場面を移れる。
-        /// 飛べるのはデバッグを出す時（エディタと開発用の書き出し）だけ（<see cref="ConsoleMenu.DigitTarget"/>）
+        /// 押された数字の行の番号。1〜9 はそのまま、0 の鍵は 10 行目（<see cref="SceneMenu.KeyOf"/>）。押されていなければ 0。
+        /// 一覧に並んだ数字で、いつでも場面を移れる。飛べるのはデバッグを出す時（エディタと開発用の書き出し）だけ（<see cref="ConsoleMenu.DigitTarget"/>）
         /// </summary>
         static int Digit(Keyboard k)
         {
             for (var i = 0; i < 9; i++)
                 if (k[Key.Digit1 + i].wasPressedThisFrame || k[Key.Numpad1 + i].wasPressedThisFrame) return i + 1;
+            if (k.digit0Key.wasPressedThisFrame || k.numpad0Key.wasPressedThisFrame) return SceneMenu.Keys;
             return 0;
         }
 
