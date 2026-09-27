@@ -47,8 +47,26 @@ namespace HalfAware
         public const string CloseEyes = "目を閉じる";
         public const string DebugLabel = "デバッグ";
 
-        /// <summary>ボタンの字。<see cref="ConsoleAction"/> と同じ並び</summary>
-        public static readonly string[] Labels = { Remember, Recall, CloseEyes, DebugLabel };
+        static readonly string[] WithDebug = { Remember, Recall, CloseEyes, DebugLabel };
+        static readonly string[] WithoutDebug = { Remember, Recall, CloseEyes };
+
+        /// <summary>
+        /// デバッグを出すか。デバッグのボタン（場面の一覧）と、コンソールを開いて数字で場面へ飛ぶ操作の両方を決める。
+        /// エディタと開発用の書き出し（Development Build）だけで出し、公開用の書き出しでは出さない
+        /// </summary>
+        public static bool DebugShown { get { return DebugOverride ?? UnityEngine.Debug.isDebugBuild; } }
+
+        /// <summary>確かめ用。null でなければ <see cref="DebugShown"/> をこの値にする。EditMode のテストが両方の形を作るのに使う</summary>
+        public static bool? DebugOverride { get; set; }
+
+        /// <summary>ボタンの字。<see cref="ConsoleAction"/> と同じ並び。デバッグを出さない時は最後のデバッグを除く</summary>
+        public static string[] Labels { get { return DebugShown ? WithDebug : WithoutDebug; } }
+
+        /// <summary>コンソールを開いて数字の鍵を押した時の移り先（<see cref="SceneMenu.Target"/>）。デバッグを出さない時はどこへも飛ばない（null）</summary>
+        public static string DigitTarget(int digit, string here)
+        {
+            return DebugShown ? SceneMenu.Target(digit, here) : null;
+        }
 
         /// <summary>記憶する・思い出すの行の数</summary>
         public const int RememberRows = 3;

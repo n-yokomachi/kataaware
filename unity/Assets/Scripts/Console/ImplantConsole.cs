@@ -838,7 +838,7 @@ namespace HalfAware
                 return false;
             }
             var digit = Digit(keys);
-            if (digit > 0 && Jump(SceneMenu.Target(digit, Here))) return true;
+            if (digit > 0 && Jump(ConsoleMenu.DigitTarget(digit, Here))) return true;
             if (keys.leftArrowKey.wasPressedThisFrame || keys.aKey.wasPressedThisFrame) menu.Move(-1);
             if (keys.rightArrowKey.wasPressedThisFrame || keys.dKey.wasPressedThisFrame) menu.Move(1);
             var up = keys.upArrowKey.wasPressedThisFrame || keys.wKey.wasPressedThisFrame;
@@ -861,7 +861,10 @@ namespace HalfAware
             return Press();
         }
 
-        /// <summary>1〜9 の数字。押されていなければ 0。一覧に並んだ数字で、いつでも場面を移れる</summary>
+        /// <summary>
+        /// 1〜9 の数字。押されていなければ 0。一覧に並んだ数字で、いつでも場面を移れる。
+        /// 飛べるのはデバッグを出す時（エディタと開発用の書き出し）だけ（<see cref="ConsoleMenu.DigitTarget"/>）
+        /// </summary>
         static int Digit(Keyboard k)
         {
             for (var i = 0; i < 9; i++)
