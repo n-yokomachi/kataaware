@@ -54,6 +54,8 @@ Noto Sans JP (© 2014-2021 Adobe) — SIL Open Font License 1.1
 ## 
 Made with Unity
 
+## 
+Thank you for remembering.
 
 ---
 
@@ -64,5 +66,5 @@ Made with Unity
 3. **Background Music の「Ambient」（leberch）は二曲ある**（村に近づく所と、対面）。一行にまとめた
 4. **効果音の作者は、名の分かる人を並べた。** 全員を並べるか、「Pixabay ほか」にまとめるか
 5. **Quaternius の行。** 今も場面で使っているかを確かめてから残す（人の模型は Rocketbox に替えた）
-6. **結び。** 最後に題をもう一度出すか、「Thank you for playing」のような一行を置くか
+6. **結びの一行**は「おもいだしてくれてありがとう」の英語で `Thank you for remembering.`（オーナー、2026-09-28）
 7. **題の「かたあはれ」と原作の行の日本語を残すか**（ほかは英語にした）
