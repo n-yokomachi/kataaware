@@ -238,7 +238,8 @@ namespace HalfAware
             return c;
         }
 
-        static string Here { get { return SceneManager.GetActiveScene().name; } }
+        /// <summary>いまいる場面の、デバッグの一覧での名。村で場面 6 を流していれば庭の記憶の行（<see cref="SceneMenu.Here"/>）</summary>
+        static string Here { get { return SceneMenu.Here(SceneManager.GetActiveScene().name, GardenHandoff.Active); } }
 
         // ---- 作る ------------------------------------------------------------
 
@@ -1124,12 +1125,16 @@ namespace HalfAware
             view.mark.text = data != null ? Mono(data.written) : string.Empty;
         }
 
-        /// <summary>場面へ飛ぶ。閉じて秒を戻してから読む。移り先が無ければ何もしない</summary>
+        /// <summary>
+        /// 場面へ飛ぶ。閉じて秒を戻してから読む。移り先が無ければ何もしない。
+        /// 庭の記憶の行は村を読み、場面 6 として開く印を立てる（<see cref="SceneMenu.Prepare"/>）
+        /// </summary>
         bool Jump(string target)
         {
             if (string.IsNullOrEmpty(target)) return false;
             Close();
-            SceneManager.LoadScene(target);
+            SceneMenu.Prepare(target);
+            SceneManager.LoadScene(SceneMenu.SceneOf(target));
             return true;
         }
 

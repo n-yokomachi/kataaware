@@ -59,7 +59,7 @@ namespace HalfAware.Tests
             foreach (var scene in UnityEditor.EditorBuildSettings.scenes)
                 built.Add(System.IO.Path.GetFileNameWithoutExtension(scene.path));
             foreach (var name in SceneMenu.Scenes)
-                Assert.That(built, Does.Contain(name), name + " が組み立ての一覧に無い");
+                Assert.That(built, Does.Contain(SceneMenu.SceneOf(name)), name + " が組み立ての一覧に無い");
         }
     }
 }

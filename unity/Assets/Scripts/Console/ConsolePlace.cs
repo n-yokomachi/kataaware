@@ -47,9 +47,17 @@ namespace HalfAware
         /// <summary>日時と場所のあいだ</summary>
         public const string Gap = "　";
 
+        /// <summary>場面 6（庭の記憶）の頭の行。「潜行中」と、記憶の日時と場所（<see cref="GardenMemory"/>）</summary>
+        public static string Garden
+        {
+            get { return Diving + Gap + GardenMemory.Stamp + Gap + GardenMemory.Place; }
+        }
+
         /// <summary>場面の名から頭の行の左。表に無い場面は場面の名だけ</summary>
         public static string For(string scene)
         {
+            // 場面 6（庭の記憶）は村のシーンの中の記憶。デバッグの一覧では別の名（SceneMenu.Garden）で持つ
+            if (scene == SceneMenu.Garden) return Garden;
             for (var i = 0; i < Table.GetLength(0); i++)
             {
                 if (Table[i, 0] != scene) continue;
@@ -65,12 +73,12 @@ namespace HalfAware
         /// </summary>
         public static string ForStage(int stage)
         {
+            // 場面 6 は村のシーンの夕方。村の行（朝）ではなく、記憶の日時
+            if (stage == GardenHandoff.Stage) return Garden;
             var scene = StageMap.SceneOf(stage);
             if (scene != null) return For(scene);
             switch (stage)
             {
-                // 場面 6。庭の記憶。記憶の日時は場面 6 を作る時に決める
-                case 6: return Diving + Gap + "村";
                 // 場面 7。潜って戻った夜の自室。時刻は場面 7 を作る時に決める
                 case 7: return "倫敦・自室";
                 // 場面 10。場面 9 と同じ朝の村

@@ -82,8 +82,23 @@ namespace HalfAware
             yield return Smoke();
         }
 
+        void OnEnable()
+        {
+            if (flow != null) flow.Examined += Examined;
+        }
+
+        /// <summary>
+        /// モニターの「潜る」を調べた。行き先は庭（場面 6）。SceneFlow が次に読む村（nextScene）を、
+        /// 朝の村（場面 9）ではなく夕方の庭の記憶として開くよう、印を立てる（<see cref="GardenHandoff"/>）
+        /// </summary>
+        void Examined(IInteractable item)
+        {
+            if (item != null && item.Id == ConnectIds.Dive) GardenHandoff.Pending = true;
+        }
+
         void OnDisable()
         {
+            if (flow != null) flow.Examined -= Examined;
             StopAllCoroutines();
             smoking = false;
             if (cigarette != null) cigarette.Stop();

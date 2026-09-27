@@ -98,6 +98,7 @@ namespace HalfAware
         {
             pending = null;
             DiveHandoff.Clear();
+            GardenHandoff.Clear();
             SceneManager.LoadScene(StageMap.SceneOf(StageMap.First));
         }
 
@@ -123,6 +124,8 @@ namespace HalfAware
             var data = SaveStore.Read(slot);
             if (data == null || !CanLoad(data.scene)) return false;
             SaveStore.Restore(data);
+            // 村は朝（場面 9）と夕方（場面 6）で同じシーン。場面 6 のセーブなら、村を庭の記憶として開く印を立てる
+            GardenHandoff.Pending = data.stage == GardenHandoff.Stage;
             pending = data;
             SceneManager.LoadScene(data.scene);
             return true;
