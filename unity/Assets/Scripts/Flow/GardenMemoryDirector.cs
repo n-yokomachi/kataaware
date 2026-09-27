@@ -9,15 +9,15 @@ namespace HalfAware
     /// 場面 6（庭の記憶）の段の進行（シナリオ設計書 10 節）。村（<c>Village.unity</c>）の夕方で、
     /// 片割れの目に入って 1 分ほどを受け身で過ごす。
     ///
-    /// 1. **名を呼ばれる**（頭）。芝の西の縁で花に水を撒いていた女性（過去の主人公）が振り返り、主（片割れ）の名を呼ぶ。
+    /// 1. **名を呼ばれる**（頭）。夕日の側の小路で花に水を撒いていた女性（過去の主人公）が振り返り、主（片割れ）の名を呼ぶ。女性は夕日を背にしていて、顔は影
     ///    ほかの記憶の頭と同じく（<see cref="DiveDirector"/> の Lead）、黒から明けてから目を女性の顔へ 1 秒で回して追い、見回しと歩きを封じる。
     ///    字幕は場面 4 の一行目と同じ帯で、名前の行を出さず、崩して読めない形（<see cref="GardenMemory.Call"/>）で出す。E で送る
     /// 2. **身を乗り出す**。送ると、聞き返すように目が少し前へ出て戻る（自動）
     /// 3. **庭を見る**。女性は向き直って水を撒き、しばらくしてホースを止める。座ったまま首の届く範囲で見回せる。歩けない
-    /// 4. **女性の板**。女性に目を留めると板が出る。名前は文字化けで、「潜る」を押しても渡らない
-    /// 5. **近づく**。女性がこちらを向き、ホースを置いて、芝を横切って卓の方へ歩いてくる。近づくほど逆光の影が薄くなる
+    /// 4. **女性の板**。女性に目を留めると板が出る。名前は文字化けで、二行目は薄い色の「潜れない」。潜る案内は出さず、E を押しても何もしない
+    /// 5. **近づく**。女性がこちらを向き、ホースを置いて、小路からテラスへ上がって歩いてくる。近づくほど逆光の影が薄くなる
     /// 6. **途切れる**。顔が見分けられるかという所（目から <see cref="cutDistance"/>）で、直に切れる。
-    ///    行き先（<see cref="nextScene"/>）が空なら、黒と「（仮）続く」で止める
+    ///    途切れた次のフレームに、行き先（<see cref="nextScene"/>、場面 7 の <c>Notice</c>）を読む。空なら、黒と「（仮）続く」で止める
     ///
     /// **村は場面 9 と同じシーン。** どちらで入ったかは <see cref="GardenHandoff"/> で受け取る。立っていなければ何もせず、
     /// 場面 6 の物（女性・主の体・ホース、<see cref="memory"/> の下）は伏せたまま、場面 9 のまま始まる。
@@ -48,9 +48,6 @@ namespace HalfAware
             /// <summary>途切れた</summary>
             Cut,
         }
-
-        /// <summary>板を出した相手へ潜るときの案内。<see cref="DiveDirector"/> と同じ言い方</summary>
-        public const string DiveLabel = "この人の記憶へ潜る";
 
         [Header("繋ぎ")]
         [SerializeField] PlayerController player;
@@ -124,22 +121,22 @@ namespace HalfAware
         [Tooltip("水を撒き始める")]
         [SerializeField] float sprayAt = 1.8f;
         [Tooltip("ホースを止める")]
-        [SerializeField] float stopAt = 27f;
+        [SerializeField] float stopAt = 45.5f;
         [Tooltip("こちらを向く")]
-        [SerializeField] float lookAt = 30f;
+        [SerializeField] float lookAt = 48.5f;
         // これより先は女性の歩きの線（Mover）の秒。ホースを置いて歩き出すのは線の頭（Mover.At）
         [Tooltip("歩き出してから、女性の顔と主の目の隔たりがこれを切ったら途切れる。m")]
-        [SerializeField] float cutDistance = 2.6f;
+        [SerializeField] float cutDistance = 1.6f;
         [Tooltip("顔までの隔たりが縮まらなくても、この秒で切る")]
-        [SerializeField] float cutLatest = 60f;
+        [SerializeField] float cutLatest = 70f;
 
         [Header("逆光の影")]
         [Tooltip("遠いときの暗さ（色に掛ける）")]
-        [SerializeField, Range(0f, 1f)] float shadeDark = 0.6f;
+        [SerializeField, Range(0f, 1f)] float shadeDark = 0.3f;
         [Tooltip("この隔たりより遠ければ shadeDark のまま。m")]
-        [SerializeField] float shadeFar = 5.5f;
+        [SerializeField] float shadeFar = 3.3f;
         [Tooltip("この隔たりまで来れば素の色。m")]
-        [SerializeField] float shadeNear = 2.2f;
+        [SerializeField] float shadeNear = 0.4f;
 
         [Header("板")]
         [Tooltip("目の中央からこの角度の内側にいれば留めたことにする。度")]
@@ -511,7 +508,8 @@ namespace HalfAware
             if (skins.Length == 0 || block == null) return;
             var d = Apart;
             var k = shadeFar <= shadeNear ? 1f : Mathf.Clamp01((shadeFar - d) / (shadeFar - shadeNear));
-            var s = Mathf.Lerp(shadeDark, 1f, Gaze.Ease(k));
+            // 二乗で上げる。遠いうちは影のまま、途切れる所（1.6 m ほど）でようやく影から出かかる
+            var s = Mathf.Lerp(shadeDark, 1f, k * k);
             if (Mathf.Abs(s - shade) < 1e-3f) return;
             shade = s;
             for (var i = 0; i < skins.Length; i++)
@@ -558,7 +556,8 @@ namespace HalfAware
         // ---- 4. 女性の板 ----------------------------------------------------------
 
         /// <summary>
-        /// 女性に目を留めたら板を出す。名前は文字化けで、潜れない（E を押しても何もしない）。
+        /// 女性に目を留めたら板を出す。名前は文字化けで、二行目は薄い色の「潜れない」（<see cref="HoloPanel.Locked"/>）。
+        /// 潜れない人なので、画面の下の「この人の記憶へ潜る」の案内は出さない。E を押しても何もしない。
         /// 消えるのは、女性が画面から外れたときと、物の陰に隠れたときだけ（<see cref="DiveDirector"/> と同じ）
         /// </summary>
         void Watch(float dt)
@@ -566,18 +565,13 @@ namespace HalfAware
             if (panel == null || woman == null || player == null || player.Eye == null) return;
             var who = woman.transform;
             if (showing && (!OnScreen(who) || !Visible(who))) Drop();
-            if (!showing)
-            {
-                var looking = AngleTo(who) < watchAngle && Visible(who);
-                dwell = looking ? dwell + dt : 0f;
-                if (dwell >= watchSeconds)
-                {
-                    showing = true;
-                    panel.Show(who, GardenMemory.Row, GardenMemory.WomanRow);
-                    panel.Grow(DiveChain.CutStart);
-                }
-            }
-            if (showing && hud != null) hud.SetPrompt(HudView.Prompt(DiveLabel));
+            if (showing) return;
+            var looking = AngleTo(who) < watchAngle && Visible(who);
+            dwell = looking ? dwell + dt : 0f;
+            if (dwell < watchSeconds) return;
+            showing = true;
+            panel.Show(who, GardenMemory.Row, GardenMemory.WomanRow);
+            panel.Lock(HoloPanel.Locked);
         }
 
         void Drop()
@@ -661,7 +655,11 @@ namespace HalfAware
 
         /// <summary>
         /// 途切れる。ほかの記憶が尽きる時と同じ、直の切れ方。終わりの合図は入れない。
-        /// 行き先があれば直に読み、無ければ黒のまま「（仮）続く」で止める
+        /// 行き先（場面 7、<c>Notice</c>）があれば、途切れた次のフレームに直に読む（場面 7 は黒から明けずに始まる）。
+        /// 無ければ黒のまま「（仮）続く」で止める。
+        ///
+        /// **途切れの音は場面をまたいで鳴らし切る。** 村の音源から鳴らすと、次の場面を読んだ所で音源ごと消えて切れる。
+        /// 場面の外（DontDestroyOnLoad）に一時の音源を作り、鳴り終えたら捨てる
         /// </summary>
         public void Cut()
         {
@@ -672,7 +670,7 @@ namespace HalfAware
             Spray(false);
             if (spray != null) spray.Clear(true);
             if (water != null) water.Stop();
-            if (noise != null && cut != null) noise.PlayOneShot(cut);
+            CutSound();
             if (player != null)
             {
                 player.CanLook = false;
@@ -681,7 +679,7 @@ namespace HalfAware
             if (hud != null) hud.SetSubtitle(null);
             if (SceneExit.Continues(nextScene))
             {
-                SceneManager.LoadScene(SceneExit.Target(nextScene));
+                if (Application.isPlaying) StartCoroutine(Next());
                 return;
             }
             if (hud != null)
@@ -691,6 +689,32 @@ namespace HalfAware
             }
             if (caption != null) caption.text = string.Empty;
             if (Application.isPlaying) StartCoroutine(Hold());
+        }
+
+        /// <summary>途切れた次のフレームに、行き先の場面を読む</summary>
+        IEnumerator Next()
+        {
+            yield return null;
+            SceneManager.LoadScene(SceneExit.Target(nextScene));
+        }
+
+        /// <summary>途切れの音を、場面の外の一時の音源で鳴らす。鳴り終えたら捨てる</summary>
+        void CutSound()
+        {
+            if (cut == null) return;
+            if (!Application.isPlaying)
+            {
+                if (noise != null) noise.PlayOneShot(cut);
+                return;
+            }
+            var go = new GameObject("GardenCutSound");
+            DontDestroyOnLoad(go);
+            var src = go.AddComponent<AudioSource>();
+            src.playOnAwake = false;
+            src.spatialBlend = 0f;
+            src.volume = noise != null ? noise.volume : 1f;
+            src.PlayOneShot(cut);
+            Destroy(go, cut.length + 0.2f);
         }
 
         IEnumerator Hold()

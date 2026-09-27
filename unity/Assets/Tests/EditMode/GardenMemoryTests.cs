@@ -195,6 +195,28 @@ namespace HalfAware.Tests
         }
 
         [Test]
+        public void TheWomansBoardSaysSheCannotBeDived()
+        {
+            var go = new GameObject("HoloPanel");
+            try
+            {
+                var panel = go.AddComponent<HoloPanel>();
+                panel.Lock(HoloPanel.Locked);
+                Assert.IsTrue(panel.IsLocked);
+                StringAssert.Contains(HoloPanel.Locked, panel.Action);
+                // 潜る・切断の選びも、選んでいる印（▶）も出さない
+                StringAssert.DoesNotContain(Choice.Cursor, panel.Action);
+                StringAssert.DoesNotContain(HoloPanel.Cut, panel.Action);
+                panel.Hide();
+                Assert.IsFalse(panel.IsLocked);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
         public void TheGardenComesRightAfterTheRest()
         {
             var rest = System.Array.IndexOf(SceneMenu.Scenes, "Rest");
