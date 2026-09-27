@@ -192,7 +192,8 @@ namespace HalfAware.EditorTools
             var verge = new Bank { Texel = 0.3f };
             verge.FaceY(0.01f, TrackWest, ChurchYardWest - 0.5f, RoadHalf, NorthEdge, 1);
             verge.FaceY(0.01f, TrackWest, ChurchYardWest - 0.5f, -NorthEdge, -RoadHalf, 1);
-            NoShadow(Emit(parent, "VillageVerge", verge, VergeMat(), true));
+            var vergeMade = Emit(parent, "VillageVerge", verge, VergeMat(), true);
+            NoShadow(vergeMade);
 
             // 片割れの敷地。芝と花の縁の土と菜園を一枚の絵で塗り分ける（GroundPicture）
             var plot = new Bank { Texel = 1f };
@@ -201,8 +202,8 @@ namespace HalfAware.EditorTools
                 new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(1f, 0f), new Vector2(0f, 0f));
             var plotMade = Emit(parent, "VillagePlot", plot, GroundMat(), true);
             NoShadow(plotMade);
-            // 足音の地面。路地は砂利、片割れの敷地は芝の中に煉瓦の小路とテラスの硬い所（BuildVillageSound.StepGrounds）
-            StepGrounds(roadMade, plotMade);
+            // 足音の地面。路地は砂利、芝の路肩と片割れの敷地の芝は草、煉瓦の小路とテラスだけ硬い音（BuildVillageSound.StepGrounds）
+            StepGrounds(roadMade, plotMade, vergeMade);
 
             // 周りの家の庭の芝。村の帯（南の家の裏の生け垣から北の家の奥の生け垣まで）の下に一枚
             var rest = new Bank { Texel = 0.2f };

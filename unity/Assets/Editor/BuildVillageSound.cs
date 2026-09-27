@@ -73,19 +73,37 @@ namespace HalfAware.EditorTools
         };
 
         /// <summary>
-        /// 床の当たりに足音の地面（<see cref="StepGround"/>）を付ける。
-        /// 路地（未舗装路と門の前の砂利の溜まりを含む一枚）は砂利。芝の路肩は付けない（既定の柔らかい足音）。
-        /// 片割れの敷地（芝も小路もテラスも一枚の当たり）は芝の柔らかい足音のまま、煉瓦の小路・玄関の小路・
-        /// テラスと芝へ下りる段だけを硬い音にする。形は見た目の小路と同じ線（<see cref="PathSamples"/>）から取る
+        /// 芝と草むらの足音。草を踏んだ録音から一歩ずつ切り出した単発（Step1〜5 とは別の音、オーナー、2026-09-27）。
+        /// `tools/make-ambience.sh` の 7 節。出どころは Assets/Audio/LICENSES.md
         /// </summary>
-        static void StepGrounds(Transform road, Transform plot)
+        static readonly string[] GrassSteps =
+        {
+            "Assets/Audio/Grass1.wav", "Assets/Audio/Grass2.wav", "Assets/Audio/Grass3.wav",
+            "Assets/Audio/Grass4.wav", "Assets/Audio/Grass5.wav", "Assets/Audio/Grass6.wav",
+        };
+
+        /// <summary>
+        /// 床の当たりに足音の地面（<see cref="StepGround"/>）を付ける。
+        /// 路地（未舗装路と門の前の砂利の溜まりを含む一枚）は砂利。芝の路肩は草の足音。
+        /// 片割れの敷地（芝も小路もテラスも一枚の当たり）は既定を草の足音にし、煉瓦の小路・玄関の小路・
+        /// テラスと芝へ下りる段だけを硬い音の区画で上書きする。形は見た目の小路と同じ線（<see cref="PathSamples"/>）から取る。
+        /// 草の素材が無ければ <see cref="StepClips"/> が空を返し、その地面は Footsteps の既定の音に落ちる（偽の音は鳴らさない）
+        /// </summary>
+        static void StepGrounds(Transform road, Transform plot, Transform verge)
         {
             var hard = StepClips(HardSteps);
+            var grass = StepClips(GrassSteps);
             if (road != null)
             {
                 var gravel = StepClips(GravelSteps);
                 var so = new SerializedObject(road.gameObject.AddComponent<StepGround>());
                 WriteClips(so.FindProperty("clips"), gravel);
+                so.ApplyModifiedPropertiesWithoutUndo();
+            }
+            if (verge != null)
+            {
+                var so = new SerializedObject(verge.gameObject.AddComponent<StepGround>());
+                WriteClips(so.FindProperty("clips"), grass);
                 so.ApplyModifiedPropertiesWithoutUndo();
             }
             if (plot != null)
@@ -100,6 +118,8 @@ namespace HalfAware.EditorTools
                     new StepGround.Patch { name = "TerraceStep", box = Rect.MinMaxRect(StepWest, TerraceNorth, StepEast, TerraceNorth + 0.4f), clips = hard },
                 };
                 var so = new SerializedObject(plot.gameObject.AddComponent<StepGround>());
+                // 区画のどれにも入らない所（芝と花の縁）は、既定（top の clips）の草の足音へ落ちる
+                WriteClips(so.FindProperty("clips"), grass);
                 var list = so.FindProperty("patches");
                 list.arraySize = parts.Length;
                 for (var i = 0; i < parts.Length; i++)
