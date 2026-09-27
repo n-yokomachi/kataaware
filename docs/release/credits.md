@@ -15,7 +15,7 @@
 yoko
 
 ## Original Story
-"Kataaware" (かたあはれ) by yoko
+『かたあはれ』 by yoko
 
 ## Music
 "HALF AWARE"
@@ -23,7 +23,6 @@ yoko
 "Peach Light"
 "The Ones Who Stayed"
 "Copper Heart"
-Generated with Suno
 
 ## Background Music
 "Melancholic Ambient Background" by Universfield
@@ -39,9 +38,9 @@ Pixabay
 dragon-studio / tommylynn / xomxomski / lunasound
 bdvictor / DOBCommunications / elittle13 / JazzyBay
 Diicorp95 / smokenweewALT / freesound_community and others
+OpenGameArt
+dawith / OwlishMedia
 "RPG Audio" by Kenney
-"Zippo click sound" by dawith (OpenGameArt)
-"Sound Effects Pack" by OwlishMedia (OpenGameArt)
 
 ## 3D Models
 Microsoft Rocketbox Avatar Library (© 2020 Microsoft) — MIT License
@@ -55,7 +54,6 @@ Noto Sans JP (© 2014-2021 Adobe) — SIL Open Font License 1.1
 ## 
 Made with Unity
 
-Full license texts are included in THIRD_PARTY_NOTICES.txt
 
 ---
 
