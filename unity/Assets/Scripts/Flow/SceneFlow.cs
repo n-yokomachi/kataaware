@@ -45,6 +45,9 @@ namespace HalfAware
         [SerializeField] float cardSeconds = 2.4f;
         [Tooltip("見出しから明けるまでの秒数")]
         [SerializeField] float cardLiftSeconds = 1.8f;
+        [Tooltip("見出しが無いとき、黒から明ける秒数。0 なら明けを挟まず、最初のフレームから映す（場面 7 は庭が途切れた次のフレームに部屋が映る）。" +
+            "思い出して来た時は、0 でも既定の秒数で黒から明ける")]
+        [SerializeField] float fadeInSeconds = FadeInSeconds;
         [Tooltip("出て行くときに 1 度鳴らす音。扉の開け閉めなど")]
         [SerializeField] AudioSource exitSound;
         [Tooltip("その音を鳴らしてから暗転するまでの秒数。扉が閉まる瞬間に合わせる")]
@@ -214,8 +217,14 @@ namespace HalfAware
                 hud.SetCurtain(false);
                 yield break;
             }
+            // 明けを挟まない場面。思い出して来た時は当て終えた形を黒から明ける（SceneMemory.Resume の決まり）
+            if (!resumed && fadeInSeconds <= 0f)
+            {
+                hud.SetFade(0f);
+                yield break;
+            }
             hud.SetFade(1f);
-            yield return hud.FadeTo(0f, FadeInSeconds);
+            yield return hud.FadeTo(0f, fadeInSeconds > 0f ? fadeInSeconds : FadeInSeconds);
         }
 
         /// <summary>次のフレームで調べる操作を 1 回起こす。E キーの代わりに、再生中の動作確認から SendMessage で呼ぶ</summary>
