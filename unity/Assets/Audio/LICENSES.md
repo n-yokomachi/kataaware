@@ -49,6 +49,10 @@ https://pixabay.com/service/license-summary/
 | `GateCreak.wav` | Pixabay `dobcommunications-creaky-wooden-gate-opens-170210`（「Creaky Wooden Gate Opens」。作者 DOBCommunications） | Pixabay Content License | モノラル 44.1kHz へ、前後の −60dB 未満を落とし、頂点を −6dB に揃えた。2.19 秒。村の片割れの家の格子戸を開ける音 |
 | `Gravel1`〜`Gravel6.wav` | Pixabay `freesound_community-walking-on-a-road-with-gravel-01-30100`（「Walking on a road with gravel 01」。freesound_community） | Pixabay Content License | 元は 61.99 秒、24kHz のステレオ mp3。砂利道を歩いた録音から、一つの塊で終わる一歩を六つ切り出した（5.540 / 6.055 / 7.650 / 16.650 / 17.295 / 20.245 秒から 0.34 秒ずつ。足の重なり、立ち上がりの前の長い擦り、二つ目の当たり、小石を蹴ったような単発の当たりのある所は避けた）。左右を平均してモノラル 44.1kHz へ、100Hz より下を落とし、頭 4ms をなだらかにして 0.20 秒から 0.14 秒かけて消した。大きさは一歩あたりの大きさ（0.5 秒に伸ばして 10 回繰り返した物の integrated loudness）を `Step1`〜`Step5` の平均（−28.5 LUFS）に揃えた。頂点は −4.7〜−10.3dB。村の未舗装の路地の足音 |
 | `Grass1`〜`Grass6.wav` | Pixabay `freesound_community-walking-through-grass-80308`（「Walking through grass」。freesound_community、オーナーの許諾済み） | Pixabay Content License | 元は 12.38 秒、44.1kHz のモノラル mp3。一歩ずつ録った単発が並ぶ録音から、一つの塊で終わる一歩を六つ切り出した（1.790 / 2.490 / 5.110 / 5.770 / 8.910 / 10.010 秒から 0.34 秒ずつ。numpy が無いので ffmpeg で 16bit PCM に落とし、素の Python で 4ms 窓・2ms 送りの実効値を積んで塊を見た。次の塊まで 0.34 秒の余白が無い三つ（9.405 秒はほぼ天井の頂点で二歩の重なりの疑い、10.465 秒は塊の長さ自体が 0.40 秒で長すぎる、11.345 秒は残り一つで数が増えないので見送り）は避けた）。100Hz より下を落とし、頭 4ms をなだらかにして 0.20 秒から 0.14 秒かけて消した。大きさは `Gravel` と同じ揃え方で `Step1`〜`Step5` の平均（−28.5 LUFS）に、頂点 −3dB の天井を添えた。頂点は −3.0〜−10.5dB。村の芝の足音（`tools/make-ambience.sh grass`） |
+| `GardenHose.wav` | Pixabay `freesound_community-watering-62546`（「Watering」。作者 elittle13（Freesound）。早朝に自分の庭のホースで植木に水をやった録音） | Pixabay Content License | 元は 25.22 秒、24kHz のステレオ mp3（左右はほぼ同じ）。1.15〜14.50 秒の 13.35 秒を切り出し（出し始めの 0.25〜1.1 秒、14.55 秒の何かに当たった低い音、24.5 秒からのフェードアウトを避けた）、左右を平均してモノラル 44.1kHz へ（いちばん強いのが 6〜11kHz の帯なので 22.05kHz にしない）。末尾 2 秒を頭に重ねて輪にし、実効値を −24dBFS に揃えた。11.35 秒、頂点 −5.3dB。場面 6 で女性がホースで花に水を撒く音（`tools/make-ambience.sh garden`） |
+| `GardenHoseStop.wav` | Pixabay `freesound_community-hose-sounds-24388`（「Hose Sounds」。作者 JazzyBay（Freesound）。よく軋む栓を開け、吹きさらしの車庫でホースからコンクリートに水を撒いた録音） | Pixabay Content License | 元は 128.93 秒、48kHz のモノラル mp3。短く出しては止めた所のうち、ノズルを離して 0.2 秒で 18dB 落ちる 101.35 秒の止まりを使った。101.22〜102.32 秒の 1.10 秒（止まる前の噴きは 0.13 秒だけ。101.86 秒で噴き残りが止みきり、あとは滴り）。120Hz より下の車庫の唸りを落とし、頭 50ms をなだらかに入れ、0.80 秒から 0.30 秒かけて消した。モノラル 44.1kHz、頂点 −6dB、実効 −33.2dB。場面 6 で水を止める音 |
+| `SignalGlitch.wav` | Pixabay `freesound_community-computer-glitch-corrupted-file-96176`（「Computer Glitch, Corrupted File」。作者 Diicorp95（Freesound。利用者の頁は消えていて、元の説明は読めない）） | Pixabay Content License | 元は 6.17 秒、24kHz のステレオ mp3（左右は同じ）。40ms ほどの雑音の粒がデジタルの無音を挟んで並ぶ、データが欠けて飛ぶような音。1.68〜4.62 秒の 2.94 秒を切り出し（頭の「ピッ」に近い音程のある一発と、4.72 秒からのまばらな所を避けた。切り口はどちらも無音の中）、モノラル 44.1kHz へ、頂点を −6dB に揃えた。実効 −23.1dB。場面 6 で名を呼ぶ口元が動く間に鳴らす |
+| `SignalCut.wav` | Pixabay `freesound_community-glitch-49142`（「Glitch」。作者 smokenweewALT（Freesound。いまの名は smokevhstapes）。動画をデータベンディングして録り直した物） | Pixabay Content License | 元は 0.50 秒、44.1kHz のモノラル mp3。全帯域の雑音が立ち上がり、0.490 秒で断ち切られる。0.020〜0.490 秒の 0.47 秒を切り出し、頭 2ms と尻 3ms だけなだらかにして断ち切れの鋭さを残した。頂点を −6dB に揃えた（元は 0dB 近く）。実効 −18.3dB。場面 6 で記憶が途切れる瞬間の「ぶつっ」 |
 
 ## 曲
 
@@ -64,6 +68,7 @@ https://pixabay.com/service/license-summary/
 
 雑踏の輪と曲の加工は `tools/make-ambience.sh` で作り直せる（村の朝・麦の風・格子戸は同じ中の 5 節。`bash make-ambience.sh village` でそれだけ作り直す。
 未舗装の路地の足音は 6 節で、`bash make-ambience.sh gravel`。芝の足音は 7 節で、`bash make-ambience.sh grass`。
+場面 6 の庭の 4 つ（ホースの輪・水を止める音・途切れ・断ち切れ）は 8 節で、`bash make-ambience.sh garden`。
 素材の mp3 は `unity/RawAssets/audio/pixabay/` に Pixabay の元の名前で置く。git には入れない）。WebGL では Unity のオーディオのフィルターが効かないので、
 スピーカーらしさと響きはファイルに焼き込んである。
 
