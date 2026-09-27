@@ -198,17 +198,39 @@ namespace HalfAware
             }
         }
 
-        /// <summary>上下の向き。度。書き込むと範囲に収まる。動作確認から視線を向けるのにも使う</summary>
+        /// <summary>上下の向き。度。書き込むと範囲（下は <see cref="PitchDown"/>）に収まる。動作確認から視線を向けるのにも使う</summary>
         public float Pitch
         {
             get { return pitch; }
-            set { pitch = ClampPitch(value); }
+            set { pitch = ClampPitch(value, pitchDown); }
         }
+
+        /// <summary>
+        /// この場面で下を向ける限り。度。ふだんは <see cref="PitchDownLimit"/>（主人公の胸を画面に入れない決まり）。
+        /// 体が主人公でない記憶（場面 6 の主は片割れ）では、演出がこれを広げる。直列化しないので、シーンを読むたびに元へ戻る。
+        /// 書き込むと、今の向きもその範囲に収め直す
+        /// </summary>
+        public float PitchDown
+        {
+            get { return pitchDown; }
+            set
+            {
+                pitchDown = Mathf.Max(0f, value);
+                pitch = ClampPitch(pitch, pitchDown);
+            }
+        }
+        float pitchDown = PitchDownLimit;
 
         /// <summary>上下の向きを、向けられる範囲（上 <see cref="PitchUpLimit"/>・下 <see cref="PitchDownLimit"/>）に収める。正が下向き</summary>
         public static float ClampPitch(float pitch)
         {
-            return Mathf.Clamp(pitch, -PitchUpLimit, PitchDownLimit);
+            return ClampPitch(pitch, PitchDownLimit);
+        }
+
+        /// <summary>上下の向きを、上 <see cref="PitchUpLimit"/>・下 down の範囲に収める。正が下向き</summary>
+        public static float ClampPitch(float pitch, float down)
+        {
+            return Mathf.Clamp(pitch, -PitchUpLimit, down);
         }
 
         /// <summary>目の位置に上乗せするずれ。眩暈の漂いが毎フレーム入れる</summary>

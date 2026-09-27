@@ -13,7 +13,8 @@ namespace HalfAware
     ///    ほかの記憶の頭と同じく（<see cref="DiveDirector"/> の Lead）、黒から明けてから目を女性の顔へ 1 秒で回して追い、見回しと歩きを封じる。
     ///    字幕は場面 4 の一行目と同じ帯で、名前の行を出さず、崩して読めない形（<see cref="GardenMemory.Call"/>）で出す。E で送る
     /// 2. **身を乗り出す**。送ると、聞き返すように目が少し前へ出て戻る（自動）
-    /// 3. **庭を見る**。女性は向き直って水を撒き、しばらくしてホースを止める。座ったまま首の届く範囲で見回せる。歩けない
+    /// 3. **庭を見る**。女性は向き直って水を撒き、しばらくしてホースを止める。座ったまま首の届く範囲で見回せる。歩けない。
+    ///    主は片割れなので、下はほかの場面より深く（<see cref="pitchDown"/>）向けられ、膝と裾の先に足首とサンダルが見える
     /// 4. **女性の板**。女性に目を留めると板が出る。名前は文字化けで、二行目は薄い色の「潜れない」。潜る案内は出さず、E を押しても何もしない
     /// 5. **近づく**。女性がこちらを向き、ホースを置いて、小路からテラスへ上がって歩いてくる。近づくほど逆光の影が薄くなる
     /// 6. **途切れる**。顔が見分けられるかという所（目から <see cref="cutDistance"/>）で、直に切れる。
@@ -21,7 +22,7 @@ namespace HalfAware
     ///
     /// **村は場面 9 と同じシーン。** どちらで入ったかは <see cref="GardenHandoff"/> で受け取る。立っていなければ何もせず、
     /// 場面 6 の物（女性・主の体・ホース、<see cref="memory"/> の下）は伏せたまま、場面 9 のまま始まる。
-    /// 立っていれば、時刻を夕方にし、場面 6 の物を起こし、場面 9 の物（格子戸、<see cref="morningOnly"/>）を切る。
+    /// 立っていれば、時刻を夕方にし、場面 6 の物を起こし、場面 9 の物（格子戸、<see cref="morningOnly"/>）を切り、主の椅子（<see cref="turnedChair"/>）を夕日の方へ回す。
     /// 時刻は Awake で替える。セーブの流れ（<see cref="SaveFlow"/>）が sceneLoaded で村の時刻から場面の番号を決めるため
     ///
     /// **記憶するは場面の頭を残す**（<see cref="ISceneMemory"/>）。1 分の受け身の場面なので、途中の形は残さない。
@@ -65,6 +66,12 @@ namespace HalfAware
         [Tooltip("主の足元と体の向き。目がここから前へ eyeLead、上へ seatEyeHeight に来るよう、組み立てが座った体の目から決める")]
         [SerializeField] Transform seat;
         [SerializeField] float seatEyeHeight = 1.1f;
+        [Tooltip("主が座る椅子（卓の北の一脚）。朝の村では卓へ向いていて、場面 6 の間だけ夕日の方へ回す")]
+        [SerializeField] Transform turnedChair;
+        [Tooltip("回した椅子の向き。度（+z が 0 で東回り）")]
+        [SerializeField] float turnedChairYaw = 305f;
+        [Tooltip("下を向ける限り。度。主は片割れなので、主人公の胸を見せない 40 度の決まり（PlayerController.PitchDownLimit）は要らない。膝と裾の先の足首とサンダルまで見下ろせるようにする")]
+        [SerializeField] float pitchDown = 60f;
 
         [Header("女性")]
         [Tooltip("女性の根。歩く線を持つ")]
@@ -217,7 +224,7 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// 場面 6 として起こす。時刻を夕方にし、場面 6 の物を起こし、場面 9 の物を切る。
+        /// 場面 6 として起こす。時刻を夕方にし、場面 6 の物を起こし、場面 9 の物を切り、主の椅子を夕日の方へ回す。
         /// Awake から呼ぶ（エディタで撮るときは直に呼ぶ）
         /// </summary>
         public void Begin()
@@ -228,6 +235,8 @@ namespace HalfAware
             if (memory != null) memory.SetActive(true);
             for (var i = 0; i < morningOnly.Length; i++)
                 if (morningOnly[i] != null) morningOnly[i].enabled = false;
+            // 主の椅子を夕日の方へ回す。朝の村（場面 9・10）では卓へ向いたまま（組み立てがその向きで保存している）
+            if (turnedChair != null) turnedChair.rotation = Quaternion.Euler(0f, turnedChairYaw, 0f);
             if (player != null)
             {
                 hull = player.GetComponent<CharacterController>();
@@ -309,6 +318,8 @@ namespace HalfAware
                 player.PlaceAt(seat.position, seat.eulerAngles.y, HeadTurn.DefaultLimit, 0f, 0f, seatEyeHeight);
             player.CanMove = false;
             player.CanLook = true;
+            // 主は片割れ。下を向けば膝と裾と、その先の足首とサンダルが見える
+            player.PitchDown = pitchDown;
             player.EyeHeight = seatEyeHeight;
             player.HeadYawLimit = HeadTurn.DefaultLimit;
             player.SpeedScale = 1f;

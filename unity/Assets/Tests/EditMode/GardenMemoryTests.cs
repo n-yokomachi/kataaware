@@ -217,6 +217,62 @@ namespace HalfAware.Tests
         }
 
         [Test]
+        public void TheChairTurnsToTheSunsetOnlyInTheGarden()
+        {
+            var go = new GameObject("GardenMemoryDirector");
+            var chair = new GameObject("TurnedChair");
+            try
+            {
+                var toTable = Quaternion.Euler(0f, 170f, 0f);
+                chair.transform.rotation = toTable;
+                var d = go.AddComponent<GardenMemoryDirector>();
+                var so = new UnityEditor.SerializedObject(d);
+                so.FindProperty("turnedChair").objectReferenceValue = chair.transform;
+                so.FindProperty("turnedChairYaw").floatValue = 305f;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                // 朝の村（場面 9・10）では、組み立てが保存した卓への向きのまま
+                Assert.AreEqual(0f, Quaternion.Angle(toTable, chair.transform.rotation), 1e-3f);
+                // 場面 6 として起こすと、夕日の方へ回る
+                d.Begin();
+                Assert.AreEqual(305f, chair.transform.eulerAngles.y, 1e-3f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+                Object.DestroyImmediate(chair);
+            }
+        }
+
+        [Test]
+        public void TheTwinsEyeCanLookFurtherDownThanTheHeroines()
+        {
+            var go = new GameObject("Player");
+            try
+            {
+                var player = go.AddComponent<PlayerController>();
+                // ふだんは主人公の決まり（胸を画面に入れない）の 40 度
+                Assert.AreEqual(PlayerController.PitchDownLimit, player.PitchDown, 1e-4f);
+                player.Pitch = 70f;
+                Assert.AreEqual(PlayerController.PitchDownLimit, player.Pitch, 1e-4f);
+                // 場面 6 の主は片割れなので、演出が広げる。広げた所までは向け、その先は止まる
+                player.PitchDown = 60f;
+                player.Pitch = 55f;
+                Assert.AreEqual(55f, player.Pitch, 1e-4f);
+                player.Pitch = 70f;
+                Assert.AreEqual(60f, player.Pitch, 1e-4f);
+                // 狭め直すと今の向きも収め直す
+                player.PitchDown = PlayerController.PitchDownLimit;
+                Assert.AreEqual(PlayerController.PitchDownLimit, player.Pitch, 1e-4f);
+                // 場面をまたぐ決まりの式は 40 度のまま
+                Assert.AreEqual(PlayerController.PitchDownLimit, PlayerController.ClampPitch(70f), 1e-4f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
         public void TheGardenComesRightAfterTheRest()
         {
             var rest = System.Array.IndexOf(SceneMenu.Scenes, "Rest");
