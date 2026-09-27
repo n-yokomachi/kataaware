@@ -18,6 +18,9 @@ namespace HalfAware
     /// 村（Village）への切り替えは SceneFlow の nextScene が受け持ち、暗転を挟まない（SceneExit.FadesOut）。
     /// 段取りそのものは ArrivalClock が持つ
     ///
+    /// **曲**（音楽の設計書 5 節）は、メモリーチップを調べて独白の一行目が出たフレームからフェードインし（<see cref="MusicCue.Drive"/>）、
+    /// 最後の暗転に入ったら消し始めて、ドアを閉める音が鳴るのと同じ瞬間に 0 で止める（<see cref="MusicBed"/>）。
+    ///
     /// 時間帯（空・霧・日射し）も帯ごとに持っていて、Dress が黒のあいだに差し替える。
     /// RenderSettings はシーンにひとつしか無いので、組み立てで一度置くだけでは
     /// 全部の帯が同じ時間帯になり、朝の小麦畑まで夜のまま出る。
@@ -188,6 +191,11 @@ namespace HalfAware
         bool hushed;
         /// <summary>村へ着く一連を終えた。あとは SceneFlow が村へ切り替えるのを待つだけ</summary>
         bool handedOver;
+        /// <summary>
+        /// チップの独白の一行目。これが字幕に出たフレームで曲（<see cref="MusicCue.Drive"/>）を入れる。
+        /// 積んでから出るまで（チップそのものの文を送るまで）持つ。無ければ null
+        /// </summary>
+        string musicCue;
 
         /// <summary>
         /// i 番目の帯の値。DriveRoute は並びの問い合わせにだけ使い、秒数はここから直に読む。
@@ -227,6 +235,28 @@ namespace HalfAware
             band = -1;
             shown = -1;
             flow.Examined += Examined;
+            // 曲はチップの独白から。Web で展開を待たないよう、先に読み始めておく
+            if (Application.isPlaying) MusicBed.Warm(MusicCue.Drive);
+        }
+
+        /// <summary>
+        /// チップの独白の一行目が字幕に出たフレームで、曲をフェードインする（音楽の設計書 5 節、オーナー「メモリーチップにインタラクトして独白が始まったタイミングでフェードイン」）。
+        /// SceneFlow が行を送るのは Update なので、同じフレームのうちに拾えるよう LateUpdate で見る
+        /// </summary>
+        void LateUpdate()
+        {
+            if (musicCue == null) return;
+            if (flow.CurrentLine != musicCue) return;
+            musicCue = null;
+            MusicBed.Play(MusicCue.Drive);
+        }
+
+        /// <summary>
+        /// 帯 band を走っている時に曲が流れているはずか。チップの帯（chipsBand）の独白で入れて、村へ着くまで流すので、それより後の帯なら流れている
+        /// </summary>
+        public static bool Scored(int band, int chipsBand)
+        {
+            return chipsBand >= 0 && band > chipsBand;
         }
 
         void OnDestroy()
@@ -373,8 +403,18 @@ namespace HalfAware
                 hold = villageHold,
             };
             arrival.Tick(dt, times);
-            if (arrival.TakeStop() && sound != null) sound.Park();
-            if (arrival.TakeDoor() && sound != null) sound.DoorShut();
+            // 曲は黒へ入ったところから消し始め、ドアを閉める音と同じ瞬間に消しきる（止まる音 + 間 の秒）。
+            // ドアの所ではその場で止めて、0 のまま音源も止める
+            if (arrival.TakeStop())
+            {
+                if (sound != null) sound.Park();
+                MusicBed.FadeOut(MusicFade(times));
+            }
+            if (arrival.TakeDoor())
+            {
+                if (sound != null) sound.DoorShut();
+                MusicBed.Stop();
+            }
             if (sound != null) sound.Settle(arrival.Level(times));
             if (arrival.Beat == ArrivalBeat.Arrived)
             {
@@ -388,6 +428,14 @@ namespace HalfAware
             // FreezeStep ずつ延ばすと、着いてから最大でその分 SceneFlow が閉じられず、
             // ドアから村までが villageHold より延びる
             flow.Freeze(Mathf.Min(FreezeStep, arrival.Left(times)));
+        }
+
+        /// <summary>
+        /// 黒へ入ってから曲を消しきるまでの秒。ドアを閉める音が鳴るのと同じ所（止まる音の長さ + 間）。負の秒は 0 と読む（<see cref="ArrivalClock"/> と同じ）
+        /// </summary>
+        public static float MusicFade(ArrivalTimes times)
+        {
+            return Mathf.Max(0f, times.stop) + Mathf.Max(0f, times.gap);
         }
 
         /// <summary>
@@ -445,6 +493,8 @@ namespace HalfAware
             var page = script.Find(DriveIds.Page(band));
             if (page.id == null) { Debug.LogWarning("DriveDirector: 段が文面に無い: " + DriveIds.Page(band), this); return; }
             flow.Say(page.Lines);
+            // チップの帯の独白なら、一行目が字幕に出たところで曲を入れる（LateUpdate）
+            if (band == route.BandOf(DriveIds.Chips) && page.Lines.Count > 0) musicCue = page.Lines[0];
         }
 
         /// <summary>乗り込む。一連の演出は Boarding が持つ</summary>
@@ -991,6 +1041,8 @@ namespace HalfAware
             clock.Reset();
             boarding = false;
             aboard = true;
+            // 曲も帯の状態。チップの独白より後の帯なら流しておく（黒から明けるのと一緒にフェードイン）
+            if (Application.isPlaying && Scored(which, route.BandOf(DriveIds.Chips))) MusicBed.Play(MusicCue.Drive);
             // 走行音と雨は帯の状態なので鳴らしておく（乗り込みの一連の音とは違う）。エディタで当てて撮る時は鳴らさない
             if (sound == null || !Application.isPlaying) return;
             sound.Idle(false);

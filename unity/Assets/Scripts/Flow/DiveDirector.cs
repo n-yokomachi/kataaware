@@ -397,7 +397,33 @@ namespace HalfAware
             player.SpeedScale = entry.speed;
             Stand();
             player.CanMove = true;
+            Tune();
             if (lead) Lead();
+        }
+
+        /// <summary>
+        /// 記憶の曲（音楽の設計書 5 節）。`切断` が押せるようになるまでは前半の曲（<see cref="MusicCue.Dive"/>）、
+        /// 押せるようになった記憶から Parkside（<see cref="MusicCue.DiveLate"/>）へクロスフェードする。
+        /// **人を渡っても頭へ戻さない。** 同じ曲なら <see cref="MusicBed"/> は何もしない。
+        /// 次の一人で `切断` が押せるようになる所まで来たら、Parkside を先に読んでおく（Web で渡る時に展開を待たない）
+        /// </summary>
+        void Tune()
+        {
+            if (chain == null || !Application.isPlaying) return;
+            MusicBed.Play(Music(chain.CanCut));
+            if (Readies(chain.CanCut, chain.Hops, cutAfter)) MusicBed.Warm(MusicCue.DiveLate);
+        }
+
+        /// <summary>`切断` が押せるかで決まる、記憶の曲</summary>
+        public static MusicCue Music(bool canCut)
+        {
+            return canCut ? MusicCue.DiveLate : MusicCue.Dive;
+        }
+
+        /// <summary>後半の曲を先に読んでおくか。まだ押せず、次に新しい人へ渡れば押せるようになる所</summary>
+        public static bool Readies(bool canCut, int hops, int cutAfter)
+        {
+            return !canCut && hops + 1 >= cutAfter;
         }
 
         /// <summary>
@@ -1204,6 +1230,8 @@ namespace HalfAware
             cutting = true;
             DiveHandoff.Hops = chain.Hops;
             DiveHandoff.FromDive = true;
+            // 曲は裂け目で断つ。借りた頭から抜けた瞬間に、記憶の曲も途切れる（ごく短く消して、波形の段で弾けないようにする）
+            MusicBed.FadeOut(MusicBed.Snap);
             StartCoroutine(Cutting());
         }
 

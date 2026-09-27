@@ -15,6 +15,9 @@ namespace HalfAware
     /// ここが受け持つのは、頭の間と独白、モニターを開くこと、コートハンガーのジャケットを取って着ること。
     /// ドアは場面 1 と同じく SceneFlow の二択・出がけの音・暗転で、ガレージ（場面 8）へ切り替わる
     ///
+    /// **曲**（音楽の設計書 5 節、<see cref="MusicCue.Notice"/>）は、頭の間は無音のまま置き、気づく独白が出る所からフェードインする。
+    /// ドアの二択で「はい」を選んだ所から消し始め、出がけの音と黒のまま待つ間（<see cref="SceneFlow.ExitSeconds"/>）で消しきる。場面 8 へは持ち越さない
+    ///
     /// **思い出した時**（<see cref="ISceneMemory"/>）は、頭の間も独白も出さず、モニターを開いた形から始める。
     /// 独白を読み終えるまでは自由に動ける所が無いので、手動のセーブが場面の中の状態を持つのは、いつも気づいた後。
     /// ジャックを抜いたか（<see cref="JackPull"/> と SceneFlow の立ち上がり）とジャケットを着たか（ここ）は、調べ済みの印から戻す
@@ -38,6 +41,8 @@ namespace HalfAware
         [Header("ジャケットを取って着る")]
         [Tooltip("この id を調べたら、コートハンガーのジャケットを取って着る")]
         [SerializeField] string coatId = NoticeIds.Coat;
+        [Tooltip("この id を調べたら（二択で「はい」を選んだら）、曲を消し始める")]
+        [SerializeField] string doorId = NoticeIds.Door;
         [Tooltip("体に付けたジャケット。頭では脱いでいて、着る音の終わりの少し前に着せる")]
         [SerializeField] Garment garment;
         [Tooltip("コートハンガーに掛けたジャケット（場面 3 で掛けた物）。着せたところで消す")]
@@ -120,12 +125,16 @@ namespace HalfAware
             Noticed = true;
             if (noticeLines != null && noticeLines.Length > 0) flow.Say(noticeLines);
             if (logItem != null) logItem.SetActive(true);
+            // 気づく独白が出る所から、曲をフェードインする。頭の部屋の音だけの間は無音のまま
+            MusicBed.Play(MusicCue.Notice);
         }
 
         void OnExamined(IInteractable item)
         {
             if (item == null) return;
             if (item.Id == coatId && !dressing) StartCoroutine(PutOn());
+            // ドアの二択で「はい」を選んだ（Examined は「はい」の後に来る）。出がけの音と黒のまま待つ間で曲を消しきり、場面 8 へ持ち越さない
+            if (item.Id == doorId) MusicBed.FadeOut(flow.ExitSeconds);
         }
 
         /// <summary>
@@ -190,6 +199,8 @@ namespace HalfAware
             resumed = true;
             Noticed = true;
             if (logItem != null) logItem.SetActive(true);
+            // 気づいた後なので、曲も流れている形にする（黒から明けるのと一緒にフェードイン）
+            if (Application.isPlaying) MusicBed.Play(MusicCue.Notice);
             if (flow != null && flow.Progress != null && flow.Progress.Done.Contains(coatId)) Dress();
         }
     }

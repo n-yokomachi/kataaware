@@ -20,6 +20,9 @@ namespace HalfAware
     /// 6. **途切れる**。顔が見分けられるかという所（目から <see cref="cutDistance"/>）で、直に切れる。
     ///    途切れた次のフレームに、行き先（<see cref="nextScene"/>、場面 7 の <c>Notice</c>）を読む。空なら、黒と「（仮）続く」で止める
     ///
+    /// **曲**（音楽の設計書 5 節）は、記憶の頭で庭の曲（<see cref="MusicCue.Garden"/>）を流し、途切れる瞬間に途切れの音と一緒に直に止める（<see cref="MusicBed"/>）。
+    /// 村の入口の曲（<see cref="MusicCue.Village"/>）は、場面 6 として開いた時は鳴らさない（<see cref="MusicTable.Arrival"/>）
+    ///
     /// **村は場面 9 と同じシーン。** どちらで入ったかは <see cref="GardenHandoff"/> で受け取る。立っていなければ何もせず、
     /// 場面 6 の物（女性・主の体・ホース、<see cref="memory"/> の下）は伏せたまま、場面 9 のまま始まる。
     /// 立っていれば、時刻を夕方にし、場面 6 の物を起こし、場面 9 の物（格子戸、<see cref="morningOnly"/>）を切り、主の椅子（<see cref="turnedChair"/>）を夕日の方へ回す。
@@ -231,6 +234,8 @@ namespace HalfAware
         {
             beat = Beat.Calling;
             GardenHandoff.Active = true;
+            // 庭の曲は Start で流す。Web で展開を待たないよう、先に読み始めておく
+            if (Application.isPlaying) MusicBed.Warm(MusicCue.Garden);
             if (hour != null) hour.Set(VillageHour.Hour.Evening);
             if (memory != null) memory.SetActive(true);
             for (var i = 0; i < morningOnly.Length; i++)
@@ -265,6 +270,8 @@ namespace HalfAware
             // コンソールの頭の行は「潜行中」と、この記憶の日時と場所。sceneLoaded で戻されるので Start で渡す
             ImplantConsole.SetPlace(ConsolePlace.Garden);
             Open();
+            // 記憶の頭で庭の曲を流す（音楽の設計書 5 節）。曲の入りそのものから、黒から明けるのと一緒に
+            MusicBed.Play(MusicCue.Garden);
             if (hud == null) yield break;
             // 場面 5 のモニターから潜る。ほかの記憶の頭と同じく、黒から明ける
             hud.SetFade(1f);
@@ -682,6 +689,8 @@ namespace HalfAware
             if (spray != null) spray.Clear(true);
             if (water != null) water.Stop();
             CutSound();
+            // 庭の曲も、途切れの音と一緒に直に止める。フェードしない
+            MusicBed.Stop();
             if (player != null)
             {
                 player.CanLook = false;

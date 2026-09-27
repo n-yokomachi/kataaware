@@ -153,6 +153,18 @@ namespace HalfAware
         public string CurrentLine => subtitles.Current;
 
         /// <summary>
+        /// 場面を閉じ始めてから次の場面を読むまでの秒。出がけの音（鳴らす時）と、黒のまま待つ間（先に黒く落とす時）。
+        /// 閉じる所で曲を消し始め、次の場面へ持ち越さないように、演出がこの秒で消す（場面 7 のドア）
+        /// </summary>
+        public float ExitSeconds => ExitSpan(exitSound != null, exitSoundSeconds, cutToBlack, blackHoldSeconds);
+
+        /// <summary><see cref="ExitSeconds"/> の中身。負の秒は 0 と読む</summary>
+        public static float ExitSpan(bool sounds, float soundSeconds, bool toBlack, float blackSeconds)
+        {
+            return (sounds ? Mathf.Max(0f, soundSeconds) : 0f) + (toBlack ? Mathf.Max(0f, blackSeconds) : 0f);
+        }
+
+        /// <summary>
         /// 必須を済ませたあとも続きの演出がある場面で、そのあいだ場面を閉じるのを止める。
         /// Freeze と違って調べる操作は止めないので、字幕は送れる。
         /// 必須がひとつしかなく、それを済ませてから長い芝居が続く場面（路地裏の売り買い）で使う
