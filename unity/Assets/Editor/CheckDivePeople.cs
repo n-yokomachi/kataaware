@@ -354,6 +354,15 @@ namespace HalfAware.EditorTools
         /// </summary>
         public static string Walkthrough(int which, string shotDir)
         {
+            return Walkthrough(which, shotDir, false);
+        }
+
+        /// <summary>
+        /// <paramref name="animate"/> なら、人の動き（<see cref="PersonMotion"/>）も再生中と同じにこまごとに回す。
+        /// 骨は動きのグラフが置き、模型はこまの頭の置き場に据わる。エディタのままの立ちの形とは顔と胸の置き場が変わる
+        /// </summary>
+        public static string Walkthrough(int which, string shotDir, bool animate, string sweep = null)
+        {
             var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
             var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
             var d = UnityEngine.Object.FindFirstObjectByType<HalfAware.DiveDirector>();
@@ -375,7 +384,7 @@ namespace HalfAware.EditorTools
             foreach (var n in muted) saved[n] = F(n).GetValue(d);
             var pT = player.transform; var pPos = pT.position; var pRot = pT.rotation;
             var hull = pT.GetComponent<UnityEngine.CharacterController>();
-            var eye = player.Eye; var eLP = eye.localPosition; var eLR = eye.localRotation;
+            var eye = player.Eye; var eLP = eye.localPosition; var eLR = eye.localRotation; var eyeH = player.EyeHeight; var pitch0 = player.Pitch;
             var capText = caption.text;
             var panT = panel.transform; var panPos = panT.position; var panRot = panT.rotation; var panScale = panT.localScale; var panActive = panel.gameObject.activeSelf;
             var takeActive = new bool[takes.Length]; for (var i = 0; i < takes.Length; i++) takeActive[i] = takes[i].gameObject.activeSelf;
@@ -390,7 +399,16 @@ namespace HalfAware.EditorTools
             sb.AppendLine("dirty before=" + scene.isDirty);
             var step = T.GetMethod("Step", flags);
             var blocking = T.GetMethod("Blocking", flags);
-            System.Action<float, bool> S = (dt, press) => { step.Invoke(d, new object[] { dt, press }); UnityEngine.Physics.SyncTransforms(); };
+            // 動きを回す人。記憶を起こしてから拾う
+            var motions = new HalfAware.PersonMotion[0];
+            var bodyPos = new System.Collections.Generic.Dictionary<UnityEngine.Transform, UnityEngine.Vector3>();
+            var bodyRot = new System.Collections.Generic.Dictionary<UnityEngine.Transform, UnityEngine.Quaternion>();
+            System.Action<float, bool> S = (dt, press) => {
+                step.Invoke(d, new object[] { dt, press });
+                UnityEngine.Physics.SyncTransforms();
+                if (!animate) return;
+                foreach (var m in motions) { m.Step(dt); m.Late(); }
+                UnityEngine.Physics.SyncTransforms(); };
             // 顔と胸は DiveDirector と同じ所（骨から取る。DiveDirector.Aims）
             System.Func<UnityEngine.Transform, UnityEngine.Vector3> headOf = w => { UnityEngine.Vector3 f, c, h; HalfAware.DiveDirector.Aims(w, out f, out c, out h); return f; };
             System.Func<UnityEngine.Transform, UnityEngine.Vector3> chestOf = w => { UnityEngine.Vector3 f, c, h; HalfAware.DiveDirector.Aims(w, out f, out c, out h); return c; };
@@ -421,7 +439,14 @@ namespace HalfAware.EditorTools
                 T.GetMethod("Awake", flags).Invoke(d, null);
                 F("chain").SetValue(d, new HalfAware.DiveChain(roster.Count, HalfAware.DiveIds.Listed, 8, new System.Random(1)));
                 T.GetMethod("Shut", flags).Invoke(d, null);
-                T.GetMethod("Play", flags).Invoke(d, new object[] { which });
+                T.GetMethod("Play", flags).Invoke(d, new object[] { which, true });
+                if (animate)
+                {
+                    motions = takes[which].GetComponentsInChildren<HalfAware.PersonMotion>(true);
+                    // 模型の根は動きがこまごとに世界の置き場へ据えるので、ローカルの置き場を覚えて戻す
+                    foreach (var m in motions) if (m.Body != null) { bodyPos[m.Body] = m.Body.localPosition; bodyRot[m.Body] = m.Body.localRotation; }
+                    foreach (var m in motions) { m.Restart(); m.Late(); }
+                }
                 var entry = roster[which];
                 var psky = ((HalfAware.PlaceSky[])saved["skies"])[System.Array.IndexOf(HalfAware.DiveIds.Places, entry.place)];
                 psky.Apply(null);
@@ -474,8 +499,29 @@ namespace HalfAware.EditorTools
                 };
                 System.Func<UnityEngine.Transform, bool> stand = w => standIf(w, _ => true);
                 var talks = HalfAware.DiveEntry.Exchanges(entry.said);
-                // 頭を流す記憶（DiveEntry.leads）は、名を呼ぶ声から最初の会話までを E で送り切る。相手は選ばない
+                // 記憶の頭は流す。名を呼ぶ声の主へ目を回すのを、再生中と同じに一フレームずつ回して（PlayerController.Steer）、
+                // 向き終えた所で顔が画面の真ん中に来ているか測って撮る。そのあと E で送る。
+                // 最初の会話が声の主とのもので今始められれば、そのまま送り切る。相手は選ばない
                 if (d.Leading) {
+                    var PT = typeof(HalfAware.PlayerController);
+                    var steer = PT.GetMethod("Steer", flags);
+                    var aimEye = PT.GetMethod("Aim", flags);
+                    player.EyeHeight = entry.eyeHeight;
+                    var turned = 0f;
+                    for (var i = 0; i < 90; i++) {
+                        S(1f / 60f, false);
+                        steer.Invoke(player, new object[] { 1f / 60f });
+                        aimEye.Invoke(player, null);
+                        UnityEngine.Physics.SyncTransforms();
+                        turned += 1f / 60f;
+                    }
+                    var who = d.Attending;
+                    if (who != null) {
+                        var off = UnityEngine.Vector3.Angle(eye.forward, headOf(who) - eye.position);
+                        sb.AppendLine("[頭で " + who.name + " へ向いた（" + turned.ToString("F1") + " 秒）] 顔まで " + UnityEngine.Vector3.Distance(eye.position, headOf(who)).ToString("F1") + " m、目の真ん中から " + off.ToString("F1") + " 度、" + sight(who) + "、見回し封じ=" + player.LookHeld + " 歩き封じ=" + player.MoveHeld);
+                        HalfAware.EditorTools.CheckDiveSky.Pair(eye.position, eye.eulerAngles.y, pitchOf(), clear, psky.flat, System.IO.Path.Combine(shotDir, "m" + which + "_call_" + who.name));
+                    }
+                    else sb.AppendLine("[頭] 目を向ける相手がいない " + state());
                     var lead = 0;
                     while ((d.Leading || d.Talking) && lead++ < 20) S(0.02f, true);
                     sb.AppendLine("[頭を流した（" + lead + " 回）] " + state());
@@ -494,7 +540,7 @@ namespace HalfAware.EditorTools
                     fromStart = k == 0;
                     if (!standIf(w, canTalk)) { sb.AppendLine("会話 " + k + " の相手が選べない"); break; }
                     fromStart = false;
-                    for (var i = 0; i < 7; i++) S(0.1f, false);
+                    for (var i = 0; i < 7; i++) { aim(w); S(0.1f, false); }
                     sb.AppendLine("[会話 " + k + " " + w.name + " を留める] " + state());
                     HalfAware.EditorTools.CheckDiveSky.Pair(eye.position, eye.eulerAngles.y, pitchOf(), clear, psky.flat, System.IO.Path.Combine(shotDir, "m" + which + "_talk" + k + "_" + w.name));
                     S(0.02f, true); sb.AppendLine("   E: " + state());
@@ -513,15 +559,69 @@ namespace HalfAware.EditorTools
                     for (var i = 0; i < 70 || d.Clock < still + 0.5f; i++) S(0.1f, false);
                     // 台詞の合図で歩き出した人も、歩き終えるまで待つ
                     for (var i = 0; i < 200 && isWalking(w); i++) S(0.1f, false);
+                    // 最後の会話を終えた所から、動かずに振り向いただけで板が出るか
+                    aim(w);
+                    for (var i = 0; i < 8; i++) { aim(w); S(0.1f, false); }
+                    sb.AppendLine("   その場（" + place.InverseTransformPoint(pT.position).ToString("F2") + "）から " + s.name + " へ振り向く: 板=" + (d.Shown == w ? "出" : "なし") + " " + sight(w));
                     if (!stand(w)) continue;
-                    for (var i = 0; i < 8; i++) S(0.1f, false);
+                    for (var i = 0; i < 8; i++) { aim(w); S(0.1f, false); }
                     sb.AppendLine("[板 " + s.name + "] " + state());
                     HalfAware.EditorTools.CheckDiveSky.Pair(eye.position, eye.eulerAngles.y, pitchOf(), clear, psky.flat, System.IO.Path.Combine(shotDir, "m" + which + "_panel_" + s.name));
+                }
+                // 囲いの中を 0.5 m 刻みで歩き、どこからでも sweep の人に板が出るかを見る。
+                // 先に別の板の人（いちばん近い人）へ目を留めて板を出させてから振り向く（出ている板は中央から外れても消えない）
+                if (!string.IsNullOrEmpty(sweep)) {
+                    var w = take.Find(sweep);
+                    var pen = take.Find("Pen");
+                    var walls = pen != null ? pen.GetComponentsInChildren<UnityEngine.Collider>(true) : new UnityEngine.Collider[0];
+                    var box = new UnityEngine.Bounds(place.TransformPoint(tk.Keys[0].position), UnityEngine.Vector3.zero);
+                    foreach (var c in walls) box.Encapsulate(c.bounds);
+                    var inside = place.TransformPoint(tk.Keys[0].position) + UnityEngine.Vector3.up * 0.5f;
+                    int tried = 0, ok = 0;
+                    var fails = new System.Text.StringBuilder();
+                    for (var x = box.min.x; x <= box.max.x; x += 0.5f)
+                        for (var z = box.min.z; z <= box.max.z; z += 0.5f) {
+                            UnityEngine.RaycastHit hit;
+                            var top = new UnityEngine.Vector3(x, box.max.y, z);
+                            if (!UnityEngine.Physics.Raycast(top, UnityEngine.Vector3.down, out hit, box.size.y + 2f, UnityEngine.Physics.DefaultRaycastLayers, UnityEngine.QueryTriggerInteraction.Ignore)) continue;
+                            if (hit.collider.GetComponent<UnityEngine.Renderer>() == null) continue;
+                            // 囲いの壁を跨がずに始めの立ち位置から届くか（囲いは凸なので、跨がなければ内）
+                            if (UnityEngine.Physics.Linecast(inside, hit.point + UnityEngine.Vector3.up * 0.5f, 1 << 2, UnityEngine.QueryTriggerInteraction.Collide)) continue;
+                            // 人の中には立てない
+                            var tooNear = false;
+                            foreach (var p in tk.People) if (p != null && new UnityEngine.Vector2(p.position.x - x, p.position.z - z).magnitude < 0.5f) tooNear = true;
+                            if (tooNear) continue;
+                            standWorld(hit.point);
+                            // いちばん近い別の板の人へ先に目を留める
+                            UnityEngine.Transform other = null;
+                            foreach (var s in entry.seen) { var o = take.Find(s.name); if (o == null || o == w) continue; if (other == null || (o.position - hit.point).sqrMagnitude < (other.position - hit.point).sqrMagnitude) other = o; }
+                            if (other != null) for (var i = 0; i < 8; i++) { aim(other); S(0.1f, false); }
+                            var held = d.Shown != null ? d.Shown.name : "-";
+                            for (var i = 0; i < 8; i++) { aim(w); S(0.1f, false); }
+                            tried++;
+                            if (d.Shown == w) { ok++; continue; }
+                            var apart = (float)T.GetMethod("Apart", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static).Invoke(null, new object[] { eye, w });
+                            fails.AppendLine("   出ない " + place.InverseTransformPoint(hit.point).ToString("F1") + " 先に " + held + " → 板=" + (d.Shown != null ? d.Shown.name : "-") + " 角 " + apart.ToString("F1") + " " + sight(w));
+                        }
+                    sb.AppendLine("[囲いの中から " + sweep + "] " + ok + "/" + tried + " で板が出た");
+                    sb.Append(fails.ToString());
+                    // 板を出して E で潜る。飛び先の記憶が開くか
+                    if (stand(w)) {
+                        for (var i = 0; i < 8; i++) { aim(w); S(0.1f, false); }
+                        var before = d.Current;
+                        S(0.02f, true);
+                        S(0.1f, false);
+                        sb.AppendLine("[" + sweep + " の板で E] 記憶 " + before + " → " + d.Current + " " + caption.text + " " + state());
+                    }
                 }
             }
             catch (System.Exception ex) { sb.AppendLine("例外: " + ex); }
             finally
             {
+                // 動きのグラフを捨て、エディタの立ちの形へ戻す
+                foreach (var kv in bodyPos) kv.Key.localPosition = kv.Value;
+                foreach (var kv in bodyRot) kv.Key.localRotation = kv.Value;
+                foreach (var m in motions) if (m != null) { m.Close(); m.Still(); }
                 foreach (var n in muted) F(n).SetValue(d, saved[n]);
                 hud.SetSubtitle("x"); hud.SetSubtitle(null);
                 hud.SetPrompt(promptActive ? promptText0 : null);
@@ -536,13 +636,13 @@ namespace HalfAware.EditorTools
                 for (var i = 0; i < takes.Length; i++) takes[i].gameObject.SetActive(takeActive[i]);
                 for (var i = 0; i < places.Length; i++) places[i].gameObject.SetActive(placeActive[i]);
                 hull.enabled = false; pT.position = pPos; pT.rotation = pRot; hull.enabled = true;
-                eye.localPosition = eLP; eye.localRotation = eLR;
+                eye.localPosition = eLP; eye.localRotation = eLR; player.EyeHeight = eyeH; player.Pitch = pitch0;
                 caption.text = capText;
                 subText.text = subText0; band.SetActive(bandActive);
                 player.CanMove = true; player.SpeedScale = 1f;
                 // 話す相手へ向けた目と、封じた見回しを解く（再生していないので目は動いていないが、封じた者は PlayerController に残る）
-                player.StopFacing(); player.FreeLook(d);
-                F("leading").SetValue(d, false); F("attending").SetValue(d, null);
+                player.StopFacing(); player.FreeLook(d); player.FreeMove(d);
+                F("leading").SetValue(d, false); F("attending").SetValue(d, null); F("caller").SetValue(d, null);
                 F("chain").SetValue(d, null); F("take").SetValue(d, null); F("place").SetValue(d, null);
                 sky.Write();
                 UnityEngine.Physics.SyncTransforms();
