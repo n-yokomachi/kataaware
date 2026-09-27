@@ -20,6 +20,8 @@ namespace HalfAware
         [SerializeField] AudioClip blow;
 
         float elapsed = -1f;
+        /// <summary>火が点く音の長さ。Web では鳴らした直後に長さが 0 になるので、鳴らす前に読んで持っておく（SoundLoad.Seconds）</summary>
+        float flameSeconds;
         int drags;
         int nextDrag;
         int nextBlow;
@@ -35,6 +37,14 @@ namespace HalfAware
 
         /// <summary>これまでに吐いた回数。動作確認から読む</summary>
         public int Blows { get { return nextBlow; } }
+
+        void Awake()
+        {
+            // Web: どの音も先読みしない設定。火の音の長さを読み込みの前に読んで持ち、それから展開を始めておく。
+            // 火を点けてから最初の音（蓋の金属音）まで 0.3 秒しかなく、鳴らす時に読み込むと鳴り出しが遅れる（SoundLoad）
+            SoundLoad.Seconds(lighterFlame, ref flameSeconds);
+            SoundLoad.Warm(lighterClick, lighterFlame, drag, blow);
+        }
 
         /// <summary>火を点ける。drags 服ぶん吸う</summary>
         public void Light(int drags)
@@ -70,7 +80,7 @@ namespace HalfAware
                 Play(lighterFlame);
             }
             // 煙は火の音が鳴り終わってから立ちはじめる
-            if (!smoked && elapsed >= SmokeBeats.SmokeAt(lighterFlame != null ? lighterFlame.length : 0f))
+            if (!smoked && elapsed >= SmokeBeats.SmokeAt(SoundLoad.Seconds(lighterFlame, ref flameSeconds)))
             {
                 smoked = true;
                 if (puffs != null) puffs.Begin(SmokeBeats.Total(drags));

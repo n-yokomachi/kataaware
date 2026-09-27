@@ -184,6 +184,9 @@ namespace HalfAware
         {
             var player = flow.Player;
             dressing = true;
+            // Web では、鳴らす時に読み込み始めると鳴り出しが展開の後へ延び、着る音と体へ着せる時がずれる。
+            // 展開を待ってから鳴らす。待つ間も止めておく。エディタとスタンドアロンでは待たない（SoundLoad）
+            if (!SoundLoad.Ready(jacketOn)) yield return SoundLoad.Wait(jacketOn, () => flow.Freeze(FreezeMargin));
             var beats = new JacketBeats(jacketOn != null ? jacketOn.length : 0f, swapBeforeEnd);
             // 鳴り終わるまで止めておく。途中で他を調べさせない
             flow.Freeze(beats.Sound + FreezeMargin);

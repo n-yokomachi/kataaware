@@ -107,14 +107,21 @@ namespace HalfAware
         /// <summary>走行音・雨・麦の風に掛ける大きさ。場面 8 の終わりにだけ 1 から下がる</summary>
         float settle = 1f;
 
+        // 単発の長さ。Web では鳴らした直後（読み込みから展開が済むまで）に長さが 0 になるので、
+        // 鳴らす前に読んだ値を持っておく（SoundLoad.Seconds）。エディタとスタンドアロンでは使わない
+        float ignitionSeconds;
+        float parkSeconds;
+        float windowSeconds;
+        float exhaleSeconds;
+
         /// <summary>イグニッションの長さ。秒。鳴らし終えてから震え出すのに使う</summary>
-        public float IgnitionSeconds { get { return ignition != null ? ignition.length : 0f; } }
+        public float IgnitionSeconds { get { return SoundLoad.Seconds(ignition, ref ignitionSeconds); } }
 
         /// <summary>車を止める音の長さ。秒。鳴り終わってからドアを閉める</summary>
-        public float ParkSeconds { get { return park != null ? park.length : 0f; } }
+        public float ParkSeconds { get { return SoundLoad.Seconds(park, ref parkSeconds); } }
 
         /// <summary>窓を下ろす音の長さ。秒。下ろし終えてから独白を出すのに使う</summary>
-        public float WindowSeconds { get { return windowDown != null ? windowDown.length : 0f; } }
+        public float WindowSeconds { get { return SoundLoad.Seconds(windowDown, ref windowSeconds); } }
 
         /// <summary>
         /// 窓を開けた／閉めた。**音量では上げない。**
@@ -187,6 +194,13 @@ namespace HalfAware
             want = shutCut;
             cut = shutCut;
             Apply(shutCut);
+            // Web: 単発はどれも先読みしない設定。長さを読み込みの前に読んで持ち、それから展開を始めておく。
+            // 鳴らす時に読み込みが始まると、鳴り出しが展開の後へ延び、その間は長さも 0 になる（SoundLoad）
+            SoundLoad.Seconds(ignition, ref ignitionSeconds);
+            SoundLoad.Seconds(park, ref parkSeconds);
+            SoundLoad.Seconds(windowDown, ref windowSeconds);
+            SoundLoad.Seconds(exhale, ref exhaleSeconds);
+            SoundLoad.Warm(doorOpen, doorShut, ignition, windowDown, park, exhale);
         }
 
         void Update()
@@ -267,7 +281,7 @@ namespace HalfAware
         }
 
         /// <summary>吐く息の長さ。秒</summary>
-        public float ExhaleSeconds { get { return exhale != null ? exhale.length : 0f; } }
+        public float ExhaleSeconds { get { return SoundLoad.Seconds(exhale, ref exhaleSeconds); } }
 
         /// <summary>
         /// エンジンだけ掛かっている音。イグニッションのあと、走り出すまでの間を埋める。

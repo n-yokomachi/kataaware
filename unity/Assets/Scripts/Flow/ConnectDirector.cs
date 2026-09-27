@@ -125,8 +125,22 @@ namespace HalfAware
             var clip = doorShut.clip;
             // DoorShut.wav は先読みしない設定（場面 1 では出がけにしか鳴らない）。途中から鳴らすので、鳴らす前に読み終えておく
             if (clip != null && clip.loadState != AudioDataLoadState.Loaded) clip.LoadAudioData();
+            // Web では展開が非同期で、済む前に鳴らすと鳴り出しが展開の後へ延び、途中から鳴らす位置（time）も効かずに頭から鳴る。
+            // 展開を待ってから鳴らす。エディタとスタンドアロンでは読み込みがその場で済むので、このフレームで鳴らす（SoundLoad）
+            if (SoundLoad.Ready(clip)) ShutDoor(clip);
+            else StartCoroutine(ShutDoorWhenLoaded(clip));
+        }
+
+        void ShutDoor(AudioClip clip)
+        {
             doorShut.Play();
             if (clip != null && doorShutFrom > 0f) doorShut.time = Mathf.Min(doorShutFrom, Mathf.Max(0f, clip.length - 0.05f));
+        }
+
+        IEnumerator ShutDoorWhenLoaded(AudioClip clip)
+        {
+            yield return SoundLoad.Wait(clip);
+            ShutDoor(clip);
         }
 
         void OnDisable()
@@ -220,6 +234,9 @@ namespace HalfAware
             if (player != null) player.CanMove = false;
             try
             {
+                // Web では、鳴らす時に読み込み始めると鳴り出しが展開の後へ延び、脱ぐ音と手元の替わりがずれる。
+                // 展開を待ってから鳴らす。待つ間も止めておく。エディタとスタンドアロンでは待たない（SoundLoad）
+                if (!SoundLoad.Ready(jacketOff)) yield return SoundLoad.Wait(jacketOff, () => flow.Freeze(FreezeMargin));
                 var beats = new JacketBeats(jacketOff != null ? jacketOff.length : 0f, swapBeforeEnd);
                 if (voice != null && jacketOff != null) voice.PlayOneShot(jacketOff);
                 var off = false;

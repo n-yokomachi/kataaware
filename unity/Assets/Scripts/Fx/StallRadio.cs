@@ -72,7 +72,8 @@ namespace HalfAware
             sound.playOnAwake = false;
             sound.loop = false;
             lengths = new float[tracks.Length];
-            // 長さは中身を読まなくても分かる
+            // 長さは中身を読まなくても分かる。Web でも読む前なら正しい（読み始めてから展開が済むまでの間だけ 0 になる。SoundLoad）。
+            // 以後の長さはみなここで集めた値を使い、曲の length は読み直さない
             for (var i = 0; i < tracks.Length; i++) lengths[i] = tracks[i] != null ? tracks[i].length : 0f;
             int index;
             float time;
@@ -121,7 +122,7 @@ namespace HalfAware
                 return;
             }
             sound.clip = clip;
-            startAt = Mathf.Clamp(startAt, 0f, Mathf.Max(0f, clip.length - 0.05f));
+            startAt = Mathf.Clamp(startAt, 0f, Mathf.Max(0f, lengths[current] - 0.05f));
             sound.time = startAt;
             sound.Play();
             playing = true;
@@ -130,16 +131,16 @@ namespace HalfAware
 
         void Keep()
         {
-            var clip = tracks[current];
+            var length = lengths[current];
             if (!AudioListener.pause) heard += Time.unscaledDeltaTime;
             // 次の曲は、今の曲の終わりが近づいてから読む。今の曲と次の曲の二つだけをメモリに持つ
-            if (next >= 0 && next != current && clip.length - (startAt + heard) < lead
+            if (next >= 0 && next != current && length - (startAt + heard) < lead
                 && tracks[next].loadState == AudioDataLoadState.Unloaded)
                 tracks[next].LoadAudioData();
             if (sound.isPlaying || AudioListener.pause) return;
             // 止まったのが曲の終わりのときだけ次へ送る。ブラウザが音を止めている（まだ一度も操作していない）あいだに
             // 次々と送って、読んでは捨てるのを繰り返さないように
-            if (startAt + heard < clip.length - 1f) return;
+            if (startAt + heard < length - 1f) return;
             Advance();
         }
 
