@@ -394,6 +394,9 @@ namespace HalfAware.EditorTools
             foreach (var t in takes) foreach (var m in t.GetComponentsInChildren<HalfAware.Mover>(true)) { moverPos[m.transform] = m.transform.localPosition; moverRot[m.transform] = m.transform.localRotation; }
             var promptActive = prompt.gameObject.activeSelf; var promptText0 = prompt.text;
             var bandActive = band.activeSelf; var subText0 = subText.text;
+            // 角の白い膜は記憶を起こすと出る（DiveDirector.Wear）。出したまま残すと、次にシーンを保存した人の所で点いたまま残る
+            var haze = (HalfAware.ScreenHaze)HT.GetField("hazeLayer", flags).GetValue(hud);
+            var hazeOn = haze != null && haze.gameObject.activeSelf; var hazeAmount = haze != null ? haze.Amount : 0f;
             var sky = HalfAware.EditorTools.CheckDiveSky.Sky.Read();
             var sb = new System.Text.StringBuilder();
             sb.AppendLine("dirty before=" + scene.isDirty);
@@ -619,8 +622,9 @@ namespace HalfAware.EditorTools
                     for (var x = box.min.x; x <= box.max.x; x += 0.5f)
                         for (var z = box.min.z; z <= box.max.z; z += 0.5f) {
                             UnityEngine.RaycastHit hit;
-                            var top = new UnityEngine.Vector3(x, box.max.y, z);
-                            if (!UnityEngine.Physics.Raycast(top, UnityEngine.Vector3.down, out hit, box.size.y + 2f, UnityEngine.Physics.DefaultRaycastLayers, UnityEngine.QueryTriggerInteraction.Ignore)) continue;
+                            // 床は始めの立ち位置の階から探す。囲いの上端から下ろすと、団地では上の階の床や屋根に当たる
+                            var top = new UnityEngine.Vector3(x, inside.y + 1.5f, z);
+                            if (!UnityEngine.Physics.Raycast(top, UnityEngine.Vector3.down, out hit, 4f, UnityEngine.Physics.DefaultRaycastLayers, UnityEngine.QueryTriggerInteraction.Ignore)) continue;
                             if (hit.collider.GetComponent<UnityEngine.Renderer>() == null) continue;
                             // 囲いの壁を跨がずに始めの立ち位置から届くか（囲いは凸なので、跨がなければ内）
                             if (UnityEngine.Physics.Linecast(inside, hit.point + UnityEngine.Vector3.up * 0.5f, 1 << 2, UnityEngine.QueryTriggerInteraction.Collide)) continue;
@@ -676,6 +680,7 @@ namespace HalfAware.EditorTools
                 eye.localPosition = eLP; eye.localRotation = eLR; player.EyeHeight = eyeH; player.Pitch = pitch0;
                 caption.text = capText;
                 subText.text = subText0; band.SetActive(bandActive);
+                if (haze != null) { haze.Amount = hazeAmount; haze.gameObject.SetActive(hazeOn); }
                 player.CanMove = true; player.SpeedScale = 1f;
                 // 話す相手へ向けた目と、封じた見回しを解く（再生していないので目は動いていないが、封じた者は PlayerController に残る）
                 player.StopFacing(); player.FreeLook(d); player.FreeMove(d);
