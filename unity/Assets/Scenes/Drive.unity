@@ -10212,6 +10212,7 @@ MonoBehaviour:
   openingCard: 
   cardSeconds: 2.4
   cardLiftSeconds: 1.8
+  fadeInSeconds: 1.2
   exitSound: {fileID: 0}
   exitSoundSeconds: 1.45
   cutToBlack: 0
@@ -13499,10 +13500,13 @@ MonoBehaviour:
   walker: {fileID: 0}
   source: {fileID: 486680810}
   clips:
-  - {fileID: 8300000, guid: e1dc18205753c7c499e55fc82bd231ea, type: 3}
-  - {fileID: 8300000, guid: a5a5bf5b5dc608a4ebaf399a3139ecf4, type: 3}
-  - {fileID: 8300000, guid: 0cf30404f871d9748a97263eb989b048, type: 3}
-  - {fileID: 8300000, guid: cd85321396dec3b49b633ac5965133f9, type: 3}
+  - {fileID: 8300000, guid: 455f255196c0a8b4794654e39e68372e, type: 3}
+  - {fileID: 8300000, guid: 90a020d59fcff574596f3439d727b64a, type: 3}
+  - {fileID: 8300000, guid: e7c113c1d7b84284fa07946bbbad089a, type: 3}
+  - {fileID: 8300000, guid: e0d3adf07357dbd42a85e6be52dc969c, type: 3}
+  - {fileID: 8300000, guid: ed1bcfb638c21af4cb8dab75b1fa336a, type: 3}
+  - {fileID: 8300000, guid: c369d8167389b2b49888ecd32782b30f, type: 3}
+  - {fileID: 8300000, guid: 5460900bc0e38c84bb8dda50c66be3ca, type: 3}
   volumeJitter: 0.12
   pitchJitter: 0.09
 --- !u!164 &486680809

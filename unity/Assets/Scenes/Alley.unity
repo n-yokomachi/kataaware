@@ -39814,6 +39814,7 @@ MonoBehaviour:
   openingCard: "<size=34><voffset=1.05em><size=17>\u30ED\u30F3\u30C9\u30F3</size></voffset><space=-2em>\u502B\u6566\u3000\u30DB\u30EB\u30DC\u30FC\u30F3\u3000\u30B0\u30EC\u30D3\u30EB\u30FB\u30B9\u30C8\u30EA\u30FC\u30C8</size>"
   cardSeconds: 2.6
   cardLiftSeconds: 1.8
+  fadeInSeconds: 1.2
   exitSound: {fileID: 0}
   exitSoundSeconds: 1.7
   cutToBlack: 1
@@ -102011,11 +102012,10 @@ MonoBehaviour:
   walker: {fileID: 0}
   source: {fileID: 1971938907}
   clips:
-  - {fileID: 8300000, guid: d183c833d7ef07344b453553b97095c0, type: 3}
-  - {fileID: 8300000, guid: a744f907209d8194fb3e4cbd1f851751, type: 3}
-  - {fileID: 8300000, guid: 7e24deace4252ce49a28a537e5abbe39, type: 3}
-  - {fileID: 8300000, guid: a91f29e808ed7d440bfff09762a7ab9e, type: 3}
-  - {fileID: 8300000, guid: 0be4bb244e135604ea17f4697a720e8f, type: 3}
+  - {fileID: 8300000, guid: e1dc18205753c7c499e55fc82bd231ea, type: 3}
+  - {fileID: 8300000, guid: a5a5bf5b5dc608a4ebaf399a3139ecf4, type: 3}
+  - {fileID: 8300000, guid: 0cf30404f871d9748a97263eb989b048, type: 3}
+  - {fileID: 8300000, guid: cd85321396dec3b49b633ac5965133f9, type: 3}
   volumeJitter: 0.12
   pitchJitter: 0.09
 --- !u!164 &1971938909

@@ -36515,11 +36515,12 @@ MonoBehaviour:
   walker: {fileID: 0}
   source: {fileID: 1971938907}
   clips:
-  - {fileID: 8300000, guid: d183c833d7ef07344b453553b97095c0, type: 3}
-  - {fileID: 8300000, guid: a744f907209d8194fb3e4cbd1f851751, type: 3}
-  - {fileID: 8300000, guid: 7e24deace4252ce49a28a537e5abbe39, type: 3}
-  - {fileID: 8300000, guid: a91f29e808ed7d440bfff09762a7ab9e, type: 3}
-  - {fileID: 8300000, guid: 0be4bb244e135604ea17f4697a720e8f, type: 3}
+  - {fileID: 8300000, guid: 4bf8cda16214e244db5f60fba4294533, type: 3}
+  - {fileID: 8300000, guid: 8d57ea4ab80f1634e94d209ff1c6802b, type: 3}
+  - {fileID: 8300000, guid: 37004f123768f834fb1404eaff6af203, type: 3}
+  - {fileID: 8300000, guid: 1ef4c001fd2add547becb3f76b9f1feb, type: 3}
+  - {fileID: 8300000, guid: cd8477f61cbe9014d9b0dd177f9e2d9a, type: 3}
+  - {fileID: 8300000, guid: 3cbb2a72d1b4f7f4db79af52e7476777, type: 3}
   volumeJitter: 0.12
   pitchJitter: 0.09
 --- !u!1 &1972910772

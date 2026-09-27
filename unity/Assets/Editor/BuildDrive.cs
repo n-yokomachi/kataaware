@@ -1111,19 +1111,12 @@ namespace HalfAware.EditorTools
         const float EchoLevel = 60f;
 
         /// <summary>
-        /// 場面 8 の足音の素材。**場面 1・2 の Step1〜5 とは別物。**
+        /// 場面 8 の足音の素材。硬い床を歩いた録音から一歩ずつ切り出した HardFloor1〜7（<see cref="StepSets.HardFloor"/>、オーナーの指定、2026-09-28）。
         ///
-        /// あちらは Kenney の柔らかい足音で、濡れた石畳と土のためにある。測ると
-        /// 2.5kHz 以上が 700Hz 以下より 11〜15dB 弱く、裸のコンクリートの上で鳴らすと
-        /// 床が土に聞こえる。同じ素材（CC0）から唸りを抜いて打音を持ち上げ、
-        /// 重心を下げたものが Concrete1〜4（`tools/make-steps.py`）。
-        /// 出どころと加工は Assets/Audio/LICENSES.md に控えてある
+        /// 前は Kenney の柔らかい足音から打音を持ち上げて作った Concrete1〜4 を鳴らしていた。
+        /// 切り出しと大きさは `tools/make-ambience.sh` の 11 節、出どころは Assets/Audio/LICENSES.md
         /// </summary>
-        static readonly string[] ConcreteSteps =
-        {
-            "Assets/Audio/Concrete1.wav", "Assets/Audio/Concrete2.wav",
-            "Assets/Audio/Concrete3.wav", "Assets/Audio/Concrete4.wav",
-        };
+        static readonly string[] GarageSteps = StepSets.HardFloor;
 
         /// <summary>
         /// 足音。**場面 8 には今まで無かった。**
@@ -1315,11 +1308,11 @@ namespace HalfAware.EditorTools
             so.FindProperty("body").objectReferenceValue = body;
             so.FindProperty("source").objectReferenceValue = src;
             var clips = so.FindProperty("clips");
-            clips.arraySize = ConcreteSteps.Length;
-            for (var i = 0; i < ConcreteSteps.Length; i++)
+            clips.arraySize = GarageSteps.Length;
+            for (var i = 0; i < GarageSteps.Length; i++)
             {
-                var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(ConcreteSteps[i]);
-                if (clip == null) Debug.LogWarning("足音の素材が無い: " + ConcreteSteps[i]);
+                var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(GarageSteps[i]);
+                if (clip == null) Debug.LogWarning("足音の素材が無い: " + GarageSteps[i]);
                 clips.GetArrayElementAtIndex(i).objectReferenceValue = clip;
             }
             so.ApplyModifiedPropertiesWithoutUndo();
