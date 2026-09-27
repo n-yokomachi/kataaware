@@ -51,7 +51,7 @@ namespace HalfAware.EditorTools
                 sb.AppendLine(run.Note("2 板") + " → " + run.Shot(dir + "/g6_2_board.png"));
                 // 3. 下を向く（首は体の向きのまま、下は向けられる限り）。膝の先に裾から出た足首とサンダル
                 run.Until(() => run.D.Garden >= 12f, false);
-                run.Hold(0f, PlayerController.PitchDownLimit, 0.3f);
+                run.Hold(0f, run.PitchDown, 0.3f);
                 sb.AppendLine(run.Note("3 下") + " → " + run.Shot(dir + "/g6_3_down.png"));
                 // 3b. 庭を見回す（女性と花の縁とトンネルの口）
                 run.Hold(-10f, 2f, 0.3f);
@@ -294,7 +294,7 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 主（片割れ）の座った体を撮る。主の目から下を向いた所（首は正面と左へ 25 度、下は向けられる限り）と、脚を左の横（卓の側）から見た所
+        /// 主（片割れ）の座った体を撮る。主の目から下を向いた所（首は正面と左へ 25 度、下は場面 6 で向けられる限り＝演出の pitchDown）と、脚を左の横（卓の側）から見た所
         /// </summary>
         public static string Host(string dir)
         {
@@ -311,10 +311,15 @@ namespace HalfAware.EditorTools
                 var memory = (GameObject)so.FindProperty("memory").objectReferenceValue;
                 BuildVillage.SetHour(VillageHour.Hour.Evening);
                 memory.SetActive(true);
+                // 主の椅子を、演出が場面 6 の頭でするのと同じく夕日の方へ回す
+                var chair = (Transform)so.FindProperty("turnedChair").objectReferenceValue;
+                if (chair != null) chair.rotation = Quaternion.Euler(0f, so.FindProperty("turnedChairYaw").floatValue, 0f);
+                else sb.AppendLine("回す椅子が繋がっていない");
+                var down = so.FindProperty("pitchDown").floatValue;
                 var seat = (Transform)so.FindProperty("seat").objectReferenceValue;
                 var eye = seat.position + Vector3.up * so.FindProperty("seatEyeHeight").floatValue + seat.forward * 0.22f;
                 foreach (var head in new[] { 0f, -25f })
-                    sb.AppendLine(CheckVillage.Game(new CheckVillage.View("host_down_" + head, eye, seat.eulerAngles.y + head, PlayerController.PitchDownLimit), dir + "/host_down_" + head + ".png"));
+                    sb.AppendLine(CheckVillage.Game(new CheckVillage.View("host_down_" + head, eye, seat.eulerAngles.y + head, down), dir + "/host_down_" + head + ".png"));
                 var an = memory.transform.Find("Host").GetComponent<Animator>();
                 var knee = an.GetBoneTransform(HumanBodyBones.LeftLowerLeg).position;
                 var foot = an.GetBoneTransform(HumanBodyBones.LeftFoot).position;
@@ -398,6 +403,9 @@ namespace HalfAware.EditorTools
                 }
             }
 
+            /// <summary>下を向ける限り（演出が場面 6 の頭で広げた値）</summary>
+            public float PitchDown { get { return player.PitchDown; } }
+
             public Vector3 Face()
             {
                 return face != null ? face.position + Vector3.up * 0.07f : D.transform.position;
@@ -433,7 +441,7 @@ namespace HalfAware.EditorTools
                 var eye = player.Eye;
                 var lead = new SerializedObject(player).FindProperty("eyeLead").floatValue;
                 eye.localPosition = new Vector3(0f, player.EyeHeight, lead) + offset;
-                eye.localRotation = Quaternion.Euler(PlayerController.ClampPitch(pitch), player.HeadYaw, 0f);
+                eye.localRotation = Quaternion.Euler(player.Pitch, player.HeadYaw, 0f);
                 Physics.SyncTransforms();
             }
 

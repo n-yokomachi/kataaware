@@ -18,9 +18,9 @@ namespace HalfAware.EditorTools
     /// - Hud に、角の白い膜と右上の見出し（場面 4 と同じ物）
     ///
     /// 並び（世界の値。+x が東、+z が北）:
-    /// - 主はテラスの白いパラソルの卓の、北の椅子（卓から 80 度、<see cref="HostChair"/>）に座る。この椅子だけは卓に背を向け、
-    ///   西北西の夕日の方へ向けてある（<see cref="TurnedChairYaw"/>、卓の組み立て <c>Parasol</c>）
-    /// - 女性は、テラスの西の脇から北へ抜ける煉瓦の小路の西の縁（<see cref="WomanAt"/>）で、西の塀の下の花の縁に水を撒いている。主の目から 3.6 m、
+    /// - 主はテラスの白いパラソルの卓の、北の椅子（卓から 80 度、<see cref="HostChair"/>）に座る。この椅子は場面 6 の間だけ卓に背を向け、
+    ///   西北西の夕日の方へ回る（<see cref="TurnedChairYaw"/>。卓の組み立て <c>Parasol</c> が形を分け、演出が回す）。朝の村では卓へ向いたまま
+    /// - 女性は、テラスの西の脇から北へ抜ける煉瓦の小路の西の縁（<see cref="WomanAt"/>）で、西の塀の下の花の縁に水を撒いている。主の目から顔まで 3.5 m、
     ///   方位 305 度（主の体の向きの真正面）。日（方位 290 度、仰角 11 度）はその左上にあり、女性の後ろに低い夕日と明るい空が来る。夕日を背にするので、顔の側は影
     /// - 歩く道: 小路を南へテラスの西の脇（<see cref="WalkBend"/>）まで下り、テラスへ上がって主の方（<see cref="WalkEnd"/>）へ。
     ///   女性はずっと夕日を背にしている。あいだに卓と椅子は入らない（どれも主の後ろ）
@@ -131,6 +131,11 @@ namespace HalfAware.EditorTools
             for (var i = 0; i < gates.Length; i++) off.GetArrayElementAtIndex(i).objectReferenceValue = gates[i];
             so.FindProperty("seat").objectReferenceValue = seat;
             so.FindProperty("seatEyeHeight").floatValue = eyeHeight;
+            // 主の椅子。朝の向き（卓へ）で保存し、場面 6 の間だけ演出が夕日の方へ回す
+            var turned = root.Find("Garden/" + TurnedChairName);
+            if (turned == null) note.AppendLine("回す椅子が無い: Garden/" + TurnedChairName);
+            so.FindProperty("turnedChair").objectReferenceValue = turned;
+            so.FindProperty("turnedChairYaw").floatValue = TurnedChairYaw;
             so.FindProperty("woman").objectReferenceValue = woman.GetComponent<Mover>();
             so.FindProperty("womanMotion").objectReferenceValue = woman.GetComponent<PersonMotion>();
             so.FindProperty("jaw").objectReferenceValue = jaw;
@@ -184,6 +189,7 @@ namespace HalfAware.EditorTools
             her.transform.rotation = chair.rotation;
             BodyPoser.Stand(an);
             BodyPoser.Pose(an, HostSit(chair, BuildRocketboxProtagonist.Twin == BuildRocketboxProtagonist.TwinMode.MirrorWhole));
+            LiftToes(an, HumanBodyBones.RightFoot, HumanBodyBones.RightToes, ToeLift);
             // **動きを止めると骨が素の形へ戻る**（controller を外す・Animator を切ると、Unity が骨を既定の値へ書き戻す）。
             // 座った形の骨の値を持っておき、止めてから書き戻す
             var bones = her.GetComponentsInChildren<Transform>(true);
@@ -206,6 +212,25 @@ namespace HalfAware.EditorTools
             note.AppendFormat("主の目: {0}（足元から {1:0.000} m）。腰 {2}", eyes.ToString("F3"), eyeHeight,
                 an.GetBoneTransform(HumanBodyBones.Hips).position.ToString("F3")).AppendLine();
             return chair;
+        }
+
+        /// <summary>
+        /// 斜め前へ伸ばした足（右）の爪先を上げる角。度。踵をテラスに置いて爪先を少し起こすと、上から見下ろす目に足の甲とサンダルが長く見える
+        /// （爪先を下げたままだと、足が目の向きと並んで縮んで見えた）
+        /// </summary>
+        const float ToeLift = 20f;
+
+        /// <summary>足の骨を、足首を中心に爪先が上がる向きへ degrees 度回す（足の向きに直交する水平の軸で）</summary>
+        static void LiftToes(Animator an, HumanBodyBones foot, HumanBodyBones toes, float degrees)
+        {
+            var f = an.GetBoneTransform(foot);
+            var t = an.GetBoneTransform(toes);
+            if (f == null || t == null) return;
+            var along = t.position - f.position;
+            along.y = 0f;
+            if (along.sqrMagnitude < 1e-6f) return;
+            var axis = Vector3.Cross(Vector3.up, along.normalized);
+            f.rotation = Quaternion.AngleAxis(-degrees, axis) * f.rotation;
         }
 
         /// <summary>座った体をベイクして置くメッシュ</summary>
@@ -233,7 +258,9 @@ namespace HalfAware.EditorTools
                 if (smr.name != "HeadShadow" && smr.sharedMesh != null && smr.sharedMesh.subMeshCount >= 5) body = smr;
             if (body == null) { note.AppendLine("座った体の mesh が見つからない。裾を上げられない"); return; }
             var mesh = new Mesh { name = "HostSeated" };
-            body.BakeMesh(mesh);
+            // 体の Transform のローカル空間でベイクする（useScale）。片割れの模型は根の x を裏返してあり、scale を外してベイクすると、
+            // 同じ所に置いた時にもう一度裏返り、脚の左右が骨と入れ違った（伸ばした足が反対の側に出た）
+            body.BakeMesh(mesh, true);
             var v = mesh.vertices;
             var n = mesh.normals;
             var uv = mesh.uv;
@@ -317,7 +344,7 @@ namespace HalfAware.EditorTools
         ///
         /// くるぶし丈のスカートの筒は、座ると膝のまわりに大きな輪で立ち、輪の上の縁が膝より 20 cm ほど上へ膨らむ。
         /// 目から見下ろすと、その膨らみが膝の向こうの脛と足を塞いだ（布を外すと足とサンダルが見えた）。
-        /// 腰より前の布の頂点を、その前後の位置での脚の上の面（腰から膝、膝から足首を結んだ骨の芯に、脚の太さを足した高さ）より上へ出さない。
+        /// 腰より前の布の頂点を、その所での脚の上の面（腰から膝、膝から足首を結んだ骨の芯に、脚の太さを足した高さ。二本のあいだは横の位置で繋ぐ）より上へ出さない。
         /// 脇に垂れた布は元から低いので動かない。v と n は体の mesh の中の位置と法線で、書き換える。下ろした頂点の数を返す
         /// </summary>
         static int LayOnLegs(GameObject her, Transform body, Vector2[] uv, Vector3[] v, Vector3[] n)
@@ -333,19 +360,28 @@ namespace HalfAware.EditorTools
                 new[] { B(HumanBodyBones.RightUpperLeg), B(HumanBodyBones.RightLowerLeg), B(HumanBodyBones.RightFoot) },
             };
             var hipAhead = Vector3.Dot(B(HumanBodyBones.Hips), ahead);
-            // 前後の位置 f での脚の上の面の高さ（二本のうち高い方）
-            System.Func<float, float> top = f =>
+            var side = Vector3.Cross(Vector3.up, ahead);
+            // 前後の位置 f での、一本の脚の上の面の高さと、脚の芯の横の位置
+            System.Func<Vector3[], float, Vector2> legAt = (leg, f) =>
             {
-                var best = float.MinValue;
-                foreach (var leg in legs)
+                float fh = Vector3.Dot(leg[0], ahead), fk = Vector3.Dot(leg[1], ahead), fa = Vector3.Dot(leg[2], ahead);
+                if (f <= fk)
                 {
-                    float fh = Vector3.Dot(leg[0], ahead), fk = Vector3.Dot(leg[1], ahead), fa = Vector3.Dot(leg[2], ahead);
-                    float h;
-                    if (f <= fk) h = Mathf.Lerp(leg[0].y + ThighTop, leg[1].y + KneeTop, Mathf.InverseLerp(fh, fk, f));
-                    else h = Mathf.Lerp(leg[1].y + KneeTop, leg[2].y + ShinTop, Mathf.InverseLerp(fk, fa, f));
-                    best = Mathf.Max(best, h);
+                    var t = Mathf.InverseLerp(fh, fk, f);
+                    return new Vector2(Mathf.Lerp(leg[0].y + ThighTop, leg[1].y + KneeTop, t), Vector3.Dot(Vector3.Lerp(leg[0], leg[1], t), side));
                 }
-                return best;
+                var u = Mathf.InverseLerp(fk, fa, f);
+                return new Vector2(Mathf.Lerp(leg[1].y + KneeTop, leg[2].y + ShinTop, u), Vector3.Dot(Vector3.Lerp(leg[1], leg[2], u), side));
+            };
+            // 布の頂点 w の所での、脚の上の面の高さ。二本の脚のあいだは、横の位置で二本の高さを繋ぐ（布は高い方の脚から低い方の脚へ斜めに渡る）。
+            // 二本の高い方で一枚の板にすると、片脚を伸ばして低くした時に、その脚の上に布の板が浮いて脛と足を隠した
+            System.Func<Vector3, float> top = w =>
+            {
+                var f = Vector3.Dot(w, ahead);
+                var a = legAt(legs[0], f);
+                var b = legAt(legs[1], f);
+                var t = Mathf.Abs(b.y - a.y) < 1e-4f ? 0.5f : Mathf.Clamp01((Vector3.Dot(w, side) - a.y) / (b.y - a.y));
+                return Mathf.Lerp(a.x, b.x, t);
             };
             var toWorld = body.localToWorldMatrix;
             var toLocal = body.worldToLocalMatrix;
@@ -356,7 +392,7 @@ namespace HalfAware.EditorTools
                 var w = toWorld.MultiplyPoint3x4(v[i]);
                 var f = Vector3.Dot(w, ahead);
                 if (f < hipAhead + 0.08f) continue;
-                var cap = top(f);
+                var cap = top(w);
                 if (w.y <= cap) continue;
                 // 腰の近くは少しずつ効かせる（腰の布との継ぎ目に段を作らない）
                 var k = Mathf.Clamp01((f - hipAhead - 0.08f) / 0.12f);
@@ -372,9 +408,10 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 白い鉄のビストロの椅子（座面 0.45 m、丸く肘掛けは無い）に座った形。値は椅子の足元から見た位置で、+z が体の前。
-        /// 腿は座面に乗せ、脚は前へ伸ばして左（卓の脇の空いたテラスの側）へ少し流し、サンダルをテラスに置く。手は腿の上。
-        /// 足は膝の脇へ出す。真っすぐ前だと、目から見て膝と手と裾の向こうに隠れる（脚は座面から 0.73 m ほどしか前へ届かないので、膝より前へ出しきれない）。
-        /// 裾は座った形で脛の中ほどまで上げる（<see cref="SeatedDrape"/>）。下を向くと、膝の上の白いワンピースと両手、その先に脛とサンダルが見える
+        /// 腿は座面に乗せ、片脚を斜め前へ楽に伸ばし、もう片脚は膝を曲げて足を引き、サンダルをテラスに置く。手は腿の上。
+        /// 座った目から見ると、足首が自分の膝の線を越えて見えるのは目から 0.65 m ほどより先。膝の真下や少し前の足は、膝と裾の向こうに隠れる。
+        /// 裾は座った形で膝のすぐ下まで上げる（<see cref="SeatedDrape"/>）。場面 6 では下を 60 度まで向けられるので（演出の pitchDown）、
+        /// 下を向くと、膝の上の白いワンピースと両手、その先に脛と足首とサンダルが見える
         /// mirror なら左右を入れ替える（片割れの模型は根の x を裏返してあり、左の骨が世界の右に来る）
         /// </summary>
         static BodyPoser.Sit HostSit(Transform chair, bool mirror)
@@ -388,13 +425,15 @@ namespace HalfAware.EditorTools
             {
                 hips = P(0f, 0.53f, -0.03f),
                 pelvis = 0f,
-                lean = 6f,
+                // 背は少し前へ倒す（膝の上へ目が出て、膝の向こうの足が見える。頭は立てたまま）
+                lean = 14f,
                 headKeep = 1f,
-                // 足は模型の右（+x。裏返した片割れでは世界の左、卓の脇の空いたテラスの側）へ流して置く。
-                // 真っすぐ前へ出すと、目から見て膝と手と裾の向こうに隠れる。世界の右（北）はすぐテラスの縁のラベンダーで、足が埋もれる
-                ankleL = P(0.14f, 0.085f, 0.70f),
-                ankleR = P(0.34f, 0.085f, 0.64f),
-                kneePoleL = P(0.14f, 0.9f, 1.2f),
+                // 右の脚（模型の +x。裏返した片割れでは体の左、卓の脇の空いたテラスの側）を斜め前へ楽に伸ばし、左は膝を曲げて足を引く。
+                // 両足とも膝の少し前（足首 0.62・0.66 m）に置くと、目から見て膝と裾の向こうに隠れ、爪先しか見えなかった。
+                // 右を真っすぐ前（0.71 m）へ伸ばしても、膝の上の裾の向こうに足の甲が細く覗くだけだった。斜めに開くと、裾の脇に脛と足首とサンダルが出る
+                ankleL = P(-0.10f, 0.085f, 0.50f),
+                ankleR = P(0.38f, 0.085f, 0.62f),
+                kneePoleL = P(-0.10f, 0.9f, 1.2f),
                 kneePoleR = P(0.34f, 0.9f, 1.2f),
                 footPoint = 0f,
                 // 手は腿の中ほど。膝に置くと指が膝の先へ出て、その向こうの足を隠した

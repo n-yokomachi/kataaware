@@ -103,7 +103,7 @@ namespace HalfAware.EditorTools
         {
             Paths(b);
             Terrace(b);
-            Parasol(b, TableAt);
+            Parasol(parent, b, TableAt);
             Boundaries(b);
             Arch(b);
             Gazebo(b);
@@ -218,7 +218,7 @@ namespace HalfAware.EditorTools
         /// 白いパラソルと黒い鉄の卓と椅子三脚。傘は八角の円錐に、縁の垂れ。
         /// 下調べ 4 節の一つ目: 白い円錐と、その下の黒い鉄の脚の対比が遠目にも立つ
         /// </summary>
-        static void Parasol(Banks b, Vector3 at)
+        static void Parasol(Transform parent, Banks b, Vector3 at)
         {
             const int sides = 8;
             const float r = 1.30f;
@@ -257,22 +257,37 @@ namespace HalfAware.EditorTools
                 Beam(b.Paint, at + Vector3.up * 0.30f + o * 0.22f, at + o * 0.34f, 0.03f, 0.03f);
             }
             // 椅子。卓を囲んで三脚、卓へ向ける。白。
-            // 北の一脚（TurnedChairDeg）だけは卓に背を向け、西北西の夕日の方（小路と西の花の縁）へ向ける。
-            // 場面 6 の主（片割れ）がここに座り、夕日を背にして水を撒く女性を見る（BuildVillageMemory）
+            // 北の一脚（TurnedChairDeg）だけは形を分け、足元を原点にした子（TurnedChairName）にする。y を回せば向きが変わる。
+            // 場面 6 の間だけ、演出（GardenMemoryDirector）が西北西の夕日の方（TurnedChairYaw）へ回し、主（片割れ）がここに座って
+            // 夕日を背にして水を撒く女性を見る（BuildVillageMemory）。朝の村（場面 9・10）では、ほかの二脚と同じく卓へ向いたまま
             foreach (var deg in new[] { 200f, 320f, TurnedChairDeg })
             {
                 var a = deg * Mathf.Deg2Rad;
                 var foot = at + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * 0.82f;
-                var face = deg == TurnedChairDeg ? Quaternion.Euler(0f, TurnedChairYaw, 0f) : Quaternion.LookRotation(at - foot, Vector3.up);
-                Chair(b.Paint, foot, face);
+                var face = Quaternion.LookRotation(at - foot, Vector3.up);
+                if (deg != TurnedChairDeg)
+                {
+                    Chair(b.Paint, foot, face);
+                    continue;
+                }
+                var pivot = new GameObject(TurnedChairName).transform;
+                pivot.SetParent(parent, false);
+                pivot.position = foot;
+                pivot.rotation = face;
+                var paint = new Bank { Texel = 0.5f };
+                Chair(paint, Vector3.zero, Quaternion.identity);
+                Emit(pivot, TurnedChairName + "Paint", paint, PaintMat(), false);
             }
         }
 
-        /// <summary>卓から見た、夕日の方へ向けた椅子の向き（度。卓の東から北回り）</summary>
+        /// <summary>卓から見た、場面 6 で夕日の方へ回す椅子の向き（度。卓の東から北回り）</summary>
         public const float TurnedChairDeg = 80f;
 
-        /// <summary>その椅子の向き。度（+z が 0 で東回り）。西北西（日は方位 290 度）の少し北、小路の上で水を撒く女性の方</summary>
+        /// <summary>場面 6 の間のその椅子の向き。度（+z が 0 で東回り）。西北西（日は方位 290 度）の少し北、小路の上で水を撒く女性の方</summary>
         public const float TurnedChairYaw = 305f;
+
+        /// <summary>その椅子の子の名（庭の根 <c>Village/Garden</c> の下）。演出が回す</summary>
+        public const string TurnedChairName = "TurnedChair";
 
         /// <summary>
         /// 白い鉄のビストロの椅子。丸い座面、四本の脚、背。rot の +z が前（卓の側）。
