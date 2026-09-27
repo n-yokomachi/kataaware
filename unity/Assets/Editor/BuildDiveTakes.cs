@@ -399,46 +399,8 @@ namespace HalfAware.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        /// <summary>
-        /// 鳩の群れ。足元から一斉に飛び立つので、端は滑らかに繋がない。
-        /// 場所ではなく記憶の側に置くのは、飛び立つ秒が記憶ごとに違うため
-        /// </summary>
-        static Transform Doves(Transform take, Vector3 at, float when, int cue = -1)
-        {
-            var flock = Child(take, "Doves");
-            var mesh = Shape("Pigeon", 1f, b =>
-            {
-                b.Box(new Vector3(0f, 0.09f, 0f), new Vector3(0.13f, 0.11f, 0.24f));
-                b.Box(new Vector3(0f, 0.17f, 0.11f), new Vector3(0.08f, 0.08f, 0.09f));
-            });
-            for (var i = 0; i < 8; i++)
-            {
-                var a = Mathf.Deg2Rad * (i * 47f);
-                var spread = new Vector3(Mathf.Cos(a) * (0.5f + i * 0.13f), 0f, Mathf.Sin(a) * (0.5f + i * 0.11f));
-                var bird = Piece(flock, "Dove" + i, mesh, Mat("Bird"));
-                bird.localRotation = Quaternion.Euler(0f, i * 47f + 20f, 0f);
-                // 飛ぶので床へは下ろさない
-                Move(bird, at + spread, at + spread * 2.4f + new Vector3(0f, 3.4f + i * 0.2f, 0.6f),
-                    when + i * 0.06f, 1.6f, false, false, cue);
-            }
-            return flock;
-        }
-
-        /// <summary>
-        /// 飛び立った鳩を、撒いた餌へ寄せる。飛び立ちの線の先から、足元のまわりへ降りてくる。
-        /// <paramref name="cue"/> 行が出てから数え始める（記憶 11 の「うわっ！　全部こっち来た」）。
-        /// 撒いた主のすぐ足元には来ず、0.5〜0.9 m ほど離れた輪に散らばる
-        /// </summary>
-        static void Gather(Transform flock, Vector3 feet, int cue)
-        {
-            for (var i = 0; i < flock.childCount; i++)
-            {
-                var bird = flock.GetChild(i);
-                var a = Mathf.Deg2Rad * (i * 45f + 10f);
-                var ring = 0.5f + (i % 3) * 0.2f;
-                Then(bird, feet + new Vector3(Mathf.Cos(a) * ring, 0f, Mathf.Sin(a) * ring), 0.1f + i * 0.08f, 1.3f, cue);
-            }
-        }
+        // 鳩の群れ（形・色・置き方）は BuildDivePigeon.cs にある。場所ではなく記憶の側に置くのは、
+        // 飛び立つ秒が記憶ごとに違い、時刻（15:47 と 15:50）で数と居場所が違うため
 
         /// <summary>
         /// 餌の紙袋。手の骨に付ける小さな紙袋で、口を折った茶色の箱。
@@ -591,7 +553,7 @@ namespace HalfAware.EditorTools
             // 門の前では、池の方から来る夫の方を向く
             Face(wife, Toward(wifeFrom, wifeTo), 215f);
             // 鳩は区切りの後の最初の行（ソフィア「見て！　鳩がいっせいに飛んだ」）で飛び立つ
-            Doves(take, new Vector3(-1.1f, 0.09f, 5.6f), 0.2f, 7);
+            DovesEarly(take, 0.2f, 7, new Vector2(-1.1f, 4.3f));
             // 区切りの行き先は池の縁
             Stop(-1.1f, 0f, 4.3f);
             return new[]
@@ -636,7 +598,7 @@ namespace HalfAware.EditorTools
             Move(gran, granFrom, granTo, 1.0f, 9f, true, true, 5);
             Face(gran, Toward(granFrom, granTo), 231f);
             // 鳩は区切りの後の最初の行（ソフィア「見て！　鳩がいっせいに飛んだ」）で飛び立つ
-            Doves(take, new Vector3(-1.2f, 0.09f, 4.4f), 0.2f, 6);
+            DovesEarly(take, 0.2f, 6, new Vector2(-0.9f, 4.2f));
             // 区切りの行き先は池の縁
             Stop(-0.9f, 0f, 4.2f);
             // 通りすがり。イヤホンをした少女（記憶 11 のプリヤ）が、小径の東の芝生の奥を北から南へ横切り、
@@ -853,7 +815,7 @@ namespace HalfAware.EditorTools
             var girl = Cast(take, "Granddaughter", new Vector3(0.15f, 0f, 8.05f), 350f, 0);
             Move(girl, new Vector3(-0.9f, 0f, 6.6f), new Vector3(0.15f, 0f, 8.05f), 20f, 7f, true);
             // 鳩は駆け込んでくる孫に追われて飛び立つ
-            Doves(take, new Vector3(-1.4f, 0.09f, 4.4f), 1.2f, 3);
+            DovesLate(take, 1.2f, 3);
             return new[]
             {
                 K(0f,  0.6f,  0f, 6.4f, 327f,   6f, 1.50f),  // 前から夫の声
@@ -883,8 +845,7 @@ namespace HalfAware.EditorTools
             // **鳩は追いかけられて飛び立ち、門の前で撒くと足元へ寄ってくる**（設計書 6 節の 11）。
             // 寄ってくるのは区切りの後の最初の行（六行目、ルーカス「うわっ！　全部こっち来た」）が出てから
             var gate = new Vector3(0.1f, 0f, 8.1f);
-            var flock = Doves(take, new Vector3(-1.5f, 0.09f, 4.5f), 2f);
-            Gather(flock, gate + new Vector3(-0.2f, 0.09f, -0.1f), 6);
+            DovesFed(take, 2f, gate, 6);
             // 〔区切り〕の行き先。一つ目は祖母のそば、二つ目は門の前
             Stop(0.3f, 0f, 5.95f);
             Stop(gate.x, gate.y, gate.z);
