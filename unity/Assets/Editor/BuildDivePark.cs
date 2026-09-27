@@ -103,6 +103,26 @@ namespace HalfAware.EditorTools
         const float LinkWest = -2.0f;
         const float LinkEast = -1.0f;
 
+        /// <summary>
+        /// 小径の帯。(西, 東, 南, 北) の縁、場所のローカル。絵（<see cref="ParkPaths"/>）と
+        /// 足音の区画（<see cref="ParkStepGround"/>）が同じ表を見る
+        /// </summary>
+        static readonly Vector4[] ParkWalks =
+        {
+            // 門からベンチまで。門の口の下まで伸ばして、外の歩道と繋ぐ
+            new Vector4(WalkWest, WalkEast, CrossNorth, GateZ + 0.16f),
+            // ベンチの前の東西
+            new Vector4(-CrossEnd, CrossEnd, CrossSouth, CrossNorth),
+            // 西と東の端から南へ、南の東西
+            new Vector4(-CrossEnd, -CrossEnd + LoopWide, LoopNorth, CrossSouth),
+            new Vector4(CrossEnd - LoopWide, CrossEnd, LoopNorth, CrossSouth),
+            new Vector4(-CrossEnd, CrossEnd, LoopNorth - LoopWide, LoopNorth),
+            // ベンチ A の西の脇から南へ
+            new Vector4(LinkWest, LinkEast, LoopNorth, CrossSouth),
+            // 池への寄り付き。門からの小径の西へ、池の縁の手前まで広げる
+            new Vector4(-2.3f, WalkWest, 2.2f, 7.2f),
+        };
+
         // ---- 街灯 ----------------------------------------------------------------
 
         /// <summary>街灯の間隔。等間隔の繰り返しが、ここが公園だといちばん早く伝える</summary>
@@ -134,7 +154,8 @@ namespace HalfAware.EditorTools
             ground.Patch(new Vector3(ParkWest, 0f, GateZ), new Vector3(ParkEast, 0f, GateZ),
                 new Vector3(ParkEast, 0f, ParkSouth), new Vector3(ParkWest, 0f, ParkSouth),
                 new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(1f, 0f), new Vector2(0f, 0f));
-            EstateEmit(place, "ParkGround", ground, ParkGroundMat(), true);
+            var turf = EstateEmit(place, "ParkGround", ground, ParkGroundMat(), true);
+            ParkStepGround(place, turf);
 
             var walk = new Bank { Texel = 0.35f };
             ParkPaths(walk, y);
@@ -196,18 +217,7 @@ namespace HalfAware.EditorTools
         static void ParkPaths(Bank b, YardBanks y)
         {
             const float h = 0.02f;
-            // 門からベンチまで。門の口の下まで伸ばして、外の歩道と繋ぐ
-            b.FaceY(h, WalkWest, WalkEast, CrossNorth, GateZ + 0.16f, 1);
-            // ベンチの前の東西
-            b.FaceY(h, -CrossEnd, CrossEnd, CrossSouth, CrossNorth, 1);
-            // 西と東の端から南へ、南の東西
-            b.FaceY(h, -CrossEnd, -CrossEnd + LoopWide, LoopNorth, CrossSouth, 1);
-            b.FaceY(h, CrossEnd - LoopWide, CrossEnd, LoopNorth, CrossSouth, 1);
-            b.FaceY(h, -CrossEnd, CrossEnd, LoopNorth - LoopWide, LoopNorth, 1);
-            // ベンチ A の西の脇から南へ
-            b.FaceY(h, LinkWest, LinkEast, LoopNorth, CrossSouth, 1);
-            // 池への寄り付き。門からの小径の西へ、池の縁の手前まで広げる
-            b.FaceY(h, -2.3f, WalkWest, 2.2f, 7.2f, 1);
+            foreach (var w in ParkWalks) b.FaceY(h, w.x, w.y, w.z, w.w, 1);
 
             // 縁石。門からの小径の東、西（池への寄り付きの所は開ける）、ベンチの前の小径の北と南
             const float k = 0.08f;
@@ -218,6 +228,32 @@ namespace HalfAware.EditorTools
             ParkKerb(y, new Vector3(WalkEast + k, 0f, CrossNorth + k * 0.5f), new Vector3(CrossEnd, 0f, CrossNorth + k * 0.5f));
             ParkKerb(y, new Vector3(-CrossEnd + LoopWide + k, 0f, CrossSouth - k * 0.5f), new Vector3(LinkWest - k, 0f, CrossSouth - k * 0.5f));
             ParkKerb(y, new Vector3(LinkEast + k, 0f, CrossSouth - k * 0.5f), new Vector3(CrossEnd - LoopWide - k, 0f, CrossSouth - k * 0.5f));
+        }
+
+        /// <summary>
+        /// 公園の地面の足音。芝（<see cref="StepSets.Grass"/>）を地にして、小径の帯（<see cref="ParkWalks"/>）だけ
+        /// コンクリート（<see cref="StepSets.Concrete"/>）で鳴らす。小径は地面の当たりの上に 2 cm 浮かせた当たりの無い面なので、
+        /// 足元の線が当たるのは地面。区画は世界の (x, z) で持つので、場所の置き場（<see cref="PlaceOrigin"/>）だけずらして書く
+        /// </summary>
+        static void ParkStepGround(Transform place, Transform turf)
+        {
+            if (turf == null) return;
+            if (Quaternion.Angle(place.rotation, Quaternion.identity) > 0.01f)
+                Debug.LogWarning("公園の場所が回っている。足音の区画（世界の x, z の四角）がずれる");
+            var concrete = StepSets.Clips(StepSets.Concrete);
+            var o = place.position;
+            var parts = new StepGround.Patch[ParkWalks.Length];
+            for (var i = 0; i < ParkWalks.Length; i++)
+            {
+                var w = ParkWalks[i];
+                parts[i] = new StepGround.Patch
+                {
+                    name = "小径 " + (i + 1),
+                    box = Rect.MinMaxRect(o.x + w.x, o.z + w.z, o.x + w.y, o.z + w.w),
+                    clips = concrete,
+                };
+            }
+            StepFloor(turf, StepSets.Grass, parts);
         }
 
         /// <summary>小径の縁の低い石。地面から 6 cm</summary>
@@ -677,6 +713,8 @@ namespace HalfAware.EditorTools
             floor.transform.SetParent(place, false);
             floor.transform.localPosition = new Vector3(0f, -0.05f, (GateZ + ParkKerbZ) * 0.5f);
             floor.AddComponent<BoxCollider>().size = new Vector3(ParkEast - ParkWest, 0.1f, ParkKerbZ - GateZ + 0.4f);
+            // 門の外の歩道はコンクリートの音
+            StepFloor(floor.transform, StepSets.Concrete);
 
             // 池の縁。縁石の外の面に沿って一周。膝の高さなので、人を選ぶ目の線は遮らない
             var rim = ParkRim(0.36f);

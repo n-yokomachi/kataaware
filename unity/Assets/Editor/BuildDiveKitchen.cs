@@ -255,8 +255,9 @@ namespace HalfAware.EditorTools
             var oak = EstatePaint("KitchenOak", new Color(0.460f, 0.330f, 0.200f), 0.18f);
             var brass = EstatePaint("KitchenBrass", new Color(0.520f, 0.400f, 0.170f), 0.55f);
 
-            EstateEmit(place, "KitchenFloor", b.Lino, lino, true);
-            EstateEmit(place, "KitchenQuarry", b.Quarry, quarry, true);
+            // 足音は場所の既定（自室の床。居間の板と階段）のほか、台所のリノリウムと廊下・玄関先の陶板だけ硬い床で鳴らす（BuildDive.PlaceStepPaths）
+            StepFloor(EstateEmit(place, "KitchenFloor", b.Lino, lino, true), StepSets.HardFloor);
+            StepFloor(EstateEmit(place, "KitchenQuarry", b.Quarry, quarry, true), StepSets.HardFloor);
             EstateEmit(place, "KitchenBoards", b.Boards, KitchenShared("EstateBoard"), true);
             EstateEmit(place, "KitchenWall", b.Walls, KitchenShared("EstateWallA"), true);
             EstateEmit(place, "KitchenPaper", b.Paper, paper, true);

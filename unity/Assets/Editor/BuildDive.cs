@@ -257,30 +257,53 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 団地・教室・台所の床。場面 8 と同じコンクリートの打音（`tools/make-steps.py`）
+        /// 場所ごとの既定の足音（<see cref="DiveDirector"/> が記憶の頭で取り替える）。床の作りで選ぶ（オーナー、2026-09-28
+        /// 「潜った先の記憶の足音はシーンごとに新しい足音から選んで」）。
+        /// 一つの場所に床の違う所がある物は、床の当たりに <see cref="StepGround"/> を付けて分ける（<see cref="StepFloor"/>）:
+        /// <list type="table">
+        /// <item><term>公営住宅</term><description>外階段・踊り場・デッキ・地面の小径はコンクリート。住戸の中の板の床と絨毯は自室の床、台所と浴室の陶板は硬い床</description></item>
+        /// <item><term>公園</term><description>芝。小径（砂利を固めた明るい帯）と門の外の歩道はコンクリート</description></item>
+        /// <item><term>電車</term><description>硬い床（車両の床）</description></item>
+        /// <item><term>台所の家</term><description>居間の板と階段は自室の床。台所のリノリウムと、廊下と玄関先の陶板（クオリー・タイル）は硬い床</description></item>
+        /// <item><term>教室</term><description>硬い床（リノリウム）</description></item>
+        /// </list>
         /// </summary>
-        static readonly string[] HardSteps =
+        static string[] PlaceStepPaths(string place)
         {
-            "Assets/Audio/Concrete1.wav", "Assets/Audio/Concrete2.wav",
-            "Assets/Audio/Concrete3.wav", "Assets/Audio/Concrete4.wav",
-        };
+            if (place == DiveIds.Estate) return StepSets.Concrete;
+            if (place == DiveIds.Park) return StepSets.Grass;
+            if (place == DiveIds.Kitchen) return StepSets.Room;
+            return StepSets.HardFloor;   // 電車と教室
+        }
 
-        /// <summary>公園の土と電車の板。場面 1・2 の柔らかい足音</summary>
-        static readonly string[] SoftSteps =
+        /// <summary>
+        /// 床の当たり floor に、そこで鳴らす足音を付ける。当たりの無い物（null）は何もしない。
+        /// 付け直すたびに前の区画は消える（組み直しで作り直すので、前の物は残っていない）
+        /// </summary>
+        static StepGround StepFloor(Transform floor, string[] paths, StepGround.Patch[] patches = null)
         {
-            "Assets/Audio/Step1.wav", "Assets/Audio/Step2.wav", "Assets/Audio/Step3.wav",
-            "Assets/Audio/Step4.wav", "Assets/Audio/Step5.wav",
-        };
-
-        static AudioClip[] Steps(string[] paths)
-        {
-            var all = new AudioClip[paths.Length];
-            for (var i = 0; i < paths.Length; i++)
+            if (floor == null) return null;
+            if (floor.GetComponent<Collider>() == null) { Debug.LogWarning("足音の地面に当たりが無い: " + floor.name); return null; }
+            var ground = floor.GetComponent<StepGround>();
+            if (ground == null) ground = floor.gameObject.AddComponent<StepGround>();
+            var so = new SerializedObject(ground);
+            Fill(so.FindProperty("clips"), StepSets.Clips(paths));
+            var rows = so.FindProperty("patches");
+            var all = patches ?? new StepGround.Patch[0];
+            rows.arraySize = all.Length;
+            for (var i = 0; i < all.Length; i++)
             {
-                all[i] = AssetDatabase.LoadAssetAtPath<AudioClip>(paths[i]);
-                if (all[i] == null) Debug.LogWarning("足音の素材が無い: " + paths[i]);
+                var row = rows.GetArrayElementAtIndex(i);
+                row.FindPropertyRelative("name").stringValue = all[i].name;
+                var line = row.FindPropertyRelative("line");
+                line.arraySize = all[i].line != null ? all[i].line.Length : 0;
+                for (var k = 0; k < line.arraySize; k++) line.GetArrayElementAtIndex(k).vector2Value = all[i].line[k];
+                row.FindPropertyRelative("half").floatValue = all[i].half;
+                row.FindPropertyRelative("box").rectValue = all[i].box;
+                Fill(row.FindPropertyRelative("clips"), all[i].clips ?? new AudioClip[0]);
             }
-            return all;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            return ground;
         }
 
         /// <summary>
@@ -307,7 +330,8 @@ namespace HalfAware.EditorTools
             var so = new SerializedObject(steps);
             so.FindProperty("body").objectReferenceValue = body;
             so.FindProperty("source").objectReferenceValue = src;
-            Fill(so.FindProperty("clips"), Steps(HardSteps));
+            // 初めの一組。記憶の頭で DiveDirector が場所の既定の音へ取り替える
+            Fill(so.FindProperty("clips"), StepSets.Clips(PlaceStepPaths(DiveIds.Estate)));
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
@@ -642,8 +666,14 @@ namespace HalfAware.EditorTools
             dso.FindProperty("panel").objectReferenceValue = holo;
             dso.FindProperty("feet").objectReferenceValue =
                 Object.FindFirstObjectByType<Footsteps>(FindObjectsInactive.Include);
-            Fill(dso.FindProperty("hardSteps"), Steps(HardSteps));
-            Fill(dso.FindProperty("softSteps"), Steps(SoftSteps));
+            var steps = dso.FindProperty("placeSteps");
+            steps.arraySize = DiveIds.Places.Length;
+            for (var i = 0; i < DiveIds.Places.Length; i++)
+            {
+                var row = steps.GetArrayElementAtIndex(i);
+                row.FindPropertyRelative("place").stringValue = DiveIds.Places[i];
+                Fill(row.FindPropertyRelative("clips"), StepSets.Clips(PlaceStepPaths(DiveIds.Places[i])));
+            }
             dso.FindProperty("roster").objectReferenceValue = roster;
             Fill(dso.FindProperty("places"), Named(places, DiveIds.Places));
             var sky = dso.FindProperty("skies");

@@ -85,10 +85,8 @@ namespace HalfAware
         [SerializeField] float edgeMargin = 0.08f;
 
         [Header("足音")]
-        [Tooltip("団地・教室・台所の床。コンクリート")]
-        [SerializeField] AudioClip[] hardSteps = new AudioClip[0];
-        [Tooltip("公園の土と電車の板")]
-        [SerializeField] AudioClip[] softSteps = new AudioClip[0];
+        [Tooltip("場所ごとの既定の足音。床の当たりに StepGround が付いていれば、Footsteps はそちらで鳴らす")]
+        [SerializeField] PlaceSteps[] placeSteps = new PlaceSteps[0];
 
         [Header("会話")]
         [Tooltip("一行目（名を呼ぶ声）を出しておく秒。送らずに消える。相手を探して振り向く間が要る")]
@@ -367,8 +365,8 @@ namespace HalfAware
             Wear();
             Deepen();
 
-            // 床の音は場所ごとに変える。団地・教室・台所はコンクリート、公園は土、電車は板
-            if (feet != null) feet.Use(Soft(entry.place) ? softSteps : hardSteps);
+            // 床の音は場所ごとに変える（既定の音。部屋の中や小径など、床の当たりに StepGround があればそちらが勝つ）
+            if (feet != null) feet.Use(StepsFor(entry.place, placeSteps));
 
             clock = 0f;
             called = false;
@@ -527,10 +525,21 @@ namespace HalfAware
             player.FreeMove(this);
         }
 
-        /// <summary>土と板の床。公園と電車だけ。ほかはコンクリート</summary>
-        static bool Soft(string place)
+        /// <summary>場所ごとの既定の足音の一行。場所の id（<see cref="DiveIds"/>）と、その場所で鳴らす組</summary>
+        [System.Serializable]
+        public struct PlaceSteps
         {
-            return place == DiveIds.Park || place == DiveIds.Train;
+            public string place;
+            public AudioClip[] clips;
+        }
+
+        /// <summary>場所の既定の足音。表に無い場所は空（Footsteps はそのとき何も鳴らさない。見直しが気づく）</summary>
+        public static AudioClip[] StepsFor(string place, PlaceSteps[] table)
+        {
+            if (table != null)
+                foreach (var row in table)
+                    if (row.place == place) return row.clips ?? new AudioClip[0];
+            return new AudioClip[0];
         }
 
         /// <summary>

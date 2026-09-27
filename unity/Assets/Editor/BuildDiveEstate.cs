@@ -318,15 +318,16 @@ namespace HalfAware.EditorTools
             EstateEmit(place, "EstateFloor", b.Slab, crete, true);
             EstateEmit(place, "EstateWall", b.Wall, skin, true);
             EstateEmit(place, "EstateRail", b.Rail, Mat("Rail"), true);
-            EstateEmit(place, "EstateRoomFloor", b.Board, board, true);
-            EstateEmit(place, "EstateTile", b.Tile, tiles, true);
+            // 足音は場所の既定（コンクリート。外階段・踊り場・デッキ・地面の小径）のほか、住戸の中だけ床で替える（BuildDive.PlaceStepPaths）
+            StepFloor(EstateEmit(place, "EstateRoomFloor", b.Board, board, true), StepSets.Room);
+            StepFloor(EstateEmit(place, "EstateTile", b.Tile, tiles, true), StepSets.HardFloor);
             EstateEmit(place, "EstateFixture", b.Fixture, tiles, false);
             EstateEmit(place, "EstateCast", b.Cast, cast, true);
             EstateEmit(place, "EstateFacing", b.Facing, brick, true);
             EstateEmit(place, "EstateWallA", b.WallA, wallA, true);
             EstateEmit(place, "EstateWallB", b.WallB, wallB, true);
-            EstateEmit(place, "EstateCarpetA", b.CarpetA, carpetA, true);
-            EstateEmit(place, "EstateCarpetB", b.CarpetB, carpetB, true);
+            StepFloor(EstateEmit(place, "EstateCarpetA", b.CarpetA, carpetA, true), StepSets.Room);
+            StepFloor(EstateEmit(place, "EstateCarpetB", b.CarpetB, carpetB, true), StepSets.Room);
             EstateEmit(place, "EstateGlaze", b.Glaze, glass, false);
             EstateEmit(place, "EstateFrame", b.Frame, paint, false);
             EstateEmit(place, "EstateCeil", b.Ceil, ceil, false);
