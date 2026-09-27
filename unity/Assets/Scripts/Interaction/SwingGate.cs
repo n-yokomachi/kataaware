@@ -9,7 +9,7 @@ namespace HalfAware
     /// 目を留めると、ほかの場面の調べる操作と同じ案内（<see cref="HudView.Prompt"/>、<c>E/(左クリック)　開ける</c>）を <see cref="HudView.SetPrompt"/> に出し、
     /// 調べる操作で開く。選び方は <see cref="InteractionPicker.Select"/> で、距離と視線の角度もほかの場面と同じ。
     /// 開くと戸の板（丁番を原点にした子）を y まわりに回し、閉じている間の当たりを切る。開いたままにする。
-    /// 開けたら、ほかの場面で調べたときと同じく目を戸へ向け（<see cref="PlayerController.Face"/>）、開き切るまで見回しを封じる。
+    /// 開けたら、ほかの場面で調べたときと同じく目を戸へ向け（<see cref="PlayerController.Face"/>）、開き切るまで見回しと歩きを封じる。
     ///
     /// **場面の進行（SceneFlow）には繋がない。** 必須や出来事はまだ入れない（設計書 4 節）。
     /// 場面の流れが入ったら、この案内と SceneFlow の案内がぶつからないよう、どちらかへまとめる。
@@ -63,8 +63,8 @@ namespace HalfAware
                     t = Mathf.Min(1f, t + Time.deltaTime / Mathf.Max(0.05f, seconds));
                     Pose(t);
                 }
-                // 開き切ったら見回しを返す
-                if (t >= 1f && player != null) player.FreeLook(this);
+                // 開き切ったら見回しと歩きを返す
+                if (t >= 1f) Release();
                 return;
             }
             if (player == null || hud == null || items.Count == 0) return;
@@ -79,13 +79,22 @@ namespace HalfAware
             {
                 player.Face(picked.Position);
                 player.HoldLook(this);
+                player.HoldMove(this);
                 Open();
             }
         }
 
         void OnDisable()
         {
-            if (player != null) player.FreeLook(this);
+            Release();
+        }
+
+        /// <summary>封じた見回しと歩きを返す。歩きは封じを解くだけで、ほかが止めていればそのまま</summary>
+        void Release()
+        {
+            if (player == null) return;
+            player.FreeLook(this);
+            player.FreeMove(this);
         }
 
         /// <summary>開ける。当たりを切り、音を鳴らし、板を回し始める</summary>
@@ -141,7 +150,7 @@ namespace HalfAware
             if (memo == null || !memo.open) return;
             Set(true);
             prompting = false;
-            if (player != null) player.FreeLook(this);
+            Release();
         }
 
         /// <summary>閉じた向きを一度だけ覚える。エディタでは Awake が鳴らないので、使う所で覚える</summary>

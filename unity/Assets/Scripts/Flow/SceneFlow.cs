@@ -15,7 +15,8 @@ namespace HalfAware
     ///
     /// **調べたら、その物を画面の真ん中へ持ってくる。** 調べる操作は視線から 40 度の内の物を拾うので、
     /// 調べた物が真ん中から外れていることがある。調べたら目をその物へ回し（<see cref="PlayerController.Face"/>）、
-    /// その物の字幕・二択・その物が起こした止まりが済むまで見回しを封じる（<see cref="PlayerController.HoldLook"/>）。歩きは止めない。
+    /// その物の字幕・二択・その物が起こした止まりが済むまで見回しと歩きを封じる（<see cref="PlayerController.HoldLook"/>・
+    /// <see cref="PlayerController.HoldMove"/>）。目は 1 秒かけてなめらかに回す（<see cref="PlayerController.FaceSeconds"/>）。
     /// 演出がもともと目を動かす所（端末の前へ座る、露店の内側へ回る）は、演出の側が勝つ
     /// </summary>
     public sealed class SceneFlow : MonoBehaviour
@@ -274,6 +275,7 @@ namespace HalfAware
                 // 目は先に向け始める。同じフレームで演出が見回しを預かるか向きを書き換えたら、そちらが勝つ
                 player.Face(selected.Position);
                 player.HoldLook(this);
+                player.HoldMove(this);
                 // 前提が揃っているかは、済んだことにする前に見る
                 var ready = InteractionPicker.UnmetPrerequisite(selected, progress.Done) == null;
                 var said = progress.Examine(selected);
@@ -501,12 +503,17 @@ namespace HalfAware
             return passed < lines || choosing || now < until;
         }
 
-        /// <summary>調べている物を手放し、見回しを返す</summary>
+        /// <summary>
+        /// 調べている物を手放し、見回しと歩きを返す。歩きは封じを解くだけで、座っている間や演出が止めている間
+        /// （<see cref="PlayerController.CanMove"/> が false）はそのまま
+        /// </summary>
         void Forget()
         {
             attending = null;
             attendUntil = 0f;
-            if (player != null) player.FreeLook(this);
+            if (player == null) return;
+            player.FreeLook(this);
+            player.FreeMove(this);
         }
 
         void OnDisable()

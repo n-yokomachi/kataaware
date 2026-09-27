@@ -86,5 +86,34 @@ namespace HalfAware.Tests
                 Object.DestroyImmediate(go);
             }
         }
+
+        // 調べている間は歩きも封じる。者ごとに数え、解いても CanMove（座っている・演出が止めている）には触らない
+        [Test]
+        public void WalkingIsHeldPerHolderAndLeavesCanMoveAlone()
+        {
+            var go = new GameObject("AttentionTests.Player");
+            try
+            {
+                var player = go.AddComponent<PlayerController>();
+                var flow = new object();
+                var gate = new object();
+                player.CanMove = false;
+                Assert.IsFalse(player.MoveHeld);
+                player.HoldMove(flow);
+                player.HoldMove(gate);
+                Assert.IsTrue(player.MoveHeld);
+                player.FreeMove(flow);
+                Assert.IsTrue(player.MoveHeld, "戸がまだ封じている");
+                player.FreeMove(gate);
+                Assert.IsFalse(player.MoveHeld);
+                Assert.IsFalse(player.CanMove, "座っている間は、封じを解いても歩けるようにならない");
+                player.HoldMove(null);
+                Assert.IsFalse(player.MoveHeld, "空の者は数えない");
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
     }
 }

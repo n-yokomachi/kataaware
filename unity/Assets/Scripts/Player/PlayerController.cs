@@ -29,8 +29,13 @@ namespace HalfAware
         // 度 / ピクセル。試作は 0.0022 rad/px（＝ 0.126）だったが、実画面で速すぎたので半分にした。
         // **場面をまたいで効く。** 自室も路地裏も車内も同じ速さで振れる
         public const float LookSensitivity = 0.063f;
-        /// <summary>調べた物へ目を向けるのにかける秒（<see cref="Face"/>）</summary>
-        public const float FaceSeconds = 0.3f;
+        /// <summary>
+        /// 調べた物や話す相手へ目を向けるのにかける秒（<see cref="Face"/>・<see cref="Follow"/>）。
+        /// 動き出しと止まりはなめらかに（<see cref="Gaze.Ease"/>）。
+        /// 0.3 秒では「インタラクトする際のカメラ移動はもっとゆっくり」と差し戻された（2026-09-27）。
+        /// 場面 4 の記憶の頭で名を呼ぶ人へ向けるのも同じ秒
+        /// </summary>
+        public const float FaceSeconds = 1.0f;
         /// <summary>動いている相手を追うときの遅れ。秒（<see cref="Follow"/>、<see cref="Gaze.Chase"/>）</summary>
         public const float FollowLag = 0.12f;
 
@@ -48,6 +53,8 @@ namespace HalfAware
         bool pointing;
         /// <summary>見回しを封じている者。調べている SceneFlow、話している DiveDirector、開けている戸など</summary>
         readonly System.Collections.Generic.HashSet<object> lookHolds = new System.Collections.Generic.HashSet<object>();
+        /// <summary>歩きを封じている者。見回しと同じ者が、調べている間だけ封じる</summary>
+        readonly System.Collections.Generic.HashSet<object> moveHolds = new System.Collections.Generic.HashSet<object>();
         bool facing;
         bool following;
         Transform faceTarget;
@@ -213,8 +220,8 @@ namespace HalfAware
         // ---- 調べた物へ目を向ける ----------------------------------------------
         //
         // 調べる操作は視線から 0.7 rad（40 度）の内の物を拾うので、調べた物が画面の真ん中から外れていることがある。
-        // 調べたら目をその物へ回し（Face）、調べている間（字幕・二択・その物が起こした止まり）は見回しを封じる（HoldLook）。
-        // 歩きは止めない。
+        // 調べたら目をその物へ回し（Face）、調べている間（字幕・二択・その物が起こした止まり）は見回しと歩きを封じる
+        // （HoldLook・HoldMove）。「インタラクト中は移動もできないように」（オーナー、2026-09-27）。
         //
         // **演出の側を先にする。** 演出が見回しを預かったら（CanLook を下げる）、あるいは Yaw・Pitch を自分で書いたら、
         // 目を向ける動きはそこでやめる。路地裏の売り買いで露店の内側へ回すときや、端末の前へ座らせるときと取り合わない
@@ -237,11 +244,30 @@ namespace HalfAware
         /// <summary>だれかが見回しを封じているか</summary>
         public bool LookHeld { get { return lookHolds.Count > 0; } }
 
+        /// <summary>
+        /// 歩きを封じる。<see cref="HoldLook"/> と同じく by ごとに数える。
+        /// <see cref="CanMove"/> とは別に持つので、解いても、座っている間や演出が止めている間（CanMove が false）に歩けるようにはならない。
+        /// 封じている間は足を止め、体の速さも 0 に戻す（足音が最後の速さのまま鳴り続けない）
+        /// </summary>
+        public void HoldMove(object by)
+        {
+            if (by != null) moveHolds.Add(by);
+        }
+
+        /// <summary><see cref="HoldMove"/> を解く</summary>
+        public void FreeMove(object by)
+        {
+            if (by != null) moveHolds.Remove(by);
+        }
+
+        /// <summary>だれかが歩きを封じているか</summary>
+        public bool MoveHeld { get { return moveHolds.Count > 0; } }
+
         /// <summary>目を向けている最中か。向け終えるか、追うのをやめるまで true</summary>
         public bool Facing { get { return facing; } }
 
         /// <summary>
-        /// point を画面の真ん中へ持ってくるよう、seconds 秒かけて目を回す。端はなめらかに。
+        /// point を画面の真ん中へ持ってくるよう、seconds 秒かけて目を回す。端はなめらかに（<see cref="Gaze.Ease"/>）。
         /// 座っていて首の振りに限りがあるときは、限りの中までしか回らない（<see cref="Yaw"/>）。
         /// 上下も向けられる範囲（<see cref="ClampPitch"/>）に収まる
         /// </summary>
@@ -297,7 +323,7 @@ namespace HalfAware
             var want = Gaze.Toward(transform.position, transform.eulerAngles.y, !head.Limited, new Vector3(0f, EyeHeight, eyeLead), FaceAt);
             var k = faceSeconds > 0f ? faceClock / faceSeconds : 1f;
             Vector2 now;
-            if (k < 1f) now = Gaze.Blend(faceFrom, want, Mathf.SmoothStep(0f, 1f, k));
+            if (k < 1f) now = Gaze.Blend(faceFrom, want, Gaze.Ease(k));
             else if (following) now = Gaze.Chase(new Vector2(Yaw, Pitch), want, dt, FollowLag);
             else now = want;
             Yaw = now.x;
@@ -387,7 +413,8 @@ namespace HalfAware
                 ChoiceStep = SideStep(stick);
                 // 目を向けている間と、調べている間は、マウスで見回さない
                 if (CanLook && !LookHeld && !facing) Look(look.ReadValue<Vector2>());
-                if (CanMove) Walk(stick);
+                // 調べている間は歩かない（MoveHeld）。足は止めても、床へは下ろし続ける
+                if (CanMove) Walk(MoveHeld ? Vector2.zero : stick);
             }
             else
             {

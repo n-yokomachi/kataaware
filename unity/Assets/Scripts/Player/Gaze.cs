@@ -48,8 +48,20 @@ namespace HalfAware
         }
 
         /// <summary>
+        /// 目を向ける動きの進み。k は経た秒を向ける秒で割った 0〜1。動き出しと止まりをなめらかにする（ease in と ease out）。
+        ///
+        /// **五次の曲線にする。** SmoothStep（三次）は速さこそ端で 0 になるが、加速は端でいきなり立ち上がって、
+        /// いきなり止まる。五次（6k⁵ − 15k⁴ + 10k³）は加速も端で 0 なので、じわりと動き出し、じわりと止まる
+        /// </summary>
+        public static float Ease(float k)
+        {
+            k = Mathf.Clamp01(k);
+            return k * k * k * (k * (k * 6f - 15f) + 10f);
+        }
+
+        /// <summary>
         /// from から to へ、k（0〜1）だけ寄せた向き。左右は近い回り方で回す。
-        /// k は呼び手が時間から決める（端を滑らかにするなら SmoothStep を掛けて渡す）
+        /// k は呼び手が時間から決める（端を滑らかにするなら <see cref="Ease"/> を掛けて渡す）
         /// </summary>
         public static Vector2 Blend(Vector2 from, Vector2 to, float k)
         {

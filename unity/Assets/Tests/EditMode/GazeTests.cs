@@ -85,5 +85,28 @@ namespace HalfAware.Tests
             var want = new Vector2(33f, 4f);
             Assert.AreEqual(want, Gaze.Chase(Vector2.zero, want, 0.016f, 0f));
         }
+
+        // 目を向ける動きは端でじわりと動き出し、じわりと止まる。速さも加速も端で 0
+        [Test]
+        public void EaseStartsAndStopsGently()
+        {
+            Assert.AreEqual(0f, Gaze.Ease(0f), 1e-6f);
+            Assert.AreEqual(1f, Gaze.Ease(1f), 1e-6f);
+            Assert.AreEqual(0.5f, Gaze.Ease(0.5f), 1e-6f);
+            Assert.AreEqual(0f, Gaze.Ease(-1f), 1e-6f);
+            Assert.AreEqual(1f, Gaze.Ease(2f), 1e-6f);
+            const float h = 1e-3f;
+            Assert.Less(Gaze.Ease(h) / h, 1e-4f, "動き出しの速さは 0 に近い");
+            Assert.Less((1f - Gaze.Ease(1f - h)) / h, 1e-4f, "止まりの速さは 0 に近い");
+            // 三次（SmoothStep）より出だしがゆるい
+            Assert.Less(Gaze.Ease(0.1f), Mathf.SmoothStep(0f, 1f, 0.1f));
+            for (var k = 0f; k < 1f; k += 0.05f) Assert.LessOrEqual(Gaze.Ease(k), Gaze.Ease(k + 0.05f), "戻らない");
+        }
+
+        [Test]
+        public void TurningTowardSomethingTakesAboutASecond()
+        {
+            Assert.AreEqual(1f, PlayerController.FaceSeconds, 1e-6f, "0.3 秒は速すぎると差し戻された");
+        }
     }
 }
