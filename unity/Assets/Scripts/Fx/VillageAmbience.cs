@@ -9,8 +9,9 @@ namespace HalfAware
     /// 鳴らす物は時刻（<see cref="VillageHour.Current"/>）で決める。時刻が替わったら <see cref="follow"/> 秒かけて入れ替える。
     /// 場面の頭は寄せずに、その時刻の大きさから始める。
     ///
-    /// **朝の麦の風は、路地を村の中へ歩くと薄れて消える**（オーナー、2026-09-27）。車を降りた所は麦畑の間の
-    /// 未舗装路で風が鳴っているが、最初の家（家 C）を通り過ぎるあたりから薄くし、家並みの中では聞こえない。
+    /// **朝の麦の風は、路地を村の中へ歩くと薄れて消える**（オーナー、2026-09-27。同日「もう少し手前から」で前倒し）。
+    /// 車を降りた所は麦畑の間の未舗装路で風が鳴っているが、歩き出してすぐ薄れ始め、いちばん手前の家（家 C）に
+    /// たどり着く頃には消えきる。家並みの中では聞こえない。
     /// 立ち位置（東西の x）だけで決めるので、西へ戻れば、また聞こえる（<see cref="Reach"/>）。
     /// 朝の村の鳥の声は残す。夕方（場面 6 の庭）の風は立ち位置によらず今のまま。
     ///
@@ -19,16 +20,20 @@ namespace HalfAware
     /// </summary>
     public sealed class VillageAmbience : MonoBehaviour
     {
-        public const float DefaultMorningVillage = 0.6f;
+        public const float DefaultMorningVillage = 0.4f;
         public const float DefaultMorningWheat = 0.5f;
         public const float DefaultEveningWheat = 0.6f;
         /// <summary>
-        /// 朝の麦の風が薄れ始める x。家 C（路地の南、x -52.6〜-42.4）の中ほど。
-        /// 車を降りた所（x -76）から 29 m、歩いて 20 秒ほど
+        /// 朝の麦の風が薄れ始める x（オーナー、2026-09-27「もう少し手前からフェードアウトするように」で前より西へ動かした）。
+        /// 車を降りた所（<c>BuildVillage.ArriveAt.x</c> -76.3）から 6 m ほど、農場の門（車の着く所の側、x -73.6〜-70.2）を
+        /// 過ぎたあたり
         /// </summary>
-        public const float DefaultWheatFadeFrom = -47f;
-        /// <summary>朝の麦の風が消えきる x。家 C を過ぎ、電話ボックス（x -35.4）の前。薄れ始めから 12 m、歩いて 9 秒ほど</summary>
-        public const float DefaultWheatFadeTo = -35f;
+        public const float DefaultWheatFadeFrom = -70f;
+        /// <summary>
+        /// 朝の麦の風が消えきる x。いちばん手前の家（家 C、路地の南の x -52.6〜-42.4）の西の端。
+        /// ここまでに消えているので、家 C にたどり着く頃には聞こえない（オーナーの言葉どおり）。薄れ始めから 17 m、歩いて 12 秒ほど
+        /// </summary>
+        public const float DefaultWheatFadeTo = -52.6f;
 
         [Tooltip("いまの時刻を持つ物")]
         [SerializeField] VillageHour hour;

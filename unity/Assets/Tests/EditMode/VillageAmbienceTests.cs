@@ -23,7 +23,7 @@ namespace HalfAware.Tests
         [Test]
         public void StartsFromTheOwnersStartingPoint()
         {
-            Assert.AreEqual(0.6f, VillageAmbience.DefaultMorningVillage, 1e-6f);
+            Assert.AreEqual(0.4f, VillageAmbience.DefaultMorningVillage, 1e-6f, "鳥の声は風とのバランスを見て抑えめにした（オーナー、2026-09-27）");
             Assert.AreEqual(0.5f, VillageAmbience.DefaultMorningWheat, 1e-6f);
             Assert.AreEqual(0.6f, VillageAmbience.DefaultEveningWheat, 1e-6f);
         }
@@ -45,11 +45,16 @@ namespace HalfAware.Tests
         }
 
         [Test]
-        public void TheFadeStartsAroundTheFirstHouse()
+        public void TheFadeStartsSoonAfterLeavingTheCarAndEndsAtTheFirstHouse()
         {
-            // 最初の家（家 C、路地の南の x -52.6〜-42.4）の脇で薄れ始め、電話ボックス（x -35.4）の前で消えきる
-            Assert.That(VillageAmbience.DefaultWheatFadeFrom, Is.InRange(-52.6f, -42.4f));
-            Assert.That(VillageAmbience.DefaultWheatFadeTo, Is.InRange(-42.4f, -34f));
+            // 車を降りた所（BuildVillage.ArriveAt.x -76.3）から歩き出してすぐ薄れ始め、
+            // いちばん手前の家（家 C、路地の南の x -52.6〜-42.4）の西の端で消えきる
+            const float arriveX = -76.3f;
+            const float houseCWest = -52.6f;
+            Assert.That(VillageAmbience.DefaultWheatFadeFrom, Is.GreaterThan(arriveX), "降りた所よりは東");
+            Assert.That(VillageAmbience.DefaultWheatFadeFrom, Is.LessThan(houseCWest), "いちばん手前の家より手前");
+            Assert.That(VillageAmbience.DefaultWheatFadeFrom - arriveX, Is.LessThan(10f), "歩き出してすぐ薄れ始める");
+            Assert.AreEqual(houseCWest, VillageAmbience.DefaultWheatFadeTo, 1e-6f, "いちばん手前の家にたどり着く頃には消えきる");
         }
 
         [Test]
