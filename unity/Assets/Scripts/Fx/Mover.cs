@@ -13,7 +13,10 @@ namespace HalfAware
     /// 同じ人へ戻れば頭から流し直すので、ここが Update で数えると主の体とずれる。
     /// 経過秒は外から渡してもらう。
     ///
-    /// 位置は Take のローカル。場所ごと動かしても付いてくるようにするため
+    /// 位置は Take のローカル。場所ごと動かしても付いてくるようにするため。
+    ///
+    /// **鳩（<see cref="Pigeon"/>）の線は運ばない。** 同じ物に鳩が付いていれば、渡された秒をそのまま鳩へ回し、
+    /// 鳩が線を飛び立ちと降りてくる所の秒と行き先として読んで自分で置く
     /// </summary>
     public sealed class Mover : MonoBehaviour
     {
@@ -96,6 +99,18 @@ namespace HalfAware
         public bool Started { get { return started; } }
         bool started;
 
+        /// <summary>同じ物に付いた鳩（<see cref="Pigeon"/>）。付いていれば、置くのは鳩に任せる</summary>
+        Pigeon Bird
+        {
+            get
+            {
+                if (!birdLooked) { bird = GetComponent<Pigeon>(); birdLooked = true; }
+                return bird;
+            }
+        }
+        Pigeon bird;
+        bool birdLooked;
+
         /// <summary>頭から流し直すので、有効になった瞬間は開始位置に戻しておく</summary>
         void OnEnable()
         {
@@ -116,6 +131,9 @@ namespace HalfAware
         public void Play(float t, float after)
         {
             started = t >= at;
+            // **鳩は自分で置く。** 線は飛び立ちと降りてくる所の秒と行き先として読むだけで、
+            // 一直線に運ぶと、ついばんでいる鳩が合図の前から地面を滑り、飛び立った後は空に止まる
+            if (Bird != null) { bird.Cue(t, after); return; }
             transform.localPosition = nextCue < 0 ? Where(t) : Where(t, after);
             // **根の向きは一息に替える。** 模型は PersonMotion がこまの頭ごとに根の向きへ寄せるので
             // （TurnPerTick）、振り向きはそちらで段々に回って見える
