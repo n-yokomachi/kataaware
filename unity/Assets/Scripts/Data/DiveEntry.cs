@@ -85,13 +85,13 @@ namespace HalfAware
         public Seen[] seen;
         [Tooltip("記憶の中の会話。一行目は名を呼ぶ声。設計書 7 節")]
         public Said[] said;
-        [Tooltip("記憶の頭で、名を呼ぶ声の主（最初の会話の相手）へ目を向け、一行目から最初の会話までを続けて流す。" +
-                 "声の主が遠くて行き先が読めない記憶だけ（記憶 0 のメイ。三階の手すりから母が呼ぶ）")]
-        public bool leads;
+        [Tooltip("最初の会話は、相手のそばまで歩いてから始める。名を呼ぶ声からそのまま続けない。" +
+                 "設計書 7 節で最初の会話に「（居間まで入ってから）」と付いた記憶（記憶 8 のジョルジョ）")]
+        public bool approach;
 
         // ---- 会話の決まり（設計書 7 節） -------------------------------------
         //
-        // 一行目は名を呼ぶ声で、記憶に入った瞬間に出て、決まった秒で消える。送らない。
+        // 一行目は名を呼ぶ声で、記憶に入った瞬間に E で送る帯に出る。目はその話し手（Caller）へ向く。
         // 二行目からは、相手が同じ行が続く所を一つの会話とし、並びの順にしか始められない。
         // 板は、会話の相手にはその人との会話が済んでから、会話を持たない人には
         // その記憶の会話が全部済んでから出す。
@@ -101,12 +101,34 @@ namespace HalfAware
 
         /// <summary>
         /// 記憶に入ってから since 秒のときに出しておく一行目。hold 秒を過ぎたら null。
-        /// 一行も無ければ null
+        /// 一行も無ければ null。話し手（<see cref="Caller"/>）が引けず、記憶の頭を流せない時の、薄い帯の出し方
         /// </summary>
         public static string Calling(Said[] said, float since, float hold)
         {
             if (said == null || said.Length == 0) return null;
             return since < hold ? said[0].line : null;
+        }
+
+        /// <summary>
+        /// 一行目（名を呼ぶ声）の話し手。見える人（<see cref="seen"/>）のうち、飛び先の人の名前（<see cref="DiveCast"/>）が
+        /// 一行目の話し手の名前（「ハンナ「メイ！……」」の鉤括弧の前）と同じ人の、Take の下の名前。見つからなければ null。
+        ///
+        /// 記憶の頭で目を向ける先（<c>DiveDirector.Lead</c>）。一行目は相手を持たない行なので、会話の相手（<see cref="Said.partner"/>）からは引けない。
+        /// 名を呼ぶ人は、その記憶で板の出る人でもある（十六の記憶のどれも）ので、飛び先の人の名前で結べる
+        /// </summary>
+        public static string Caller(DiveEntry entry)
+        {
+            if (entry.said == null || entry.said.Length == 0 || entry.seen == null) return null;
+            var line = entry.said[0].line;
+            var open = string.IsNullOrEmpty(line) ? -1 : line.IndexOf('「');
+            if (open <= 0) return null;
+            var speaker = line.Substring(0, open);
+            for (var i = 0; i < entry.seen.Length; i++)
+            {
+                Person person;
+                if (DiveCast.TryByEntry(entry.seen[i].target, out person) && person.name == speaker) return entry.seen[i].name;
+            }
+            return null;
         }
 
         /// <summary>

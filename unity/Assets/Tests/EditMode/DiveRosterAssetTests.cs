@@ -36,16 +36,39 @@ namespace HalfAware.Tests
             Assert.That(Load().Count, Is.EqualTo(16));
         }
 
-        // 記憶の頭から声の主へ目を向けて流すのは、記憶 0（メイ）だけ。母は三階の手すりから呼び、庭から行き先が読めない
+        // どの記憶も、頭で名を呼ぶ人へ目を向ける。名を呼ぶ人は板の出る人の一人で、一行目の話し手の名前で引ける
         [Test]
-        public void OnlyMeiLeadsFromTheCall()
+        public void EveryMemoryKnowsWhoCallsFirst()
         {
             var roster = Load();
-            Assert.That(roster[0].leads, Is.True, "記憶 0 の頭を流す");
-            for (var i = 1; i < roster.Count; i++) Assert.That(roster[i].leads, Is.False, "記憶 " + i + " は流さない");
+            var expected = new[]
+            {
+                "Mother", "Neighbour", "Wife", "Grandfather", "Junior", "Wife", "Husband", "Pupil",
+                "Wife", "Husband", "Grandmother", "Senior", "Mother", "Teacher", "Neighbour", "Husband",
+            };
+            for (var i = 0; i < roster.Count; i++)
+                Assert.That(DiveEntry.Caller(roster[i]), Is.EqualTo(expected[i]), "記憶 " + i + " の一行目の話し手");
+        }
+
+        // 記憶 0 は、名を呼ぶ母との会話へそのまま続ける。流す会話は区切りの前（呼ばれたその場）
+        [Test]
+        public void MeiAnswersTheCallerStraightAway()
+        {
+            var roster = Load();
             var talks = DiveEntry.Exchanges(roster[0].said);
             Assert.That(talks.Length, Is.GreaterThan(0));
-            Assert.That(talks[0].Cut, Is.False, "流す会話は区切りの前（呼ばれたその場）");
+            Assert.That(talks[0].partner, Is.EqualTo(DiveEntry.Caller(roster[0])));
+            Assert.That(talks[0].Cut, Is.False);
+            Assert.That(roster[0].approach, Is.False);
+        }
+
+        // 最初の会話を相手のそばまで歩いてからにするのは、記憶 8（ジョルジョは居間まで入ってから、設計書 7 節）だけ
+        [Test]
+        public void OnlyGiorgioWalksInBeforeTheFirstTalk()
+        {
+            var roster = Load();
+            for (var i = 0; i < roster.Count; i++)
+                Assert.That(roster[i].approach, Is.EqualTo(i == 8), "記憶 " + i);
         }
 
         [Test]

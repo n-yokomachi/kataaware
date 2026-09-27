@@ -27,8 +27,8 @@ namespace HalfAware
     /// プレイヤーが選ぶ。そのためここから <see cref="DiveChain.Next"/> は呼ばない。
     /// あちらは最初の一人を決める <see cref="DiveChain"/> の作りの一部として残してある。
     ///
-    /// **会話は人を選んで進める。** 一行目（名を呼ぶ声）だけは記憶に入った瞬間に出て、
-    /// 送らずに消える。二行目からは、次の会話の相手に目を留めて `話す` の案内で始め、
+    /// **会話は人を選んで進める。** 一行目（名を呼ぶ声）だけは記憶に入った瞬間に出る（下の「記憶の頭は流す」）。
+    /// 二行目からは、次の会話の相手に目を留めて `話す` の案内で始め、
     /// 一行ずつ E で送る。板はその人との会話が済んでから出す。決まりは
     /// <see cref="DiveEntry.Exchanges"/> から <see cref="DiveEntry.MayDive"/> までが持っている。
     ///
@@ -36,14 +36,14 @@ namespace HalfAware
     /// 板の `潜る` と `切断`。一度の押下はこのうち一つにしか使わない。
     /// `E 次へ` は無い（設計書 2 節）。案内の書式は <see cref="HudView.Prompt"/>。
     ///
-    /// **話しているあいだは、相手の顔へ目を向けて見回しを封じる。** `話す` で始めたら目を相手の顔へ回し、
-    /// 動けば追う（<see cref="PlayerController.Follow"/>）。会話を閉じたら見回しを返す。
+    /// **話しているあいだは、相手の顔へ目を向けて見回しと歩きを封じる。** `話す` で始めたら目を相手の顔へ 1 秒かけて回し、
+    /// 動けば追う（<see cref="PlayerController.Follow"/>）。会話を閉じたら見回しと歩きを返す。
     ///
-    /// **記憶 0（メイ）だけは頭から流す**（<see cref="DiveEntry.leads"/>）。母は三階の手すりから呼ぶので、
-    /// 庭からは行き先が読めない。記憶に入ると同時に目を母へ回し、名を呼ぶ声を E で送る帯に出して、
-    /// そのまま最初の会話（「投げてよー」「投げません。いいから上がっておいで」まで）へ続ける。
-    /// 母は「いいから上がっておいで」で手すりから身を起こして戸口へ戻り（<see cref="PersonMotion"/> の letsGo）、
-    /// 会話を閉じたら見回しが戻る
+    /// **記憶の頭は流す。** 記憶に入ると同時に、名を呼ぶ声を E で送る帯に出し、目を声の主（<see cref="DiveEntry.Caller"/>）へ回して追う。
+    /// 記憶 0（メイ）で入れた形で（母は三階の手すりから呼ぶので、庭からは行き先が読めない）、全部の記憶へ広げた。
+    /// 送ると、最初の会話が声の主とのもので今始められるなら続け（メイは「投げません。いいから上がっておいで」まで）、
+    /// そうでなければ帯を閉じて見回しと歩きを返す（<see cref="Answer"/>）。
+    /// 母は「いいから上がっておいで」で手すりから身を起こして戸口へ戻る（<see cref="PersonMotion"/> の letsGo）
     ///
     /// **記憶するは、今いる記憶と、そこまで渡った道筋を残す**（設計書 5 節）。区切りは会話と会話の間
     /// （名を呼ぶ声を送る帯も、話している間も、切断の間も無い時）で、そこでは歩ける。そのフレームごとに写しを持ち（<see cref="Keep"/>）、
@@ -97,8 +97,6 @@ namespace HalfAware
         [SerializeField] float reach = 1.6f;
         [Tooltip("行き先と主の足元の高さの差がこれを超えたら、横が近くても着いていない。m。階の違う真上と真下を分ける")]
         [SerializeField] float reachHigh = 1.2f;
-        [Tooltip("記憶の頭で、名を呼ぶ声の主へ目を回すのにかける秒（DiveEntry.leads の記憶だけ）")]
-        [SerializeField] float callTurnSeconds = 0.8f;
 
         [Header("眩暈")]
         [Tooltip("`切断` が押せるようになってから、さらに cutAfter 人渡ったときの眩暈の濃さ")]
@@ -159,10 +157,12 @@ namespace HalfAware
         int lastStep;
         bool cutting;
         /// <summary>
-        /// 記憶の頭で、名を呼ぶ声を E で送る帯に出し、目を声の主へ向けている間（<see cref="DiveEntry.leads"/>）。
-        /// E を押すと最初の会話へ続く
+        /// 記憶の頭で、名を呼ぶ声を E で送る帯に出し、目を声の主（<see cref="DiveEntry.Caller"/>）へ向けている間。
+        /// E を押すと、最初の会話がその人とのもので今始められるなら続け、そうでなければ帯を閉じて歩きと見回しを返す
         /// </summary>
         bool leading;
+        /// <summary>記憶の頭で名を呼んだ人。いなければ null</summary>
+        Transform caller;
         /// <summary>いま目を向けて見回しを封じている相手。向けていなければ null</summary>
         Transform attending;
         /// <summary>記憶の頭で、声の主へ目を回し始める記憶の時計の秒。場面の頭は暗転から明けるのを待つ</summary>
@@ -297,11 +297,11 @@ namespace HalfAware
             clock += dt;
             Drift();
             Voice();
-            // 記憶の頭の、名を呼ぶ声。目を声の主へ回し、E で最初の会話へ続ける
+            // 記憶の頭の、名を呼ぶ声。目を声の主へ回し、E で送る
             if (leading)
             {
-                if (attending == null && clock >= turnAt) Attend(Partner(0), callTurnSeconds);
-                if (press) Begin(Partner(0));
+                if (attending == null && clock >= turnAt) Attend(caller, PlayerController.FaceSeconds);
+                if (press) Answer();
                 return;
             }
             if (Talking) { Converse(press); return; }
@@ -325,7 +325,7 @@ namespace HalfAware
 
         /// <summary>
         /// i 番の記憶を頭から流す。前の記憶と場所は伏せる。
-        /// lead が false なら、記憶の頭の名を呼ぶ声（<see cref="DiveEntry.leads"/>）を流さない（思い出した時）
+        /// lead が false なら、記憶の頭の名を呼ぶ声（<see cref="Lead"/>）を流さない（思い出した時）
         /// </summary>
         void Play(int i, bool lead = true)
         {
@@ -376,6 +376,7 @@ namespace HalfAware
             hushed = false;
             pending = false;
             leading = false;
+            caller = null;
             Unattend();
             if (panel != null) panel.Hide();
             if (hud != null) { hud.SetSubtitle(null); hud.SetPrompt(null); }
@@ -387,31 +388,74 @@ namespace HalfAware
             player.SpeedScale = entry.speed;
             Stand();
             player.CanMove = true;
-            if (entry.leads && lead) Lead();
+            if (lead) Lead();
         }
 
         /// <summary>
-        /// 記憶の頭を流す（<see cref="DiveEntry.leads"/>）。名を呼ぶ声を E で送る帯に出し、目を声の主へ回して追う。
-        /// 声の主は最初の会話の相手。送ると <see cref="Begin"/> で最初の会話へ続く。
+        /// 記憶の頭を流す。どの記憶でも、名を呼ぶ声を E で送る帯に出し、目を声の主（<see cref="DiveEntry.Caller"/>）へ回して追う。
+        /// そのあいだ見回しと歩きは封じる。送ると <see cref="Answer"/>。
         ///
         /// **一行目を薄い帯（<see cref="HudView.SetPassing"/>）で出さない。** 薄い帯は、声の主をプレイヤーが探して振り向くあいだ
-        /// 勝手に消える行として作った。ここでは目を声の主へ向けてあるので、ふつうの会話と同じく E で送らせる
+        /// 勝手に消える行として作った。ここでは目を声の主へ向けてあるので、ふつうの会話と同じく E で送らせる。
+        /// 記憶 0 の母で入れた形を、「メイの時と同じように、記憶に潜った時最初に話しかけてきた人に視線を合わせるようにして」
+        /// （オーナー、2026-09-27）で全部の記憶へ広げた
         /// </summary>
         void Lead()
         {
-            var who = Partner(0);
+            var who = take != null ? take.Person(DiveEntry.Caller(entry)) : null;
             if (who == null || entry.said == null || entry.said.Length == 0) return;
+            caller = who;
             leading = true;
             hushed = true;
             spoken = 1;
             ConsoleLog.Said(entry.said[0].line);
             if (hud != null) hud.SetSubtitle(entry.said[0].line, SubtitleKind.Line, true);
-            player.CanMove = false;
-            // 見回しは頭から封じる。目を回し始めるのは暗転が明けてから（Step）
+            // 見回しと歩きは頭から封じる。目を回し始めるのは暗転が明けてから（Step）
             player.HoldLook(this);
+            player.HoldMove(this);
             turnAt = turnDelay;
             turnDelay = 0f;
-            if (turnAt <= 0f) Attend(who, callTurnSeconds);
+            if (turnAt <= 0f) Attend(who, PlayerController.FaceSeconds);
+        }
+
+        /// <summary>
+        /// 記憶の頭の名を呼ぶ声を E で送った。
+        ///
+        /// **最初の会話がその人とのもので、いま始められるなら、そのまま続ける**（記憶 0 のメイ、「えーなにー？」へ）。
+        /// 名を呼んだ人へ主が答える形の記憶はこちら。
+        /// **そうでなければ帯を閉じて、見回しと歩きを返す。** 最初の会話の相手が名を呼んだ人と違う記憶（記憶 2 のアルベルトは
+        /// 妻に呼ばれて孫娘に声を掛ける）、相手がまだ歩いてくる記憶（記憶 13 の先生、記憶 15 の夫）、相手のいる所まで歩いてから
+        /// 話す記憶（記憶 8 のジョルジョは居間まで入ってから）。最初の会話は、これまでどおり相手を選んで `話す` で始める（設計書 7 節）
+        /// </summary>
+        void Answer()
+        {
+            leading = false;
+            var first = Partner(0);
+            if (first != null && first == caller && Ready(first)) { Begin(first); return; }
+            if (hud != null) hud.SetSubtitle(null);
+            Unattend();
+            Drop();
+        }
+
+        /// <summary>
+        /// 記憶の頭の続きで、その人との最初の会話をいま始めてよいか。話せる相手で（<see cref="Talkable"/>）、目から見えていて、
+        /// 合図の来た線をまだ歩き出していなくはない（歩き出す前でも、歩いている途中でもない）。
+        /// 動き出す行はもう出たのにまだ歩き出していない人（記憶 13 の先生は一行目で机の列を歩いてくる）と話し始めると、
+        /// 近づいてくる前に会話が始まる
+        /// </summary>
+        bool Ready(Transform who)
+        {
+            // 壁の向こうにいる人とは続けない。相手のいる所まで歩いてから、選んで話す（記憶 8 のジョルジョの妻は居間にいる）
+            if (!Talkable(who) || !Visible(who)) return false;
+            for (var i = 0; i < movers.Length; i++)
+            {
+                if (movers[i] == null || movers[i].transform != who) continue;
+                // 合図がまだ来ていない人は、会話の中の行で動き出す（記憶 0 の母は「いいから上がっておいで」で身を起こす）
+                if (movers[i].Cue >= 0 && cued[i] < 0f) continue;
+                var t = movers[i].Cue < 0 ? clock : clock - cued[i];
+                if (t < movers[i].At) return false;
+            }
+            return true;
         }
 
         /// <summary>k 番目の会話の相手。いなければ null</summary>
@@ -422,27 +466,29 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// who の顔へ seconds 秒かけて目を回し、そのあとも追う。見回しは封じる。
+        /// who の顔へ seconds 秒かけて目を回し、そのあとも追う。見回しと歩きは封じる。
         /// 同じ相手をもう追っていれば、そのまま追い続ける
         /// </summary>
         void Attend(Transform who, float seconds)
         {
             if (who == null) return;
+            player.HoldLook(this);
+            player.HoldMove(this);
             if (attending == who && player.Facing) return;
             attending = who;
             Vector3 offset;
             var aim = FaceAnchor(who, out offset);
             player.Follow(aim, offset, seconds);
-            player.HoldLook(this);
         }
 
-        /// <summary>相手を追うのをやめ、見回しを返す</summary>
+        /// <summary>相手を追うのをやめ、見回しと歩きを返す（封じを解くだけ。切断の間のように CanMove を下げていればそのまま）</summary>
         void Unattend()
         {
             if (player == null) return;
             if (attending != null) player.StopFacing();
             attending = null;
             player.FreeLook(this);
+            player.FreeMove(this);
         }
 
         /// <summary>土と板の床。公園と電車だけ。ほかはコンクリート</summary>
@@ -548,16 +594,19 @@ namespace HalfAware
         /// **相手が歩いているあいだは始めない。** 降りてくる息子や戻ってくる孫、机の列を歩いてくる先生に、
         /// 着く前から話しかけられてしまう（設計書 7 節の「先生が机の列を歩いて近づいてから」）。
         /// **〔区切り〕の後の会話は、主が体を動かしてから次を話す所**（設計書 7 節）。三階まで駆け上がる、池の縁まで歩く、
-        /// 玄関で靴を履く。主の足元が行き先（<see cref="Take.Stop"/>）の近くに来るまで始めない。行き先が無ければ相手のそば
+        /// 玄関で靴を履く。主の足元が行き先（<see cref="Take.Stop"/>）の近くに来るまで始めない。行き先が無ければ相手のそば。
+        /// **最初の会話を相手のそばまで歩いてからにする記憶**（<see cref="DiveEntry.approach"/>、記憶 8 のジョルジョは居間まで入ってから）も、
+        /// 最初の会話は相手のそばに来るまで始めない
         /// </summary>
         bool Arrived(Transform who)
         {
             if (DiveEntry.AllDone(talks, done)) return false;
             if (who == null || Walking(who)) return false;
             var talk = talks[done];
-            if (!talk.Cut) return true;
+            var near = done == 0 && entry.approach;
+            if (!talk.Cut && !near) return true;
             Vector3 goal;
-            if (take.Stop(talk.stop, out goal)) goal = place != null ? place.TransformPoint(goal) : goal;
+            if (talk.Cut && take.Stop(talk.stop, out goal)) goal = place != null ? place.TransformPoint(goal) : goal;
             else goal = who.position;
             var foot = player.transform.position;
             var flat = new Vector2(foot.x - goal.x, foot.z - goal.z);
@@ -608,8 +657,8 @@ namespace HalfAware
 
         /// <summary>
         /// 次の会話を始める。話しているあいだは歩けない。
-        /// 目は相手 who の顔へ回して追い、見回しは封じる（閉じたら返す）。
-        /// 足音も止まる（<see cref="Footsteps"/> が <see cref="PlayerController.CanMove"/> を見ている）
+        /// 目は相手 who の顔へ回して追い、見回しと歩きは封じる（閉じたら返す、<see cref="Attend"/>）。
+        /// 封じている間は足を止めて体の速さも 0 に戻すので、足音も止まる
         /// </summary>
         void Begin(Transform who)
         {
@@ -618,7 +667,6 @@ namespace HalfAware
             Hush();
             Drop();
             line = 0;
-            player.CanMove = false;
             Attend(who, PlayerController.FaceSeconds);
             Say();
         }
@@ -646,7 +694,6 @@ namespace HalfAware
             line = -1;
             done++;
             if (hud != null) hud.SetSubtitle(null);
-            player.CanMove = true;
             Unattend();
             Drop();
         }
@@ -1203,7 +1250,7 @@ namespace HalfAware
 
         /// <summary>
         /// 記憶するが書く状態。いま自由に動けるならその場で取り、話している途中なら、その会話を始める前の写し。
-        /// 場面に入ってからまだ一度も自由に動ける所へ来ていなければ（記憶 0 の頭の会話の途中）null（場面の頭を書く）
+        /// 場面に入ってからまだ一度も自由に動ける所へ来ていなければ（記憶の頭の名を呼ぶ声を送る前か、そのまま続けた最初の会話の途中）null（場面の頭を書く）
         /// </summary>
         public SceneMemo Kept()
         {

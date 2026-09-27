@@ -129,11 +129,11 @@ namespace HalfAware.EditorTools
                 entries[i] = e;
             }
 
-            // 記憶 0 は、名を呼ぶ母が三階の手すりにいて、庭から行き先が読めない。
-            // 記憶に入ると同時に目を母へ向け、呼ぶ声から「投げません。いいから上がっておいで」までを続けて流す（DiveEntry.leads）
-            var mei = entries[0];
-            mei.leads = true;
-            entries[0] = mei;
+            // 記憶 8 は、居間から妻が「早く閉めて」と呼ぶ。最初の会話は居間まで入ってから（設計書 7 節）。
+            // 呼ぶ声から戸口のまま話し続けず、妻のそばまで歩いてから `話す` で始める（DiveEntry.approach）
+            var giorgio = entries[8];
+            giorgio.approach = true;
+            entries[8] = giorgio;
 
             return entries;
         }
@@ -588,7 +588,7 @@ namespace HalfAware.EditorTools
                 e.FindPropertyRelative("tint").colorValue = entries[i].tint;
                 e.FindPropertyRelative("muffle").floatValue = entries[i].muffle;
                 e.FindPropertyRelative("heartbeat").boolValue = entries[i].heartbeat;
-                e.FindPropertyRelative("leads").boolValue = entries[i].leads;
+                e.FindPropertyRelative("approach").boolValue = entries[i].approach;
                 Fill(e.FindPropertyRelative("seen"), entries[i].seen);
                 Lines(e.FindPropertyRelative("said"), entries[i].said);
             }

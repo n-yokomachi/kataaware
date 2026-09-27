@@ -60,7 +60,7 @@ MonoBehaviour:
     - line: "\u30E1\u30A4\u300C\u3044\u3063\u3066\u304D\u307E\u30FC\u3059\u300D"
       partner: Mother
       cut: 0
-    leads: 1
+    approach: 0
   - row: "\u5973\u300034\u3000\u300E\u30CF\u30F3\u30CA\u300F\u30002156/03/02 09:02"
     place: estate
     length: 30
@@ -122,7 +122,7 @@ MonoBehaviour:
     - line: "\u30CF\u30F3\u30CA\u300C\u8EE2\u3070\u306A\u3044\u3067\u3088\u300D"
       partner: Daughter
       cut: 0
-    leads: 0
+    approach: 0
   - row: "\u7537\u300078\u3000\u300E\u30A2\u30EB\u30D9\u30EB\u30C8\u300F\u30002156/03/02
       15:47"
     place: park
@@ -191,7 +191,7 @@ MonoBehaviour:
     - line: "\u30ED\u30FC\u30B6\u300C\u98A8\u304C\u51FA\u3066\u304D\u305F\u308F\u3002\u65E9\u304F\u5E30\u308A\u307E\u3057\u3087\u3046\u300D"
       partner: Wife
       cut: 0
-    leads: 0
+    approach: 0
   - row: "\u5973\u30007\u3000\u300E\u30BD\u30D5\u30A3\u30A2\u300F\u30002156/03/02
       15:47"
     place: park
@@ -256,7 +256,7 @@ MonoBehaviour:
     - line: "\u30BD\u30D5\u30A3\u30A2\u300C\u5F15\u3063\u3071\u3063\u3066\u306A\u3044\u3088\u3002\u624B\u3064\u306A\u3044\u3067\u308B\u3060\u3051\u300D"
       partner: Grandmother
       cut: 0
-    leads: 0
+    approach: 0
   - row: "\u5973\u300019\u3000\u300E\u30A8\u30DF\u30EA\u30FC\u300F\u30002156/03/02
       18:20"
     place: train
@@ -316,7 +316,7 @@ MonoBehaviour:
     - line: "\u30D7\u30EA\u30E4\u300C\u306F\u3044\u3002\u307E\u305F\u6765\u9031\u300D"
       partner: Junior
       cut: 0
-    leads: 0
+    approach: 0
   - row: "\u7537\u300052\u3000\u300E\u30DE\u30FC\u30AF\u300F\u30002156/03/03 06:55"
     place: kitchen
     length: 35
@@ -381,7 +381,7 @@ MonoBehaviour:
     - line: "\u30DE\u30FC\u30AF\u300C\u9784\u306B\u5165\u3063\u3066\u308B\u300D"
       partner: Wife
       cut: 0
-    leads: 0
+    approach: 0
   - row: "\u5973\u300049\u3000\u300E\u30EA\u30F3\u30C0\u300F\u30002156/03/03 06:56"
     place: kitchen
     length: 30
@@ -449,7 +449,7 @@ MonoBehaviour:
     - line: "\u30EA\u30F3\u30C0\u300C\u3044\u3063\u3066\u3089\u3063\u3057\u3083\u3044\u3002\u524D\u898B\u3066\u6B69\u304F\u306E\u3088\u300D"
       partner: Son
       cut: 0
-    leads: 0
+    approach: 0
   - row: "\u7537\u300041\u3000\u300E\u30EA\u30FC\u300F\u30002156/03/03 11:38"
     place: classroom
     length: 35
@@ -508,7 +508,7 @@ MonoBehaviour:
     - line: "\u30DE\u30C6\u30AA\u300C\u8D77\u304D\u307E\u3059\u300D"
       partner: Sleeper
       cut: 0
-    leads: 0
+    approach: 0
   - row: "\u7537\u300066\u3000\u300E\u30B8\u30E7\u30EB\u30B8\u30E7\u300F\u30002156/03/02
       09:03"
     place: estate
@@ -565,7 +565,7 @@ MonoBehaviour:
     - line: "\u30A8\u30EC\u30CA\u300C\u3042\u3089\u300D"
       partner: Wife
       cut: 0
-    leads: 0
+    approach: 1
   - row: "\u5973\u300072\u3000\u300E\u30ED\u30FC\u30B6\u300F\u30002156/03/02 15:50"
     place: park
     length: 30
@@ -611,7 +611,7 @@ MonoBehaviour:
     - line: "\u30ED\u30FC\u30B6\u300C\u9580\u306E\u3068\u3053\u3067\u306D\u3002\u5168\u90E8\u3069\u3046\u305E\u300D"
       partner: Grandson
       cut: 0
-    leads: 0
+    approach: 0
   - row: "\u7537\u300011\u3000\u300E\u30EB\u30FC\u30AB\u30B9\u300F\u30002156/03/02
       15:50"
     place: park
@@ -662,7 +662,7 @@ MonoBehaviour:
     - line: "\u30EB\u30FC\u30AB\u30B9\u300C\u5F85\u3063\u3066\u3002\u3042\u3068\u4E00\u56DE\u300D"
       partner: Grandfather
       cut: 0
-    leads: 0
+    approach: 0
   - row: "\u5973\u300018\u3000\u300E\u30D7\u30EA\u30E4\u300F\u30002156/03/02 18:20"
     place: train
     length: 25
@@ -716,7 +716,7 @@ MonoBehaviour:
     - line: "\u30D7\u30EA\u30E4\u300C\u306F\u3044\u3002\u307E\u305F\u6765\u9031\u300D"
       partner: Senior
       cut: 0
-    leads: 0
+    approach: 0
   - row: "\u7537\u300015\u3000\u300E\u30C0\u30CB\u30A8\u30EB\u300F\u30002156/03/03
       06:56"
     place: kitchen
@@ -775,7 +775,7 @@ MonoBehaviour:
     - line: "\u30EA\u30F3\u30C0\u300C\u3044\u3063\u3066\u3089\u3063\u3057\u3083\u3044\u3002\u524D\u898B\u3066\u6B69\u304F\u306E\u3088\u300D"
       partner: Mother
       cut: 0
-    leads: 0
+    approach: 0
   - row: "\u5973\u300016\u3000\u300E\u30A2\u30A4\u30B7\u30E3\u300F\u30002156/03/03
       11:38"
     place: classroom
@@ -841,7 +841,7 @@ MonoBehaviour:
     - line: "\u30A2\u30A4\u30B7\u30E3\u300C\u56DB\u5341\u4E8C\u30DA\u30FC\u30B8\u3002\u4E09\u554F\u76EE\u300D"
       partner: Neighbour
       cut: 0
-    leads: 0
+    approach: 0
   - row: "\u7537\u300016\u3000\u300E\u30DE\u30C6\u30AA\u300F\u30002156/03/03 11:39"
     place: classroom
     length: 25
@@ -894,7 +894,7 @@ MonoBehaviour:
     - line: "\u30A2\u30A4\u30B7\u30E3\u300C\u3042\u3068\u3067\u30CE\u30FC\u30C8\u898B\u305B\u3066\u3042\u3052\u308B\u300D"
       partner: Neighbour
       cut: 0
-    leads: 0
+    approach: 0
   - row: "\u5973\u300063\u3000\u300E\u30A8\u30EC\u30CA\u300F\u30002156/03/02 09:03"
     place: estate
     length: 25
@@ -953,4 +953,4 @@ MonoBehaviour:
     - line: "\u30A8\u30EC\u30CA\u300C\u3042\u3089\u300D"
       partner: Husband
       cut: 0
-    leads: 0
+    approach: 0
