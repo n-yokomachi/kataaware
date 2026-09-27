@@ -63,7 +63,7 @@ namespace HalfAware.Tests
         public void AReleaseBuildIgnoresTheDigits()
         {
             ConsoleMenu.DebugOverride = false;
-            for (var d = 1; d <= 9; d++) Assert.IsNull(ConsoleMenu.DigitTarget(d, "Room"), "数字 " + d);
+            for (var d = 1; d <= SceneMenu.Keys; d++) Assert.IsNull(ConsoleMenu.DigitTarget(d, "Room"), "数字 " + d);
         }
     }
 }

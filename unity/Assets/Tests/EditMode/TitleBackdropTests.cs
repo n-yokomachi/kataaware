@@ -30,9 +30,11 @@ namespace HalfAware.Tests
         {
             Assert.AreEqual(0, StageMap.StageOf(TitleScreen.SceneName, ""));
             Assert.AreEqual(0, StageMap.StageOf(null, ""));
-            // 夕方の村は場面 6（庭の記憶）。表の値は GardenMemoryTests で見る
-            Assert.IsNull(StageMap.SceneOf(10));
-            Assert.IsFalse(StageMap.Playable(10));
+            // 夕方の村は場面 6（庭の記憶）、場面 10（対面）は朝の村。表の値は GardenMemoryTests・ReunionTests で見る。
+            // 場面は 1〜10 まで揃ったので、無い場面は範囲の外だけ
+            Assert.IsNull(StageMap.SceneOf(0));
+            Assert.IsNull(StageMap.SceneOf(StageMap.Last + 1));
+            Assert.IsFalse(StageMap.Playable(StageMap.Last + 1));
         }
 
         [Test]
@@ -43,7 +45,9 @@ namespace HalfAware.Tests
                 Assert.IsNotEmpty(StageMap.TitleOf(s), "場面 " + s);
                 var scene = StageMap.SceneOf(s);
                 if (scene == null) continue;
-                Assert.AreEqual(s, StageMap.StageOf(scene, StageMap.HourOf(s)), scene);
+                // 場面 10 は場面 9 と同じ村の朝。シーンと時刻からは場面 9 に当たり、場面 10 かは村の演出の印（ReunionHandoff）で分ける
+                var expected = s == ReunionHandoff.Stage ? 9 : s;
+                Assert.AreEqual(expected, StageMap.StageOf(scene, StageMap.HourOf(s)), scene);
             }
             Assert.AreEqual("Village", StageMap.SceneOf(9));
             Assert.AreEqual(StageMap.Morning, StageMap.HourOf(9));
@@ -60,7 +64,8 @@ namespace HalfAware.Tests
                 var entry = SceneMenu.Scenes[i];
                 var scene = SceneMenu.SceneOf(entry);
                 var hour = entry == SceneMenu.Garden ? StageMap.Evening : scene == "Village" ? StageMap.Morning : "";
-                var stage = StageMap.StageOf(scene, hour);
+                // 対面の行も村の朝。場面 10 かは村の演出の印で分ける
+                var stage = entry == SceneMenu.Reunion ? ReunionHandoff.Stage : StageMap.StageOf(scene, hour);
                 Assert.Greater(stage, 0, scene);
                 Assert.AreEqual(SceneMenu.Titles[i], StageMap.TitleOf(stage), scene);
             }

@@ -23,15 +23,20 @@ namespace HalfAware.Tests
             var order = new System.Collections.Generic.List<string>(SceneMenu.Scenes);
             Assert.That(order.IndexOf("Notice"), Is.GreaterThan(order.IndexOf("Rest")), "自室・気づきは小休止の後");
             Assert.That(order.IndexOf("Drive"), Is.GreaterThan(order.IndexOf("Notice")), "車内は自室・気づきの後");
-            Assert.That(SceneMenu.Pick(SceneMenu.Count), Is.EqualTo("Village"), "終わりは村");
+            Assert.That(order.IndexOf("Village"), Is.GreaterThan(order.IndexOf("Drive")), "村は車内の後");
+            Assert.That(SceneMenu.Pick(SceneMenu.Count), Is.EqualTo(SceneMenu.Reunion), "終わりは対面");
         }
 
-        // 数字は鍵盤から直に読んでいて、読んでいるのは 1〜9。
+        // 数字は鍵盤から直に読んでいて、読んでいるのは 1〜9 と 0（0 は 10 行目）。
         // それより多く並べると、一覧に出ているのに押せない番号ができる
         [Test]
         public void EveryNumberCanBeTyped()
         {
-            Assert.That(SceneMenu.Count, Is.LessThanOrEqualTo(9));
+            Assert.That(SceneMenu.Count, Is.LessThanOrEqualTo(SceneMenu.Keys));
+            for (var i = 0; i < SceneMenu.Count; i++)
+                Assert.That(SceneMenu.KeyOf(i), Is.Not.Empty, SceneMenu.Titles[i] + " の鍵が無い");
+            Assert.That(SceneMenu.KeyOf(9), Is.EqualTo("0"));
+            Assert.That(SceneMenu.KeyOf(10), Is.Empty);
         }
 
         [Test]

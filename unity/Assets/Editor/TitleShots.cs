@@ -205,7 +205,7 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>撮る前の場面へ戻す。撮る間に汚した場面は、開き直して捨てる</summary>
-        static void Back(SceneSetup[] setup)
+        internal static void Back(SceneSetup[] setup)
         {
             if (SceneManager.GetActiveScene().isDirty) EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var usable = setup != null && setup.Length > 0;
@@ -273,7 +273,7 @@ namespace HalfAware.EditorTools
         /// 絵が落ち着くまで撮り直す。開いたばかりの場面の一枚目は、壁や道が抜けることがある
         /// （エディタを組み直した後の最初の一度だけ起きる。二枚目からは揃う）。続けて撮った二枚が同じになったら採る
         /// </summary>
-        static Texture2D Steady(Camera cam)
+        internal static Texture2D Steady(Camera cam)
         {
             var shot = CheckDiveSky.Grab(cam, 960, 540);
             for (var i = 0; i < 4; i++)
@@ -343,7 +343,7 @@ namespace HalfAware.EditorTools
             }
         }
 
-        static Camera Main()
+        internal static Camera Main()
         {
             var go = GameObject.Find("Player/Main Camera");
             if (go != null && go.GetComponent<Camera>() != null) return go.GetComponent<Camera>();
@@ -360,7 +360,7 @@ namespace HalfAware.EditorTools
         /// 960×540 を中の 320×180 へ。3×3 の塊の真ん中の画素を採る。
         /// loose は 3×3 が同じ色でない塊の数（後処理が画面の解像度で掛かるようになると増える。そのときは縮めずに置く）
         /// </summary>
-        static Texture2D Shrink(Texture2D big, out int loose)
+        internal static Texture2D Shrink(Texture2D big, out int loose)
         {
             var w = big.width / 3;
             var h = big.height / 3;
@@ -388,7 +388,7 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>絵の取り込み。最近傍、ミップ無し、圧縮しない（粗い画素をそのまま出す）</summary>
-        static void Import(string path)
+        internal static void Import(string path)
         {
             AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
             var imp = AssetImporter.GetAtPath(path) as TextureImporter;

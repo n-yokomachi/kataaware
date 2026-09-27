@@ -6,9 +6,9 @@ namespace HalfAware
     /// 一つのシーンが二つの場面を持つことがある。村（<c>Village</c>）は朝なら場面 9、夕方なら場面 6。
     /// その区別は村の時刻（<see cref="VillageHour.Hour"/> の名）で付ける。
     ///
-    /// **まだ無い場面は表に載せない。** 場面 6（庭の記憶、村の夕方）・7（自室・気づき）・10（対面）を作ったら、
-    /// <see cref="Rows"/> に一行足す。場面 10 のように、同じシーンの途中で場面が替わるものは、
-    /// 替わった所から <see cref="SaveFlow.EnterStage"/> を呼ぶ
+    /// **まだ無い場面は表に載せない。** 場面を作ったら <see cref="Rows"/> に一行足す。
+    /// 場面 10（対面）は場面 9 と同じ村の朝で、卓の前に立った所から場面が替わる（<see cref="ReunionDirector"/> が
+    /// <see cref="SaveFlow.EnterStage"/> を呼ぶ）。村の朝を読んだだけでは場面 9 で、場面 10 から始める時は <see cref="ReunionHandoff"/> で渡す
     /// </summary>
     public static class StageMap
     {
@@ -65,6 +65,8 @@ namespace HalfAware
             new Row(7, "Notice", ""),
             new Row(8, "Drive", ""),
             new Row(9, "Village", Morning),
+            // 場面 10 は場面 9 と同じ村の朝。村の朝から引くと上の場面 9 に当たるので、この行は場面 10 のシーンと時刻を引くためだけにある
+            new Row(10, "Village", Morning),
         };
 
         /// <summary>シーンの名と村の時刻から、場面の番号。表に無ければ 0（タイトルの画面など、セーブしない所）</summary>

@@ -115,6 +115,10 @@ namespace HalfAware.EditorTools
             var memoryNote = new System.Text.StringBuilder();
             Memory(root, hours, memoryNote);
             if (memoryNote.Length > 0) Debug.Log("庭の記憶の物を置いた。\n" + memoryNote);
+            // 場面 9 の終わりと場面 10（対面）の片割れと、その進行。伏せて置き、卓の前に立った時だけ起こす
+            var reunionNote = new System.Text.StringBuilder();
+            Reunion(root, reunionNote);
+            if (reunionNote.Length > 0) Debug.Log("対面の物を置いた。\n" + reunionNote);
             Register();
 
             var scene = EditorSceneManager.GetActiveScene();

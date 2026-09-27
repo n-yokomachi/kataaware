@@ -72,6 +72,8 @@ namespace HalfAware
             if (resumed != null) SetHour(resumed.hour);
             var hour = CurrentHour();
             var stage = resumed != null ? resumed.stage : StageMap.StageOf(scene.name, hour);
+            // 村の朝は場面 9。場面 10 の頭から入った時（デバッグの一覧の「対面」）は、村の演出が Awake で印を立てている
+            if (stage == 9 && ReunionHandoff.Active) stage = ReunionHandoff.Stage;
             if (stage <= 0)
             {
                 head = null;
@@ -99,6 +101,7 @@ namespace HalfAware
             pending = null;
             DiveHandoff.Clear();
             GardenHandoff.Clear();
+            ReunionHandoff.Clear();
             SceneManager.LoadScene(StageMap.SceneOf(StageMap.First));
         }
 
@@ -126,6 +129,8 @@ namespace HalfAware
             SaveStore.Restore(data);
             // 村は朝（場面 9）と夕方（場面 6）で同じシーン。場面 6 のセーブなら、村を庭の記憶として開く印を立てる
             GardenHandoff.Pending = data.stage == GardenHandoff.Stage;
+            // 場面 10 も村の朝。場面 10 のセーブなら、村を場面 10 の頭（卓の前）から開く印を立てる
+            ReunionHandoff.Pending = data.stage == ReunionHandoff.Stage;
             pending = data;
             SceneManager.LoadScene(data.scene);
             return true;

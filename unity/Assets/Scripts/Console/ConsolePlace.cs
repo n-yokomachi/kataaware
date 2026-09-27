@@ -58,6 +58,8 @@ namespace HalfAware
         {
             // 場面 6（庭の記憶）は村のシーンの中の記憶。デバッグの一覧では別の名（SceneMenu.Garden）で持つ
             if (scene == SceneMenu.Garden) return Garden;
+            // 場面 10（対面）は場面 9 と同じ朝の村
+            if (scene == SceneMenu.Reunion) scene = SceneMenu.GardenScene;
             for (var i = 0; i < Table.GetLength(0); i++)
             {
                 if (Table[i, 0] != scene) continue;
@@ -81,8 +83,6 @@ namespace HalfAware
             {
                 // 場面 7。潜って戻った夜の自室。時刻は場面 7 を作る時に決める
                 case 7: return "倫敦・自室";
-                // 場面 10。場面 9 と同じ朝の村
-                case 10: return For("Village");
                 default: return string.Empty;
             }
         }

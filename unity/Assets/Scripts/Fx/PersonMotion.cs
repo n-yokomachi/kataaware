@@ -130,6 +130,12 @@ namespace HalfAware
         [Tooltip("頭の骨から見た、顔の向く向き（立った形で体の前を向く向き）")]
         [SerializeField] Vector3 headAim = Vector3.forward;
 
+        [Header("演出が据える形")]
+        [Tooltip("演出が一時に据える形の骨。親から順（場面 10 の片割れの、口元を覆う手と頬へ伸ばす手の腕と指）")]
+        [SerializeField] Transform[] posed = new Transform[0];
+        [Tooltip("形ごとの、骨の向き（模型の根から見た向き）。posed の数ずつ、形の順に並べる")]
+        [SerializeField] Quaternion[] poses = new Quaternion[0];
+
         [Header("持ち物")]
         [Tooltip("骨に付いて動く持ち物。人の根の子に置き、こまの頭ごとに骨の所へ据え直す")]
         [SerializeField] Transform[] carried = new Transform[0];
@@ -164,6 +170,9 @@ namespace HalfAware
         float letGo;
         /// <summary>据えた骨の、動きが置いた向き。解くあいだの混ぜに使う</summary>
         Quaternion[] moving = new Quaternion[0];
+        /// <summary>演出が掛けている形の番号（-1 で掛けない）と効き</summary>
+        int pose = -1;
+        float poseWeight;
 
         public Transform Body { get { return body; } }
         public AnimationClip Idle { get { return idle; } }
@@ -182,6 +191,24 @@ namespace HalfAware
         public bool Attends { get { return attends; } }
         /// <summary>今の首と頭の向けぶん（度。x 横・右が正、y 縦・下が正）</summary>
         public Vector2 Look { get { return look; } }
+
+        /// <summary>演出が据えられる形の数（<see cref="Pose"/>）</summary>
+        public int PoseCount { get { return posed.Length > 0 ? poses.Length / posed.Length : 0; } }
+
+        /// <summary>いま掛けている形の番号（-1 で掛けていない）と効き</summary>
+        public int PoseIndex { get { return pose; } }
+        public float PoseWeight { get { return poseWeight; } }
+
+        /// <summary>
+        /// 演出が形 index を weight（0〜1）だけ掛ける。-1 か weight 0 で掛けない。
+        /// 骨は次のこまの頭で置き直すので、効くのもそこから（12 こまで段々に動く）。
+        /// 動きが置いた向きから、形の向き（模型の根から見た向き）へ weight だけ寄せる
+        /// </summary>
+        public void Pose(int index, float weight)
+        {
+            pose = index;
+            poseWeight = Mathf.Clamp01(weight);
+        }
 
         /// <summary>その人の自然な歩きの速さ。m/s。歩きの動きのままの歩幅で一周期に進む m と、一周期の秒の比</summary>
         public float Natural
@@ -511,12 +538,31 @@ namespace HalfAware
             }
             for (var i = 0; i < feet.Length && i < ankles.Length; i++)
                 if (feet[i] != null && ankles[i] != null) feet[i].position = ankles[i].position;
+            Posed();
             // 首と頭は持ち物より先に回す（イヤホンは頭に付いてくる）
             Gaze();
             for (var i = 0; i < carried.Length && i < carriers.Length && i < carryAt.Length && i < carryTurn.Length; i++)
             {
                 if (carried[i] == null || carriers[i] == null) continue;
                 carried[i].SetPositionAndRotation(carriers[i].TransformPoint(carryAt[i]), carriers[i].rotation * carryTurn[i]);
+            }
+        }
+
+        /// <summary>
+        /// 演出が掛けている形（<see cref="Pose"/>）を置く。親の骨から順に、動きが置いた向きから形の向きへ効きの分だけ寄せる。
+        /// 子の骨は親を回した後の向きから寄せるので、効き 1 なら形のまま、途中なら動きと形のあいだ
+        /// </summary>
+        void Posed()
+        {
+            if (pose < 0 || poseWeight <= 0f || body == null || posed.Length == 0) return;
+            var n = posed.Length;
+            var frame = body.rotation;
+            for (var i = 0; i < n; i++)
+            {
+                var k = pose * n + i;
+                if (posed[i] == null || k >= poses.Length) continue;
+                var want = frame * poses[k];
+                posed[i].rotation = poseWeight >= 1f ? want : Quaternion.Slerp(posed[i].rotation, want, poseWeight);
             }
         }
 
