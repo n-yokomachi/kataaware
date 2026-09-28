@@ -40,5 +40,9 @@ sysinfo.txt
 # 映り込みの下地も組み立てのたびに焼き直す
 /Assets/Models/generated/alley/Mirror*.exr
 
+# エンディングの景色の帯も同じ。HalfAware/Build the ending のひと押しで揃う（30 MB 近くある）
+/Assets/Models/generated/ending/
+/Assets/Models/generated/ending.meta
+
 # 外から落とした素材の元（大きい）。Assets の外に置き、縮めた写しだけを Assets に入れる
 /[Rr]aw[Aa]ssets/
