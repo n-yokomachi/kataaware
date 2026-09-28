@@ -26,4 +26,6 @@
 
 ## 確かめること
 
-- `unity/Assets/TextMesh Pro/Resources/` にある物は、場面が使っていなくても書き出しに入る。`LiberationSans SDF.asset`（Liberation Sans、SIL Open Font License 1.1）と、TMP の既定のスプライトアセット `EmojiOne.asset`（EmojiOne の絵。同梱の `EmojiOne Attribution.txt` は EmojiOne のサイトのライセンスを見るように、とだけ書いてある）。書き出しから外すか、`THIRD_PARTY_NOTICES.txt` に足すかを決める
+- （済み）`unity/Assets/TextMesh Pro/Resources/` にある物は、場面が使っていなくても書き出しに入る。そこにあった `LiberationSans SDF.asset` の一式（Liberation Sans、SIL Open Font License 1.1）と、TMP の既定のスプライトアセット `EmojiOne.asset`（EmojiOne の絵）は、どの場面も使っていなかったので Resources から消し、`TMP Settings.asset` の既定のスプライトアセットも空にした。いまの書き出しには Liberation Sans も EmojiOne の絵も入らないので、`THIRD_PARTY_NOTICES.txt` には足さない
+  - 元の `TextMesh Pro/Fonts/LiberationSans.ttf` と `TextMesh Pro/Sprites/EmojiOne.png` はリポジトリに残っているが、何からも参照されず、書き出しには入らない
+  - TMP の Essential Resources を取り込み直すと、この二つが Resources に戻り、既定のスプライトアセットも EmojiOne に戻る。その時はまた消す
