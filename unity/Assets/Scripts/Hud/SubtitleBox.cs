@@ -20,6 +20,61 @@ namespace HalfAware
         /// <summary>この行数を超えたら、それ以上はウインドウを伸ばさない</summary>
         public const int MaxRows = 8;
 
+        // ---- 行の間（オーナー、2026-09-29「字幕でルビがあるときだけ行間が空いたように見えないように、あらかじめルビを含めた行間を常に開けるようにして」） ----
+        //
+        // 行の間は、ルビの有る無しにかかわらず、いつもルビが入る分を含めた一定の間にする。
+        // TMP は、行の頭より高い字（持ち上げたルビ）が行の途中に来ると、その行を下げて上の行とかぶらないようにする。
+        // ルビのある行だけが下がり、1 行目にルビがあれば文ごと下がって、ルビのあるページだけ行が広がって見えた。
+        // 行の高さを <line-height> で決め打ちにして下げさせず、1 行目の上には見えない字をルビの高さに置いて、いつもルビの分を空ける（Frame）
+
+        /// <summary>
+        /// ルビと上の行の字のあいだに、さらに空ける間（em）。ルビのための行間（<see cref="Ruby.ExtraLineSpacing"/>）だけでは、
+        /// 粗い画面でルビの上の端が上の行の字の下の端と 1 画素しか離れず、ルビが上の行に付いて見えた（2026-09-29）。0.1 em（台詞の字で 1.3 画素）足して、
+        /// ルビの上の隙間を下の隙間（親字との間）より広くする
+        /// </summary>
+        public const float RubyClear = 0.1f;
+
+        /// <summary>行の送り（em）。素の行送り（<see cref="Ruby.Advance"/>）に、ルビのための行間（<see cref="Ruby.ExtraLineSpacing"/>）と <see cref="RubyClear"/> を足した一定の間</summary>
+        public const float LineEm = Ruby.Advance + Ruby.ExtraLineSpacing * 0.01f + RubyClear;
+
+        /// <summary>字の上の端の線（ascent）。Noto Sans JP の字の寸法で 1.16 em（TMP の faceInfo、74.24 / 64）</summary>
+        public const float AscentEm = 1.16f;
+
+        /// <summary>字の下の端の線（descent）。Noto Sans JP で 0.288 em（18.432 / 64）</summary>
+        public const float DescentEm = 0.288f;
+
+        /// <summary>
+        /// 字幕の枠の上の縁から 1 行目のベースラインまで（em）。持ち上げたルビの字の上の線（ルビの大きさの ascent ＋ 持ち上げる高さ）。
+        /// ルビが無くてもここまで空ける（1 行目の上のルビが名前の行や地の上の縁にかからない）。TMP で測って 1.80 em
+        /// </summary>
+        public const float TopEm = Ruby.Lift + AscentEm * Ruby.Scale;
+
+        /// <summary>rows 行ぶんの字の枠の高さ（em）。1 行目の上のルビの分 ＋ 行の送り × (rows − 1) ＋ 最後の行の下の端の線</summary>
+        public static float BodyEm(int rows)
+        {
+            return TopEm + LineEm * Mathf.Max(0, rows - 1) + DescentEm;
+        }
+
+        /// <summary>1 行目の上にルビの高さを取る、見えない字。ルビと同じ大きさと高さに置き、進んだぶんを戻す</summary>
+        public static readonly string Headroom =
+            "<voffset=" + Num(Ruby.Lift) + "em><size=" + Num(Ruby.Scale * 100f) + "%><alpha=#00>あ<alpha=#FF></size></voffset>" +
+            "<space=" + Num(-Ruby.Scale) + "em>";
+
+        /// <summary>
+        /// 書式に直した台詞 expanded（<see cref="Ruby.Expand(string)"/> の後）を、一定の行の間で組む形にする。
+        /// 行の高さを決め打ちにし（<see cref="LineEm"/>）、1 行目の上にルビの高さを取る（<see cref="Headroom"/>）。空ならそのまま
+        /// </summary>
+        public static string Frame(string expanded)
+        {
+            if (string.IsNullOrEmpty(expanded)) return expanded;
+            return "<line-height=" + Num(LineEm) + "em>" + Headroom + expanded;
+        }
+
+        static string Num(float value)
+        {
+            return value.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
         /// <summary>改行で区切った行数。空なら 0</summary>
         public static int LineCount(string text)
         {

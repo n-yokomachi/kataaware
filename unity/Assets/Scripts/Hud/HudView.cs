@@ -26,9 +26,8 @@ namespace HalfAware
         [SerializeField] TMP_Text subtitleName;
         [Tooltip("送れる時だけ右下に出す送りの印（「E/」と左クリックのアイコン）。字は HudView.Advance で上書きする")]
         [SerializeField] TMP_Text subtitleHint;
-        [Tooltip("字幕 1 行ぶんの高さ。地はこの倍数で伸びる")]
-        [SerializeField] float subtitleRowHeight = 44f;
-        [Tooltip("地の上下の余白をあわせた高さ。名前の行を含む")]
+        [Tooltip("地の上下の余白をあわせた高さ。名前の行を含む。台詞の行の頭（subtitleHead）が 0 の場面だけが使う。" +
+            "行の送りは SubtitleBox.LineEm、下の余白は HudView.SubtitleBottom でコードが決める")]
         [SerializeField] float subtitlePadding = 34f;
         [Tooltip("地の上の縁から台詞の行の頭まで。名前の行を含む。0 なら台詞の行を動かさない")]
         [SerializeField] float subtitleHead = 0f;
@@ -308,29 +307,30 @@ namespace HalfAware
             var shown = SubtitleBox.Wrap(said, fits);
             var rows = SubtitleBox.Rows(shown);
             var scale = SubtitleBox.FontScale(shown);
+            var fontSize = baseFontSize * scale;
+            subtitleText.fontSize = fontSize;
             // ルビは折り返してから書式に直す。
-            // 先に直すと、折り返しがタグを字数に数えてしまう
-            subtitleText.text = Ruby.Expand(shown);
-            // ルビ（傍点）のある文は行を少し開ける。
-            // そのままだと下の行のルビが上の行の字にかぶる
-            var ruby = Ruby.Has(shown);
-            subtitleText.lineSpacing = ruby ? Ruby.ExtraLineSpacing : 0f;
+            // 先に直すと、折り返しがタグを字数に数えてしまう。
+            // 行の間は、ルビの有る無しにかかわらず、ルビが入る分を含めた一定の間（SubtitleBox.Frame）。1 行目の上にもルビの分を取る
+            subtitleText.text = SubtitleBox.Frame(Ruby.Expand(shown));
+            subtitleText.lineSpacing = 0f;
             subtitleText.alignment = listlessAlignment;
-            // 字を小さくしたぶん 1 行も低くなる。地の高さも同じだけ詰める
-            var body = subtitleRowHeight * rows * scale;
-            // 行を開けたぶん、地も伸ばす。下の行が地の下の余白へはみ出さないように
-            if (ruby)
-            {
-                var lines = SubtitleBox.LineCount(shown);
-                var opened = baseFontSize * scale * Ruby.ExtraLineSpacing * 0.01f * Mathf.Max(0, lines - 1);
-                body = Mathf.Max(body, subtitleRowHeight * lines * scale + opened);
-            }
+            // 字の枠の高さは行の数と一定の行の間で決まる。字を小さくしたぶん低くなる
+            var body = SubtitleBox.BodyEm(rows) * fontSize;
             var band = subtitleBand.GetComponent<RectTransform>();
             if (band != null)
             {
                 var size = band.sizeDelta;
-                size.y = subtitlePadding + body;
+                // 地の下の余白は SubtitleBottom（オーナー、2026-09-29「下側の余白はもうちょっととってほしい。そのため帯自体をもう少し幅出して」）。
+                // 名前の行と字の枠の頭までの寸法（subtitleHead）だけを場面から読み、下の余白は場面に焼かずにここで足す
+                size.y = subtitleHead > 0f ? subtitleHead + body + SubtitleBottom : subtitlePadding + body;
                 band.sizeDelta = size;
+            }
+            if (subtitleHint != null)
+            {
+                // 送りの印は下の余白の中に置く。最後の行の字にかからない
+                var hint = subtitleHint.rectTransform;
+                hint.anchoredPosition = new Vector2(hint.anchoredPosition.x, HintBottom);
             }
             // 台詞の行は、地の上の縁から名前の行のぶん下げて置く。
             // 独白でも同じ所に置き、会話と独白が続いても行が跳ねないようにする
@@ -340,8 +340,17 @@ namespace HalfAware
                 line.anchoredPosition = new Vector2(line.anchoredPosition.x, -subtitleHead);
                 line.sizeDelta = new Vector2(line.sizeDelta.x, body);
             }
-            subtitleText.fontSize = baseFontSize * scale;
         }
+
+        /// <summary>
+        /// 字幕の地の下の余白。字の枠（最後の行の下の端の線）から地の下の縁まで。粗い画面の 26 画素（Dot）。
+        /// 前は 14 Dot（最後の行の字の下から地の下の縁までが目で 19 Dot ほど）。オーナーの「下側の余白はもうちょっと」で、
+        /// 最後の行の字の下から地の下の縁まで 30 Dot ほど（前の 1.6 倍）にした（2026-09-29）
+        /// </summary>
+        public const float SubtitleBottom = 26f * ChoiceLayout.Dot;
+
+        /// <summary>送りの印の箱の下の縁を、地の下の縁からどれだけ上に置くか。印の字が下の余白の中ほどに来て、最後の行の字にかからない</summary>
+        public const float HintBottom = 7f * ChoiceLayout.Dot;
 
         /// <summary>
         /// 地のふだんの色を覚える。**組み立てた色をそのまま正とする。**

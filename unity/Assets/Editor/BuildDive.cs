@@ -471,7 +471,6 @@ namespace HalfAware.EditorTools
             var so = new SerializedObject(hud);
             so.FindProperty("subtitleBand").objectReferenceValue = band.gameObject;
             so.FindProperty("subtitleText").objectReferenceValue = subtitle;
-            so.FindProperty("subtitleRowHeight").floatValue = 44f;
             so.FindProperty("subtitlePadding").floatValue = 34f;
             so.FindProperty("promptText").objectReferenceValue = prompt;
             so.FindProperty("centerText").objectReferenceValue = centre;

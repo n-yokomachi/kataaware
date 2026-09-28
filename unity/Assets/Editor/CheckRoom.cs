@@ -272,6 +272,54 @@ namespace HalfAware.EditorTools
             return log.ToString();
         }
 
+        // ---- 字幕の窓の余白（2026-09-29） ------------------------------------------
+
+        /// <summary>
+        /// 字幕の窓を、1 行・2 行・3 行（ルビ有りと無し）のページと会話のページで撮り、二択と印の出ている所も撮る。
+        /// 名は tag_…png。場面 1 の座った目の正面で撮る。終えたら撮る前に開いていたシーンを開き直す（場面は保存しない）
+        /// </summary>
+        public static string ShootSubtitles(string dir, string tag)
+        {
+            if (EditorApplication.isPlaying) return "再生中は撮らない";
+            var active = EditorSceneManager.GetActiveScene();
+            if (active.isDirty) return "開いているシーンに未保存の変更がある: " + active.path;
+            var open = active.path;
+            Directory.CreateDirectory(dir);
+            var log = new System.Text.StringBuilder();
+            try
+            {
+                EditorSceneManager.OpenScene(PlaceProtagonist.RoomPath, OpenSceneMode.Single);
+                var flow = UnityEngine.Object.FindFirstObjectByType<SceneFlow>(FindObjectsInactive.Include);
+                var player = flow.Player;
+                var fso = new SerializedObject(flow);
+                var seatEye = fso.FindProperty("seatEyeHeight").floatValue;
+                var limit = fso.FindProperty("seatedHeadLimit").floatValue;
+                player.PlaceAt(player.transform.position, player.transform.eulerAngles.y, limit, 0f, 0f, seatEye);
+                var items = Items();
+                var cig = Find(items, RoomIds.Cigarette);
+                var jack = Find(items, RoomIds.Jack);
+                var monitor = Find(items, RoomIds.Terminal);
+                string P(string name) { return Path.Combine(dir, tag + "_" + name + ".png"); }
+                log.AppendLine(Shoot(P("1line"), h => h.SetSubtitle(cig.Lines[0], SubtitleKind.Line, true)));
+                log.AppendLine(Shoot(P("2line"), h => h.SetSubtitle(monitor.Lines[0], SubtitleKind.Line, true)));
+                log.AppendLine(Shoot(P("3line"), h => h.SetSubtitle(monitor.Lines[3], SubtitleKind.Line, true)));
+                log.AppendLine(Shoot(P("3line_ruby"), h => h.SetSubtitle(jack.Lines[0], SubtitleKind.Line, true)));
+                log.AppendLine(Shoot(P("talk"), h => h.SetSubtitle("ハンナ「メイ！　忘れもの！　上がっておいで！」", SubtitleKind.Line, true)));
+                log.AppendLine(Shoot(P("talk2"), h => h.SetSubtitle("ハンナ「水筒忘れるの毎日でしょ。<br/>投げません。いいから上がっておいで」", SubtitleKind.Line, true)));
+                log.AppendLine(Shoot(P("choice"), h => h.SetChoice(new Choice(monitor.Question))));
+                log.AppendLine(Shoot(P("prompt"), h => h.SetPrompt(HudView.Prompt(monitor.Label))));
+            }
+            catch (Exception e)
+            {
+                log.AppendLine("例外: " + e);
+            }
+            finally
+            {
+                if (!string.IsNullOrEmpty(open)) EditorSceneManager.OpenScene(open, OpenSceneMode.Single);
+            }
+            return log.ToString();
+        }
+
         // ---- 場面 3 ------------------------------------------------------------
 
         static void Connect(string dir, System.Text.StringBuilder log)

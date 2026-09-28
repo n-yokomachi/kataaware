@@ -44,13 +44,13 @@ namespace HalfAware.EditorTools
         const float Top = 12f * Dot;
         const float NameHeight = 16f * Dot;
         const float NameGap = 4f * Dot;
-        /// <summary>台詞 1 行の高さ。13 Dot の字の素の行送り（1.45 em）</summary>
-        const float Row = 19f * Dot;
-        const float Bottom = 14f * Dot;
+        /// <summary>地の下の余白。<see cref="HudView.SubtitleBottom"/>（26 Dot。前は 14 Dot）</summary>
+        const float Bottom = HudView.SubtitleBottom;
         /// <summary>左右の余白。画面の幅に対する割合。コンソールの枠と揃える</summary>
         const float Side = 0.14f;
         const float HintRight = 0.13f;
-        const float HintBottom = 8f * Dot;
+        /// <summary>送りの印の箱の下の縁。<see cref="HudView.HintBottom"/>（7 Dot。前は 8 Dot）</summary>
+        const float HintBottom = HudView.HintBottom;
 
         /// <summary>E で送る字幕の地より薄い、流れる行の地の濃さ</summary>
         const float PassingAlpha = 0.45f;
@@ -103,7 +103,10 @@ namespace HalfAware.EditorTools
             rect.anchorMax = new Vector2(1f, 0f);
             rect.pivot = new Vector2(0.5f, 0f);
             rect.anchoredPosition = Vector2.zero;
-            rect.sizeDelta = new Vector2(0f, Top + NameHeight + NameGap + Row * SubtitleBox.BaseRows + Bottom);
+            // 台詞の字の枠（既定の 2 行ぶん）。行の送りはルビの分を含めた一定の間（SubtitleBox.LineEm、1.845 em）で、1 行目の上にもルビの分を取る。
+            // 前は素の行送りの 19 Dot × 行で、ルビのある文だけ行を開けていた（2026-09-29 に改めた）。遊んでいる間の高さは HudView が行の数から決める
+            var body = SubtitleBox.BodyEm(SubtitleBox.BaseRows) * TextFont;
+            rect.sizeDelta = new Vector2(0f, Top + NameHeight + NameGap + body + Bottom);
             var shade = band.GetComponent<Image>();
             shade.sprite = Shade();
             shade.type = Image.Type.Simple;
@@ -115,7 +118,7 @@ namespace HalfAware.EditorTools
             line.anchorMax = new Vector2(1f - Side, 1f);
             line.pivot = new Vector2(0.5f, 1f);
             line.anchoredPosition = new Vector2(0f, -(Top + NameHeight + NameGap));
-            line.sizeDelta = new Vector2(0f, Row * SubtitleBox.BaseRows);
+            line.sizeDelta = new Vector2(0f, body);
             text.fontSize = TextFont;
             text.color = Color.white;
             text.alignment = TextAlignmentOptions.TopLeft;
@@ -166,7 +169,6 @@ namespace HalfAware.EditorTools
 
             so.FindProperty("subtitleName").objectReferenceValue = name;
             so.FindProperty("subtitleHint").objectReferenceValue = hint;
-            so.FindProperty("subtitleRowHeight").floatValue = Row;
             so.FindProperty("subtitlePadding").floatValue = Top + NameHeight + NameGap + Bottom;
             so.FindProperty("subtitleHead").floatValue = Top + NameHeight + NameGap;
             so.FindProperty("passingAlpha").floatValue = PassingAlpha;
