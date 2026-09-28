@@ -518,6 +518,359 @@ def atlas():
     return im
 
 
+# ---- 畑と荒野と石垣の丘のアトラス（EndingField.png、帯 3〜5） ----------------------------------------
+
+def poppy():
+    """
+    ヒナゲシ（コモン・ポピー）。畑の縁の、細い毛の生えた茎の先の緋色の四弁の杯。黒い芯。
+    6〜8 月に咲き、8 月は花と、壺の形の青灰の実が混じる
+    """
+    w, h = UNIT, UNIT * 2
+    rng = random.Random(701)
+    b = Brush(w, h)
+    heads = [(rng.uniform(16, 112), rng.uniform(18, 150)) for _ in range(9)]
+    for x, y in heads:
+        b.line([(64 + (x - 64) * 0.3, h - 4), (x + rng.uniform(-10, 10), (y + h) / 2.0), (x, y + 6)], (104, 128, 74), 1)
+    foliage(b, rng, 16, 112, h * 0.70, h - 3, 20, 12, (56, 80, 46), (104, 128, 76))
+    for i, (x, y) in enumerate(heads):
+        if i % 3 == 2:
+            # 実。青灰の壺に平たい蓋
+            b.ell(x, y + 2, 4, 5.5, (116, 138, 110))
+            b.ell(x, y - 3, 4.5, 1.6, (92, 104, 90))
+            continue
+        r = rng.uniform(9, 12)
+        col = jitter((214, 38, 26), rng, 10)
+        b.ell(x - r * 0.35, y, r * 0.8, r * 0.72, mix(col, (150, 18, 16), 0.25))
+        b.ell(x + r * 0.35, y, r * 0.8, r * 0.72, col)
+        b.ell(x, y - r * 0.25, r * 0.7, r * 0.55, mix(col, (255, 90, 60), 0.2))
+        b.ell(x, y + 1, r * 0.22, r * 0.2, (34, 26, 32))
+    return b.done()
+
+
+def cornflower():
+    """ヤグルマギク（コーンフラワー）。畑の縁の、針金のような灰緑の茎の先の、縁の裂けた鮮やかな青の花"""
+    w, h = UNIT, UNIT * 2
+    rng = random.Random(703)
+    b = Brush(w, h)
+    heads = [(rng.uniform(16, 112), rng.uniform(20, 130)) for _ in range(9)]
+    for x, y in heads:
+        b.line([(64 + (x - 64) * 0.25, h - 4), (x + rng.uniform(-8, 8), (y + h) / 2.0), (x, y + 4)], (110, 130, 104), 1)
+    for _ in range(18):
+        x = rng.uniform(30, 98)
+        y = rng.uniform(h * 0.45, h - 8)
+        b.leaf(x, y, rng.uniform(14, 22), rng.uniform(-50, 50), 1.6, jitter((96, 118, 90), rng, 8))
+    for x, y in heads:
+        for k in range(8):
+            a = 2 * math.pi * k / 8
+            b.ell(x + math.cos(a) * 4.5, y + math.sin(a) * 3.4, 3.2, 2.6, jitter((62, 96, 208), rng, 12))
+        b.ell(x, y, 2.6, 2.2, (44, 50, 120))
+    return b.done()
+
+
+def thistle():
+    """
+    アザミ（スピア・シスル）。牧草地と道端の、棘の縁の灰緑の葉と、棘の球の上の赤紫の刷毛。
+    8 月は白い綿毛の頭が混じる
+    """
+    w, h = UNIT, UNIT * 2
+    rng = random.Random(707)
+    b = Brush(w, h)
+    b.line([(64, h - 2), (62, 120), (60, 40)], (96, 116, 70), 4)
+    for bx, by in ((60, 60), (60, 90), (62, 120)):
+        for sgn in (-1, 1):
+            b.line([(bx, by), (bx + sgn * 26, by - 30)], (96, 116, 70), 2)
+    for k in range(9):
+        y = h - 10 - k * 20
+        for sgn in (-1, 1):
+            length = 46 - k * 4
+            x = 62 + sgn * 2
+            b.leaf(x, y, length, sgn * rng.uniform(55, 75), 7, jitter((82, 108, 72), rng, 8))
+            for q in range(5):
+                t = (q + 1) / 6.0
+                a = math.radians(sgn * 65)
+                px, py = x + math.sin(a) * length * t, y - math.cos(a) * length * t
+                b.line([(px, py), (px + rng.uniform(-3, 3), py - 5)], (200, 206, 170), 1)
+    heads = [(60, 40), (86, 30), (34, 30), (88, 62), (32, 58)]
+    for i, (x, y) in enumerate(heads):
+        if i == 3:
+            b.ell(x, y, 9, 8, (238, 234, 222))
+            b.ell(x - 2, y - 2, 6, 5, (252, 250, 244))
+            continue
+        b.ell(x, y + 5, 6, 6.5, (86, 104, 60))
+        for k in range(10):
+            b.line([(x + rng.uniform(-5, 5), y + 1), (x + rng.uniform(-7, 7), y - 7)], jitter((178, 60, 146), rng, 12), 2)
+    return b.done()
+
+
+def mayweed():
+    """シカギク（スセントレス・メイウィード）。畑の縁の、糸のように細かい葉の上の白い花びらと黄の芯"""
+    w, h = UNIT, UNIT * 2
+    rng = random.Random(709)
+    b = Brush(w, h)
+    heads = [(rng.uniform(14, 114), rng.uniform(h * 0.42, h * 0.72)) for _ in range(12)]
+    for x, y in heads:
+        b.line([(64 + (x - 64) * 0.4, h - 3), (x, y + 4)], (84, 116, 60), 1)
+    for _ in range(90):
+        x = rng.uniform(16, 112)
+        y = rng.uniform(h * 0.66, h - 4)
+        b.line([(x, y), (x + rng.uniform(-6, 6), y - rng.uniform(6, 12))], jitter((70, 104, 52), rng, 10), 1)
+    for x, y in heads:
+        G.daisy(b, rng, x, y, rng.uniform(7, 8.5), (246, 246, 238), (232, 196, 48))
+    return b.done()
+
+
+def _hedge(seed, top, bumps, extras):
+    """生け垣（2×1 升）。上の輪郭 top(x) から下の縁まで葉を詰め、上ほど日を受けて明るく。extras は実や花を足す"""
+    w, h = UNIT * 2, UNIT
+    rng = random.Random(seed)
+    b = Brush(w, h)
+    for _ in range(3000):
+        x = rng.uniform(2, 254)
+        t0 = top(x) + bumps(x, rng)
+        y = rng.uniform(t0, h - 1)
+        k = min(1.0, max(0.0, (y - t0) / 70.0 + rng.uniform(-0.12, 0.12)))
+        col = jitter(mix((104, 132, 60), (30, 48, 26), k), rng, 7)
+        b.leaf(x, y + 3, rng.uniform(5, 8), rng.uniform(0, 360), 2.6, col)
+    extras(b, rng, top)
+    return b.done()
+
+
+def hedge_a():
+    """刈り込んだサンザシの生け垣。上は平らに刈られ、縁は少し波打つ。8 月の終わりに色づき始めた赤い実を少し"""
+    def top(x):
+        return 22 + 3 * math.sin(x * 0.06) + 2 * math.sin(x * 0.19 + 1.0)
+
+    def bumps(x, rng):
+        return rng.uniform(-2, 3)
+
+    def extras(b, rng, top):
+        for _ in range(16):
+            x = rng.uniform(10, 246)
+            y = rng.uniform(top(x) + 10, 100)
+            b.ell(x, y, 1.8, 1.8, (148, 30, 30))
+    return _hedge(711, top, bumps, extras)
+
+
+def hedge_b():
+    """
+    伸びた生け垣。サンザシにキイチゴと野バラが絡み、明るい緑のカエデが頭を出す。
+    上の輪郭は不揃いで、若い枝が突き出る。野バラの橙の実とキイチゴの黒い実
+    """
+    def top(x):
+        return 16 + 10 * math.sin(x * 0.035 + 0.5) + 6 * math.sin(x * 0.11)
+
+    def bumps(x, rng):
+        return rng.uniform(-4, 6)
+
+    def extras(b, rng, top):
+        # カエデの明るい房
+        for cx in (60, 190):
+            for _ in range(160):
+                a = rng.uniform(0, 2 * math.pi)
+                d = 22 * math.sqrt(rng.random())
+                x, y = cx + math.cos(a) * d, top(cx) + 8 + math.sin(a) * d * 0.7
+                b.leaf(x, y, rng.uniform(5, 7), rng.uniform(0, 360), 3, jitter(mix((150, 170, 80), (96, 124, 60), rng.random()), rng, 6))
+        for _ in range(10):
+            x = rng.uniform(10, 246)
+            y0 = top(x)
+            b.line([(x, y0 + 6), (x + rng.uniform(-8, 8), y0 - rng.uniform(8, 16))], (92, 110, 60), 1)
+        for _ in range(12):
+            x = rng.uniform(10, 246)
+            b.ell(x, rng.uniform(top(x) + 8, 90), 2.2, 2.6, (222, 76, 36))
+        for _ in range(10):
+            x = rng.uniform(10, 246)
+            b.ell(x, rng.uniform(top(x) + 14, 110), 2, 2, (36, 22, 34))
+    return _hedge(713, top, bumps, extras)
+
+
+def _heath(seed, leaf_dark, leaf_light, flowers, flower_share, top_lo=34, leggy=False):
+    """ヒースの株（2×1 升）。低い座布団の輪郭に細かい葉を詰め、上の方に花の穂を散らす"""
+    w, h = UNIT * 2, UNIT
+    rng = random.Random(seed)
+    b = Brush(w, h)
+    if leggy:
+        for _ in range(26):
+            x = rng.uniform(20, 236)
+            b.line([(x, h - 2), (x + rng.uniform(-10, 10), rng.uniform(40, 70))], (92, 76, 66), 1)
+    for _ in range(760):
+        x = rng.uniform(6, 250)
+        t = (x - 128) / 122.0
+        top = top_lo + 50 * t * t
+        y = rng.uniform(top, h - 2)
+        b.leaf(x, y + 4, rng.uniform(5, 8), rng.uniform(-40, 40), 1.4, jitter(mix(leaf_dark, leaf_light, rng.random()), rng, 8))
+    for _ in range(int(560 * flower_share)):
+        x = rng.uniform(8, 248)
+        t = (x - 128) / 120.0
+        top = top_lo - 4 + 50 * t * t
+        y = rng.uniform(top, top + (h - top) * 0.55)
+        col = flowers[rng.randrange(len(flowers))]
+        b.ell(x, y, rng.uniform(1.8, 2.8), rng.uniform(2.2, 3.4), jitter(col, rng, 12))
+    return b.done()
+
+
+def ling():
+    """
+    リング（カルーナ）。荒野を一面に覆う主のヒース。8 月の盛りの、藤色がかった紫の細かい花の穂。
+    花を詰めすぎると、昼の日を受けて綿菓子のような桃色の塊に見えたので、暗い葉を覗かせる
+    """
+    return _heath(717, (50, 56, 40), (86, 88, 58), [(150, 92, 150), (132, 80, 136), (168, 114, 166)], 0.62)
+
+
+def bell_heather():
+    """ベル・ヘザー。乾いた斜面の、濃い赤紫の鐘形の花。リングより色が深い"""
+    return _heath(719, (44, 52, 38), (80, 84, 56), [(140, 40, 104), (120, 30, 90), (160, 60, 124)], 0.75, top_lo=40)
+
+
+def old_heather():
+    """年を経て伸びたヒース。茶色い木の茎が目立ち、花は少なくくすむ（焼いて若返らせる前の株）"""
+    return _heath(723, (60, 54, 44), (98, 88, 70), [(150, 110, 130), (130, 100, 110)], 0.35, top_lo=26, leggy=True)
+
+
+def bilberry():
+    """ビルベリー。ヒースのあいだの、明るい緑の小さな葉の低い茂みと、青黒い実"""
+    w, h = UNIT * 2, UNIT
+    rng = random.Random(727)
+    b = Brush(w, h)
+    for _ in range(900):
+        x = rng.uniform(8, 248)
+        t = (x - 128) / 120.0
+        top = 50 + 44 * t * t
+        y = rng.uniform(top, h - 2)
+        b.leaf(x, y + 3, rng.uniform(5, 7), rng.uniform(0, 360), 2.4, jitter(mix((70, 110, 40), (132, 160, 64), rng.random()), rng, 8))
+    for _ in range(20):
+        x = rng.uniform(20, 236)
+        b.ell(x, rng.uniform(64, 110), 1.8, 1.8, (44, 44, 76))
+    return b.done()
+
+
+def moor_grass():
+    """ムラサキ・ムーアグラス。荒野の湿った所の株立ちの草。藁色がかった緑の葉と、紫を帯びた穂"""
+    w, h = UNIT * 2, UNIT
+    rng = random.Random(729)
+    b = Brush(w, h)
+    for _ in range(240):
+        x = rng.uniform(10, 246)
+        foot = 128 + (x - 128) * 0.5
+        a = (x - 128) * 0.5 + rng.uniform(-18, 18)
+        b.leaf(foot, h - 2, rng.uniform(40, 84), a, 2.2, jitter(mix((112, 124, 70), (170, 160, 104), rng.random()), rng, 8))
+    for _ in range(26):
+        x = rng.uniform(40, 216)
+        y = rng.uniform(8, 50)
+        b.line([(x, y), (x + rng.uniform(-3, 3), y + 30)], (140, 130, 96), 1)
+        for k in range(5):
+            b.ell(x + rng.uniform(-1.5, 1.5), y + k * 3.5, 1.5, 2.6, jitter((124, 92, 116), rng, 10))
+    return b.done()
+
+
+def ash():
+    """トネリコ（アッシュ）の樹冠。生け垣の木と畑の一本木。明るい緑の、羽の葉の房の透けた軽い樹冠"""
+    b, rng = G.canopy(733, (138, 160, 84), (58, 88, 44), (7, 10))
+    for _ in range(44):
+        x0 = rng.uniform(40, 216)
+        y0 = rng.uniform(40, 190)
+        for _k in range(rng.randint(3, 7)):
+            x = x0 + rng.uniform(-8, 8)
+            y = y0 + rng.uniform(-6, 6)
+            a = math.radians(rng.uniform(0, 180))
+            L = rng.uniform(4, 8)
+            dx, dy = math.cos(a) * L, math.sin(a) * L
+            px, py = -dy * 0.4, dx * 0.4
+            b.a.polygon([(x - dx, y - dy), (x + px, y + py), (x + dx, y + dy), (x - px, y - py)], fill=0)
+    return b.done()
+
+
+def coping():
+    """
+    石垣の頭の、縦に立てて詰めた笠石（コック・アンド・ヘン）。2×1 升の下の 40 画素に、2 m ぶん（128 画素で 1 m）。
+    3〜6 cm の薄い石を隙間なく詰め、高いのと低いのを混ぜ、少しずつ傾ける。上は透かす。
+    頭に明るい線を引いて濃い目地で区切ったら、木の杭の柵に見えた（村の庭の石垣でも、間を空けると白い杭の柵に見えた）。
+    目地は石の色を少し沈めるだけにし、頭の輪郭の凸凹で石と読ませる
+    """
+    w, h = UNIT * 2, UNIT
+    rng = random.Random(737)
+    b = Brush(w, h)
+    x = 0.0
+    i = 0
+    while x < w:
+        wide = rng.uniform(4, 7)
+        tall = rng.uniform(19, 22) if i % 3 == 0 else rng.uniform(15, 18)
+        lean = rng.uniform(-2.5, 2.5)
+        base = jitter(mix((160, 146, 112), (132, 122, 98), rng.random()), rng, 7)
+        x1 = min(float(w), x + wide)
+        top_l = h - tall + rng.uniform(-1.5, 1.5)
+        top_r = h - tall + rng.uniform(-1.5, 1.5)
+        b.poly([(x, h), (x1, h), (x1 + lean, top_r), (x + lean, top_l)], base)
+        b.line([(x1 - 0.5, h), (x1 - 0.5 + lean, top_r + 3)], mix(base, (90, 78, 60), 0.35), 1)
+        if rng.random() < 0.3:
+            b.ell(x + wide * 0.5, h - rng.uniform(6, 16), 1.4, 1.2, (196, 192, 120))
+        x = x1
+        i += 1
+    return b.done()
+
+
+# (升の x, 升の y, 幅の升, 高さの升, 描く関数)。BuildEndingFarm.cs の FieldCells と同じ並び。
+# 下の 7・8 行目は空けておく（帯 6・7 の作り込みで足す）
+FIELD_CELLS = [
+    (0, 0, 1, 2, poppy),          # 0 ヒナゲシ
+    (1, 0, 1, 2, cornflower),     # 1 ヤグルマギク
+    (2, 0, 1, 2, thistle),        # 2 アザミ
+    (3, 0, 1, 2, mayweed),        # 3 シカギク
+    (4, 0, 1, 2, knapweed),       # 4 ノップウィード（EndingWild と同じ）
+    (5, 0, 1, 2, scabious),       # 5 マツムシソウ（同）
+    (6, 0, 1, 2, ragwort),        # 6 黄の平たい花房（同）
+    (7, 0, 1, 2, tall_grass),     # 7 背の高い草（同）
+    (0, 2, 2, 1, hedge_a),        # 8 刈り込んだ生け垣
+    (2, 2, 2, 1, hedge_b),        # 9 伸びた生け垣
+    (4, 2, 2, 1, bracken),        # 10 ワラビ（同）
+    (6, 2, 2, 1, gorse),          # 11 ハリエニシダ（同）
+    (0, 3, 2, 1, ling),           # 12 リング
+    (2, 3, 2, 1, bell_heather),   # 13 ベル・ヘザー
+    (4, 3, 2, 1, old_heather),    # 14 伸びたヒース
+    (6, 3, 2, 1, bilberry),       # 15 ビルベリー
+    (0, 4, 2, 2, G.oak),          # 16 楢の樹冠（村の庭と同じ）
+    (2, 4, 2, 2, beech),          # 17 ブナの樹冠（EndingWild と同じ）
+    (4, 4, 2, 2, ash),            # 18 トネリコの樹冠
+    (6, 4, 2, 1, moor_grass),     # 19 ムーアグラス
+    (6, 5, 2, 1, grass_tuft),     # 20 草の株（EndingWild と同じ）
+    (0, 6, 2, 1, coping),         # 21 石垣の笠石
+]
+
+
+def field_atlas():
+    im = Image.new('RGBA', (ATLAS, ATLAS), (70, 90, 50, 0))
+    for (ux, uy, uw, uh, draw) in FIELD_CELLS:
+        cell = draw()
+        assert cell.size == (uw * UNIT, uh * UNIT), (ux, uy, cell.size)
+        im.paste(cell, (ux * UNIT, uy * UNIT))
+    return im
+
+
+def heath_ground():
+    """
+    荒野の道の近くの地面（256 画素で 4 m 四方、繰り返す）。ヒースの細かい葉の暗い地に、盛りの紫の花の粒、伸びた株の茶、
+    焼いた後の若い緑を、大きな斑で寄せて散らす。色見本の平らな色では、株のあいだの地面が芝生に見えた
+    """
+    size = (256, 256)
+    rng = random.Random(751)
+    im = Image.new('RGB', size, (58, 50, 46))
+    w = G.D.Wrap(im)
+    patch = G.D.spread(G.D.clouds(size, 753, 4, 1.0), 3.0).load()
+    for _ in range(9000):
+        x, y = rng.uniform(0, 256), rng.uniform(0, 256)
+        k = patch[int(x) % 256, int(y) % 256] / 255.0
+        roll = rng.random()
+        if roll < 0.18 + 0.5 * k:
+            col = mix((150, 92, 146), (116, 70, 112), rng.random())
+        elif roll < 0.62 + 0.2 * k:
+            col = mix((64, 72, 46), (92, 96, 60), rng.random())
+        else:
+            col = mix((88, 72, 62), (112, 94, 78), rng.random())
+        r = rng.uniform(1.2, 2.6)
+        w.ellipse([x - r, y - r * 0.8, x + r, y + r * 0.8], fill=jitter(col, rng, 8))
+    G.D.shade(im, G.D.spread(G.D.clouds(size, 757, 3, 1.0), 2.0), 0.18)
+    return im
+
+
 def shaft():
     """
     林の光の筋（32×128）。加算で重ねる。横は芯が明るく縁で消える。縦は上（樹冠の隙間）で細く始まり、
@@ -548,6 +901,8 @@ def main():
     if not os.path.isdir(OUT):
         os.makedirs(OUT)
     save(atlas(), 'EndingWild')
+    save(field_atlas(), 'EndingField')
+    save(heath_ground(), 'EndingHeathGround')
     save(shaft(), 'EndingShaft')
 
 
