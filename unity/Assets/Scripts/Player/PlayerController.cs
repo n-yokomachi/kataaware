@@ -26,9 +26,10 @@ namespace HalfAware
         /// 演出が視線を寄せるとき（JackPull・JackPlug など）も、この範囲に収める
         /// </summary>
         public const float PitchDownLimit = 40f;
-        // 度 / ピクセル。試作は 0.0022 rad/px（＝ 0.126）だったが、実画面で速すぎたので半分にした。
+        // 度 / ピクセル。試作は 0.0022 rad/px（＝ 0.126）だったが、実画面で速すぎたので半分にした（0.063）。
+        // 2026-09-28 に「カメラ回転のスピードをもっと落として」と言われ、さらに 2/3 に落とした。
         // **場面をまたいで効く。** 自室も路地裏も車内も同じ速さで振れる
-        public const float LookSensitivity = 0.063f;
+        public const float LookSensitivity = 0.042f;
         /// <summary>
         /// 調べた物や話す相手へ目を向けるのにかける秒（<see cref="Face"/>・<see cref="Follow"/>）。
         /// 動き出しと止まりはなめらかに（<see cref="Gaze.Ease"/>）。
