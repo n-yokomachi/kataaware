@@ -66,11 +66,11 @@ namespace HalfAware.EditorTools
                 UiLens.Scale = uiScale;
                 lens = UiLens.Make();
                 lens.Fit(w, h);
-                Lens(hudCanvas, lens.Eye, 0);
+                Lens(hudCanvas, lens.Eye, 0, w, h);
                 if (console)
                 {
                     panel = ImplantConsole.Make();
-                    Lens(panel.GetComponent<Canvas>(), lens.Eye, ImplantConsole.SortingOrder);
+                    Lens(panel.GetComponent<Canvas>(), lens.Eye, ImplantConsole.SortingOrder, w, h);
                 }
                 // 見出し（冒頭のカード）は粗い画面の外に出すので、ここでは伏せる。
                 // コンソールを開いている間は、ゲームでも字幕と印を伏せる（HudView.LateUpdate）
@@ -122,8 +122,15 @@ namespace HalfAware.EditorTools
             return Camera.main;
         }
 
-        /// <summary>canvas を UiLens のカメラで描く向きにする。当たりの付け替えはしない（撮るだけなので）</summary>
-        internal static void Lens(Canvas canvas, Camera eye, int order)
+        /// <summary>
+        /// canvas を UiLens のカメラで描く向きにする。当たりの付け替えはしない（撮るだけなので）。
+        ///
+        /// CanvasScaler が ScaleWithScreenSize のとき、Unity の標準の作りは常にエディタの Game View の実寸
+        /// （Screen.width/height）から scaleFactor を出す。そのままだと撮る絵の大きさ（w×h）と関わりなく、
+        /// Game View の縦横比で字幕の枠の幅や折り返しがぶれる。ここでは w×h から scaleFactor を計算して
+        /// ConstantPixelSize で直に当て、Game View の実寸を読ませない（呼び出し側で元へ戻す）
+        /// </summary>
+        internal static void Lens(Canvas canvas, Camera eye, int order, int w, int h)
         {
             canvas.renderMode = RenderMode.ScreenSpaceCamera;
             canvas.worldCamera = eye;
@@ -131,8 +138,34 @@ namespace HalfAware.EditorTools
             canvas.planeDistance = Mathf.Max(1f, 10f - order * 0.01f);
             Layer(canvas.transform);
             var scaler = canvas.GetComponent<CanvasScaler>();
+            if (scaler != null && scaler.uiScaleMode == CanvasScaler.ScaleMode.ScaleWithScreenSize)
+            {
+                scaler.scaleFactor = ScaleFactorFor(scaler, w, h);
+                scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
+            }
             if (scaler != null && Handle != null) Handle.Invoke(scaler, null);
             Canvas.ForceUpdateCanvases();
+        }
+
+        /// <summary>
+        /// CanvasScaler の ScaleWithScreenSize が Screen.width/height から出す scaleFactor を、代わりに
+        /// 撮る大きさ w×h から計算する（Unity の CanvasScaler.HandleScaleWithScreenSize と同じ式）
+        /// </summary>
+        internal static float ScaleFactorFor(CanvasScaler scaler, int w, int h)
+        {
+            var reference = scaler.referenceResolution;
+            switch (scaler.screenMatchMode)
+            {
+                case CanvasScaler.ScreenMatchMode.Expand:
+                    return Mathf.Min(w / reference.x, h / reference.y);
+                case CanvasScaler.ScreenMatchMode.Shrink:
+                    return Mathf.Max(w / reference.x, h / reference.y);
+                default:
+                    var logWidth = Mathf.Log(w / reference.x, 2f);
+                    var logHeight = Mathf.Log(h / reference.y, 2f);
+                    var logWeightedAverage = Mathf.Lerp(logWidth, logHeight, scaler.matchWidthOrHeight);
+                    return Mathf.Pow(2f, logWeightedAverage);
+            }
         }
 
         static void Layer(Transform t)
@@ -197,7 +230,7 @@ namespace HalfAware.EditorTools
             return (byte)Mathf.Clamp(Mathf.RoundToInt(Mathf.LinearToGammaSpace(Mathf.Clamp01(v)) * 255f), 0, 255);
         }
 
-        /// <summary>Canvas の向きとレイヤー。撮り終えたら戻す（場面は開き直して捨てるが、念のため）</summary>
+        /// <summary>Canvas の向きとレイヤー、CanvasScaler の当て方。撮り終えたら戻す（場面は開き直して捨てるが、念のため）</summary>
         sealed class Keep
         {
             Canvas canvas;
@@ -207,6 +240,9 @@ namespace HalfAware.EditorTools
             float distance;
             Transform[] all;
             int[] layers;
+            CanvasScaler scaler;
+            CanvasScaler.ScaleMode scalerMode;
+            float scalerFactor;
 
             public static Keep Of(Canvas canvas)
             {
@@ -219,6 +255,12 @@ namespace HalfAware.EditorTools
                 k.all = canvas.GetComponentsInChildren<Transform>(true);
                 k.layers = new int[k.all.Length];
                 for (var i = 0; i < k.all.Length; i++) k.layers[i] = k.all[i].gameObject.layer;
+                k.scaler = canvas.GetComponent<CanvasScaler>();
+                if (k.scaler != null)
+                {
+                    k.scalerMode = k.scaler.uiScaleMode;
+                    k.scalerFactor = k.scaler.scaleFactor;
+                }
                 return k;
             }
 
@@ -230,6 +272,11 @@ namespace HalfAware.EditorTools
                 canvas.sortingOrder = order;
                 canvas.planeDistance = distance;
                 for (var i = 0; i < all.Length; i++) if (all[i] != null) all[i].gameObject.layer = layers[i];
+                if (scaler != null)
+                {
+                    scaler.uiScaleMode = scalerMode;
+                    scaler.scaleFactor = scalerFactor;
+                }
             }
         }
 

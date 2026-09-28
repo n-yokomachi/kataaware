@@ -185,8 +185,8 @@ namespace HalfAware.EditorTools
 
                 lens = UiLens.Make();
                 lens.Fit(w, h);
-                if (hud != null) ConsoleShot.Lens(hud.GetComponent<Canvas>(), lens.Eye, 0);
-                if (card != null) ConsoleShot.Lens(card.GetComponent<Canvas>(), lens.Eye, -1);
+                if (hud != null) ConsoleShot.Lens(hud.GetComponent<Canvas>(), lens.Eye, 0, w, h);
+                if (card != null) ConsoleShot.Lens(card.GetComponent<Canvas>(), lens.Eye, -1, w, h);
                 if (refresh != null)
                 {
                     refresh();
@@ -225,7 +225,7 @@ namespace HalfAware.EditorTools
                             if (asset.rendererDataList[i] == look.renderer) data.SetRenderer(i);
                     crispRt = new RenderTexture(w, h, 16, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB) { hideFlags = HideFlags.HideAndDontSave };
                     cc.targetTexture = crispRt;
-                    ConsoleShot.Lens(card.GetComponent<Canvas>(), cc, UiLens.ShowOrder + 1);
+                    ConsoleShot.Lens(card.GetComponent<Canvas>(), cc, UiLens.ShowOrder + 1, w, h);
                     if (asset != null) asset.renderScale = 1f;
                     Canvas.ForceUpdateCanvases();
                     cc.Render();

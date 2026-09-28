@@ -465,12 +465,12 @@ namespace HalfAware.EditorTools
                 rt = new RenderTexture(w, h, 16, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
                 rt.hideFlags = HideFlags.HideAndDontSave;
                 cam.targetTexture = rt;
-                ConsoleShot.Lens(screen.BackdropCanvas, cam, 0);
+                ConsoleShot.Lens(screen.BackdropCanvas, cam, 0, w, h);
 
                 // 枠と字。ゲームと同じ粗い画面で
                 lens = UiLens.Make();
                 lens.Fit(w, h);
-                ConsoleShot.Lens(screen.ScreenCanvas, lens.Eye, TitleScreen.SortingOrder);
+                ConsoleShot.Lens(screen.ScreenCanvas, lens.Eye, TitleScreen.SortingOrder, w, h);
                 // 起動を出し切った形にしてから描く
                 screen.Finish();
                 if (recall) screen.OpenList();
@@ -508,7 +508,7 @@ namespace HalfAware.EditorTools
                 nameRt = new RenderTexture(w, h, 16, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
                 nameRt.hideFlags = HideFlags.HideAndDontSave;
                 nameCam.targetTexture = nameRt;
-                ConsoleShot.Lens(screen.NameCanvas, nameCam, TitleScreen.NameOrder);
+                ConsoleShot.Lens(screen.NameCanvas, nameCam, TitleScreen.NameOrder, w, h);
                 if (asset != null) asset.renderScale = 1f;
                 Canvas.ForceUpdateCanvases();
                 nameCam.Render();
