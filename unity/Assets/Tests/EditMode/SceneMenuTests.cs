@@ -24,17 +24,19 @@ namespace HalfAware.Tests
             Assert.That(order.IndexOf("Notice"), Is.GreaterThan(order.IndexOf("Rest")), "自室・気づきは小休止の後");
             Assert.That(order.IndexOf("Drive"), Is.GreaterThan(order.IndexOf("Notice")), "車内は自室・気づきの後");
             Assert.That(order.IndexOf("Village"), Is.GreaterThan(order.IndexOf("Drive")), "村は車内の後");
-            Assert.That(SceneMenu.Pick(SceneMenu.Count), Is.EqualTo(SceneMenu.Reunion), "終わりは対面");
+            Assert.That(SceneMenu.Pick(SceneMenu.Count - 1), Is.EqualTo(SceneMenu.Reunion), "対面はエンディングの前");
+            Assert.That(SceneMenu.Pick(SceneMenu.Count), Is.EqualTo("Ending"), "終わりはエンディング");
         }
 
         // 数字は鍵盤から直に読んでいて、読んでいるのは 1〜9 と 0（0 は 10 行目）。
-        // それより多く並べると、一覧に出ているのに押せない番号ができる
+        // 11 行目（エンディング）から後は鍵が無く、一覧の行を押すか枠を動かして選ぶ（行の番号では選べる）
         [Test]
         public void EveryNumberCanBeTyped()
         {
-            Assert.That(SceneMenu.Count, Is.LessThanOrEqualTo(SceneMenu.Keys));
-            for (var i = 0; i < SceneMenu.Count; i++)
+            for (var i = 0; i < SceneMenu.Count && i < SceneMenu.Keys; i++)
                 Assert.That(SceneMenu.KeyOf(i), Is.Not.Empty, SceneMenu.Titles[i] + " の鍵が無い");
+            for (var i = SceneMenu.Keys; i < SceneMenu.Count; i++)
+                Assert.That(SceneMenu.Pick(i + 1), Is.Not.Null, SceneMenu.Titles[i] + " を行の番号で選べない");
             Assert.That(SceneMenu.KeyOf(9), Is.EqualTo("0"));
             Assert.That(SceneMenu.KeyOf(10), Is.Empty);
         }

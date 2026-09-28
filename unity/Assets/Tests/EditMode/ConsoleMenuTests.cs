@@ -156,10 +156,10 @@ namespace HalfAware.Tests
             var m = new ConsoleMenu();
             m.Hover(3);
             m.Decide("Room");
-            // 一覧の終わりは対面。行の数は場面を足すたびに増えるので、数えて引く
+            // 一覧の終わりはエンディング。行の数は場面を足すたびに増えるので、数えて引く
             var last = SceneMenu.Count - 1;
             m.HoverRow(last);
-            Assert.AreEqual(SceneMenu.Reunion, m.RowTarget("Room"));
+            Assert.AreEqual("Ending", m.RowTarget("Room"));
             m.MoveRow(1);
             Assert.AreEqual(last, m.Row);
             m.HoverRow(99);

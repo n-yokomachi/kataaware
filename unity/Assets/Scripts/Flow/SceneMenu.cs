@@ -6,18 +6,19 @@ namespace HalfAware
     ///
     /// **数字の鍵は 1〜9 と 0。** 10 番目の行は 0 の鍵で飛ぶ（<see cref="KeyOf"/>）。
     /// 押された鍵は行の番号（1 から数える、0 の鍵なら 10）で渡す（<see cref="Pick"/>）
+    /// 11 行目（エンディング）から後は数字の鍵が無い。一覧の行を押すか枠を動かして選ぶ
     /// </summary>
     public static class SceneMenu
     {
         /// <summary>表に出す名。物語の順に並べる</summary>
-        public static readonly string[] Titles = { "自室", "路地裏", "自室・接続", "潜る", "小休止", "庭の記憶", "自室・気づき", "車内", "村", "対面" };
+        public static readonly string[] Titles = { "自室", "路地裏", "自室・接続", "潜る", "小休止", "庭の記憶", "自室・気づき", "車内", "村", "対面", "エンディング" };
 
         /// <summary>
         /// 読み込むシーンの名。Titles と同じ並び。
         /// ここに挙げた名は組み立ての一覧にも入っていること。
         /// 入っていないと、数字を押した先で読み込みが落ちる
         /// </summary>
-        public static readonly string[] Scenes = { "Room", "Alley", "Connect", "Dive", "Rest", Garden, "Notice", "Drive", "Village", Reunion };
+        public static readonly string[] Scenes = { "Room", "Alley", "Connect", "Dive", "Rest", Garden, "Notice", "Drive", "Village", Reunion, "Ending" };
 
         /// <summary>押せる数字の数</summary>
         public static int Count { get { return Scenes.Length; } }
