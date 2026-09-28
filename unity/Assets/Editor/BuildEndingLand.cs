@@ -155,9 +155,9 @@ namespace HalfAware.EditorTools
                     {
                         case Scene.Forest: Woodland(s); break;
                         case Scene.Coast: Cliffs(s); break;
-                        case Scene.Moor: Moor(s); break;
-                        case Scene.Wheat: Wheat(s); break;
-                        case Scene.Pasture: Pasture(s); break;
+                        case Scene.Moor: Moorland(s); break;
+                        case Scene.Wheat: Harvest(s); break;
+                        case Scene.Pasture: Wolds(s); break;
                         case Scene.Beech: Beech(s); break;
                         case Scene.Lake: Lake(s); break;
                     }
@@ -206,6 +206,12 @@ namespace HalfAware.EditorTools
             public readonly Bank shafts = new Bank { Texel = 1f };
             /// <summary>海辺の帯の海</summary>
             public readonly Bank sea = new Bank { Texel = 1f };
+            /// <summary>荒野・麦畑・石垣の丘の札（EndingField.png）</summary>
+            public readonly Bank farm = new Bank { Texel = 1f, Rooted = true, CardLift = 1.4f };
+            /// <summary>石垣の面（村の石垣と同じ石灰岩の絵。2 m で一回り）</summary>
+            public readonly Bank stone = new Bank { Texel = 0.5f };
+            /// <summary>荒野の道の近くの地面（EndingHeathGround.png。4 m で一回り）</summary>
+            public readonly Bank heath = new Bank { Texel = 0.25f };
             public Material roadMat;
 
             /// <summary>環の中での z（区切りの頭が環の頭から何 m か）。起伏の位相を環の一周で閉じるのに使う</summary>
@@ -221,10 +227,12 @@ namespace HalfAware.EditorTools
             {
                 var m = Materials();
                 var dir = BuildEnding.Generated + name + "_";
-                stats.cards += flora.Count / 2 + wheat.Count / 2 + wild.Count / 2;
-                stats.tris += flora.Count + wheat.Count + paint.Count + road.Count + water.Count + field.Count + wild.Count + shafts.Count + sea.Count;
+                stats.cards += flora.Count / 2 + wheat.Count / 2 + wild.Count / 2 + farm.Count / 2;
+                stats.tris += flora.Count + wheat.Count + paint.Count + road.Count + water.Count + field.Count + wild.Count + shafts.Count + sea.Count
+                    + farm.Count + stone.Count + heath.Count;
                 stats.calls += (flora.Count > 0 ? 1 : 0) + (wheat.Count > 0 ? 1 : 0) + (paint.Count > 0 ? 1 : 0) + (road.Count > 0 ? 1 : 0)
-                    + (water.Count > 0 ? 1 : 0) + (field.Count > 0 ? 1 : 0) + (wild.Count > 0 ? 1 : 0) + (shafts.Count > 0 ? 1 : 0) + (sea.Count > 0 ? 1 : 0);
+                    + (water.Count > 0 ? 1 : 0) + (field.Count > 0 ? 1 : 0) + (wild.Count > 0 ? 1 : 0) + (shafts.Count > 0 ? 1 : 0) + (sea.Count > 0 ? 1 : 0)
+                    + (farm.Count > 0 ? 1 : 0) + (stone.Count > 0 ? 1 : 0) + (heath.Count > 0 ? 1 : 0);
                 road.Emit(slice, "Road", roadMat != null ? roadMat : m.road, false, dir);
                 var mesh = paint.Bake(dir + "Land.asset");
                 if (mesh != null)
@@ -240,6 +248,9 @@ namespace HalfAware.EditorTools
                 flora.Emit(slice, "Flora", m.flora, false, dir);
                 wild.Emit(slice, "Wild", m.wild, false, dir);
                 sea.Emit(slice, "Sea", m.sea, false, dir);
+                farm.Emit(slice, "Farm", m.farm, false, dir);
+                stone.Emit(slice, "Stone", m.stone, false, dir);
+                heath.Emit(slice, "Heath", m.heath, false, dir);
                 var beams = shafts.Emit(slice, "Shafts", m.shaft, false, dir);
                 if (beams != null) beams.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             }
@@ -253,6 +264,9 @@ namespace HalfAware.EditorTools
             Grass, Floor, Bark, Rock, RockDark, Foam, Turf, Asphalt, Stone, StoneDark, Wool, Face,
             Heath, HeathDark, Litter, Pasture, Roof, Wall, HillFar, HillNight, Reed, Sand, Line, Moon, Star, Lamp,
             BeechBark, Wood, Moss, Granite, GraniteDark, Slate,
+            // ここから絵の上の行（<see cref="SwatchTexture"/>）
+            HeathBloom, HeathOld, HeathYoung, Burnt, Bracken, MoorGrass, Stubble, StubbleDark, Straw, StrawEnd,
+            Honey, StoneSlate, Gritstone, WheatFar, Gate, Lush, HillMoor, HedgeDark,
         }
 
         /// <summary>升の色（sRGB）。Swatch と同じ並び</summary>
@@ -270,7 +284,7 @@ namespace HalfAware.EditorTools
             new Color32(118, 112, 102, 255), // 石垣の陰
             new Color32(226, 222, 208, 255), // 羊の毛
             new Color32(54, 50, 48, 255),    // 羊の顔
-            new Color32(112, 72, 104, 255),  // ヒース
+            new Color32(86, 60, 82, 255),    // ヒース
             new Color32(72, 54, 66, 255),    // ヒースの陰
             new Color32(126, 90, 54, 255),   // 落ち葉
             new Color32(98, 128, 60, 255),   // 牧草
@@ -290,6 +304,24 @@ namespace HalfAware.EditorTools
             new Color32(146, 140, 126, 255), // 石垣の花崗岩
             new Color32(104, 100, 92, 255),  // 石垣の花崗岩の陰
             new Color32(92, 96, 100, 255),   // 石垣の粘板岩
+            new Color32(98, 62, 94, 255),    // 盛りのヒース（藤色がかった紫。昼の日と霞で持ち上がるので暗めに置く）
+            new Color32(86, 70, 66, 255),    // 伸びたヒース（茶を帯びる）
+            new Color32(80, 84, 54, 255),    // 焼いた後の若いヒース（緑がかる。明るいと芝生に見えた）
+            new Color32(62, 52, 46, 255),    // 焼いた跡
+            new Color32(100, 138, 54, 255),  // ワラビ
+            new Color32(126, 120, 82, 255),  // ムーアグラス
+            new Color32(206, 188, 130, 255), // 刈った畑の株
+            new Color32(176, 156, 100, 255), // 刈った畑の株の陰
+            new Color32(228, 200, 122, 255), // 藁の束
+            new Color32(204, 174, 106, 255), // 藁の束の端（渦）
+            new Color32(200, 172, 118, 255), // コッツウォルズの石（蜂蜜色）
+            new Color32(108, 104, 98, 255),  // 石版の屋根
+            new Color32(122, 114, 102, 255), // ヨークシャーの砂岩
+            new Color32(202, 172, 92, 255),  // 遠くの麦畑
+            new Color32(170, 162, 142, 255), // 風に晒された木の門
+            new Color32(116, 142, 68, 255),  // 濃い牧草
+            new Color32(116, 88, 112, 255),  // 遠くの荒野の丘
+            new Color32(56, 76, 40, 255),    // 遠くの生け垣
         };
 
         /// <summary>
@@ -306,7 +338,9 @@ namespace HalfAware.EditorTools
 
             static Vector2 Uv(Swatch c)
             {
-                return new Vector2(((int)c + 0.5f) / SwatchWide, 0.5f);
+                // 初めの 32 升は絵の下の三行（真ん中の 0.5 はどちらの行でも同じ色）、33 升目からは上の行
+                var i = (int)c;
+                return i < SwatchWide ? new Vector2((i + 0.5f) / SwatchWide, 0.5f) : new Vector2((i - SwatchWide + 0.5f) / SwatchWide, 0.875f);
             }
 
             public void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Swatch col)
@@ -379,9 +413,9 @@ namespace HalfAware.EditorTools
 
             /// <summary>
             /// 寝かせた丸太。a から b へ、半径 r の sides 角柱。上を向く面（法線の上向きが 0.35 を越える面）を moss、ほかを col で塗る。
-            /// 両端は col の輪で塞ぐ
+            /// 両端は cap（無ければ col）の輪で塞ぐ
             /// </summary>
-            public void Log(Vector3 a, Vector3 b, float r, int sides, Swatch col, Swatch moss)
+            public void Log(Vector3 a, Vector3 b, float r, int sides, Swatch col, Swatch moss, Swatch? cap = null)
             {
                 var axis = (b - a).normalized;
                 var e1 = Vector3.Cross(axis, Vector3.up).sqrMagnitude > 1e-6f ? Vector3.Cross(Vector3.up, axis).normalized : Vector3.right;
@@ -407,8 +441,8 @@ namespace HalfAware.EditorTools
                 for (var i = 0; i < sides; i++)
                 {
                     var n = (i + 1) % sides;
-                    Tri(b, ring1[n], ring1[i], col);
-                    Tri(a, ring0[i], ring0[n], col);
+                    Tri(b, ring1[n], ring1[i], cap ?? col);
+                    Tri(a, ring0[i], ring0[n], cap ?? col);
                 }
             }
 
@@ -430,6 +464,8 @@ namespace HalfAware.EditorTools
 
         /// <summary>色見本の絵の横の画素数</summary>
         const int SwatchWide = 32;
+        /// <summary>色見本の絵の縦の画素数。下の三行が初めの 32 升（どれも同じ）、上の一行が 33 升目から</summary>
+        const int SwatchHigh = 4;
 
         // ---- アトラスの升（村の庭と同じ絵。BuildVillagePlants の Cells と Sizes から、使う物だけ） -------------
 
@@ -515,7 +551,7 @@ namespace HalfAware.EditorTools
 
         sealed class Mats
         {
-            public Material flora, swatch, road, asphalt, water, field, wheat, glow, wild, shaft, sea;
+            public Material flora, swatch, road, asphalt, water, field, wheat, glow, wild, shaft, sea, farm, stone, heath, cloudLow, cloudHigh;
         }
 
         static Mats materials;
@@ -533,6 +569,11 @@ namespace HalfAware.EditorTools
                 wild = WildMat(),
                 shaft = ShaftMat(),
                 sea = SeaMat(),
+                farm = FarmMat(),
+                stone = StoneMat(),
+                heath = HeathGroundMat(),
+                cloudLow = CloudMat("EndingCloudLow", new Color(1f, 1f, 1f, 0.88f), 0.16f, 0.34f),
+                cloudHigh = CloudMat("EndingCloudHigh", new Color(0.95f, 0.97f, 1f, 0.55f), 0.28f, 0.52f),
                 // 麦は場面 8 の麦（HalfAware/Wheat）をそのまま使う。場面 8 と同じ畑の絵と色
                 wheat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/Drive/Wheat.mat"),
                 field = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/Drive/FieldCrop.mat"),
@@ -632,12 +673,21 @@ namespace HalfAware.EditorTools
             return m;
         }
 
-        /// <summary>色見本の絵。1 画素ずつの升を横に並べる。最近傍・ミップ無し（隣の升が滲まない）</summary>
+        /// <summary>
+        /// 色見本の絵。1 画素ずつの升を横に並べる。最近傍・ミップ無し（隣の升が滲まない）。
+        /// 32 升を越えた分は上の行に置く。下の三行は初めの 32 升を繰り返し、升の uv の縦を 0.5 のまま保つ
+        /// （前からの帯のメッシュの uv が変わらない）
+        /// </summary>
         static Texture2D SwatchTexture()
         {
-            var tex = new Texture2D(SwatchWide, 1, TextureFormat.RGBA32, false, false);
-            var px = new Color32[SwatchWide];
-            for (var i = 0; i < SwatchWide; i++) px[i] = i < Tones.Length ? Tones[i] : new Color32(255, 0, 255, 255);
+            var tex = new Texture2D(SwatchWide, SwatchHigh, TextureFormat.RGBA32, false, false);
+            var px = new Color32[SwatchWide * SwatchHigh];
+            for (var y = 0; y < SwatchHigh; y++)
+                for (var i = 0; i < SwatchWide; i++)
+                {
+                    var k = y == SwatchHigh - 1 ? SwatchWide + i : i;
+                    px[y * SwatchWide + i] = k < Tones.Length ? Tones[k] : new Color32(255, 0, 255, 255);
+                }
             tex.SetPixels32(px);
             tex.Apply();
             return SavePng(tex, BuildEnding.Textures + "EndingSwatch.png", FilterMode.Point, TextureWrapMode.Clamp, true);

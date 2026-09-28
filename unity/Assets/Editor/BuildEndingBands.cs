@@ -188,28 +188,7 @@ namespace HalfAware.EditorTools
             }
         }
 
-        // ---- 起伏のある地面（帯 3〜5） -----------------------------------------------------
-
-        /// <summary>
-        /// 道の片側の地面を、道からの隔たり xs の段と z の刻みで升目に張る。高さは h(隔たり, 環の中の z)。
-        /// col は升ごとの色（隔たりの段と z の刻みから）
-        /// </summary>
-        static void Terrain(Slice s, int side, float[] xs, int zSteps, System.Func<float, float, float> h, System.Func<int, int, Swatch> col)
-        {
-            var dz = TileLength / zSteps;
-            for (var k = 0; k + 1 < xs.Length; k++)
-                for (var j = 0; j < zSteps; j++)
-                {
-                    float a = xs[k], b = xs[k + 1], z0 = j * dz, z1 = z0 + dz;
-                    System.Func<float, float, Vector3> P = (d, z) => new Vector3(side * d, h(d, s.Offset + z), z);
-                    var c = col(k, j);
-                    if (side > 0) s.paint.Quad(P(a, z1), P(b, z1), P(b, z0), P(a, z0), c);
-                    else s.paint.Quad(P(b, z1), P(a, z1), P(a, z0), P(b, z0), c);
-                }
-        }
-
-        /// <summary>起伏の段。近くは細かく、遠くは粗く</summary>
-        static readonly float[] HillRows = { RoadHalf - 0.05f, 3f, 4.5f, 6.5f, 9f, 12f, 16f, 21f, 27f, 34f, 42f, 52f, 64f, 78f, 95f, 115f, 140f, 170f };
+        // ---- 起伏のある地面（帯 4） -------------------------------------------------------
 
         /// <summary>
         /// 丘の高さ。道の近く（near まで）は平ら、そこから high m へなだらかに上がり、環に沿って波打つ。
@@ -225,163 +204,20 @@ namespace HalfAware.EditorTools
             return VergeY + rise + wave;
         }
 
-        /// <summary>升ごとの色の混ぜ。二つの色を、升の番号から決まった混ぜ方で散らす</summary>
-        static System.Func<int, int, Swatch> Mottle(Slice s, Swatch a, Swatch b, float share)
-        {
-            var seed = s.index * 31;
-            return (k, j) =>
-            {
-                var hash = Mathf.Abs(((k * 73856093) ^ ((j + seed) * 19349663)) % 1000) / 1000f;
-                return hash < share ? b : a;
-            };
-        }
-
-        // ---- ヒースの荒野（帯 3） -----------------------------------------------------------
-
-        static void Moor(Slice s)
-        {
-            DirtRoad(s);
-            for (var side = -1; side <= 1; side += 2)
-            {
-                var sd = side;
-                System.Func<float, float, float> h = (d, z) => Hill(s, d, z, 4f, sd > 0 ? 14f : 20f, 45f, 2.2f);
-                Terrain(s, side, HillRows, 4, h, Mottle(s, Swatch.Heath, Swatch.HeathDark, 0.35f));
-                // ヒースの株（紫の穂のラベンダーと紫のアスター、キャットミント）を道の近くに密に、丘へ疎らに。黄のハリエニシダを差す
-                for (var i = 0; i < 90; i++)
-                {
-                    var d = RoadHalf + 0.1f + Mathf.Pow(s.Next(), 1.8f) * 40f;
-                    var z = s.Next() * TileLength;
-                    var pick = s.Next();
-                    var kind = pick < 0.45f ? Wild.Lavender : pick < 0.7f ? Wild.Aster : pick < 0.88f ? Wild.Catmint : Wild.Rudbeckia;
-                    var scale = s.Range(0.9f, 1.4f) * (1f + d * 0.015f);
-                    Clump(s.flora, kind, new Vector3(side * d, h(d, s.Offset + z), z), scale, s.Next() * 180f, Vector3.zero);
-                }
-                // 丘の岩
-                for (var i = 0; i < 3; i++)
-                {
-                    var d = s.Range(6f, 45f);
-                    var z = s.Next() * TileLength;
-                    var r = s.Range(0.4f, 1.6f);
-                    s.paint.Prism(new Vector3(side * d, h(d, s.Offset + z) - 0.2f, z), r, r * 0.6f, r * s.Range(0.6f, 1.1f), 6, s.Next() * 60f,
-                        Swatch.Rock, Swatch.RockDark, s.rnd, 0.4f);
-                }
-            }
-        }
-
-        // ---- 麦畑の丘（帯 4） ---------------------------------------------------------------
-
         /// <summary>麦の株の背。場面 8 の麦と同じくらい</summary>
         const float WheatHigh = 0.95f;
 
-        static void Wheat(Slice s)
-        {
-            DirtRoad(s);
-            for (var side = -1; side <= 1; side += 2)
-            {
-                var sd = side;
-                System.Func<float, float, float> h = (d, z) => Hill(s, d, z, 5f, sd > 0 ? 9f : 13f, 55f, 1.6f);
-                // 道の縁の踏み固めた土の肩（草）と、畑の地（場面 8 の畑の地のマテリアル）
-                Strip(s, side, RoadHalf - 0.05f, 2.7f, VergeY, Swatch.Grass);
-                var rows = new[] { 2.6f, 4f, 6f, 9f, 12f, 16f, 21f, 27f, 34f, 42f, 52f, 64f, 78f, 95f, 115f, 140f, 170f };
-                const int steps = 4;
-                var dz = TileLength / steps;
-                for (var k = 0; k + 1 < rows.Length; k++)
-                    for (var j = 0; j < steps; j++)
-                    {
-                        float a = rows[k], b = rows[k + 1], z0 = j * dz, z1 = z0 + dz;
-                        System.Func<float, float, Vector3> P = (d, z) => new Vector3(sd * d, h(d, s.Offset + z) - 0.02f, z);
-                        System.Func<float, float, Vector2> U = (d, z) => new Vector2(sd * d * 0.15f, z * 0.15f);
-                        if (sd > 0) s.field.Patch(P(a, z1), P(b, z1), P(b, z0), P(a, z0), U(a, z1), U(b, z1), U(b, z0), U(a, z0));
-                        else s.field.Patch(P(b, z1), P(a, z1), P(a, z0), P(b, z0), U(b, z1), U(a, z1), U(a, z0), U(b, z0));
-                    }
-                // 麦の株。十字に交差させた札（場面 8 と同じ）を 1 m ほどの升に一つ。道から 18 m まで。そこから先は畑の地が株の色を持つ
-                for (var d = 2.9f; d < 18f; d += 0.95f)
-                    for (var z = 0.2f; z < TileLength; z += 0.95f)
-                    {
-                        var x = d + s.Range(-0.3f, 0.3f);
-                        var zz = z + s.Range(-0.3f, 0.3f);
-                        var root = new Vector3(sd * x, h(x, s.Offset + zz), zz);
-                        var high = WheatHigh * s.Range(0.85f, 1.15f);
-                        s.wheat.RootY = root.y;
-                        s.wheat.RootHigh = high;
-                        var yaw = s.Next() * Mathf.PI;
-                        for (var c = 0; c < 2; c++)
-                        {
-                            var a = yaw + c * Mathf.PI * 0.5f;
-                            var across = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * 0.36f;
-                            s.wheat.Card(root, across, Vector3.up * high, s.Next() * 4f);
-                        }
-                    }
-                // 丘の上の一本木
-                if (s.Next() < 0.35f)
-                {
-                    var d = s.Range(30f, 70f);
-                    var z = s.Next() * TileLength;
-                    Tree(s, new Vector3(side * d, h(d, s.Offset + z), z), s.Range(4f, 6f), s.Range(1.3f, 1.7f), 0f, Swatch.Bark);
-                }
-            }
-        }
-
-        // ---- 石垣と羊の丘（帯 5） -----------------------------------------------------------
-
-        static void Pasture(Slice s)
-        {
-            DirtRoad(s);
-            for (var side = -1; side <= 1; side += 2)
-            {
-                var sd = side;
-                System.Func<float, float, float> h = (d, z) => Hill(s, d, z, 4f, sd > 0 ? 16f : 22f, 50f, 2.4f);
-                Terrain(s, side, HillRows, 4, h, Mottle(s, Swatch.Pasture, Swatch.Grass, 0.3f));
-                // 道に沿った石垣（腰の高さ、乾いた石を積んだ塀）
-                for (var z = 0f; z < TileLength - 0.01f; z += 1.25f)
-                {
-                    var high = s.Range(0.92f, 1.08f);
-                    s.paint.Box(new Vector3(sd * 3.0f, VergeY + high * 0.5f, z + 0.625f), new Vector3(0.55f, high, 1.26f), s.Range(-1.5f, 1.5f),
-                        Swatch.StoneDark, s.Next() < 0.5f ? Swatch.Stone : Swatch.StoneDark);
-                }
-                // 丘を登っていく石垣（畑の境）
-                if (s.Next() < 0.5f)
-                {
-                    var z = s.Range(4f, 16f);
-                    for (var d = 3.4f; d < 70f; d += 1.3f)
-                    {
-                        var y = h(d, s.Offset + z);
-                        s.paint.Box(new Vector3(sd * d, y + 0.45f, z), new Vector3(1.32f, 0.95f, 0.5f), s.Range(-2f, 2f), Swatch.StoneDark, Swatch.Stone);
-                    }
-                }
-                // 羊。白い胴と黒い顔と脚
-                var flock = 3 + s.rnd.Next(5);
-                for (var i = 0; i < flock; i++)
-                {
-                    var d = s.Range(6f, 55f);
-                    var z = s.Next() * TileLength;
-                    Sheep(s, new Vector3(sd * d, h(d, s.Offset + z), z), s.Next() * 360f);
-                }
-                if (s.Next() < 0.3f)
-                {
-                    var d = s.Range(25f, 70f);
-                    var z = s.Next() * TileLength;
-                    Tree(s, new Vector3(sd * d, h(d, s.Offset + z), z), s.Range(4f, 6f), s.Range(1.2f, 1.6f), 0f, Swatch.Bark);
-                }
-                // 石垣の根元の草花
-                Flowers(s, side, new[]
-                {
-                    new Row { from = RoadHalf + 0.05f, to = 2.7f, scale = 0.9f, drift = 3, step = 0.9f,
-                        kinds = new[] { Wild.Filler, Wild.EchWhite, Wild.Mantle, Wild.Geranium }, weights = new[] { 1f, 0.8f, 0.6f, 0.5f } },
-                }, 0.8f, d => VergeY);
-            }
-        }
-
-        static void Sheep(Slice s, Vector3 foot, float yaw)
+        /// <summary>羊。胴は白い毛、face は顔と脚の色</summary>
+        static void Sheep(Slice s, Vector3 foot, float yaw, Swatch face)
         {
             var r = Quaternion.Euler(0f, yaw, 0f);
             s.paint.Box(foot + new Vector3(0f, 0.62f, 0f), new Vector3(0.62f, 0.55f, 1.05f), yaw, Swatch.Wool, Swatch.Wool);
-            s.paint.Box(foot + r * new Vector3(0f, 0.72f, 0.62f), new Vector3(0.26f, 0.30f, 0.34f), yaw, Swatch.Face, Swatch.Face);
+            s.paint.Box(foot + r * new Vector3(0f, 0.72f, 0.62f), new Vector3(0.26f, 0.30f, 0.34f), yaw, face, face);
             for (var i = 0; i < 4; i++)
             {
                 var x = (i % 2 == 0 ? -0.2f : 0.2f);
                 var z = (i < 2 ? -0.35f : 0.35f);
-                s.paint.Box(foot + r * new Vector3(x, 0.18f, z), new Vector3(0.09f, 0.36f, 0.09f), yaw, Swatch.Face, Swatch.Face);
+                s.paint.Box(foot + r * new Vector3(x, 0.18f, z), new Vector3(0.09f, 0.36f, 0.09f), yaw, face, face);
             }
         }
 
@@ -454,6 +290,7 @@ namespace HalfAware.EditorTools
         {
             var p = new Paint();
             var glow = new Paint();
+            var trees = new Bank { Texel = 1f, Rooted = true, CardLift = 1.4f };
             var rnd = new System.Random(77 + (int)scene * 13);
             switch (scene)
             {
@@ -472,14 +309,9 @@ namespace HalfAware.EditorTools
                     break;
                 }
                 case Scene.Moor:
-                    Ridge(p, rnd, 380f, -80f, 250f, 25f, 70f, Swatch.HillFar);
-                    break;
                 case Scene.Wheat:
-                    Ridge(p, rnd, 420f, -80f, 250f, 20f, 55f, Swatch.HillFar);
-                    break;
                 case Scene.Pasture:
-                    Ridge(p, rnd, 360f, -80f, 250f, 25f, 60f, Swatch.HillFar);
-                    Village(p, glow, rnd, 300f, -38f);
+                    FarmBackdrop(scene, p, trees, rnd);
                     break;
                 case Scene.Lake:
                     // 向こう岸の丘の影と、ぽつぽつと灯る窓。月と、湖に伸びる月の光の道。星
@@ -494,14 +326,21 @@ namespace HalfAware.EditorTools
                     Stars(glow, rnd);
                     break;
             }
-            stats.far = p.Count + glow.Count;
+            stats.far = p.Count + glow.Count + trees.Count;
             var dir = BuildEnding.Generated + "Far" + scene + "_";
             var m = Materials();
             var land = p.Bake(dir + "Land.asset");
             if (land != null) Put(parent, "Land", land, m.swatch);
             var lit = glow.Bake(dir + "Glow.asset");
             if (lit != null) Put(parent, "Glow", lit, m.glow);
+            var grove = trees.Emit(parent, "Trees", m.farm, false, dir);
+            if (grove != null) grove.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             if (scene == Scene.Coast) stats.far += Gulls(parent) * 2;
+            if (scene == Scene.Moor || scene == Scene.Wheat || scene == Scene.Pasture)
+            {
+                Clouds(parent);
+                stats.far += 4;
+            }
             // 遠景の子はどれも一つのレンダラー
             stats.farCalls = parent.childCount;
         }
@@ -572,28 +411,6 @@ namespace HalfAware.EditorTools
                 // 上を向く巻き（上から見て右回り）。角が増すほど右へ回るので、外 a0 → 外 a1 → 内 a1 → 内 a0
                 p.Quad(d0 * radius + y, d1 * radius + y, d1 * near + y, d0 * near + y, Swatch.Foam);
             }
-        }
-
-        /// <summary>遠くの村。丘の上に石の家と教会の塔。方位 deg（度）、隔たり dist</summary>
-        static void Village(Paint p, Paint glow, System.Random rnd, float dist, float deg)
-        {
-            var a = deg * Mathf.Deg2Rad;
-            var centre = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * dist;
-            var across = new Vector3(Mathf.Cos(a), 0f, -Mathf.Sin(a));
-            var baseY = 14f;
-            // 村の載る丘
-            p.Prism(centre + Vector3.down * 20f, 90f, 60f, 20f + baseY, 10, 0f, Swatch.Pasture, Swatch.Pasture);
-            for (var i = 0; i < 14; i++)
-            {
-                var at = centre + across * Mathf.Lerp(-45f, 45f, (float)rnd.NextDouble()) + new Vector3(0f, baseY, 0f)
-                         + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * Mathf.Lerp(-20f, 20f, (float)rnd.NextDouble());
-                var w = Mathf.Lerp(6f, 10f, (float)rnd.NextDouble());
-                p.Box(at + Vector3.up * 2.5f, new Vector3(w, 5f, 5f), deg + 90f, Swatch.Wall, Swatch.Wall);
-                p.Box(at + Vector3.up * 5.6f, new Vector3(w + 0.6f, 1.4f, 4.2f), deg + 90f, Swatch.Roof, Swatch.Roof);
-            }
-            var tower = centre + new Vector3(0f, baseY, 0f) + across * 8f;
-            p.Box(tower + Vector3.up * 8f, new Vector3(4f, 16f, 4f), deg, Swatch.Wall, Swatch.Wall);
-            p.Prism(tower + Vector3.up * 16f, 2.8f, 0.2f, 9f, 4, 45f, Swatch.Roof, null);
         }
 
         /// <summary>月。前の右の低い所に、平らな円（原点を向く）</summary>
