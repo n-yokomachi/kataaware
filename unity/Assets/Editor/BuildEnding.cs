@@ -56,10 +56,10 @@ namespace HalfAware.EditorTools
         public static Vector3 EyeAt { get { return SeatAt + new Vector3(0f, 0f, BuildDrive.EyeLead); } }
 
         /// <summary>
-        /// 前を見ている向き。度（左右は +z が 0 で右回り、上下は下が正）。
-        /// 右の柱（x 0.865 / z 0.905）が画面の横の 2/3 に来る所。その右が運転席の窓の外
+        /// 前を見ている向き。度（左右は +z が 0 で右回り、上下は下が正）。値は <see cref="EndingView.front"/> の一か所
+        /// （2026-09-28 オーナー「もう少し右を向けてみて」で右へ 9 度回した。右の柱が画面の横の 6 割ほどに来て、その右が運転席の窓の外）
         /// </summary>
-        public static readonly Vector2 Front = new Vector2(8f, 6f);
+        public static Vector2 Front { get { return EndingView.Default.front; } }
 
         /// <summary>
         /// 片割れを見る所（車の座標）。腿の上に置いた手のあたり。ここを画面の真ん中へ持ってくると、
@@ -518,7 +518,7 @@ namespace HalfAware.EditorTools
             EditorUtility.SetDirty(roll);
             var headings = 0;
             foreach (var r in rows) if (r.kind == CreditsText.Kind.Heading) headings++;
-            return string.Format("クレジット: {0} 行（見出し {1}）、中身の長さ {2:0} px（1280×720 の Canvas）、最後の行の真ん中 {3:0} px。明朝に無い字 {4}",
+            return string.Format("クレジット: {0} 行（見出し {1}）、中身の長さ {2:0} px（16:9 の粗い画面の Canvas の画素）、最後の行の真ん中 {3:0} px。明朝に無い字 {4}",
                 rows.Count, headings, roll.Length, roll.LastCentre, missing.Length == 0 ? "無し" : "「" + missing + "」");
         }
 
@@ -599,7 +599,13 @@ namespace HalfAware.EditorTools
             dso.FindProperty("player").objectReferenceValue = player;
             dso.FindProperty("eye").objectReferenceValue = cam;
             dso.FindProperty("seat").vector3Value = root.TransformPoint(SeatAt);
-            dso.FindProperty("front").vector2Value = Front;
+            View(dso.FindProperty("view"), EndingView.Default);
+            dso.FindProperty("twinProbe").arraySize = 0;
+            var probe = TwinProbe(root);
+            var probes = dso.FindProperty("twinProbe");
+            probes.arraySize = probe.Length;
+            for (var i = 0; i < probe.Length; i++) probes.GetArrayElementAtIndex(i).vector3Value = probe[i];
+            dso.FindProperty("actions").objectReferenceValue = AssetDatabase.LoadAssetAtPath<UnityEngine.InputSystem.InputActionAsset>(ActionsPath);
             var twin = TwinLook(root);
             dso.FindProperty("twin").vector2Value = twin;
             dso.FindProperty("glanceShift").vector3Value = GlanceShift;
@@ -613,12 +619,46 @@ namespace HalfAware.EditorTools
             dso.FindProperty("cover").objectReferenceValue = cover != null ? cover.GetComponent<Image>() : null;
             dso.FindProperty("credits").objectReferenceValue = screen.GetComponent<CreditRoll>();
             dso.ApplyModifiedPropertiesWithoutUndo();
-            note.AppendFormat("目: 根 {0}、前 {1}、片割れ {2}（下へ {3:0.0} 度。限り {4}）", SeatAt.ToString("F3"), Front, twin, twin.y, TwinPitchMost).AppendLine();
+            note.AppendFormat("目: 根 {0}、前 {1}、片割れ {2}（下へ {3:0.0} 度。限り {4}）、見回しの限り 右 {5}・左の止め {6}・上 {7}・下 {8}、片割れの点 {9}",
+                SeatAt.ToString("F3"), Front, twin, twin.y, TwinPitchMost, EndingView.Default.right, EndingView.Default.left, EndingView.Default.up, EndingView.Default.down, probe.Length).AppendLine();
             // 組み上がった場面の見え方: 明けて走っている所（黒は掛けない）
             var beats = new EndingBeats();
             d.Apply(beats.openFade + 0.5f);
             var c = cover != null ? cover.GetComponent<Image>() : null;
             if (c != null) { c.color = Color.black; c.enabled = true; }
+        }
+
+        /// <summary>EndingView の値を、直列化した枠へ一つずつ書く</summary>
+        static void View(SerializedProperty into, EndingView from)
+        {
+            foreach (var f in typeof(EndingView).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+            {
+                var sp = into.FindPropertyRelative(f.Name);
+                if (sp == null) continue;
+                var v = f.GetValue(from);
+                if (v is float) sp.floatValue = (float)v;
+                else if (v is Vector2) sp.vector2Value = (Vector2)v;
+            }
+        }
+
+        /// <summary>
+        /// 片割れの体の点（場面の座標）。見回しの左の限りを決めるのに使う。座った体のメッシュの頂点を間引いて 1200 点まで
+        /// （画面の縁から 3 度の余白を残すので、点のあいだの隙間はその内に収まる。EndingViewTests が全部の頂点で確かめる）
+        /// </summary>
+        public static Vector3[] TwinProbe(Transform root)
+        {
+            var list = new List<Vector3>();
+            var twin = root.Find("Twin");
+            if (twin == null) return list.ToArray();
+            foreach (var mf in twin.GetComponentsInChildren<MeshFilter>(true))
+            {
+                var r = mf.GetComponent<MeshRenderer>();
+                if (r == null || !r.enabled || mf.sharedMesh == null) continue;
+                var verts = mf.sharedMesh.vertices;
+                var step = Mathf.Max(1, verts.Length / 1200);
+                for (var i = 0; i < verts.Length; i += step) list.Add(mf.transform.TransformPoint(verts[i]));
+            }
+            return list.ToArray();
         }
 
         /// <summary>

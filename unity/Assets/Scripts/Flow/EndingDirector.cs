@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace HalfAware
@@ -13,7 +14,10 @@ namespace HalfAware
     /// 4. ドロップからクレジットが縦に流れ、曲の尾と一緒にフェードアウトして、タイトルの画面へ戻る
     ///
     /// 段取りの秒は <see cref="EndingBeats"/>。明けてから後は曲の再生の位置（素の版の <see cref="AudioSource.time"/>）で数え、曲とずれない。
-    /// 見回しと歩きはさせない。目の向きは段取りが書く。
+    /// 歩きはさせない。見回しは、マウスとゲームパッドの右スティックで、限り（<see cref="EndingView"/>）の内だけさせる。
+    /// 片割れの体へ一度向いて戻る間は見回しを封じ、戻った先は既定の向き（<see cref="EndingView.front"/>）。
+    /// 見回しの速さはほかの場面と同じ <see cref="PlayerController.LookSensitivity"/>。PlayerController の見回しは使わない（限りがこの場面だけの形なので、
+    /// 向きはここで組んで毎フレーム書く）。
     /// コンソールを開いている間（<see cref="ImplantConsole.IsOpen"/>）は、この場面の音を止めて段取りも止める（戻れば同じ所から続く）。
     ///
     /// 実行順を -15 に置くのは、PlayerController（-10）がそのフレームの目の向きを書く前に向きを渡すため。
@@ -39,8 +43,12 @@ namespace HalfAware
         [SerializeField] Camera eye;
         [Tooltip("Player の根の置き場。運転席の目より窓の側へ寄せた所")]
         [SerializeField] Vector3 seat;
-        [Tooltip("前を見ている向き。度（左右は +z が 0 で右回り、上下は下が正）。画面の左 2/3 が車内、右 1/3 が窓の外")]
-        [SerializeField] Vector2 front = new Vector2(8f, 6f);
+        [Tooltip("既定の向きと見回しの限り。値は EndingView の既定の一か所（組み立てが書く）")]
+        [SerializeField] EndingView view = new EndingView();
+        [Tooltip("片割れの体の点（場面の座標）。見回しの左の限りを、この点が画面の縁に近づく所で止める。組み立てが座った体のメッシュから拾う")]
+        [SerializeField] Vector3[] twinProbe = new Vector3[0];
+        [Tooltip("入力の割り当て（Player の Look を読む）")]
+        [SerializeField] InputActionAsset actions;
         [Tooltip("片割れを見る向き。度。顔が画面に入らず、膝と手と胸の下までが入る所")]
         [SerializeField] Vector2 twin = new Vector2(-78f, 30f);
         [Tooltip("片割れを見る間に、目を寄せる量（Player の根から見た m）。少し身を低くして覗き込む。" +
@@ -82,6 +90,13 @@ namespace HalfAware
         bool leaving;
         float waited;
         int band = -1;
+        InputAction look;
+        /// <summary>見回しの向き（度）。片割れへ向いている間は動かさない</summary>
+        Vector2 looking;
+        /// <summary>見回しの向きを既定の向きで始めたか（エディタで撮る時は Awake が走らないので、初めて向きを書く時に始める）</summary>
+        bool lookReady;
+        bool glancing;
+        Vector2 glanceFrom;
         /// <summary>コンソールを開いた時に止めた音。閉じたらこれだけを続ける（止めていなかった物を鳴らし始めない）</summary>
         readonly System.Collections.Generic.List<AudioSource> held = new System.Collections.Generic.List<AudioSource>();
 
@@ -97,6 +112,31 @@ namespace HalfAware
         /// <summary>景色の帯</summary>
         public EndingBand[] Bands { get { return bands; } }
 
+        /// <summary>既定の向きと見回しの限り</summary>
+        public EndingView View { get { return view; } }
+
+        /// <summary>片割れの体の点（場面の座標）</summary>
+        public Vector3[] TwinProbe { get { return twinProbe; } }
+
+        /// <summary>見回しの向き。書き込むと角度の限りに収まる（エディタで限りの向きを撮るのに使う）</summary>
+        public Vector2 Looking
+        {
+            get { return looking; }
+            set { looking = view.Clamp(value); lookReady = true; }
+        }
+
+        /// <summary>
+        /// 見回しを turn（度）だけ進めた向き。限りの手前で重くなり、片割れの体が画面の縁に近づく所で止まる。
+        /// 目の置き場とカメラの画角は、いまの目のカメラから取る
+        /// </summary>
+        public Vector2 Turned(Vector2 from, Vector2 turn)
+        {
+            var at = player != null && player.Eye != null ? player.Eye.position : seat;
+            var aspect = eye != null ? eye.aspect : 16f / 9f;
+            var fov = eye != null ? eye.fieldOfView : 70f;
+            return view.Step(from, turn, at, twinProbe, aspect, fov);
+        }
+
         void Awake()
         {
             if (player != null)
@@ -105,6 +145,13 @@ namespace HalfAware
                 player.CanLook = false;
                 player.EyeHeight = 0f;
                 player.HeadYawLimit = headLimit;
+            }
+            looking = view.front;
+            lookReady = true;
+            if (actions != null)
+            {
+                var map = actions.FindActionMap("Player", false);
+                look = map != null ? map.FindAction("Look", false) : null;
             }
             // 黒のあいだから走らせておく。明けた時にはもう走っている
             if (world != null) world.Rolling = Application.isPlaying;
@@ -141,6 +188,7 @@ namespace HalfAware
                 if (Ready() || waited >= loadWait) Begin();
             }
             if (started) song = Heard();
+            if (started) Steer();
             Apply(started ? song : -1f);
             Sound(started ? song : -1f);
             if (started && beats.Finished(song))
@@ -172,6 +220,15 @@ namespace HalfAware
                 held.Clear();
             }
             return open;
+        }
+
+        /// <summary>マウスとスティックで見回す。片割れへ向いている間と、カーソルを掴んでいない間は回さない</summary>
+        void Steer()
+        {
+            if (look == null || glancing || !PlayerController.CursorLocked) return;
+            var d = look.ReadValue<Vector2>() * PlayerController.LookSensitivity;
+            if (d.sqrMagnitude <= 0f) return;
+            looking = Turned(looking, new Vector2(d.x, -d.y));
         }
 
         /// <summary>二つの版とも展開が済んだか</summary>
@@ -216,7 +273,7 @@ namespace HalfAware
                 cover.color = c;
                 cover.enabled = c.a > 0f;
             }
-            Look(at < 0f ? 0f : beats.Glance(at));
+            Look(at < 0f ? 0f : beats.Glance(at), at);
             if (credits != null)
             {
                 var shown = at >= 0f && beats.Rolling(at);
@@ -248,11 +305,38 @@ namespace HalfAware
             b.sky.Apply(sun, eye, beams);
         }
 
-        /// <summary>目を前（0）と片割れ（1）のあいだの k へ向ける</summary>
-        void Look(float k)
+        /// <summary>
+        /// 目を、見回しの向き（0）と片割れ（1）のあいだの k へ向ける。片割れへ向き始めた時の見回しの向きから回り、
+        /// 戻りは既定の向きへ戻る（戻り終えたら、見回しもそこから始める）
+        /// </summary>
+        void Look(float k, float at)
         {
             if (player == null) return;
-            var a = Gaze.Blend(front, twin, k);
+            if (!lookReady)
+            {
+                looking = view.front;
+                lookReady = true;
+            }
+            Vector2 a;
+            if (k > 0f)
+            {
+                if (!glancing)
+                {
+                    glancing = true;
+                    glanceFrom = looking;
+                }
+                var back = at >= beats.glanceAt + beats.glanceTurn + beats.glanceHold;
+                a = Gaze.Blend(back ? view.front : glanceFrom, twin, k);
+            }
+            else
+            {
+                if (glancing)
+                {
+                    glancing = false;
+                    looking = view.front;
+                }
+                a = looking;
+            }
             if (Application.isPlaying)
             {
                 player.Yaw = a.x;
