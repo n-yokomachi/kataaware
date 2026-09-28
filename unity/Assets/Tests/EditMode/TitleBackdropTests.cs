@@ -29,6 +29,11 @@ namespace HalfAware.Tests
         public void TheTitleAndUnmadeStagesAreNotSaved()
         {
             Assert.AreEqual(0, StageMap.StageOf(TitleScreen.SceneName, ""));
+            // クリアの後に流れるエンディングも、自動のセーブを書かない
+            Assert.AreEqual(0, StageMap.StageOf(ReunionDirector.EndingScene, ""));
+            Assert.IsTrue(StageMap.IsUnsaved(TitleScreen.SceneName));
+            Assert.IsTrue(StageMap.IsUnsaved(ReunionDirector.EndingScene));
+            Assert.IsFalse(StageMap.IsUnsaved("Village"));
             Assert.AreEqual(0, StageMap.StageOf(null, ""));
             // 夕方の村は場面 6（庭の記憶）、場面 10（対面）は朝の村。表の値は GardenMemoryTests・ReunionTests で見る。
             // 場面は 1〜10 まで揃ったので、無い場面は範囲の外だけ
@@ -63,6 +68,12 @@ namespace HalfAware.Tests
                 // 庭の記憶の行は村の夕方（場面 6）。村の行は朝（場面 9）
                 var entry = SceneMenu.Scenes[i];
                 var scene = SceneMenu.SceneOf(entry);
+                // エンディングはセーブを書かない場面（場面の番号を持たない）。一覧からは飛べるが、場面の表には載せない
+                if (StageMap.IsUnsaved(scene))
+                {
+                    Assert.AreEqual(0, StageMap.StageOf(scene, ""), scene);
+                    continue;
+                }
                 var hour = entry == SceneMenu.Garden ? StageMap.Evening : scene == "Village" ? StageMap.Morning : "";
                 // 対面の行も村の朝。場面 10 かは村の演出の印で分ける
                 var stage = entry == SceneMenu.Reunion ? ReunionHandoff.Stage : StageMap.StageOf(scene, hour);

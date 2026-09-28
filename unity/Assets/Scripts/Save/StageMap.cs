@@ -69,7 +69,20 @@ namespace HalfAware
             new Row(10, "Village", Morning),
         };
 
-        /// <summary>シーンの名と村の時刻から、場面の番号。表に無ければ 0（タイトルの画面など、セーブしない所）</summary>
+        /// <summary>
+        /// 場面の番号を持たないシーン。入っても自動のセーブを書かず、記憶する・思い出すの行き先にもならない。
+        /// タイトルの画面と、場面 10 の後に流れるエンディング（クリアした後の場面。タイトルの背景はクリアの印で朝の村になるので、
+        /// エンディングの所をセーブに残す要が無い）。表（<see cref="Rows"/>）には載せない
+        /// </summary>
+        public static readonly string[] Unsaved = { SaveFlow.TitleScene, ReunionDirector.EndingScene };
+
+        /// <summary>場面の番号を持たない（セーブを書かない）シーンか</summary>
+        public static bool IsUnsaved(string scene)
+        {
+            return System.Array.IndexOf(Unsaved, scene) >= 0;
+        }
+
+        /// <summary>シーンの名と村の時刻から、場面の番号。表に無ければ 0（タイトルの画面とエンディング（<see cref="Unsaved"/>）など、セーブしない所）</summary>
         public static int StageOf(string scene, string hour)
         {
             if (string.IsNullOrEmpty(scene)) return 0;

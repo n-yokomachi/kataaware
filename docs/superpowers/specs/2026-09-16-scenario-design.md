@@ -720,7 +720,7 @@
   - 景色の帯の表と組み方は `BuildEndingLand`、帯の中身は `BuildEndingBands`
   - 片割れは `BuildEndingTwin`
 - 場面 10 の `ReunionDirector` が、クリアの印を付けてから `Ending` を読む
-  - この場面はセーブしない（`StageMap` に無い）
+  - この場面はセーブしない（`StageMap` の表に無い。2026-09-28 に `StageMap.Unsaved`（タイトルの画面とエンディング）に載せて、デバッグの一覧の確かめ（`TitleBackdropTests`）がセーブを書かない場面として扱うようにした）
   - 入った時に `MusicBed` の曲が残っていれば止める（`MusicBed.Stop`）
 - デバッグの一覧の 11 行目に「エンディング」（`SceneMenu`）
   - 数字の鍵は 10 行目までなので、この行は押すか枠を動かして選ぶ
