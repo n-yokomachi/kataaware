@@ -910,7 +910,7 @@ namespace HalfAware
             Show(0f, false);
         }
 
-        /// <summary>閉じる。止めた秒とカーソルを開く前へ戻す。設定で動かした値を確かに残す</summary>
+        /// <summary>閉じる。止めた秒とカーソルを開く前へ戻す。設定で動かした値を、待たずに確かに残す</summary>
         public void Close()
         {
             if (!IsOpen) return;
@@ -970,8 +970,8 @@ namespace HalfAware
             }
             // 知らせは、出した後の次の入力で消す。入力は消すだけでなく、そのままふだんどおり効く
             note.Step(Time.unscaledTime, Time.frameCount, Pressed(keys, mouse));
-            // 設定の枠を離れたら、動かした値を確かに残す（WebGL では PlayerPrefs.Save でブラウザの中に落ちる）
-            if (menu.Panel != ConsolePanel.Settings) GameSettings.Commit();
+            // 設定で動かした値は、動きが止まってから 0.5 秒で残す（WebGL では PlayerPrefs.Save でブラウザの中に落ちる）
+            GameSettings.Tick(Time.unscaledTime);
             // 開いている間に行が増えることは無いはずだが、増えたら並べ直す
             if (ConsoleLog.Here().Count != shown) Rows();
             if (keys != null && Keys(keys)) return;

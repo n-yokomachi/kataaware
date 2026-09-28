@@ -3,8 +3,8 @@ using NUnit.Framework;
 namespace HalfAware.Tests
 {
     /// <summary>
-    /// コンソールの設定の枠（設計書 1 節）。カメラの速さの範囲と刻み、残して読み直す、見回しの速さへの効き、
-    /// 枠の上下と左右、右クリック（Esc）の戻り方、マウスの押した所からの値、左右の押し続け
+    /// コンソールの設定の枠（設計書 1 節）。カメラの速さの範囲と刻み、残して読み直す（動きが止まってから書く）、
+    /// 見回しの速さへの効き、枠の上下と左右、右クリック（Esc）の戻り方、マウスの押した所からの値、左右の押し続け
     /// </summary>
     public class SettingsTests
     {
@@ -101,6 +101,38 @@ namespace HalfAware.Tests
         }
 
         [Test]
+        public void ItIsFlushedHalfASecondAfterTheLastMove()
+        {
+            GameSettings.Tick(0f);
+            Assert.AreEqual(0, box.Flushes, "動かしていなければ書かない");
+            // 押し続けで続けて動かす（0.05 秒ごと）。動いている間は書かない
+            for (var i = 0; i < 10; i++)
+            {
+                Look.Nudge(1);
+                GameSettings.Tick(10f + i * HoldRepeat.Every);
+            }
+            Assert.AreEqual(0, box.Flushes);
+            var last = 10f + 9 * HoldRepeat.Every;
+            GameSettings.Tick(last + GameSettings.SaveDelay - 0.01f);
+            Assert.AreEqual(0, box.Flushes, "止まってから 0.5 秒たつまでは待つ");
+            GameSettings.Tick(last + GameSettings.SaveDelay + 0.01f);
+            Assert.AreEqual(1, box.Flushes, "止まって 0.5 秒で一度だけ書く");
+            Assert.IsFalse(GameSettings.Unsaved);
+            GameSettings.Tick(last + 5f);
+            Assert.AreEqual(1, box.Flushes);
+            // 閉じる時は待たずに書く
+            Look.Nudge(-1);
+            GameSettings.Tick(20f);
+            GameSettings.Commit();
+            Assert.AreEqual(2, box.Flushes);
+            GameSettings.Tick(30f);
+            Assert.AreEqual(2, box.Flushes, "書いた後に待っていた分は書かない");
+            // 書いた値は、起動し直しても残る
+            GameSettings.Forget();
+            Assert.AreEqual(1.45f, Look.Value, 1e-6f);
+        }
+
+        [Test]
         public void BrokenOrStrayValuesReadAsTheNearestAllowed()
         {
             box.Set(Look.Key, "not a number");
@@ -172,7 +204,7 @@ namespace HalfAware.Tests
             Assert.AreSame(GameSettings.LookScale, rows[1].Dial);
             Assert.AreEqual(SettingKind.Reset, rows[2].Kind);
             Assert.AreEqual("既定に戻す", rows[2].Label);
-            Assert.AreEqual("設定", ConsoleSettings.Title);
+            Assert.AreEqual("設定　　←→ で変える", ConsoleSettings.Title);
         }
 
         static ConsoleMenu OpenSettings()

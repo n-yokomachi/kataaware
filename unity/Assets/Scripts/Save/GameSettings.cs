@@ -5,7 +5,7 @@ namespace HalfAware
 {
     /// <summary>
     /// 設定の一つの値（倍率など）。範囲・刻み・既定を持ち、書くたびに範囲へ収めて刻みへ揃える。
-    /// 読み書きは <see cref="GameSettings.Box"/>。初めて読む時に鍵から読み、書くとすぐ鍵へ書く（Flush は <see cref="GameSettings.Commit"/>）。
+    /// 読み書きは <see cref="GameSettings.Box"/>。初めて読む時に鍵から読み、書くとすぐ鍵へ書く（Flush は <see cref="GameSettings.Tick"/>・<see cref="GameSettings.Commit"/>）。
     /// 見せ方は持たない（コンソールの設定の枠、<see cref="ConsoleSettings"/>）
     /// </summary>
     public sealed class SettingDial
@@ -124,9 +124,10 @@ namespace HalfAware
     /// - PlayerPrefs の <see cref="KeyPrefix"/> の下に、値ごとの鍵で書く。WebGL ではブラウザの中（IndexedDB）に残る
     /// - **セーブとは別に持つ。** 鍵も別（<see cref="SaveStore.SaveKey"/>・<see cref="SaveStore.ClearedKey"/> と重ならない）なので、
     ///   セーブを消しても残り、思い出すでも変わらない
-    /// - 起動の後、最初に読む時に鍵から読む。動かすとすぐ値が変わり（見回しは毎フレーム読む）、
-    ///   Flush（PlayerPrefs.Save）は設定の枠を離れる時とコンソールを閉じる時にまとめて一度（<see cref="Commit"/>）。
-    ///   WebGL の PlayerPrefs.Save はブラウザの中へ書き出すので、つまみを動かすフレームごとには呼ばない
+    /// - 起動の後、最初に読む時に鍵から読む。動かすとすぐ値が変わる（見回しは毎フレーム読む）
+    /// - **動かしたら、その場で残す。** 動きが止まってから <see cref="SaveDelay"/> 秒で Flush（PlayerPrefs.Save）する（<see cref="Tick"/>）。
+    ///   設定の枠を開いたままブラウザのタブを閉じても残る。WebGL の PlayerPrefs.Save はブラウザの中へ書き出すので、
+    ///   つまみを掴んで動かしている間や押し続けている間の、フレームごとには呼ばない。コンソールを閉じる時は待たずに書く（<see cref="Commit"/>）
     /// </summary>
     public static class GameSettings
     {
@@ -141,8 +142,15 @@ namespace HalfAware
         /// <summary>持っている値の全部。値を足したらここにも足す（読み直しと既定に戻すが回る）</summary>
         public static readonly SettingDial[] All = { LookScale };
 
+        /// <summary>動きが止まってから Flush するまでの秒</summary>
+        public const float SaveDelay = 0.5f;
+
         static ISaveBox box;
         static bool dirty;
+        /// <summary>鍵へ書いた数と、<see cref="Tick"/> が最後に見た数。違えば、その後に動いた</summary>
+        static int changes;
+        static int seen;
+        static float settleAt;
 
         /// <summary>置き場。既定は PlayerPrefs。テストや撮影では手元の辞書に差し替え、終えたら null で戻す。差し替えると値を読み直す</summary>
         public static ISaveBox Box
@@ -155,7 +163,7 @@ namespace HalfAware
             set
             {
                 box = value;
-                dirty = false;
+                Settle();
                 Forget();
             }
         }
@@ -167,14 +175,37 @@ namespace HalfAware
         {
             Box.Set(key, text);
             dirty = true;
+            changes++;
         }
 
-        /// <summary>書いた物を確かに残す（PlayerPrefs.Save）。書いていなければ何もしない</summary>
+        /// <summary>
+        /// 一フレームぶん。now は unscaled の秒（コンソールを開いている間は Time.timeScale が 0）。
+        /// 鍵へ書いてから <see cref="SaveDelay"/> 秒、次の書き込みが無ければ Flush する。動き続けている間は待ち直す
+        /// </summary>
+        public static void Tick(float now)
+        {
+            if (!dirty) return;
+            if (changes != seen)
+            {
+                seen = changes;
+                settleAt = now + SaveDelay;
+                return;
+            }
+            if (now >= settleAt) Commit();
+        }
+
+        /// <summary>書いた物を待たずに確かに残す（PlayerPrefs.Save）。書いていなければ何もしない</summary>
         public static void Commit()
         {
             if (!dirty) return;
-            dirty = false;
+            Settle();
             Box.Flush();
+        }
+
+        static void Settle()
+        {
+            dirty = false;
+            seen = changes;
         }
 
         /// <summary>全部の値を既定へ戻す</summary>
@@ -194,7 +225,7 @@ namespace HalfAware
         static void Fresh()
         {
             box = null;
-            dirty = false;
+            Settle();
             Forget();
         }
     }

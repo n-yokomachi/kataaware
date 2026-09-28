@@ -55,7 +55,8 @@ namespace HalfAware
     /// </summary>
     public static class ConsoleSettings
     {
-        public const string Title = ConsoleMenu.SettingsLabel;
+        /// <summary>枠の見出しの行。ほかの枠（「記憶する　　E で書く」など）に揃えて、操作を添える</summary>
+        public const string Title = ConsoleMenu.SettingsLabel + "　　←→ で変える";
         public const string Camera = "カメラ";
         public const string LookSpeed = "カメラの速さ";
         public const string ResetLabel = "既定に戻す";
