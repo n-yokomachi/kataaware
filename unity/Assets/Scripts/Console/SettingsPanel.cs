@@ -1,0 +1,340 @@
+using System;
+using System.Collections.Generic;
+using TMPro;
+using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.UI;
+
+namespace HalfAware
+{
+    /// <summary>
+    /// 設定の枠の見た目と操作（設計書 1 節・5 節）。コンソール（<see cref="ImplantConsole"/>）とタイトルの画面（<see cref="TitleScreen"/>）が
+    /// 同じ物を使う。置き場と、開け閉め・一つ前に戻る（Esc・右クリック・TAB）は呼び手が決める。
+    ///
+    /// 行は <see cref="SettingsList"/> の表の順に並べる: 小見出し（字と細い線）、つまみの行（項目の名の升・つまみ・倍率の字）、
+    /// 既定に戻す、（タイトルの画面だけ）戻る。寸法はコンソールと同じ粗い画面の 1 画素（Dot）で、字はいちばん小さい 11 Dot。
+    ///
+    /// 操作: マウスは行に重ねると選び、つまみを掴んで動かす・溝を押すとそこへ飛ぶ。既定に戻す・戻るは押すと効く。
+    /// 鍵盤は上下で行（小見出しは飛ばす）、左右でつまみを一刻みずつ（押し続けると <see cref="HoldRepeat"/> で続けて）、
+    /// E・Enter で既定に戻す・戻る（<see cref="Keys"/>）。
+    /// 値は動かすとすぐ効き、残すのは <see cref="GameSettings.Tick"/>（動きが止まってから 0.5 秒）と呼び手の <see cref="GameSettings.Commit"/>
+    /// </summary>
+    public sealed class SettingsPanel
+    {
+        const float Dot = ImplantConsole.Dot;
+
+        /// <summary>枠の幅。つまみの行に、項目の名・つまみ・倍率を並べる（記憶する・思い出すの枠の 280 Dot より広い）</summary>
+        public const float Width = 320f * Dot;
+        /// <summary>つまみの行の、項目の名の升の幅。選んでいる時はここを塗る（つまみは塗らずに青緑のまま見せる）</summary>
+        const float DialName = 84f * Dot;
+        /// <summary>つまみの行の右の、倍率の字の幅</summary>
+        const float DialValue = 48f * Dot;
+        /// <summary>名の升と、つまみの当たりのあいだ</summary>
+        const float DialGap = 10f * Dot;
+        /// <summary>つまみ。ボタンの選んだ色で塗った縦長の升</summary>
+        const float KnobWidth = 6f * Dot;
+        const float KnobHeight = 14f * Dot;
+        /// <summary>溝の太さ。1 Dot だと薄い色の線が粗い画面で途切れるので 2 Dot</summary>
+        const float GrooveHeight = 2f * Dot;
+        /// <summary>既定（1 倍）の所に立てる目盛りの高さ</summary>
+        const float TickHeight = 8f * Dot;
+        /// <summary>小見出し（先頭を除く）と「既定に戻す」の行の上に空ける</summary>
+        const float SectionGap = 6f * Dot;
+        /// <summary>小見出しの字と、その後ろの細い線のあいだ</summary>
+        const float RuleGap = 8f * Dot;
+
+        const float BoxRow = ImplantConsole.BoxRow;
+        const float BoxPad = ImplantConsole.BoxPad;
+        const float RowInset = ImplantConsole.RowInset;
+        const float HeadHeight = ImplantConsole.HeadHeight;
+
+        // 色は使う時に作る。タイトルの画面はシーンから読まれる部品なので、静的な値の初期化で色空間を訊かない
+        static Color Groove { get { return ImplantConsole.Tint(ImplantConsole.Rgb(127, 227, 236, 0.35f)); } }
+
+        readonly SettingsList list;
+        readonly HoldRepeat nudge = new HoldRepeat();
+        readonly List<RowView> views = new List<RowView>();
+        RectTransform box;
+        Material heavy;
+
+        /// <summary>「戻る」の行を押した・E で決めた時に呼ぶ（タイトルの画面が枠を閉じる）</summary>
+        public Action Back;
+
+        public SettingsPanel(SettingsList list)
+        {
+            this.list = list;
+        }
+
+        public SettingsList List { get { return list; } }
+
+        /// <summary>組んだ枠。呼び手が置き場（anchor・pivot・位置）と出し入れを決める</summary>
+        public RectTransform Box { get { return box; } }
+
+        /// <summary>行 index の上の縁。枠の上の縁から。小見出し（先頭を除く）と既定に戻すの上は少し空ける</summary>
+        public static float RowTop(SettingsList list, int index)
+        {
+            var top = BoxPad * 2f + HeadHeight + BoxRow * index;
+            for (var i = 1; i <= index; i++)
+            {
+                var kind = list.RowAt(i).Kind;
+                if (kind == SettingKind.Heading || kind == SettingKind.Reset) top += SectionGap;
+            }
+            return top;
+        }
+
+        /// <summary>枠の高さ</summary>
+        public static float Height(SettingsList list)
+        {
+            return RowTop(list, list.Count - 1) + BoxRow + BoxPad;
+        }
+
+        /// <summary>
+        /// 枠を組む。parent の左上を軸に置いておく（呼び手が置き場を決め直す）。
+        /// title は見出しの行、heavy は塗りの上の暗い字を太らせる色づけ（無ければ素の書体）。閉じた形で返す
+        /// </summary>
+        public RectTransform Build(Transform parent, string title, Material heavy)
+        {
+            this.heavy = heavy;
+            box = ImplantConsole.Rect(parent, "Settings");
+            box.anchorMin = new Vector2(0f, 1f);
+            box.anchorMax = new Vector2(0f, 1f);
+            box.pivot = new Vector2(0f, 1f);
+            box.sizeDelta = new Vector2(Width, Height(list));
+            var bg = box.gameObject.AddComponent<Image>();
+            bg.color = ImplantConsole.BoxFill;
+            ImplantConsole.Border(box, ImplantConsole.ButtonLine, ImplantConsole.Line);
+            var head = ImplantConsole.Text(box, "Title", ImplantConsole.HeadFont, ImplantConsole.Accent, TextAlignmentOptions.TopLeft);
+            ImplantConsole.Top(head.rectTransform, BoxPad, BoxPad, BoxPad, HeadHeight);
+            head.characterSpacing = ImplantConsole.HeadSpacing;
+            head.text = title;
+            for (var i = 0; i < list.Count; i++)
+            {
+                var r = ImplantConsole.Rect(box, "Row" + i);
+                ImplantConsole.Top(r, BoxPad, BoxPad, RowTop(list, i), BoxRow);
+                views.Add(MakeRow(r, list.RowAt(i), i));
+            }
+            box.gameObject.SetActive(false);
+            return box;
+        }
+
+        /// <summary>一行を組む。小見出しは選べないので当たりを持たない</summary>
+        RowView MakeRow(RectTransform r, SettingRow row, int index)
+        {
+            var view = new RowView();
+            view.row = row;
+            if (row.Kind == SettingKind.Heading)
+            {
+                view.label = ImplantConsole.Text(r, "Label", ImplantConsole.HeadFont, ImplantConsole.Accent, TextAlignmentOptions.Left);
+                ImplantConsole.Stretch(view.label.rectTransform, RowInset, RowInset, 0f, 0f);
+                view.label.characterSpacing = ImplantConsole.HeadSpacing;
+                view.label.text = row.Label;
+                // 字の後ろから右の端まで細い線を引いて、項目の区切りに見せる
+                var width = view.label.GetPreferredValues(row.Label).x;
+                var rule = ImplantConsole.Fill(r, "Rule", Groove, false).rectTransform;
+                rule.anchorMin = new Vector2(0f, 0.5f);
+                rule.anchorMax = new Vector2(1f, 0.5f);
+                rule.pivot = new Vector2(0.5f, 0.5f);
+                rule.offsetMin = new Vector2(RowInset + width + RuleGap, -ImplantConsole.Line);
+                rule.offsetMax = new Vector2(-RowInset, 0f);
+                return view;
+            }
+            var hit = r.gameObject.AddComponent<ConsolePointer>();
+            hit.Entered = () => { list.HoverRow(index); Paint(); };
+            hit.Clicked = () => Press(index);
+            if (row.Kind != SettingKind.Dial)
+            {
+                // 既定に戻す・戻る。記憶する・思い出すの行と同じく、選んでいる時は行ごと塗る
+                view.fill = r.gameObject.AddComponent<Image>();
+                view.fill.color = ImplantConsole.Clear;
+                view.label = Label(r, row.Label);
+                ImplantConsole.Stretch(view.label.rectTransform, RowInset, RowInset, 0f, 0f);
+                return view;
+            }
+            // 行のどこにカーソルを重ねても選ぶ
+            var area = r.gameObject.AddComponent<Image>();
+            area.color = ImplantConsole.Clear;
+            var cell = ImplantConsole.Rect(r, "Name");
+            cell.anchorMin = new Vector2(0f, 0f);
+            cell.anchorMax = new Vector2(0f, 1f);
+            cell.pivot = new Vector2(0f, 0.5f);
+            cell.offsetMin = Vector2.zero;
+            cell.offsetMax = new Vector2(DialName, 0f);
+            view.fill = cell.gameObject.AddComponent<Image>();
+            view.fill.color = ImplantConsole.Clear;
+            view.fill.raycastTarget = false;
+            view.label = Label(cell, row.Label);
+            ImplantConsole.Stretch(view.label.rectTransform, RowInset, RowInset, 0f, 0f);
+
+            // つまみの当たり。溝より両脇につまみの半分ずつ広い（端の値でもつまみが当たりからはみ出さない）
+            var track = ImplantConsole.Rect(r, "Track");
+            track.anchorMin = Vector2.zero;
+            track.anchorMax = Vector2.one;
+            track.pivot = new Vector2(0.5f, 0.5f);
+            track.offsetMin = new Vector2(DialName + DialGap, 0f);
+            track.offsetMax = new Vector2(-DialValue, 0f);
+            var trackHit = track.gameObject.AddComponent<Image>();
+            trackHit.color = ImplantConsole.Clear;
+            var groove = ImplantConsole.Fill(track, "Groove", Groove, false).rectTransform;
+            groove.anchorMin = new Vector2(0f, 0.5f);
+            groove.anchorMax = new Vector2(1f, 0.5f);
+            groove.pivot = new Vector2(0.5f, 0.5f);
+            groove.offsetMin = new Vector2(KnobWidth / 2f, -GrooveHeight / 2f);
+            groove.offsetMax = new Vector2(-KnobWidth / 2f, GrooveHeight / 2f);
+            // 既定の所の目盛り。塗りとつまみの下に置く
+            var tick = ImplantConsole.Fill(groove, "Default", ImplantConsole.ButtonLine, false).rectTransform;
+            var at = row.Dial.Fraction(row.Dial.Default);
+            tick.anchorMin = new Vector2(at, 0.5f);
+            tick.anchorMax = new Vector2(at, 0.5f);
+            tick.pivot = new Vector2(0.5f, 0.5f);
+            tick.anchoredPosition = Vector2.zero;
+            tick.sizeDelta = new Vector2(ImplantConsole.Line, TickHeight);
+            // 溝の左の端からつまみまでの塗り
+            view.done = ImplantConsole.Fill(groove, "Done", ImplantConsole.Accent, false).rectTransform;
+            view.knob = ImplantConsole.Fill(groove, "Knob", ImplantConsole.Accent, false).rectTransform;
+            view.knob.pivot = new Vector2(0.5f, 0.5f);
+            view.knob.sizeDelta = new Vector2(KnobWidth, KnobHeight);
+
+            view.value = ImplantConsole.Text(r, "Value", ImplantConsole.RowFont, ImplantConsole.ButtonText, TextAlignmentOptions.Right);
+            var vr = view.value.rectTransform;
+            vr.anchorMin = new Vector2(1f, 0f);
+            vr.anchorMax = new Vector2(1f, 1f);
+            vr.pivot = new Vector2(1f, 0.5f);
+            vr.offsetMin = new Vector2(-DialValue, 0f);
+            vr.offsetMax = new Vector2(-RowInset, 0f);
+            view.value.fontStyle = FontStyles.Bold;
+            if (heavy != null) view.value.fontSharedMaterial = heavy;
+
+            // 掴んで動かす・溝の上を押すとそこへ飛ぶ
+            var slide = track.gameObject.AddComponent<ConsolePointer>();
+            slide.Held = p => Slide(index, p.x, track.rect.width);
+            return view;
+        }
+
+        /// <summary>行の字。塗りつぶしの上でも地に溶けないよう、太くして太らせた色づけを当てる</summary>
+        TMP_Text Label(RectTransform parent, string text)
+        {
+            var t = ImplantConsole.Text(parent, "Label", ImplantConsole.RowFont, ImplantConsole.ButtonText, TextAlignmentOptions.Left);
+            t.fontStyle = FontStyles.Bold;
+            if (heavy != null) t.fontSharedMaterial = heavy;
+            t.text = text;
+            return t;
+        }
+
+        // ---- 操作 ------------------------------------------------------------
+
+        /// <summary>
+        /// 鍵盤の一フレームぶん。上下（W・S・矢印）で行、左右（A・D・矢印）でつまみを一刻みずつ（押し続けると続けて）、
+        /// E・Enter で既定に戻す・戻る。戻るの行で決めたら true（呼び手が枠を閉じる）。
+        /// Esc・右クリック・TAB は呼び手が読む。now は unscaled の秒
+        /// </summary>
+        public bool Keys(Keyboard keys, float now)
+        {
+            if (keys == null) return false;
+            if (keys.upArrowKey.wasPressedThisFrame || keys.wKey.wasPressedThisFrame) list.MoveRow(-1);
+            if (keys.downArrowKey.wasPressedThisFrame || keys.sKey.wasPressedThisFrame) list.MoveRow(1);
+            var left = keys.leftArrowKey.wasPressedThisFrame || keys.aKey.wasPressedThisFrame;
+            var right = keys.rightArrowKey.wasPressedThisFrame || keys.dKey.wasPressedThisFrame;
+            var held = (keys.rightArrowKey.isPressed || keys.dKey.isPressed ? 1 : 0)
+                - (keys.leftArrowKey.isPressed || keys.aKey.isPressed ? 1 : 0);
+            var step = nudge.Step((right ? 1 : 0) - (left ? 1 : 0), held, now);
+            if (step != 0) list.Nudge(step);
+            var back = false;
+            if (keys.eKey.wasPressedThisFrame || keys.enterKey.wasPressedThisFrame || keys.numpadEnterKey.wasPressedThisFrame)
+                back = Decide();
+            Paint();
+            return back;
+        }
+
+        /// <summary>押し続けを忘れる。枠を閉じている間に呼ぶ（開く前から押していた鍵で動かさない）</summary>
+        public void Rest()
+        {
+            nudge.Release();
+        }
+
+        /// <summary>選んでいる行を決める。既定に戻すなら全部の値を既定へ戻す。戻るなら true</summary>
+        public bool Decide()
+        {
+            if (list.Reset()) return false;
+            return list.AtBack;
+        }
+
+        /// <summary>行を押す（クリック・撮影）。選べない行（小見出し）なら何もしない</summary>
+        public void Press(int row)
+        {
+            list.HoverRow(row);
+            if (list.Row != row) return;
+            var back = Decide();
+            Paint();
+            if (back && Back != null) Back();
+        }
+
+        /// <summary>
+        /// つまみの当たりを押した・掴んで動かした。x は当たりの中の割合（左 0・右 1）、width は当たりの幅。
+        /// その行を選び、押した所の値（刻みへ揃える）にする
+        /// </summary>
+        void Slide(int row, float x, float width)
+        {
+            list.HoverRow(row);
+            var dial = list.Dial;
+            if (list.Row != row || dial == null) return;
+            dial.Value = dial.AtFraction(ConsoleSettings.TrackAt(x, width, KnobWidth / 2f));
+            Paint();
+        }
+
+        // ---- 塗る ------------------------------------------------------------
+
+        /// <summary>選びと値を塗る。つまみの位置と倍率の字もここで入れ直す</summary>
+        public void Paint()
+        {
+            for (var i = 0; i < views.Count; i++) views[i].Paint(i == list.Row);
+        }
+
+        /// <summary>
+        /// 一行の塗り。既定に戻す・戻るは、記憶する・思い出すの行と同じく行ごと塗る。
+        /// つまみの行は、選んでいる時に項目の名の升だけ塗り、倍率の字を白に。つまみは青緑のまま見せる（行ごと塗ると、つまみが塗りに溶ける）
+        /// </summary>
+        sealed class RowView
+        {
+            public SettingRow row;
+            public Image fill;
+            public TMP_Text label;
+            public RectTransform done;
+            public RectTransform knob;
+            public TMP_Text value;
+
+            public void Paint(bool on)
+            {
+                if (row.Kind == SettingKind.Heading) return;
+                fill.color = on ? ImplantConsole.Accent : ImplantConsole.Clear;
+                label.color = on ? ImplantConsole.Ink : ImplantConsole.ButtonText;
+                if (row.Kind != SettingKind.Dial) return;
+                var v = row.Dial.Value;
+                var t = row.Dial.Fraction(v);
+                done.anchorMin = Vector2.zero;
+                done.anchorMax = new Vector2(t, 1f);
+                done.offsetMin = Vector2.zero;
+                done.offsetMax = Vector2.zero;
+                knob.anchorMin = new Vector2(t, 0.5f);
+                knob.anchorMax = new Vector2(t, 0.5f);
+                knob.anchoredPosition = Vector2.zero;
+                value.text = ImplantConsole.Mono(row.Dial.Text(v));
+                value.color = on ? Color.white : ImplantConsole.ButtonText;
+            }
+        }
+
+        /// <summary>確かめ用。行 row のつまみの位置（溝の中の割合）。つまみの行でなければ -1</summary>
+        public float KnobAt(int row)
+        {
+            if (row < 0 || row >= views.Count || views[row].knob == null) return -1f;
+            return views[row].knob.anchorMin.x;
+        }
+
+        /// <summary>確かめ用。行 row の字（倍率の字があればそれ、無ければ行の名）</summary>
+        public string TextAt(int row)
+        {
+            if (row < 0 || row >= views.Count) return null;
+            var v = views[row];
+            return v.value != null ? v.value.text : v.label != null ? v.label.text : null;
+        }
+    }
+}

@@ -13,6 +13,9 @@ namespace HalfAware
 
         /// <summary>既定に戻す。E・Enter か押すと、全部の値を既定へ戻す</summary>
         Reset,
+
+        /// <summary>戻る。E・Enter か押すと枠を閉じる。タイトルの画面の枠だけ（思い出すの枠に揃える）</summary>
+        Back,
     }
 
     /// <summary>設定の枠の一行</summary>
@@ -45,13 +48,19 @@ namespace HalfAware
             return new SettingRow(SettingKind.Reset, label, null);
         }
 
+        public static SettingRow Back(string label)
+        {
+            return new SettingRow(SettingKind.Back, label, null);
+        }
+
         /// <summary>選べる行か。小見出しは選べない</summary>
         public bool Selectable { get { return Kind != SettingKind.Heading; } }
     }
 
     /// <summary>
-    /// コンソールの設定の枠（設計書 1 節）に並べる行の表。**項目を足す時はここに一行足す**
-    /// （値そのものは <see cref="GameSettings"/> に足す）。選ぶ・動かすは <see cref="ConsoleMenu"/>、見せ方は <see cref="ImplantConsole"/>
+    /// 設定の枠（設計書 1 節・5 節）に並べる行の表。**項目を足す時はここに一行足す**
+    /// （値そのものは <see cref="GameSettings"/> に足す）。コンソールとタイトルの画面が同じ表を使う（タイトルの画面は最後に「戻る」を足す）。
+    /// 選ぶ・動かすは <see cref="SettingsList"/>、見せ方と操作は <see cref="SettingsPanel"/>
     /// </summary>
     public static class ConsoleSettings
     {
@@ -69,6 +78,15 @@ namespace HalfAware
             SettingRow.Reset(ResetLabel),
         };
 
+        /// <summary><see cref="Rows"/> の最後に「戻る」の行を足した表。タイトルの画面の枠に使う</summary>
+        public static SettingRow[] WithBack(string label)
+        {
+            var list = new SettingRow[Rows.Length + 1];
+            System.Array.Copy(Rows, list, Rows.Length);
+            list[Rows.Length] = SettingRow.Back(label);
+            return list;
+        }
+
         /// <summary>
         /// マウスで押した所から、つまみの位置（0〜1）。x は当たりの中の割合（左の端 0・右の端 1、<see cref="ConsolePointer.Held"/>）、
         /// width は当たりの幅、inset は当たりの両端の、溝の外の幅（つまみの半分。端の値でもつまみが当たりからはみ出さない）
@@ -78,6 +96,106 @@ namespace HalfAware
             var span = width - inset * 2f;
             if (span <= 0f) return 0f;
             return Mathf.Clamp01((Mathf.Clamp01(x) * width - inset) / span);
+        }
+    }
+
+    /// <summary>
+    /// 設定の枠の行の選びと、値の動かし（見せ方は持たない）。コンソール（<see cref="ConsoleMenu"/> が持つ）と
+    /// タイトルの画面が、それぞれ一つずつ持つ。上下で選べる行（小見出しは飛ばす）を選び、つまみの行なら左右で値を動かす
+    /// </summary>
+    public sealed class SettingsList
+    {
+        readonly SettingRow[] rows;
+
+        public SettingsList(SettingRow[] rows)
+        {
+            this.rows = rows ?? new SettingRow[0];
+        }
+
+        /// <summary>行の数（小見出しも一つと数える）</summary>
+        public int Count { get { return rows.Length; } }
+
+        public SettingRow RowAt(int row)
+        {
+            return row >= 0 && row < rows.Length ? rows[row] : null;
+        }
+
+        /// <summary>選んでいる行（0 始まり）。選べる行が無ければ -1</summary>
+        public int Row { get; private set; }
+
+        /// <summary>開いた時の形。いちばん上の選べる行（小見出しの次）を選ぶ</summary>
+        public void Open()
+        {
+            Row = Next(-1, 1);
+        }
+
+        /// <summary>その行を選べるか。小見出しは選べない</summary>
+        public bool Usable(int row)
+        {
+            return row >= 0 && row < rows.Length && rows[row].Selectable;
+        }
+
+        /// <summary>from から step の向きで、次に選べる行。無ければ from（from が選べない行なら -1）</summary>
+        int Next(int from, int step)
+        {
+            for (var r = from + step; r >= 0 && r < rows.Length; r += step)
+                if (Usable(r)) return r;
+            return Usable(from) ? from : -1;
+        }
+
+        /// <summary>上下。-1 で上、+1 で下。両端で止まり、小見出しは飛ばす</summary>
+        public void MoveRow(int step)
+        {
+            if (step == 0) return;
+            var n = Mathf.Abs(step);
+            for (var i = 0; i < n; i++) Row = Next(Row, step > 0 ? 1 : -1);
+        }
+
+        /// <summary>カーソルが重なった行を選ぶ。小見出しなら何もしない</summary>
+        public void HoverRow(int row)
+        {
+            if (Usable(row)) Row = row;
+        }
+
+        /// <summary>選んでいる行。選べる行が無ければ null</summary>
+        public SettingRow Selected { get { return Usable(Row) ? rows[Row] : null; } }
+
+        /// <summary>選んでいる、つまみの行が動かす値。つまみの行を選んでいなければ null</summary>
+        public SettingDial Dial
+        {
+            get
+            {
+                var row = Selected;
+                return row != null ? row.Dial : null;
+            }
+        }
+
+        /// <summary>選んでいるつまみを step 刻みだけ動かす。両端で止まる。つまみの行でなければ false</summary>
+        public bool Nudge(int step)
+        {
+            var dial = Dial;
+            if (dial == null || step == 0) return false;
+            dial.Nudge(step);
+            return true;
+        }
+
+        /// <summary>「既定に戻す」を選んでいれば、全部の値を既定へ戻して true</summary>
+        public bool Reset()
+        {
+            var row = Selected;
+            if (row == null || row.Kind != SettingKind.Reset) return false;
+            GameSettings.ResetAll();
+            return true;
+        }
+
+        /// <summary>「戻る」を選んでいるか</summary>
+        public bool AtBack
+        {
+            get
+            {
+                var row = Selected;
+                return row != null && row.Kind == SettingKind.Back;
+            }
         }
     }
 

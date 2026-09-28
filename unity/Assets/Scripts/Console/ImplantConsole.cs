@@ -59,7 +59,7 @@ namespace HalfAware
         /// <summary>画面の縁から枠まで（上下・左右）。画面に対する割合</summary>
         const float InsetY = 0.12f;
         const float InsetX = 0.14f;
-        const float Line = 1f * Dot;
+        internal const float Line = 1f * Dot;
         const float HookSize = 12f * Dot;
         const float HookLine = 2f * Dot;
 
@@ -67,10 +67,10 @@ namespace HalfAware
         const float Inner = 22f * Dot;
         const float HeadTop = 16f * Dot;
         const float HeadSide = Inner;
-        const float HeadFont = 11f * Dot;
-        const float HeadHeight = 14f * Dot;
+        internal const float HeadFont = 11f * Dot;
+        internal const float HeadHeight = 14f * Dot;
         /// <summary>頭の行の字の間。0.08 em</summary>
-        const float HeadSpacing = 8f;
+        internal const float HeadSpacing = 8f;
 
         const float ButtonTop = HeadTop + HeadHeight + 16f * Dot;
         const float ButtonHeight = 28f * Dot;
@@ -90,7 +90,7 @@ namespace HalfAware
         /// <summary>ボタンの下の枠を開いている間の、ログの濃さ</summary>
         const float PanelBehind = 0.25f;
 
-        const float RowFont = 11f * Dot;
+        internal const float RowFont = 11f * Dot;
         const float RowLine = 17f * Dot;
         const float RowGap = 10f * Dot;
         /// <summary>行の送り。TMP の Noto は素で 1.45 em。折り返した行のあいだも少し開ける</summary>
@@ -114,33 +114,9 @@ namespace HalfAware
         const int ListColumn = 5;
         /// <summary>記憶する・思い出すの枠の幅。行に場面の名と書いた日時を並べる</summary>
         const float SlotBoxWidth = 280f * Dot;
-        const float BoxRow = 22f * Dot;
-        const float BoxPad = 12f * Dot;
-        const float RowInset = 7f * Dot;
-
-        // 設定の枠。記憶する・思い出すの枠と同じ出し方で、行は ConsoleSettings.Rows の順に並べる。
-        // つまみの行は、左に項目の名の升、中ほどにつまみ（溝・塗り・つまみ）、右に倍率の字
-
-        /// <summary>設定の枠の幅。つまみの行に、項目の名・つまみ・倍率を並べる</summary>
-        const float SettingsBoxWidth = 320f * Dot;
-        /// <summary>つまみの行の、項目の名の升の幅。選んでいる時はここを塗る（つまみは塗らずに青緑のまま見せる）</summary>
-        const float DialName = 84f * Dot;
-        /// <summary>つまみの行の右の、倍率の字の幅</summary>
-        const float DialValue = 48f * Dot;
-        /// <summary>名の升と、つまみの当たりのあいだ</summary>
-        const float DialGap = 10f * Dot;
-        /// <summary>つまみ。ボタンの選んだ色で塗った縦長の升</summary>
-        const float KnobWidth = 6f * Dot;
-        const float KnobHeight = 14f * Dot;
-        /// <summary>溝の太さ。1 Dot だと薄い色の線が粗い画面で途切れるので 2 Dot</summary>
-        const float GrooveHeight = 2f * Dot;
-        /// <summary>既定（1 倍）の所に立てる目盛りの高さ</summary>
-        const float TickHeight = 8f * Dot;
-        /// <summary>小見出し（先頭を除く）と「既定に戻す」の行の上に空ける</summary>
-        const float SectionGap = 6f * Dot;
-        /// <summary>小見出しの字と、その後ろの細い線のあいだ</summary>
-        const float RuleGap = 8f * Dot;
-        static readonly Color Groove = Tint(Rgb(127, 227, 236, 0.35f));
+        internal const float BoxRow = 22f * Dot;
+        internal const float BoxPad = 12f * Dot;
+        internal const float RowInset = 7f * Dot;
 
         public const string CloseHint = "TAB　閉じる";
         public const string ListTitle = "場面　　数字・E で飛ぶ";
@@ -202,10 +178,8 @@ namespace HalfAware
         readonly List<ButtonView> places = new List<ButtonView>();
         readonly List<ButtonView> rememberRows = new List<ButtonView>();
         readonly List<ButtonView> recallRows = new List<ButtonView>();
-        /// <summary>設定の枠の行。<see cref="ConsoleSettings.Rows"/> と同じ並び（小見出しも一つと数える）</summary>
-        readonly List<SettingView> settingRows = new List<SettingView>();
-        /// <summary>設定の枠の左右の押し続け</summary>
-        readonly HoldRepeat nudge = new HoldRepeat();
+        /// <summary>設定の枠の見た目と操作。タイトルの画面と同じ物（行の選びは menu.Settings）</summary>
+        SettingsPanel settingsPanel;
         /// <summary>置き場ごとのセーブ（自動・1・2・3）。枠を開く時と書いた後に読み直す</summary>
         readonly SaveData[] slots = new SaveData[ConsoleMenu.RecallRows];
 
@@ -430,7 +404,10 @@ namespace HalfAware
             List();
             rememberBox = SlotBox("Remember", RememberTitle, ConsoleMenu.RememberRows, rememberRows);
             recallBox = SlotBox("Recall", RecallTitle, ConsoleMenu.RecallRows, recallRows);
-            settingsBox = SettingsBox();
+            // 設定の枠。記憶する・思い出すの枠と同じく、ログの枠の中の左上に重ねる
+            settingsPanel = new SettingsPanel(menu.Settings);
+            settingsBox = settingsPanel.Build(viewport.parent, ConsoleSettings.Title, heavy);
+            settingsBox.anchoredPosition = new Vector2(PadLeft, -PadTop);
             // 浮かべる板は最後に作って、いちばん上の層に置く。知らせは確かめよりさらに上
             BuildAsk();
             BuildNote();
@@ -742,158 +719,6 @@ namespace HalfAware
             return b;
         }
 
-        /// <summary>
-        /// 設定の枠。記憶する・思い出すの枠と同じ出し方で、ログの枠の中の左上に重ねる。
-        /// 行は <see cref="ConsoleSettings.Rows"/> の順: 小見出し（「カメラ」と細い線）、つまみの行（項目の名・つまみ・倍率）、既定に戻す
-        /// </summary>
-        RectTransform SettingsBox()
-        {
-            var frame = (RectTransform)viewport.parent;
-            var b = Rect(frame, "Settings");
-            b.anchorMin = new Vector2(0f, 1f);
-            b.anchorMax = new Vector2(0f, 1f);
-            b.pivot = new Vector2(0f, 1f);
-            b.anchoredPosition = new Vector2(PadLeft, -PadTop);
-            var list = ConsoleSettings.Rows;
-            b.sizeDelta = new Vector2(SettingsBoxWidth, SettingTop(list.Length - 1) + BoxRow + BoxPad);
-            var bg = b.gameObject.AddComponent<Image>();
-            bg.color = BoxFill;
-            Border(b, ButtonLine, Line);
-            var title = Text(b, "Title", HeadFont, Accent, TextAlignmentOptions.TopLeft);
-            Top(title.rectTransform, BoxPad, BoxPad, BoxPad, HeadHeight);
-            title.characterSpacing = HeadSpacing;
-            title.text = ConsoleSettings.Title;
-            for (var i = 0; i < list.Length; i++)
-            {
-                var r = Rect(b, "Row" + i);
-                Top(r, BoxPad, BoxPad, SettingTop(i), BoxRow);
-                settingRows.Add(MakeSetting(r, list[i], i));
-            }
-            b.gameObject.SetActive(false);
-            return b;
-        }
-
-        /// <summary>設定の枠の index 行目の上の縁。枠の上の縁から。小見出し（先頭を除く）と既定に戻すの上は少し空ける</summary>
-        static float SettingTop(int index)
-        {
-            var top = BoxPad * 2f + HeadHeight + BoxRow * index;
-            for (var i = 1; i <= index; i++)
-                if (ConsoleSettings.Rows[i].Kind != SettingKind.Dial) top += SectionGap;
-            return top;
-        }
-
-        /// <summary>設定の枠の一行を組む。小見出しは選べないので当たりを持たない</summary>
-        SettingView MakeSetting(RectTransform r, SettingRow row, int index)
-        {
-            var view = new SettingView();
-            view.row = row;
-            if (row.Kind == SettingKind.Heading)
-            {
-                view.label = Text(r, "Label", HeadFont, Accent, TextAlignmentOptions.Left);
-                Stretch(view.label.rectTransform, RowInset, RowInset, 0f, 0f);
-                view.label.characterSpacing = HeadSpacing;
-                view.label.text = row.Label;
-                // 字の後ろから右の端まで細い線を引いて、項目の区切りに見せる
-                var width = view.label.GetPreferredValues(row.Label).x;
-                var rule = Fill(r, "Rule", Groove, false).rectTransform;
-                rule.anchorMin = new Vector2(0f, 0.5f);
-                rule.anchorMax = new Vector2(1f, 0.5f);
-                rule.pivot = new Vector2(0.5f, 0.5f);
-                rule.offsetMin = new Vector2(RowInset + width + RuleGap, -Line);
-                rule.offsetMax = new Vector2(-RowInset, 0f);
-                return view;
-            }
-            var hit = r.gameObject.AddComponent<ConsolePointer>();
-            hit.Entered = () => { menu.HoverRow(index); Paint(); };
-            hit.Clicked = () => PressRow(index);
-            if (row.Kind != SettingKind.Dial)
-            {
-                // 既定に戻す。記憶する・思い出すの行と同じく、選んでいる時は行ごと塗る
-                view.fill = r.gameObject.AddComponent<Image>();
-                view.fill.color = Clear;
-                view.label = Text(r, "Label", RowFont, ButtonText, TextAlignmentOptions.Left);
-                Stretch(view.label.rectTransform, RowInset, RowInset, 0f, 0f);
-                view.label.fontStyle = FontStyles.Bold;
-                Heavy(view.label);
-                view.label.text = row.Label;
-                return view;
-            }
-            // 行のどこにカーソルを重ねても選ぶ
-            var area = r.gameObject.AddComponent<Image>();
-            area.color = Clear;
-            var cell = Rect(r, "Name");
-            cell.anchorMin = new Vector2(0f, 0f);
-            cell.anchorMax = new Vector2(0f, 1f);
-            cell.pivot = new Vector2(0f, 0.5f);
-            cell.offsetMin = Vector2.zero;
-            cell.offsetMax = new Vector2(DialName, 0f);
-            view.fill = cell.gameObject.AddComponent<Image>();
-            view.fill.color = Clear;
-            view.fill.raycastTarget = false;
-            view.label = Text(cell, "Label", RowFont, ButtonText, TextAlignmentOptions.Left);
-            Stretch(view.label.rectTransform, RowInset, RowInset, 0f, 0f);
-            view.label.fontStyle = FontStyles.Bold;
-            Heavy(view.label);
-            view.label.text = row.Label;
-
-            // つまみの当たり。溝より両脇につまみの半分ずつ広い（端の値でもつまみが当たりからはみ出さない）
-            var track = Rect(r, "Track");
-            track.anchorMin = Vector2.zero;
-            track.anchorMax = Vector2.one;
-            track.pivot = new Vector2(0.5f, 0.5f);
-            track.offsetMin = new Vector2(DialName + DialGap, 0f);
-            track.offsetMax = new Vector2(-DialValue, 0f);
-            var trackHit = track.gameObject.AddComponent<Image>();
-            trackHit.color = Clear;
-            var groove = Fill(track, "Groove", Groove, false).rectTransform;
-            groove.anchorMin = new Vector2(0f, 0.5f);
-            groove.anchorMax = new Vector2(1f, 0.5f);
-            groove.pivot = new Vector2(0.5f, 0.5f);
-            groove.offsetMin = new Vector2(KnobWidth / 2f, -GrooveHeight / 2f);
-            groove.offsetMax = new Vector2(-KnobWidth / 2f, GrooveHeight / 2f);
-            // 既定の所の目盛り。塗りとつまみの下に置く
-            var tick = Fill(groove, "Default", ButtonLine, false).rectTransform;
-            var at = row.Dial.Fraction(row.Dial.Default);
-            tick.anchorMin = new Vector2(at, 0.5f);
-            tick.anchorMax = new Vector2(at, 0.5f);
-            tick.pivot = new Vector2(0.5f, 0.5f);
-            tick.anchoredPosition = Vector2.zero;
-            tick.sizeDelta = new Vector2(Line, TickHeight);
-            // 溝の左の端からつまみまでの塗り
-            view.done = Fill(groove, "Done", Accent, false).rectTransform;
-            view.knob = Fill(groove, "Knob", Accent, false).rectTransform;
-            view.knob.pivot = new Vector2(0.5f, 0.5f);
-            view.knob.sizeDelta = new Vector2(KnobWidth, KnobHeight);
-
-            view.value = Text(r, "Value", RowFont, ButtonText, TextAlignmentOptions.Right);
-            var vr = view.value.rectTransform;
-            vr.anchorMin = new Vector2(1f, 0f);
-            vr.anchorMax = new Vector2(1f, 1f);
-            vr.pivot = new Vector2(1f, 0.5f);
-            vr.offsetMin = new Vector2(-DialValue, 0f);
-            vr.offsetMax = new Vector2(-RowInset, 0f);
-            view.value.fontStyle = FontStyles.Bold;
-            Heavy(view.value);
-
-            // 掴んで動かす・溝の上を押すとそこへ飛ぶ
-            var slide = track.gameObject.AddComponent<ConsolePointer>();
-            slide.Held = p => Slide(index, p.x, track.rect.width);
-            return view;
-        }
-
-        /// <summary>
-        /// つまみの当たりを押した・掴んで動かした。x は当たりの中の割合（左 0・右 1）、width は当たりの幅。
-        /// その行を選び、押した所の値（刻みへ揃える）にする
-        /// </summary>
-        void Slide(int row, float x, float width)
-        {
-            menu.HoverRow(row);
-            var dial = menu.RowDial;
-            if (menu.Row != row || dial == null) return;
-            dial.Value = dial.AtFraction(ConsoleSettings.TrackAt(x, width, KnobWidth / 2f));
-            Paint();
-        }
-
         // ---- 開け閉め ----------------------------------------------------------
 
         /// <summary>開く。場面の秒を止め、カーソルを出してロックを外す。ログは必ず最新から</summary>
@@ -1034,22 +859,16 @@ namespace HalfAware
             }
             var digit = Digit(keys);
             if (digit > 0 && Jump(ConsoleMenu.DigitTarget(digit, Here))) return true;
-            var left = keys.leftArrowKey.wasPressedThisFrame || keys.aKey.wasPressedThisFrame;
-            var right = keys.rightArrowKey.wasPressedThisFrame || keys.dKey.wasPressedThisFrame;
             if (menu.Panel == ConsolePanel.Settings)
             {
-                // 設定の枠では、左右はつまみを一刻みずつ動かす。押し続けると続けて動く（秒は unscaled）
-                var held = (keys.rightArrowKey.isPressed || keys.dKey.isPressed ? 1 : 0)
-                    - (keys.leftArrowKey.isPressed || keys.aKey.isPressed ? 1 : 0);
-                var step = nudge.Step((right ? 1 : 0) - (left ? 1 : 0), held, Time.unscaledTime);
-                if (step != 0) menu.Move(step);
+                // 設定の枠の上下・左右（つまみ、押し続け）・E はタイトルの画面と同じ物（SettingsPanel）が読む。
+                // 左右はボタンへ移らない
+                settingsPanel.Keys(keys, Time.unscaledTime);
+                return false;
             }
-            else
-            {
-                nudge.Release();
-                if (left) menu.Move(-1);
-                if (right) menu.Move(1);
-            }
+            settingsPanel.Rest();
+            if (keys.leftArrowKey.wasPressedThisFrame || keys.aKey.wasPressedThisFrame) menu.Move(-1);
+            if (keys.rightArrowKey.wasPressedThisFrame || keys.dKey.wasPressedThisFrame) menu.Move(1);
             var up = keys.upArrowKey.wasPressedThisFrame || keys.wKey.wasPressedThisFrame;
             var down = keys.downArrowKey.wasPressedThisFrame || keys.sKey.wasPressedThisFrame;
             if (menu.Panel != ConsolePanel.None)
@@ -1065,7 +884,7 @@ namespace HalfAware
                 if (keys.pageDownKey.wasPressedThisFrame) scroll.By(-scroll.View * 0.9f);
             }
             if (!decide) return false;
-            // 枠を出している間の決定は、選んでいる行に効く（場面へ飛ぶ・書く・読む・既定に戻す）
+            // 枠を出している間の決定は、選んでいる行に効く（場面へ飛ぶ・書く・読む）
             if (menu.Panel != ConsolePanel.None) return Act();
             return Press();
         }
@@ -1103,8 +922,8 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// 枠で選んでいる行に効かせる。場面の一覧なら飛び、記憶するなら書き、思い出すなら読み、
-        /// 設定なら「既定に戻す」で全部の値を既定へ戻す（つまみの行では何もしない。値は左右とマウスで動かす）。閉じたら true
+        /// 枠で選んでいる行に効かせる。場面の一覧なら飛び、記憶するなら書き、思い出すなら読む。閉じたら true。
+        /// 設定の枠は SettingsPanel が自分で読む
         /// </summary>
         bool Act()
         {
@@ -1145,9 +964,6 @@ namespace HalfAware
                     SaveFlow.Resume(slot.Value);
                     return true;
                 }
-                case ConsolePanel.Settings:
-                    if (menu.ResetSettings()) Paint();
-                    return false;
                 default:
                     return false;
             }
@@ -1168,7 +984,7 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// 枠の行を押す（クリック・撮影）。選べない行（思い出すの空き・設定の小見出し）なら選びが替わらないので何もしない。
+        /// 枠の行を押す（クリック・撮影）。選べない行（思い出すの空き）なら選びが替わらないので何もしない。
         /// 閉じたら true
         /// </summary>
         public bool PressRow(int row)
@@ -1459,8 +1275,7 @@ namespace HalfAware
             if (slotRows != null)
                 for (var i = 0; i < slotRows.Count; i++) slotRows[i].PaintSlot(i == menu.Row, menu.Usable(i));
             settingsBox.gameObject.SetActive(menu.Panel == ConsolePanel.Settings);
-            if (menu.Panel == ConsolePanel.Settings)
-                for (var i = 0; i < settingRows.Count; i++) settingRows[i].Paint(i == menu.Row);
+            if (menu.Panel == ConsolePanel.Settings) settingsPanel.Paint();
             if (askLayer.gameObject.activeSelf != menu.Asking) askLayer.gameObject.SetActive(menu.Asking);
             if (menu.Asking)
                 for (var i = 0; i < askCards.Count; i++) askCards[i].Paint(i == menu.Answer);
@@ -1492,39 +1307,6 @@ namespace HalfAware
                 fill.color = on ? Accent : Clear;
                 label.color = on ? Ink : usable ? ButtonText : Faded;
                 mark.color = on ? Ink : usable ? RowText : Faded;
-            }
-        }
-
-        /// <summary>
-        /// 設定の枠の一行。既定に戻すは記憶する・思い出すの行と同じく行ごと塗る。
-        /// つまみの行は、選んでいる時に項目の名の升だけ塗り、つまみは青緑のまま見せる（行ごと塗ると、つまみが塗りに溶ける）
-        /// </summary>
-        sealed class SettingView
-        {
-            public SettingRow row;
-            public Image fill;
-            public TMP_Text label;
-            public RectTransform done;
-            public RectTransform knob;
-            public TMP_Text value;
-
-            public void Paint(bool on)
-            {
-                if (row.Kind == SettingKind.Heading) return;
-                fill.color = on ? Accent : Clear;
-                label.color = on ? Ink : ButtonText;
-                if (row.Kind != SettingKind.Dial) return;
-                var v = row.Dial.Value;
-                var t = row.Dial.Fraction(v);
-                done.anchorMin = Vector2.zero;
-                done.anchorMax = new Vector2(t, 1f);
-                done.offsetMin = Vector2.zero;
-                done.offsetMax = Vector2.zero;
-                knob.anchorMin = new Vector2(t, 0.5f);
-                knob.anchorMax = new Vector2(t, 0.5f);
-                knob.anchoredPosition = Vector2.zero;
-                value.text = Mono(row.Dial.Text(v));
-                value.color = on ? Color.white : ButtonText;
             }
         }
 

@@ -119,9 +119,20 @@ namespace HalfAware
 
         /// <summary>
         /// 枠で選んでいる行（0 始まり）。場面の一覧なら <see cref="SceneMenu.Scenes"/> の番号、
-        /// 記憶するなら手動の 1〜3、思い出すなら自動・1・2・3。選べる行が無ければ -1
+        /// 記憶するなら手動の 1〜3、思い出すなら自動・1・2・3、設定なら <see cref="ConsoleSettings.Rows"/> の番号。選べる行が無ければ -1
         /// </summary>
-        public int Row { get; private set; }
+        public int Row
+        {
+            get { return Panel == ConsolePanel.Settings ? settings.Row : row; }
+            private set { row = value; }
+        }
+
+        int row;
+
+        /// <summary>設定の枠の行の選びと値の動かし。見せ方と操作は <see cref="SettingsPanel"/>（タイトルの画面と同じ物）</summary>
+        public SettingsList Settings { get { return settings; } }
+
+        readonly SettingsList settings = new SettingsList(ConsoleSettings.Rows);
 
         /// <summary>記憶するで中身のある置き場を選んだ時の、上書きの確かめを出しているか</summary>
         public bool Asking { get; private set; }
@@ -175,7 +186,7 @@ namespace HalfAware
             }
             if (Panel == ConsolePanel.Settings)
             {
-                Nudge(step);
+                settings.Nudge(step);
                 return;
             }
             Index = Mathf.Clamp(Index + step, 0, Labels.Length - 1);
@@ -222,8 +233,8 @@ namespace HalfAware
             switch (want)
             {
                 case ConsolePanel.Scenes: Row = Mathf.Max(0, System.Array.IndexOf(SceneMenu.Scenes, here)); break;
-                case ConsolePanel.Recall:
-                case ConsolePanel.Settings: Row = Next(-1, 1); break;
+                case ConsolePanel.Recall: Row = Next(-1, 1); break;
+                case ConsolePanel.Settings: settings.Open(); break;
                 default: Row = 0; break;
             }
             return action;
@@ -239,7 +250,7 @@ namespace HalfAware
                     case ConsolePanel.Scenes: return SceneMenu.Count;
                     case ConsolePanel.Remember: return RememberRows;
                     case ConsolePanel.Recall: return RecallRows;
-                    case ConsolePanel.Settings: return ConsoleSettings.Rows.Length;
+                    case ConsolePanel.Settings: return settings.Count;
                     default: return 0;
                 }
             }
@@ -250,7 +261,7 @@ namespace HalfAware
         {
             if (row < 0 || row >= Rows) return false;
             if (Panel == ConsolePanel.Recall) return Filled(row);
-            if (Panel == ConsolePanel.Settings) return ConsoleSettings.Rows[row].Selectable;
+            if (Panel == ConsolePanel.Settings) return settings.Usable(row);
             return true;
         }
 
@@ -266,6 +277,11 @@ namespace HalfAware
         public void MoveRow(int step)
         {
             if (Asking || Panel == ConsolePanel.None || step == 0) return;
+            if (Panel == ConsolePanel.Settings)
+            {
+                settings.MoveRow(step);
+                return;
+            }
             var n = Mathf.Abs(step);
             for (var i = 0; i < n; i++) Row = Next(Row, step > 0 ? 1 : -1);
         }
@@ -274,7 +290,8 @@ namespace HalfAware
         public void HoverRow(int row)
         {
             if (Asking || !Usable(row)) return;
-            Row = row;
+            if (Panel == ConsolePanel.Settings) settings.HoverRow(row);
+            else Row = row;
         }
 
         /// <summary>一覧で選んでいる行の移り先。今いる場面なら null（<see cref="SceneMenu.Target"/>）</summary>
@@ -300,35 +317,25 @@ namespace HalfAware
         /// <summary>設定の枠で選んでいる行。設定の枠を開いていない、選べる行が無ければ null</summary>
         public SettingRow SettingRow
         {
-            get { return Panel == ConsolePanel.Settings && Usable(Row) ? ConsoleSettings.Rows[Row] : null; }
+            get { return Panel == ConsolePanel.Settings ? settings.Selected : null; }
         }
 
         /// <summary>設定の枠で選んでいる、つまみの行が動かす値。つまみの行を選んでいなければ null</summary>
         public SettingDial RowDial
         {
-            get
-            {
-                var row = SettingRow;
-                return row != null ? row.Dial : null;
-            }
+            get { return Panel == ConsolePanel.Settings ? settings.Dial : null; }
         }
 
-        /// <summary>選んでいるつまみを step 刻みだけ動かす。両端で止まる。動かせる行でなければ false</summary>
+        /// <summary>設定の枠で選んでいるつまみを step 刻みだけ動かす。両端で止まる。動かせる行でなければ false</summary>
         public bool Nudge(int step)
         {
-            var dial = RowDial;
-            if (dial == null || step == 0) return false;
-            dial.Nudge(step);
-            return true;
+            return Panel == ConsolePanel.Settings && settings.Nudge(step);
         }
 
         /// <summary>設定の枠で「既定に戻す」を選んでいれば、全部の値を既定へ戻して true</summary>
         public bool ResetSettings()
         {
-            var row = SettingRow;
-            if (row == null || row.Kind != SettingKind.Reset) return false;
-            GameSettings.ResetAll();
-            return true;
+            return Panel == ConsolePanel.Settings && settings.Reset();
         }
 
         // ---- 上書きの確かめ -------------------------------------------------
