@@ -3,6 +3,7 @@
     "rootNamespace": "HalfAware.Tests",
     "references": [
         "HalfAware",
+        "Unity.InputSystem",
         "Unity.TextMeshPro",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"

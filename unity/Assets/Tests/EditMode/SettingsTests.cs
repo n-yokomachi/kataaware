@@ -1,10 +1,12 @@
 using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace HalfAware.Tests
 {
     /// <summary>
     /// コンソールの設定の枠（設計書 1 節）。カメラの速さの範囲と刻み、残して読み直す（動きが止まってから書く）、
-    /// 見回しの速さへの効き、枠の上下と左右、右クリック（Esc）の戻り方、マウスの押した所からの値、左右の押し続け
+    /// 見回しの速さへの効き（マウスとスティック）、枠の上下と左右、右クリック（Esc）の戻り方、マウスの押した所からの値、左右の押し続け
     /// </summary>
     public class SettingsTests
     {
@@ -188,6 +190,61 @@ namespace HalfAware.Tests
             Assert.AreEqual(0.084f, PlayerController.LookSensitivity, 1e-7f);
             Look.Value = 0.25f;
             Assert.AreEqual(0.0105f, PlayerController.LookSensitivity, 1e-7f);
+        }
+
+        [Test]
+        public void TheStickTurnsByTiltTimesDegreesPerSecond()
+        {
+            Assert.AreEqual(120f, PlayerController.StickDegreesPerSecond);
+            // 倒しきって 1 秒で 120 度。半分倒せば 60 度。上下も同じ
+            var full = PlayerController.LookTurn(new Vector2(1f, 0f), true, 1f);
+            Assert.AreEqual(120f, full.x, 1e-4f);
+            Assert.AreEqual(0f, full.y, 1e-4f);
+            var half = PlayerController.LookTurn(new Vector2(-0.5f, 0.5f), true, 1f / 60f);
+            Assert.AreEqual(-1f, half.x, 1e-4f);
+            Assert.AreEqual(1f, half.y, 1e-4f);
+            // 倒した量は 1 までに収める（ハットの斜めは (1, 1) で来る）
+            var diagonal = PlayerController.LookTurn(new Vector2(1f, 1f), true, 1f);
+            Assert.AreEqual(120f, diagonal.magnitude, 1e-3f);
+            // 秒が無ければ回らない
+            Assert.AreEqual(Vector2.zero, PlayerController.LookTurn(Vector2.one, true, 0f));
+            // 設定の倍率はスティックにも掛かる
+            Look.Value = 0.5f;
+            Assert.AreEqual(60f, PlayerController.StickLookSpeed, 1e-4f);
+            Assert.AreEqual(60f, PlayerController.LookTurn(new Vector2(1f, 0f), true, 1f).x, 1e-4f);
+            Look.Value = 2f;
+            Assert.AreEqual(240f, PlayerController.LookTurn(new Vector2(0f, -1f), true, 1f).y * -1f, 1e-4f);
+        }
+
+        [Test]
+        public void TheMouseStillTurnsByPixelsWhateverTheFrame()
+        {
+            // マウスの速さは変えない。動いた画素 × 0.042 度で、秒は関わらない
+            var turn = PlayerController.LookTurn(new Vector2(100f, -50f), false, 1f / 60f);
+            Assert.AreEqual(4.2f, turn.x, 1e-4f);
+            Assert.AreEqual(-2.1f, turn.y, 1e-4f);
+            Assert.AreEqual(turn, PlayerController.LookTurn(new Vector2(100f, -50f), false, 0.5f));
+            // 大きく動かしても収めない（画素は倒した量ではない）
+            Assert.AreEqual(42f, PlayerController.LookTurn(new Vector2(1000f, 0f), false, 0.01f).x, 1e-3f);
+            Look.Value = 1.5f;
+            Assert.AreEqual(6.3f, PlayerController.LookTurn(new Vector2(100f, 0f), false, 1f).x, 1e-4f);
+        }
+
+        [Test]
+        public void TheGamepadStickIsReadAsAStickAndTheMouseAsPixels()
+        {
+            Assert.IsFalse(PlayerController.FromStick(null), "何も押していなければマウスと同じ扱い（入力は 0）");
+            if (Mouse.current != null) Assert.IsFalse(PlayerController.FromStick(Mouse.current.delta));
+            var pad = InputSystem.AddDevice<Gamepad>();
+            try
+            {
+                Assert.IsTrue(PlayerController.FromStick(pad.rightStick));
+                Assert.IsTrue(PlayerController.FromStick(pad.dpad));
+            }
+            finally
+            {
+                InputSystem.RemoveDevice(pad);
+            }
         }
 
         // ---- 枠の上下と左右 ----------------------------------------------------

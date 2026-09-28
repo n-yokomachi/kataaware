@@ -33,12 +33,44 @@ namespace HalfAware
         public const float BaseLookSensitivity = 0.042f;
 
         /// <summary>
-        /// 見回しの速さ。度 / ピクセル。元の速さ（<see cref="BaseLookSensitivity"/>）に、コンソールの設定の
+        /// マウス（とポインター）で見回す速さ。度 / ピクセル。元の速さ（<see cref="BaseLookSensitivity"/>）に、コンソールの設定の
         /// 「カメラの速さ」の倍率（<see cref="GameSettings.LookScale"/>、0.25〜2 倍）を掛ける。
-        /// 見回し（マウスとゲームパッドの右スティック）にだけ効く。調べた物へ目を向ける動き（<see cref="Face"/>・<see cref="Follow"/>）は
-        /// 秒で決まるので、倍率に関わらない
+        /// スティックは <see cref="StickLookSpeed"/>（同じ倍率が掛かる）。倍率は見回しにだけ効く。
+        /// 調べた物へ目を向ける動き（<see cref="Face"/>・<see cref="Follow"/>）は秒で決まるので、倍率に関わらない
         /// </summary>
         public static float LookSensitivity { get { return BaseLookSensitivity * GameSettings.LookScale.Value; } }
+
+        /// <summary>
+        /// ゲームパッドの右スティック（とジョイスティックのハット）で見回す速さ。倒しきった時の度 / 秒。倒した量に比例する。
+        /// スティックは毎フレーム「どれだけ倒しているか」（-1〜1）を返すので、マウスの度 / ピクセルを掛けると
+        /// 倒しきっても 1 フレームに 0.042 度（60 fps で毎秒 2.5 度）にしかならず、使えなかった（2026-09-28）。
+        ///
+        /// 120 の根拠: 据え置きの一人称の既定の見回し（倒しきって毎秒 150〜200 度ほど）より遅めにする。
+        /// オーナーはマウスの見回しを二度落としており（0.126 → 0.063 → 0.042）、歩いて眺める遊びなので速く回す要が無い。
+        /// 倒しきって 3 秒で一回り、半分倒せば毎秒 60 度で、ゆっくり見回せる。上下も同じ速さ（マウスと同じく左右と上下を揃える）。
+        /// コンソールの設定の「カメラの速さ」の倍率（<see cref="GameSettings.LookScale"/>）も掛かる
+        /// </summary>
+        public const float StickDegreesPerSecond = 120f;
+
+        /// <summary>スティックで見回す速さ。度 / 秒。<see cref="StickDegreesPerSecond"/> × 設定の倍率</summary>
+        public static float StickLookSpeed { get { return StickDegreesPerSecond * GameSettings.LookScale.Value; } }
+
+        /// <summary>
+        /// 見回しの入力を、この一フレームで回す角度（度。x が左右、y が上下で上が正）にする。
+        /// stick が false ならマウス（とポインター）の動いた画素で、<see cref="LookSensitivity"/> を掛ける（秒は関わらない）。
+        /// true ならスティックの倒した量（大きさは 1 までに収める）で、<see cref="StickLookSpeed"/> × deltaTime を掛ける
+        /// </summary>
+        public static Vector2 LookTurn(Vector2 input, bool stick, float deltaTime)
+        {
+            if (!stick) return input * LookSensitivity;
+            return Vector2.ClampMagnitude(input, 1f) * (StickLookSpeed * Mathf.Max(0f, deltaTime));
+        }
+
+        /// <summary>見回しの入力が、スティック（倒した量で来る物）からか。マウス・ペン・タッチ（動いた画素で来る物）でなければ true</summary>
+        public static bool FromStick(InputControl control)
+        {
+            return control != null && !(control.device is Pointer);
+        }
         /// <summary>
         /// 調べた物や話す相手へ目を向けるのにかける秒（<see cref="Face"/>・<see cref="Follow"/>）。
         /// 動き出しと止まりはなめらかに（<see cref="Gaze.Ease"/>）。
@@ -444,7 +476,8 @@ namespace HalfAware
                 var stick = move.ReadValue<Vector2>();
                 ChoiceStep = SideStep(stick);
                 // 目を向けている間と、調べている間は、マウスで見回さない
-                if (CanLook && !LookHeld && !facing) Look(look.ReadValue<Vector2>());
+                if (CanLook && !LookHeld && !facing)
+                    Look(LookTurn(look.ReadValue<Vector2>(), FromStick(look.activeControl), Time.deltaTime));
                 // 調べている間は歩かない（MoveHeld）。足は止めても、床へは下ろし続ける
                 if (CanMove) Walk(MoveHeld ? Vector2.zero : stick);
             }
@@ -510,13 +543,12 @@ namespace HalfAware
             if (!Cursor.visible) Cursor.visible = true;
         }
 
-        void Look(Vector2 delta)
+        /// <summary>turn（度。<see cref="LookTurn"/>）だけ見回す</summary>
+        void Look(Vector2 turn)
         {
-            var speed = LookSensitivity;
-            var turn = delta.x * speed;
             // 座っている間は首だけ。立てば体ごと回る
-            if (!head.Add(turn)) transform.Rotate(0f, turn, 0f);
-            Pitch -= delta.y * speed;
+            if (!head.Add(turn.x)) transform.Rotate(0f, turn.x, 0f);
+            Pitch -= turn.y;
         }
 
         void Walk(Vector2 input)

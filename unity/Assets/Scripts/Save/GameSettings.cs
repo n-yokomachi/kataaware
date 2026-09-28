@@ -135,7 +135,8 @@ namespace HalfAware
 
         /// <summary>
         /// カメラの速さ。見回し（マウスとゲームパッドの右スティック）の速さに掛ける倍率。
-        /// 1 が今の速さ（<see cref="PlayerController.BaseLookSensitivity"/>）。0.25〜2 倍を 0.05 刻み
+        /// 1 が元の速さ（マウスは <see cref="PlayerController.BaseLookSensitivity"/>、スティックは <see cref="PlayerController.StickDegreesPerSecond"/>）。
+        /// 0.25〜2 倍を 0.05 刻み
         /// </summary>
         public static readonly SettingDial LookScale = new SettingDial(KeyPrefix + "LookScale", 0.25f, 2f, 0.05f, 1f, "×");
 
