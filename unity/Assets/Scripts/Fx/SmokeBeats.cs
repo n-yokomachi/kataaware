@@ -3,26 +3,33 @@ using UnityEngine;
 namespace HalfAware
 {
     /// <summary>
-    /// 一本吸い終わるまでの間合い。火を点け、吸い、止め、吐く、を決めた回数だけ繰り返す。
+    /// 一本吸い終わるまでの間合い。ジッポで火を点け、吸い、止め、吐く、を決めた回数だけ繰り返す。
     /// 音も煙もカードもこの時刻表に合わせるので、ずれない。
     ///
+    /// **火はジッポで点ける**（オーナー、2026-09-28「ライターの音にZippoの開閉音を追加する。…開いて、点火して、閉じるまでの音が入っている。
+    /// 点火したタイミングで、煙草に火が移った音を鳴らして」）。ジッポの音（<c>Zippo.wav</c>）は開く・点く・閉じるが一つに入っていて、
+    /// 点いた瞬間（<see cref="StrikeInZippo"/>）から煙草に火が移った音（<c>CigaretteLit.wav</c>）を鳴らし、煙もそこから立ちはじめる。
+    ///
     /// **火を点けてから吸い始めるまでに、向き直す間（turn）を挟める。** 場面 1 は煙草を調べた向きのまま火を点け、
-    /// 火の音が鳴りきってから座り始めの向きへ戻してから吸う（<see cref="RoomIntroDirector"/>）。場面 5 は挟まない（0）
+    /// ジッポの音と火が移った音が鳴りきってから座り始めの向きへ戻してから吸う（<see cref="RoomIntroDirector"/>）。場面 5 は挟まない（0）
     /// </summary>
     public static class SmokeBeats
     {
-        /// <summary>くわえてから蓋を開けるまで</summary>
-        public const float ClickAt = 0.30f;
-        /// <summary>「カチン」から火が点くまで</summary>
-        public const float FlameAfterClick = 0.34f;
-        /// <summary>火が点いてから最初の一服まで（向き直す間を挟むなら、向き直し始めるまで）。火の音が鳴りきる長さ</summary>
-        public const float FirstDragAfterFlame = 1.55f;
+        /// <summary>火を点け始めて（場面 1 は煙草を取った 1 ページを送って）から、ジッポを開け始めるまで</summary>
+        public const float ZippoAt = 0.30f;
 
         /// <summary>
-        /// 火の音が鳴り終わるまでの目安。煙はここから立ちはじめる。
-        /// 素材の実尺が分かるならそちらを使う
+        /// ジッポの音の中で、フリントを擦って火が点く時刻。音の頭から。
+        /// 切り出しの中の 0.954 秒（蓋を開ける金属音の後、フリントを擦る雑音の塊の頭。<c>tools/make-ambience.sh smoke</c> が測って出す）。
+        /// **素材か切り出しを替えたら測り直す**
         /// </summary>
-        public const float FlameSeconds = 1.50f;
+        public const float StrikeInZippo = 0.954f;
+
+        /// <summary>ジッポの音の長さ（開く・点く・閉じる）。<c>Zippo.wav</c> の実尺。素材を替えたら合わせる（ZippoSoundTests が確かめる）</summary>
+        public const float ZippoSeconds = 3.691f;
+
+        /// <summary>煙草に火が移った音の長さ。<c>CigaretteLit.wav</c> の実尺。素材を替えたら合わせる</summary>
+        public const float LitSeconds = 3.142f;
 
         /// <summary>吸っている長さ。素材の長さに合わせてある</summary>
         public const float DragSeconds = 3.70f;
@@ -48,16 +55,14 @@ namespace HalfAware
         /// </summary>
         public const float LastPauseSeconds = 1.70f;
 
-        public static float FlameAt { get { return ClickAt + FlameAfterClick; } }
+        /// <summary>ジッポに火が点き、煙草に火が移った音を鳴らす時刻。煙もここから立ちはじめる</summary>
+        public static float LitAt { get { return ZippoAt + StrikeInZippo; } }
 
-        /// <summary>煙が立ちはじめる時刻。火の音が鳴り終わってから</summary>
-        public static float SmokeAt(float flameSeconds)
-        {
-            return FlameAt + (flameSeconds > 0f ? flameSeconds : FlameSeconds);
-        }
+        /// <summary>煙が立ちはじめる時刻。火が点いたところから</summary>
+        public static float SmokeAt { get { return LitAt; } }
 
-        /// <summary>火の音が鳴りきった時刻。向き直す間を挟むなら、ここから向き直し始める</summary>
-        public static float TurnAt { get { return FlameAt + FirstDragAfterFlame; } }
+        /// <summary>ジッポの音（閉じるまで）と火が移った音が、どちらも鳴りきった時刻。向き直す間を挟むなら、ここから向き直し始める</summary>
+        public static float TurnAt { get { return Mathf.Max(ZippoAt + ZippoSeconds, LitAt + LitSeconds); } }
 
         /// <summary>向き直す間を挟まないときの、最初の一服の時刻</summary>
         public static float FirstDragAt { get { return TurnAt; } }

@@ -118,7 +118,7 @@ namespace HalfAware.EditorTools
             EditorUtility.SetDirty(garment);
 
             // 調べる対象。天板の縁の角の上。メモリハブのチップより目に近くしておく
-            var script = AssetDatabase.LoadAssetAtPath<RoomScript>(RoomText.ScriptPath);
+            var script = AssetDatabase.LoadAssetAtPath<RoomScript>(RoomScenario.ScriptPath);
             var parent = GameObject.Find("Interactables");
             if (parent == null) { note.AppendLine("Interactables が無い"); return false; }
             var item = parent.transform.Find(JacketItemName);

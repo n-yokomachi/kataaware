@@ -6,7 +6,12 @@ namespace HalfAware
     /// <summary>
     /// 並びになっている文を表に組む。空白で区切られた塊を列と見なし、列ごとに頭を揃える。
     /// 帯に収まらなければ列を減らし、余った分は最後の列へ元のまま残す。
-    /// 文面そのものには手を入れず、出すときだけ整える
+    /// 文面そのものには手を入れず、出すときだけ整える。
+    ///
+    /// **列の区切りは、半角の空白 2 つ以上か全角の空白**（台詞の原稿の決まり、docs/scenario/README.md、オーナー、2026-09-28）。
+    /// 半角の空白 1 つは同じ列の中（「30 pcs」「2156/03/02 - 2156/03/03」「｜Name-call time&lt;…&gt;」が一つの列）。
+    /// ルビと傍点は列の中で一まとまりに扱い、列の幅は親字とルビの広い方で取る（<see cref="Ruby.Width"/>）。
+    /// 数で始まる塊だけの列（年齢・長さ・枚数）は、尻を揃える。原稿で空白を足して尻を揃えてある所
     /// </summary>
     public static class ListFormat
     {
@@ -45,10 +50,12 @@ namespace HalfAware
 
         /// <summary>
         /// 列の頭を揃えた形にする。roomEm に収まる列数まで畳むのは同じ。
-        /// center が false なら、余っても真ん中へ寄せず左に置く（表の幅に合わせて枠を伸ばす、リストの枠 <see cref="ListView"/>）
+        /// center が false なら、余っても真ん中へ寄せず左に置く（表の幅に合わせて枠を伸ばす、リストの枠 <see cref="ListView"/>）。
+        /// 返すのは、原稿の書き方を直した形（<see cref="Ruby.Normalize"/>）。ルビの書式には出す側が <see cref="Ruby.Expand(string)"/> で直す
         /// </summary>
         public static string Compose(string text, float roomEm, bool center)
         {
+            text = Ruby.Normalize(text);
             // 幅は字の実寸ではなく半角いくつで数えているので、少し余裕を見る
             var safe = roomEm * Margin;
             var cols = Most(text);
@@ -61,6 +68,7 @@ namespace HalfAware
             }
             var table = Total(widths);
             var indent = center && safe > 0f && table < safe ? (safe - table) * 0.5f : 0f;
+            var right = Numbers(text, cols);
 
             var at = new int[widths.Count];
             for (var i = 1; i < widths.Count; i++) at[i] = at[i - 1] + widths[i - 1] + Gap;
@@ -73,8 +81,10 @@ namespace HalfAware
                 var cells = Split(lines[r], cols);
                 for (var i = 0; i < cells.Count; i++)
                 {
-                    var x = at[i] * EmPerUnit + indent;
-                    if (i > 0 || indent > 0f) sb.Append("<pos=").Append(x.ToString("0.##")).Append("em>");
+                    var units = at[i];
+                    if (i < right.Length && right[i]) units += widths[i] - Ruby.Width(cells[i]);
+                    var x = units * EmPerUnit + indent;
+                    if (units > 0 || indent > 0f) sb.Append("<pos=").Append(x.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)).Append("em>");
                     sb.Append(cells[i]);
                 }
             }
@@ -84,7 +94,7 @@ namespace HalfAware
         /// <summary>columns 列で組んだときの横幅。em</summary>
         public static float WidthEm(string text, int columns)
         {
-            return Total(Widths(text, columns));
+            return Total(Widths(Ruby.Normalize(text), columns));
         }
 
         /// <summary>いちばん多く分かれている行の塊の数</summary>
@@ -99,7 +109,7 @@ namespace HalfAware
             return most;
         }
 
-        /// <summary>半角いくつぶんの幅か。全角は 2 つぶん</summary>
+        /// <summary>半角いくつぶんの幅か。全角は 2 つぶん。書式もルビも字として数える（画面に出る幅は <see cref="Ruby.Width"/>）</summary>
         public static int Units(string text)
         {
             if (string.IsNullOrEmpty(text)) return 0;
@@ -110,11 +120,13 @@ namespace HalfAware
 
         /// <summary>
         /// 1 行を最大 max 個の塊に切る。max 個目には、そこから先が元の空白のまま残る。
-        /// 「対象　防壁なし　距離 ランダム」を 2 つで切れば「対象」と残り全部になる
+        /// 「対象　防壁なし　距離 ランダム」を 2 つで切れば「対象」と残り全部になる。
+        /// 区切りは全角の空白か、半角の空白 2 つ以上。半角の空白 1 つは塊の中。ルビ・傍点・書式の途中では切らない
         /// </summary>
         public static List<string> Split(string line, int max)
         {
             var list = new List<string>();
+            line = Ruby.Normalize(line);
             if (string.IsNullOrEmpty(line)) return list;
             var i = 0;
             while (i < line.Length)
@@ -127,10 +139,28 @@ namespace HalfAware
                     return list;
                 }
                 var start = i;
-                while (i < line.Length && !IsSpace(line[i])) i++;
+                while (i < line.Length && !Breaks(line, i)) i = Step(line, i);
                 list.Add(line.Substring(start, i - start));
             }
             return list;
+        }
+
+        /// <summary>at で塊が切れるか。全角の空白、半角の空白 2 つ（か半角の空白の後に全角の空白）、行の尻の空白</summary>
+        static bool Breaks(string line, int at)
+        {
+            var c = line[at];
+            if (c == '　') return true;
+            if (c != ' ') return false;
+            return at + 1 >= line.Length || IsSpace(line[at + 1]);
+        }
+
+        /// <summary>at の次に見る所。ルビ・傍点・書式は一まとまりで飛ばす</summary>
+        static int Step(string line, int at)
+        {
+            int baseFrom, baseTo, rubyFrom, rubyTo;
+            if (Ruby.Group(line, at, out baseFrom, out baseTo, out rubyFrom, out rubyTo)) return rubyTo + 1;
+            var tag = Ruby.TagEnd(line, at);
+            return tag > at ? tag + 1 : at + 1;
         }
 
         static List<int> Widths(string text, int columns)
@@ -141,12 +171,35 @@ namespace HalfAware
                 var cells = Split(line, columns);
                 for (var i = 0; i < cells.Count; i++)
                 {
-                    var w = Units(cells[i]);
+                    var w = Ruby.Width(cells[i]);
                     if (i < widths.Count) { if (w > widths[i]) widths[i] = w; }
                     else widths.Add(w);
                 }
             }
             return widths;
+        }
+
+        /// <summary>
+        /// 列ごとに、尻を揃えるか。その列のどの塊も数で始まる時だけ真。
+        /// 原稿では「41」と「 8」、「32m40s」と「 3m32s」、「30 pcs」と「 5 pcs」のように、空白を足して尻を揃えてある
+        /// </summary>
+        static bool[] Numbers(string text, int columns)
+        {
+            var right = new bool[columns];
+            var seen = new bool[columns];
+            for (var i = 0; i < columns; i++) right[i] = true;
+            foreach (var line in Lines(text))
+            {
+                var cells = Split(line, columns);
+                for (var i = 0; i < cells.Count && i < columns; i++)
+                {
+                    seen[i] = true;
+                    var c = cells[i][0];
+                    if (c < '0' || c > '9') right[i] = false;
+                }
+            }
+            for (var i = 0; i < columns; i++) right[i] &= seen[i];
+            return right;
         }
 
         static float Total(List<int> widths)
@@ -165,9 +218,11 @@ namespace HalfAware
             return c == ' ' || c == '　';
         }
 
+        /// <summary>行に分ける。原稿の書き方（&lt;br/&gt; とルビ）は先に直す</summary>
         static List<string> Lines(string text)
         {
             var list = new List<string>();
+            text = Ruby.Normalize(text);
             if (string.IsNullOrEmpty(text)) return list;
             var start = 0;
             for (var i = 0; i <= text.Length; i++)
@@ -190,7 +245,7 @@ namespace HalfAware
             return c <= 'ᅟ'                          // ハングル字母
                 || (c >= '⺀' && c <= '꓏')       // 漢字・かな・記号
                 || (c >= '가' && c <= '힣')       // ハングル
-                || (c >= '豈' && c <= '﫿')       // 互換漢字
+                || (c >= '豈' && c <= '﫿')       // 互換漢字
                 || (c >= '︰' && c <= '﹯')       // 縦組み用の約物
                 || (c >= '＀' && c <= '｠')       // 全角の英数と記号
                 || (c >= '￠' && c <= '￦');

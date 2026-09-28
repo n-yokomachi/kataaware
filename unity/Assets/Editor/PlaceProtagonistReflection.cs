@@ -183,7 +183,7 @@ namespace HalfAware.EditorTools
             var so = new SerializedObject(reflection);
             so.FindProperty("flow").objectReferenceValue = flow;
             so.FindProperty("source").objectReferenceValue = terminal;
-            so.FindProperty("fromLine").intValue = 2;
+            so.FindProperty("fromLine").intValue = TerminalReflection.FromPage;
             var list = so.FindProperty("panes");
             list.arraySize = panes.Count;
             for (var i = 0; i < panes.Count; i++)

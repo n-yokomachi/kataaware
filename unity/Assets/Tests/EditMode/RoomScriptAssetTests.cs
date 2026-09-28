@@ -1,9 +1,15 @@
+using System.IO;
+using System.Text;
 using NUnit.Framework;
 using UnityEditor;
+using UnityEngine;
 
 namespace HalfAware.Tests
 {
-    /// <summary>場面 1 の文面のアセットが、シナリオ設計書 4 節のとおりに入っているかを見る</summary>
+    /// <summary>
+    /// 場面 1 の文面のアセットが、台詞の原稿（docs/scenario/01-room.md）のとおりに入っているかを見る。
+    /// 原稿を直して写し忘れていたら（HalfAware/Apply the scenario (room)）、ここで落ちる
+    /// </summary>
     public class RoomScriptAssetTests
     {
         const string Path = "Assets/Data/RoomScript.asset";
@@ -15,50 +21,45 @@ namespace HalfAware.Tests
             return script;
         }
 
+        static RoomManuscript.Text Manuscript()
+        {
+            var file = System.IO.Path.GetFullPath(System.IO.Path.Combine(Application.dataPath, "..", "..", RoomManuscript.Path));
+            return RoomManuscript.Read(File.ReadAllText(file, Encoding.UTF8));
+        }
+
         [Test]
         public void HoldsEveryIdOfScene1()
         {
-            Assert.That(Load().Ids(), Is.EquivalentTo(new[]
-            {
-                "jack", "cigarette", "jacket", "chips", "terminal", "door", "ashtray", "cigarette-box", "clipboard",
-            }));
-            Assert.That(Load().Ids(), Is.EquivalentTo(RoomIds.All));
+            Assert.That(Load().Ids(), Is.EqualTo(RoomIds.All), "RoomIds.All の順");
         }
 
-        // 何ページに割るかは見た目の都合で変わるので、行の総数で見る。
-        // 二択の後に出す文も、シナリオの一部なので数に入れる。
-        // 煙草とジャケットは 0 行。着た後の独白は RoomIntroDirector が言う
-        [TestCase("jack", 1)]
-        [TestCase("cigarette", 0)]
-        [TestCase("jacket", 0)]
-        [TestCase("chips", 7)]
-        [TestCase("terminal", 11)]
-        [TestCase("door", 1)]
-        [TestCase("ashtray", 1)]
-        [TestCase("cigarette-box", 1)]
-        [TestCase("clipboard", 4)]
-        public void KeepsTheLineCountOfTheScenario(string id, int lines)
+        [Test]
+        public void MatchesTheManuscript()
         {
-            var entry = Load().Find(id);
-            Assert.That(entry.id, Is.EqualTo(id));
-            var count = 0;
-            foreach (var page in entry.Lines) count += SubtitleBox.LineCount(page);
-            foreach (var page in entry.choice.AfterYes) count += SubtitleBox.LineCount(page);
-            Assert.That(count, Is.EqualTo(lines));
+            var script = Load();
+            var text = Manuscript();
+            foreach (var id in RoomIds.All)
+            {
+                var want = text.Find(id);
+                var have = script.Find(id);
+                Assert.AreEqual(want.label, have.label, id + " の対象の名前");
+                Assert.AreEqual(want.lines, have.Lines, id + " のページ（写し忘れていないか）");
+                Assert.AreEqual(want.choice.question, have.choice.question, id + " の二択");
+                Assert.AreEqual(want.choice.afterYes, have.choice.AfterYes, id + " の「はい」の後");
+            }
         }
 
         // 見た目や進行が変わる 3 つだけ二択を出す
-        [TestCase("chips", "チップを抜く")]
-        [TestCase("terminal", "スリープを解除する")]
-        [TestCase("door", "部屋を出る")]
-        public void AsksBeforeItChangesAnything(string id, string question)
+        [TestCase("chips")]
+        [TestCase("terminal")]
+        [TestCase("door")]
+        public void AsksBeforeItChangesAnything(string id)
         {
-            var entry = Load().Find(id);
-            Assert.That(entry.Asks, Is.True, id + " は二択を出す");
-            Assert.That(entry.choice.question, Is.EqualTo(question));
+            Assert.That(Load().Find(id).Asks, Is.True, id + " は二択を出す");
         }
 
         [TestCase("jack")]
+        [TestCase("cigarette")]
         [TestCase("jacket")]
         [TestCase("ashtray")]
         [TestCase("cigarette-box")]
@@ -89,9 +90,10 @@ namespace HalfAware.Tests
         }
 
         [Test]
-        public void TheJacketIsLabelledToPutOn()
+        public void TheJacketHasNoPagesOfItsOwn()
         {
-            Assert.That(Load().Find(RoomIds.Jacket).label, Is.EqualTo("ジャケットを着る"));
+            // 着た後の独白は着る音の後に RoomIntroDirector が言う
+            Assert.That(Load().Find(RoomIds.Jacket).Lines, Is.Empty);
         }
 
         /// <summary>

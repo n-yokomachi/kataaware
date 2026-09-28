@@ -161,6 +161,117 @@ namespace HalfAware.EditorTools
             log.AppendLine(Shoot(Path.Combine(dir, "6b_door_open.png"), h => h.SetPrompt(after != null ? HudView.Prompt(after.Label) : null)));
         }
 
+        // ---- 場面 1 の台詞の原稿（2026-09-28） ------------------------------------------
+
+        [MenuItem("HalfAware/Shoot the room text checks", false, 213)]
+        public static void TextMenu()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "HalfAwareRoomText");
+            Debug.Log(ShootText(dir));
+        }
+
+        /// <summary>
+        /// 原稿から写した文面の組み方を dir へ撮る。ルビと改行（ジャックの 1 ページ目）、傍点（3 ページ目）、長いページの窓の伸び方（モニターの 4 ページ目）、
+        /// リストの枠（走査条件・チップ・売り上げのメモ）、カード、煙草の箱、煙草を取った時の 1 ページ（煙草へ向いた絵）、コンソールのログ。
+        /// 終えたら場面 1 を開き直す（場面は保存しない）
+        /// </summary>
+        public static string ShootText(string dir)
+        {
+            if (EditorApplication.isPlaying) return "再生中は撮らない";
+            var active = EditorSceneManager.GetActiveScene();
+            if (active.isDirty) return "開いているシーンに未保存の変更がある: " + active.path;
+            Directory.CreateDirectory(dir);
+            var log = new System.Text.StringBuilder();
+            try
+            {
+                EditorSceneManager.OpenScene(PlaceProtagonist.RoomPath, OpenSceneMode.Single);
+                var flow = UnityEngine.Object.FindFirstObjectByType<SceneFlow>(FindObjectsInactive.Include);
+                var player = flow.Player;
+                var fso = new SerializedObject(flow);
+                var seatEye = fso.FindProperty("seatEyeHeight").floatValue;
+                var limit = fso.FindProperty("seatedHeadLimit").floatValue;
+                var intro = UnityEngine.Object.FindFirstObjectByType<RoomIntroDirector>(FindObjectsInactive.Include);
+                var card = new SerializedObject(intro).FindProperty("card").stringValue;
+                var foot = player.transform.position;
+                var body = player.transform.eulerAngles.y;
+                var lead = new SerializedObject(player).FindProperty("eyeLead").floatValue;
+                var items = Items();
+                var jack = Find(items, RoomIds.Jack);
+                var cig = Find(items, RoomIds.Cigarette);
+                var box = Find(items, RoomIds.CigaretteBox);
+
+                // ジャックの 1 ページ目（身体のルビと改行）と 3 ページ目（傍点）。ジャックへ目を向けた所
+                var toJack = Aim(foot, body, seatEye, lead, jack.Position, limit);
+                player.PlaceAt(foot, body, limit, toJack.x, toJack.y, seatEye);
+                log.AppendLine(Shoot(Path.Combine(dir, "t1_jack_page1.png"), h => h.SetSubtitle(jack.Lines[0], SubtitleKind.Line, true)));
+                log.AppendLine(Shoot(Path.Combine(dir, "t2_jack_page3_dots.png"), h => h.SetSubtitle(jack.Lines[2], SubtitleKind.Line, true)));
+
+                // 煙草を取った時の 1 ページ。煙草へ目を向けた所（火を点けるのもこの向き）
+                var toCig = Aim(foot, body, seatEye, lead, cig.Position, limit);
+                player.PlaceAt(foot, body, limit, toCig.x, toCig.y, seatEye);
+                log.AppendFormat("煙草へ向けた首 {0:0.0} 度・下へ {1:0.0} 度", toCig.x, toCig.y).AppendLine();
+                log.AppendLine(Shoot(Path.Combine(dir, "t3_cigarette_page.png"), h => h.SetSubtitle(cig.Lines[0], SubtitleKind.Line, true)));
+                // 暗転のカード（ゲームでも粗くしない）
+                player.PlaceAt(foot, body, limit, 0f, 0f, seatEye);
+                log.AppendLine(Shoot(Path.Combine(dir, "t4_card.png"), h =>
+                {
+                    h.SetCurtain(true);
+                    h.SetCenter(card);
+                }, 1f));
+                // 煙草の箱（双鶴のルビ）
+                var toBox = Aim(foot, body, seatEye, lead, box.Position, limit);
+                player.PlaceAt(foot, body, limit, toBox.x, toBox.y, seatEye);
+                Wear();
+                log.AppendLine(Shoot(Path.Combine(dir, "t5_box_page.png"), h => h.SetSubtitle(box.Lines[0], SubtitleKind.Line, true)));
+
+                // モニターの 4 ページ目（長いページ）と、スリープを解除した後の走査条件
+                var seat = UnityEngine.Object.FindFirstObjectByType<TerminalSeat>(FindObjectsInactive.Include);
+                var sso = new SerializedObject(seat);
+                var screen = (TerminalScreen)sso.FindProperty("screen").objectReferenceValue;
+                var chair = (Transform)sso.FindProperty("chair").objectReferenceValue;
+                if (chair != null) chair.position = sso.FindProperty("chairSeated").vector3Value;
+                player.PlaceAt(sso.FindProperty("seatSpot").vector3Value, sso.FindProperty("seatYaw").floatValue, 0f, 0f,
+                    sso.FindProperty("seatPitch").floatValue, sso.FindProperty("seatEyeHeight").floatValue);
+                var terminal = Find(items, RoomIds.Terminal);
+                log.AppendLine(Shoot(Path.Combine(dir, "t6_monitor_page4.png"), h => h.SetSubtitle(terminal.Lines[3], SubtitleKind.Line, true)));
+                if (screen != null) screen.LightNow();
+                log.AppendLine(Shoot(Path.Combine(dir, "t7_list_conditions.png"), h => h.SetSubtitle(terminal.AfterYes[1], SubtitleKind.Line, true)));
+                log.AppendLine(Frame("走査条件"));
+
+                // チップのリストと売り上げのメモ
+                var chips = Find(items, RoomIds.Chips);
+                Stand(player, new Vector3(1.85f, 0.05f, 0.75f), chips.Position);
+                log.AppendLine(Shoot(Path.Combine(dir, "t8_list_chips.png"), h => h.SetSubtitle(chips.Lines[1], SubtitleKind.Line, true)));
+                log.AppendLine(Frame("チップ"));
+                var memo = Find(items, RoomIds.Clipboard);
+                Stand(player, new Vector3(-1.35f, 0.05f, 0.35f), memo.Position);
+                log.AppendLine(Shoot(Path.Combine(dir, "t9_list_memo.png"), h => h.SetSubtitle(memo.Lines[1], SubtitleKind.Line, true)));
+                log.AppendLine(Frame("売り上げのメモ"));
+
+                // コンソールのログ。ルビ・傍点・改行の付いた行
+                log.AppendLine(ConsoleShot.Shoot(Path.Combine(dir, "t10_console_log.png"), Width, Height, UiLens.Scale, true, 0f, false, (h, c) =>
+                {
+                    var l = ConsoleLog.Here();
+                    l.Clear();
+                    ConsoleLog.Said(new[] { "『今回のは酔いが酷いな…』" });
+                    ConsoleLog.Examined(jack.Label, jack.Lines);
+                    ConsoleLog.Examined(cig.Label, cig.Lines);
+                    ConsoleLog.Examined(box.Label, box.Lines);
+                    ConsoleLog.Examined(chips.Label, chips.Lines);
+                    ConsoleLog.Picked(chips.Question, Choice.Yes);
+                }));
+            }
+            catch (Exception e)
+            {
+                log.AppendLine("例外: " + e);
+            }
+            finally
+            {
+                EditorSceneManager.OpenScene(PlaceProtagonist.RoomPath, OpenSceneMode.Single);
+            }
+            return log.ToString();
+        }
+
         // ---- 場面 3 ------------------------------------------------------------
 
         static void Connect(string dir, System.Text.StringBuilder log)

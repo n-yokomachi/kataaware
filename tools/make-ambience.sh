@@ -9,6 +9,7 @@
 #         bash make-ambience.sh bgm       （9 節の場面ごとの BGM の 7 曲だけ）
 #         bash make-ambience.sh ending    （10 節のエンディングの曲「HALF AWARE」の二つの版だけ）
 #         bash make-ambience.sh breath    （12 節の場面 1 の冒頭の呼吸の輪だけ）
+#         bash make-ambience.sh smoke     （13 節の煙草の三つ（箱から一本取る・ジッポ・火が移る）だけ）
 # 出力先は OUT_DIR 直下。中間ファイルは OUT_DIR/tmp に置く。
 set -euo pipefail
 
@@ -35,6 +36,10 @@ SRC_CONCRETE="$SRC_PIXABAY_DIR/freesound_community-concrete-footsteps-1-6265.mp3
 SRC_ROOM_STEP="$SRC_PIXABAY_DIR/freesound_community-step_soundwav-14903.mp3"
 # 12 節（場面 1 の冒頭の呼吸）の素材
 SRC_BREATH="$SRC_PIXABAY_DIR/freesound_community-breathing-6811.mp3"
+# 13 節（煙草の三つ）の素材。切り出す範囲はオーナーの指定（Pixabay の元の名前の尻に付けた時刻）
+SRC_PACK="$SRC_PIXABAY_DIR/freesound_community-cigarette-box-handling-shaking-dropping-59285.mp3"
+SRC_ZIPPO="$SRC_PIXABAY_DIR/fronbondi_skegs-foley-zippo-cigarette-lighter-open-and-close-sound-effects-235249.mp3"
+SRC_LIT="$SRC_PIXABAY_DIR/freesound_community-cigarette-suck-107102.mp3"
 # 8 節（場面 6 の庭の記憶）の素材
 SRC_HOSE="$SRC_PIXABAY_DIR/freesound_community-watering-62546.mp3"
 SRC_HOSE_STOP="$SRC_PIXABAY_DIR/freesound_community-hose-sounds-24388.mp3"
@@ -1095,5 +1100,80 @@ ffmpeg -y -v error -i "$OUT_DIR/Breathing.wav" -filter_complex "
 " -map "[out]" -frames:v 1 "$ANALYSIS_DIR/Breathing_sheet.png"
 
 fi   # PART=all か breath
+
+# ---------------------------------------------------------------------------
+# 13. 煙草の三つ（PackPull.wav / Zippo.wav / CigaretteLit.wav）— 場面 1 で煙草を取って火を点けるまで（オーナー、2026-09-28）
+#    「煙草を箱からとる音を追加」「ライターの音にZippoの開閉音を追加する。…開いて、点火して、閉じるまでの音が入っている。
+#    点火したタイミングで、煙草に火が移った音を鳴らして」。切り出す範囲はオーナーの指定（元の名前の尻に付けた時刻）。
+#    前の LighterClick.wav（OpenGameArt の Zippo の金属音）と LighterFlame.wav（Pixabay の flint）は、ジッポの一本に置き替えた。
+#    - PackPull.wav: 「cigarette box handling shaking dropping」（freesound_community）の 0〜2.434 秒。元は 133.51 秒、48kHz のモノラル mp3。
+#      頭はデジタルの無音、尻（2.42 秒）は次の物音の手前の静かな所（−74dB）。低い揺れはほとんど無いので低域は落とさない
+#    - Zippo.wav: 「FOLEY - Zippo Cigarette Lighter Open and Close Sound Effects」（Fronbondi_Skegs）の 1.630〜5.321 秒。
+#      元は 18.74 秒、48kHz のモノラル mp3。切り出しの中に、蓋を開ける金属音（0.35 秒、響きの線が残る）・フリントを擦る音
+#      （0.954 秒から 50ms ほどの雑音の塊。点火した瞬間）・蓋を閉じる音（2.43 秒と 2.55 秒の二段）が入っている。
+#      地に 40〜160Hz の揺れ（静かな所で −53dB）が乗っているので、250Hz より下を 24dB/oct で落とした（静かな所 −63.5dB、
+#      三つの音は 0.1dB も削れない）。**点火の時刻は SmokeBeats.StrikeInZippo が持つ**（下で測って表示する。素材や切り出しを替えたら合わせる）
+#    - CigaretteLit.wav: 「Cigarette suck」（freesound_community）の 0〜3.142 秒。元は 3.53 秒、44.1kHz のモノラル mp3。
+#      40Hz より下に大きな揺れ（吸う息がマイクに当たった物と思われる。全体の実効値の大半）があり、中身（0.72 秒の口元の当たり、
+#      0.88〜1.84 秒の葉が燃える小さなはぜ、その後の細い尾）は 5〜20kHz にある。250Hz より下を 24dB/oct で落とした
+#      （頭の静かな所 −68.6dB、はぜは 0.3dB しか削れない）。聞こえ始めは頭から 0.72 秒
+#    大きさは三つとも、一番大きい 400ms の窓の大きさ（momentary の最大）を Drag.wav（−30.6 LUFS。吸う息。はぜの音で、
+#    前の LighterFlame.wav も −30.3 で並んでいた）に揃え、頂点 −3dB の天井を添えた。Blow.wav（吐く息）は −20.1 で一段大きい。
+#    44.1kHz のモノラル、頭 5ms と尻 20〜50ms をなだらかにした
+# ---------------------------------------------------------------------------
+if [ "$PART" = "all" ] || [ "$PART" = "smoke" ]; then
+
+echo "=== PackPull.wav / Zippo.wav / CigaretteLit.wav ==="
+SMOKE_TARGET_M=-30.6
+SMOKE_CEIL=-3
+
+# 一番大きい momentary（400ms の窓）の大きさ。後ろに 1 秒の無音を足して、尻の窓まで数える
+momentary_max () {
+  ffmpeg -hide_banner -nostats -i "$1" -af "apad=pad_dur=1,ebur128=metadata=1,ametadata=print:key=lavfi.r128.M" -f null - 2>&1 \
+    | grep -oE "lavfi.r128.M=[-0-9.]+" | cut -d= -f2 | sort -g | tail -1
+}
+peak_db () {
+  ffmpeg -hide_banner -i "$1" -af "astats=metadata=0" -f null - 2>&1 | grep "Peak level dB" | tail -1 | grep -oE '[-0-9.]+$'
+}
+
+# $1 名前  $2 元  $3 頭（秒）  $4 尻（秒）  $5 低域を落とすフィルター（空なら落とさない）  $6 尻をなだらかにする秒
+smoke_cut () {
+  local name="$1" src="$2" s="$3" e="$4" lo="$5" tail="$6" len fo m pk gain out
+  len=$(awk "BEGIN{printf \"%.3f\", $e-$s}")
+  fo=$(awk "BEGIN{printf \"%.3f\", $len-$tail}")
+  # 丸ごと 44.1kHz に直してから切る（mp3 の頭で探すより、切り口が標本の単位で決まる）
+  ffmpeg -y -v error -i "$src" \
+    -af "aresample=44100${lo:+,$lo},atrim=start=${s}:end=${e},asetpts=PTS-STARTPTS,afade=t=in:st=0:d=0.005,afade=t=out:st=${fo}:d=${tail}" \
+    -ac 1 -c:a pcm_f32le "$TMP_DIR/${name}_cut.wav"
+  m=$(momentary_max "$TMP_DIR/${name}_cut.wav")
+  pk=$(peak_db "$TMP_DIR/${name}_cut.wav")
+  gain=$(awk "BEGIN{g=$SMOKE_TARGET_M - ($m); c=$SMOKE_CEIL - ($pk); printf \"%.2f\", (g < c ? g : c)}")
+  out="$OUT_DIR/${name}.wav"
+  ffmpeg -y -v error -i "$TMP_DIR/${name}_cut.wav" -af "volume=${gain}dB" -ar 44100 -ac 1 -c:a pcm_s16le "$out"
+  printf "  %-13s %6.3f〜%6.3f 秒  %s 秒  momentary 最大 %6s LUFS / 頂点 %6.1f dB → %+6.2f dB → %6s LUFS / 頂点 %6.1f dB\n" \
+    "$name" "$s" "$e" "$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$out")" "$m" "$pk" "$gain" \
+    "$(momentary_max "$out")" "$(peak_db "$out")"
+  ffmpeg -y -v error -i "$out" -filter_complex "
+[0:a]asplit=2[w][s];
+[w]showwavespic=s=1600x300:colors=0x3070c0:scale=log[wv];
+[s]showspectrumpic=s=1600x420:fscale=lin:legend=0:color=intensity:gain=2:stop=20000[sp];
+[wv][sp]vstack=inputs=2[o]
+" -map "[o]" -frames:v 1 "$ANALYSIS_DIR/${name}_sheet.png"
+}
+
+LOW_CUT="highpass=f=250:poles=2,highpass=f=250:poles=2"
+smoke_cut PackPull     "$SRC_PACK"  0     2.434 ""          0.030
+smoke_cut Zippo        "$SRC_ZIPPO" 1.630 5.321 "$LOW_CUT"  0.020
+smoke_cut CigaretteLit "$SRC_LIT"   0     3.142 "$LOW_CUT"  0.050
+
+# 点火の時刻: 蓋を開ける音が引いた後（0.6 秒から）で、4ms の窓の実効値が初めて −45dB を越える所（静かな所は −63dB）。
+# SmokeBeats.StrikeInZippo と合わせる。大きさを揃える前の切り出しで測る（揃えた後だと閾値がずれる）
+STRIKE=$(ffmpeg -hide_banner -nostats -i "$TMP_DIR/Zippo_cut.wav" \
+  -af "asetnsamples=n=176:p=0,astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level" -f null - 2>&1 \
+  | awk '/pts_time/{t=$NF; sub(/.*pts_time:/,"",t)} /RMS_level/{split($0,a,"="); print t, a[2]}' \
+  | awk '$1>=0.6 && $2>-45 {printf "%.3f", $1; exit}')
+echo "  Zippo の点火（フリントを擦る音の頭）: ${STRIKE} 秒"
+
+fi   # PART=all か smoke
 
 echo "=== done ==="

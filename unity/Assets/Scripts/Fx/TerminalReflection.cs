@@ -20,7 +20,7 @@ namespace HalfAware
     /// 頭を描く写し（<see cref="head"/>）と灯り（<see cref="lamps"/>）を点け、撮り終えたら消す。
     /// 映り込みの板は、ほかの映り込みのカメラに撮られないよう、その間は伏せる。
     ///
-    /// 端末を調べた独白の 3 行目（「こうして反射で自分の顔が見られるからだ」）から、独白を読み終えるまでだけ浮かべる。
+    /// 端末を調べた独白の 2 ページ目（「こうして画面の反射で自分の顔が見られるからだ。」。原稿 docs/scenario/01-room.md の注記）から、独白を読み終えるまでだけ浮かべる。
     /// ほかの時は映り込みのカメラを止め、画面は黒のまま
     /// </summary>
     [DefaultExecutionOrder(20)]
@@ -50,11 +50,17 @@ namespace HalfAware
             [System.NonSerialized] public RenderTexture target;
         }
 
+        /// <summary>
+        /// 独白の何ページ目から映すか（0 から数える）。原稿の注記「2 ページ目と同時に、モニターに顔が映る」（オーナー、2026-09-28）。
+        /// 前は 3 ページ目（「というのもほら、」を 1 ページに分けていた頃）
+        /// </summary>
+        public const int FromPage = 1;
+
         [SerializeField] SceneFlow flow;
         [Tooltip("独白を持つ調べる対象（端末）")]
         [SerializeField] Interactable source;
-        [Tooltip("独白の何行目から映すか。0 から数える")]
-        [SerializeField] int fromLine = 2;
+        [Tooltip("独白の何ページ目から映すか。0 から数える")]
+        [SerializeField] int fromLine = FromPage;
         [Tooltip("浮かべるのと消すのにかける秒数")]
         [SerializeField] float fadeSeconds = 0.8f;
         [Tooltip("映り込みを出す画面")]

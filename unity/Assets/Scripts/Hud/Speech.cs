@@ -13,8 +13,8 @@ namespace HalfAware
         /// <summary>名前として認める長さ。これより長い頭は地の文とみなす</summary>
         public const int NameMax = 12;
 
-        /// <summary>名前に入らない字。約物と、ルビの書式の字</summary>
-        const string NotInName = "、。！？…・「」『』（）｜《》　 ";
+        /// <summary>名前に入らない字。約物と、ルビの書式の字（前からの書き方と、原稿の書き方）</summary>
+        const string NotInName = "、。！？…・「」『』（）｜《》<>　 ";
 
         /// <summary>
         /// 分けられたら true。名前と台詞（外側の鉤括弧を外したもの）を返す。

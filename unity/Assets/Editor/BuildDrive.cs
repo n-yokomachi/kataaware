@@ -1135,8 +1135,8 @@ namespace HalfAware.EditorTools
         /// 火を点けて一服する一連。**場面 1 の仕組みをそのまま使い回す。**
         ///
         /// <see cref="Cigarette"/> が <see cref="SmokeBeats"/> の時刻表どおりに
-        /// 蓋を開ける金属音・火・吸う息・吐く息を並べ、<see cref="SmokePuffs"/> が煙を出す。
-        /// 素材も場面 1 と同じものを読む。
+        /// ジッポ（開く・点く・閉じる）・煙草に火が移る音・吸う息・吐く息を並べ、<see cref="SmokePuffs"/> が煙を出す。
+        /// 素材も場面 1 と同じものを読む（同じ主人公の同じジッポ）。
         ///
         /// 煙はカメラの子に置く。口元から立つものなので、視線を振れば一緒に動く
         /// </summary>
@@ -1170,8 +1170,8 @@ namespace HalfAware.EditorTools
         /// <summary>一服の素材。場面 1 と同じものを読む。出どころは Assets/Audio/LICENSES.md</summary>
         static readonly string[] SmokeClips =
         {
-            "lighterClick", "Assets/Audio/LighterClick.wav",
-            "lighterFlame", "Assets/Audio/LighterFlame.wav",
+            "zippo", "Assets/Audio/Zippo.wav",
+            "lit", "Assets/Audio/CigaretteLit.wav",
             "drag", "Assets/Audio/Drag.wav",
             "blow", "Assets/Audio/Blow.wav",
         };

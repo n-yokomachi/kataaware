@@ -100,8 +100,8 @@ namespace HalfAware
         /// <summary>
         /// 字ごとの幅（半角いくつぶん）と、その後ろで切ってはいけないかを拾う。
         ///
-        /// ルビの指定（｜親字《るび》）は、幅を親字だけで数える。
-        /// 記号とルビは画面に出ないので 0。
+        /// ルビと傍点の指定（｜親字《るび》。原稿の書き方は先に Ruby.Normalize で直しておく）は、幅を親字だけで数える。
+        /// 記号とルビは画面に出ないので 0。TextMeshPro の書式（&lt;size=…&gt; など）も 0。
         /// 指定の途中で切ると親字とルビが離れてしまうので、そこは繋いでおく
         /// </summary>
         static void Scan(string text, out int[] wide, out bool[] joined)
@@ -111,6 +111,14 @@ namespace HalfAware
             var i = 0;
             while (i < text.Length)
             {
+                var tag = Ruby.TagEnd(text, i);
+                if (tag > i)
+                {
+                    // 書式の途中では切らない
+                    for (var k = i; k < tag; k++) joined[k] = true;
+                    i = tag + 1;
+                    continue;
+                }
                 int baseFrom, baseTo, rubyFrom, rubyTo;
                 if (!Ruby.Group(text, i, out baseFrom, out baseTo, out rubyFrom, out rubyTo))
                 {
@@ -132,10 +140,11 @@ namespace HalfAware
         /// <summary>
         /// この行の切り口を選ぶ。start から fits に収まる範囲で、
         /// 幅が want に近いところ。strict なら語の途中と熟語の境目を避ける。
+        /// 切った後の残り（全体 total から切り口までを引いた幅）が room を超える所は選ばない（残りの行に入らない）。
         /// 見つからなければ -1
         /// </summary>
         static int Pick(string text, int[] wide, bool[] joined,
-            int start, int carried, int fits, int want, bool strict)
+            int start, int carried, int fits, int want, bool strict, int total, int room)
         {
             var best = -1;
             var bestGap = int.MaxValue;
@@ -144,6 +153,7 @@ namespace HalfAware
             {
                 at += wide[i];
                 if (at - carried > fits) break;                       // この行にはもう入らない
+                if (total - at > room) continue;                      // 残りが後の行に入らない
                 if (joined[i]) continue;                              // ルビの指定の途中では切らない
                 var a = text[i];
                 var b = text[i + 1];
@@ -165,7 +175,7 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// 長い 1 行を割る。すでに改行があるものと短いものはそのまま
+        /// 長い行を割る。短いものはそのまま
         /// </summary>
         public static string Wrap(string text)
         {
@@ -173,7 +183,10 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// 1 行に fits ぶんしか入らないとして、収まる行数まで割る。
+        /// 1 行に fits ぶんしか入らないとして、はみ出す行を収まる行数まで割る。
+        ///
+        /// **書いてある改行（原稿の &lt;br/&gt;）には従う。** 改行で区切った行ごとに見て、窓の幅を超える行だけを割る。
+        /// 原稿の書き方（ルビ・傍点・&lt;br/&gt;）は先に前からの書き方に直す（<see cref="Ruby.Normalize"/>）。返すのも直した形。
         ///
         /// 割る数は先に決めてしまい、各行が同じくらいの長さになる position を狙う。
         /// 貪欲に詰めると最後の行だけ極端に短くなって、字幕としてみっともない。
@@ -181,9 +194,19 @@ namespace HalfAware
         /// </summary>
         public static string Wrap(string text, int fits)
         {
+            text = Ruby.Normalize(text);
             if (string.IsNullOrEmpty(text)) return text;
-            if (LineCount(text) > 1) return text;
             if (fits <= 0) return text;
+            if (LineCount(text) == 1) return WrapLine(text, fits);
+            var lines = text.Split('\n');
+            for (var i = 0; i < lines.Length; i++) lines[i] = WrapLine(lines[i], fits);
+            return string.Join("\n", lines);
+        }
+
+        /// <summary>改行の無い 1 行を、fits に収まる行数まで割る</summary>
+        static string WrapLine(string text, int fits)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
             int[] wide;
             bool[] joined;
             Scan(text, out wide, out joined);
@@ -191,24 +214,40 @@ namespace HalfAware
             for (var i = 0; i < wide.Length; i++) units += wide[i];
             if (units <= fits) return text;
 
-            var rows = Mathf.CeilToInt((float)units / fits);
-            var target = (float)units / rows;
+            // 行数はまず幅で割り切れる数。句読点を優先して切った結果、最後の行が入りきらない時だけ 1 行増やす
+            var least = Mathf.CeilToInt((float)units / fits);
+            string made = null;
+            for (var rows = least; rows <= least + 2; rows++)
+            {
+                bool fitted;
+                made = Cut(text, wide, joined, units, fits, rows, out fitted);
+                if (fitted) break;
+            }
+            return made;
+        }
 
+        /// <summary>rows 行に割る。各行が同じくらいの長さになる所を狙う。最後の行まで fits に入ったら fitted</summary>
+        static string Cut(string text, int[] wide, bool[] joined, int units, int fits, int rows, out bool fitted)
+        {
+            var target = (float)units / rows;
             var made = new System.Text.StringBuilder();
             var start = 0;      // 今の行の頭
             var carried = 0;    // 切り終えたぶんの幅
             for (var row = 1; row < rows; row++)
             {
                 var want = Mathf.RoundToInt(target * row);
-                // まず語を割らずに探し、どうしても無ければ禁則だけ守って切る
-                var best = Pick(text, wide, joined, start, carried, fits, want, true);
-                if (best <= start) best = Pick(text, wide, joined, start, carried, fits, want, false);
+                var room = fits * (rows - row);
+                // まず語を割らずに探し、どうしても無ければ禁則だけ守って切る。残りが後の行に入る所を先に探す
+                var best = Pick(text, wide, joined, start, carried, fits, want, true, units, room);
+                if (best <= start) best = Pick(text, wide, joined, start, carried, fits, want, false, units, room);
+                if (best <= start) best = Pick(text, wide, joined, start, carried, fits, want, false, units, int.MaxValue);
                 if (best <= start || best >= text.Length) break;
                 made.Append(text, start, best - start).Append('\n');
                 for (var k = start; k < best; k++) carried += wide[k];
                 start = best;
             }
             made.Append(text, start, text.Length - start);
+            fitted = units - carried <= fits;
             return made.ToString();
         }
     }

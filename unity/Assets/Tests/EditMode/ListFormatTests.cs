@@ -24,7 +24,8 @@ namespace HalfAware.Tests
         public void SeveralLinesSplitBySpacesAreAList()
         {
             Assert.IsTrue(ListFormat.IsList("2166/08/13　5枚\n2166/08/14　4枚"));
-            Assert.IsTrue(ListFormat.IsList("08/15 #1 男 41\n08/15 #2 女 23"));
+            Assert.IsTrue(ListFormat.IsList("08/15  #1  男  41\n08/15  #2  女  23"), "半角の空白 2 つでも区切る");
+            Assert.IsFalse(ListFormat.IsList("08/15 #1 男 41\n08/15 #2 女 23"), "半角の空白 1 つは列の中（原稿の決まり）");
         }
 
         [Test]
@@ -64,7 +65,7 @@ namespace HalfAware.Tests
         [Test]
         public void EveryWordSurvives()
         {
-            var text = "08/15 #1 男 41 『ディエゴ』 3分40秒\n08/15 #2 女 23 『ミア』 2分05秒";
+            var text = "08/15  #1  男  41  『ディエゴ』  3分40秒\n08/15  #2  女  23  『ミア』  2分05秒";
             var made = ListFormat.Compose(text, 60f);
             foreach (var word in new[] { "08/15", "#1", "男", "41", "『ディエゴ』", "3分40秒", "『ミア』" })
                 StringAssert.Contains(word, made);
@@ -84,14 +85,14 @@ namespace HalfAware.Tests
         [Test]
         public void ItNeverDropsBelowTwoColumns()
         {
-            var made = ListFormat.Compose("あ い う\nか き", 1f);
+            var made = ListFormat.Compose("あ　い　う\nか　き", 1f);
             foreach (var row in made.Split('\n')) Assert.AreEqual(1, Count(row, "<pos="));
         }
 
         [Test]
         public void ARowWithFewerCellsJustStopsEarly()
         {
-            var made = ListFormat.Compose("あ い う\nか き", NoRoom + 200f);
+            var made = ListFormat.Compose("あ　い　う\nか　き", NoRoom + 200f);
             var rows = made.Split('\n');
             Assert.AreEqual(3, Count(rows[0], "<pos="), "寄せの分も入れて 3 つ");
             Assert.AreEqual(2, Count(rows[1], "<pos="));

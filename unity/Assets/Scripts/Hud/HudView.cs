@@ -302,7 +302,8 @@ namespace HalfAware
                 if (subtitleHint.text != Advance) subtitleHint.text = Advance;
                 subtitleHint.gameObject.SetActive(advance && !passing && kind == SubtitleKind.Line);
             }
-            // 1 行に入る幅はウインドウの実寸から。全角 1 文字で半角 2 つぶん
+            // 1 行に入る幅はウインドウの実寸から。全角 1 文字で半角 2 つぶん。
+            // 書いてある改行（原稿の <br/>）には従い、窓の幅を超える行だけを割る（SubtitleBox.Wrap）
             var fits = Mathf.Max(SubtitleBox.BaseRows * 2, Mathf.FloorToInt(RoomEm(1f) * 2f) - 1);
             var shown = SubtitleBox.Wrap(said, fits);
             var rows = SubtitleBox.Rows(shown);
@@ -310,9 +311,9 @@ namespace HalfAware
             // ルビは折り返してから書式に直す。
             // 先に直すと、折り返しがタグを字数に数えてしまう
             subtitleText.text = Ruby.Expand(shown);
-            // ルビのある文は行を少し開ける。
+            // ルビ（傍点）のある文は行を少し開ける。
             // そのままだと下の行のルビが上の行の字にかぶる
-            var ruby = shown.IndexOf(Ruby.Head) >= 0;
+            var ruby = Ruby.Has(shown);
             subtitleText.lineSpacing = ruby ? Ruby.ExtraLineSpacing : 0f;
             subtitleText.alignment = listlessAlignment;
             // 字を小さくしたぶん 1 行も低くなる。地の高さも同じだけ詰める

@@ -12,6 +12,9 @@ namespace HalfAware
     ///
     /// 幅は ListFormat.Units（半角いくつぶん）で測る。全角 1 字 = 2、半角 1 字 = 1。
     /// em になおすと半分なので、ルビの進む幅は Units / 2 × Scale
+    ///
+    /// 傍点（圏点）も同じ仕組みで、字ごとに点を乗せる（<see cref="DotGlyph"/>）。
+    /// 文面への書き方は「｜親字《るび》」と、台詞の原稿の「親字&lt;るび&gt;」「&lt;dot&gt;…&lt;/dot&gt;」の二つ（<see cref="Normalize"/>）
     /// </summary>
     public static class Ruby
     {
@@ -138,6 +141,13 @@ namespace HalfAware
         }
 
         // ---- 文面への書き方 --------------------------------------------
+        //
+        // 書き方は二つある。どちらも読める。
+        // - 前からの書き方「｜親字《るび》」。青空文庫の記法。場面 3 などの文面が使っている
+        // - 台詞の原稿の書き方（docs/scenario/README.md、オーナー、2026-09-28）。
+        //   `親字<るび>`（親字は直前の同じ種類の字の並び。`｜` があればそこから）、`<dot>…</dot>` は傍点、`<br/>` は改行
+        // 原稿の書き方は、まず Normalize で前からの書き方に直してから扱う。傍点は、字ごとに「｜字《﹅》」のルビに直す。
+        // TextMeshPro の書式（`<size=…>` など。コードが足す物と、カードに付ける物）は、名前で見分けてそのまま通す
 
         /// <summary>親字の頭。青空文庫の記法に合わせてある</summary>
         public const char Head = '｜';
@@ -146,8 +156,27 @@ namespace HalfAware
         /// <summary>ルビの尻</summary>
         public const char Shut = '》';
 
+        /// <summary>傍点を表すルビ。「｜字《﹅》」は、その字の上に点（<see cref="DotGlyph"/>）を打つ</summary>
+        public const string DotMark = "﹅";
+
         /// <summary>
-        /// 文面には「｜親字《るび》」の形で書いておく。
+        /// 傍点に打つ字。
+        /// Noto Sans JP の「﹅」（U+FE45）は縦組み用の形で、読点のような大きな点が字の枠の左上に寄っていて、横組みの上に乗せると字の左へずれて見える。
+        /// 「・」（U+30FB）は字の枠の真ん中の小さな丸なので、こちらを打つ（2026-09-28）
+        /// </summary>
+        public const string DotGlyph = "・";
+
+        /// <summary>傍点の大きさ。親字に対する割合。「・」は字の枠の 0.21 em しか無いので、ルビより縮めずに親字と同じ大きさで打つ</summary>
+        public const float DotScale = 1f;
+
+        /// <summary>「・」の下の端。ベースラインから（em）。TMP の字の寸法（Noto Sans JP、2026-09-28）</summary>
+        public const float DotBottom = 0.274f;
+
+        /// <summary>傍点を持ち上げる高さ。点の下の端を、漢字の上の端（<see cref="BaseTop"/>）からルビと同じ隙間だけ上に置く</summary>
+        public const float DotLift = BaseTop + Gap - DotBottom;
+
+        /// <summary>
+        /// 文面には「｜親字《るび》」か「親字&lt;るび&gt;」の形で書いておく。
         /// 書式の指定をそのまま持たせると、字幕の折り返しがタグを字数に数えてしまう。
         /// 折り返してから Expand で書式に直す
         /// </summary>
@@ -156,9 +185,10 @@ namespace HalfAware
             return Expand(text, Scale, Lift);
         }
 
-        /// <summary>大きさ scale と持ち上げる高さ lift を渡して直す。大きさを比べて撮るときに使う</summary>
+        /// <summary>大きさ scale と持ち上げる高さ lift を渡して直す。大きさを比べて撮るときに使う（傍点は <see cref="DotScale"/> のまま）</summary>
         public static string Expand(string text, float scale, float lift)
         {
+            text = Normalize(text);
             if (string.IsNullOrEmpty(text) || text.IndexOf(Head) < 0) return text;
             var made = new System.Text.StringBuilder(text.Length + 64);
             var i = 0;
@@ -171,17 +201,32 @@ namespace HalfAware
                     i++;
                     continue;
                 }
-                var lineStart = i == 0 || text[i - 1] == '\n';
-                made.Append(Over(text.Substring(baseFrom, baseTo - baseFrom),
-                                 text.Substring(rubyFrom, rubyTo - rubyFrom), scale, lift, lineStart));
+                var baseText = text.Substring(baseFrom, baseTo - baseFrom);
+                var ruby = text.Substring(rubyFrom, rubyTo - rubyFrom);
+                // 傍点は行の頭でも親字の真ん中に打つ
+                if (ruby == DotMark) made.Append(Over(baseText, DotGlyph, DotScale, DotLift, false));
+                else made.Append(Over(baseText, ruby, scale, lift, LineStart(text, i)));
                 i = rubyTo + 1;
             }
             return made.ToString();
         }
 
-        /// <summary>ルビを落として親字だけにする。ログや照合に使う</summary>
+        /// <summary>
+        /// at が行の頭か。文の頭・改行の直後と、表の列の頭（<see cref="ListFormat"/> が置く &lt;pos=…&gt; の直後）。
+        /// 列の頭も、前の列の字の上へルビを掛けない（列の幅は親字とルビの広い方で取ってある、<see cref="Width"/>）
+        /// </summary>
+        static bool LineStart(string text, int at)
+        {
+            if (at == 0 || text[at - 1] == '\n') return true;
+            if (text[at - 1] != '>') return false;
+            var open = text.LastIndexOf('<', at - 1);
+            return open >= 0 && string.CompareOrdinal(text, open, "<pos=", 0, 5) == 0;
+        }
+
+        /// <summary>ルビと傍点を落として親字だけにする。ログや照合に使う</summary>
         public static string Plain(string text)
         {
+            text = Normalize(text);
             if (string.IsNullOrEmpty(text) || text.IndexOf(Head) < 0) return text;
             var made = new System.Text.StringBuilder(text.Length);
             var i = 0;
@@ -200,8 +245,56 @@ namespace HalfAware
             return made.ToString();
         }
 
+        /// <summary>ルビか傍点が一つでもあるか。ある文は行を開ける（<see cref="ExtraLineSpacing"/>）</summary>
+        public static bool Has(string text)
+        {
+            text = Normalize(text);
+            if (string.IsNullOrEmpty(text)) return false;
+            for (var at = text.IndexOf(Head); at >= 0; at = text.IndexOf(Head, at + 1))
+            {
+                int baseFrom, baseTo, rubyFrom, rubyTo;
+                if (Group(text, at, out baseFrom, out baseTo, out rubyFrom, out rubyTo)) return true;
+            }
+            return false;
+        }
+
         /// <summary>
-        /// at から始まるルビの指定を読む。「｜親字《るび》」の形だけを見る。
+        /// 画面に出る幅。半角いくつぶん（<see cref="ListFormat.Units"/> と同じ数え方）。
+        /// ルビと傍点は親字とルビ（傍点）の広い方、TextMeshPro の書式は 0 と数える。表の列の幅を揃えるのに使う
+        /// </summary>
+        public static int Width(string text)
+        {
+            text = Normalize(text);
+            if (string.IsNullOrEmpty(text)) return 0;
+            var n = 0;
+            var i = 0;
+            while (i < text.Length)
+            {
+                int baseFrom, baseTo, rubyFrom, rubyTo;
+                if (Group(text, i, out baseFrom, out baseTo, out rubyFrom, out rubyTo))
+                {
+                    var ruby = text.Substring(rubyFrom, rubyTo - rubyFrom);
+                    var over = ruby == DotMark
+                        ? ListFormat.Units(DotGlyph) * DotScale
+                        : ListFormat.Units(ruby) * Scale;
+                    n += Mathf.Max(ListFormat.Units(text.Substring(baseFrom, baseTo - baseFrom)), Mathf.CeilToInt(over - 1e-3f));
+                    i = rubyTo + 1;
+                    continue;
+                }
+                var shut = TagEnd(text, i);
+                if (shut > i)
+                {
+                    i = shut + 1;
+                    continue;
+                }
+                n += ListFormat.Units(text.Substring(i, 1));
+                i++;
+            }
+            return n;
+        }
+
+        /// <summary>
+        /// at から始まるルビの指定を読む。「｜親字《るび》」の形だけを見る（原稿の書き方は先に <see cref="Normalize"/> で直しておく）。
         /// 親字もルビも空でないときだけ真
         /// </summary>
         public static bool Group(string text, int at, out int baseFrom, out int baseTo, out int rubyFrom, out int rubyTo)
@@ -219,6 +312,184 @@ namespace HalfAware
             rubyFrom = open + 1;
             rubyTo = shut;
             return true;
+        }
+
+        /// <summary>
+        /// at から TextMeshPro の書式（&lt;size=…&gt; など）が始まっていれば、その &gt; の位置。書式でなければ -1。
+        /// ルビ（&lt;るび&gt;）と改行・傍点（&lt;br/&gt;・&lt;dot&gt;）は書式に数えない
+        /// </summary>
+        public static int TagEnd(string text, int at)
+        {
+            if (at >= text.Length || text[at] != '<') return -1;
+            var shut = text.IndexOf('>', at + 1);
+            if (shut < 0) return -1;
+            return IsTag(text.Substring(at + 1, shut - at - 1)) ? shut : -1;
+        }
+
+        // ---- 原稿の書き方を直す -------------------------------------------
+
+        /// <summary>
+        /// TextMeshPro の書式の名前。**これに当たる &lt;…&gt; はルビにしない。**
+        /// ほかに、= を含む物・/ で始まる物（閉じ）・# で始まる物（色）も書式とみなす
+        /// </summary>
+        static readonly string[] TagNames =
+        {
+            "a", "action", "align", "allcaps", "alpha", "b", "br", "class", "color", "cspace", "font", "font-weight",
+            "gradient", "i", "indent", "line-height", "line-indent", "link", "lowercase", "margin", "margin-left",
+            "margin-right", "mark", "material", "mspace", "nbsp", "nobr", "noparse", "page", "pos", "rotate", "s",
+            "shy", "size", "smallcaps", "space", "sprite", "strikethrough", "style", "sub", "sup", "u", "uppercase",
+            "voffset", "width", "zwj", "zwsp",
+        };
+
+        /// <summary>&lt;…&gt; の中身 inner が TextMeshPro の書式か</summary>
+        public static bool IsTag(string inner)
+        {
+            if (string.IsNullOrEmpty(inner)) return false;
+            var t = inner.Trim();
+            if (t.Length == 0) return false;
+            if (t[0] == '/' || t[0] == '#') return !IsDotOrBreak(t);
+            if (t.IndexOf('=') >= 0) return true;
+            var end = 0;
+            while (end < t.Length && t[end] != ' ' && t[end] != '"') end++;
+            var name = t.Substring(0, end).ToLowerInvariant();
+            if (IsDotOrBreak(name)) return false;
+            return System.Array.IndexOf(TagNames, name) >= 0;
+        }
+
+        static bool IsDotOrBreak(string name)
+        {
+            name = name.Replace(" ", string.Empty).ToLowerInvariant();
+            return name == "dot" || name == "/dot" || name == "br" || name == "br/";
+        }
+
+        /// <summary>
+        /// 原稿の書き方（docs/scenario/README.md）を、前からの書き方に直す。前からの書き方と書式はそのまま通す。何度かけても同じ。
+        /// - `&lt;br/&gt;`（`&lt;br&gt;`）は改行
+        /// - `&lt;dot&gt;…&lt;/dot&gt;` は傍点。囲んだ字ごとに「｜字《﹅》」にする（空白と改行には打たない）
+        /// - それ以外の `&lt;…&gt;` はルビ。親字は、`｜` があればそこから、無ければ直前の同じ種類の字の並び（<see cref="Kind"/>）。
+        ///   親字が決まらない（直前が約物や空白）物は、書いたまま残す
+        /// </summary>
+        public static string Normalize(string text)
+        {
+            if (string.IsNullOrEmpty(text) || text.IndexOf('<') < 0) return text;
+            var made = new System.Text.StringBuilder(text.Length + 32);
+            var head = -1;      // 親字の頭の ｜ を置いた made の位置。ルビを待っている間だけ
+            var dot = false;
+            var i = 0;
+            while (i < text.Length)
+            {
+                var c = text[i];
+                if (c == Head)
+                {
+                    int baseFrom, baseTo, rubyFrom, rubyTo;
+                    if (Group(text, i, out baseFrom, out baseTo, out rubyFrom, out rubyTo))
+                    {
+                        made.Append(text, i, rubyTo + 1 - i);
+                        i = rubyTo + 1;
+                        head = -1;
+                        continue;
+                    }
+                    head = made.Length;
+                    made.Append(c);
+                    i++;
+                    continue;
+                }
+                if (c == '\n')
+                {
+                    head = -1;
+                    made.Append(c);
+                    i++;
+                    continue;
+                }
+                if (c == '<')
+                {
+                    var shut = text.IndexOf('>', i + 1);
+                    if (shut > i + 1)
+                    {
+                        var inner = text.Substring(i + 1, shut - i - 1);
+                        var name = inner.Replace(" ", string.Empty).ToLowerInvariant();
+                        if (name == "br" || name == "br/")
+                        {
+                            made.Append('\n');
+                            head = -1;
+                            i = shut + 1;
+                            continue;
+                        }
+                        if (name == "dot" || name == "/dot")
+                        {
+                            dot = name == "dot";
+                            i = shut + 1;
+                            continue;
+                        }
+                        if (IsTag(inner))
+                        {
+                            made.Append(text, i, shut + 1 - i);
+                            i = shut + 1;
+                            continue;
+                        }
+                        var from = head >= 0 ? head + 1 : RunStart(made);
+                        if (from < made.Length)
+                        {
+                            if (head < 0) made.Insert(from, Head);
+                            made.Append(Open).Append(inner).Append(Shut);
+                            head = -1;
+                            i = shut + 1;
+                            continue;
+                        }
+                    }
+                    // 親字の無い <…> と、閉じの無い < は書いたまま
+                }
+                if (dot && c != ' ' && c != '　')
+                {
+                    var n = char.IsHighSurrogate(c) && i + 1 < text.Length ? 2 : 1;
+                    made.Append(Head).Append(text, i, n).Append(Open).Append(DotMark).Append(Shut);
+                    i += n;
+                    continue;
+                }
+                made.Append(c);
+                i++;
+            }
+            return made.ToString();
+        }
+
+        /// <summary>親字になる字の種類。直前の同じ種類の字の並びが親字になる</summary>
+        public enum Kind
+        {
+            None,
+            /// <summary>漢字。々〆〇ヵヶを含む</summary>
+            Kanji,
+            /// <summary>片仮名。ーを含む</summary>
+            Katakana,
+            Hiragana,
+            /// <summary>英字。数字・ハイフン・アポストロフィを含む</summary>
+            Latin,
+        }
+
+        public static Kind KindOf(char c)
+        {
+            if (c == '々' || c == '〆' || c == '〇' || c == 'ヵ' || c == 'ヶ') return Kind.Kanji;
+            if ((c >= '㐀' && c <= '䶿') || (c >= '一' && c <= '鿿') || (c >= '豈' && c <= '﫿')) return Kind.Kanji;
+            if (char.IsSurrogate(c)) return Kind.Kanji;     // 拡張の漢字（𠮷 など）
+            if ((c >= 'ァ' && c <= 'ヺ') || c == 'ー' || c == 'ヽ' || c == 'ヾ' || (c >= 'ㇰ' && c <= 'ㇿ')
+                || (c >= 'ｦ' && c <= 'ﾟ')) return Kind.Katakana;
+            if ((c >= 'ぁ' && c <= 'ゖ') || c == 'ゝ' || c == 'ゞ') return Kind.Hiragana;
+            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) return Kind.Latin;
+            if (c == '-' || c == '\'' || c == '’') return Kind.Latin;
+            if ((c >= 'À' && c <= 'ɏ') && c != '×' && c != '÷') return Kind.Latin;
+            if ((c >= 'Ａ' && c <= 'Ｚ') || (c >= 'ａ' && c <= 'ｚ') || (c >= '０' && c <= '９')) return Kind.Latin;
+            return Kind.None;
+        }
+
+        /// <summary>made の尻の、同じ種類の字の並びの頭。尻の字がどの種類でもなければ made.Length</summary>
+        static int RunStart(System.Text.StringBuilder made)
+        {
+            var end = made.Length;
+            if (end == 0) return end;
+            var kind = KindOf(made[end - 1]);
+            if (kind == Kind.None) return end;
+            var at = end - 1;
+            while (at > 0 && KindOf(made[at - 1]) == kind) at--;
+            return at;
         }
     }
 }

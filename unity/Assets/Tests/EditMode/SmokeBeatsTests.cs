@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using UnityEditor;
 
 namespace HalfAware.Tests
 {
@@ -10,12 +11,52 @@ namespace HalfAware.Tests
             return SmokeBeats.FirstDragAt + SmokeBeats.Cycle * i;
         }
 
+        // ---- ジッポ（オーナー、2026-09-28） ------------------------------------------
+
         [Test]
-        public void TheLidOpensBeforeTheFlame()
+        public void TheZippoOpensThenCatchesThenTheDragsFollow()
         {
-            Assert.Less(SmokeBeats.ClickAt, SmokeBeats.FlameAt);
-            Assert.Less(SmokeBeats.FlameAt, SmokeBeats.FirstDragAt, "火が点いてから吸う");
+            Assert.Greater(SmokeBeats.ZippoAt, 0f, "くわえてから開ける");
+            Assert.Greater(SmokeBeats.LitAt, SmokeBeats.ZippoAt, "開けてから点く");
+            Assert.Less(SmokeBeats.LitAt, SmokeBeats.ZippoAt + SmokeBeats.ZippoSeconds, "点くのはジッポの音の途中（閉じる前）");
+            Assert.Less(SmokeBeats.LitAt, SmokeBeats.FirstDragAt, "火が点いてから吸う");
         }
+
+        [Test]
+        public void TheCigaretteCatchesTheMomentTheZippoStrikes()
+        {
+            // 点火したタイミングで、煙草に火が移った音を鳴らす。煙もそこから
+            Assert.AreEqual(SmokeBeats.ZippoAt + SmokeBeats.StrikeInZippo, SmokeBeats.LitAt, 1e-4f);
+            Assert.AreEqual(SmokeBeats.LitAt, SmokeBeats.SmokeAt, 1e-4f);
+        }
+
+        [Test]
+        public void SheTurnsOnlyAfterBothSoundsHaveEnded()
+        {
+            // ジッポの音（閉じるまで）と火が移った音が鳴り終わってから向き直す
+            Assert.GreaterOrEqual(SmokeBeats.TurnAt, SmokeBeats.ZippoAt + SmokeBeats.ZippoSeconds - 1e-4f);
+            Assert.GreaterOrEqual(SmokeBeats.TurnAt, SmokeBeats.LitAt + SmokeBeats.LitSeconds - 1e-4f);
+            Assert.AreEqual(SmokeBeats.FirstDragAt, SmokeBeats.TurnAt, 1e-4f, "向き直さなければ、そこで吸い始める");
+        }
+
+        [TestCase("Assets/Audio/Zippo.wav", SmokeBeats.ZippoSeconds)]
+        [TestCase("Assets/Audio/CigaretteLit.wav", SmokeBeats.LitSeconds)]
+        public void TheTimetableKnowsTheLengthOfTheSounds(string path, float seconds)
+        {
+            // 素材を替えたら時刻表も合わせる。Web では鳴らす前に長さが読めないことがあるので、長さは時刻表が持つ
+            var clip = AssetDatabase.LoadAssetAtPath<UnityEngine.AudioClip>(path);
+            Assert.That(clip, Is.Not.Null, path);
+            Assert.AreEqual(seconds, clip.length, 0.01f, path);
+        }
+
+        [Test]
+        public void TheStrikeFallsBetweenTheLidOpeningAndClosing()
+        {
+            // 切り出しの中で、蓋を開ける音は 0.35 秒、閉じる音は 2.43 秒から。点火はそのあいだ
+            Assert.That(SmokeBeats.StrikeInZippo, Is.GreaterThan(0.5f).And.LessThan(2.4f));
+        }
+
+        // ---- 吸う・吐く ----------------------------------------------------------
 
         [Test]
         public void SheBreathesInBeforeSheBreathesOut()
@@ -84,15 +125,6 @@ namespace HalfAware.Tests
         // ---- 向き直す間（場面 1） ------------------------------------------------
 
         [Test]
-        public void SheTurnsBackOnlyAfterTheFlameHasSounded()
-        {
-            // 火を点けてから向き直す。火の音が鳴りきったところ（最初の一服の頃）から向き直し始める
-            Assert.Greater(SmokeBeats.TurnAt, SmokeBeats.FlameAt);
-            Assert.GreaterOrEqual(SmokeBeats.TurnAt, SmokeBeats.SmokeAt(SmokeBeats.FlameSeconds) - 1e-4f, "火の音が鳴りきってから");
-            Assert.AreEqual(SmokeBeats.FirstDragAt, SmokeBeats.TurnAt, 1e-4f, "向き直さなければ、そこで吸い始める");
-        }
-
-        [Test]
         public void TheTurnPushesEveryDragAndBlowBackByTheSameAmount()
         {
             const float turn = 2.9f;
@@ -154,21 +186,6 @@ namespace HalfAware.Tests
             var plain = Plain(SmokeBeats.Drags - 1) + SmokeBeats.DragSeconds + SmokeBeats.HoldSeconds
                 + SmokeBeats.BlowSeconds + SmokeBeats.TailSeconds;
             Assert.AreEqual(SmokeBeats.LastPauseSeconds * 2f, SmokeBeats.Total(SmokeBeats.Drags) - plain, 1e-4f);
-        }
-
-        [Test]
-        public void TheSmokeStartsOnlyAfterTheFlameHasSounded()
-        {
-            var flame = 1.49f;
-            Assert.AreEqual(SmokeBeats.FlameAt + flame, SmokeBeats.SmokeAt(flame), 1e-4f);
-            Assert.Greater(SmokeBeats.SmokeAt(flame), SmokeBeats.FlameAt, "火の音が鳴りきってから煙が出る");
-            Assert.LessOrEqual(SmokeBeats.SmokeAt(flame), SmokeBeats.FirstDragAt + 1e-3f, "最初の一服には間に合う");
-        }
-
-        [Test]
-        public void WithoutAClipItFallsBackToTheEstimate()
-        {
-            Assert.AreEqual(SmokeBeats.FlameAt + SmokeBeats.FlameSeconds, SmokeBeats.SmokeAt(0f), 1e-4f);
         }
 
         [Test]

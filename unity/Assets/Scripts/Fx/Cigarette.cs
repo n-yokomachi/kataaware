@@ -5,32 +5,32 @@ namespace HalfAware
 {
     /// <summary>
     /// 一本吸い終わるまでの音と煙。SmokeBeats の時刻表どおりに、
-    /// 蓋を開ける金属音 → 火が点く音 → 吸う息 → 吐く息、を決めた回数だけ並べる。
-    /// 火の音と最初の吸う息のあいだには、向き直す間（turn）を挟める（場面 1）。
-    /// 煙は火が点いてから立ちはじめ、吐く息に合わせてひと吹き足す
+    /// ジッポ（開く・点く・閉じる）→ 点いた瞬間に煙草に火が移った音 → 吸う息 → 吐く息、を決めた回数だけ並べる。
+    /// ジッポの音と火が移った音が鳴りきってから最初の吸う息までには、向き直す間（turn）を挟める（場面 1）。
+    /// 煙は火が点いたところから立ちはじめ、吐く息に合わせてひと吹き足す。
+    /// 場面 1・5・8 が同じ仕組みを使う（同じ主人公の同じジッポ）
     /// </summary>
     [DefaultExecutionOrder(15)]
     public sealed class Cigarette : MonoBehaviour
     {
         [SerializeField] SmokePuffs puffs;
-        [Tooltip("ライターと息を鳴らす。口元に置く")]
+        [Tooltip("ジッポと息を鳴らす。口元に置く")]
         [SerializeField] AudioSource voice;
-        [SerializeField] AudioClip lighterClick;
-        [SerializeField] AudioClip lighterFlame;
+        [Tooltip("ジッポの音（Zippo.wav）。開く・点く・閉じるが一つに入っている。点く時刻は SmokeBeats.StrikeInZippo")]
+        [SerializeField] AudioClip zippo;
+        [Tooltip("煙草に火が移った音（CigaretteLit.wav）。ジッポが点いた瞬間から鳴らす")]
+        [SerializeField] AudioClip lit;
         [SerializeField] AudioClip drag;
         [SerializeField] AudioClip blow;
 
         float elapsed = -1f;
-        /// <summary>火が点く音の長さ。Web では鳴らした直後に長さが 0 になるので、鳴らす前に読んで持っておく（SoundLoad.Seconds）</summary>
-        float flameSeconds;
         int drags;
-        /// <summary>火の音が鳴りきってから吸い始めるまでに挟む、向き直す間。秒</summary>
+        /// <summary>ジッポの音と火が移った音が鳴りきってから吸い始めるまでに挟む、向き直す間。秒</summary>
         float turn;
         int nextDrag;
         int nextBlow;
-        bool clicked;
-        bool flamed;
-        bool smoked;
+        bool opened;
+        bool caught;
 
         /// <summary>吐き始めるたびに知らせる。何服目かを渡す。0 から数える</summary>
         public event Action<int> Blew;
@@ -41,15 +41,17 @@ namespace HalfAware
         /// <summary>これまでに吐いた回数。動作確認から読む</summary>
         public int Blows { get { return nextBlow; } }
 
+        /// <summary>火を点けてからの秒。吸っていなければ -1。動作確認から読む</summary>
+        public float Elapsed { get { return elapsed; } }
+
         void Awake()
         {
-            // Web: どの音も先読みしない設定。火の音の長さを読み込みの前に読んで持ち、それから展開を始めておく。
-            // 火を点けてから最初の音（蓋の金属音）まで 0.3 秒しかなく、鳴らす時に読み込むと鳴り出しが遅れる（SoundLoad）
-            SoundLoad.Seconds(lighterFlame, ref flameSeconds);
-            SoundLoad.Warm(lighterClick, lighterFlame, drag, blow);
+            // Web: どの音も先読みしない設定。展開を始めておく。
+            // 火を点けてから最初の音（ジッポ）まで 0.3 秒しかなく、鳴らす時に読み込むと鳴り出しが遅れる（SoundLoad）
+            SoundLoad.Warm(zippo, lit, drag, blow);
         }
 
-        /// <summary>火を点ける。drags 服ぶん吸う。turn は火の音が鳴りきってから吸い始めるまでに挟む、向き直す間（秒）</summary>
+        /// <summary>火を点ける。drags 服ぶん吸う。turn はジッポの音と火が移った音が鳴りきってから吸い始めるまでに挟む、向き直す間（秒）</summary>
         public void Light(int drags, float turn = 0f)
         {
             this.drags = Mathf.Max(0, drags);
@@ -57,9 +59,8 @@ namespace HalfAware
             elapsed = 0f;
             nextDrag = 0;
             nextBlow = 0;
-            clicked = false;
-            flamed = false;
-            smoked = false;
+            opened = false;
+            caught = false;
         }
 
         /// <summary>途中で止める</summary>
@@ -73,20 +74,16 @@ namespace HalfAware
         {
             if (elapsed < 0f) return;
             elapsed += Time.deltaTime;
-            if (!clicked && elapsed >= SmokeBeats.ClickAt)
+            if (!opened && elapsed >= SmokeBeats.ZippoAt)
             {
-                clicked = true;
-                Play(lighterClick);
+                opened = true;
+                Play(zippo);
             }
-            if (!flamed && elapsed >= SmokeBeats.FlameAt)
+            // ジッポに火が点いた瞬間に、煙草に火が移る。煙もここから
+            if (!caught && elapsed >= SmokeBeats.LitAt)
             {
-                flamed = true;
-                Play(lighterFlame);
-            }
-            // 煙は火の音が鳴り終わってから立ちはじめる
-            if (!smoked && elapsed >= SmokeBeats.SmokeAt(SoundLoad.Seconds(lighterFlame, ref flameSeconds)))
-            {
-                smoked = true;
+                caught = true;
+                Play(lit);
                 if (puffs != null) puffs.Begin(SmokeBeats.Total(drags, turn));
             }
             if (nextDrag < drags && elapsed >= SmokeBeats.DragAt(nextDrag, drags, turn))

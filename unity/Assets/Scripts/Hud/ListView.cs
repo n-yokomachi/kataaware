@@ -105,8 +105,8 @@ namespace HalfAware
             laid = text;
             // ルビは列を組んでから書式に直す。先に直すと、列の幅がタグを字数に数えてしまう
             var composed = Ruby.Expand(ListFormat.Compose(text, ListLayout.RoomEm, false));
-            // ルビのある表は行を少し開ける。そのままだと下の行のルビが上の行の字にかぶる
-            table.lineSpacing = text.IndexOf(Ruby.Head) >= 0 ? Ruby.ExtraLineSpacing : 0f;
+            // ルビ（傍点）のある表は行を少し開ける。そのままだと下の行のルビが上の行の字にかぶる
+            table.lineSpacing = Ruby.Has(text) ? Ruby.ExtraLineSpacing : 0f;
             table.text = composed;
             var size = table.GetPreferredValues(composed);
             var mark = hint.GetPreferredValues(HudView.Advance);

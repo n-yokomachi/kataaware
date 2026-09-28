@@ -8,14 +8,31 @@ namespace HalfAware.Tests
     {
         const float Dot = ListLayout.Dot;
 
+        /// <summary>場面 1 のチップのリスト（原稿 docs/scenario/01-room.md。英語に日本語訳のルビ）</summary>
         const string Chips =
-            "08/15 #1 男 41 『ディエゴ』 32分40秒\n" +
-            "08/15 #2 女 23 『ミア』 16分05秒\n" +
-            "08/15 #3 男 8 『ゆうと』 24分38秒\n" +
-            "08/15 #4 女 35 『阿明』 56分26秒\n" +
-            "08/15 #5 男 19 『リアム』 3分32秒\n" +
-            "08/15 #6 女 52 『マチルド』 48分55秒";
+            "08/15  #1  Male<男>    41  32m40s  『Diego』\n" +
+            "08/15  #2  Female<女>  23  16m05s  『Mia』\n" +
+            "08/15  #3  Male<男>     8  24m38s  『優斗』\n" +
+            "08/15  #4  Female<女>  35  56m26s  『阿明』\n" +
+            "08/15  #5  Male<男>    19   3m32s  『Liam』\n" +
+            "08/15  #6  Female<女>  52  48m55s  『Mathilde』";
 
+        /// <summary>場面 1 の走査条件（原稿）</summary>
+        const string ConditionsInEnglish =
+            "Condition<条件>:  ｜Name-call time<名前を呼ばれた時刻>\n" +
+            "Target<対象>:  ｜No firewall<防壁なし>\n" +
+            "Range<距離>:  Random<ランダム>\n" +
+            "Period<期間>:  2156/03/02 - 2156/03/03\n" +
+            "｜Quick-filter hits<候補の簡易抽出結果>:  526,232,318";
+
+        /// <summary>場面 1 の売り上げのメモ（原稿）。最後の行は日付だけ</summary>
+        const string Memo =
+            "2166/08/10  Bought<仕入>  30 pcs  Stock<在庫>  47 pcs\n" +
+            "2166/08/11  Sold<売却>     5 pcs  Stock<在庫>  42 pcs\n" +
+            "2166/08/13  Sold<売却>     4 pcs  Stock<在庫>  38 pcs\n" +
+            "2166/08/15";
+
+        /// <summary>場面 3 の走査条件（今は日本語。全角の空白で区切る）</summary>
         const string Conditions =
             "条件　名前を呼ばれた時刻\n" +
             "対象　防壁なし　距離 ランダム　期間 2156年3月2日～2156年3月3日\n" +
@@ -111,6 +128,38 @@ namespace HalfAware.Tests
                 Assert.AreEqual(5, Pos(line), line);
             foreach (var line in ListFormat.Compose(Conditions, ListLayout.RoomEm, false).Split('\n'))
                 Assert.AreEqual(1, Pos(line), line);
+        }
+
+        [Test]
+        public void TheEnglishListsKeepEveryColumn()
+        {
+            // 原稿の英語のリストは、ルビの付いた列も含めて全部の列が枠に入る
+            foreach (var line in ListFormat.Compose(ConditionsInEnglish, ListLayout.RoomEm, false).Split('\n'))
+                Assert.AreEqual(1, Pos(line), line);
+            var memo = ListFormat.Compose(Memo, ListLayout.RoomEm, false).Split('\n');
+            for (var i = 0; i < 3; i++) Assert.AreEqual(4, Pos(memo[i]), memo[i]);
+            Assert.AreEqual("2166/08/15", memo[3], "日付だけの行はそのまま");
+            Assert.LessOrEqual(ListFormat.WidthEm(Chips, 6), ListLayout.RoomEm * 0.92f, "チップの 6 列が枠の幅に入る");
+        }
+
+        [Test]
+        public void TheCountsLineUpAtTheirEnds()
+        {
+            // 「 5 pcs」は「30 pcs」と尻を揃える（原稿で空白を足して揃えてある）
+            var memo = ListFormat.Compose(Memo, ListLayout.RoomEm, false).Split('\n');
+            Assert.AreEqual(PosOf(memo[0], "30 pcs") + 0.5f, PosOf(memo[1], "5 pcs"), 1e-3f);
+            var chips = ListFormat.Compose(Chips, ListLayout.RoomEm, false).Split('\n');
+            Assert.AreEqual(PosOf(chips[0], "41") + 0.5f, PosOf(chips[2], "8"), 1e-3f);
+            Assert.AreEqual(PosOf(chips[0], "32m40s") + 0.5f, PosOf(chips[4], "3m32s"), 1e-3f);
+        }
+
+        /// <summary>line の中で text の直前に置いた pos の値（em）</summary>
+        static float PosOf(string line, string text)
+        {
+            var at = line.IndexOf("em>" + text);
+            Assert.GreaterOrEqual(at, 0, text + " が無い: " + line);
+            var from = line.LastIndexOf("<pos=", at) + 5;
+            return float.Parse(line.Substring(from, at - from), System.Globalization.CultureInfo.InvariantCulture);
         }
     }
 }
