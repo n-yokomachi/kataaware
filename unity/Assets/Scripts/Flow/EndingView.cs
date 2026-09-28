@@ -19,9 +19,13 @@ namespace HalfAware
     [System.Serializable]
     public sealed class EndingView
     {
+        [Tooltip("目の置き場の寄せ（車の座標。m）。場面 8 の運転席の目（BuildDrive.SeatAt）からの量。" +
+            "運転席に座ったまま、頭を窓の側へ寄せた所。窓の側の内張り（x 0.82）まで 0.2 m 残す")]
+        public Vector3 lean = new Vector3(0.24f, 0f, 0f);
         [Tooltip("既定の向き（前を見ている向き）。明けた時と、片割れの体へ向いて戻った時にこの向きになる。" +
-            "右の柱が画面の横の 6 割ほどに来て、その右が運転席の窓の外")]
-        public Vector2 front = new Vector2(17f, 6f);
+            "寄せた目から見て、風防と横の窓のあいだの前の柱（目の高さで x 0.865・z 0.911）が画面の真ん中に来る向き。" +
+            "左半分が風防の向こうの道、右半分が横の窓の外")]
+        public Vector2 front = new Vector2(19.5f, 6f);
         [Tooltip("右の限り（左右）。運転席の窓の外を見渡せる所まで")]
         public float right = 76f;
         [Tooltip("左の限り（左右）。片割れの体で止まる所より左に置く、角度の止め")]

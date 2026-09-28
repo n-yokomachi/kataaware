@@ -43,21 +43,19 @@ namespace HalfAware.EditorTools
 
         // ---- 目 ------------------------------------------------------------------------
         //
-        // 運転席の目（場面 8 の SeatAt + EyeLead、(0.38, 1.55, 0.22)）から、窓の側（+x）へ寄せる。
-        // 前を向いた時に、画面の左 2/3 が車内（計器盤・ハンドル・風防の向こうの道）、右 1/3 が運転席の窓の外になる所
-
-        /// <summary>目を窓の側へ寄せる量。m。運転席の真ん中から、座ったまま窓の方へ身を寄せた所</summary>
-        public const float SeatLean = 0.08f;
+        // 運転席の目（場面 8 の SeatAt + EyeLead、(0.38, 1.55, 0.22)）から、窓の側（+x）へ寄せる。寄せる量は EndingView.lean の一か所。
+        // 2026-09-28 オーナー「カメラ位置自体をもう少し右にして。前の柱が画面中央になるイメージ」で 0.08 m から 0.24 m へ寄せた。
+        // 既定の向きで、風防と横の窓のあいだの前の柱が画面の真ん中に来て、左半分が風防の向こうの道、右半分が横の窓の外になる
 
         /// <summary>Player の根。目はここから前へ <see cref="BuildDrive.EyeLead"/></summary>
-        public static Vector3 SeatAt { get { return BuildDrive.SeatAt + new Vector3(SeatLean, 0f, 0f); } }
+        public static Vector3 SeatAt { get { return BuildDrive.SeatAt + EndingView.Default.lean; } }
 
         /// <summary>目の置き場（車の座標）</summary>
         public static Vector3 EyeAt { get { return SeatAt + new Vector3(0f, 0f, BuildDrive.EyeLead); } }
 
         /// <summary>
         /// 前を見ている向き。度（左右は +z が 0 で右回り、上下は下が正）。値は <see cref="EndingView.front"/> の一か所
-        /// （2026-09-28 オーナー「もう少し右を向けてみて」で右へ 9 度回した。右の柱が画面の横の 6 割ほどに来て、その右が運転席の窓の外）
+        /// （2026-09-28 オーナー「カメラ位置自体をもう少し右にして。前の柱が画面中央になるイメージ」。寄せた目から見て前の柱が画面の真ん中に来る向き）
         /// </summary>
         public static Vector2 Front { get { return EndingView.Default.front; } }
 
@@ -638,6 +636,7 @@ namespace HalfAware.EditorTools
                 var v = f.GetValue(from);
                 if (v is float) sp.floatValue = (float)v;
                 else if (v is Vector2) sp.vector2Value = (Vector2)v;
+                else if (v is Vector3) sp.vector3Value = (Vector3)v;
             }
         }
 
