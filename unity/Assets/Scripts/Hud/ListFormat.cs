@@ -11,7 +11,10 @@ namespace HalfAware
     /// **列の区切りは、半角の空白 2 つ以上か全角の空白**（台詞の原稿の決まり、docs/scenario/README.md、オーナー、2026-09-28）。
     /// 半角の空白 1 つは同じ列の中（「30 pcs」「2156/03/02 - 2156/03/03」「｜Name-call time&lt;…&gt;」が一つの列）。
     /// ルビと傍点は列の中で一まとまりに扱い、列の幅は親字とルビの広い方で取る（<see cref="Ruby.Width"/>）。
-    /// 数で始まる塊だけの列（年齢・長さ・枚数）は、尻を揃える。原稿で空白を足して尻を揃えてある所
+    /// 数で始まる塊だけの列（年齢・長さ・枚数）は、尻を揃える。原稿で空白を足して尻を揃えてある所。
+    ///
+    /// 幅は半角いくつぶんで数える（半角 1 字 = 0.5 em）。英字は実際にはそれより広い（「Female」で 3.15 em ほど）ので、
+    /// 出す側が字の実寸を測れる時は measure で渡す（<see cref="ListView"/>）。列の幅は、測った幅と数えた幅（ルビを含む）の広い方
     /// </summary>
     public static class ListFormat
     {
@@ -55,23 +58,32 @@ namespace HalfAware
         /// </summary>
         public static string Compose(string text, float roomEm, bool center)
         {
+            return Compose(text, roomEm, center, null);
+        }
+
+        /// <summary>
+        /// measure は塊の親字だけの幅（em）を字の実寸で測る物（無ければ半角いくつで数える）。
+        /// 列の幅は、測った幅と、ルビを含めて数えた幅（<see cref="Ruby.Width"/>）の広い方
+        /// </summary>
+        public static string Compose(string text, float roomEm, bool center, System.Func<string, float> measure)
+        {
             text = Ruby.Normalize(text);
             // 幅は字の実寸ではなく半角いくつで数えているので、少し余裕を見る
             var safe = roomEm * Margin;
             var cols = Most(text);
-            var widths = Widths(text, cols);
+            var widths = Widths(text, cols, measure);
             // 収まるところまで列を減らす。減らした分は最後の列に元のまま残る
             while (cols > 2 && Total(widths) > safe)
             {
                 cols--;
-                widths = Widths(text, cols);
+                widths = Widths(text, cols, measure);
             }
             var table = Total(widths);
             var indent = center && safe > 0f && table < safe ? (safe - table) * 0.5f : 0f;
             var right = Numbers(text, cols);
 
-            var at = new int[widths.Count];
-            for (var i = 1; i < widths.Count; i++) at[i] = at[i - 1] + widths[i - 1] + Gap;
+            var at = new float[widths.Count];
+            for (var i = 1; i < widths.Count; i++) at[i] = at[i - 1] + widths[i - 1] + Gap * EmPerUnit;
 
             var sb = new StringBuilder();
             var lines = Lines(text);
@@ -81,10 +93,10 @@ namespace HalfAware
                 var cells = Split(lines[r], cols);
                 for (var i = 0; i < cells.Count; i++)
                 {
-                    var units = at[i];
-                    if (i < right.Length && right[i]) units += widths[i] - Ruby.Width(cells[i]);
-                    var x = units * EmPerUnit + indent;
-                    if (units > 0 || indent > 0f) sb.Append("<pos=").Append(x.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)).Append("em>");
+                    var em = at[i];
+                    if (i < right.Length && right[i]) em += widths[i] - Measure(cells[i], measure);
+                    var x = em + indent;
+                    if (x > 0.004f) sb.Append("<pos=").Append(x.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)).Append("em>");
                     sb.Append(cells[i]);
                 }
             }
@@ -94,7 +106,15 @@ namespace HalfAware
         /// <summary>columns 列で組んだときの横幅。em</summary>
         public static float WidthEm(string text, int columns)
         {
-            return Total(Widths(Ruby.Normalize(text), columns));
+            return Total(Widths(Ruby.Normalize(text), columns, null));
+        }
+
+        /// <summary>塊の幅（em）。数えた幅（ルビを含む）と、measure があれば測った親字の幅の広い方</summary>
+        static float Measure(string cell, System.Func<string, float> measure)
+        {
+            var counted = Ruby.Width(cell) * EmPerUnit;
+            if (measure == null) return counted;
+            return System.Math.Max(counted, measure(Ruby.Plain(cell)));
         }
 
         /// <summary>いちばん多く分かれている行の塊の数</summary>
@@ -163,15 +183,15 @@ namespace HalfAware
             return tag > at ? tag + 1 : at + 1;
         }
 
-        static List<int> Widths(string text, int columns)
+        static List<float> Widths(string text, int columns, System.Func<string, float> measure)
         {
-            var widths = new List<int>();
+            var widths = new List<float>();
             foreach (var line in Lines(text))
             {
                 var cells = Split(line, columns);
                 for (var i = 0; i < cells.Count; i++)
                 {
-                    var w = Ruby.Width(cells[i]);
+                    var w = Measure(cells[i], measure);
                     if (i < widths.Count) { if (w > widths[i]) widths[i] = w; }
                     else widths.Add(w);
                 }
@@ -202,15 +222,15 @@ namespace HalfAware
             return right;
         }
 
-        static float Total(List<int> widths)
+        static float Total(List<float> widths)
         {
-            var total = 0;
+            var total = 0f;
             for (var i = 0; i < widths.Count; i++)
             {
-                if (i > 0) total += Gap;
+                if (i > 0) total += Gap * EmPerUnit;
                 total += widths[i];
             }
-            return total * EmPerUnit;
+            return total;
         }
 
         static bool IsSpace(char c)

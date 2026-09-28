@@ -253,12 +253,12 @@ namespace HalfAware.EditorTools
                 {
                     var l = ConsoleLog.Here();
                     l.Clear();
-                    ConsoleLog.Said(new[] { "『今回のは酔いが酷いな…』" });
-                    ConsoleLog.Examined(jack.Label, jack.Lines);
-                    ConsoleLog.Examined(cig.Label, cig.Lines);
-                    ConsoleLog.Examined(box.Label, box.Lines);
+                    // 新しい行ほど下。見える所にルビ・傍点・改行の行が来るよう、リストを先に積む
                     ConsoleLog.Examined(chips.Label, chips.Lines);
                     ConsoleLog.Picked(chips.Question, Choice.Yes);
+                    ConsoleLog.Said(new[] { "『今回のは酔いが酷いな…』" });
+                    ConsoleLog.Examined(jack.Label, jack.Lines);
+                    ConsoleLog.Examined(box.Label, box.Lines);
                 }));
             }
             catch (Exception e)

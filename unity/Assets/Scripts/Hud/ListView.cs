@@ -103,8 +103,11 @@ namespace HalfAware
         void Arrange(string text)
         {
             laid = text;
-            // ルビは列を組んでから書式に直す。先に直すと、列の幅がタグを字数に数えてしまう
-            var composed = Ruby.Expand(ListFormat.Compose(text, ListLayout.RoomEm, false));
+            // ルビは列を組んでから書式に直す。先に直すと、列の幅がタグを字数に数えてしまう。
+            // 列の幅は表の字で実際に測る。英字は半角 1 字 = 0.5 em より広く、数えただけでは「Female」が次の列へ食い込む
+            var em = table.fontSize > 0f ? table.fontSize : ListLayout.RowFont;
+            var composed = Ruby.Expand(ListFormat.Compose(text, ListLayout.RoomEm, false,
+                cell => string.IsNullOrEmpty(cell) ? 0f : table.GetPreferredValues(cell).x / em));
             // ルビ（傍点）のある表は行を少し開ける。そのままだと下の行のルビが上の行の字にかぶる
             table.lineSpacing = Ruby.Has(text) ? Ruby.ExtraLineSpacing : 0f;
             table.text = composed;

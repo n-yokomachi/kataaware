@@ -168,8 +168,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: HalfAware::HalfAware.Cigarette
   puffs: {fileID: 12771892}
   voice: {fileID: 154678549}
-  zippo: {fileID: 0}
-  lit: {fileID: 0}
+  zippo: {fileID: 8300000, guid: 6999f20771abfc84e98e8bec6c7e90fb, type: 3}
+  lit: {fileID: 8300000, guid: bb681e58ea05eef42bb0311f62afefbe, type: 3}
   drag: {fileID: 8300000, guid: 6dc80ac8032b3324691f137ee9665769, type: 3}
   blow: {fileID: 8300000, guid: daab3408d34748546b393dec10542ea7, type: 3}
 --- !u!114 &12771892
@@ -17170,9 +17170,11 @@ MonoBehaviour:
   cigarette: {fileID: 12771891}
   cigaretteId: cigarette
   firstLines:
-  - "\u3046\u3045\u2026\u4ECA\u56DE\u306F\u9154\u3044\u304C\u9177\u3044\u2026"
-  packPull: {fileID: 0}
-  card: "<size=30>2166\u5E748\u670815\u65E5 18\u664235\u5206\u3000<voffset=1.05em><size=15>\u30ED\u30F3\u30C9\u30F3</size></voffset><space=-2em>\u502B\u6566\u3000\u81EA\u5BA4</size>"
+  - "\u300E\u2026\u2026\u2026\u3046\u3046\u3063\u300F"
+  - "\u300E\u4ECA\u56DE\u306E\u306F\u9154\u3044\u304C\u9177\u3044\u306A\u2026\u300F"
+  - "\u300E\u4E00\u65E6\u3053\u3053\u307E\u3067\u306B\u3057\u3066\u304A\u3053\u3046\u2026\u300F"
+  packPull: {fileID: 8300000, guid: de7e20f87f12aab4b83bfaeda6513e69, type: 3}
+  card: "<size=30>2166\u5E748\u670815\u65E5 19\u664235\u5206\u3000\u502B\u6566<\u30ED\u30F3\u30C9\u30F3>\u3000\u81EA\u5BA4</size>"
   jacketId: jacket
   garment: {fileID: 859949019}
   folded: {fileID: 36964918}
@@ -17181,7 +17183,8 @@ MonoBehaviour:
   swapBeforeEnd: 0.6
   jacketAimSeconds: 1.6
   afterJacketLines:
-  - "\u7159\u8349\u304C\u5207\u308C\u305F\u2026\u8CB7\u3044\u306B\u884C\u304F\u3064\u3044\u3067\u306B\u4ECA\u65E5\u306E\u30E1\u30E2\u30EA\u3082\u58F2\u3063\u3061\u3083\u304A\u3046"
+  - "\u9769\u306E\u30B8\u30E3\u30B1\u30C3\u30C8\u306B\u8896\u3092\u901A\u3059\u3002\u5C11\u3057\u6691\u3044\u304C\u2026"
+  - "\u7159\u8349\u304C\u5207\u308C\u3066\u3057\u307E\u3063\u305F\u306E\u3067\u5916\u51FA\u3057\u306A\u3051\u308C\u3070\u3002\n\u3064\u3044\u3067\u306B\u4ECA\u65E5\u56DE\u53CE\u3057\u305F\u5206\u306E\u30E1\u30E2\u30EA<\u8A18\u61B6>\u3082\u58F2\u3063\u3066\u3057\u307E\u304A\u3046\u3002"
 --- !u!114 &835399818
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -41118,7 +41121,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: HalfAware::HalfAware.TerminalReflection
   flow: {fileID: 835399815}
   source: {fileID: 383899900}
-  fromLine: 2
+  fromLine: 1
   fadeSeconds: 0.8
   panes:
   - screen: {fileID: 1313831706}

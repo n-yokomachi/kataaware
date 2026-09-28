@@ -87,6 +87,18 @@ namespace HalfAware
         /// </summary>
         public static string Over(string text, string ruby, float scale, float lift, bool lineStart)
         {
+            return Over(text, ruby, scale, lift, lineStart, 0f);
+        }
+
+        /// <summary>
+        /// 親字が &lt;size=数&gt; の中にある時は、その大きさ size（0 なら無し）を渡す。ルビの大きさを数で書く。
+        ///
+        /// **TextMeshPro の &lt;size=70%&gt; は、外側の &lt;size&gt; ではなく字の既定の大きさに対して効く。**
+        /// カード（既定 40、&lt;size=30&gt; で包む）で 70% と書くと、ルビが 21 ではなく 28 になり、戻す幅がずれて親字が右へずれた（2026-09-28）。
+        /// &lt;space&gt; と &lt;voffset&gt; の em は今の大きさで効くので、そちらはそのまま
+        /// </summary>
+        public static string Over(string text, string ruby, float scale, float lift, bool lineStart, float size)
+        {
             if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(ruby)) return text ?? string.Empty;
             if (scale <= 0f) return text;
 
@@ -121,7 +133,8 @@ namespace HalfAware
             // ルビの外に置く <space> は親字の em で効く
             if (Mathf.Abs(start) > 0.001f) made.Append(Tag("<space=", start, "em>"));
             made.Append(Tag("<voffset=", lift, "em>"));
-            made.Append("<size=").Append(Num(scale * 100f)).Append("%>");
+            if (size > 0f) made.Append("<size=").Append(Num(scale * size)).Append(">");
+            else made.Append("<size=").Append(Num(scale * 100f)).Append("%>");
             made.Append(ruby);
             made.Append("</size></voffset>");
             made.Append(Tag("<space=", -back, "em>"));
@@ -191,9 +204,19 @@ namespace HalfAware
             text = Normalize(text);
             if (string.IsNullOrEmpty(text) || text.IndexOf(Head) < 0) return text;
             var made = new System.Text.StringBuilder(text.Length + 64);
+            // 今かかっている <size=数>。数で書いた物だけを追う（% と em は既定の大きさに対して効くので 0 にして、ルビも % で書く）
+            var sizes = new System.Collections.Generic.List<float>();
             var i = 0;
             while (i < text.Length)
             {
+                var tag = TagEnd(text, i);
+                if (tag > i)
+                {
+                    Track(text.Substring(i + 1, tag - i - 1), sizes);
+                    made.Append(text, i, tag + 1 - i);
+                    i = tag + 1;
+                    continue;
+                }
                 int baseFrom, baseTo, rubyFrom, rubyTo;
                 if (!Group(text, i, out baseFrom, out baseTo, out rubyFrom, out rubyTo))
                 {
@@ -203,12 +226,31 @@ namespace HalfAware
                 }
                 var baseText = text.Substring(baseFrom, baseTo - baseFrom);
                 var ruby = text.Substring(rubyFrom, rubyTo - rubyFrom);
+                var size = sizes.Count > 0 ? sizes[sizes.Count - 1] : 0f;
                 // 傍点は行の頭でも親字の真ん中に打つ
-                if (ruby == DotMark) made.Append(Over(baseText, DotGlyph, DotScale, DotLift, false));
-                else made.Append(Over(baseText, ruby, scale, lift, LineStart(text, i)));
+                if (ruby == DotMark) made.Append(Over(baseText, DotGlyph, DotScale, DotLift, false, size));
+                else made.Append(Over(baseText, ruby, scale, lift, LineStart(text, i), size));
                 i = rubyTo + 1;
             }
             return made.ToString();
+        }
+
+        /// <summary>書式 inner が &lt;size=…&gt; か &lt;/size&gt; なら、かかっている大きさの積み上げ sizes を進める</summary>
+        static void Track(string inner, System.Collections.Generic.List<float> sizes)
+        {
+            var t = inner.Trim().ToLowerInvariant();
+            if (t == "/size")
+            {
+                if (sizes.Count > 0) sizes.RemoveAt(sizes.Count - 1);
+                return;
+            }
+            if (!t.StartsWith("size=")) return;
+            var value = t.Substring(5).Trim().Trim('"');
+            if (value.EndsWith("px")) value = value.Substring(0, value.Length - 2);
+            var n = 0f;
+            var plain = value.Length > 0 && value[0] != '+' && value[0] != '-'
+                && float.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out n);
+            sizes.Add(plain ? n : 0f);
         }
 
         /// <summary>

@@ -99,6 +99,10 @@ namespace HalfAware.Tests
             StringAssert.StartsWith("<size=30>2166年8月15日 19時35分　", made);
             StringAssert.EndsWith("倫敦　自室</size>", made);
             StringAssert.Contains("ロンドン</size></voffset>", made, "ルビの書式に直る");
+            // TMP の % は外側の <size> ではなく字の既定の大きさに対して効く。<size=30> の中のルビは数で 30 × 0.7 と書く
+            StringAssert.Contains("<size=" + Num(30f * Ruby.Scale) + ">ロンドン</size>", made);
+            StringAssert.Contains("<size=" + Num(30f * Ruby.DotScale) + ">" + Ruby.DotGlyph + "</size>", Ruby.Expand("<size=30><dot>自</dot></size>"));
+            StringAssert.Contains("<size=" + Num(Ruby.Scale * 100f) + "%>ロンドン", Ruby.Expand("倫敦<ロンドン>"), "外側に <size> が無ければ % のまま");
             Assert.AreEqual("<size=30>2166年8月15日 19時35分　倫敦　自室</size>", Ruby.Plain(card));
         }
 

@@ -39825,6 +39825,7 @@ MonoBehaviour:
   chairBlocker: {fileID: 0}
   chair: {fileID: 0}
   chairPushBack: 0.24
+  seatedHeadLimit: 90
   wakeDrop: 0.18
   wakeStartPitch: -50
   wakeSeconds: 0
@@ -45471,8 +45472,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: HalfAware::HalfAware.Cigarette
   puffs: {fileID: 861195207}
   voice: {fileID: 154678549}
-  lighterClick: {fileID: 8300000, guid: 2d61b935b68954847a02ee31120c24c6, type: 3}
-  lighterFlame: {fileID: 8300000, guid: 4e52f81a446d5e940ae49424c670c0a3, type: 3}
+  zippo: {fileID: 8300000, guid: 6999f20771abfc84e98e8bec6c7e90fb, type: 3}
+  lit: {fileID: 8300000, guid: bb681e58ea05eef42bb0311f62afefbe, type: 3}
   drag: {fileID: 8300000, guid: 6dc80ac8032b3324691f137ee9665769, type: 3}
   blow: {fileID: 8300000, guid: daab3408d34748546b393dec10542ea7, type: 3}
 --- !u!1 &867404119
