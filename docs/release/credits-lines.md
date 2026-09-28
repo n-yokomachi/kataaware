@@ -11,7 +11,6 @@
 | 3D モデル | Kenney「Furniture Kit」— CC0 | Kenney "Furniture Kit" — CC0 |
 | 書体 | しっぽり明朝（© 2021 The Shippori Mincho Project Authors）— SIL Open Font License 1.1 | Shippori Mincho (© 2021 The Shippori Mincho Project Authors) — SIL Open Font License 1.1 |
 | 書体 | Noto Sans JP（© 2014-2021 Adobe）— SIL Open Font License 1.1 | Noto Sans JP (© 2014-2021 Adobe) — SIL Open Font License 1.1 |
-| 効果音 | Kenney「RPG Audio」— CC0 | Kenney "RPG Audio" — CC0 |
 | 効果音 | dawith「Zippo click sound」（OpenGameArt）— CC0 | dawith "Zippo click sound" (OpenGameArt) — CC0 |
 | 効果音 | OwlishMedia「Sound Effects Pack」（OpenGameArt）— CC0 | OwlishMedia "Sound Effects Pack" (OpenGameArt) — CC0 |
 | 効果音 | Pixabay（dragon-studio、tommylynn、freesound_community ほか）— Pixabay Content License | Pixabay (dragon-studio, tommylynn, freesound_community and others) — Pixabay Content License |

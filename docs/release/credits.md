@@ -40,7 +40,6 @@ bdvictor / DOBCommunications / elittle13 / JazzyBay
 Diicorp95 / smokenweewALT / freesound_community and others
 OpenGameArt
 dawith / OwlishMedia
-"RPG Audio" by Kenney
 
 ## 3D Models
 Microsoft Rocketbox Avatar Library (© 2020 Microsoft) — MIT License

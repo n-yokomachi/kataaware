@@ -24,7 +24,6 @@
 | 3D モデル | Kenney Furniture Kit | CC0 | 無し |
 | 書体 | しっぽり明朝（Fontworks ほか） | SIL Open Font License 1.1 | **有り**（書体を同梱して配るので、著作権の表示と許諾の文を添える） |
 | 書体 | Noto Sans JP（Google） | SIL Open Font License 1.1 | **有り**（同上） |
-| 効果音 | Kenney RPG Audio | CC0 | 無し |
 | 効果音 | OpenGameArt「Zippo click sound」（dawith） | CC0 | 無し |
 | 効果音 | OpenGameArt「Sound Effects Pack」（OwlishMedia） | CC0 | 無し |
 | 効果音 | Pixabay の音（雨・扉・車・ジャックを挿す音・煙草の 3 つ） | Pixabay Content License | 無し（書けば喜ばれる） |

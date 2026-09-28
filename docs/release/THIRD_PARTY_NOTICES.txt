@@ -160,9 +160,6 @@ These licenses do not require a notice. They are listed with thanks.
     CC0 1.0 Universal
 
 Sound effects
-  Kenney - RPG Audio
-    https://kenney.nl/assets/rpg-audio
-    CC0 1.0 Universal
   dawith - Zippo click sound (OpenGameArt)
     https://opengameart.org/content/zippo-click-sound
     CC0 1.0 Universal
