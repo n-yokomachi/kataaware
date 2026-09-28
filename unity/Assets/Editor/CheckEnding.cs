@@ -104,6 +104,59 @@ namespace HalfAware.EditorTools
             return sb.ToString().TrimEnd();
         }
 
+        /// <summary>
+        /// 見回しの向きを替えて撮る。曲の秒 song の形で、names[i] の名で looks[i] の向きを一枚ずつ（向きは角度の限りに収まる）。
+        /// looks に NaN の成分があれば、その向きは既定の向きから左（x が NaN）へ、片割れで止まるまで回した向きにする
+        /// </summary>
+        public static string ShootViews(string dir, float song, string[] names, Vector2[] looks)
+        {
+            if (EditorApplication.isPlaying) return "再生中は撮らない";
+            for (var i = 0; i < SceneManager.sceneCount; i++)
+                if (SceneManager.GetSceneAt(i).isDirty)
+                    return "開いている場面に未保存の変更がある: " + SceneManager.GetSceneAt(i).path;
+            var setup = EditorSceneManager.GetSceneManagerSetup();
+            var sb = new StringBuilder();
+            var async = ShaderUtil.allowAsyncCompilation;
+            try
+            {
+                ShaderUtil.allowAsyncCompilation = false;
+                EditorSceneManager.OpenScene(BuildEnding.ScenePath, OpenSceneMode.Single);
+                var d = UnityEngine.Object.FindFirstObjectByType<EndingDirector>(FindObjectsInactive.Include);
+                if (d == null) return "EndingDirector が無い";
+                var so = new SerializedObject(d);
+                var world = (DriveWorld)so.FindProperty("world").objectReferenceValue;
+                Directory.CreateDirectory(dir);
+                for (var i = 0; i < names.Length; i++)
+                {
+                    Roll(world, Travelled(d, song));
+                    d.Apply(song);
+                    var want = looks[i];
+                    if (float.IsNaN(want.x))
+                    {
+                        // 撮る絵の縦横比の画角で調べる（エディタのカメラの縦横比は Game View の形のまま）
+                        var player = UnityEngine.Object.FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
+                        var eyeAt = player != null && player.Eye != null ? player.Eye.position : Vector3.zero;
+                        var at = d.View.front;
+                        for (var k = 0; k < 300; k++) at = d.View.Step(at, new Vector2(-1f, 0f), eyeAt, d.TwinProbe, Size.x / (float)Size.y, BuildEnding.Fov);
+                        want = at;
+                    }
+                    d.Looking = want;
+                    d.Apply(song);
+                    sb.AppendLine(names[i] + " " + d.Looking.ToString("F1") + ": " + Grab(Path.Combine(dir, "ending_" + names[i] + ".png"), () => d.Apply(song)));
+                }
+            }
+            catch (Exception e)
+            {
+                sb.AppendLine("例外: " + e);
+            }
+            finally
+            {
+                ShaderUtil.allowAsyncCompilation = async;
+                TitleShots.Back(setup);
+            }
+            return sb.ToString().TrimEnd();
+        }
+
         /// <summary>曲の秒 song の形にして撮る</summary>
         static string One(EndingDirector d, Take t, string path)
         {
@@ -156,13 +209,16 @@ namespace HalfAware.EditorTools
             what.localPosition = new Vector3(at.x, at.y, RoadRing.Slot(i, n, length, travelled, behind));
         }
 
+        /// <summary>撮る絵の大きさ。ふだんは 960×540（16:9）。縦横比を替えて確かめる時だけ書き換え、撮り終えたら戻す</summary>
+        public static Vector2Int Size = new Vector2Int(960, 540);
+
         /// <summary>
-        /// いまの形を 960×540 で撮って path へ書く。refresh は UI の Canvas を撮る向きに替えた後に呼ぶ
+        /// いまの形を <see cref="Size"/> の大きさで撮って path へ書く。refresh は UI の Canvas を撮る向きに替えた後に呼ぶ
         /// （エディタの Game の画面の大きさのままでは、クレジットの列の高さが違い、並びがずれる）
         /// </summary>
         public static string Grab(string path, System.Action refresh = null)
         {
-            const int w = 960, h = 540;
+            int w = Size.x, h = Size.y;
             var main = TitleShots.Main();
             if (main == null) return "カメラが無い";
             var hud = GameObject.Find("Hud");
@@ -181,30 +237,20 @@ namespace HalfAware.EditorTools
                 cam.CopyFrom(main);
                 cam.GetUniversalAdditionalCameraData().renderPostProcessing = true;
                 eye.transform.SetPositionAndRotation(main.transform.position, main.transform.rotation);
-                scene = TitleShots.Steady(cam);
+                scene = Steady(cam, w, h);
 
                 lens = UiLens.Make();
                 lens.Fit(w, h);
                 if (hud != null) ConsoleShot.Lens(hud.GetComponent<Canvas>(), lens.Eye, 0, w, h);
-                if (card != null) ConsoleShot.Lens(card.GetComponent<Canvas>(), lens.Eye, -1, w, h);
-                if (refresh != null)
-                {
-                    refresh();
-                    Canvas.ForceUpdateCanvases();
-                }
-                // くっきり描く列は粗い画面では描かない（下で画面の解像度で描く）
-                if (card != null) card.GetComponent<Canvas>().enabled = false;
-                lens.Draw();
-                if (card != null) card.GetComponent<Canvas>().enabled = true;
-                ui = ConsoleShot.Read(lens.Target);
-                mixed = ConsoleShot.Blend(scene, ui, w, h);
-
+                Camera cc = null;
                 if (card != null)
                 {
-                    // 題と読み。画面の解像度で、透明な地に描いてから重ねる（TitleShots.Screen と同じ）
+                    // 題と読み。画面の解像度で、透明な地に描いてから重ねる（TitleShots.Screen と同じ）。
+                    // クレジットの並べ直しは二つの Canvas の大きさを見るので、先に両方とも撮る向きに替えてから当て直す
+                    // （くっきりの Canvas を粗い画面の目へ一度渡すと、その間は Canvas の幅が粗い画面の幅になり、列が広がって見えた）
                     crispEye = new GameObject("EndingShotCrisp") { hideFlags = HideFlags.HideAndDontSave };
                     crispEye.transform.position = new Vector3(0f, -7000f, 0f);
-                    var cc = crispEye.AddComponent<Camera>();
+                    cc = crispEye.AddComponent<Camera>();
                     cc.enabled = false;
                     cc.clearFlags = CameraClearFlags.SolidColor;
                     cc.backgroundColor = new Color(0f, 0f, 0f, 0f);
@@ -226,6 +272,18 @@ namespace HalfAware.EditorTools
                     crispRt = new RenderTexture(w, h, 16, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB) { hideFlags = HideFlags.HideAndDontSave };
                     cc.targetTexture = crispRt;
                     ConsoleShot.Lens(card.GetComponent<Canvas>(), cc, UiLens.ShowOrder + 1, w, h);
+                }
+                if (refresh != null)
+                {
+                    refresh();
+                    Canvas.ForceUpdateCanvases();
+                }
+                lens.Draw();
+                ui = ConsoleShot.Read(lens.Target);
+                mixed = ConsoleShot.Blend(scene, ui, w, h);
+
+                if (cc != null)
+                {
                     if (asset != null) asset.renderScale = 1f;
                     Canvas.ForceUpdateCanvases();
                     cc.Render();
@@ -249,6 +307,21 @@ namespace HalfAware.EditorTools
                 foreach (var tex in new[] { scene, ui, mixed, crisp, final })
                     if (tex != null) UnityEngine.Object.DestroyImmediate(tex);
             }
+        }
+
+        /// <summary>カメラを w×h で撮る。描き上がりが揃うまで（前の一枚と同じになるまで）撮り直す（TitleShots.Steady と同じ）</summary>
+        static Texture2D Steady(Camera cam, int w, int h)
+        {
+            var shot = CheckDiveSky.Grab(cam, w, h);
+            for (var i = 0; i < 4; i++)
+            {
+                var again = CheckDiveSky.Grab(cam, w, h);
+                var same = CheckDiveSky.Diff(shot, again).y == 0f;
+                UnityEngine.Object.DestroyImmediate(shot);
+                shot = again;
+                if (same) break;
+            }
+            return shot;
         }
 
         /// <summary>
