@@ -91,14 +91,19 @@ namespace HalfAware.EditorTools
             {
                 // タイトルの背景。トンネルの北の端のアーチの芯から、軸（北から東へ 8.3 度）の上を北へ 2.5 m、目 1.6 m で軸を真っすぐ見る
                 new View("g1_title", new Vector3(-3.25f + 0.1444f * 2.5f, 1.6f, 25.30f + 0.9895f * 2.5f), 188.3f, 0f),
-                new View("g2_gate", new Vector3(-4.2f, 1.6f, 12.9f), 4f, 3f),
+                // 格子戸をくぐった所。小路は低い生け垣の西をゆるく左へ寄り、右の垣越しにテラスの卓
+                new View("g2_gate", new Vector3(-4.2f, 1.6f, 12.9f), 356f, 3f),
                 new View("g3_terrace", new Vector3(1.2f, 1.7f, 17.8f), 352f, 6f),
                 new View("g4_gazebo", new Vector3(-1.3f, 1.6f, 27.4f), 322f, 5f),
                 new View("g5_seated", new Vector3(-1.66f, 1.25f, 17.95f), 18f, 2f),
                 new View("g6_whole", new Vector3(3.4f, 1.7f, 19.6f), 325f, 6f),
-                // 小路のトンネル（2026-09-27）。格子戸の側（南）からトンネルの口を、トンネルの中を歩く目から上を見上げた所
-                new View("g7_tunnel", new Vector3(-4.15f, 1.6f, 18.2f), 7f, 3f),
+                // 小路のトンネル（2026-09-27）。トンネルの南の口の内からテラスと卓の開ける所（2026-09-28 に、格子戸の側からトンネルの口を見た所と替えた）と、
+                // トンネルの中を歩く目から上を見上げた所
+                new View("g7_south_mouth", new Vector3(-3.62f, 1.6f, 22.8f), 172f, 6f),
                 new View("g8_tunnel_up", new Vector3(-3.55f, 1.6f, 23.0f), 8f, -38f),
+                // 格子戸から卓までの道（2026-09-28）。格子戸からの小路が塀に沿って北へ上がり、東屋の前で東へ折れる所と、東屋の前の踊り場からトンネルの北の口
+                new View("g9_west_walk", new Vector3(-5.74f, 1.6f, 24.6f), 8f, 4f),
+                new View("g10_north_mouth", new Vector3(-4.75f, 1.6f, 31.2f), 162f, 6f),
             };
         }
 
@@ -276,6 +281,267 @@ namespace HalfAware.EditorTools
             {
                 Object.DestroyImmediate(go);
             }
+        }
+
+        // ---- 歩ける所（2026-09-28、格子戸から卓までは必ずトンネルを通る） ------------------
+
+        /// <summary>
+        /// 片割れの敷地の歩ける所を、Player と同じカプセル（CharacterController の太さ・高さ・越えられる段）で 0.1 m 升に塗り、
+        /// 格子戸をくぐった所から歩いて行ける所を数える。二度数える。一度目はそのまま、二度目はトンネルの中を塞いで。
+        /// 格子戸から卓までトンネルを通る道しか無ければ、一度目は卓のまわりの区画（場面 9 の終わり）に届き、二度目は届かない。
+        /// 芝（東屋の側から入れる）はどちらでも届く。
+        /// png があれば、上から見た道の並びの絵を書く（塞いだ升は暗い灰、トンネルを通らずに行ける所は青、トンネルを通って初めて行ける所は橙、
+        /// トンネルの中は緑、行けない空きは薄い灰。白い線は小路の芯、黄の線は低い生け垣の芯、赤は卓の区画の縁）
+        /// </summary>
+        public static string Reach(string png)
+        {
+            var player = GameObject.Find("Player");
+            var cc = player != null ? player.GetComponent<CharacterController>() : null;
+            if (cc == null) return "Player の CharacterController が無い";
+            var r = cc.radius;
+            var high = cc.height;
+            var climb = cc.stepOffset;
+            const float cell = 0.1f;
+            const float x0 = BuildVillage.PlotWest - 0.4f, z0 = BuildVillage.GateZ - 0.2f;
+            const int nx = 148, nz = 240;
+            var floor = new float[nx, nz];
+            var free = new bool[nx, nz];
+            Physics.SyncTransforms();
+            for (var i = 0; i < nx; i++)
+                for (var k = 0; k < nz; k++)
+                {
+                    var p = new Vector3(x0 + (i + 0.5f) * cell, 0f, z0 + (k + 0.5f) * cell);
+                    var best = float.NegativeInfinity;
+                    foreach (var h in Physics.RaycastAll(p + Vector3.up * 0.45f, Vector3.down, 1.2f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                    {
+                        if (h.collider.transform.IsChildOf(player.transform)) continue;
+                        if (h.point.y > best) best = h.point.y;
+                    }
+                    floor[i, k] = best;
+                    if (float.IsNegativeInfinity(best)) continue;
+                    var foot = new Vector3(p.x, best, p.z);
+                    free[i, k] = !Blocked(foot + Vector3.up * (climb + r), foot + Vector3.up * (high - r), r, player.transform);
+                }
+            var start = new Vector2(BuildVillage.SidePathX, BuildVillage.GateZ + 0.6f);
+            var table = new Vector2(BuildVillage.TableAt.x, BuildVillage.TableAt.z);
+            var lawn = new Vector2(1.0f, 25.0f);
+            var open = Flood(free, floor, climb, x0, z0, cell, start, false);
+            var shut = Flood(free, floor, climb, x0, z0, cell, start, true);
+            System.Func<bool[,], Vector2, float, bool> near = (seen, at, radius) =>
+            {
+                for (var i = 0; i < nx; i++)
+                    for (var k = 0; k < nz; k++)
+                        if (seen[i, k] && Vector2.Distance(new Vector2(x0 + (i + 0.5f) * cell, z0 + (k + 0.5f) * cell), at) <= radius) return true;
+                return false;
+            };
+            var sb = new StringBuilder();
+            sb.AppendFormat("カプセル 半径 {0:0.00}・高さ {1:0.00}・越えられる段 {2:0.00}", r, high, climb).AppendLine();
+            sb.AppendFormat("そのまま: 卓の区画 {0}、芝 {1}", near(open, table, BuildVillage.ReunionZone) ? "届く" : "届かない", near(open, lawn, 0.3f) ? "届く" : "届かない").AppendLine();
+            sb.AppendFormat("トンネルを塞ぐ: 卓の区画 {0}、芝 {1}", near(shut, table, BuildVillage.ReunionZone) ? "届く" : "届かない", near(shut, lawn, 0.3f) ? "届く" : "届かない").AppendLine();
+            if (!string.IsNullOrEmpty(png)) sb.AppendLine(Plan(png, free, open, shut, x0, z0, cell, table));
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// 片割れの裏庭を真上から、影の向きもゲームと同じ光で撮る（正射影、北を右、西を上）。粗い画面の 3 倍（2880×1620、中は 960×540）で、
+        /// 道と生け垣と花の縁の並びが読めるようにする。霞は切る
+        /// </summary>
+        public static string Aerial(string path)
+        {
+            var main = GameObject.Find("Player/Main Camera");
+            if (main == null) return "Player/Main Camera が無い";
+            GameObject go = null;
+            var fog = RenderSettings.fog;
+            try
+            {
+                go = new GameObject("CheckVillageAerial") { hideFlags = HideFlags.HideAndDontSave };
+                var cam = go.AddComponent<Camera>();
+                cam.enabled = false;
+                cam.CopyFrom(main.GetComponent<Camera>());
+                cam.GetUniversalAdditionalCameraData().renderPostProcessing = true;
+                cam.orthographic = true;
+                cam.orthographicSize = 7.8f;
+                cam.nearClipPlane = 1f;
+                cam.farClipPlane = 80f;
+                go.transform.position = new Vector3(0f, 40f, 23.4f);
+                go.transform.rotation = Quaternion.Euler(90f, -90f, 0f);
+                RenderSettings.fog = false;
+                var shot = CheckDiveSky.Grab(cam, 2880, 1620);
+                CheckDiveSky.Save(shot, path);
+                Object.DestroyImmediate(shot);
+                return "真上から → " + path;
+            }
+            finally
+            {
+                RenderSettings.fog = fog;
+                if (go != null) Object.DestroyImmediate(go);
+            }
+        }
+
+        /// <summary>カプセルが Player の外の当たりに掛かるか</summary>
+        static bool Blocked(Vector3 a, Vector3 b, float r, Transform player)
+        {
+            foreach (var c in Physics.OverlapCapsule(a, b, r, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                if (!c.transform.IsChildOf(player)) return true;
+            return false;
+        }
+
+        /// <summary>start から、空いた升を越えられる段の内で辿れる所。shutTunnel ならトンネルの中を塞ぐ</summary>
+        static bool[,] Flood(bool[,] free, float[,] floor, float climb, float x0, float z0, float cell, Vector2 start, bool shutTunnel)
+        {
+            var nx = free.GetLength(0);
+            var nz = free.GetLength(1);
+            var seen = new bool[nx, nz];
+            var si = Mathf.FloorToInt((start.x - x0) / cell);
+            var sk = Mathf.FloorToInt((start.y - z0) / cell);
+            if (!free[si, sk]) return seen;
+            var queue = new Queue<Vector2Int>();
+            queue.Enqueue(new Vector2Int(si, sk));
+            seen[si, sk] = true;
+            var steps = new[] { new Vector2Int(1, 0), new Vector2Int(-1, 0), new Vector2Int(0, 1), new Vector2Int(0, -1) };
+            while (queue.Count > 0)
+            {
+                var at = queue.Dequeue();
+                foreach (var s in steps)
+                {
+                    var n = at + s;
+                    if (n.x < 0 || n.y < 0 || n.x >= nx || n.y >= nz || seen[n.x, n.y] || !free[n.x, n.y]) continue;
+                    if (Mathf.Abs(floor[n.x, n.y] - floor[at.x, at.y]) > climb) continue;
+                    if (shutTunnel && BuildVillage.InTunnel(new Vector2(x0 + (n.x + 0.5f) * cell, z0 + (n.y + 0.5f) * cell))) continue;
+                    seen[n.x, n.y] = true;
+                    queue.Enqueue(n);
+                }
+            }
+            return seen;
+        }
+
+        /// <summary>上から見た道の並びの絵（升ひとつを 4 画素に）</summary>
+        static string Plan(string png, bool[,] free, bool[,] open, bool[,] shut, float x0, float z0, float cell, Vector2 table)
+        {
+            const int px = 4;
+            var nx = free.GetLength(0);
+            var nz = free.GetLength(1);
+            var tex = new Texture2D(nx * px, nz * px, TextureFormat.RGB24, false, false);
+            try
+            {
+                var colors = new Color32[nx * px * nz * px];
+                for (var i = 0; i < nx; i++)
+                    for (var k = 0; k < nz; k++)
+                    {
+                        var p = new Vector2(x0 + (i + 0.5f) * cell, z0 + (k + 0.5f) * cell);
+                        Color32 c;
+                        if (!free[i, k]) c = new Color32(60, 60, 64, 255);
+                        else if (BuildVillage.InTunnel(p) && open[i, k]) c = new Color32(70, 170, 80, 255);
+                        else if (shut[i, k]) c = new Color32(90, 140, 220, 255);
+                        else if (open[i, k]) c = new Color32(235, 150, 60, 255);
+                        else c = new Color32(185, 185, 185, 255);
+                        for (var a = 0; a < px; a++)
+                            for (var b = 0; b < px; b++)
+                                colors[(k * px + b) * nx * px + i * px + a] = c;
+                    }
+                System.Action<Vector2, Color32> dot = (p, c) =>
+                {
+                    var u = Mathf.RoundToInt((p.x - x0) / cell * px);
+                    var v = Mathf.RoundToInt((p.y - z0) / cell * px);
+                    for (var a = -1; a <= 0; a++)
+                        for (var b = -1; b <= 0; b++)
+                        {
+                            var uu = u + a;
+                            var vv = v + b;
+                            if (uu >= 0 && vv >= 0 && uu < nx * px && vv < nz * px) colors[vv * nx * px + uu] = c;
+                        }
+                };
+                var lines = BuildVillage.PlanLines();
+                for (var l = 0; l < lines.Count; l++)
+                {
+                    var line = lines[l];
+                    var col = l == 2 ? new Color32(250, 230, 60, 255) : new Color32(255, 255, 255, 255);
+                    for (var j = 0; j + 1 < line.Length; j++)
+                        for (var t = 0f; t <= 1f; t += 0.02f) dot(Vector2.Lerp(line[j], line[j + 1], t), col);
+                }
+                for (var a = 0; a < 360; a++)
+                    dot(table + new Vector2(Mathf.Cos(a * Mathf.Deg2Rad), Mathf.Sin(a * Mathf.Deg2Rad)) * BuildVillage.ReunionZone, new Color32(230, 40, 40, 255));
+                tex.SetPixels32(colors);
+                tex.Apply();
+                CheckDiveSky.Save(tex, png);
+                return "道の並び → " + png;
+            }
+            finally
+            {
+                Object.DestroyImmediate(tex);
+            }
+        }
+
+        /// <summary>
+        /// 格子戸をくぐった所から卓の区画まで、Player と同じ CharacterController を道の芯に沿って歩かせる（毎秒 1.4 m、1/60 秒ずつ）。
+        /// 当たりに止められて 1 秒進めなければ、そこで止める。途切れずに歩けたか、どこで止まったかを返す。
+        /// 歩かせるのは写し（HideAndDontSave）で、同じ呼び出しの中で捨てる
+        /// </summary>
+        public static string Walk()
+        {
+            var player = GameObject.Find("Player");
+            var src = player != null ? player.GetComponent<CharacterController>() : null;
+            if (src == null) return "Player の CharacterController が無い";
+            var route = BuildVillage.RouteToTable();
+            var go = new GameObject("CheckVillageWalker") { hideFlags = HideFlags.HideAndDontSave };
+            try
+            {
+                var cc = go.AddComponent<CharacterController>();
+                cc.radius = src.radius;
+                cc.height = src.height;
+                cc.center = src.center;
+                cc.stepOffset = src.stepOffset;
+                cc.slopeLimit = src.slopeLimit;
+                cc.skinWidth = src.skinWidth;
+                cc.enabled = false;
+                go.transform.position = new Vector3(route[0].x, 0.1f, route[0].y);
+                cc.enabled = true;
+                Physics.SyncTransforms();
+                const float dt = 1f / 60f;
+                const float speed = 1.4f;
+                var stuck = 0;
+                var frames = 0;
+                var worst = 0f;
+                var target = 1;
+                while (target < route.Count && frames < 60 * 120)
+                {
+                    var at = go.transform.position;
+                    var to = new Vector3(route[target].x, at.y, route[target].y);
+                    var d = to - at;
+                    if (d.magnitude < 0.2f) { target++; continue; }
+                    var before = at;
+                    cc.Move(d.normalized * speed * dt + Vector3.down * 2f * dt);
+                    frames++;
+                    var moved = new Vector2(go.transform.position.x - before.x, go.transform.position.z - before.z).magnitude;
+                    stuck = moved < speed * dt * 0.25f ? stuck + 1 : 0;
+                    worst = Mathf.Max(worst, Off(route, new Vector2(go.transform.position.x, go.transform.position.z)));
+                    if (stuck > 60)
+                        return string.Format("止まった: {0}（道の {1} 番目の点 {2} の手前、{3:0.0} 秒）", go.transform.position.ToString("F2"), target, route[target].ToString("F2"), frames * dt);
+                }
+                var end = go.transform.position;
+                var inZone = ReunionDirector.Within(end, BuildVillage.TableAt, BuildVillage.ReunionZone);
+                return string.Format("歩けた: {0} 秒で {1} に着いた（卓の区画 {2}）。芯からのずれは最大 {3:0.00} m",
+                    (frames * dt).ToString("0.0"), end.ToString("F2"), inZone ? "の内" : "の外", worst);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        /// <summary>点 p から道の芯（折れ線）までの隔たり</summary>
+        static float Off(List<Vector2> line, Vector2 p)
+        {
+            var best = float.MaxValue;
+            for (var i = 0; i + 1 < line.Count; i++)
+            {
+                var a = line[i];
+                var b = line[i + 1];
+                var ab = b - a;
+                var t = ab.sqrMagnitude > 1e-8f ? Mathf.Clamp01(Vector2.Dot(p - a, ab) / ab.sqrMagnitude) : 0f;
+                best = Mathf.Min(best, Vector2.Distance(p, a + ab * t));
+            }
+            return best;
         }
 
         /// <summary>どのアセットにも属さない RenderTexture の数。撮影の片づけ漏れを見る</summary>

@@ -23,29 +23,113 @@ namespace HalfAware.EditorTools
         // ---- 裏庭の寸法 -----------------------------------------------------------------
 
         /// <summary>
-        /// 煉瓦の小路の芯。前庭の石垣の口から格子戸を抜け、テラスの西を通り、ゆるく S を描いて奥の東屋へ入る。
-        /// 間を <see cref="PathSamples"/> で滑らかに補う。
+        /// 煉瓦の小路は二本で、どちらも z が増えるほうへ並べる（間を <see cref="Samples"/> で滑らかに補う）。
+        ///
+        /// **格子戸から卓までは、必ずアーチのトンネルを通る**（オーナー、2026-09-28、シナリオ設計 12.1）。
+        /// 格子戸を入った小路（<see cref="WestWalk"/>）は、低い生け垣（<see cref="LowHedge"/>）でテラスと分け、
+        /// 西の塀に沿って北へ上がって東屋の前の踊り場（<see cref="Landing"/>）に着く。そこから東へ折れてトンネルの北の口に入り、
+        /// トンネルを南へ抜けると、短い小路（<see cref="TunnelWalk"/> の南の端）がテラスの北西の角へ出る。
+        /// 芝は東屋の側から入れ、テラスとは北の縁のラベンダーの花の縁で分ける（段は無くした）
+        ///
+        /// 格子戸を入った小路。前庭の石垣の口から格子戸を抜け、生け垣の西をゆるく西へ寄って、西の塀に沿って北へ上がり、東屋の前の踊り場へ
+        /// </summary>
+        static readonly Vector2[] WestWalk =
+        {
+            // 前庭から格子戸までは、前と同じくまっすぐ。点の間を 1〜2 m に揃える（Catmull-Rom は隣の間の長さが大きく違うと行き過ぎて輪を描く）
+            new Vector2(SidePathX, NorthEdge), new Vector2(SidePathX, 5.0f), new Vector2(SidePathX, 6.6f), new Vector2(SidePathX, 8.2f),
+            new Vector2(SidePathX, 9.8f), new Vector2(SidePathX, 11.0f), new Vector2(SidePathX, GateZ),
+            new Vector2(-4.27f, 13.0f), new Vector2(-4.60f, 14.2f), new Vector2(-5.10f, 15.6f), new Vector2(-5.50f, 17.1f),
+            new Vector2(-5.70f, 18.8f), new Vector2(-5.75f, 21.0f), new Vector2(-5.75f, 23.0f), new Vector2(-5.75f, 25.0f),
+            new Vector2(-5.68f, 26.6f), new Vector2(-5.58f, 28.2f), new Vector2(-5.45f, 29.6f), new Vector2(-5.35f, 30.8f),
+        };
+
+        /// <summary>
+        /// トンネルを抜ける小路。テラスの北西の角（北の縁に着く）から北へ、トンネルを抜けて、東屋の前の踊り場へ。
+        /// 歩く向きはこの逆（踊り場 → トンネルの北の口 → 南の口 → テラス）。
         ///
         /// **トンネルの中はまっすぐ通す**（2026-09-27）。トンネルの軸（<see cref="TunnelAt"/> と <see cref="TunnelAxis"/>）の上に、
         /// トンネルの両端から 0.45 m 先まで点を並べる。Catmull-Rom は前後の点も一直線なら直線を引くので、
         /// z 22.0 から 26.0 までが真っすぐになり、曲がりはその外で付く。小路の曲がる芯にアーチを沿わせたら、
-        /// タイトルの背景の画角でトンネルの奥が右へ振れて、口の額の中が左右で揃わなかった
+        /// タイトルの背景の画角でトンネルの奥が右へ振れて、口の額の中が左右で揃わなかった。
+        /// 南の口を出てからは東へ 22 度ほど振って、テラスの西の縁と揃えて北の縁に着く
         /// </summary>
-        static readonly Vector2[] PathLine =
+        static readonly Vector2[] TunnelWalk =
         {
-            new Vector2(SidePathX, NorthEdge), new Vector2(SidePathX, GateZ), new Vector2(SidePathX, HouseRear),
-            new Vector2(-4.25f, 18.6f),
+            new Vector2(TerraceWest + PathWide * 0.5f, TerraceNorth), new Vector2(-3.28f, 19.5f), new Vector2(-3.58f, 20.6f),
             OnAxis(21.5f), OnAxis(22.0f), OnAxis(23.0f), OnAxis(24.0f), OnAxis(25.0f), OnAxis(26.0f), OnAxis(26.5f),
-            // トンネルを出てから東屋へ、ゆるく西へ曲げる。曲がりの強さはもとの小路の東屋の前（1 m あたり 17 度ほど）を超えない
+            // 北の口から東屋へ、ゆるく西へ曲げる。曲がりの強さはもとの小路の東屋の前（1 m あたり 17 度ほど）を超えない
             new Vector2(-2.99f, 27.4f), new Vector2(-3.10f, 28.4f), new Vector2(-3.45f, 29.4f), new Vector2(-4.00f, 30.4f),
-            new Vector2(-4.60f, 31.3f), new Vector2(-5.10f, 32.0f),
+            new Vector2(-4.50f, 31.15f),
         };
+
+        /// <summary>東屋の前の煉瓦の踊り場（上から見て）。格子戸からの小路とトンネルへの小路がここで出会う</summary>
+        static readonly Rect Landing = Rect.MinMaxRect(-6.3f, 30.6f, -3.95f, GazeboSouth);
+
+        /// <summary>東屋の南の面（床板の縁）</summary>
+        const float GazeboSouth = 32.05f;
+
+        /// <summary>
+        /// 格子戸からの小路とテラスを分ける低い生け垣の芯（上から見て）。家の西の壁から西へ、テラスの南西の角を回ってテラスの西の縁に沿って北へ、
+        /// テラスの北西の角から格子戸からの小路の東の縁へ寄り、トンネルの南の口の西の脇（アーチの柱）で止める。
+        /// 南の口から先の小路の西は、生け垣との間に花の縁（BuildVillagePlants の HedgeEast）を挟む。場面 6 で女性が水を撒く花
+        /// </summary>
+        static readonly Vector2[] LowHedge =
+        {
+            new Vector2(HouseWest - 0.12f, 14.95f), new Vector2(-3.95f, 14.95f), new Vector2(-3.95f, 18.4f),
+            new Vector2(-4.88f, 19.2f), new Vector2(-4.90f, 21.6f), new Vector2(-4.62f, 22.5f),
+        };
+        const float LowHedgeHigh = 0.72f;
+        const float LowHedgeThick = 0.42f;
+
+        /// <summary>
+        /// 格子戸から卓までの歩く道の芯（上から見て）。格子戸をくぐった所から、格子戸からの小路を東屋の前の踊り場まで上がり、
+        /// トンネルを抜ける小路をテラスの北の縁まで下りる。確かめ（CheckVillage.Reach と Walk）が読む
+        /// </summary>
+        public static List<Vector2> RouteToTable()
+        {
+            var route = new List<Vector2>();
+            foreach (var p in Samples(WestWalk))
+                if (p.y > GateZ + 0.4f) route.Add(p);
+            var down = Samples(TunnelWalk);
+            down.Reverse();
+            route.AddRange(down);
+            // テラスへ一歩上がる。卓の区画はそこから
+            route.Add(new Vector2(TerraceWest + PathWide * 0.5f, TerraceNorth - 0.4f));
+            return route;
+        }
+
+        /// <summary>確かめの絵に引く線。小路の二本の芯と低い生け垣の芯</summary>
+        public static List<Vector2[]> PlanLines()
+        {
+            return new List<Vector2[]> { Samples(WestWalk).ToArray(), Samples(TunnelWalk).ToArray(), (Vector2[])LowHedge.Clone() };
+        }
+
+        /// <summary>トンネルの中（上から見て）。北の端のアーチの前の弧から南の端の輪まで、柱の内。確かめでここを塞いで、ほかに道が無いかを見る</summary>
+        public static bool InTunnel(Vector2 p)
+        {
+            var axis = TunnelAxis;
+            var d = p - TunnelAt;
+            var along = Vector2.Dot(d, axis);
+            var across = Mathf.Abs(d.x * axis.y - d.y * axis.x);
+            return along <= ArchDepth + 0.05f && along >= -(TunnelHoops - 1) * TunnelStep - 0.05f && across <= ArchHalf + 0.1f;
+        }
+
+        /// <summary>低い生け垣の芯の x を z から引く（テラスの南西の角より北、z 14.95 から 22.5 まで）</summary>
+        static float LowHedgeX(float z)
+        {
+            var s = LowHedge;
+            if (z <= s[1].y) return s[1].x;
+            for (var i = 1; i + 1 < s.Length; i++)
+                if (z <= s[i + 1].y)
+                    return Mathf.Lerp(s[i].x, s[i + 1].x, Mathf.InverseLerp(s[i].y, s[i + 1].y, z));
+            return s[s.Length - 1].x;
+        }
 
         /// <summary>
         /// トンネルの北の端のアーチの芯（上から見て）と、トンネルの軸の向き（北へ）。
         /// 軸は、トンネルの掛かる所の小路の平均の向き（北から東へ 8.3 度）に合わせる。
         /// タイトルの背景の画角（yaw 188.3、目は北の端のアーチの芯から軸の上を北へ 2.5 m）は、この軸を真っすぐ見る。
-        /// 小路の点（<see cref="PathLine"/>）がこれを読むので、静的な値の初期化の順に左右されないよう、式で返す
+        /// 小路の点（<see cref="TunnelWalk"/>）がこれを読むので、静的な値の初期化の順に左右されないよう、式で返す
         /// </summary>
         static Vector2 TunnelAt { get { return new Vector2(-3.25f, 25.3f); } }
         static Vector2 TunnelAxis { get { return new Vector2(Mathf.Sin(TunnelYaw * Mathf.Deg2Rad), Mathf.Cos(TunnelYaw * Mathf.Deg2Rad)); } }
@@ -57,11 +141,14 @@ namespace HalfAware.EditorTools
             return new Vector2(TunnelAt.x + TunnelAxis.x / TunnelAxis.y * (z - TunnelAt.y), z);
         }
 
-        /// <summary>テラスの広がり。裏口の前の敷石。西の縁は小路の東の縁</summary>
+        /// <summary>テラスの広がり。裏口の前の敷石。西の縁は低い生け垣の東（格子戸からの小路が前にここを通っていた、その東の縁）</summary>
         const float TerraceWest = SidePathX + PathWide * 0.5f;
         const float TerraceNorth = 18.6f;
         const float TerraceTop = 0.1f;
-        /// <summary>テラスから芝へ下りる段の西と東</summary>
+        /// <summary>
+        /// テラスの北の縁の鉢の二つ。前はこの間に芝へ下りる段があった。
+        /// 段は無くした（2026-09-28。芝は東屋の側から入れるので、芝からテラスへ直に出られないよう、北の縁をラベンダーで閉じる）
+        /// </summary>
         const float StepWest = 0.3f;
         const float StepEast = 1.7f;
 
@@ -104,6 +191,7 @@ namespace HalfAware.EditorTools
         {
             Paths(b);
             Terrace(b);
+            LowHedges(b);
             Parasol(parent, b, TableAt);
             Boundaries(b);
             Arch(b);
@@ -123,15 +211,15 @@ namespace HalfAware.EditorTools
         // ---- 小路とテラス ---------------------------------------------------------------
 
         /// <summary>小路の芯を 0.35 m ごとに補った点。Catmull-Rom で角を丸める</summary>
-        static List<Vector2> PathSamples()
+        static List<Vector2> Samples(Vector2[] line)
         {
             var dense = new List<Vector2>();
-            for (var i = 0; i + 1 < PathLine.Length; i++)
+            for (var i = 0; i + 1 < line.Length; i++)
             {
-                var p0 = PathLine[Mathf.Max(0, i - 1)];
-                var p1 = PathLine[i];
-                var p2 = PathLine[i + 1];
-                var p3 = PathLine[Mathf.Min(PathLine.Length - 1, i + 2)];
+                var p0 = line[Mathf.Max(0, i - 1)];
+                var p1 = line[i];
+                var p2 = line[i + 1];
+                var p3 = line[Mathf.Min(line.Length - 1, i + 2)];
                 var n = Mathf.Max(1, Mathf.CeilToInt(Vector2.Distance(p1, p2) / 0.35f));
                 for (var k = 0; k < n; k++)
                 {
@@ -141,18 +229,30 @@ namespace HalfAware.EditorTools
                     dense.Add(0.5f * (2f * p1 + (-p0 + p2) * t + (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2 + (-p0 + 3f * p1 - 3f * p2 + p3) * t3));
                 }
             }
-            dense.Add(PathLine[PathLine.Length - 1]);
+            dense.Add(line[line.Length - 1]);
             return dense;
         }
 
-        /// <summary>補った点の控え。地面の絵を描くとき画素ごとに引くので、一度だけ作る</summary>
-        static List<Vector2> pathCache;
+        /// <summary>補った点の控え。地面の絵を描くとき画素ごとに引くので、一度だけ作る。組み立ての頭で捨てる</summary>
+        static List<Vector2> westCache, tunnelCache;
 
-        /// <summary>小路の芯の x を z から引く。z は小路に沿って増えるだけなので、z で引ける</summary>
-        static float PathX(float z)
+        /// <summary>格子戸からの小路の芯の x を z から引く</summary>
+        static float WestX(float z)
         {
-            if (pathCache == null) pathCache = PathSamples();
-            var s = pathCache;
+            if (westCache == null) westCache = Samples(WestWalk);
+            return XAt(westCache, z);
+        }
+
+        /// <summary>トンネルを抜ける小路の芯の x を z から引く</summary>
+        static float TunnelX(float z)
+        {
+            if (tunnelCache == null) tunnelCache = Samples(TunnelWalk);
+            return XAt(tunnelCache, z);
+        }
+
+        /// <summary>補った芯の x を z から引く。どちらの小路も z は芯に沿って増えるだけなので、z で引ける</summary>
+        static float XAt(List<Vector2> s, float z)
+        {
             if (z <= s[0].y) return s[0].x;
             for (var i = 0; i + 1 < s.Count; i++)
                 if (z <= s[i + 1].y)
@@ -161,12 +261,22 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 煉瓦の小路。芯に沿って帯を張り、煉瓦の段が小路を横切る向きに uv を振る。
-        /// 両縁に煉瓦を立てて並べた縁取り
+        /// 煉瓦の小路の二本と、東屋の前の踊り場。芯に沿って帯を張り、煉瓦の段が小路を横切る向きに uv を振る。
+        /// 両縁に煉瓦を立てて並べた縁取り（踊り場の中では立てない）
         /// </summary>
         static void Paths(Banks b)
         {
-            var s = PathSamples();
+            Walk(b, Samples(WestWalk));
+            Walk(b, Samples(TunnelWalk));
+            // 踊り場。二本の小路の端より 6 mm 上に張り、端の重なりを隠す
+            b.Brick.FaceY(0.036f, Landing.xMin, Landing.xMax, Landing.yMin, Landing.yMax, 1);
+            Beam(b.Brick, new Vector3(Landing.xMin, 0.05f, Landing.yMin + 0.3f), new Vector3(Landing.xMin, 0.05f, Landing.yMax), 0.10f, 0.08f);
+            // 玄関の小路は前庭で張ってある（FrontGarden）
+        }
+
+        /// <summary>小路を一本。帯と両縁の縁取り</summary>
+        static void Walk(Banks b, List<Vector2> s)
+        {
             var run = 0f;
             const float h = 0.03f;
             for (var i = 0; i + 1 < s.Count; i++)
@@ -184,14 +294,25 @@ namespace HalfAware.EditorTools
                 // 左の縁 → 先の左 → 先の右 → 右の縁の順が上を向く（Bank の表の向き）
                 b.Brick.Patch(new Vector3(la.x, h, la.y), new Vector3(lc.x, h, lc.y), new Vector3(rc.x, h, rc.y), new Vector3(ra.x, h, ra.y),
                     new Vector2(0f, run), new Vector2(0f, run + step), new Vector2(PathWide, run + step), new Vector2(PathWide, run));
-                // 縁取りの煉瓦。テラスに接する所は立てない
-                var mid = (a + c) * 0.5f;
-                var inTerrace = mid.y > HouseRear && mid.y < TerraceNorth;
-                Beam(b.Brick, new Vector3(la.x, 0.05f, la.y), new Vector3(lc.x, 0.05f, lc.y), 0.10f, 0.08f);
-                if (!inTerrace) Beam(b.Brick, new Vector3(ra.x, 0.05f, ra.y), new Vector3(rc.x, 0.05f, rc.y), 0.10f, 0.08f);
                 run += step;
             }
-            // 玄関の小路は前庭で張ってある（FrontGarden）
+            // 縁取りの煉瓦。補った点を二つずつ飛ばした弦（0.7 m）で並べ、底は張らない（小路が二本になった分の三角を抑える。
+            // 曲がりのいちばん強い所でも弦と芯のずれは 2 cm ほど）。踊り場の中では立てない
+            for (var i = 0; i + 1 < s.Count; i += 2)
+            {
+                var j = Mathf.Min(i + 2, s.Count - 1);
+                var na = Across(s, i);
+                var nc = Across(s, j);
+                foreach (var side in new[] { -1f, 1f })
+                {
+                    var p = s[i] + na * (PathWide * 0.5f * side);
+                    var q = s[j] + nc * (PathWide * 0.5f * side);
+                    if (Landing.Contains((p + q) * 0.5f)) continue;
+                    var a = new Vector3(p.x, 0.05f, p.y);
+                    var c = new Vector3(q.x, 0.05f, q.y);
+                    b.Brick.BoxOpenBottom((a + c) * 0.5f, new Vector3(0.10f, 0.08f, Vector3.Distance(a, c)), Quaternion.LookRotation(c - a, Vector3.up));
+                }
+            }
         }
 
         /// <summary>小路の i 番目の点で、進む向きの右を指す単位の向き（上から見て）</summary>
@@ -204,7 +325,8 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// テラス。裏口の前の敷石を地面から 10 cm 上げ、縁に石の見切り。芝へ下りる所に一段
+        /// テラス。裏口の前の敷石を地面から 10 cm 上げ、縁に石の見切り。
+        /// 芝へ下りる段は無くした（2026-09-28）。北の縁はラベンダーの花の縁で芝と分け、トンネルからの小路だけが北西の角に着く
         /// </summary>
         static void Terrace(Banks b)
         {
@@ -212,7 +334,24 @@ namespace HalfAware.EditorTools
             b.Dressed.FaceZ(TerraceNorth, TerraceWest, HouseEast, 0f, TerraceTop, 1);
             b.Dressed.FaceX(TerraceWest, HouseRear, TerraceNorth, 0f, TerraceTop, -1);
             b.Dressed.Box(new Vector3((TerraceWest + HouseEast) * 0.5f, TerraceTop + 0.02f, TerraceNorth - 0.07f), new Vector3(HouseEast - TerraceWest, 0.04f, 0.14f));
-            b.Flag.Box(new Vector3((StepWest + StepEast) * 0.5f, 0.05f, TerraceNorth + 0.2f), new Vector3(StepEast - StepWest, 0.1f, 0.4f));
+        }
+
+        /// <summary>
+        /// 格子戸からの小路とテラス（と、トンネルを抜けた小路）を分ける低い生け垣（<see cref="LowHedge"/>）。
+        /// 刈り込んだ垣を腰の下の高さ（<see cref="LowHedgeHigh"/>、0.72 m）で。テラスの卓も、トンネルの南の口も、垣越しに見える
+        /// </summary>
+        static void LowHedges(Banks b)
+        {
+            for (var i = 0; i + 1 < LowHedge.Length; i++)
+            {
+                // 折れる所で角が欠けないよう、両端を厚みの半分ずつ延ばして隣と重ねる
+                var a = LowHedge[i];
+                var c = LowHedge[i + 1];
+                var d = (c - a).normalized * (LowHedgeThick * 0.5f);
+                a -= d;
+                c += d;
+                Hedge(b, new Vector3(a.x, 0f, a.y), new Vector3(c.x, 0f, c.y), LowHedgeHigh, LowHedgeThick, 61 + i * 3);
+            }
         }
 
         /// <summary>
@@ -284,8 +423,11 @@ namespace HalfAware.EditorTools
         /// <summary>卓から見た、場面 6 で夕日の方へ回す椅子の向き（度。卓の東から北回り）</summary>
         public const float TurnedChairDeg = 80f;
 
-        /// <summary>場面 6 の間のその椅子の向き。度（+z が 0 で東回り）。西北西（日は方位 290 度）の少し北、小路の上で水を撒く女性の方</summary>
-        public const float TurnedChairYaw = 305f;
+        /// <summary>
+        /// 場面 6 の間のその椅子の向き。度（+z が 0 で東回り）。北西（日は方位 290 度で、その 28 度右）、トンネルの南の口から下りる小路の上で水を撒く女性の方。
+        /// 2026-09-28 に道を組み直して女性の立ち位置を移したので、305 度から回した
+        /// </summary>
+        public const float TurnedChairYaw = 318f;
 
         /// <summary>その椅子の子の名（庭の根 <c>Village/Garden</c> の下）。演出が回す</summary>
         public const string TurnedChairName = "TurnedChair";
@@ -1232,7 +1374,7 @@ namespace HalfAware.EditorTools
         // ---- 当たり ---------------------------------------------------------------------
 
         /// <summary>
-        /// テラスの敷石の床の当たりと、芝へ下りる段の当たり。どちらも上面は敷石の上面（<see cref="TerraceTop"/>）。
+        /// テラスの敷石の床の当たり。上面は敷石の上面（<see cref="TerraceTop"/>）。
         /// 前は敷地の地面（VillagePlot、高さ 0）の一枚だけで、Player はテラスの上でも敷石の 0.1 m 下を歩き、
         /// 敷石の上に立つ片割れ（場面 10）より目が 0.1 m 低かった。
         /// 足音は敷石の硬い音（<see cref="HardSteps"/>）。敷地の地面の当たりの区画（BuildVillageSound.StepGrounds の Terrace）と同じ音
@@ -1242,8 +1384,6 @@ namespace HalfAware.EditorTools
             var hard = StepClips(HardSteps);
             Floor(parent, "TerraceFloor", new Vector3((TerraceWest + HouseEast) * 0.5f, TerraceTop - 0.05f, (HouseRear + TerraceNorth) * 0.5f),
                 new Vector3(HouseEast - TerraceWest, 0.1f, TerraceNorth - HouseRear), hard);
-            Floor(parent, "TerraceStepFloor", new Vector3((StepWest + StepEast) * 0.5f, TerraceTop - 0.05f, TerraceNorth + 0.2f),
-                new Vector3(StepEast - StepWest, 0.1f, 0.4f), hard);
         }
 
         /// <summary>歩ける床の見えない箱と、その上の足音</summary>
@@ -1259,13 +1399,18 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 裏庭の当たり。塀と生け垣、東屋の腰と腰掛け、温室と物置、菜園と堆肥箱、卓と椅子、樽、水盤、物干しの柱、
-        /// アーチの横の芝の小物（ベンチ・鉢・手押し車・オベリスク・鳥の餌台）。
-        /// 花の縁の当たりは札の側で線を引く（BuildVillagePlants.BorderBounds）
+        /// 裏庭の当たり。塀と生け垣、格子戸からの小路とテラスを分ける低い生け垣、東屋の腰と腰掛け、温室と物置、菜園と堆肥箱、
+        /// 卓と椅子、樽、水盤、物干しの柱、アーチの横の芝の小物（ベンチ・鉢・手押し車・オベリスク・鳥の餌台）。
+        /// 花の縁の当たりは札の側で線を引く（BuildVillagePlants.BorderBounds）。
+        /// **格子戸から卓へは、トンネルの中を抜けるほかに道が無い。** 低い生け垣・トンネルの両脇の花の縁・テラスの北のラベンダーの当たりが
+        /// 一続きで、テラスとトンネルを抜けた小路（卓の側）を、格子戸からの小路・東屋・芝（格子戸の側）から切り離す（CheckVillage.Reach で確かめる）
         /// </summary>
         static void GardenBounds(Transform parent)
         {
             Wall(parent, "FenceWest", new Vector3(PlotWest, 0f, GateZ), new Vector3(PlotWest, 0f, PlotNorth + 1f), 2.4f, 0.4f);
+            // 低い生け垣。越えられない高さの見えない壁を、垣と同じ厚みで
+            for (var i = 0; i + 1 < LowHedge.Length; i++)
+                Wall(parent, "LowHedge" + i, new Vector3(LowHedge[i].x, 0f, LowHedge[i].y), new Vector3(LowHedge[i + 1].x, 0f, LowHedge[i + 1].y), 2.2f, LowHedgeThick + 0.04f);
             Wall(parent, "WallEast", new Vector3(PlotEast + 0.2f, 0f, GateZ), new Vector3(PlotEast + 0.2f, 0f, PlotNorth + 1f), 2.4f, 0.4f);
             Wall(parent, "HedgeNorth", new Vector3(PlotWest, 0f, PlotNorth + 0.3f), new Vector3(PlotEast, 0f, PlotNorth + 0.3f), 2.4f, 0.6f);
             // 東屋。入口の南を開け、西・北・東の腰を止める

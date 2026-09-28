@@ -20,9 +20,10 @@ namespace HalfAware.EditorTools
     /// 並び（世界の値。+x が東、+z が北）:
     /// - 主はテラスの白いパラソルの卓の、北の椅子（卓から 80 度、<see cref="HostChair"/>）に座る。この椅子は場面 6 の間だけ卓に背を向け、
     ///   西北西の夕日の方へ回る（<see cref="TurnedChairYaw"/>。卓の組み立て <c>Parasol</c> が形を分け、演出が回す）。朝の村では卓へ向いたまま
-    /// - 女性は、テラスの西の脇から北へ抜ける煉瓦の小路の西の縁（<see cref="WomanAt"/>）で、西の塀の下の花の縁に水を撒いている。主の目から顔まで 3.5 m、
-    ///   方位 305 度（主の体の向きの真正面）。日（方位 290 度、仰角 11 度）はその左上にあり、女性の後ろに低い夕日と明るい空が来る。夕日を背にするので、顔の側は影
-    /// - 歩く道: 小路を南へテラスの西の脇（<see cref="WalkBend"/>）まで下り、テラスへ上がって主の方（<see cref="WalkEnd"/>）へ。
+    /// - 女性は、トンネルの南の口からテラスへ下りる煉瓦の小路の西の縁（<see cref="WomanAt"/>）で、小路と低い生け垣の間の花の縁に水を撒いている。
+    ///   主の椅子から 3.5 m、方位 318 度（主の体の向きの真正面）。日（方位 290 度、仰角 11 度）はその左上にあり、女性の後ろに低い夕日と明るい空が来る。
+    ///   夕日を背にするので、顔の側は影。生け垣は女性の後ろで、あいだに入らない
+    /// - 歩く道: 小路を南へテラスの北の縁の手前（<see cref="WalkBend"/>）まで下り、テラスへ上がって主の方（<see cref="WalkEnd"/>）へ。
     ///   女性はずっと夕日を背にしている。あいだに卓と椅子は入らない（どれも主の後ろ）
     /// </summary>
     public static partial class BuildVillage
@@ -36,16 +37,19 @@ namespace HalfAware.EditorTools
         public const float HostYaw = TurnedChairYaw;
 
         /// <summary>
-        /// 女性が水を撒く立ち位置。テラスの西の脇から北へ抜ける煉瓦の小路の西の縁（z 19.75 で芯は x -4.1 ほど、幅 1.1 m）。西の花の縁の前。
-        /// 主の目から 3.5〜4 m に置く（z 19.3 では 3.4 m で近すぎた）
+        /// 女性が水を撒く立ち位置。トンネルの南の口からテラスの北西の角へ下りる煉瓦の小路の西の縁（z 20.35 で芯は x -3.51、幅 1.1 m）。
+        /// 小路と低い生け垣の間の花の縁（HedgeEast）の前。主の椅子の足元から 3.5 m、方位 318 度（主の体の向きの真正面）。
+        /// 生け垣は女性の後ろ（西）で、主と女性のあいだには入らない。
+        /// 2026-09-28 に、格子戸から卓までは必ずトンネルを通る道に組み直したので、前の立ち位置（(-4.62, 19.75)、方位 305 度。
+        /// 前はテラスの西の脇を北へ抜ける小路の西の縁）から移した。前の所は、いまは格子戸からの小路とテラスを分ける生け垣の上
         /// </summary>
-        public static readonly Vector3 WomanAt = new Vector3(-4.62f, 0f, 19.75f);
+        public static readonly Vector3 WomanAt = new Vector3(-4.0f, 0f, 20.35f);
 
-        /// <summary>水を撒くときに向く向き。西の塀の下の花の縁（夕日の方）</summary>
-        public const float FlowerYaw = 262f;
+        /// <summary>水を撒くときに向く向き。小路の西の花の縁（夕日の方）</summary>
+        public const float FlowerYaw = 265f;
 
-        /// <summary>歩く道の曲がり角。小路の、テラスの北西の角の脇</summary>
-        public static readonly Vector3 WalkBend = new Vector3(-4.15f, 0f, 18.35f);
+        /// <summary>歩く道の曲がり角。小路の、テラスの北の縁に着く手前</summary>
+        public static readonly Vector3 WalkBend = new Vector3(-3.2f, 0f, 18.85f);
 
         /// <summary>歩く道の終わり。テラスの上、主の前。ここへ着く前に途切れる</summary>
         public static readonly Vector3 WalkEnd = new Vector3(-2.45f, TerraceTopY, 17.95f);
@@ -59,13 +63,13 @@ namespace HalfAware.EditorTools
         /// <summary>歩き出す、送ってからの秒（庭の時計）。ホースを止めて、こちらを向いてから</summary>
         public const float WalkAt = 52f;
 
-        /// <summary>ホースの出どころ。西の花の縁の奥の地面（花に隠れる。塀の際の水栓から来ている見立て）</summary>
-        static readonly Vector3 HoseSource = new Vector3(-5.7f, 0.02f, 18.6f);
+        /// <summary>ホースの出どころ。小路の西の花の縁の奥の地面（花に隠れる。生け垣の根の水栓から来ている見立て）</summary>
+        static readonly Vector3 HoseSource = new Vector3(-4.25f, 0.02f, 19.1f);
         /// <summary>ホースが花の縁の前と小路を這う途中の点</summary>
         static readonly Vector3[] HoseRun =
         {
-            new Vector3(-5.1f, 0.02f, 19.1f),
-            new Vector3(-4.8f, 0.02f, 19.4f),
+            new Vector3(-4.02f, 0.02f, 19.55f),
+            new Vector3(-3.9f, 0.02f, 19.95f),
         };
 
         /// <summary>主の体の置き場の名</summary>

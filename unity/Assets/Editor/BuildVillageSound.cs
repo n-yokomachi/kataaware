@@ -85,8 +85,8 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// 床の当たりに足音の地面（<see cref="StepGround"/>）を付ける。
         /// 路地（未舗装路と門の前の砂利の溜まりを含む一枚）は砂利。芝の路肩は草の足音。
-        /// 片割れの敷地（芝も小路もテラスも一枚の当たり）は既定を草の足音にし、煉瓦の小路・玄関の小路・
-        /// テラスと芝へ下りる段だけを硬い音の区画で上書きする。形は見た目の小路と同じ線（<see cref="PathSamples"/>）から取る。
+        /// 片割れの敷地（芝も小路もテラスも一枚の当たり）は既定を草の足音にし、煉瓦の小路の二本・東屋の前の踊り場・玄関の小路・
+        /// テラスだけを硬い音の区画で上書きする。形は見た目の小路と同じ線（<see cref="Samples"/>）から取る。
         /// 草の素材が無ければ <see cref="StepClips"/> が空を返し、その地面は Footsteps の既定の音に落ちる（偽の音は鳴らさない）
         /// </summary>
         static void StepGrounds(Transform road, Transform plot, Transform verge)
@@ -110,12 +110,13 @@ namespace HalfAware.EditorTools
             {
                 var parts = new[]
                 {
-                    // 煉瓦の小路。縁取りの煉瓦の分だけ半幅を広げる
-                    new StepGround.Patch { name = "BrickPath", line = PathSamples().ToArray(), half = PathWide * 0.5f + 0.06f, clips = hard },
+                    // 煉瓦の小路の二本（格子戸からの小路と、トンネルを抜ける小路）と東屋の前の踊り場。縁取りの煉瓦の分だけ半幅を広げる
+                    new StepGround.Patch { name = "WestWalk", line = Samples(WestWalk).ToArray(), half = PathWide * 0.5f + 0.06f, clips = hard },
+                    new StepGround.Patch { name = "TunnelWalk", line = Samples(TunnelWalk).ToArray(), half = PathWide * 0.5f + 0.06f, clips = hard },
+                    new StepGround.Patch { name = "Landing", box = Landing, clips = hard },
                     new StepGround.Patch { name = "FrontPath", box = Rect.MinMaxRect(FrontDoorX - PathWide * 0.5f, NorthEdge, FrontDoorX + PathWide * 0.5f, HouseFront), clips = hard },
-                    // テラスと、芝へ下りる段
+                    // テラス（芝へ下りる段は無くした）
                     new StepGround.Patch { name = "Terrace", box = Rect.MinMaxRect(TerraceWest, HouseRear, HouseEast, TerraceNorth), clips = hard },
-                    new StepGround.Patch { name = "TerraceStep", box = Rect.MinMaxRect(StepWest, TerraceNorth, StepEast, TerraceNorth + 0.4f), clips = hard },
                 };
                 var so = new SerializedObject(plot.gameObject.AddComponent<StepGround>());
                 // 区画のどれにも入らない所（芝と花の縁）は、既定（top の clips）の草の足音へ落ちる

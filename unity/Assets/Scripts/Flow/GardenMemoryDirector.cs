@@ -72,7 +72,7 @@ namespace HalfAware
         [Tooltip("主が座る椅子（卓の北の一脚）。朝の村では卓へ向いていて、場面 6 の間だけ夕日の方へ回す")]
         [SerializeField] Transform turnedChair;
         [Tooltip("回した椅子の向き。度（+z が 0 で東回り）")]
-        [SerializeField] float turnedChairYaw = 305f;
+        [SerializeField] float turnedChairYaw = 318f;
         [Tooltip("下を向ける限り。度。主は片割れなので、主人公の胸を見せない 40 度の決まり（PlayerController.PitchDownLimit）は要らない。膝と裾の先の足首とサンダルまで見下ろせるようにする")]
         [SerializeField] float pitchDown = 60f;
 

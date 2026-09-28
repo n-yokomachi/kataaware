@@ -90,7 +90,8 @@ namespace HalfAware.EditorTools
 
             var root = Root("Village");
             Clear(root);
-            pathCache = null;
+            westCache = null;
+            tunnelCache = null;
             var hours = Hours(root);
             Backdrops(hours);
             Ground(Child(root, "Ground"));

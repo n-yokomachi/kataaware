@@ -184,6 +184,8 @@ namespace HalfAware.EditorTools
             public bool TwoSided;
             public Palette Plan;
             public int Seed;
+            /// <summary>一枚に焼く相手の名。空なら自分の名で一枚。近くの細い縁をまとめて、描く回数を増やさない</summary>
+            public string Bake;
 
             public Vector2 At(float t, float s)
             {
@@ -278,26 +280,67 @@ namespace HalfAware.EditorTools
             LowW = new[] { 2f, 1f, 1f },
         };
 
-        /// <summary>組み立ての度に作り直す花の縁の一覧。地面の絵・札・当たりが同じ線を読む</summary>
+        /// <summary>
+        /// 組み立ての度に作り直す花の縁の一覧。地面の絵・札・当たりが同じ線を読む。
+        /// 格子戸からの小路（WestX）とトンネルを抜ける小路（TunnelX）と低い生け垣（LowHedgeX）の線から引く
+        /// </summary>
         static List<Border> Borders()
         {
             var all = new List<Border>();
-            // 西の縁。板の塀と小路の間。格子戸の脇はエスパリエの前なので低く
+            const float edge = PathWide * 0.5f + 0.05f;
+            // 西の縁。板の塀と格子戸からの小路の間。格子戸の脇はエスパリエの前なので低く
             all.Add(new Border
             {
                 Name = "WestLow", AlongZ = true, From = GateZ + 0.35f, To = 18.0f,
-                Front = z => PathX(z) - PathWide * 0.5f - 0.05f, Back = z => PlotWest + 0.45f, Plan = LowPlan, Seed = 101,
+                Front = z => WestX(z) - edge, Back = z => PlotWest + 0.45f, Plan = LowPlan, Seed = 101,
+            });
+            // 塀の下の細い縁。奥にタチアオイとデルフィニウム、手前に低い物（小路が塀に沿うので、中ほどの段は置かない）
+            all.Add(new Border
+            {
+                Name = "West", AlongZ = true, From = 18.0f, To = Landing.yMin,
+                Front = z => WestX(z) - edge, Back = z => PlotWest + 0.12f, Plan = FencePlan, Seed = 103,
+            });
+            // 東屋の前の踊り場と板の塀の間の角。塀の下の縁の続き
+            all.Add(new Border
+            {
+                Name = "WestCorner", AlongZ = true, From = Landing.yMin, To = GazeboSouth - 0.05f,
+                Front = z => Landing.xMin - 0.05f, Back = z => PlotWest + 0.12f, Plan = FencePlan, Seed = 117, Bake = "West",
+            });
+            // 家の西の脇の日陰。格子戸からの小路と家の壁の間、低い生け垣の南まで
+            all.Add(new Border
+            {
+                Name = "HouseSide", AlongZ = true, From = GateZ + 0.35f, To = LowHedge[0].y - LowHedgeThick * 0.5f - 0.05f,
+                Front = z => WestX(z) + edge, Back = z => HouseWest - 0.12f, Plan = ShadePlan, Seed = 141, Bake = "WestLow",
+            });
+            // 格子戸からの小路と低い生け垣の間（小路の側）。低い物
+            all.Add(new Border
+            {
+                Name = "HedgeWest", AlongZ = true, From = LowHedge[0].y + LowHedgeThick * 0.5f + 0.1f, To = 19.1f,
+                Front = z => WestX(z) + edge, Back = z => LowHedgeX(z) - 0.3f, Plan = LowPlan, Seed = 143, Bake = "WestLow",
+            });
+            // 低い生け垣とトンネルを抜けた小路の間（卓の側）。場面 6 で女性が水を撒く
+            all.Add(new Border
+            {
+                Name = "HedgeEast", AlongZ = true, From = 18.75f, To = 22.3f,
+                Front = z => TunnelX(z) - edge, Back = z => LowHedgeX(z) + 0.3f, Plan = NarrowPlan, Seed = 145, Bake = "Middle",
+            });
+            // 格子戸からの小路とトンネル（とその北の口への小路）の間の島。両側から見る。
+            // 北の先（東屋の前の踊り場の側）は背の高い物を置かない。踊り場からトンネルの北の口を塞いだ
+            all.Add(new Border
+            {
+                Name = "Island", AlongZ = true, From = 22.45f, To = IslandTall,
+                Front = z => WestX(z) + edge, Back = z => TunnelX(z) - edge, TwoSided = true, Plan = IslandPlan, Seed = 105, Bake = "West",
             });
             all.Add(new Border
             {
-                Name = "West", AlongZ = true, From = 18.0f, To = 30.8f,
-                Front = z => PathX(z) - PathWide * 0.5f - 0.05f, Back = z => PlotWest + 0.12f, Plan = MainPlan, Seed = 103,
+                Name = "IslandTip", AlongZ = true, From = IslandTall, To = 30.4f,
+                Front = z => WestX(z) + edge, Back = z => TunnelX(z) - edge, TwoSided = true, Plan = NarrowPlan, Seed = 111, Bake = "West",
             });
-            // 小路と芝の間。両側から見る
+            // トンネルを抜ける小路と芝の間。両側から見る。トンネルとその南の小路（卓の側）を芝（格子戸の側）から分ける
             all.Add(new Border
             {
-                Name = "Middle", AlongZ = true, From = 19.0f, To = LawnNorth,
-                Front = z => PathX(z) + PathWide * 0.5f + 0.05f, Back = z => LawnWest, TwoSided = true, Plan = NarrowPlan, Seed = 107,
+                Name = "Middle", AlongZ = true, From = LawnSouth, To = LawnNorth,
+                Front = z => TunnelX(z) + edge, Back = z => LawnWest, TwoSided = true, Plan = NarrowPlan, Seed = 107,
             });
             // 芝の東。奥は菜園
             all.Add(new Border
@@ -334,19 +377,45 @@ namespace HalfAware.EditorTools
                 Name = "Shade", AlongZ = true, From = NorthEdge + FrontWallThick + 0.1f, To = GateZ - 0.3f,
                 Front = z => SidePathX + PathWide * 0.5f + 0.05f, Back = z => HouseWest - 0.12f, Plan = ShadePlan, Seed = 139,
             });
-            // テラスの縁のラベンダー。芝へ下りる段の所は開ける
+            // テラスの北の縁のラベンダー。トンネルを抜けた小路の東の縁から、東の野石の塀まで一続きにして、芝からテラスへ直に出られないようにする
+            // （2026-09-28。前は芝へ下りる段の所を開け、東の端も菜園の前で切れていた）。二つに分けて焼くのは、前と同じ描く回数に収めるため
+            var lavenderFrom = TerraceWest + PathWide + 0.05f;
             all.Add(new Border
             {
-                Name = "LavenderW", AlongZ = false, From = TerraceWest + 0.1f, To = StepWest - 0.05f,
+                Name = "LavenderW", AlongZ = false, From = lavenderFrom, To = 1.0f,
                 Front = x => LawnSouth - 0.05f, Back = x => TerraceNorth + 0.05f, TwoSided = true, Plan = LavenderPlan, Seed = 149,
             });
             all.Add(new Border
             {
-                Name = "LavenderE", AlongZ = false, From = StepEast + 0.05f, To = LawnEast + 0.9f,
+                Name = "LavenderE", AlongZ = false, From = 1.0f, To = PlotEast - 0.05f,
                 Front = x => LawnSouth - 0.05f, Back = x => TerraceNorth + 0.05f, TwoSided = true, Plan = LavenderPlan, Seed = 151,
             });
             return all;
         }
+
+        /// <summary>島の背の高い物の北の限り。これより北（踊り場の側）は中くらいと低い物だけ</summary>
+        const float IslandTall = 26.8f;
+
+        /// <summary>塀の下の細い縁。奥に背の高い物、手前に低い物</summary>
+        static readonly Palette FencePlan = new Palette
+        {
+            Tall = new[] { Kind.HollyPink, Kind.HollyWhite, Kind.Delph, Kind.Foxglove },
+            TallW = new[] { 4f, 2.2f, 1.6f, 1.0f },
+            Low = new[] { Kind.Catmint, Kind.Geranium, Kind.Mantle, Kind.Lavender },
+            LowW = new[] { 3f, 3f, 1.5f, 1.0f },
+        };
+
+        /// <summary>
+        /// 小路とトンネルの間の島。真ん中はダリアとエキナセアのピンクと白を主に、タチアオイとデルフィニウムを少し混ぜ、
+        /// タイトルの背景の画角でトンネルの右にピンクの花の塊と花の穂が立つようにする
+        /// </summary>
+        static readonly Palette IslandPlan = new Palette
+        {
+            Mid = new[] { Kind.DahliaPink, Kind.EchPink, Kind.EchWhite, Kind.Aster, Kind.HollyPink, Kind.Delph, Kind.HollyWhite, Kind.Allium },
+            MidW = new[] { 2.4f, 2.2f, 2.0f, 1.8f, 1.4f, 0.9f, 0.6f, 0.8f },
+            Low = new[] { Kind.Catmint, Kind.Geranium, Kind.Mantle, Kind.Lavender },
+            LowW = new[] { 3f, 2.5f, 2f, 1f },
+        };
 
         static readonly Palette LavenderPlan = new Palette
         {
@@ -354,12 +423,25 @@ namespace HalfAware.EditorTools
             LowW = new[] { 1f },
         };
 
-        /// <summary>花の縁をまとまりごとに植える。花の縁一つを一枚の mesh に焼く</summary>
-        static void Plant(Transform parent, Border border, Material mat)
+        /// <summary>
+        /// 花の縁をまとまりごとに植える。花の縁一つを一枚の mesh に焼く。<see cref="Border.Bake"/> の同じ縁は一枚にまとめ、
+        /// 名はまとめる先（Bake）の名にする
+        /// </summary>
+        static void Plant(Transform parent, List<Border> borders, Material mat)
         {
-            var f = FloraBank();
-            Sow(f, border);
-            Emit(parent, "Flora" + border.Name, f, mat, false);
+            var groups = new List<string>();
+            foreach (var b in borders)
+            {
+                var key = string.IsNullOrEmpty(b.Bake) ? b.Name : b.Bake;
+                if (!groups.Contains(key)) groups.Add(key);
+            }
+            foreach (var key in groups)
+            {
+                var f = FloraBank();
+                foreach (var b in borders)
+                    if ((string.IsNullOrEmpty(b.Bake) ? b.Name : b.Bake) == key) Sow(f, b);
+                Emit(parent, "Flora" + key, f, mat, false);
+            }
         }
 
         /// <summary>
@@ -470,7 +552,7 @@ namespace HalfAware.EditorTools
         {
             var mat = FloraMat();
             var borders = Borders();
-            foreach (var border in borders) Plant(parent, border, mat);
+            Plant(parent, borders, mat);
             Climbers(parent, mat);
             Pots(parent, mat);
             Trees(parent, mat);
@@ -848,7 +930,7 @@ namespace HalfAware.EditorTools
         const float PicNorth = PlotNorth + 1.0f;
         const string GroundPath = Textures + "VillageGround.png";
         /// <summary>描き方の版。花の縁や芝の寸法を変えたら上げる。上げないと前の絵のまま貼られる</summary>
-        const string GroundSign = "ground4|512x1024";
+        const string GroundSign = "ground5|512x1024";
 
         static Material GroundMat()
         {
@@ -945,9 +1027,8 @@ namespace HalfAware.EditorTools
             worn = Mathf.Max(worn, 1f - SkyPaint.Smooth(0.2f, 0.9f + fine * 0.3f, Vector2.Distance(p, new Vector2((ShedWest + ShedEast) * 0.5f, ShedSouth - 0.5f))));
             worn = Mathf.Max(worn, 1f - SkyPaint.Smooth(0.2f, 0.8f + fine * 0.3f, Vector2.Distance(p, new Vector2(6.1f, 27.4f))));
             worn = Mathf.Max(worn, 1f - SkyPaint.Smooth(0.2f, 0.7f + fine * 0.3f, Vector2.Distance(p, new Vector2((GlassWest + GlassEast) * 0.5f, GlassSouth - 0.4f))));
-            // 物干しの下と、テラスの段の下
+            // 物干しの下（テラスの段の下の禿げは、段と一緒に無くした）
             worn = Mathf.Max(worn, (1f - SkyPaint.Smooth(0.1f, 0.5f, Vector2.Distance(p, new Vector2(AirerAt.x, AirerAt.z)))) * 0.8f);
-            worn = Mathf.Max(worn, (1f - SkyPaint.Smooth(0.1f, 0.7f, Mathf.Abs(p.y - (TerraceNorth + 0.6f)) + Mathf.Max(0f, Mathf.Abs(p.x - 1f) - 0.6f))) * 0.5f);
             c = Color.Lerp(c, WornCol, Mathf.Clamp01(worn) * (0.6f + fine * 0.4f));
             // 塀と生け垣の根元は暗い
             var edge = Mathf.Min(Mathf.Min(p.x - PlotWest, PlotEast - p.x), PlotNorth - p.y);

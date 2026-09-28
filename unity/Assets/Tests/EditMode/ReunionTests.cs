@@ -115,7 +115,7 @@ namespace HalfAware.Tests
         {
             var table = new Vector3(-1.8f, 0.1f, 16.9f);
             Assert.IsTrue(ReunionDirector.Within(new Vector3(-3.35f, 0.06f, 16.75f), table, 2.2f));
-            // 小路の上（テラスの西の縁の外）では入らない
+            // テラスの西の縁の外（格子戸からの小路と低い生け垣の側）では入らない
             Assert.IsFalse(ReunionDirector.Within(new Vector3(-4.2f, 0f, 15.5f), table, 2.2f));
             // 高さは見ない
             Assert.IsTrue(ReunionDirector.Within(new Vector3(-1.8f, 5f, 16.9f), table, 2.2f));
@@ -142,6 +142,24 @@ namespace HalfAware.Tests
             // 回るのは北（テラスの北の縁の側）。南は家の壁との間が狭い
             foreach (var p in path) Assert.GreaterOrEqual(p.z, TableBox.z - 1e-4f);
             Assert.IsTrue(path.Exists(p => Mathf.Abs(p.z - TableBox.w) < 1e-4f));
+        }
+
+        /// <summary>
+        /// トンネルを抜けた小路がテラスの北西の角に着いた所（2026-09-28 から、卓の区画に入るのはここからだけ）。
+        /// 卓の北をなぞって東へ回り、卓の前へ下りる
+        /// </summary>
+        [Test]
+        public void FromTheTunnelWalkTheWalkToTheTableGoesRoundItsNorthSide()
+        {
+            var from = new Vector3(-3.15f, 0.06f, 18.55f);
+            Assert.IsTrue(ReunionDirector.Within(from, new Vector3(-1.8f, 0.1f, 16.9f), 2.2f), "小路がテラスに着く所は区画の内");
+            Assert.IsTrue(ReunionDirector.Crosses(from, Head, TableBox), "まっすぐ行くと卓を抜ける");
+            var path = ReunionDirector.Route(from, Head, TableBox);
+            Assert.AreEqual(2, path.Count, "卓の北東の角を一つ回る");
+            Assert.AreEqual(new Vector3(TableBox.y, Head.y, TableBox.w), path[0]);
+            Assert.AreEqual(Head, path[1]);
+            Assert.IsFalse(ReunionDirector.Crosses(from, path[0], TableBox));
+            Assert.IsFalse(ReunionDirector.Crosses(path[0], path[1], TableBox));
         }
 
         [Test]

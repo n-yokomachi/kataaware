@@ -47,9 +47,10 @@ namespace HalfAware.EditorTools
                 run = new Run();
                 if (!run.Ready(sb)) return sb.ToString();
 
-                // 場面 9 の終わり。区画の外（小路の上）から卓の方へ歩いて入る
-                run.Place(new Vector3(-4.2f, 0.06f, 16.6f), 95f);
-                run.WalkTo(BuildVillage.ReunionHead, () => run.D.Current != ReunionDirector.Beat.Waiting);
+                // 場面 9 の終わり。トンネルの南の口から下りる小路の上（区画の外）から、テラスの北西の角へ歩いて入る
+                // （2026-09-28。格子戸から卓までは必ずトンネルを通るので、卓の区画に入るのはこの小路からだけ）
+                run.Place(new Vector3(-3.45f, 0.06f, 20.2f), 170f);
+                run.WalkTo(new Vector3(-3.1f, 0.06f, 18.3f), () => run.D.Current != ReunionDirector.Beat.Waiting);
                 // 区画に入ると、演出が卓の前まで歩かせる（卓の北を回る）
                 var from = run.Where();
                 run.Until(() => run.D.Current == ReunionDirector.Beat.Musing, false);
