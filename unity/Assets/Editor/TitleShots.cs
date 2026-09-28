@@ -411,9 +411,11 @@ namespace HalfAware.EditorTools
         /// タイトルの画面を、ゲームと同じ見え方で撮る（既定は 960×540）。背景の Canvas は画面の解像度で、
         /// 枠と字の Canvas は粗い画面（UiLens）で描いて重ね、その上に題と読みの Canvas を画面の解像度で重ねる。
         /// セーブは手元の辞書（saves）に差し替えて撮る（PlayerPrefs を汚さない）。recall で思い出すの枠を開いた形。
-        /// picture を渡すと、背景の絵をそれに差し替える（背景の候補を題と重ねて見るとき）
+        /// picture を渡すと、背景の絵をそれに差し替える（背景の候補を題と重ねて見るとき）。
+        /// stage を渡すと、起動を出し切った後（思い出すの枠を開いた後）に画面へ手を入れてから撮る（設定の枠を開く、など）
         /// </summary>
-        public static string Screen(string path, bool cleared, SaveData[] saves, bool recall, Texture2D picture = null, int w = 960, int h = 540)
+        public static string Screen(string path, bool cleared, SaveData[] saves, bool recall, Texture2D picture = null, int w = 960, int h = 540,
+            Action<TitleScreen> stage = null)
         {
             var box = new MemoryBox();
             if (saves != null)
@@ -474,6 +476,7 @@ namespace HalfAware.EditorTools
                 // 起動を出し切った形にしてから描く
                 screen.Finish();
                 if (recall) screen.OpenList();
+                if (stage != null) stage(screen);
 
                 if (asset != null) asset.renderScale = 1f;
                 Canvas.ForceUpdateCanvases();

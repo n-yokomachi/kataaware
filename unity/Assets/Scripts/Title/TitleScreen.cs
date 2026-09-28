@@ -14,7 +14,8 @@ namespace HalfAware
     /// タイトルの画面（設計書 5 節、案 1「インプラントの起動」）。
     ///
     /// 黒い画面に、眼球インプラントが立ち上がる短い表示が一行ずつ流れ、そのあと背景が明けて、
-    /// コンソールと同じ青緑の枠・題（HALF AWARE／かたあはれ）・ボタン（はじめる・思い出す）が出る。制作の表記は出さない。
+    /// コンソールと同じ青緑の枠・題（HALF AWARE／かたあはれ）・ボタン（はじめる・思い出す・設定）が出る。制作の表記は出さない。
+    /// 設定はコンソールと同じ設定の枠（<see cref="SettingsPanel"/>）を、思い出すの枠と同じ置き場に出す。
     ///
     /// **背景は前もって撮った絵。** クリアの印があれば朝の村、無ければいちばん新しいセーブの場面、セーブが無ければ自室
     /// （<see cref="TitleBackdrops.Pick"/>）。タイトルのために重い場面を読まない。絵は組み立ての道具
@@ -51,7 +52,30 @@ namespace HalfAware
         public const string ListTitle = "思い出す　　E で読む";
 
         /// <summary>ボタンの字。並びの順</summary>
-        public static readonly string[] Labels = { Begin, ConsoleMenu.Recall };
+        public static readonly string[] Labels = { Begin, ConsoleMenu.Recall, ConsoleMenu.SettingsLabel };
+
+        public const int BeginButton = 0;
+        public const int RecallButton = 1;
+        public const int SettingsButton = 2;
+
+        /// <summary>設定の枠の行。コンソールと同じ表の最後に「戻る」（思い出すの枠に揃える）</summary>
+        public static readonly SettingRow[] SettingRows = ConsoleSettings.WithBack(Back);
+
+        /// <summary>ボタンを押せるか。思い出すはセーブが一つでも無ければ押せない</summary>
+        public static bool ButtonUsable(int button, bool canRecall)
+        {
+            return button >= 0 && button < Labels.Length && (button != RecallButton || canRecall);
+        }
+
+        /// <summary>ボタンの上下。from から step の向きで次に押せるボタン。押せないボタン（セーブが無い時の思い出す）は飛ばし、端で止まる</summary>
+        public static int NextButton(int from, int step, bool canRecall)
+        {
+            if (step == 0) return from;
+            var dir = step > 0 ? 1 : -1;
+            for (var i = from + dir; i >= 0 && i < Labels.Length; i += dir)
+                if (ButtonUsable(i, canRecall)) return i;
+            return from;
+        }
 
         // ---- 見た目 ------------------------------------------------------------
         //
@@ -160,7 +184,7 @@ namespace HalfAware
 
         // ---- 状態 ------------------------------------------------------------
 
-        enum Phase { Boot, Menu, Recall, Leaving }
+        enum Phase { Boot, Menu, Recall, Settings, Leaving }
 
         Phase phase = Phase.Boot;
         int index;
@@ -180,6 +204,10 @@ namespace HalfAware
         CanvasGroup chrome;
         CanvasGroup menuGroup;
         RectTransform list;
+        /// <summary>設定の枠。行の選びと値の動かし、見た目と操作はコンソールと同じ物</summary>
+        readonly SettingsList settings = new SettingsList(SettingRows);
+        SettingsPanel settingsPanel;
+        RectTransform settingsBox;
         readonly List<TMP_Text> bootLines = new List<TMP_Text>();
         readonly List<Row> buttons = new List<Row>();
         readonly List<Row> rows = new List<Row>();
@@ -238,6 +266,8 @@ namespace HalfAware
 
         void OnDestroy()
         {
+            // 設定で動かした値を、待たずに確かに残す（場面を読んでタイトルの画面が消える時）
+            GameSettings.Commit();
             Release();
         }
 
@@ -331,6 +361,7 @@ namespace HalfAware
             menuGroup.alpha = 0f;
             for (var i = 0; i < bootLines.Count; i++) bootLines[i].gameObject.SetActive(false);
             list.gameObject.SetActive(false);
+            settingsBox.gameObject.SetActive(false);
         }
 
         /// <summary>インプラントの起動。表示を一行ずつ流し、背景を明けて、枠と題とボタンを出す</summary>
@@ -399,9 +430,31 @@ namespace HalfAware
             Paint();
         }
 
+        /// <summary>設定の枠を開いた形にする。いちばん上の項目（カメラの速さ）を選ぶ。エディタで撮るときにも使う</summary>
+        public void OpenSettings()
+        {
+            phase = Phase.Settings;
+            index = SettingsButton;
+            settings.Open();
+            settingsPanel.Rest();
+            Paint();
+        }
+
+        /// <summary>設定の枠を閉じてボタンへ戻る（設定のボタンを選んだまま）。動かした値は待たずに確かに残す</summary>
+        void CloseSettings()
+        {
+            GameSettings.Commit();
+            phase = Phase.Menu;
+            Paint();
+        }
+
+        /// <summary>設定の枠。確かめ用</summary>
+        public SettingsPanel Settings { get { return settingsPanel; } }
+
         /// <summary>画面を閉じて、黒く落としてから then を呼ぶ（場面を読む）</summary>
         void Leave(Action then)
         {
+            GameSettings.Commit();
             phase = Phase.Leaving;
             chrome.blocksRaycasts = false;
             StartCoroutine(Leaving(then));
@@ -430,6 +483,9 @@ namespace HalfAware
         {
             var keys = Keyboard.current;
             var mouse = Mouse.current;
+            // 設定で動かした値は、動きが止まってから 0.5 秒で残す（コンソールと同じ）
+            GameSettings.Tick(Time.unscaledTime);
+            if (phase != Phase.Settings && settingsPanel != null) settingsPanel.Rest();
             if (phase == Phase.Boot)
             {
                 // 起動の表示は、キーかクリックで飛ばせる
@@ -459,6 +515,14 @@ namespace HalfAware
                 if (back) CloseList();
                 else if (decide) Pick();
             }
+            else if (phase == Phase.Settings)
+            {
+                // 上下・左右（つまみ、押し続け）・E はコンソールと同じ物が読む。一つ前に戻るのは Esc か右クリックか「戻る」
+                var back = (keys != null && keys.escapeKey.wasPressedThisFrame)
+                    || (mouse != null && mouse.rightButton.wasPressedThisFrame);
+                if (back) CloseSettings();
+                else if (settingsPanel.Keys(keys, Time.unscaledTime)) CloseSettings();
+            }
             if (phase == Phase.Leaving) return;
             Paint();
             // 押したボタンが選ばれたままだと、矢印の入力を uGUI が横取りする
@@ -469,19 +533,19 @@ namespace HalfAware
         /// <summary>ボタンの上下。押せないボタン（セーブが無い時の思い出す）は飛ばす</summary>
         void Move(int step)
         {
-            var next = Mathf.Clamp(index + step, 0, Labels.Length - 1);
-            if (Usable(next)) index = next;
+            index = NextButton(index, step, canRecall);
         }
 
         bool Usable(int button)
         {
-            return button == 0 || canRecall;
+            return ButtonUsable(button, canRecall);
         }
 
         void Decide()
         {
-            if (index == 0) Leave(SaveFlow.StartNew);
-            else if (canRecall) OpenList();
+            if (index == BeginButton) Leave(SaveFlow.StartNew);
+            else if (index == RecallButton && canRecall) OpenList();
+            else if (index == SettingsButton) OpenSettings();
         }
 
         /// <summary>思い出すの行を決める。いちばん下は戻る</summary>
@@ -540,7 +604,8 @@ namespace HalfAware
         {
             Crop();
             var menu = phase == Phase.Menu;
-            menuGroup.gameObject.SetActive(phase != Phase.Recall);
+            // 思い出す・設定の枠を開いている間は、ボタンを伏せて同じ所に枠を出す
+            menuGroup.gameObject.SetActive(phase != Phase.Recall && phase != Phase.Settings);
             for (var i = 0; i < buttons.Count; i++)
             {
                 var on = menu && i == index;
@@ -559,6 +624,8 @@ namespace HalfAware
                     rows[r].label.color = on ? ImplantConsole.Ink : usable ? ImplantConsole.ButtonText : ImplantConsole.Faded;
                     rows[r].mark.color = on ? ImplantConsole.Ink : usable ? ImplantConsole.RowText : ImplantConsole.Faded;
                 }
+            settingsBox.gameObject.SetActive(phase == Phase.Settings);
+            if (phase == Phase.Settings) settingsPanel.Paint();
             var size = root.rect.size;
             if (size.x > 0f && size.y > 0f) scan.uvRect = new Rect(0f, 0f, 1f, size.y / (3f * Dot));
         }
@@ -693,6 +760,7 @@ namespace HalfAware
             Frame(c);
             BuildMenu(c);
             BuildList(c);
+            BuildSettings(c);
             BuildNames();
         }
 
@@ -857,7 +925,7 @@ namespace HalfAware
             return t;
         }
 
-        /// <summary>はじめる・思い出す。縦に二つ。選んでいる方を塗りつぶす</summary>
+        /// <summary>はじめる・思い出す・設定。縦に並べ、選んでいる物を塗りつぶす</summary>
         void BuildMenu(RectTransform parent)
         {
             var m = ImplantConsole.Rect(parent, "Menu");
@@ -898,6 +966,21 @@ namespace HalfAware
                 };
                 buttons.Add(view);
             }
+        }
+
+        /// <summary>
+        /// 設定の枠。コンソールと同じ物（<see cref="SettingsPanel"/>）を、思い出すの枠と同じ置き場（横の真ん中、上から <see cref="ListTop"/>）に出す。
+        /// 行はコンソールと同じ表の最後に「戻る」
+        /// </summary>
+        void BuildSettings(RectTransform parent)
+        {
+            settingsPanel = new SettingsPanel(settings);
+            settingsPanel.Back = CloseSettings;
+            settingsBox = settingsPanel.Build(parent, ConsoleSettings.Title, heavy);
+            settingsBox.anchorMin = new Vector2(0.5f, 1f - ListTop);
+            settingsBox.anchorMax = new Vector2(0.5f, 1f - ListTop);
+            settingsBox.pivot = new Vector2(0.5f, 1f);
+            settingsBox.anchoredPosition = Vector2.zero;
         }
 
         /// <summary>思い出すの枠。自動・1・2・3 と、戻る。空きは薄くして押せない</summary>
