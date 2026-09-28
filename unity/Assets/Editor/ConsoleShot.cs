@@ -127,11 +127,21 @@ namespace HalfAware.EditorTools
         ///
         /// CanvasScaler が ScaleWithScreenSize のとき、Unity の標準の作りは常にエディタの Game View の実寸
         /// （Screen.width/height）から scaleFactor を出す。そのままだと撮る絵の大きさ（w×h）と関わりなく、
-        /// Game View の縦横比で字幕の枠の幅や折り返しがぶれる。ここでは w×h から scaleFactor を計算して
-        /// ConstantPixelSize で直に当て、Game View の実寸を読ませない（呼び出し側で元へ戻す）
+        /// Game View の縦横比で字幕の枠の幅や折り返しがぶれる。ここでは scaleFactor を計算して
+        /// ConstantPixelSize で直に当て、Game View の実寸を読ませない（呼び出し側で元へ戻す）。
+        ///
+        /// **拡縮は、カメラが描く先の大きさから出す。** ゲームの中で粗い画面のカメラは RenderTexture（画面の 0.75 倍、
+        /// 960×540 なら 720×405）へ描き、CanvasScaler はその大きさ（Canvas.renderingDisplaySize）から拡縮を出す（0.5625）。
+        /// 撮る絵の大きさ w×h（0.75）で出すと、UI がゲームの 4/3 倍に大きく写った（2026-09-28 に直す）。
+        /// カメラが RenderTexture へ描くならその大きさを、そうでなければ w×h を使う
         /// </summary>
         internal static void Lens(Canvas canvas, Camera eye, int order, int w, int h)
         {
+            if (eye != null && eye.targetTexture != null)
+            {
+                w = eye.targetTexture.width;
+                h = eye.targetTexture.height;
+            }
             canvas.renderMode = RenderMode.ScreenSpaceCamera;
             canvas.worldCamera = eye;
             canvas.sortingOrder = order;

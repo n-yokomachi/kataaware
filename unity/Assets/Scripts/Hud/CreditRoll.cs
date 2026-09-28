@@ -17,9 +17,9 @@ namespace HalfAware
     /// <item>見出しと名前の行は、ほかの UI と同じ粗い画面（<see cref="UiLens"/>）の Canvas</item>
     /// <item>題（HALF AWARE）と読み（かたあはれ）だけは、タイトルの画面と同じく粗くしない。画面の解像度で描く Canvas（<see cref="crispColumn"/>）</item>
     /// </list>
-    /// **二つの Canvas は一画素の大きさが違う。** 粗い画面の Canvas は描く先（画面の 0.75 倍）の大きさから拡縮が決まるので、
-    /// 16:9 では 960×540 の画素になり、くっきりの Canvas は 1280×720 になる。並べる深さは粗い画面の画素で持ち、
-    /// くっきりの列へは二つの Canvas の高さの比（<see cref="ratio"/>）を掛けて渡す。これで二つの中身が画面の上で同じだけ動く。
+    /// 二つの Canvas はどちらも 1280×720 の拡縮（粗い画面の Canvas は描く先の RenderTexture の大きさから、くっきりの Canvas は画面の大きさから
+    /// 拡縮が決まり、どちらも 16:9 なら 1280×720 の画素になる）。並べる深さは粗い画面の画素で持ち、くっきりの列へは
+    /// 二つの Canvas の高さの比（<see cref="ratio"/>）を掛けて渡す。比は 1 のはずだが、どこかで拡縮がずれても二つの中身が画面の上で同じだけ動く。
     ///
     /// **行は、いま見えている列の幅で折り返す。** 画面の縦横比が変わると列の幅（Canvas の画素）が変わるので、
     /// 流すたびに二つの Canvas の大きさを見て、変わっていれば並べ直す（<see cref="Layout"/>）。
@@ -232,7 +232,7 @@ namespace HalfAware
         /// <summary>
         /// rows を並べて置く。前に置いた字は捨てる。題と読みはくっきりの列へ、ほかは粗い列へ。
         /// 行は列の幅で折り返す（長い素材の名は二行、三行になる）。ここでは 16:9 の決まりの大きさ
-        /// （粗い画面の Canvas は 1280×720 に粗さを掛けた大きさ、くっきりは 1280×720）で並べ、場面にはその並びを残す。
+        /// （二つの Canvas とも 1280×720）で並べ、場面にはその並びを残す。
         /// 流す時に画面の大きさで並べ直す（<see cref="Layout"/>）
         /// </summary>
         public void Compose(List<CreditsText.Row> rows, Look look)
@@ -271,7 +271,7 @@ namespace HalfAware
             crispNeed = widest + margin * 2f + 2f;
             var scaler = column != null ? column.GetComponentInParent<CanvasScaler>() : null;
             var reference = scaler != null ? scaler.referenceResolution : new Vector2(1280f, 720f);
-            var bodyCanvas = reference * UiLens.Scale;
+            var bodyCanvas = reference;
             Fit(reference.x);
             var span = column != null ? column.anchorMax.x - column.anchorMin.x : columnTo - columnFrom;
             Relayout(new Vector2(bodyCanvas.x * span, bodyCanvas.y), new Vector2(reference.x * span, reference.y));
