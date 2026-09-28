@@ -106,10 +106,13 @@ namespace HalfAware
             // ルビは列を組んでから書式に直す。先に直すと、列の幅がタグを字数に数えてしまう。
             // 列の幅は表の字で実際に測る。英字は半角 1 字 = 0.5 em より広く、数えただけでは「Female」が次の列へ食い込む
             var em = table.fontSize > 0f ? table.fontSize : ListLayout.RowFont;
+            // ルビは字幕より大きく振る（ListLayout.RubyScale）。列の幅も行の間も、その大きさで取る
+            var scale = ListLayout.RubyScale;
             var composed = Ruby.Expand(ListFormat.Compose(text, ListLayout.RoomEm, false,
-                cell => string.IsNullOrEmpty(cell) ? 0f : table.GetPreferredValues(cell).x / em));
-            // ルビ（傍点）のある表は行を少し開ける。そのままだと下の行のルビが上の行の字にかぶる
-            table.lineSpacing = Ruby.Has(text) ? Ruby.ExtraLineSpacing : 0f;
+                cell => string.IsNullOrEmpty(cell) ? 0f : table.GetPreferredValues(cell).x / em, scale),
+                scale, Ruby.LiftFor(scale));
+            // ルビ（傍点）のある表は行を開ける。そのままだと下の行のルビが上の行の字にかぶる
+            table.lineSpacing = Ruby.Has(text) ? Ruby.SpacingFor(scale) : 0f;
             table.text = composed;
             var size = table.GetPreferredValues(composed);
             var mark = hint.GetPreferredValues(HudView.Advance);

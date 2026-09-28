@@ -8,7 +8,7 @@ namespace HalfAware.Tests
     {
         const float Dot = ListLayout.Dot;
 
-        /// <summary>場面 1 のチップのリスト（原稿 docs/scenario/01-room.md。英語に日本語訳のルビ）</summary>
+        /// <summary>英語に日本語訳のルビを振ったリストの見本（2026-09-28 の原稿の形。2026-09-29 にオーナーが日本語へ戻したが、ルビの付いた表の組み方を見るのに使う）</summary>
         const string Chips =
             "08/15  #1  Male<男>    41  32m40s  『Diego』\n" +
             "08/15  #2  Female<女>  23  16m05s  『Mia』\n" +
@@ -17,7 +17,7 @@ namespace HalfAware.Tests
             "08/15  #5  Male<男>    19   3m32s  『Liam』\n" +
             "08/15  #6  Female<女>  52  48m55s  『Mathilde』";
 
-        /// <summary>場面 1 の走査条件（原稿）</summary>
+        /// <summary>英語にルビの走査条件の見本（2026-09-28 の原稿の形）</summary>
         const string ConditionsInEnglish =
             "Condition<条件>:  ｜Name-call time<名前を呼ばれた時刻>\n" +
             "Target<対象>:  ｜No firewall<防壁なし>\n" +
@@ -25,7 +25,7 @@ namespace HalfAware.Tests
             "Period<期間>:  2156/03/02 - 2156/03/03\n" +
             "｜Quick-filter hits<候補の簡易抽出結果>:  526,232,318";
 
-        /// <summary>場面 1 の売り上げのメモ（原稿）。最後の行は日付だけ</summary>
+        /// <summary>英語にルビの売り上げのメモの見本（2026-09-28 の原稿の形）。最後の行は日付だけ</summary>
         const string Memo =
             "2166/08/10  Bought<仕入>  30 pcs  Stock<在庫>  47 pcs\n" +
             "2166/08/11  Sold<売却>     5 pcs  Stock<在庫>  42 pcs\n" +
@@ -110,6 +110,41 @@ namespace HalfAware.Tests
             Assert.AreEqual(ChoiceLayout.CardFont, ListLayout.RowFont, 1e-4f, "表の字は二択の札の字と同じ");
             Assert.AreEqual(11f, ListLayout.HintFont / Dot, 1e-3f, "送りの印は字幕の送りの印と同じ 11 Dot");
             Assert.AreEqual(ChoiceLayout.Lift, ListLayout.Lift, 1e-4f, "二択と同じ所に浮かぶ");
+        }
+
+        [Test]
+        public void TheListRubyIsBigEnoughToReadOnTheCoarseScreen()
+        {
+            // 表の字 12 Dot に対してルビ 11 Dot。字の下限（10 画素ほど）を下回ると、画数の多い漢字が粗い画面で潰れる（2026-09-28）
+            Assert.That(ListLayout.RubyFont / Dot, Is.GreaterThanOrEqualTo(10f));
+            Assert.That(ListLayout.RubyScale, Is.LessThan(1f), "表の字より一回り小さい");
+            Assert.That(ListLayout.RubyScale, Is.GreaterThan(Ruby.Scale), "字幕のルビより大きい");
+        }
+
+        [Test]
+        public void TheListRowsOpenEnoughForTheBiggerRuby()
+        {
+            var scale = ListLayout.RubyScale;
+            // ルビが親字にかぶらない
+            Assert.That(Ruby.LiftFor(scale) - Ruby.RubyDip * scale, Is.GreaterThanOrEqualTo(Ruby.BaseTop + 0.05f));
+            // 行を開けた後の行送りから、下の行のルビの上の端を引いても、上の行の親字の下の端より下にならない
+            var advance = Ruby.Advance + Ruby.SpacingFor(scale) * 0.01f;
+            var rubyTop = Ruby.LiftFor(scale) + Ruby.RubyTop * scale;
+            Assert.That(advance - rubyTop, Is.GreaterThanOrEqualTo(Ruby.BaseBottom + 0.05f));
+            Assert.That(Ruby.SpacingFor(Ruby.Scale), Is.EqualTo(Ruby.ExtraLineSpacing).Within(1e-3f), "字幕の行間と同じ式");
+        }
+
+        [Test]
+        public void TheBiggerRubyWidensItsColumnWhenItIsWiderThanTheBase()
+        {
+            // 「名前を呼ばれた時刻」（9 字）は、字幕の大きさなら親字「Name-call time」（14）に収まるが、表の大きさでは親字より広い
+            const string cell = "｜Name-call time<名前を呼ばれた時刻>";
+            Assert.AreEqual(14, Ruby.Width(cell));
+            Assert.AreEqual(17, Ruby.Width(cell, ListLayout.RubyScale));
+            var made = ListFormat.Compose("a  " + cell + "  z\nb  c  z", 200f, false, null, ListLayout.RubyScale).Split('\n');
+            // 3 列目の頭は 1 列目 0.5 em + 間 1 em + 2 列目 8.5 em（ルビの幅 17）+ 間 1 em = 11 em。字幕の大きさなら 2 列目は 7 em で 9.5 em
+            StringAssert.Contains("<pos=11em>z", made[1]);
+            StringAssert.Contains("<pos=9.5em>z", ListFormat.Compose("a  " + cell + "  z\nb  c  z", 200f, false).Split('\n')[1]);
         }
 
         [Test]

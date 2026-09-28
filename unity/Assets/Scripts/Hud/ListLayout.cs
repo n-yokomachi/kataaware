@@ -25,6 +25,16 @@ namespace HalfAware
         /// <summary>送りの印の字。字幕の送りの印と同じ 11 Dot</summary>
         public const float HintFont = 11f * Dot;
 
+        /// <summary>
+        /// 表のルビの字。11 Dot（表の字の 12 Dot に対して 0.92）。
+        /// 字幕と同じ割合（<see cref="Ruby.Scale"/>、0.7）では 8.4 Dot になり、「距離」「候補の簡易抽出結果」のような画数の多い漢字が
+        /// 粗い画面で潰れて読めなかった（2026-09-28）。字の下限（10 画素ほど、設計書 2.5 節）より上に置く
+        /// </summary>
+        public const float RubyFont = 11f * Dot;
+
+        /// <summary>表のルビの大きさ。表の字に対する割合</summary>
+        public const float RubyScale = RubyFont / RowFont;
+
         /// <summary>板の上の縁から表まで</summary>
         const int PadTop = 13;
         /// <summary>表から送りの印まで</summary>

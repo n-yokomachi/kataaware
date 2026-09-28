@@ -9,7 +9,7 @@ namespace HalfAware
     /// 見出し（## と ###）ごとに一まとまり（<see cref="Section"/>）にし、その中の
     /// - `**対象の名前**: …` を印に出す字
     /// - `- 「…」` の 1 行を 1 ページ（外側の「」を外し、`&lt;br/&gt;` は改行にする。ルビと傍点の書き方はそのまま）
-    /// - `**リスト**` の後のコードブロックを 1 ページ（行を改行で繋ぐ）
+    /// - `**リスト**` の後のコードブロックを 1 ページ（行を改行で繋ぎ、頭にリストの印 <see cref="ListFormat.Mark"/> を付ける）
     /// - `**二択**: 問い（説明）` を二択の問い（説明の括弧は落とす）
     /// - `「はい」の後:` から後のページを、「はい」の後の文
     /// - `**暗転のカード**` の後の 1 ページを、カード
@@ -142,7 +142,8 @@ namespace HalfAware
                     if (end >= lines.Length) throw new ManuscriptException(at + 1, "コードブロックが閉じていない");
                     while (rows.Count > 0 && rows[rows.Count - 1].Length == 0) rows.RemoveAt(rows.Count - 1);
                     if (rows.Count == 0) throw new ManuscriptException(at + 1, "リストが空");
-                    Add(current, into, string.Join("\n", rows.ToArray()), number);
+                    // 頭にリストの印を付ける。1 列だけの行でも画面の真ん中の枠に出す（ListFormat.Mark）
+                    Add(current, into, ListFormat.Mark + string.Join("\n", rows.ToArray()), number);
                     n = end;
                     continue;
                 }

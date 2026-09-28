@@ -31,11 +31,19 @@ namespace HalfAware
         const float Margin = 0.92f;
 
         /// <summary>
-        /// 表に組むか。2 行以上あって、どれかの行が 2 つ以上の塊に分かれていること。
+        /// リストのページの印。ページの頭に置く（幅の無い空白 U+200B。画面には出ず、<see cref="Ruby.Normalize"/> が落とす）。
+        /// 台詞の原稿で **リスト** と書いたページは、並びの形によらず画面の真ん中の枠に出す。1 列だけの行
+        /// （走査条件の「条件: 名前を呼ばれた時刻」。半角の空白 1 つは列の中）でも枠に出すよう、写す道具（<see cref="Manuscript"/>）がこの印を付ける
+        /// </summary>
+        public const char Mark = '\u200B';
+
+        /// <summary>
+        /// 表に組むか。頭に <see cref="Mark"/> があるか、2 行以上あって、どれかの行が 2 つ以上の塊に分かれていること。
         /// 1 行だけの文や、区切りの無い文はそのまま出す
         /// </summary>
         public static bool IsList(string text)
         {
+            if (!string.IsNullOrEmpty(text) && text[0] == Mark) return true;
             var lines = Lines(text);
             if (lines.Count < 2) return false;
             foreach (var line in lines) if (Split(line, MaxColumns).Count >= 2) return true;
@@ -67,16 +75,22 @@ namespace HalfAware
         /// </summary>
         public static string Compose(string text, float roomEm, bool center, System.Func<string, float> measure)
         {
+            return Compose(text, roomEm, center, measure, Ruby.Scale);
+        }
+
+        /// <summary>rubyScale はルビを振る大きさ（リストの枠は字幕より大きい、<see cref="ListLayout.RubyScale"/>）。列の幅に数えるルビの幅がこれで決まる</summary>
+        public static string Compose(string text, float roomEm, bool center, System.Func<string, float> measure, float rubyScale)
+        {
             text = Ruby.Normalize(text);
             // 幅は字の実寸ではなく半角いくつで数えているので、少し余裕を見る
             var safe = roomEm * Margin;
             var cols = Most(text);
-            var widths = Widths(text, cols, measure);
+            var widths = Widths(text, cols, measure, rubyScale);
             // 収まるところまで列を減らす。減らした分は最後の列に元のまま残る
             while (cols > 2 && Total(widths) > safe)
             {
                 cols--;
-                widths = Widths(text, cols, measure);
+                widths = Widths(text, cols, measure, rubyScale);
             }
             var table = Total(widths);
             var indent = center && safe > 0f && table < safe ? (safe - table) * 0.5f : 0f;
@@ -94,7 +108,7 @@ namespace HalfAware
                 for (var i = 0; i < cells.Count; i++)
                 {
                     var em = at[i];
-                    if (i < right.Length && right[i]) em += widths[i] - Measure(cells[i], measure);
+                    if (i < right.Length && right[i]) em += widths[i] - Measure(cells[i], measure, rubyScale);
                     var x = em + indent;
                     if (x > 0.004f) sb.Append("<pos=").Append(x.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)).Append("em>");
                     sb.Append(cells[i]);
@@ -106,13 +120,13 @@ namespace HalfAware
         /// <summary>columns 列で組んだときの横幅。em</summary>
         public static float WidthEm(string text, int columns)
         {
-            return Total(Widths(Ruby.Normalize(text), columns, null));
+            return Total(Widths(Ruby.Normalize(text), columns, null, Ruby.Scale));
         }
 
         /// <summary>塊の幅（em）。数えた幅（ルビを含む）と、measure があれば測った親字の幅の広い方</summary>
-        static float Measure(string cell, System.Func<string, float> measure)
+        static float Measure(string cell, System.Func<string, float> measure, float rubyScale)
         {
-            var counted = Ruby.Width(cell) * EmPerUnit;
+            var counted = Ruby.Width(cell, rubyScale) * EmPerUnit;
             if (measure == null) return counted;
             return System.Math.Max(counted, measure(Ruby.Plain(cell)));
         }
@@ -183,7 +197,7 @@ namespace HalfAware
             return tag > at ? tag + 1 : at + 1;
         }
 
-        static List<float> Widths(string text, int columns, System.Func<string, float> measure)
+        static List<float> Widths(string text, int columns, System.Func<string, float> measure, float rubyScale)
         {
             var widths = new List<float>();
             foreach (var line in Lines(text))
@@ -191,7 +205,7 @@ namespace HalfAware
                 var cells = Split(line, columns);
                 for (var i = 0; i < cells.Count; i++)
                 {
-                    var w = Measure(cells[i], measure);
+                    var w = Measure(cells[i], measure, rubyScale);
                     if (i < widths.Count) { if (w > widths[i]) widths[i] = w; }
                     else widths.Add(w);
                 }

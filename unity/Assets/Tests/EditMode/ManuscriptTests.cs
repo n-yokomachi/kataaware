@@ -67,8 +67,8 @@ namespace HalfAware.Tests
             var s = m.Find("灰皿");
             Assert.AreEqual("灰皿（任意）", s.Heading);
             Assert.AreEqual("灰皿", s.Label);
-            Assert.AreEqual(new[] { "一行目。\n二行目。", "『声』と身体<からだ>", "a  b\nc  d" }, s.Pages.ToArray(),
-                "外側の「」を外し、<br/> を改行に。リストは行を改行で繋いで 1 ページ。ルビの書き方はそのまま");
+            Assert.AreEqual(new[] { "一行目。\n二行目。", "『声』と身体<からだ>", ListFormat.Mark + "a  b\nc  d" }, s.Pages.ToArray(),
+                "外側の「」を外し、<br/> を改行に。リストは行を改行で繋いで 1 ページにし、頭にリストの印。ルビの書き方はそのまま");
             Assert.AreEqual("片づける", s.Question, "二択の説明の括弧は落とす");
             Assert.AreEqual(new[] { "片づけた。" }, s.AfterYes.ToArray());
             Assert.AreEqual("2166年　倫敦<ロンドン>", m.Find("カード").Card);
@@ -184,7 +184,8 @@ namespace HalfAware.Tests
             var chips = Room().Find(RoomIds.Chips);
             Assert.AreEqual(2, chips.lines.Length);
             Assert.AreEqual(6, SubtitleBox.LineCount(chips.lines[1]));
-            StringAssert.StartsWith("08/15  #1  Male<男>    41  32m40s  『Diego』\n", chips.lines[1]);
+            StringAssert.StartsWith(ListFormat.Mark + "08/15  #1  Male    41  32m40s  『Diego』\n", chips.lines[1]);
+            Assert.IsTrue(ListFormat.IsList(chips.lines[1]));
             Assert.AreEqual("メモリチップを抜く", chips.choice.question);
             Assert.AreEqual(0, chips.choice.afterYes.Length);
         }
@@ -199,7 +200,22 @@ namespace HalfAware.Tests
             Assert.AreEqual("スリープを解除する", monitor.choice.question);
             Assert.AreEqual(2, monitor.choice.afterYes.Length);
             Assert.AreEqual(5, SubtitleBox.LineCount(monitor.choice.afterYes[1]));
+            StringAssert.StartsWith(ListFormat.Mark + "条件: 名前を呼ばれた時刻\n", monitor.choice.afterYes[1]);
+            // 「条件: 名前を呼ばれた時刻」は半角の空白 1 つなので 1 列。それでもリストの印で画面の真ん中の枠に出す
+            Assert.AreEqual(1, ListFormat.Most(monitor.choice.afterYes[1]));
             Assert.IsTrue(ListFormat.IsList(monitor.choice.afterYes[1]));
+            Assert.IsFalse(ListFormat.IsList(monitor.choice.afterYes[0]), "リストの前の 1 ページは字幕の窓");
+        }
+
+        [Test]
+        public void TheListMarkNeverShows()
+        {
+            // 印は表に組むかを決めるだけ。組んだ物・ログ・親字だけの形には出ない
+            var page = Room().Find(RoomIds.Terminal).choice.afterYes[1];
+            Assert.AreEqual(-1, ListFormat.Compose(page, ListLayout.RoomEm, false).IndexOf(ListFormat.Mark));
+            Assert.AreEqual(-1, Ruby.Expand(page).IndexOf(ListFormat.Mark));
+            Assert.AreEqual(-1, Ruby.Plain(page).IndexOf(ListFormat.Mark));
+            StringAssert.StartsWith("条件: 名前を呼ばれた時刻", ListFormat.Compose(page, ListLayout.RoomEm, false));
         }
 
         [Test]
@@ -215,10 +231,44 @@ namespace HalfAware.Tests
         {
             var memo = Room().Find(RoomIds.Clipboard);
             Assert.AreEqual(2, memo.lines.Length);
-            Assert.AreEqual("2166/08/10  Bought<仕入>  30 pcs  Stock<在庫>  47 pcs\n" +
-                "2166/08/11  Sold<売却>     5 pcs  Stock<在庫>  42 pcs\n" +
-                "2166/08/13  Sold<売却>     4 pcs  Stock<在庫>  38 pcs\n" +
+            Assert.AreEqual(ListFormat.Mark + "2166/08/10  仕入  30枚  在庫  47枚\n" +
+                "2166/08/11  売却   5枚  在庫  42枚\n" +
+                "2166/08/13  売却   4枚  在庫  38枚\n" +
                 "2166/08/15", memo.lines[1]);
+            // 「 5枚」は「30枚」と尻を揃える（数で始まる塊だけの列）
+            var rows = ListFormat.Compose(memo.lines[1], ListLayout.RoomEm, false).Split('\n');
+            Assert.AreEqual(Pos(rows[0], "30枚") + 0.5f, Pos(rows[1], "5枚"), 1e-3f);
+        }
+
+        /// <summary>line の中で text の直前に置いた pos の値（em）</summary>
+        static float Pos(string line, string text)
+        {
+            var at = line.IndexOf("em>" + text);
+            Assert.GreaterOrEqual(at, 0, text + " が無い: " + line);
+            var from = line.LastIndexOf("<pos=", at) + 5;
+            return float.Parse(line.Substring(from, at - from), System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        [Test]
+        public void TheConsoleClockFollowsTheCard()
+        {
+            // コンソールの頭の時刻（場面 1・2）は、原稿のカードの時刻の後。カードを 18時35分 から 19時35分 に直したので 1 時間ずらした（2026-09-28）
+            var card = System.Text.RegularExpressions.Regex.Match(Room().Card, @"(\d+)時(\d+)分");
+            Assert.That(card.Success, Is.True, Room().Card);
+            var at = int.Parse(card.Groups[1].Value) * 60 + int.Parse(card.Groups[2].Value);
+            var room = Minutes(ConsolePlace.For("Room"));
+            var alley = Minutes(ConsolePlace.For("Alley"));
+            Assert.That(room, Is.GreaterThan(at), "一服したあと");
+            Assert.That(room - at, Is.LessThan(30), "一服とジャケットのぶんだけ後");
+            Assert.That(alley, Is.GreaterThan(room), "路地裏は部屋を出た後");
+            Assert.That(Minutes(ConsolePlace.For("Connect")), Is.GreaterThan(alley), "場面 3 は路地裏から戻った後");
+        }
+
+        static int Minutes(string head)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(head, @"(\d\d):(\d\d)");
+            Assert.That(m.Success, Is.True, head);
+            return int.Parse(m.Groups[1].Value) * 60 + int.Parse(m.Groups[2].Value);
         }
 
         [Test]

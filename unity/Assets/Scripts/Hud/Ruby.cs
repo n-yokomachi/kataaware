@@ -59,6 +59,18 @@ namespace HalfAware
         /// </summary>
         public const float ExtraLineSpacing = (Lift + RubyTop * Scale + BaseBottom + Gap - Advance) * 100f;
 
+        /// <summary>ルビの大きさ scale で振る時の、持ち上げる高さ。<see cref="Lift"/> と同じ式（リストの枠は字幕より大きなルビを振る、<see cref="ListLayout.RubyScale"/>）</summary>
+        public static float LiftFor(float scale)
+        {
+            return BaseTop + Gap + RubyDip * scale;
+        }
+
+        /// <summary>ルビの大きさ scale で振る時に足す行間。字の大きさに対する百分率。<see cref="ExtraLineSpacing"/> と同じ式</summary>
+        public static float SpacingFor(float scale)
+        {
+            return (LiftFor(scale) + RubyTop * scale + BaseBottom + Gap - Advance) * 100f;
+        }
+
         /// <summary>
         /// ルビが親字より広いとき、両脇の字の上へ掛けてよい幅。em（親字の）。片側の値。
         ///
@@ -179,14 +191,21 @@ namespace HalfAware
         /// </summary>
         public const string DotGlyph = "・";
 
-        /// <summary>傍点の大きさ。親字に対する割合。「・」は字の枠の 0.21 em しか無いので、ルビより縮めずに親字と同じ大きさで打つ</summary>
-        public const float DotScale = 1f;
+        /// <summary>
+        /// 傍点の大きさ。親字に対する割合。「・」の点は字の枠の 0.212 em しか無く、親字と同じ大きさ（1）では
+        /// 粗い画面の台詞（13 画素）の中で 2 画素ほどにしかならなかった。1.25 倍で 0.265 em、3.4 画素にする（2026-09-28）。
+        /// 字の送りも 1.25 em になるが、親字の真ん中に揃えて両脇へ 0.125 em ずつ掛けるだけなので（<see cref="Hang"/> の内）、点の間隔は親字の間隔のまま
+        /// </summary>
+        public const float DotScale = 1.25f;
 
-        /// <summary>「・」の下の端。ベースラインから（em）。TMP の字の寸法（Noto Sans JP、2026-09-28）</summary>
+        /// <summary>「・」の点の径。字の大きさに対する em（Noto Sans JP、2026-09-28）</summary>
+        public const float DotInk = 0.212f;
+
+        /// <summary>「・」の下の端。ベースラインから（em、字の大きさ 1 の時）。TMP の字の寸法（Noto Sans JP、2026-09-28）</summary>
         public const float DotBottom = 0.274f;
 
-        /// <summary>傍点を持ち上げる高さ。点の下の端を、漢字の上の端（<see cref="BaseTop"/>）からルビと同じ隙間だけ上に置く</summary>
-        public const float DotLift = BaseTop + Gap - DotBottom;
+        /// <summary>傍点を持ち上げる高さ。点の下の端を、漢字の上の端（<see cref="BaseTop"/>）からルビと同じ隙間だけ上に置く（点を大きくしても、字との隙間は同じ）</summary>
+        public const float DotLift = BaseTop + Gap - DotBottom * DotScale;
 
         /// <summary>
         /// 文面には「｜親字《るび》」か「親字&lt;るび&gt;」の形で書いておく。
@@ -306,6 +325,12 @@ namespace HalfAware
         /// </summary>
         public static int Width(string text)
         {
+            return Width(text, Scale);
+        }
+
+        /// <summary>ルビの大きさ scale で振る時の幅（リストの枠、<see cref="ListLayout.RubyScale"/>）</summary>
+        public static int Width(string text, float scale)
+        {
             text = Normalize(text);
             if (string.IsNullOrEmpty(text)) return 0;
             var n = 0;
@@ -316,9 +341,8 @@ namespace HalfAware
                 if (Group(text, i, out baseFrom, out baseTo, out rubyFrom, out rubyTo))
                 {
                     var ruby = text.Substring(rubyFrom, rubyTo - rubyFrom);
-                    var over = ruby == DotMark
-                        ? ListFormat.Units(DotGlyph) * DotScale
-                        : ListFormat.Units(ruby) * Scale;
+                    // 傍点の点は小さく、親字の真ん中に乗るだけなので、幅は親字のまま
+                    var over = ruby == DotMark ? 0f : ListFormat.Units(ruby) * scale;
                     n += Mathf.Max(ListFormat.Units(text.Substring(baseFrom, baseTo - baseFrom)), Mathf.CeilToInt(over - 1e-3f));
                     i = rubyTo + 1;
                     continue;
@@ -413,6 +437,8 @@ namespace HalfAware
         /// </summary>
         public static string Normalize(string text)
         {
+            // リストのページの印（ListFormat.Mark）は、表に組むかを決めるだけの物。組む時と出す時には落とす
+            if (!string.IsNullOrEmpty(text) && text[0] == ListFormat.Mark) text = text.Substring(1);
             if (string.IsNullOrEmpty(text) || text.IndexOf('<') < 0) return text;
             var made = new System.Text.StringBuilder(text.Length + 32);
             var head = -1;      // 親字の頭の ｜ を置いた made の位置。ルビを待っている間だけ

@@ -125,7 +125,7 @@ HTML = f"""<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>メ
 <h3>A　端末</h3>
 <p>主人公が記憶を売り買いする端末と、場面 4 の板に揃えた、薄い青緑の線の画面。左上にいまの時刻と場所。ログの行に「調べる」「会話」の札を付ける。</p>
 <div class="stage menu-bg"><div class="a-dim"></div><div class="a-scan"></div>
-<div class="a-panel"><div class="a-head"><span>2166/08/15 18:42　倫敦・自室</span><span>TAB　閉じる</span></div>
+<div class="a-panel"><div class="a-head"><span>2166/08/15 19:42　倫敦・自室</span><span>TAB　閉じる</span></div>
 <div class="a-btns"><div class="a-btn sel">セーブ</div><div class="a-btn">ロード</div><div class="a-btn">タイトルへ戻る</div><div class="a-btn">デバッグ</div></div>
 <div class="a-log">{A_ROWS}</div><div class="a-bar"><i></i></div></div></div>
 
@@ -139,7 +139,7 @@ HTML = f"""<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>メ
 <p>場面 1・2 の記憶チップと、それを挿すハブの金属の筐体に揃えた、手触りのある画面。ボタンはチップの形、ログはチップのラベルのように番号付きの行。橙の灯りで、端末の青緑とは違う温度にする。</p>
 <div class="stage menu-bg"><div class="c-dim"></div>
 <div class="c-panel"><i class="c-screw" style="left:8px;top:8px"></i><i class="c-screw" style="right:8px;top:8px"></i><i class="c-screw" style="left:8px;bottom:8px"></i><i class="c-screw" style="right:8px;bottom:8px"></i>
-<div class="c-head"><span><span class="c-led"></span>MEMORY HUB　LOG</span><span>2166/08/15 18:42</span></div>
+<div class="c-head"><span><span class="c-led"></span>MEMORY HUB　LOG</span><span>2166/08/15 19:42</span></div>
 <div class="c-btns"><div class="c-btn sel"><b>SAVE</b><span>セーブ</span></div><div class="c-btn"><b>LOAD</b><span>ロード</span></div><div class="c-btn"><b>TITLE</b><span>タイトルへ戻る</span></div><div class="c-btn"><b>DEBUG</b><span>デバッグ</span></div></div>
 <div class="c-log">{C_ROWS}</div><div class="c-bar"><i></i></div></div></div>
 

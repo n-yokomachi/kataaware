@@ -138,8 +138,19 @@ namespace HalfAware.Tests
         public void TheDotSitsJustAboveTheBaseGlyphs()
         {
             // 点の下の端が、漢字の上の端よりルビと同じ隙間だけ上。ルビより上へは出ない（行の開け方はルビのぶんで足りる）
-            Assert.AreEqual(Ruby.BaseTop + Ruby.Gap, Ruby.DotLift + Ruby.DotBottom, 1e-4f);
+            Assert.AreEqual(Ruby.BaseTop + Ruby.Gap, Ruby.DotLift + Ruby.DotBottom * Ruby.DotScale, 1e-4f);
             Assert.Less(Ruby.DotLift + 0.486f * Ruby.DotScale, Ruby.Lift + Ruby.RubyTop * Ruby.Scale);
+        }
+
+        [Test]
+        public void TheDotIsBigEnoughToSeeOnTheCoarseScreen()
+        {
+            // 粗い画面の台詞（13 画素）で、点が 3 画素ほどになる。親字と同じ大きさ（1）では 2 画素ほどだった（2026-09-28）
+            Assert.That(13f * Ruby.DotInk * Ruby.DotScale, Is.GreaterThanOrEqualTo(3f));
+            // 点の送りは広がっても、親字の真ん中に揃えて両脇へ掛けるだけ。親字の前後は空けない（点の間隔は親字の間隔のまま）
+            var made = Ruby.Over("他", Ruby.DotGlyph, Ruby.DotScale, Ruby.DotLift, false);
+            StringAssert.EndsWith("他", made);
+            Assert.LessOrEqual((Ruby.DotScale - 1f) * 0.5f, Ruby.Hang);
         }
 
         // ---- 改行と折り返し --------------------------------------------------
