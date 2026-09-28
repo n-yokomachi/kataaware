@@ -66,8 +66,8 @@ namespace HalfAware.EditorTools
                 new View("table", new Vector3(-0.2f, 1.45f, 19.3f), 225f, 22f),
                 // 4. 閉じた格子戸を、脇の小路の外から
                 new View("4_gate", new Vector3(BuildVillage.SidePathX + 0.3f, 1.6f, 7.4f), -4f, 4f),
-                // 5. アーチの下の煉瓦の小路。アーチの手前から、くぐった先を見通す
-                new View("5_arch", new Vector3(-4.05f, 1.6f, 21.6f), 12f, 6f),
+                // 5. アーチの下の煉瓦の小路。トンネルの南の口の手前から、くぐった先を見通す（2026-09-28 にトンネルを南へ一つ延ばしたので手前へ寄せた）
+                new View("5_arch", new Vector3(-3.85f, 1.6f, 20.6f), 12f, 6f),
                 // 6. 芝から、テラスの白いパラソルの卓と裏口を
                 new View("6_terrace", new Vector3(1.9f, 1.6f, 25.2f), 190f, 7f),
                 // 7. 東屋の角
@@ -89,8 +89,9 @@ namespace HalfAware.EditorTools
         {
             return new[]
             {
-                // タイトルの背景。トンネルの北の端のアーチの芯から、軸（北から東へ 8.3 度）の上を北へ 2.5 m、目 1.6 m で軸を真っすぐ見る
-                new View("g1_title", new Vector3(-3.25f + 0.1444f * 2.5f, 1.6f, 25.30f + 0.9895f * 2.5f), 188.3f, 0f),
+                // タイトルの背景。トンネルの北の端のアーチの芯から、軸（北から東へ 8.3 度）の上を北へ 2.5 m、目 1.6 m で軸を真っすぐ見る。
+                // 2026-09-28 にトンネルを北へ一つ延ばした（北の端のアーチは (-3.25, 25.3) から軸の上を北へ 0.95 m）ので、目も同じだけ北へ
+                new View("g1_title", new Vector3(-3.25f + 0.1444f * 3.45f, 1.6f, 25.30f + 0.9895f * 3.45f), 188.3f, 0f),
                 // 格子戸をくぐった所。小路は低い生け垣の西をゆるく左へ寄り、右の垣越しにテラスの卓
                 new View("g2_gate", new Vector3(-4.2f, 1.6f, 12.9f), 356f, 3f),
                 new View("g3_terrace", new Vector3(1.2f, 1.7f, 17.8f), 352f, 6f),
@@ -99,11 +100,13 @@ namespace HalfAware.EditorTools
                 new View("g6_whole", new Vector3(3.4f, 1.7f, 19.6f), 325f, 6f),
                 // 小路のトンネル（2026-09-27）。トンネルの南の口の内からテラスと卓の開ける所（2026-09-28 に、格子戸の側からトンネルの口を見た所と替えた）と、
                 // トンネルの中を歩く目から上を見上げた所
-                new View("g7_south_mouth", new Vector3(-3.62f, 1.6f, 22.8f), 172f, 6f),
+                new View("g7_south_mouth", new Vector3(-3.75f, 1.6f, 21.9f), 170f, 6f),
                 new View("g8_tunnel_up", new Vector3(-3.55f, 1.6f, 23.0f), 8f, -38f),
                 // 格子戸から卓までの道（2026-09-28）。格子戸からの小路が塀に沿って北へ上がり、東屋の前で東へ折れる所と、東屋の前の踊り場からトンネルの北の口
                 new View("g9_west_walk", new Vector3(-5.74f, 1.6f, 24.6f), 8f, 4f),
                 new View("g10_north_mouth", new Vector3(-4.75f, 1.6f, 31.2f), 162f, 6f),
+                // 格子戸からの小路（塀沿い）から、トンネルを西の脇から見た所（輪 6 つ、5 m ほどの長さ）
+                new View("g11_tunnel_side", new Vector3(-5.74f, 1.6f, 20.2f), 32f, 5f),
             };
         }
 

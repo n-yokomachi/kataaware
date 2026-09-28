@@ -88,7 +88,7 @@ namespace HalfAware
         /// 村の背景（<c>village_a1</c>）の目の東西の位置（世界の x）。裏庭のアーチのトンネルの北の端の先
         /// （設計書 5 節の表、<c>CheckVillage.GardenViews</c> の g1_title）。朝の麦の風の残りをここで見る
         /// </summary>
-        public const float VillageEyeX = -2.889f;
+        public const float VillageEyeX = -2.752f;
 
         /// <summary>
         /// 背景の場所の環境音。その場面で流している輪を、その場面の中と同じ大きさで重ねて流す（オーナー、2026-09-27）。

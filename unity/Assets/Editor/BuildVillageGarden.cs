@@ -51,14 +51,15 @@ namespace HalfAware.EditorTools
         /// トンネルの両端から 0.45 m 先まで点を並べる。Catmull-Rom は前後の点も一直線なら直線を引くので、
         /// z 22.0 から 26.0 までが真っすぐになり、曲がりはその外で付く。小路の曲がる芯にアーチを沿わせたら、
         /// タイトルの背景の画角でトンネルの奥が右へ振れて、口の額の中が左右で揃わなかった。
-        /// 南の口を出てからは東へ 22 度ほど振って、テラスの西の縁と揃えて北の縁に着く
+        /// 2026-09-28 にトンネルを輪 6 つに延ばしたので、まっすぐな所は z 21.1 から 26.95 まで（南の輪 z 21.54、北の口の前の弧 z 26.50 の、それぞれ 0.45 m 先）。
+        /// 南の口を出てからは東へ振って、テラスの西の縁と揃えて北の縁に着く（点を 0.65 m ほどに詰めて、振り始めを丸める）
         /// </summary>
         static readonly Vector2[] TunnelWalk =
         {
-            new Vector2(TerraceWest + PathWide * 0.5f, TerraceNorth), new Vector2(-3.28f, 19.5f), new Vector2(-3.58f, 20.6f),
-            OnAxis(21.5f), OnAxis(22.0f), OnAxis(23.0f), OnAxis(24.0f), OnAxis(25.0f), OnAxis(26.0f), OnAxis(26.5f),
-            // 北の口から東屋へ、ゆるく西へ曲げる。曲がりの強さはもとの小路の東屋の前（1 m あたり 17 度ほど）を超えない
-            new Vector2(-2.99f, 27.4f), new Vector2(-3.10f, 28.4f), new Vector2(-3.45f, 29.4f), new Vector2(-4.00f, 30.4f),
+            new Vector2(TerraceWest + PathWide * 0.5f, TerraceNorth), new Vector2(-3.28f, 19.3f), new Vector2(-3.55f, 19.95f), new Vector2(-3.80f, 20.6f),
+            OnAxis(21.1f), OnAxis(21.6f), OnAxis(22.0f), OnAxis(23.0f), OnAxis(24.0f), OnAxis(25.0f), OnAxis(26.0f), OnAxis(26.95f), OnAxis(27.45f),
+            // 北の口から東屋へ、ゆるく西へ曲げる
+            new Vector2(-2.97f, 28.3f), new Vector2(-3.20f, 29.1f), new Vector2(-3.62f, 29.85f), new Vector2(-4.10f, 30.5f),
             new Vector2(-4.50f, 31.15f),
         };
 
@@ -70,13 +71,13 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 格子戸からの小路とテラスを分ける低い生け垣の芯（上から見て）。家の西の壁から西へ、テラスの南西の角を回ってテラスの西の縁に沿って北へ、
-        /// テラスの北西の角から格子戸からの小路の東の縁へ寄り、トンネルの南の口の西の脇（アーチの柱）で止める。
+        /// テラスの北西の角から格子戸からの小路の東の縁へ寄り、トンネルの南の口の西の脇（南の輪の柱）で止める。
         /// 南の口から先の小路の西は、生け垣との間に花の縁（BuildVillagePlants の HedgeEast）を挟む。場面 6 で女性が水を撒く花
         /// </summary>
         static readonly Vector2[] LowHedge =
         {
             new Vector2(HouseWest - 0.12f, 14.95f), new Vector2(-3.95f, 14.95f), new Vector2(-3.95f, 18.4f),
-            new Vector2(-4.88f, 19.2f), new Vector2(-4.90f, 21.6f), new Vector2(-4.62f, 22.5f),
+            new Vector2(-4.88f, 19.2f), new Vector2(-4.90f, 20.9f), new Vector2(-4.64f, 21.6f),
         };
         const float LowHedgeHigh = 0.72f;
         const float LowHedgeThick = 0.42f;
@@ -114,7 +115,7 @@ namespace HalfAware.EditorTools
             return along <= ArchDepth + 0.05f && along >= -(TunnelHoops - 1) * TunnelStep - 0.05f && across <= ArchHalf + 0.1f;
         }
 
-        /// <summary>低い生け垣の芯の x を z から引く（テラスの南西の角より北、z 14.95 から 22.5 まで）</summary>
+        /// <summary>低い生け垣の芯の x を z から引く（テラスの南西の角より北、z 14.95 から 21.6 まで）</summary>
         static float LowHedgeX(float z)
         {
             var s = LowHedge;
@@ -129,9 +130,11 @@ namespace HalfAware.EditorTools
         /// トンネルの北の端のアーチの芯（上から見て）と、トンネルの軸の向き（北へ）。
         /// 軸は、トンネルの掛かる所の小路の平均の向き（北から東へ 8.3 度）に合わせる。
         /// タイトルの背景の画角（yaw 188.3、目は北の端のアーチの芯から軸の上を北へ 2.5 m）は、この軸を真っすぐ見る。
-        /// 小路の点（<see cref="TunnelWalk"/>）がこれを読むので、静的な値の初期化の順に左右されないよう、式で返す
+        /// 小路の点（<see cref="TunnelWalk"/>）がこれを読むので、静的な値の初期化の順に左右されないよう、式で返す。
+        /// 2026-09-28 にトンネルを輪 4 つから 6 つへ延ばした時、北へ一つ（<see cref="TunnelStep"/>）、南へ一つ足した。
+        /// 北の端のアーチは前の (-3.25, 25.3) から軸の上を北へ 0.95 m の (-3.113, 26.24)。軸は同じ線のまま
         /// </summary>
-        static Vector2 TunnelAt { get { return new Vector2(-3.25f, 25.3f); } }
+        static Vector2 TunnelAt { get { return new Vector2(-3.25f, 25.3f) + TunnelAxis * TunnelStep; } }
         static Vector2 TunnelAxis { get { return new Vector2(Mathf.Sin(TunnelYaw * Mathf.Deg2Rad), Mathf.Cos(TunnelYaw * Mathf.Deg2Rad)); } }
         const float TunnelYaw = 8.3f;
 
@@ -512,11 +515,12 @@ namespace HalfAware.EditorTools
         // ---- アーチ ---------------------------------------------------------------------
 
         /// <summary>
-        /// 小路に掛けるトンネル。**アーチを小路に沿って四つ連ね、上を横木で繋いだ一本のトンネルにする**
-        /// （オーナー、2026-09-27「アーチ自体をもう少し長くしてみて」「藤棚みたいに吊り物がある場合も」「両立してみて」）。
+        /// 小路に掛けるトンネル。**アーチを小路に沿って六つ連ね、上を横木で繋いだ一本のトンネルにする**
+        /// （オーナー、2026-09-27「アーチ自体をもう少し長くしてみて」「藤棚みたいに吊り物がある場合も」「両立してみて」。
+        /// 2026-09-28「どっちにしてももっと長くしていいかも」で、輪 4 つ・3.1 m から輪 6 つ・5 m ほどへ延ばした）。
         /// 北の端（東屋の側、タイトルの背景の画角が正面に見る面）は、もとのアーチ（前後二本の弧と横の格子）のまま置き、
-        /// 南（家の側）へ白く塗った細い輪を <see cref="TunnelStep"/> ごとに三つ足す。長さは 3.1 m ほどで、
-        /// ふつうの家庭の庭に収まる（豪邸の長い回廊にしない）。輪は小路の芯に沿って立て、小路はトンネルの中を真っすぐ抜ける。
+        /// 南（家の側）へ白く塗った細い輪を <see cref="TunnelStep"/> ごとに五つ足す。
+        /// 輪は一本の軸の上に同じ向きで並べ、小路はトンネルの中を真っすぐ抜ける。
         /// つるバラとクレマチスを脇と上に絡ませ、上の横木から藤の花房を垂らす（札の側、BuildVillagePlants.TunnelPlants）
         /// </summary>
         static void Arch(Banks b)
@@ -532,7 +536,7 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>トンネルのアーチの数と、小路に沿った間（m）</summary>
-        const int TunnelHoops = 4;
+        const int TunnelHoops = 6;
         const float TunnelStep = 0.95f;
         /// <summary>アーチの枠の寸法。半幅・肩の高さ・北の端のアーチの前後の弧の隔たりの半分・弧の縦の潰れ</summary>
         const float ArchHalf = 0.78f;

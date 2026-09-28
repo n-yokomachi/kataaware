@@ -321,14 +321,14 @@ namespace HalfAware.EditorTools
             // 低い生け垣とトンネルを抜けた小路の間（卓の側）。場面 6 で女性が水を撒く
             all.Add(new Border
             {
-                Name = "HedgeEast", AlongZ = true, From = 18.75f, To = 22.3f,
+                Name = "HedgeEast", AlongZ = true, From = 18.75f, To = 21.2f,
                 Front = z => TunnelX(z) - edge, Back = z => LowHedgeX(z) + 0.3f, Plan = NarrowPlan, Seed = 145, Bake = "Middle",
             });
             // 格子戸からの小路とトンネル（とその北の口への小路）の間の島。両側から見る。
             // 北の先（東屋の前の踊り場の側）は背の高い物を置かない。踊り場からトンネルの北の口を塞いだ
             all.Add(new Border
             {
-                Name = "Island", AlongZ = true, From = 22.45f, To = IslandTall,
+                Name = "Island", AlongZ = true, From = 21.45f, To = IslandTall,
                 Front = z => WestX(z) + edge, Back = z => TunnelX(z) - edge, TwoSided = true, Plan = IslandPlan, Seed = 105, Bake = "West",
             });
             all.Add(new Border
