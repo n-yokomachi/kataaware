@@ -25,7 +25,7 @@ namespace HalfAware.EditorTools
         {
             Poppy, Cornflower, Thistle, Mayweed, Knapweed, Scabious, Ragwort, Grass,
             HedgeA, HedgeB, Bracken, Gorse, Ling, Bell, OldHeath, Bilberry,
-            Oak, Beech, Ash, MoorGrass, Tuft, Coping,
+            Oak, Beech, Ash, MoorGrass, Tuft, Coping, Reeds, Reedmace,
         }
 
         static readonly int[,] FieldCells =
@@ -33,6 +33,7 @@ namespace HalfAware.EditorTools
             { 0, 0, 1, 2 }, { 1, 0, 1, 2 }, { 2, 0, 1, 2 }, { 3, 0, 1, 2 }, { 4, 0, 1, 2 }, { 5, 0, 1, 2 }, { 6, 0, 1, 2 }, { 7, 0, 1, 2 },
             { 0, 2, 2, 1 }, { 2, 2, 2, 1 }, { 4, 2, 2, 1 }, { 6, 2, 2, 1 }, { 0, 3, 2, 1 }, { 2, 3, 2, 1 }, { 4, 3, 2, 1 }, { 6, 3, 2, 1 },
             { 0, 4, 2, 2 }, { 2, 4, 2, 2 }, { 4, 4, 2, 2 }, { 6, 4, 2, 1 }, { 6, 5, 2, 1 }, { 0, 6, 2, 1 },
+            { 2, 6, 1, 2 }, { 3, 6, 1, 2 },
         };
 
         /// <summary>丈・幅（m）・札の枚数。畑の縁の花は実物の草丈（ヒナゲシ 0.6 m、アザミ 1.1 m）、生け垣は 1.3〜1.6 m</summary>
@@ -43,7 +44,7 @@ namespace HalfAware.EditorTools
             new Vector3(1.30f, 2.60f, 1), new Vector3(1.60f, 3.20f, 1), new Vector3(0.90f, 1.80f, 3), new Vector3(0.85f, 1.60f, 3),
             new Vector3(0.40f, 0.80f, 3), new Vector3(0.36f, 0.72f, 3), new Vector3(0.50f, 0.90f, 3), new Vector3(0.34f, 0.68f, 3),
             new Vector3(6.0f, 7.0f, 3), new Vector3(8.0f, 9.0f, 3), new Vector3(6.5f, 7.0f, 3), new Vector3(0.55f, 1.00f, 3), new Vector3(0.45f, 0.90f, 3),
-            new Vector3(1.00f, 2.00f, 1),
+            new Vector3(1.00f, 2.00f, 1), new Vector3(2.0f, 1.0f, 2), new Vector3(1.8f, 0.9f, 2),
         };
 
         static void FieldUv(F k, out Vector2 min, out Vector2 max)
@@ -1017,6 +1018,24 @@ namespace HalfAware.EditorTools
             m.SetFloat("_SkyLift", 0.25f);
             m.SetFloat("_Sway", 0.03f);
             m.SetFloat("_SwayRate", 1.1f);
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// <summary>湖の上の薄い靄（加算。霧を色として混ぜない HalfAware/RoadGlow）。月明かりの青みを薄く</summary>
+        static Material MistMat()
+        {
+            const string path = BuildEnding.Materials + "EndingMist.mat";
+            var shader = Shader.Find("HalfAware/RoadGlow");
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                m = new Material(shader) { name = "EndingMist" };
+                AssetDatabase.CreateAsset(m, path);
+            }
+            m.shader = shader;
+            m.SetTexture("_BaseMap", Atlas(BuildEnding.Textures + "EndingMist.png", false));
+            m.SetColor("_BaseColor", new Color(0.10f, 0.11f, 0.14f, 1f));
             EditorUtility.SetDirty(m);
             return m;
         }

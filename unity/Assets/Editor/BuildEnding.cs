@@ -518,7 +518,7 @@ namespace HalfAware.EditorTools
             EditorUtility.SetDirty(roll);
             var headings = 0;
             foreach (var r in rows) if (r.kind == CreditsText.Kind.Heading) headings++;
-            return string.Format("クレジット: {0} 行（見出し {1}）、中身の長さ {2:0} px（16:9 の粗い画面の Canvas の画素）、最後の行の真ん中 {3:0} px。明朝に無い字 {4}",
+            return string.Format("クレジット: {0} 行（見出し {1}）、中身の長さ {2:0} px（1280×720 の Canvas）、最後の行の真ん中 {3:0} px。明朝に無い字 {4}",
                 rows.Count, headings, roll.Length, roll.LastCentre, missing.Length == 0 ? "無し" : "「" + missing + "」");
         }
 

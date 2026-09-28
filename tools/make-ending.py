@@ -808,6 +808,45 @@ def coping():
     return b.done()
 
 
+def reeds():
+    """
+    ヨシ（コモン・リード）。湖の岸の浅い所に群れて立つ。細い茎と、斜めに出る細長い葉、
+    8 月の終わりに出始めた紫がかった茶の羽のような穂。夜は月明かりの中の影になる
+    """
+    w, h = UNIT, UNIT * 2
+    rng = random.Random(761)
+    b = Brush(w, h)
+    stems = [(rng.uniform(10, 118), rng.uniform(14, 70)) for _ in range(22)]
+    for x, top in stems:
+        lean = rng.uniform(-8, 8)
+        b.line([(64 + (x - 64) * 0.5, h - 1), (x + lean * 0.5, (h + top) / 2.0), (x + lean, top)], jitter((120, 128, 80), rng, 10), 1)
+        for k in range(4):
+            y = h - 30 - k * rng.uniform(26, 36)
+            if y < top + 20:
+                break
+            side = rng.choice((-1, 1))
+            b.leaf(x + lean * (1 - y / h), y, rng.uniform(26, 40), side * rng.uniform(40, 70), 2.2, jitter((96, 120, 64), rng, 10))
+        if rng.random() < 0.7:
+            for k in range(9):
+                b.ell(x + lean + rng.uniform(-3, 3) + k * 0.6, top + k * 2.4, rng.uniform(2, 3.2), rng.uniform(2.5, 3.5), jitter((118, 92, 96), rng, 12))
+    return b.done()
+
+
+def reedmace():
+    """ガマ（リードメイス）。岸の泥に立つ、太い茶色の穂と、その上の細い穂先。幅の広い剣の形の葉"""
+    w, h = UNIT, UNIT * 2
+    rng = random.Random(763)
+    b = Brush(w, h)
+    for _ in range(26):
+        x = rng.uniform(16, 112)
+        b.leaf(64 + (x - 64) * 0.4, h - 1, rng.uniform(110, 190), (x - 64) * 0.35 + rng.uniform(-6, 6), 3.4, jitter((84, 110, 60), rng, 10))
+    for x, top in [(34, 40), (58, 22), (80, 34), (98, 52)]:
+        b.line([(x, h - 1), (x, top)], (104, 116, 70), 2)
+        b.ell(x, top + 26, 4.5, 16, (92, 62, 40))
+        b.line([(x, top + 10), (x, top - 6)], (130, 120, 90), 1)
+    return b.done()
+
+
 # (升の x, 升の y, 幅の升, 高さの升, 描く関数)。BuildEndingFarm.cs の FieldCells と同じ並び。
 # 下の 7・8 行目は空けておく（帯 6・7 の作り込みで足す）
 FIELD_CELLS = [
@@ -833,6 +872,8 @@ FIELD_CELLS = [
     (6, 4, 2, 1, moor_grass),     # 19 ムーアグラス
     (6, 5, 2, 1, grass_tuft),     # 20 草の株（EndingWild と同じ）
     (0, 6, 2, 1, coping),         # 21 石垣の笠石
+    (2, 6, 1, 2, reeds),          # 22 ヨシ（帯 7 の岸）
+    (3, 6, 1, 2, reedmace),       # 23 ガマ（帯 7 の岸）
 ]
 
 
@@ -871,6 +912,26 @@ def heath_ground():
     return im
 
 
+def mist():
+    """
+    湖の上の薄い靄（128×32）。加算で重ねる。横に長い楕円の、真ん中が明るく縁で消える帯。
+    縦は下が水に沿って厚く、上へ薄れる。色は白（靄の色と強さはマテリアルの色が持つ）
+    """
+    w, h = 128, 32
+    im = Image.new('RGBA', (w, h), (0, 0, 0, 255))
+    px = im.load()
+    for y in range(h):
+        v = y / float(h - 1)
+        vert = min(1.0, (1.0 - v) / 0.35) * min(1.0, v / 0.5)
+        for x in range(w):
+            u = (x + 0.5) / w
+            across = max(0.0, 1.0 - abs(u - 0.5) / 0.5)
+            k = across * across * (3 - 2 * across) * vert
+            c = int(255 * k)
+            px[x, y] = (c, c, c, 255)
+    return im
+
+
 def shaft():
     """
     林の光の筋（32×128）。加算で重ねる。横は芯が明るく縁で消える。縦は上（樹冠の隙間）で細く始まり、
@@ -903,6 +964,7 @@ def main():
     save(atlas(), 'EndingWild')
     save(field_atlas(), 'EndingField')
     save(heath_ground(), 'EndingHeathGround')
+    save(mist(), 'EndingMist')
     save(shaft(), 'EndingShaft')
 
 

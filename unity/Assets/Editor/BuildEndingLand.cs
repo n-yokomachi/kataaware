@@ -158,8 +158,8 @@ namespace HalfAware.EditorTools
                         case Scene.Moor: Moorland(s); break;
                         case Scene.Wheat: Harvest(s); break;
                         case Scene.Pasture: Wolds(s); break;
-                        case Scene.Beech: Beech(s); break;
-                        case Scene.Lake: Lake(s); break;
+                        case Scene.Beech: Avenue(s); break;
+                        case Scene.Lake: Lakeshore(s); break;
                     }
                     s.Emit(slice);
                 }
@@ -195,7 +195,6 @@ namespace HalfAware.EditorTools
             public Stats stats;
             public string name;
             public readonly Paint paint = new Paint();
-            public readonly Bank flora = new Bank { Texel = 1f, Rooted = true, CardLift = 1.4f };
             public readonly Bank road = new Bank { Texel = 1f };
             public readonly Bank water = new Bank { Texel = 1f };
             public readonly Bank wheat = new Bank { Texel = 1.25f, Rooted = true, CardLift = 1.0f };
@@ -212,6 +211,8 @@ namespace HalfAware.EditorTools
             public readonly Bank stone = new Bank { Texel = 0.5f };
             /// <summary>荒野の道の近くの地面（EndingHeathGround.png。4 m で一回り）</summary>
             public readonly Bank heath = new Bank { Texel = 0.25f };
+            /// <summary>湖の上の薄い靄（加算）</summary>
+            public readonly Bank mist = new Bank { Texel = 1f };
             public Material roadMat;
 
             /// <summary>環の中での z（区切りの頭が環の頭から何 m か）。起伏の位相を環の一周で閉じるのに使う</summary>
@@ -227,12 +228,12 @@ namespace HalfAware.EditorTools
             {
                 var m = Materials();
                 var dir = BuildEnding.Generated + name + "_";
-                stats.cards += flora.Count / 2 + wheat.Count / 2 + wild.Count / 2 + farm.Count / 2;
-                stats.tris += flora.Count + wheat.Count + paint.Count + road.Count + water.Count + field.Count + wild.Count + shafts.Count + sea.Count
-                    + farm.Count + stone.Count + heath.Count;
-                stats.calls += (flora.Count > 0 ? 1 : 0) + (wheat.Count > 0 ? 1 : 0) + (paint.Count > 0 ? 1 : 0) + (road.Count > 0 ? 1 : 0)
+                stats.cards += wheat.Count / 2 + wild.Count / 2 + farm.Count / 2;
+                stats.tris += wheat.Count + paint.Count + road.Count + water.Count + field.Count + wild.Count + shafts.Count + sea.Count
+                    + farm.Count + stone.Count + heath.Count + mist.Count;
+                stats.calls += (wheat.Count > 0 ? 1 : 0) + (paint.Count > 0 ? 1 : 0) + (road.Count > 0 ? 1 : 0)
                     + (water.Count > 0 ? 1 : 0) + (field.Count > 0 ? 1 : 0) + (wild.Count > 0 ? 1 : 0) + (shafts.Count > 0 ? 1 : 0) + (sea.Count > 0 ? 1 : 0)
-                    + (farm.Count > 0 ? 1 : 0) + (stone.Count > 0 ? 1 : 0) + (heath.Count > 0 ? 1 : 0);
+                    + (farm.Count > 0 ? 1 : 0) + (stone.Count > 0 ? 1 : 0) + (heath.Count > 0 ? 1 : 0) + (mist.Count > 0 ? 1 : 0);
                 road.Emit(slice, "Road", roadMat != null ? roadMat : m.road, false, dir);
                 var mesh = paint.Bake(dir + "Land.asset");
                 if (mesh != null)
@@ -245,12 +246,13 @@ namespace HalfAware.EditorTools
                 water.Emit(slice, "Water", m.water, false, dir);
                 field.Emit(slice, "Field", m.field, false, dir);
                 wheat.Emit(slice, "Wheat", m.wheat, false, dir);
-                flora.Emit(slice, "Flora", m.flora, false, dir);
                 wild.Emit(slice, "Wild", m.wild, false, dir);
                 sea.Emit(slice, "Sea", m.sea, false, dir);
                 farm.Emit(slice, "Farm", m.farm, false, dir);
                 stone.Emit(slice, "Stone", m.stone, false, dir);
                 heath.Emit(slice, "Heath", m.heath, false, dir);
+                var haze = mist.Emit(slice, "Mist", m.mist, false, dir);
+                if (haze != null) haze.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 var beams = shafts.Emit(slice, "Shafts", m.shaft, false, dir);
                 if (beams != null) beams.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             }
@@ -267,6 +269,7 @@ namespace HalfAware.EditorTools
             // ここから絵の上の行（<see cref="SwatchTexture"/>）
             HeathBloom, HeathOld, HeathYoung, Burnt, Bracken, MoorGrass, Stubble, StubbleDark, Straw, StrawEnd,
             Honey, StoneSlate, Gritstone, WheatFar, Gate, Lush, HillMoor, HedgeDark,
+            HillNight2, HillNight3, LampDim, MoonDim, Dusk, NightGlow, NightGlowHigh,
         }
 
         /// <summary>升の色（sRGB）。Swatch と同じ並び</summary>
@@ -322,6 +325,13 @@ namespace HalfAware.EditorTools
             new Color32(116, 142, 68, 255),  // 濃い牧草
             new Color32(116, 88, 112, 255),  // 遠くの荒野の丘
             new Color32(56, 76, 40, 255),    // 遠くの生け垣
+            new Color32(30, 38, 56, 255),    // 夜の二つ目の丘（少し淡い）
+            new Color32(46, 56, 78, 255),    // 夜のいちばん奥の丘（月明かりの靄で淡い）
+            new Color32(150, 108, 62, 255),  // 水に映った窓の灯り
+            new Color32(176, 186, 210, 255), // 月の光の道の淡い光
+            new Color32(255, 196, 120, 255), // 沈みかけた日
+            new Color32(78, 92, 124, 255),   // 夜の地平の明るみ（月明かりの靄。丘の影の後ろ）
+            new Color32(46, 56, 84, 255),    // 夜の地平の明るみの上
         };
 
         /// <summary>
@@ -467,91 +477,11 @@ namespace HalfAware.EditorTools
         /// <summary>色見本の絵の縦の画素数。下の三行が初めの 32 升（どれも同じ）、上の一行が 33 升目から</summary>
         const int SwatchHigh = 4;
 
-        // ---- アトラスの升（村の庭と同じ絵。BuildVillagePlants の Cells と Sizes から、使う物だけ） -------------
-
-        const int AtlasUnit = 128;
-        const int AtlasWide = 1024;
-        const int AtlasHigh = 2048;
-
-        enum Wild
-        {
-            HollyPink, HollyWhite, EchPink, EchWhite, Aster, Rudbeckia, DahliaPink,
-            Catmint, Geranium, Mantle, Filler, Ivy, Sage, Potato,
-            Roses, Honeysuckle, Oak, Yew, Lavender, Apple,
-        }
-
-        /// <summary>升の (x, y, 幅, 高さ)。make-garden.py の CELLS と同じ値。y は絵の上から</summary>
-        static readonly int[,] Cells =
-        {
-            { 0, 0, 1, 3 }, { 1, 0, 1, 3 }, { 7, 0, 1, 2 }, { 0, 3, 1, 2 }, { 1, 3, 1, 2 }, { 6, 0, 1, 2 }, { 5, 0, 1, 2 },
-            { 4, 2, 2, 1 }, { 6, 2, 2, 1 }, { 6, 4, 2, 1 }, { 4, 5, 2, 1 }, { 6, 5, 2, 1 }, { 0, 5, 2, 1 }, { 3, 12, 2, 1 },
-            { 0, 6, 2, 2 }, { 4, 6, 2, 2 }, { 6, 8, 2, 2 }, { 6, 10, 2, 2 }, { 6, 3, 2, 1 }, { 6, 6, 2, 2 },
-        };
-
-        /// <summary>株の丈・幅・札の枚数（BuildVillagePlants の Sizes と同じ値）</summary>
-        static readonly Vector3[] Sizes =
-        {
-            new Vector3(2.00f, 0.72f, 2), new Vector3(1.90f, 0.70f, 2), new Vector3(0.95f, 0.50f, 2), new Vector3(0.90f, 0.48f, 2),
-            new Vector3(0.95f, 0.55f, 2), new Vector3(0.85f, 0.50f, 2), new Vector3(1.25f, 0.66f, 2),
-            new Vector3(0.48f, 0.95f, 3), new Vector3(0.42f, 0.85f, 3), new Vector3(0.36f, 0.75f, 3), new Vector3(0.45f, 0.90f, 3),
-            new Vector3(0.60f, 1.20f, 1), new Vector3(0.42f, 0.80f, 3), new Vector3(0.62f, 1.24f, 3),
-            new Vector3(1.00f, 1.00f, 1), new Vector3(1.00f, 1.00f, 1), new Vector3(6.0f, 7.0f, 3), new Vector3(5.6f, 4.4f, 3),
-            new Vector3(0.55f, 0.95f, 3), new Vector3(3.00f, 3.20f, 3),
-        };
-
-        static void CellUv(Wild k, out Vector2 min, out Vector2 max)
-        {
-            var i = (int)k;
-            const float insetU = 1.5f / AtlasWide;
-            const float insetV = 1.5f / AtlasHigh;
-            const float u = (float)AtlasUnit / AtlasWide;
-            const float v = (float)AtlasUnit / AtlasHigh;
-            var x0 = Cells[i, 0] * u;
-            var x1 = (Cells[i, 0] + Cells[i, 2]) * u;
-            var y1 = 1f - Cells[i, 1] * v;
-            var y0 = 1f - (Cells[i, 1] + Cells[i, 3]) * v;
-            min = new Vector2(x0 + insetU, y0 + insetV);
-            max = new Vector2(x1 - insetU, y1 - insetV);
-        }
-
-        /// <summary>株を一つ。札を向きから等しい角度で回して交差させる（村の庭の Clump と同じ）</summary>
-        static void Clump(Bank f, Wild k, Vector3 foot, float scale, float yaw, Vector3 lean)
-        {
-            Vector2 min, max;
-            CellUv(k, out min, out max);
-            var size = Sizes[(int)k];
-            var high = size.x * scale;
-            var wide = size.y * scale;
-            var cards = Mathf.Max(1, (int)size.z);
-            f.RootY = foot.y;
-            f.RootHigh = high;
-            var up = (Vector3.up + lean).normalized * high;
-            for (var c = 0; c < cards; c++)
-            {
-                var a = (yaw + 180f * c / cards) * Mathf.Deg2Rad;
-                var across = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * (wide * 0.5f);
-                f.AtlasCard(foot + Vector3.down * 0.03f, across, up, min, max);
-            }
-        }
-
-        static Wild Pick(System.Random rnd, Wild[] kinds, float[] weights)
-        {
-            var sum = 0f;
-            foreach (var w in weights) sum += w;
-            var r = (float)rnd.NextDouble() * sum;
-            for (var i = 0; i < kinds.Length; i++)
-            {
-                r -= weights[i];
-                if (r <= 0f) return kinds[i];
-            }
-            return kinds[kinds.Length - 1];
-        }
-
         // ---- マテリアル ------------------------------------------------------------------
 
         sealed class Mats
         {
-            public Material flora, swatch, road, asphalt, water, field, wheat, glow, wild, shaft, sea, farm, stone, heath, cloudLow, cloudHigh;
+            public Material swatch, road, asphalt, water, field, wheat, glow, wild, shaft, sea, farm, stone, heath, mist, cloudLow, cloudHigh;
         }
 
         static Mats materials;
@@ -561,7 +491,6 @@ namespace HalfAware.EditorTools
             if (materials != null) return materials;
             materials = new Mats
             {
-                flora = FloraMat(),
                 swatch = SwatchMat(false),
                 glow = SwatchMat(true),
                 road = RoadMat(),
@@ -572,6 +501,7 @@ namespace HalfAware.EditorTools
                 farm = FarmMat(),
                 stone = StoneMat(),
                 heath = HeathGroundMat(),
+                mist = MistMat(),
                 cloudLow = CloudMat("EndingCloudLow", new Color(1f, 1f, 1f, 0.88f), 0.16f, 0.34f),
                 cloudHigh = CloudMat("EndingCloudHigh", new Color(0.95f, 0.97f, 1f, 0.55f), 0.28f, 0.52f),
                 // 麦は場面 8 の麦（HalfAware/Wheat）をそのまま使う。場面 8 と同じ畑の絵と色
@@ -580,36 +510,6 @@ namespace HalfAware.EditorTools
             };
             if (materials.wheat == null) Debug.LogWarning("場面 8 の麦のマテリアルが無い: Assets/Materials/Drive/Wheat.mat（先に HalfAware/Build the drive）");
             return materials;
-        }
-
-        /// <summary>
-        /// 花と葉の札のマテリアル。村の庭（VillageFlora.mat）の写し。絵は同じアトラスで、揺れと明るみだけこの場面の値にする。
-        /// 札は道と一緒に流れて世界の位置が変わるので、揺れの位相（世界の位置から出す）が走る速さで回る。揺れは小さくおさえる
-        /// </summary>
-        static Material FloraMat()
-        {
-            const string path = BuildEnding.Materials + "EndingFlora.mat";
-            var shader = Shader.Find("HalfAware/Foliage");
-            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
-            if (m == null)
-            {
-                m = new Material(shader) { name = "EndingFlora" };
-                AssetDatabase.CreateAsset(m, path);
-            }
-            if (m.shader != shader) m.shader = shader;
-            var atlas = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/Village/VillageFlora.png");
-            if (atlas == null) Debug.LogWarning("花と葉のアトラスが無い: Assets/Textures/Village/VillageFlora.png");
-            m.SetTexture("_BaseMap", atlas);
-            m.SetColor("_BaseColor", Color.white);
-            m.SetFloat("_Cutoff", 0.5f);
-            m.SetFloat("_Wrap", 0.5f);
-            m.SetFloat("_Glow", 0.30f);
-            m.SetFloat("_Shade", 0.35f);
-            m.SetFloat("_SkyLift", 0.25f);
-            m.SetFloat("_Sway", 0.03f);
-            m.SetFloat("_SwayRate", 1.1f);
-            EditorUtility.SetDirty(m);
-            return m;
         }
 
         /// <summary>路面。村の路面の絵（二本の轍と真ん中の草の筋）を、道に沿って繰り返す</summary>
