@@ -65,7 +65,10 @@ namespace HalfAware.EditorTools
             "Assets/Audio/Gravel4.wav", "Assets/Audio/Gravel5.wav", "Assets/Audio/Gravel6.wav",
         };
 
-        /// <summary>庭の煉瓦の小路とテラスの敷石。場面 8 の車庫と同じ硬い打音（`tools/make-steps.py`）</summary>
+        /// <summary>
+        /// 庭の煉瓦の小路とテラスの敷石。硬い靴でコンクリートを歩いた録音から一歩ずつ切り出した単発（場面 2 の通りと同じ組。<see cref="StepSets.Concrete"/>）。
+        /// `tools/make-ambience.sh` の 11 節。出どころは Assets/Audio/LICENSES.md
+        /// </summary>
         static readonly string[] HardSteps =
         {
             "Assets/Audio/Concrete1.wav", "Assets/Audio/Concrete2.wav",
@@ -73,7 +76,8 @@ namespace HalfAware.EditorTools
         };
 
         /// <summary>
-        /// 芝と草むらの足音。草を踏んだ録音から一歩ずつ切り出した単発（Step1〜5 とは別の音、オーナー、2026-09-27）。
+        /// 芝と草むらの足音。草を踏んだ録音から一歩ずつ切り出した単発（オーナー、2026-09-27）。
+        /// 村の足元の既定（床の当たりに <see cref="StepGround"/> の無い所）もこの組（2026-09-28。前は Kenney の柔らかい足音 Step1〜5）。
         /// `tools/make-ambience.sh` の 7 節。出どころは Assets/Audio/LICENSES.md
         /// </summary>
         static readonly string[] GrassSteps =

@@ -47,8 +47,10 @@ SRC_REUNION="$SRC_PIXABAY_DIR/leberch-ambient-578724.mp3"
 SRC_CINEMATIC="$SRC_PIXABAY_DIR/leberch-cinematic-586317.mp3"
 # 10 節（エンディングの曲）の素材。オーナーが Suno の Pro プランで生成した曲（repo に置かない）
 SRC_SONG="${SRC_SONG:-D:/Music/HALF_AWARE_OST/HALF AWARE.mp3}"
-# 6・7・11 節の足音の大きさを揃える相手（Step1〜5。Kenney RPG Audio の柔らかい足音）
-STEPS_DIR="${STEPS_DIR:-$SCRIPT_DIR/../unity/Assets/Audio}"
+# 6・7・11 節の足音の大きさを揃える相手（一歩あたり −28.5 LUFS）。
+# 前は村の既定の足音 Step1〜5（Kenney RPG Audio の柔らかい足音）を毎回測って電力の平均を取っていた（−28.47 LUFS）。
+# Step1〜5 はどこでも使わなくなって素材ごと外した（2026-09-28）ので、その値を定数で持つ。今の足音の組はみなこの値に揃っている
+STEPS_TARGET_LUFS=-28.47
 
 OUT_DIR="${OUT_DIR:-./out-ambience}"   # 出来た物を unity/Assets/Audio/ と unity/Assets/Audio/Music/ へ写す
 TMP_DIR="$OUT_DIR/tmp"
@@ -63,7 +65,7 @@ step_loudness () {
 }
 
 # 一歩あたりの大きさ（余韻の長い足音の分）。0.5 秒おきに 10 回重ねて鳴らした物の integrated loudness（LUFS）。
-# 0.5 秒に収まる音なら step_loudness と同じ値になる（Step1〜5・Gravel・Grass で差 0.1 LU 以内）。
+# 0.5 秒に収まる音なら step_loudness と同じ値になる（前の Step1〜5・Gravel・Grass で差 0.1 LU 以内）。
 # 0.5 秒を越える音は、step_loudness では 0.5 秒で打ち切って繰り返すので余韻が数えられない。
 # 重ねて鳴らせば、余韻が次の一歩に重なって鳴る分まで数える（6 節の砂利と 11 節の三つの組が使う）
 step_loudness_ola () {
@@ -73,15 +75,9 @@ step_loudness_ola () {
     | grep -E "^\s+I:" | tail -1 | grep -oE '[-0-9.]+' | head -1
 }
 
-# Step1〜5 の一歩あたりの大きさの電力の平均（6 節と 11 節の足音を揃える相手）。Step1〜5 が無ければ前に測った値
+# 6・7・11 節の足音を揃える一歩あたりの大きさ（LUFS）。定数（STEPS_TARGET_LUFS）
 steps_target () {
-  local sum=0 s l
-  if [ ! -f "$STEPS_DIR/Step1.wav" ]; then echo "-28.47"; return; fi
-  for s in 1 2 3 4 5; do
-    l=$(step_loudness "$STEPS_DIR/Step$s.wav")
-    sum=$(awk "BEGIN{print $sum + 10^($l/10)}")
-  done
-  awk "BEGIN{printf \"%.2f\", 10*log($sum/5)/log(10)}"
+  echo "$STEPS_TARGET_LUFS"
 }
 
 # 一歩ずつ切り出して大きさを揃え、OUT_DIR/<名前><番号>.wav に書き出す（6 節と 11 節）。
@@ -381,7 +377,7 @@ fi   # PART=all か village
 #    - 一歩の後ろに二つ目の塊が続く所（2.20・3.62・8.43・8.93・13.25・13.73・22.32・22.84 秒）
 #    - 塊の前に 0.1 秒を越える擦りが続く所（5.18・6.85 秒）
 #    - 草に入って小さい 14〜22 秒（床との差が 10〜15dB しかなく、雑音を除いても芯が細る）
-#    大きさは 11 節と同じ（0.5 秒おきに 10 回重ねた一歩あたりの大きさを Step1〜5 の平均へ、頂点 −1dB の天井）。輪にはしない単発
+#    大きさは 11 節と同じ（0.5 秒おきに 10 回重ねた一歩あたりの大きさを −28.5 LUFS（STEPS_TARGET_LUFS）へ、頂点 −1dB の天井）。輪にはしない単発
 # ---------------------------------------------------------------------------
 if [ "$PART" = "all" ] || [ "$PART" = "gravel" ]; then
 
@@ -445,7 +441,7 @@ for c in $GRAVEL_CUTS; do
 done
 
 GRAVEL_TARGET=$(steps_target)
-echo "  目標 ${GRAVEL_TARGET} LUFS（Step1〜5 の電力の平均）"
+echo "  目標 ${GRAVEL_TARGET} LUFS（足音の組の揃え先）"
 cut_steps Gravel "$TMP_DIR/gravel_clean.wav" "$GRAVEL_CUTS" "$GRAVEL_TARGET" -1
 
 fi   # PART=all か gravel
@@ -466,8 +462,8 @@ fi   # PART=all か gravel
 #    - 11.345（残り一つだけ採っても数が増えないので、前の六つで足りるとして見送った）
 #    残った六つを採用。切り出しは塊の頭の 15ms 前から 0.34 秒（砂利と同じ切り出しの型）。
 #    左右は最初からモノラルなので畳まず、100Hz より下の唸りを落とし、頭 4ms をなだらかにして、
-#    0.20 秒から 0.14 秒かけて消す（qsin）。大きさは砂利と同じ揃え方（Step1〜5 の一歩あたりの
-#    大きさの電力平均に、頂点 -3dB の天井を添えて）。輪にはしない単発
+#    0.20 秒から 0.14 秒かけて消す（qsin）。大きさは砂利と同じ揃え先（一歩あたり −28.5 LUFS、STEPS_TARGET_LUFS）に、
+#    頂点 -3dB の天井を添えて。輪にはしない単発
 # ---------------------------------------------------------------------------
 if [ "$PART" = "all" ] || [ "$PART" = "grass" ]; then
 
@@ -477,13 +473,8 @@ GRASS_FADE_AT=0.20
 GRASS_FADE=0.14
 GRASS_CEIL=-3
 
-GRASS_SUM=0
-for s in 1 2 3 4 5; do
-  l=$(step_loudness "$STEPS_DIR/Step$s.wav")
-  GRASS_SUM=$(awk "BEGIN{print $GRASS_SUM + 10^($l/10)}")
-done
-GRASS_TARGET=$(awk "BEGIN{printf \"%.2f\", 10*log($GRASS_SUM/5)/log(10)}")
-echo "Grass: target ${GRASS_TARGET} LUFS（Step1〜5 の電力の平均）"
+GRASS_TARGET=$(steps_target)
+echo "Grass: target ${GRASS_TARGET} LUFS（足音の組の揃え先）"
 
 n=0
 for st in $GRASS_STARTS; do
@@ -967,7 +958,7 @@ fi   # PART=all か ending
 #    - 外す物: 一歩の 0.06〜0.2 秒後に頂点の 20dB 以内の二つ目の当たりが来る物、塊の前に長い擦りが続く物、
 #      尾の中に頂点の 30dB 以内の物音が混じる物、床との差が小さい弱い一歩（揃えると雑音まで持ち上がる）
 #    **大きさ**: 0.5 秒おきに 10 回重ねて鳴らした物の integrated loudness（step_loudness_ola）を、
-#    Step1〜5 の平均（電力の平均、−28.5 LUFS）に揃える。頂点が −1dB を越えるならそこで止める（前の足音は −3dB。
+#    −28.5 LUFS（STEPS_TARGET_LUFS。前の村の既定の足音 Step1〜5 の電力の平均）に揃える。頂点が −1dB を越えるならそこで止める（前の足音は −3dB。
 #    硬い床の鋭い当たりは頂点と大きさの差が 25〜30dB あり、−3dB では目標に届かない物が組の半分出た。
 #    鳴らす側の音量は 0.28〜0.55 で、振れを足しても 0.62 倍なので、鳴った所では −5dB より下）。
 #    今までの足音（Step・前の Gravel・Grass）は 0.5 秒に伸ばして繰り返して測っていたが、余韻が 0.5 秒を越えると
@@ -978,7 +969,7 @@ fi   # PART=all か ending
 if [ "$PART" = "all" ] || [ "$PART" = "steps" ]; then
 
 STEPS_TARGET=$(steps_target)
-echo "=== 足音の三つの組（目標 ${STEPS_TARGET} LUFS、Step1〜5 の電力の平均）==="
+echo "=== 足音の三つの組（目標 ${STEPS_TARGET} LUFS）==="
 
 # 11-1. HardFloor1〜7.wav — 場面 8 の共用ガレージ、場面 4 の電車・教室・台所の床（Footsteps on hard floor、OxidVideos）
 #    元は 13.80 秒、48kHz のステレオ mp3。左右の差は和より 19dB 低いので、平均してモノラルに畳む。

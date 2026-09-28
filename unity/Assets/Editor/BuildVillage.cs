@@ -422,15 +422,10 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 場面 1・2 の柔らかい足音。芝の路肩と庭の芝で鳴らす既定の音。
-        /// 未舗装の路地と、庭の煉瓦の小路とテラスは、床の当たりの <see cref="StepGround"/> が替える（BuildVillageSound.StepGrounds）
+        /// 足元の既定の足音は草の組（<see cref="GrassSteps"/>）。床の当たりに <see cref="StepGround"/> の無い所で鳴る。
+        /// 村の歩ける地面（路地・芝の路肩・片割れの敷地・テラス）はみな <see cref="StepGround"/> を持つので（BuildVillageSound.StepGrounds）、
+        /// ふだんは鳴らない。前は Kenney の柔らかい足音（Step1〜5）で、どこでも使わなくなったので素材ごと外した（2026-09-28）
         /// </summary>
-        static readonly string[] SoftSteps =
-        {
-            "Assets/Audio/Step1.wav", "Assets/Audio/Step2.wav", "Assets/Audio/Step3.wav",
-            "Assets/Audio/Step4.wav", "Assets/Audio/Step5.wav",
-        };
-
         static void Feet(Transform player, CharacterController body)
         {
             var feet = new GameObject("Feet");
@@ -445,14 +440,7 @@ namespace HalfAware.EditorTools
             var so = new SerializedObject(steps);
             so.FindProperty("body").objectReferenceValue = body;
             so.FindProperty("source").objectReferenceValue = src;
-            var clips = so.FindProperty("clips");
-            clips.arraySize = SoftSteps.Length;
-            for (var i = 0; i < SoftSteps.Length; i++)
-            {
-                var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(SoftSteps[i]);
-                if (clip == null) Debug.LogWarning("足音の素材が無い: " + SoftSteps[i]);
-                clips.GetArrayElementAtIndex(i).objectReferenceValue = clip;
-            }
+            WriteClips(so.FindProperty("clips"), StepClips(GrassSteps));
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
