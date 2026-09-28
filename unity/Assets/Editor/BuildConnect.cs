@@ -74,6 +74,8 @@ namespace HalfAware.EditorTools
             }
             if (!Rename()) return;
 
+            // 窓の外は夜（22 時台）。場面 5・7 はここから写すので夜のまま来る
+            BuildRoomView.SetHour(RoomView.Hour.Night);
             Strip();
             Flow();
             Stand();
