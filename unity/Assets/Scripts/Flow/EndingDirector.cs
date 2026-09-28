@@ -16,7 +16,7 @@ namespace HalfAware
     /// 段取りの秒は <see cref="EndingBeats"/>。明けてから後は曲の再生の位置（素の版の <see cref="AudioSource.time"/>）で数え、曲とずれない。
     /// 歩きはさせない。見回しは、マウスとゲームパッドの右スティックで、限り（<see cref="EndingView"/>）の内だけさせる。
     /// 片割れの体へ一度向いて戻る間は見回しを封じ、戻った先は既定の向き（<see cref="EndingView.front"/>）。
-    /// 見回しの速さはほかの場面と同じ <see cref="PlayerController.LookSensitivity"/>。PlayerController の見回しは使わない（限りがこの場面だけの形なので、
+    /// 見回しの速さはほかの場面と同じ（<see cref="PlayerController.LookTurn"/>。マウスは度／画素、スティックは度／秒）。PlayerController の見回しは使わない（限りがこの場面だけの形なので、
     /// 向きはここで組んで毎フレーム書く）。
     /// コンソールを開いている間（<see cref="ImplantConsole.IsOpen"/>）は、この場面の音を止めて段取りも止める（戻れば同じ所から続く）。
     ///
@@ -226,7 +226,8 @@ namespace HalfAware
         void Steer()
         {
             if (look == null || glancing || !PlayerController.CursorLocked) return;
-            var d = look.ReadValue<Vector2>() * PlayerController.LookSensitivity;
+            // マウスは画素 × 度／画素、スティックは倒した量 × 度／秒（ほかの場面の見回しと同じ PlayerController.LookTurn）
+            var d = PlayerController.LookTurn(look.ReadValue<Vector2>(), PlayerController.FromStick(look.activeControl), Time.deltaTime);
             if (d.sqrMagnitude <= 0f) return;
             looking = Turned(looking, new Vector2(d.x, -d.y));
         }
