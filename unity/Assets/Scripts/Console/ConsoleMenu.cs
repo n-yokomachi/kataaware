@@ -14,6 +14,9 @@ namespace HalfAware
         /// <summary>目を閉じる（タイトルへ戻る）</summary>
         CloseEyes,
 
+        /// <summary>設定。カメラの速さなどを変える枠を出す</summary>
+        Settings,
+
         /// <summary>デバッグ。場面の一覧を出す</summary>
         Debug,
     }
@@ -28,14 +31,17 @@ namespace HalfAware
         Recall,
         /// <summary>デバッグの場面の一覧</summary>
         Scenes,
+        /// <summary>設定。行は <see cref="ConsoleSettings.Rows"/>。小見出しは選べない</summary>
+        Settings,
     }
 
     /// <summary>
-    /// コンソールのボタンの選ぶ・決めると、ボタンの下に開く枠（記憶する・思い出す・デバッグ）の行の選び、
-    /// 記憶するの上書きの確かめ。見せ方は持たない（<see cref="ImplantConsole"/>）。
+    /// コンソールのボタンの選ぶ・決めると、ボタンの下に開く枠（記憶する・思い出す・設定・デバッグ）の行の選び、
+    /// 記憶するの上書きの確かめ、設定の値の動かし。見せ方は持たない（<see cref="ImplantConsole"/>）。
     ///
     /// 左右で選び、決めると <see cref="ConsoleAction"/> を返す。枠を持つボタンを決めると枠を開き、
     /// もう一度決めるか、ほかのボタンへ左右で移ると閉じる。枠を開いている間は、上下で行を選ぶ。
+    /// 設定の枠だけは、左右で選んでいる項目の値を動かす（ボタンへは移らない。Esc・右クリックで枠を閉じてから）。
     ///
     /// 層は下から、ボタン・枠・上書きの確かめ。<see cref="Back"/>（Esc・右クリック）はいちばん上の層を一つ閉じる
     /// </summary>
@@ -45,10 +51,11 @@ namespace HalfAware
         public const string Recall = "思い出す";
         /// <summary>タイトルへ戻る。名前はここだけで持つ</summary>
         public const string CloseEyes = "目を閉じる";
+        public const string SettingsLabel = "設定";
         public const string DebugLabel = "デバッグ";
 
-        static readonly string[] WithDebug = { Remember, Recall, CloseEyes, DebugLabel };
-        static readonly string[] WithoutDebug = { Remember, Recall, CloseEyes };
+        static readonly string[] WithDebug = { Remember, Recall, CloseEyes, SettingsLabel, DebugLabel };
+        static readonly string[] WithoutDebug = { Remember, Recall, CloseEyes, SettingsLabel };
 
         /// <summary>
         /// デバッグを出すか。デバッグのボタン（場面の一覧）と、コンソールを開いて数字で場面へ飛ぶ操作の両方を決める。
@@ -155,7 +162,8 @@ namespace HalfAware
 
         /// <summary>
         /// 左右の入力。-1 で左、+1 で右。両端で止まる。枠のボタンから離れたら枠を閉じる。
-        /// 確かめを出している間は、確かめの札を選ぶ
+        /// 確かめを出している間は、確かめの札を選ぶ。設定の枠を開いている間は、選んでいる項目の値を一刻みずつ動かす
+        /// （つまみの行でなければ何もしない）
         /// </summary>
         public void Move(int step)
         {
@@ -163,6 +171,11 @@ namespace HalfAware
             if (Asking)
             {
                 MoveAnswer(step);
+                return;
+            }
+            if (Panel == ConsolePanel.Settings)
+            {
+                Nudge(step);
                 return;
             }
             Index = Mathf.Clamp(Index + step, 0, Labels.Length - 1);
@@ -183,6 +196,7 @@ namespace HalfAware
             {
                 case ConsoleAction.Remember: return ConsolePanel.Remember;
                 case ConsoleAction.Recall: return ConsolePanel.Recall;
+                case ConsoleAction.Settings: return ConsolePanel.Settings;
                 case ConsoleAction.Debug: return ConsolePanel.Scenes;
                 default: return ConsolePanel.None;
             }
@@ -190,7 +204,8 @@ namespace HalfAware
 
         /// <summary>
         /// 決める。枠を持つボタンなら枠を開け閉めする。開いたときは、場面の一覧なら here の場面の行、
-        /// 記憶するなら 1、思い出すならいちばん上の読める行を選んでおく。枠を持たないボタンなら枠を閉じる
+        /// 記憶するなら 1、思い出すならいちばん上の読める行、設定ならいちばん上の項目（小見出しの次）を選んでおく。
+        /// 枠を持たないボタンなら枠を閉じる
         /// </summary>
         public ConsoleAction Decide(string here)
         {
@@ -207,7 +222,8 @@ namespace HalfAware
             switch (want)
             {
                 case ConsolePanel.Scenes: Row = Mathf.Max(0, System.Array.IndexOf(SceneMenu.Scenes, here)); break;
-                case ConsolePanel.Recall: Row = Next(-1, 1); break;
+                case ConsolePanel.Recall:
+                case ConsolePanel.Settings: Row = Next(-1, 1); break;
                 default: Row = 0; break;
             }
             return action;
@@ -223,16 +239,19 @@ namespace HalfAware
                     case ConsolePanel.Scenes: return SceneMenu.Count;
                     case ConsolePanel.Remember: return RememberRows;
                     case ConsolePanel.Recall: return RecallRows;
+                    case ConsolePanel.Settings: return ConsoleSettings.Rows.Length;
                     default: return 0;
                 }
             }
         }
 
-        /// <summary>その行を選べるか。思い出すの空きは選べない</summary>
+        /// <summary>その行を選べるか。思い出すの空きと、設定の小見出しは選べない</summary>
         public bool Usable(int row)
         {
             if (row < 0 || row >= Rows) return false;
-            return Panel != ConsolePanel.Recall || Filled(row);
+            if (Panel == ConsolePanel.Recall) return Filled(row);
+            if (Panel == ConsolePanel.Settings) return ConsoleSettings.Rows[row].Selectable;
+            return true;
         }
 
         /// <summary>from から step の向きで、次に選べる行。無ければ from（from が選べない行なら -1）</summary>
@@ -243,7 +262,7 @@ namespace HalfAware
             return Usable(from) ? from : -1;
         }
 
-        /// <summary>枠の上下。-1 で上、+1 で下。両端で止まる。思い出すでは空きを飛ばす</summary>
+        /// <summary>枠の上下。-1 で上、+1 で下。両端で止まる。思い出すでは空きを、設定では小見出しを飛ばす</summary>
         public void MoveRow(int step)
         {
             if (Asking || Panel == ConsolePanel.None || step == 0) return;
@@ -274,6 +293,42 @@ namespace HalfAware
                 if (Panel == ConsolePanel.Recall) return (SaveSlot)Row;
                 return null;
             }
+        }
+
+        // ---- 設定 ------------------------------------------------------------
+
+        /// <summary>設定の枠で選んでいる行。設定の枠を開いていない、選べる行が無ければ null</summary>
+        public SettingRow SettingRow
+        {
+            get { return Panel == ConsolePanel.Settings && Usable(Row) ? ConsoleSettings.Rows[Row] : null; }
+        }
+
+        /// <summary>設定の枠で選んでいる、つまみの行が動かす値。つまみの行を選んでいなければ null</summary>
+        public SettingDial RowDial
+        {
+            get
+            {
+                var row = SettingRow;
+                return row != null ? row.Dial : null;
+            }
+        }
+
+        /// <summary>選んでいるつまみを step 刻みだけ動かす。両端で止まる。動かせる行でなければ false</summary>
+        public bool Nudge(int step)
+        {
+            var dial = RowDial;
+            if (dial == null || step == 0) return false;
+            dial.Nudge(step);
+            return true;
+        }
+
+        /// <summary>設定の枠で「既定に戻す」を選んでいれば、全部の値を既定へ戻して true</summary>
+        public bool ResetSettings()
+        {
+            var row = SettingRow;
+            if (row == null || row.Kind != SettingKind.Reset) return false;
+            GameSettings.ResetAll();
+            return true;
         }
 
         // ---- 上書きの確かめ -------------------------------------------------
@@ -322,7 +377,7 @@ namespace HalfAware
 
         /// <summary>
         /// 一つ前に戻る（Esc・右クリック）。いちばん上の層を一つ閉じて true。
-        /// 確かめを出していれば閉じ（「いいえ」と同じ。記憶するの枠は開いたまま）、枠を出していれば閉じる。
+        /// 確かめを出していれば閉じ（「いいえ」と同じ。記憶するの枠は開いたまま）、枠（記憶する・思い出す・設定・デバッグ）を出していれば閉じる。
         /// どちらも出していなければ false（コンソールを閉じる）
         /// </summary>
         public bool Back()

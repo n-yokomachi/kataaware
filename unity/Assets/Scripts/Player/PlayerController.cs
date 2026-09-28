@@ -29,7 +29,16 @@ namespace HalfAware
         // 度 / ピクセル。試作は 0.0022 rad/px（＝ 0.126）だったが、実画面で速すぎたので半分にした（0.063）。
         // 2026-09-28 に「カメラ回転のスピードをもっと落として」と言われ、さらに 2/3 に落とした。
         // **場面をまたいで効く。** 自室も路地裏も車内も同じ速さで振れる
-        public const float LookSensitivity = 0.042f;
+        /// <summary>見回しの元の速さ。度 / ピクセル。コンソールの設定の「カメラの速さ」が 1 倍の時の速さ</summary>
+        public const float BaseLookSensitivity = 0.042f;
+
+        /// <summary>
+        /// 見回しの速さ。度 / ピクセル。元の速さ（<see cref="BaseLookSensitivity"/>）に、コンソールの設定の
+        /// 「カメラの速さ」の倍率（<see cref="GameSettings.LookScale"/>、0.25〜2 倍）を掛ける。
+        /// 見回し（マウスとゲームパッドの右スティック）にだけ効く。調べた物へ目を向ける動き（<see cref="Face"/>・<see cref="Follow"/>）は
+        /// 秒で決まるので、倍率に関わらない
+        /// </summary>
+        public static float LookSensitivity { get { return BaseLookSensitivity * GameSettings.LookScale.Value; } }
         /// <summary>
         /// 調べた物や話す相手へ目を向けるのにかける秒（<see cref="Face"/>・<see cref="Follow"/>）。
         /// 動き出しと止まりはなめらかに（<see cref="Gaze.Ease"/>）。
@@ -503,10 +512,11 @@ namespace HalfAware
 
         void Look(Vector2 delta)
         {
-            var turn = delta.x * LookSensitivity;
+            var speed = LookSensitivity;
+            var turn = delta.x * speed;
             // 座っている間は首だけ。立てば体ごと回る
             if (!head.Add(turn)) transform.Rotate(0f, turn, 0f);
-            Pitch -= delta.y * LookSensitivity;
+            Pitch -= delta.y * speed;
         }
 
         void Walk(Vector2 input)

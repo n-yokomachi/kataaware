@@ -28,7 +28,7 @@ namespace HalfAware.Tests
         public void ADevelopmentBuildShowsDebugAndJumps()
         {
             ConsoleMenu.DebugOverride = true;
-            CollectionAssert.AreEqual(new[] { "記憶する", "思い出す", "目を閉じる", "デバッグ" }, ConsoleMenu.Labels);
+            CollectionAssert.AreEqual(new[] { "記憶する", "思い出す", "目を閉じる", "設定", "デバッグ" }, ConsoleMenu.Labels);
             var m = new ConsoleMenu();
             m.Move(5);
             Assert.AreEqual(ConsoleAction.Debug, m.Selected);
@@ -42,7 +42,7 @@ namespace HalfAware.Tests
         {
             ConsoleMenu.DebugOverride = false;
             Assert.IsFalse(ConsoleMenu.DebugShown);
-            CollectionAssert.AreEqual(new[] { "記憶する", "思い出す", "目を閉じる" }, ConsoleMenu.Labels);
+            CollectionAssert.AreEqual(new[] { "記憶する", "思い出す", "目を閉じる", "設定" }, ConsoleMenu.Labels);
         }
 
         [Test]
@@ -51,10 +51,11 @@ namespace HalfAware.Tests
             ConsoleMenu.DebugOverride = false;
             var m = new ConsoleMenu();
             m.Move(5);
-            Assert.AreEqual(ConsoleAction.CloseEyes, m.Selected, "右の端は目を閉じる");
+            Assert.AreEqual(ConsoleAction.Settings, m.Selected, "右の端は設定");
             m.Hover((int)ConsoleAction.Debug);
-            Assert.AreEqual(ConsoleAction.CloseEyes, m.Selected, "無いボタンには重ならない");
-            Assert.AreEqual(ConsoleAction.CloseEyes, m.Decide("Room"));
+            Assert.AreEqual(ConsoleAction.Settings, m.Selected, "無いボタンには重ならない");
+            Assert.AreEqual(ConsoleAction.Settings, m.Decide("Room"));
+            Assert.AreEqual(ConsolePanel.Settings, m.Panel, "設定は公開用の書き出しでも開く");
             Assert.IsFalse(m.Listing);
             Assert.IsNull(m.RowTarget("Room"));
         }

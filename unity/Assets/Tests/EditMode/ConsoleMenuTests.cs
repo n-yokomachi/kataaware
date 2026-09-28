@@ -7,7 +7,7 @@ namespace HalfAware.Tests
         [Test]
         public void TheButtonsReadAsDecided()
         {
-            CollectionAssert.AreEqual(new[] { "記憶する", "思い出す", "目を閉じる", "デバッグ" }, ConsoleMenu.Labels);
+            CollectionAssert.AreEqual(new[] { "記憶する", "思い出す", "目を閉じる", "設定", "デバッグ" }, ConsoleMenu.Labels);
             Assert.AreEqual(ConsoleMenu.Labels.Length, System.Enum.GetValues(typeof(ConsoleAction)).Length);
         }
 
@@ -31,6 +31,8 @@ namespace HalfAware.Tests
             m.Move(1);
             m.Move(1);
             Assert.AreEqual(ConsoleAction.CloseEyes, m.Selected);
+            m.Move(1);
+            Assert.AreEqual(ConsoleAction.Settings, m.Selected);
             m.Move(5);
             Assert.AreEqual(ConsoleAction.Debug, m.Selected);
         }
@@ -137,7 +139,7 @@ namespace HalfAware.Tests
         public void DebugOpensTheSceneListOnWhereYouAre()
         {
             var m = new ConsoleMenu();
-            m.Hover(3);
+            m.Hover((int)ConsoleAction.Debug);
             Assert.AreEqual(ConsoleAction.Debug, m.Decide("Dive"));
             Assert.IsTrue(m.Listing);
             Assert.AreEqual(3, m.Row);
@@ -154,7 +156,7 @@ namespace HalfAware.Tests
         public void TheSceneListFollowsTheMouseAndStopsAtTheEnds()
         {
             var m = new ConsoleMenu();
-            m.Hover(3);
+            m.Hover((int)ConsoleAction.Debug);
             m.Decide("Room");
             // 一覧の終わりはエンディング。行の数は場面を足すたびに増えるので、数えて引く
             var last = SceneMenu.Count - 1;
@@ -173,7 +175,7 @@ namespace HalfAware.Tests
         public void MovingOffDebugOrBackingOutClosesTheList()
         {
             var m = new ConsoleMenu();
-            m.Hover(3);
+            m.Hover((int)ConsoleAction.Debug);
             m.Decide("Room");
             Assert.IsTrue(m.Back());
             Assert.IsFalse(m.Listing);
@@ -187,7 +189,7 @@ namespace HalfAware.Tests
         public void HoveringAnotherButtonKeepsTheListOpen()
         {
             var m = new ConsoleMenu();
-            m.Hover(3);
+            m.Hover((int)ConsoleAction.Debug);
             m.Decide("Room");
             m.Hover(1);
             Assert.IsTrue(m.Listing);
@@ -226,7 +228,7 @@ namespace HalfAware.Tests
         [Test]
         public void BackFromEachPanelReturnsToTheButtons()
         {
-            foreach (var action in new[] { ConsoleAction.Remember, ConsoleAction.Recall, ConsoleAction.Debug })
+            foreach (var action in new[] { ConsoleAction.Remember, ConsoleAction.Recall, ConsoleAction.Settings, ConsoleAction.Debug })
             {
                 var m = new ConsoleMenu();
                 m.Fill(SaveSlot.Auto, true);
@@ -319,7 +321,7 @@ namespace HalfAware.Tests
             m.Move(1);
             Assert.AreEqual(ConsoleMenu.NoIndex, m.Answer);
             Assert.AreEqual(ConsoleAction.Remember, m.Selected);
-            m.Hover(3);
+            m.Hover((int)ConsoleAction.Debug);
             m.HoverRow(2);
             m.MoveRow(1);
             m.Decide("Room");
