@@ -8,6 +8,7 @@
 - エンディングの景色の帯の mesh も repo に置いていない（30 MB 近くある）。clone した直後や別端末では `HalfAware/Build the ending` で一度組み直す
 - 素材の出典と許諾は `unity/Assets/Audio/LICENSES.md`、`unity/Assets/Fonts/LICENSES.md`、`unity/Assets/Models/LICENSES.md`
 - 引き継ぎ: `HANDOFF.md` があればセッション開始時に読み、読了後に削除する
+- 台詞の原稿: `docs/scenario/`（正はここ。オーナーが添削し、ゲームの文面へ写す。書き方の決まりは `docs/scenario/README.md`）
 - 参考資料: `docs/reference/`
 - 設計文書: `docs/superpowers/specs/`、実装計画: `docs/superpowers/plans/`
 - 作業の分担: 設計・レビュー・統合は親セッションが担い、実装の細かいタスクは subagent に委ねる。subagent のモデルは呼び出し側で毎回 `opus` または `sonnet` を明示し、親からの継承に任せない
