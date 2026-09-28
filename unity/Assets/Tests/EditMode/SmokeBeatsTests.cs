@@ -75,9 +75,53 @@ namespace HalfAware.Tests
         }
 
         [Test]
-        public void SheSmokesThreeTimes()
+        public void SheSmokesTwice()
         {
-            Assert.AreEqual(3, SmokeBeats.Drags);
+            // 2026-09-28 にオーナーの指示で 3 から 2 に減らした（「吸う音吐く音は１回ずつ減らす」）
+            Assert.AreEqual(2, SmokeBeats.Drags);
+        }
+
+        // ---- 向き直す間（場面 1） ------------------------------------------------
+
+        [Test]
+        public void SheTurnsBackOnlyAfterTheFlameHasSounded()
+        {
+            // 火を点けてから向き直す。火の音が鳴りきったところ（最初の一服の頃）から向き直し始める
+            Assert.Greater(SmokeBeats.TurnAt, SmokeBeats.FlameAt);
+            Assert.GreaterOrEqual(SmokeBeats.TurnAt, SmokeBeats.SmokeAt(SmokeBeats.FlameSeconds) - 1e-4f, "火の音が鳴りきってから");
+            Assert.AreEqual(SmokeBeats.FirstDragAt, SmokeBeats.TurnAt, 1e-4f, "向き直さなければ、そこで吸い始める");
+        }
+
+        [Test]
+        public void TheTurnPushesEveryDragAndBlowBackByTheSameAmount()
+        {
+            const float turn = 2.9f;
+            for (var i = 0; i < SmokeBeats.Drags; i++)
+            {
+                Assert.AreEqual(turn, SmokeBeats.DragAt(i, SmokeBeats.Drags, turn) - SmokeBeats.DragAt(i, SmokeBeats.Drags), 1e-4f);
+                Assert.AreEqual(turn, SmokeBeats.BlowAt(i, SmokeBeats.Drags, turn) - SmokeBeats.BlowAt(i, SmokeBeats.Drags), 1e-4f);
+                Assert.AreEqual(turn, SmokeBeats.CardAt(i, SmokeBeats.Drags, turn) - SmokeBeats.CardAt(i, SmokeBeats.Drags), 1e-4f);
+            }
+            Assert.AreEqual(turn, SmokeBeats.Total(SmokeBeats.Drags, turn) - SmokeBeats.Total(SmokeBeats.Drags), 1e-4f);
+            Assert.GreaterOrEqual(SmokeBeats.DragAt(0, SmokeBeats.Drags, turn), SmokeBeats.TurnAt + turn - 1e-4f, "向き直し終えてから吸う");
+        }
+
+        [Test]
+        public void ANegativeTurnIsNoTurn()
+        {
+            Assert.AreEqual(SmokeBeats.DragAt(0, 2), SmokeBeats.DragAt(0, 2, -1f), 1e-4f);
+            Assert.AreEqual(SmokeBeats.Total(2), SmokeBeats.Total(2, -1f), 1e-4f);
+        }
+
+        [Test]
+        public void TheOnlyCardComesJustAfterTheLastBlow()
+        {
+            // 場面 1 は二服目を吐いたところで一度だけ暗くする。一服目の吐きより後、吐いている最中
+            const float turn = 2.9f;
+            var last = SmokeBeats.Drags - 1;
+            var card = SmokeBeats.CardAt(last, SmokeBeats.Drags, turn);
+            Assert.Greater(card, SmokeBeats.BlowAt(0, SmokeBeats.Drags, turn) + SmokeBeats.BlowSeconds, "一服目は暗くならない");
+            Assert.Less(card, SmokeBeats.BlowAt(last, SmokeBeats.Drags, turn) + SmokeBeats.BlowSeconds, "吐いている最中に暗くなる");
         }
 
         [Test]

@@ -70,6 +70,8 @@ namespace HalfAware
         [SerializeField] Transform chair;
         [Tooltip("椅子を押し下げる距離。椅子の後ろ向きに。メートル")]
         [SerializeField] float chairPushBack = 0.24f;
+        [Tooltip("座っている間、首を左右に振れる角度。度。片側の値。場面ごとに持つ（場面 1 は前方 140 度ほどの 70、ほかは HeadTurn.DefaultLimit の 90）")]
+        [SerializeField] float seatedHeadLimit = HeadTurn.DefaultLimit;
 
         [Header("目覚めの起き上がり")]
         [Tooltip("座位の目線からどれだけ下から始めるか。メートル")]
@@ -146,6 +148,17 @@ namespace HalfAware
         /// <summary>二択を出している最中か</summary>
         public bool Choosing => choice != null;
 
+        /// <summary>目覚めの起き上がりの途中か。起き上がりの無い場面と、起き上がり終えた後は false</summary>
+        public bool Waking => wakeUp != null && !wakeUp.Done;
+
+        /// <summary>
+        /// 場面の頭の明けを、場面の演出が預かっている間 true（場面 1 の呼吸と瞬き、<see cref="RoomIntroDirector"/>）。
+        /// 預かっている間、SceneFlow は黒から明けず（Start）、目覚めの起き上がりも始めない（背を預けて天井を見た形のまま）。
+        /// 演出が明けきってから false に戻すと、そこから起き上がる。
+        /// 演出が Awake で立て、思い出した時（<see cref="ISceneMemory.Restore"/>）は下ろす。そのときは SceneFlow がいつもどおり黒から明ける
+        /// </summary>
+        public bool OpeningHeld { get; set; }
+
         /// <summary>
         /// いま出している行。出していなければ null。
         /// 台詞の途中でしぐさを入れたい演出が、どこまで進んだかを見るのに使う
@@ -192,8 +205,8 @@ namespace HalfAware
                 standUp = new StandUp(seatEyeHeight, PlayerController.StandingEyeHeight, StandSeconds);
                 player.CanMove = false;
                 player.EyeHeight = seatEyeHeight;
-                // 座っている間は体を据えて首だけ振る
-                player.HeadYawLimit = HeadTurn.DefaultLimit;
+                // 座っている間は体を据えて首だけ振る。振れる角度は場面ごと（場面 1 は 70 度）
+                player.HeadYawLimit = seatedHeadLimit > 0f ? seatedHeadLimit : HeadTurn.DefaultLimit;
                 if (body != null)
                 {
                     seatedPose = body.GetComponent<SeatedPose>();
@@ -216,6 +229,8 @@ namespace HalfAware
         /// </summary>
         IEnumerator Start()
         {
+            // 明けを演出が預かっている（場面 1 の呼吸と瞬き）。黒く覆うのも明けるのも演出がする
+            if (!resumed && OpeningHeld) yield break;
             // 思い出して来た時は見出しを出さない。当て終えた形を黒から明ける
             if (!resumed && !string.IsNullOrEmpty(openingCard))
             {
@@ -574,10 +589,11 @@ namespace HalfAware
             daze.Decay(dazeBlur, dazeWobble, dazeSeconds);
         }
 
-        /// <summary>始まりの起き上がり。終わるまで見回しを預かる</summary>
+        /// <summary>始まりの起き上がり。終わるまで見回しを預かる。明けを演出が預かっている間は、天井を見た形のまま待つ</summary>
         void Wake()
         {
             if (wakeUp == null || wakeUp.Done) return;
+            if (OpeningHeld) return;
             wakeUp.Tick(Time.deltaTime);
             player.EyeHeight = wakeUp.EyeHeight;
             player.Pitch = wakeUp.Pitch;

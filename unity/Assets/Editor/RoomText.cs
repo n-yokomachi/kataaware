@@ -74,9 +74,14 @@ namespace HalfAware.EditorTools
                 });
             }
 
-            // ドア: 出る前に一度きく
+            // ドア: 出る前に一度きく。前提（ジャケット・チップ・モニター）が残っている間の文は持たない（原稿 docs/scenario/01-room.md）。
+            // 文が無いので、前提が済むまではドアを狙っても印が出ず、調べられない（InteractionPicker.Select）
             var door = Entry(entries, "door");
-            if (door != null) Ask(door, "部屋を出る", new string[0]);
+            if (door != null)
+            {
+                Ask(door, "部屋を出る", new string[0]);
+                door.FindPropertyRelative("hints").arraySize = 0;
+            }
 
             // メモ: 売り上げは 3 行に割って 1 ページで出す
             var clipboard = Entry(entries, "clipboard");

@@ -22,7 +22,8 @@ namespace HalfAware
         public const string RootName = "Choice";
 
         static readonly Color Accent = Rgb(0x7f, 0xe3, 0xec, 1f);
-        static readonly Color Pale = Rgb(0xcf, 0xf7, 0xfa, 1f);
+        /// <summary>問いと札の字の色。リストの枠（<see cref="ListView"/>）の表も同じ色</summary>
+        internal static readonly Color Pale = Rgb(0xcf, 0xf7, 0xfa, 1f);
         /// <summary>
         /// 板の地。案の CSS は 0.62 だが、あちらは背景を 2 px ぼかしていた。ゲームではぼかせず、
         /// 村の花の上で問いの字が模様に混ざりかけたので 0.76 まで濃くした（2026-09-27）
@@ -80,10 +81,7 @@ namespace HalfAware
         /// <summary>parent（HUD の Canvas）の中に板を組む。伏せた状態で返す</summary>
         public static ChoiceView Build(RectTransform parent)
         {
-            var r = Rect(parent, RootName);
-            r.anchorMin = new Vector2(0.5f, 0.5f);
-            r.anchorMax = new Vector2(0.5f, 0.5f);
-            r.pivot = new Vector2(0.5f, 0.5f);
+            var r = Board(parent, RootName);
             r.anchoredPosition = new Vector2(0f, ChoiceLayout.Lift);
             var view = new ChoiceView(r);
             view.Make();
@@ -91,14 +89,27 @@ namespace HalfAware
             return view;
         }
 
-        void Make()
+        /// <summary>
+        /// 板を組む。半ば透ける暗い地に、青緑の細い枠と、左上と右下の鉤。画面の真ん中に置き、大きさは呼び手が決める。
+        /// 二択の札とリストの枠（<see cref="ListView"/>）が同じ板に載る
+        /// </summary>
+        internal static RectTransform Board(RectTransform parent, string name)
         {
-            var bg = root.gameObject.AddComponent<Image>();
+            var r = Rect(parent, name);
+            r.anchorMin = new Vector2(0.5f, 0.5f);
+            r.anchorMax = new Vector2(0.5f, 0.5f);
+            r.pivot = new Vector2(0.5f, 0.5f);
+            var bg = r.gameObject.AddComponent<Image>();
             bg.color = Fill;
             bg.raycastTarget = false;
-            Border(root, Edge, Line);
-            Hook(root, 0f, 1f);
-            Hook(root, 1f, 0f);
+            Border(r, Edge, Line);
+            Hook(r, 0f, 1f);
+            Hook(r, 1f, 0f);
+            return r;
+        }
+
+        void Make()
+        {
             question = Text(root, "Question", ChoiceLayout.QuestionFont, Pale);
             question.characterSpacing = ChoiceLayout.QuestionSpacing;
             rule = Solid(root, "Rule", Rule).rectTransform;
@@ -279,7 +290,7 @@ namespace HalfAware
         }
 
         /// <summary>板の中の矩形（板の真ん中が原点）に置く</summary>
-        static void Place(RectTransform r, Rect box)
+        internal static void Place(RectTransform r, Rect box)
         {
             r.anchorMin = new Vector2(0.5f, 0.5f);
             r.anchorMax = new Vector2(0.5f, 0.5f);
@@ -315,7 +326,8 @@ namespace HalfAware
             return img;
         }
 
-        static TMP_Text Text(Transform parent, string name, float size, Color color)
+        /// <summary>板の中の字。真ん中寄せ・折り返さない・当たりを取らない。寄せ方は呼び手が替えてよい</summary>
+        internal static TMP_Text Text(Transform parent, string name, float size, Color color)
         {
             var r = Rect(parent, name);
             var t = r.gameObject.AddComponent<TextMeshProUGUI>();

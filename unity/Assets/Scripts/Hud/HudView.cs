@@ -7,14 +7,15 @@ using UnityEngine.UI;
 namespace HalfAware
 {
     /// <summary>
-    /// 字幕（画面の下から上へ薄れる黒の地に、名前の行と台詞の行）、二択の札（<see cref="ChoiceView"/>）、印（中央）、中央の文字、暗転、幕。
+    /// 字幕（画面の下から上へ薄れる黒の地に、名前の行と台詞の行）、二択の札（<see cref="ChoiceView"/>）、リストの枠（<see cref="ListView"/>）、
+    /// 印（中央）、中央の文字、暗転、幕。
     /// 見せるだけで、何をいつ出すかは SceneFlow と場面固有の演出が決める。
     /// 煙は画面を覆う層ではなく世界の粒で描くので、ここには無い（SmokePuffs）。
     /// 暗転と幕の層は、繋がっていなければ何もしない。
     ///
     /// 遊んでいる間は、この Canvas を粗い画面（<see cref="UiLens"/>）で描く。
     /// 中央の文字（冒頭のカード・「続く」）だけは粗くせず、別の Canvas に分けてくっきり描く。
-    /// TAB のコンソールを開いている間は、字幕・二択の札・印・中央の文字を伏せる
+    /// TAB のコンソールを開いている間は、字幕・二択の札・リストの枠・印・中央の文字を伏せる
     /// </summary>
     public sealed class HudView : MonoBehaviour
     {
@@ -54,9 +55,12 @@ namespace HalfAware
         bool promptOn;
         bool centerOn;
         bool choiceOn;
+        bool listOn;
         bool hidden;
         /// <summary>二択の札。初めて二択を出すときに作る</summary>
         ChoiceView choiceView;
+        /// <summary>リストの枠。初めてリストのページを出すときに作る</summary>
+        ListView listView;
 
         // ---- 案内の書式 ----------------------------------------------------------
         //
@@ -149,7 +153,11 @@ namespace HalfAware
             if (promptText != null) promptText.gameObject.SetActive(promptOn && !hidden);
             if (centerText != null) centerText.gameObject.SetActive(centerOn && !hidden);
             if (choiceView != null) choiceView.Visible = choiceOn && !hidden;
+            if (listView != null) listView.Visible = listOn && !hidden;
         }
+
+        /// <summary>リストの枠。まだ一度もリストのページを出していなければ null。動作確認から読む</summary>
+        public ListView List => listView;
 
         /// <summary>
         /// 二択の札を出す。null で下げる。字幕の枠には出さず、画面の真ん中に浮かべる（<see cref="ChoiceView"/>）。
@@ -174,11 +182,25 @@ namespace HalfAware
         ChoiceView MakeChoice()
         {
             var view = ChoiceView.Build((RectTransform)transform);
+            Below(view.Root);
+            return view;
+        }
+
+        /// <summary>リストの枠を組む。札と同じく、暗転と幕より下に重ねる</summary>
+        ListView MakeList()
+        {
+            var view = ListView.Build((RectTransform)transform);
+            Below(view.Root);
+            return view;
+        }
+
+        /// <summary>r を暗転と幕の層より下へ入れる</summary>
+        void Below(RectTransform r)
+        {
             var below = int.MaxValue;
             if (fadeLayer != null && fadeLayer.transform.parent == transform) below = Mathf.Min(below, fadeLayer.transform.GetSiblingIndex());
             if (curtainLayer != null && curtainLayer.transform.parent == transform) below = Mathf.Min(below, curtainLayer.transform.GetSiblingIndex());
-            if (below != int.MaxValue) view.Root.SetSiblingIndex(below);
-            return view;
+            if (below != int.MaxValue) r.SetSiblingIndex(below);
         }
 
         /// <summary>
@@ -216,7 +238,8 @@ namespace HalfAware
 
         /// <summary>
         /// null で地ごと隠す。入っている行数に合わせて地を伸ばし、
-        /// 長いものは字を小さくして収める。台詞は E で送れるものとして送りの印（<see cref="Advance"/>）を添える
+        /// 長いものは字を小さくして収める。台詞は E で送れるものとして送りの印（<see cref="Advance"/>）を添える。
+        /// 並びになっているもの（<see cref="ListFormat.IsList"/>）は字幕の窓に出さず、画面の真ん中の枠（<see cref="ListView"/>）に出す
         /// </summary>
         public void SetSubtitle(string text)
         {
@@ -249,6 +272,15 @@ namespace HalfAware
 
         void Show(string text, SubtitleKind kind, bool passing, bool advance)
         {
+            // 並びになっているものは、字幕の窓を伏せて、画面の真ん中の枠に表で出す（二択の札と同じ扱い）
+            var list = text != null && !passing && kind == SubtitleKind.Line && ListFormat.IsList(text);
+            listOn = list;
+            if (list)
+            {
+                if (listView == null) listView = MakeList();
+                listView.Show(text, advance);
+                text = null;
+            }
             subtitleOn = text != null;
             Sync();
             subtitleText.text = text ?? string.Empty;
@@ -259,12 +291,10 @@ namespace HalfAware
             // エディタで Awake を通さずに呼ばれると字の大きさが 0 のままで、一行に二文字ずつ割れる
             if (baseFontSize <= 0f) baseFontSize = subtitleText.fontSize;
             Shape(passing);
-            // 並びになっているものは表に組む。そうでない長い 1 行は割ってウインドウに収める
-            var list = kind == SubtitleKind.Line && ListFormat.IsList(text);
             // 「名前「台詞」」は名前の行と台詞の行に分け、鉤括弧を外す。独白は名前の行を出さない
             var who = string.Empty;
             var said = text;
-            if (kind == SubtitleKind.Line && !list) Speech.Split(text, out who, out said);
+            if (kind == SubtitleKind.Line) Speech.Split(text, out who, out said);
             if (subtitleName != null) subtitleName.text = Ruby.Expand(who);
             if (subtitleHint != null)
             {
@@ -274,18 +304,17 @@ namespace HalfAware
             }
             // 1 行に入る幅はウインドウの実寸から。全角 1 文字で半角 2 つぶん
             var fits = Mathf.Max(SubtitleBox.BaseRows * 2, Mathf.FloorToInt(RoomEm(1f) * 2f) - 1);
-            var shown = list ? said : SubtitleBox.Wrap(said, fits);
+            var shown = SubtitleBox.Wrap(said, fits);
             var rows = SubtitleBox.Rows(shown);
             var scale = SubtitleBox.FontScale(shown);
-            // 列を揃えるため表は左寄せにして、表ごと地の真ん中へ寄せる
             // ルビは折り返してから書式に直す。
             // 先に直すと、折り返しがタグを字数に数えてしまう
-            subtitleText.text = Ruby.Expand(list ? ListFormat.Compose(said, RoomEm(scale)) : shown);
+            subtitleText.text = Ruby.Expand(shown);
             // ルビのある文は行を少し開ける。
             // そのままだと下の行のルビが上の行の字にかぶる
             var ruby = shown.IndexOf(Ruby.Head) >= 0;
             subtitleText.lineSpacing = ruby ? Ruby.ExtraLineSpacing : 0f;
-            subtitleText.alignment = list ? TextAlignmentOptions.TopLeft : listlessAlignment;
+            subtitleText.alignment = listlessAlignment;
             // 字を小さくしたぶん 1 行も低くなる。地の高さも同じだけ詰める
             var body = subtitleRowHeight * rows * scale;
             // 行を開けたぶん、地も伸ばす。下の行が地の下の余白へはみ出さないように
@@ -337,7 +366,7 @@ namespace HalfAware
             shade.color = col;
         }
 
-        /// <summary>地に入る横幅を em で。表の列数と寄せ方をこれで決める</summary>
+        /// <summary>地に入る横幅を em で。1 行に入る字数をこれで決める</summary>
         float RoomEm(float scale)
         {
             var size = baseFontSize * scale;

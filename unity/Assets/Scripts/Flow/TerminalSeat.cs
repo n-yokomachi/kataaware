@@ -10,10 +10,15 @@ namespace HalfAware
     ///
     /// 移す・読む・戻す間は、見回しと歩きを止める。移す・戻す間は調べる操作と字幕送りも止める
     /// （着く前に 3 行目へ送られて、映り込みが動いている途中で出ないように）。二択を出している間は止めない。
-    /// 立って調べたときだけ移す。座ったまま（場面の頭）調べたときは何もしない
+    /// 立って調べたときだけ移す。座ったまま（場面の頭）調べたときは何もしない。
+    ///
+    /// **「はい」でスリープを解除したら、机のモニター 5 枚を起動する**（<see cref="TerminalScreen"/>、オーナー、2026-09-28
+    /// 「モニターのスリープを解除したときに、別の場面の時と同じようにコンソール的なものを表示して」）。場面 3 でジャックを繋いだ時と同じ、
+    /// 二度瞬いてから明るくなって、窓ごとに文字が流れる形。映り込みが消えきってから点ける。点いた後は場面 1 の終わりまで点いたまま。
+    /// 思い出した時（<see cref="ISceneMemory"/>）は、解除した後なら瞬かずに点いた形で始める
     /// </summary>
     [DefaultExecutionOrder(-5)]
-    public sealed class TerminalSeat : MonoBehaviour
+    public sealed class TerminalSeat : MonoBehaviour, ISceneMemory
     {
         [SerializeField] SceneFlow flow;
         [Tooltip("座った形。移す間だけ掛ける")]
@@ -22,6 +27,8 @@ namespace HalfAware
         [SerializeField] TerminalReflection reflection;
         [Tooltip("端末の調べる対象の id")]
         [SerializeField] string terminalId = "terminal";
+        [Tooltip("机のモニター 5 枚の画面。スリープを解除した（「はい」）ところで起動する")]
+        [SerializeField] TerminalScreen screen;
 
         [Header("座った正面")]
         [Tooltip("腰を下ろす場所。Player の足元の位置")]
@@ -48,6 +55,8 @@ namespace HalfAware
         [SerializeField] float backSeconds = 1.6f;
 
         SeatVisit visit;
+        /// <summary>「はい」を選んで、映り込みが消えきるのを待っている</summary>
+        bool waking;
         Vector3 fromSpot;
         float fromYaw;
         float fromPitch;
@@ -65,12 +74,23 @@ namespace HalfAware
 
         void OnEnable()
         {
-            if (flow != null) flow.Examining += OnExamining;
+            if (flow == null) return;
+            flow.Examining += OnExamining;
+            flow.Examined += OnExamined;
         }
 
         void OnDisable()
         {
-            if (flow != null) flow.Examining -= OnExamining;
+            if (flow == null) return;
+            flow.Examining -= OnExamining;
+            flow.Examined -= OnExamined;
+        }
+
+        /// <summary>端末は二択を持つので、済んだ（Examined）のは「はい」を選んだ時</summary>
+        void OnExamined(IInteractable item)
+        {
+            if (item == null || item.Id != terminalId || screen == null) return;
+            waking = true;
         }
 
         void OnExamining(IInteractable item)
@@ -98,6 +118,7 @@ namespace HalfAware
 
         void Update()
         {
+            Wake();
             if (visit == null || !visit.Busy || flow == null || flow.Player == null) return;
             visit.Tick(Time.deltaTime, flow.Talking, flow.Choosing, reflection != null && reflection.Level > 0f);
             if (visit.Frozen(flow.Talking, flow.Choosing)) flow.Freeze(ConnectDirector.FreezeMargin);
@@ -128,6 +149,39 @@ namespace HalfAware
             player.Yaw = Mathf.LerpAngle(fromYaw, seatYaw, k);
             player.Pitch = Mathf.Lerp(fromPitch, seatPitch, k);
             if (chair != null) chair.position = Vector3.Lerp(fromChair, chairSeated, k);
+        }
+
+        /// <summary>
+        /// 映り込みが消えきってから画面を起動し、文字を流し始める。映り込みは二択を出したところで消え始めるので、
+        /// ふつうは「はい」を選んだ時には消えきっている。すぐに選んだ時だけ、消えきるのを待つ（顔と文字を重ねない）
+        /// </summary>
+        void Wake()
+        {
+            if (!waking) return;
+            if (reflection != null && reflection.Level > 0f) return;
+            waking = false;
+            screen.Boot();
+            screen.Scroll(true);
+        }
+
+        // ---- 記憶する・思い出す ------------------------------------------------
+
+        public string MemoryKey { get { return "room.terminal"; } }
+
+        /// <summary>座った正面へ移す・読む・戻すの途中と、起動を待っている間は残さない</summary>
+        public bool Settled { get { return (visit == null || !visit.Busy) && !waking; } }
+
+        /// <summary>画面が点いたかは調べ済みの印（terminal）から決まるので、自分では残さない</summary>
+        public string Capture() { return null; }
+
+        /// <summary>スリープを解除した後なら、瞬かずに点いた形にして文字を流しておく</summary>
+        public void Restore(string data)
+        {
+            waking = false;
+            if (flow == null || flow.Progress == null || screen == null) return;
+            if (!flow.Progress.Done.Contains(terminalId)) return;
+            screen.LightNow();
+            screen.Scroll(true);
         }
 
         /// <summary>戻りきったら、立った形に戻して歩きと見回しを返す</summary>

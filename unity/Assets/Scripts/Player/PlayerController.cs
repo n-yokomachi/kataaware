@@ -27,10 +27,11 @@ namespace HalfAware
         /// </summary>
         public const float PitchDownLimit = 40f;
         // 度 / ピクセル。試作は 0.0022 rad/px（＝ 0.126）だったが、実画面で速すぎたので半分にした（0.063）。
-        // 2026-09-28 に「カメラ回転のスピードをもっと落として」と言われ、さらに 2/3 に落とした。
+        // 2026-09-28 に「カメラ回転のスピードをもっと落として」と言われ、さらに 2/3 に落とした（0.042）。
+        // 2026-09-28 にオーナーの指示で半分にした（「カメラの速さはデフォルト（1x）を今の1/2に」、0.021）。
         // **場面をまたいで効く。** 自室も路地裏も車内も同じ速さで振れる
         /// <summary>見回しの元の速さ。度 / ピクセル。コンソールの設定の「カメラの速さ」が 1 倍の時の速さ</summary>
-        public const float BaseLookSensitivity = 0.042f;
+        public const float BaseLookSensitivity = 0.021f;
 
         /// <summary>
         /// マウス（とポインター）で見回す速さ。度 / ピクセル。元の速さ（<see cref="BaseLookSensitivity"/>）に、コンソールの設定の
@@ -45,12 +46,13 @@ namespace HalfAware
         /// スティックは毎フレーム「どれだけ倒しているか」（-1〜1）を返すので、マウスの度 / ピクセルを掛けると
         /// 倒しきっても 1 フレームに 0.042 度（60 fps で毎秒 2.5 度）にしかならず、使えなかった（2026-09-28）。
         ///
-        /// 120 の根拠: 据え置きの一人称の既定の見回し（倒しきって毎秒 150〜200 度ほど）より遅めにする。
+        /// 初めの 120 の根拠: 据え置きの一人称の既定の見回し（倒しきって毎秒 150〜200 度ほど）より遅めにした。
         /// オーナーはマウスの見回しを二度落としており（0.126 → 0.063 → 0.042）、歩いて眺める遊びなので速く回す要が無い。
-        /// 倒しきって 3 秒で一回り、半分倒せば毎秒 60 度で、ゆっくり見回せる。上下も同じ速さ（マウスと同じく左右と上下を揃える）。
+        /// 2026-09-28 にオーナーの指示で、マウスと一緒に半分にした（「カメラの速さはデフォルト（1x）を今の1/2に」、120 → 60）。
+        /// 倒しきって 6 秒で一回り、半分倒せば毎秒 30 度。上下も同じ速さ（マウスと同じく左右と上下を揃える）。
         /// コンソールの設定の「カメラの速さ」の倍率（<see cref="GameSettings.LookScale"/>）も掛かる
         /// </summary>
-        public const float StickDegreesPerSecond = 120f;
+        public const float StickDegreesPerSecond = 60f;
 
         /// <summary>スティックで見回す速さ。度 / 秒。<see cref="StickDegreesPerSecond"/> × 設定の倍率</summary>
         public static float StickLookSpeed { get { return StickDegreesPerSecond * GameSettings.LookScale.Value; } }

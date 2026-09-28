@@ -8,6 +8,7 @@
 #         bash make-ambience.sh garden    （8 節の場面 6 の庭の 4 つだけ）
 #         bash make-ambience.sh bgm       （9 節の場面ごとの BGM の 7 曲だけ）
 #         bash make-ambience.sh ending    （10 節のエンディングの曲「HALF AWARE」の二つの版だけ）
+#         bash make-ambience.sh breath    （12 節の場面 1 の冒頭の呼吸の輪だけ）
 # 出力先は OUT_DIR 直下。中間ファイルは OUT_DIR/tmp に置く。
 set -euo pipefail
 
@@ -32,6 +33,8 @@ SRC_GRASS="$SRC_PIXABAY_DIR/freesound_community-walking-through-grass-80308.mp3"
 SRC_HARD_FLOOR="$SRC_PIXABAY_DIR/oxidvideos-footsteps-on-hard-floor-356919.mp3"
 SRC_CONCRETE="$SRC_PIXABAY_DIR/freesound_community-concrete-footsteps-1-6265.mp3"
 SRC_ROOM_STEP="$SRC_PIXABAY_DIR/freesound_community-step_soundwav-14903.mp3"
+# 12 節（場面 1 の冒頭の呼吸）の素材
+SRC_BREATH="$SRC_PIXABAY_DIR/freesound_community-breathing-6811.mp3"
 # 8 節（場面 6 の庭の記憶）の素材
 SRC_HOSE="$SRC_PIXABAY_DIR/freesound_community-watering-62546.mp3"
 SRC_HOSE_STOP="$SRC_PIXABAY_DIR/freesound_community-hose-sounds-24388.mp3"
@@ -1016,5 +1019,81 @@ cut_steps Room "$TMP_DIR/room_step_src.wav" \
   "1.656-2.326 4.117-4.660 8.111-8.747 9.245-9.835 11.001-11.519 11.524-12.078" "$STEPS_TARGET" -1
 
 fi   # PART=all か steps
+
+# ---------------------------------------------------------------------------
+# 12. Breathing.wav — 場面 1 の冒頭の呼吸（輪。黒いうちから鳴らし、ジャックを抜いたら薄れて止む）
+#    「Breathing」（freesound_community。作者 SofieHolmark（Freesound）。Pixabay のタグは Mouth / Human / Breath /
+#    Breathing / Female。頁に AI generated の表示もタグも無い）。元は 20.74 秒、24kHz のステレオ mp3。
+#    元がとても小さい（左 −48.7dB・右 −49.1dB の実効値、頂点 −33dB）。
+#    **モノラルへは左右の平均で畳む。** 左右の和と差を測って決めた:
+#    - 丸ごとの平均は左右より 5dB 小さく、差のほうが和より大きい（位相の相関の平均 −0.21）。削れているのは
+#      20Hz より下の、左右で逆向きに揺れる低い揺れ（差 −53dB・和 −67dB。マイクの揺れと思われる）で、息ではない
+#    - 20Hz より上では差は和より 2dB 下、80Hz より上では 5dB 下。オクターブごとの和と左右の平均の差は
+#      500Hz〜8kHz（息の芯）で −0.6〜−1.0dB、250Hz で −2.4dB、125Hz 以下で −3.8〜−5.4dB（低い帯は部屋の揺れで、息と関わりが薄い）
+#    - 200Hz より上の左右の相互相関は、ずれ 0 で 0.67 がいちばん高い（±1 標本で 0.59〜0.67）。左右に時間のずれが無いので、
+#      平均しても櫛形の欠けは出ない（0.67 の相関なら平均で落ちるのは 0.8dB だけ）
+#    - 片側だけにしないのは、息ごとに左右の大きさが 3〜7dB 入れ替わる（「左右に振れている」）ため。片側では息ごとの大きさがばらつく
+#    150Hz より下は息のあいだの静かな所でも −61〜−66dB あり、息の間（−58dB）と大差ない部屋の揺れなので、100Hz より下を
+#    24dB/oct で落とす（2 次を二段）。
+#    息の並び: 高域寄りで短い吸う息（1.0〜1.2 秒。2.5kHz より上が 200Hz〜1kHz より 11〜15dB 下）と、低域寄りで長く細る
+#    吐く息（1.3〜1.4 秒。同じ比で 14〜19dB 下）が、3.1 秒ほどで一巡する。吐き終わりに 0.1 秒ほどの静かな所（20ms 窓の実効値で
+#    −77〜−82dB）がある: 3.34 / 6.51 / 9.73 / 12.85 / 15.80 / 18.61 秒。頭の一巡（0.4〜3.2 秒）は吸う息が明るすぎ（同じ比 −3dB）て外す。
+#    3.28〜18.66 秒を切り出し、尻 0.08 秒（18.58〜18.66 秒、吐き終わりの静かな所）を頭 0.08 秒（3.28〜3.36 秒、同じく静かな所）へ
+#    等パワー(qsin)で重ねて輪にする。輪は 15.30 秒で、吸って吐くのが 5 回（4 回目の吸う息だけ 6dB 弱い）。継ぎ目は静かな所の中なので聞こえない。
+#    44.1kHz のモノラルへ。大きさは integrated −24 LUFS に、頂点 −1dB の天井を添えて揃える（鳴らす側の大きさは
+#    RoomIntroDirector の breathVolume。自室の空気の音 RoomTone（−26.6 LUFS を 0.5 で鳴らす）と並べて決める）
+# ---------------------------------------------------------------------------
+if [ "$PART" = "all" ] || [ "$PART" = "breath" ]; then
+
+echo "=== Breathing.wav ==="
+BREATH_START=3.28
+BREATH_END=18.66
+BREATH_FADE=0.08
+BREATH_TARGET=-24
+BREATH_CEIL=-1
+BREATH_LEN=$(awk "BEGIN{print $BREATH_END-$BREATH_START}")
+BREATH_BODYEND=$(awk "BEGIN{print $BREATH_LEN-$BREATH_FADE}")
+
+# 丸ごと畳んでから切る（mp3 の頭で探すより、切り口が標本の単位で決まる）
+ffmpeg -y -v error -i "$SRC_BREATH" \
+  -af "pan=mono|c0=0.5*c0+0.5*c1,aresample=44100,highpass=f=100:poles=2,highpass=f=100:poles=2,atrim=start=${BREATH_START}:end=${BREATH_END},asetpts=PTS-STARTPTS" \
+  -c:a pcm_f32le "$TMP_DIR/breath_seg.wav"
+
+ffmpeg -y -v error -i "$TMP_DIR/breath_seg.wav" -filter_complex "
+[0:a]asplit=2[a][b];
+[a]atrim=start=0:end=${BREATH_BODYEND},asetpts=PTS-STARTPTS[body];
+[b]atrim=start=${BREATH_BODYEND}:end=${BREATH_LEN},asetpts=PTS-STARTPTS[tail];
+[tail][body]acrossfade=d=${BREATH_FADE}:curve1=qsin:curve2=qsin[out]
+" -map "[out]" -c:a pcm_f32le "$TMP_DIR/breath_loop.wav"
+
+BREATH_I=$(ffmpeg -hide_banner -nostats -i "$TMP_DIR/breath_loop.wav" -af ebur128 -f null - 2>&1 | grep -E "^\s+I:" | tail -1 | grep -oE '[-0-9.]+' | head -1)
+BREATH_PK=$(ffmpeg -hide_banner -i "$TMP_DIR/breath_loop.wav" -af "astats=metadata=0" -f null - 2>&1 | grep "Peak level dB" | tail -1 | grep -oE '[-0-9.]+$')
+BREATH_GAIN=$(awk "BEGIN{g=$BREATH_TARGET - ($BREATH_I); c=$BREATH_CEIL - ($BREATH_PK); printf \"%.2f\", (g < c ? g : c)}")
+echo "Breathing: measured I=${BREATH_I} LUFS, peak=${BREATH_PK}dB, applying gain=${BREATH_GAIN}dB"
+ffmpeg -y -v error -i "$TMP_DIR/breath_loop.wav" -af "volume=${BREATH_GAIN}dB" -ar 44100 -ac 1 -c:a pcm_s16le "$OUT_DIR/Breathing.wav"
+printf "  Breathing.wav %s 秒 / %s LUFS / 頂点 %s dB\n" \
+  "$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$OUT_DIR/Breathing.wav")" \
+  "$(ffmpeg -hide_banner -nostats -i "$OUT_DIR/Breathing.wav" -af ebur128 -f null - 2>&1 | grep -E "^\s+I:" | tail -1 | grep -oE '[-0-9.]+' | head -1)" \
+  "$(ffmpeg -hide_banner -i "$OUT_DIR/Breathing.wav" -af "astats=metadata=0" -f null - 2>&1 | grep "Peak level dB" | tail -1 | grep -oE '[-0-9.]+$')"
+
+# 継ぎ目: 輪の末尾 1 秒のあとに頭 1 秒をつなぐ（loop で鳴らしたときと同じ並び）
+BREATH_DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$OUT_DIR/Breathing.wav")
+BREATH_TAILST=$(awk "BEGIN{print $BREATH_DUR-1}")
+ffmpeg -y -v error -i "$OUT_DIR/Breathing.wav" -filter_complex "
+[0:a]asplit=2[a][b];
+[a]atrim=start=${BREATH_TAILST},asetpts=PTS-STARTPTS[t];
+[b]atrim=end=1,asetpts=PTS-STARTPTS[h];
+[t][h]concat=n=2:v=0:a=1[s]
+" -map "[s]" -c:a pcm_s16le "$ANALYSIS_DIR/Breathing_seam.wav"
+ffmpeg -y -v error -i "$ANALYSIS_DIR/Breathing_seam.wav" -lavfi "showwavespic=s=1600x300:colors=0x3070c0:scale=log" -frames:v 1 "$ANALYSIS_DIR/Breathing_seam_wave.png"
+ffmpeg -y -v error -i "$ANALYSIS_DIR/Breathing_seam.wav" -lavfi "showspectrumpic=s=1600x420:fscale=lin:legend=1:color=intensity:gain=2:start=0:stop=12000:win_func=hann" "$ANALYSIS_DIR/Breathing_seam_spec.png"
+ffmpeg -y -v error -i "$OUT_DIR/Breathing.wav" -filter_complex "
+[0:a]asplit=2[w][s];
+[w]showwavespic=s=1600x300:colors=0x3070c0:scale=log[wv];
+[s]showspectrumpic=s=1600x420:fscale=lin:legend=0:color=intensity:gain=2:stop=12000[sp];
+[wv][sp]vstack=inputs=2[out]
+" -map "[out]" -frames:v 1 "$ANALYSIS_DIR/Breathing_sheet.png"
+
+fi   # PART=all か breath
 
 echo "=== done ==="

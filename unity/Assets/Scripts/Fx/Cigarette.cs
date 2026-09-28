@@ -6,6 +6,7 @@ namespace HalfAware
     /// <summary>
     /// 一本吸い終わるまでの音と煙。SmokeBeats の時刻表どおりに、
     /// 蓋を開ける金属音 → 火が点く音 → 吸う息 → 吐く息、を決めた回数だけ並べる。
+    /// 火の音と最初の吸う息のあいだには、向き直す間（turn）を挟める（場面 1）。
     /// 煙は火が点いてから立ちはじめ、吐く息に合わせてひと吹き足す
     /// </summary>
     [DefaultExecutionOrder(15)]
@@ -23,6 +24,8 @@ namespace HalfAware
         /// <summary>火が点く音の長さ。Web では鳴らした直後に長さが 0 になるので、鳴らす前に読んで持っておく（SoundLoad.Seconds）</summary>
         float flameSeconds;
         int drags;
+        /// <summary>火の音が鳴りきってから吸い始めるまでに挟む、向き直す間。秒</summary>
+        float turn;
         int nextDrag;
         int nextBlow;
         bool clicked;
@@ -46,10 +49,11 @@ namespace HalfAware
             SoundLoad.Warm(lighterClick, lighterFlame, drag, blow);
         }
 
-        /// <summary>火を点ける。drags 服ぶん吸う</summary>
-        public void Light(int drags)
+        /// <summary>火を点ける。drags 服ぶん吸う。turn は火の音が鳴りきってから吸い始めるまでに挟む、向き直す間（秒）</summary>
+        public void Light(int drags, float turn = 0f)
         {
             this.drags = Mathf.Max(0, drags);
+            this.turn = Mathf.Max(0f, turn);
             elapsed = 0f;
             nextDrag = 0;
             nextBlow = 0;
@@ -83,14 +87,14 @@ namespace HalfAware
             if (!smoked && elapsed >= SmokeBeats.SmokeAt(SoundLoad.Seconds(lighterFlame, ref flameSeconds)))
             {
                 smoked = true;
-                if (puffs != null) puffs.Begin(SmokeBeats.Total(drags));
+                if (puffs != null) puffs.Begin(SmokeBeats.Total(drags, turn));
             }
-            if (nextDrag < drags && elapsed >= SmokeBeats.DragAt(nextDrag, drags))
+            if (nextDrag < drags && elapsed >= SmokeBeats.DragAt(nextDrag, drags, turn))
             {
                 nextDrag++;
                 Play(drag);
             }
-            if (nextBlow < drags && elapsed >= SmokeBeats.BlowAt(nextBlow, drags))
+            if (nextBlow < drags && elapsed >= SmokeBeats.BlowAt(nextBlow, drags, turn))
             {
                 var i = nextBlow;
                 nextBlow++;
@@ -98,7 +102,7 @@ namespace HalfAware
                 if (puffs != null) puffs.Blow();
                 if (Blew != null) Blew(i);
             }
-            if (elapsed < SmokeBeats.Total(drags)) return;
+            if (elapsed < SmokeBeats.Total(drags, turn)) return;
             elapsed = -1f;
         }
 

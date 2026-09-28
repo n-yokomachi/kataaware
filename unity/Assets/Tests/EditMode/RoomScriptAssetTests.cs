@@ -94,15 +94,16 @@ namespace HalfAware.Tests
             Assert.That(Load().Find(RoomIds.Jacket).label, Is.EqualTo("ジャケットを着る"));
         }
 
+        /// <summary>
+        /// 必須が残っている間、ドアは何も言わない（オーナー、2026-09-28「必須インタラクトのものが残っている場合、ドアのインタラクトを表示しないこと」）。
+        /// 前提の文が無いので、ドアを狙っても印が出ず、調べられない（InteractionPicker.Select）
+        /// </summary>
         [Test]
-        public void TellsTheDoorWhichPrerequisiteIsMissing()
+        public void TheDoorSaysNothingWhileSomethingIsLeft()
         {
             var door = Load().Find("door");
-            Assert.That(door.HintFor("chips"), Is.Not.Null.And.Not.Empty);
-            Assert.That(door.HintFor("terminal"), Is.Not.Null.And.Not.Empty);
-            Assert.That(door.HintFor("jack"), Is.Null);
-            // 着る前にドアへ近づいても文は出さない（立ち上がれないので届かないが、先頭の前提は文を持たない id にする）
-            Assert.That(door.HintFor(RoomIds.Jacket), Is.Null);
+            foreach (var id in new[] { RoomIds.Jacket, RoomIds.Chips, RoomIds.Terminal, RoomIds.Jack })
+                Assert.That(door.HintFor(id), Is.Null, id);
         }
     }
 }

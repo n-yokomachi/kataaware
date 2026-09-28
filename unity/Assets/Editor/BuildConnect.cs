@@ -156,12 +156,15 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// 場面 1 の頭の演出と、場面 1 の調べる対象を落とす。
         /// 対象は入れ物の下だけでなく手首のジャックにも付いているので、
-        /// 名前ではなく付いているコンポーネントで拾う
+        /// 名前ではなく付いているコンポーネントで拾う。
+        /// 冒頭の呼吸の音源（Player/Breath、<see cref="PlaceRoomOpening"/>）も場面 1 のものなので落とす
         /// </summary>
         static void Strip()
         {
             var intro = Object.FindFirstObjectByType<RoomIntroDirector>(FindObjectsInactive.Include);
             if (intro != null) Object.DestroyImmediate(intro);
+            var breath = Look("Player/" + PlaceRoomOpening.BreathName);
+            if (breath != null) Object.DestroyImmediate(breath.gameObject);
             foreach (var item in Object.FindObjectsByType<Interactable>(FindObjectsInactive.Include, FindObjectsSortMode.None))
                 Object.DestroyImmediate(item.gameObject);
             Sold();
@@ -235,6 +238,8 @@ namespace HalfAware.EditorTools
             // 無条件に呼ぶ。歩き回る場面で椅子の当たりを切られると、椅子をすり抜ける。
             // 座ったところで切るのは ConnectDirector の仕事
             so.FindProperty("chairBlocker").objectReferenceValue = null;
+            // 座っている間の首の限りは場面 1 だけ 70 度（前方 140 度ほど）。ほかの場面（場面 7 は座って始まる）は元の 90 度
+            so.FindProperty("seatedHeadLimit").floatValue = HeadTurn.DefaultLimit;
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(flow);
         }
@@ -560,7 +565,7 @@ namespace HalfAware.EditorTools
         /// その子に置くと窓まで縦横で違う倍率に引き伸ばされる。モニターの子に置き、
         /// 面の前の位置だけ自分で出す
         /// </summary>
-        static TerminalScreen.Pane[] Panes(Transform monitor, Transform face, Material ink, int which)
+        internal static TerminalScreen.Pane[] Panes(Transform monitor, Transform face, Material ink, int which)
         {
             var group = monitor.Find("Windows");
             if (group != null) Object.DestroyImmediate(group.gameObject);
@@ -640,8 +645,8 @@ namespace HalfAware.EditorTools
             return m;
         }
 
-        /// <summary>窓のマテリアル。帯を地と光る側の両方に貼る</summary>
-        static Material PaneFace()
+        /// <summary>窓のマテリアル。帯を地と光る側の両方に貼る。場面 1 の窓も同じものを使う（<see cref="PlaceRoomScreens"/>）</summary>
+        internal static Material PaneFace()
         {
             var m = Clone(PanePath, "TerminalPane");
             if (m == null) return null;
@@ -704,6 +709,10 @@ namespace HalfAware.EditorTools
                 screen = monitors.GetComponent<TerminalScreen>();
                 if (screen == null) screen = monitors.gameObject.AddComponent<TerminalScreen>();
                 var so = new SerializedObject(screen);
+                // 場面 1 の画面は、消えている間の地を艶のある黒の鏡のまま（地の色は Screen.mat、光りは黒）にしてある。
+                // 場面 3 は艶の無い地なので、消えている間の地の色と光りを場面 3 の色に戻す
+                so.FindProperty("off").colorValue = ScreenOff;
+                so.FindProperty("offGlow").colorValue = ScreenOff;
                 var row = so.FindProperty("backs");
                 row.arraySize = sheet.backs.Length;
                 for (var i = 0; i < sheet.backs.Length; i++)

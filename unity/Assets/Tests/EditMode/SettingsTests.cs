@@ -182,52 +182,54 @@ namespace HalfAware.Tests
         [Test]
         public void LookSensitivityIsTheBaseTimesTheCameraSpeed()
         {
-            Assert.AreEqual(0.042f, PlayerController.BaseLookSensitivity);
-            Assert.AreEqual(0.042f, PlayerController.LookSensitivity, 1e-7f);
-            Look.Value = 0.5f;
+            // 2026-09-28 にオーナーの指示で 1 倍の速さを半分にした（0.042 → 0.021）
+            Assert.AreEqual(0.021f, PlayerController.BaseLookSensitivity);
             Assert.AreEqual(0.021f, PlayerController.LookSensitivity, 1e-7f);
-            Look.Value = 2f;
-            Assert.AreEqual(0.084f, PlayerController.LookSensitivity, 1e-7f);
-            Look.Value = 0.25f;
+            Look.Value = 0.5f;
             Assert.AreEqual(0.0105f, PlayerController.LookSensitivity, 1e-7f);
+            Look.Value = 2f;
+            Assert.AreEqual(0.042f, PlayerController.LookSensitivity, 1e-7f);
+            Look.Value = 0.25f;
+            Assert.AreEqual(0.00525f, PlayerController.LookSensitivity, 1e-7f);
         }
 
         [Test]
         public void TheStickTurnsByTiltTimesDegreesPerSecond()
         {
-            Assert.AreEqual(120f, PlayerController.StickDegreesPerSecond);
-            // 倒しきって 1 秒で 120 度。半分倒せば 60 度。上下も同じ
+            // 2026-09-28 にオーナーの指示で、マウスと一緒に半分にした（120 → 60）
+            Assert.AreEqual(60f, PlayerController.StickDegreesPerSecond);
+            // 倒しきって 1 秒で 60 度。半分倒せば 30 度。上下も同じ
             var full = PlayerController.LookTurn(new Vector2(1f, 0f), true, 1f);
-            Assert.AreEqual(120f, full.x, 1e-4f);
+            Assert.AreEqual(60f, full.x, 1e-4f);
             Assert.AreEqual(0f, full.y, 1e-4f);
             var half = PlayerController.LookTurn(new Vector2(-0.5f, 0.5f), true, 1f / 60f);
-            Assert.AreEqual(-1f, half.x, 1e-4f);
-            Assert.AreEqual(1f, half.y, 1e-4f);
+            Assert.AreEqual(-0.5f, half.x, 1e-4f);
+            Assert.AreEqual(0.5f, half.y, 1e-4f);
             // 倒した量は 1 までに収める（ハットの斜めは (1, 1) で来る）
             var diagonal = PlayerController.LookTurn(new Vector2(1f, 1f), true, 1f);
-            Assert.AreEqual(120f, diagonal.magnitude, 1e-3f);
+            Assert.AreEqual(60f, diagonal.magnitude, 1e-3f);
             // 秒が無ければ回らない
             Assert.AreEqual(Vector2.zero, PlayerController.LookTurn(Vector2.one, true, 0f));
             // 設定の倍率はスティックにも掛かる
             Look.Value = 0.5f;
-            Assert.AreEqual(60f, PlayerController.StickLookSpeed, 1e-4f);
-            Assert.AreEqual(60f, PlayerController.LookTurn(new Vector2(1f, 0f), true, 1f).x, 1e-4f);
+            Assert.AreEqual(30f, PlayerController.StickLookSpeed, 1e-4f);
+            Assert.AreEqual(30f, PlayerController.LookTurn(new Vector2(1f, 0f), true, 1f).x, 1e-4f);
             Look.Value = 2f;
-            Assert.AreEqual(240f, PlayerController.LookTurn(new Vector2(0f, -1f), true, 1f).y * -1f, 1e-4f);
+            Assert.AreEqual(120f, PlayerController.LookTurn(new Vector2(0f, -1f), true, 1f).y * -1f, 1e-4f);
         }
 
         [Test]
         public void TheMouseStillTurnsByPixelsWhateverTheFrame()
         {
-            // マウスの速さは変えない。動いた画素 × 0.042 度で、秒は関わらない
+            // マウスは動いた画素 × 0.021 度で、秒は関わらない
             var turn = PlayerController.LookTurn(new Vector2(100f, -50f), false, 1f / 60f);
-            Assert.AreEqual(4.2f, turn.x, 1e-4f);
-            Assert.AreEqual(-2.1f, turn.y, 1e-4f);
+            Assert.AreEqual(2.1f, turn.x, 1e-4f);
+            Assert.AreEqual(-1.05f, turn.y, 1e-4f);
             Assert.AreEqual(turn, PlayerController.LookTurn(new Vector2(100f, -50f), false, 0.5f));
             // 大きく動かしても収めない（画素は倒した量ではない）
-            Assert.AreEqual(42f, PlayerController.LookTurn(new Vector2(1000f, 0f), false, 0.01f).x, 1e-3f);
+            Assert.AreEqual(21f, PlayerController.LookTurn(new Vector2(1000f, 0f), false, 0.01f).x, 1e-3f);
             Look.Value = 1.5f;
-            Assert.AreEqual(6.3f, PlayerController.LookTurn(new Vector2(100f, 0f), false, 1f).x, 1e-4f);
+            Assert.AreEqual(3.15f, PlayerController.LookTurn(new Vector2(100f, 0f), false, 1f).x, 1e-4f);
         }
 
         [Test]

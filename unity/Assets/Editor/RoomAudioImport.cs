@@ -5,26 +5,32 @@ using UnityEngine;
 namespace HalfAware.EditorTools
 {
     /// <summary>
-    /// 自室の空気の音（<see cref="RoomTone"/>）の取り込みの設定。場面 2 の雑踏の輪（<see cref="AlleyAudioImport"/>）と同じ考え方で、
-    /// Web（WebGL）で鳴らす前提で決める。
+    /// 自室の空気の音（<see cref="RoomTone"/>）と、場面 1 の冒頭の呼吸（<see cref="RoomIntroDirector"/> の breath）の取り込みの設定。
+    /// 場面 2 の雑踏の輪（<see cref="AlleyAudioImport"/>）と同じ考え方で、Web（WebGL）で鳴らす前提で決める。
     /// - 短い輪で場面の頭から鳴るので、Decompress On Load で先に読む（Web では Streaming が使えず、
     ///   Chromium の系統では Compressed In Memory も Decompress On Load に替わる）
     /// - 圧縮は Vorbis。Web では形だけ AAC に替わって使われる
-    /// - 元のファイルがモノラルの 22.05 kHz なので畳まず、音の速さも元のまま（揃えてある実効値 −24dBFS を崩さない）
+    /// - 元のファイルがモノラルなので畳まず、音の速さも元のまま（揃えた大きさを崩さない）
     /// </summary>
     public sealed class RoomAudioImport : AssetPostprocessor
     {
         public const string TonePath = "Assets/Audio/RoomTone.wav";
+        public const string BreathPath = "Assets/Audio/Breathing.wav";
 
         /// <summary>空気の音の圧縮の質（0〜1）。雑踏の輪と同じ</summary>
         const float Quality = 0.5f;
 
+        /// <summary>呼吸の圧縮の質。息の擦れ（2.5kHz より上）が主なので、煙草の息（0.7）と揃えて空気の音より上げる</summary>
+        const float BreathQuality = 0.7f;
+
         /// <summary>取り込みの設定を替えたら数を上げる（替えた設定で取り込み直させるため）</summary>
-        public override uint GetVersion() { return 1; }
+        public override uint GetVersion() { return 2; }
 
         void OnPreprocessAudio()
         {
-            if (!string.Equals(assetPath, TonePath, StringComparison.OrdinalIgnoreCase)) return;
+            var tone = string.Equals(assetPath, TonePath, StringComparison.OrdinalIgnoreCase);
+            var breath = string.Equals(assetPath, BreathPath, StringComparison.OrdinalIgnoreCase);
+            if (!tone && !breath) return;
             var ai = (AudioImporter)assetImporter;
             ai.forceToMono = false;
             ai.loadInBackground = true;
@@ -32,7 +38,7 @@ namespace HalfAware.EditorTools
             var d = ai.defaultSampleSettings;
             d.loadType = AudioClipLoadType.DecompressOnLoad;
             d.compressionFormat = AudioCompressionFormat.Vorbis;
-            d.quality = Quality;
+            d.quality = breath ? BreathQuality : Quality;
             d.sampleRateSetting = AudioSampleRateSetting.PreserveSampleRate;
             d.preloadAudioData = true;
             ai.defaultSampleSettings = d;

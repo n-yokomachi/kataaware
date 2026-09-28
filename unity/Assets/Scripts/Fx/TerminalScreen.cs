@@ -4,6 +4,12 @@ namespace HalfAware
 {
     /// <summary>
     /// モニターの画面。消灯から起動して、中に開いた窓ごとに文字を流す。
+    /// 場面 3 はジャックを繋いだ時に、場面 1 はスリープを解除した時（「はい」、<see cref="TerminalSeat"/>）に起動する。
+    /// 場面 5・7 は点いたまま始まる（startLit）。
+    ///
+    /// **場面 1 の地は艶のある黒のまま。** 消えている間は部屋と顔（<see cref="TerminalReflection"/>）を映す鏡なので、
+    /// 地のマテリアル（Placeholder/Screen.mat）は艶を残し、消えている間の光り（offGlow）は黒にしてある。
+    /// 場面 3 の組み立ては地を艶の無い複製へ替え、off と offGlow を場面 3 の色に戻す（BuildConnect）。
     ///
     /// **地と文字を別の面に分ける。** 画面の面そのものに帯のテクスチャを貼ると、
     /// 消えている間も灰色の文字が見えてしまう。地の色に帯が掛かるので、
@@ -41,6 +47,9 @@ namespace HalfAware
         [SerializeField] Pane[] panes = new Pane[0];
         [Tooltip("消えているときの地の色")]
         [SerializeField] Color off = new Color(0.035f, 0.040f, 0.045f);
+        [Tooltip("消えているときの地の光り。場面 3・5・7 は地の色と同じ。" +
+            "場面 1 は艶のある黒い画面に部屋と顔を映すので光らせない（黒。地のマテリアルの色のまま）")]
+        [SerializeField] Color offGlow = new Color(0.035f, 0.040f, 0.045f);
         [Tooltip("点いているときの地の色。窓の外に出る")]
         [SerializeField] Color back = new Color(0.026f, 0.070f, 0.040f);
         [Tooltip("文字の色")]
@@ -100,12 +109,12 @@ namespace HalfAware
         {
             if (block == null) block = new MaterialPropertyBlock();
             var lit = level > 0.001f;
-            Ground(lit ? Color.Lerp(off, back, level) : off);
+            Ground(lit ? Color.Lerp(off, back, level) : off, lit ? Color.Lerp(offGlow, back, level) : offGlow);
             Windows(level, lit);
         }
 
-        /// <summary>画面の地。帯を貼っていないので、色を渡すだけで一様に染まる</summary>
-        void Ground(Color tone)
+        /// <summary>画面の地。帯を貼っていないので、色を渡すだけで一様に染まる。shine は光り（emission）の色</summary>
+        void Ground(Color tone, Color shine)
         {
             if (backs == null) return;
             for (var i = 0; i < backs.Length; i++)
@@ -114,7 +123,7 @@ namespace HalfAware
                 if (face == null) continue;
                 face.GetPropertyBlock(block);
                 block.SetColor(BaseColor, tone);
-                block.SetColor(Emission, tone);
+                block.SetColor(Emission, shine);
                 face.SetPropertyBlock(block);
             }
         }

@@ -40,6 +40,15 @@ namespace HalfAware
         /// </summary>
         public static string Compose(string text, float roomEm)
         {
+            return Compose(text, roomEm, true);
+        }
+
+        /// <summary>
+        /// 列の頭を揃えた形にする。roomEm に収まる列数まで畳むのは同じ。
+        /// center が false なら、余っても真ん中へ寄せず左に置く（表の幅に合わせて枠を伸ばす、リストの枠 <see cref="ListView"/>）
+        /// </summary>
+        public static string Compose(string text, float roomEm, bool center)
+        {
             // 幅は字の実寸ではなく半角いくつで数えているので、少し余裕を見る
             var safe = roomEm * Margin;
             var cols = Most(text);
@@ -51,7 +60,7 @@ namespace HalfAware
                 widths = Widths(text, cols);
             }
             var table = Total(widths);
-            var indent = safe > 0f && table < safe ? (safe - table) * 0.5f : 0f;
+            var indent = center && safe > 0f && table < safe ? (safe - table) * 0.5f : 0f;
 
             var at = new int[widths.Count];
             for (var i = 1; i < widths.Count; i++) at[i] = at[i - 1] + widths[i - 1] + Gap;
