@@ -30,7 +30,7 @@ namespace HalfAware.EditorTools
                 s.paint.Flat(-0.06f, 0.06f, z, z + 2.2f, 0.006f, Swatch.Line);
         }
 
-        // ---- 森（帯 1。帯 2 と 7 の助手席の側も） -------------------------------------------
+        // ---- 夜の湖の助手席の側の森（帯 7。帯 1・2 は BuildEndingWild の作り込んだ林） -------------
 
         /// <summary>道の脇の花の段。道の真ん中からの隔たり・丈の倍率・種類と重み・まとまり・間隔</summary>
         struct Row
@@ -58,12 +58,6 @@ namespace HalfAware.EditorTools
 
         /// <summary>草の縁の外の端。ここから外は森の地</summary>
         const float VergeTo = 4.6f;
-
-        static void Forest(Slice s)
-        {
-            DirtRoad(s);
-            for (var side = -1; side <= 1; side += 2) ForestSide(s, side, 1f);
-        }
 
         /// <summary>森の片側。flowers は花の多さの割合（夜の湖は少なく）</summary>
         static void ForestSide(Slice s, int side, float flowers)
@@ -175,72 +169,6 @@ namespace HalfAware.EditorTools
         {
             var w = 2f * Mathf.PI * zRing / s.Span;
             return 6.0f + 1.0f * Mathf.Sin(w * 3f + 0.7f) + 0.5f * Mathf.Sin(w * 7f + 2.1f);
-        }
-
-        /// <summary>
-        /// 海辺の崖の道。運転席の側（右）が海、助手席の側（左）が森。
-        /// 右は草の縁の外に崖の上の芝が続き、崖の縁（道から 5〜7 m）から 11 m 下が海。沖には岩の島（離れ岩）が点々と立ち、根元に白い波の泡を巻く。
-        /// 窓から見下ろすと、崖の真下は縁に隠れて見えない。見えるのは沖の岩と、その根元の波（20〜70 m 先）。
-        /// 縁を道から 8.5 m・海を 16 m 下に置いた時は、縁が沖の岩の根元まで隠して、海は水平線の帯しか見えなかった。
-        /// 遠くには入り江の向こうの岬の崖（遠景）
-        /// </summary>
-        static void Coast(Slice s)
-        {
-            DirtRoad(s);
-            ForestSide(s, -1, 1f);
-            const int steps = 8;
-            var dz = TileLength / steps;
-            // 右の草の縁と、崖の上の芝（縁まで）
-            Strip(s, 1, RoadHalf - 0.05f, 3.6f, VergeY, Swatch.Grass);
-            for (var j = 0; j < steps; j++)
-            {
-                float z0 = j * dz, z1 = z0 + dz;
-                var e0 = CliffEdge(s, s.Offset + z0);
-                var e1 = CliffEdge(s, s.Offset + z1);
-                s.paint.Quad(new Vector3(3.55f, VergeY - 0.005f, z1), new Vector3(e1, -0.05f, z1), new Vector3(e0, -0.05f, z0),
-                    new Vector3(3.55f, VergeY - 0.005f, z0), Swatch.Turf);
-                // 崖の面。縁 → 中ほど → 根元（海の面より下）。面ごとに明るい岩と陰の岩を混ぜて、角の立った岩肌にする
-                System.Func<float, float, Vector3> mid = (e, zr) =>
-                    new Vector3(e + 1.6f + 0.9f * Mathf.Sin(2f * Mathf.PI * zr / s.Span * 11f), -7f + 1.2f * Mathf.Sin(2f * Mathf.PI * zr / s.Span * 13f + 1f), zr - s.Offset);
-                System.Func<float, float, Vector3> foot = (e, zr) =>
-                    new Vector3(e + 3.8f + 1.3f * Mathf.Sin(2f * Mathf.PI * zr / s.Span * 5f + 1f), SeaY - 0.8f, zr - s.Offset);
-                var top0 = new Vector3(e0, -0.05f, z0);
-                var top1 = new Vector3(e1, -0.05f, z1);
-                var mid0 = mid(e0, s.Offset + z0);
-                var mid1 = mid(e1, s.Offset + z1);
-                var foot0 = foot(e0, s.Offset + z0);
-                var foot1 = foot(e1, s.Offset + z1);
-                // 海の側（+x）を向く巻き
-                s.paint.Quad(top1, mid1, mid0, top0, (j % 3 == 0) ? Swatch.RockDark : Swatch.Rock);
-                s.paint.Quad(mid1, foot1, foot0, mid0, (j % 2 == 0) ? Swatch.Rock : Swatch.RockDark);
-                // 根元の泡（崖の縁に隠れて近くでは見えないが、前の方の入り江では覗く）
-                s.paint.Quad(new Vector3(foot1.x - 0.3f, SeaY + 0.05f, z1), new Vector3(foot1.x + 1.4f + s.Next(), SeaY + 0.05f, z1),
-                    new Vector3(foot0.x + 1.4f + s.Next(), SeaY + 0.05f, z0), new Vector3(foot0.x - 0.3f, SeaY + 0.05f, z0), Swatch.Foam);
-            }
-            // 海。崖の根元の下から沖（1.5 km）まで。細かい波の絵を 8 m × 4 m で繰り返す（区切りに 5 回で継ぎ目が揃う）
-            const float sea0 = 6f, sea1 = 1500f;
-            s.water.Patch(new Vector3(sea0, SeaY, TileLength), new Vector3(sea1, SeaY, TileLength), new Vector3(sea1, SeaY, 0f), new Vector3(sea0, SeaY, 0f),
-                new Vector2(sea0 / 8f, 5f), new Vector2(sea1 / 8f, 5f), new Vector2(sea1 / 8f, 0f), new Vector2(sea0 / 8f, 0f));
-            // 沖の離れ岩と、根元の泡
-            var stacks = 1 + (s.Next() < 0.5f ? 1 : 0);
-            for (var k = 0; k < stacks; k++)
-            {
-                var at = new Vector3(s.Range(22f, 70f), SeaY - 1f, s.Range(3f, 17f));
-                var r = s.Range(2.5f, 7f);
-                var high = s.Range(6f, 18f);
-                s.paint.Prism(at, r, r * s.Range(0.45f, 0.75f), high, 7, s.Next() * 60f, Swatch.Rock, Swatch.Turf, s.rnd, 0.35f);
-                s.paint.Prism(at + new Vector3(r * 0.6f, 0f, -r * 0.4f), r * 0.5f, r * 0.3f, high * 0.45f, 6, s.Next() * 60f, Swatch.RockDark, Swatch.RockDark, s.rnd, 0.4f);
-                Foam(s, new Vector3(at.x, SeaY + 0.06f, at.z), r * 1.05f, r * 1.05f + s.Range(2f, 4f));
-            }
-            // 崖の上の低い花（ピンクのハマカンザシに見立てたエキナセアのピンク、黄のレディースマントル）とハリエニシダの黄
-            for (var i = 0; i < 26; i++)
-            {
-                var z = s.Next() * TileLength;
-                var edge = CliffEdge(s, s.Offset + z);
-                var x = s.Range(RoadHalf + 0.1f, edge - 0.6f);
-                var kind = s.Next() < 0.4f ? Wild.EchPink : s.Next() < 0.5f ? Wild.Mantle : s.Next() < 0.6f ? Wild.Filler : Wild.Rudbeckia;
-                Clump(s.flora, kind, new Vector3(x, VergeY, z), s.Range(0.6f, 0.95f), s.Next() * 180f, Vector3.zero);
-            }
         }
 
         /// <summary>水の面の上の、ぎざぎざの輪の泡</summary>
@@ -530,11 +458,19 @@ namespace HalfAware.EditorTools
             switch (scene)
             {
                 case Scene.Coast:
-                    // 入り江の向こうの岬。海から立つ崖の面と、上の芝と、根元の白い波
+                {
+                    // 入り江の向こうの岬。海から立つ崖の面と、上の芝と、根元の白い波。岬のいちばん高い所に錫の鉱山の機関場
                     Ridge(p, rnd, 380f, 22f, 78f, 18f, 42f, Swatch.Rock, SeaY - 1f);
-                    Ridge(p, rnd, 379f, 22f, 78f, 1f, 3f, Swatch.Turf, 0f, true);
+                    var headDeg = 30f;
+                    for (var d = 30f; d <= 60f; d += 1f)
+                        if (RidgeTop(d, 22f, 78f, 18f, 42f) > RidgeTop(headDeg, 22f, 78f, 18f, 42f)) headDeg = d;
+                    var head = RidgeTop(headDeg, 22f, 78f, 18f, 42f);
+                    // 芝は厚めに（薄いと霞に消えて、岬が灰色の板に見えた）
+                    Ridge(p, rnd, 379f, 22f, 78f, 3f, 7f, Swatch.Turf, 0f, true);
                     Surf(p, 380f, 22f, 78f);
+                    EngineHouse(p, headDeg, 392f, head + 4f);
                     break;
+                }
                 case Scene.Moor:
                     Ridge(p, rnd, 380f, -80f, 250f, 25f, 70f, Swatch.HillFar);
                     break;
@@ -565,6 +501,16 @@ namespace HalfAware.EditorTools
             if (land != null) Put(parent, "Land", land, m.swatch);
             var lit = glow.Bake(dir + "Glow.asset");
             if (lit != null) Put(parent, "Glow", lit, m.glow);
+            if (scene == Scene.Coast) stats.far += Gulls(parent) * 2;
+            // 遠景の子はどれも一つのレンダラー
+            stats.farCalls = parent.childCount;
+        }
+
+        /// <summary>直前に立てた稜線（<see cref="Ridge"/>）の、方位 deg での高さ</summary>
+        static float RidgeTop(float deg, float from, float to, float low, float high)
+        {
+            var t = Mathf.InverseLerp(from, to, deg);
+            return Mathf.Lerp(low, high, 0.5f + 0.35f * Mathf.Sin(t * 9f + lastPhase) + 0.15f * Mathf.Sin(t * 23f + lastPhase * 2f));
         }
 
         static void Put(Transform parent, string name, Mesh mesh, Material mat)

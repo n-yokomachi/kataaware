@@ -153,8 +153,8 @@ namespace HalfAware.EditorTools
                     var s = new Slice { index = i, count = leg.slices, rnd = rnd, stats = stats, name = leg.scene + "_" + i };
                     switch (leg.scene)
                     {
-                        case Scene.Forest: Forest(s); break;
-                        case Scene.Coast: Coast(s); break;
+                        case Scene.Forest: Woodland(s); break;
+                        case Scene.Coast: Cliffs(s); break;
                         case Scene.Moor: Moor(s); break;
                         case Scene.Wheat: Wheat(s); break;
                         case Scene.Pasture: Pasture(s); break;
@@ -166,9 +166,9 @@ namespace HalfAware.EditorTools
                 Backdrop(leg.scene, back, stats);
                 band.gameObject.SetActive(b == 0);
                 back.gameObject.SetActive(b == 0);
-                note.AppendFormat("帯 {0} {1}: 曲の {2:0.00} 秒から、区切り {3} 枚（前 {4:0} m）、札 {5}・三角 {6}（区切りあたり 札 {7:0}・三角 {8:0}）、遠景の三角 {9}",
+                note.AppendFormat("帯 {0} {1}: 曲の {2:0.00} 秒から、区切り {3} 枚（前 {4:0} m）、札 {5}・三角 {6}（区切りあたり 札 {7:0}・三角 {8:0}）、描く回数 {9}（区切りあたり {10:0.0}）、遠景の三角 {11}・描く回数 {12}",
                     b + 1, leg.name, leg.from, leg.slices, leg.slices * TileLength + Behind, stats.cards, stats.tris,
-                    stats.cards / (float)leg.slices, stats.tris / (float)leg.slices, stats.far).AppendLine();
+                    stats.cards / (float)leg.slices, stats.tris / (float)leg.slices, stats.calls, stats.calls / (float)leg.slices, stats.far, stats.farCalls).AppendLine();
             }
         }
 
@@ -178,6 +178,9 @@ namespace HalfAware.EditorTools
             public int cards;
             public int tris;
             public int far;
+            /// <summary>描く回数（区切りの物の和。遠景は別）</summary>
+            public int calls;
+            public int farCalls;
         }
 
         /// <summary>
@@ -197,6 +200,12 @@ namespace HalfAware.EditorTools
             public readonly Bank water = new Bank { Texel = 1f };
             public readonly Bank wheat = new Bank { Texel = 1.25f, Rooted = true, CardLift = 1.0f };
             public readonly Bank field = new Bank { Texel = 0.15f, Rooted = false };
+            /// <summary>野の花と木の札（EndingWild.png）。作り込んだ帯はこちらだけを使う</summary>
+            public readonly Bank wild = new Bank { Texel = 1f, Rooted = true, CardLift = 1.4f };
+            /// <summary>林の光の筋（加算）</summary>
+            public readonly Bank shafts = new Bank { Texel = 1f };
+            /// <summary>海辺の帯の海</summary>
+            public readonly Bank sea = new Bank { Texel = 1f };
             public Material roadMat;
 
             /// <summary>環の中での z（区切りの頭が環の頭から何 m か）。起伏の位相を環の一周で閉じるのに使う</summary>
@@ -212,8 +221,10 @@ namespace HalfAware.EditorTools
             {
                 var m = Materials();
                 var dir = BuildEnding.Generated + name + "_";
-                stats.cards += flora.Count / 2 + wheat.Count / 2;
-                stats.tris += flora.Count + wheat.Count + paint.Count + road.Count + water.Count + field.Count;
+                stats.cards += flora.Count / 2 + wheat.Count / 2 + wild.Count / 2;
+                stats.tris += flora.Count + wheat.Count + paint.Count + road.Count + water.Count + field.Count + wild.Count + shafts.Count + sea.Count;
+                stats.calls += (flora.Count > 0 ? 1 : 0) + (wheat.Count > 0 ? 1 : 0) + (paint.Count > 0 ? 1 : 0) + (road.Count > 0 ? 1 : 0)
+                    + (water.Count > 0 ? 1 : 0) + (field.Count > 0 ? 1 : 0) + (wild.Count > 0 ? 1 : 0) + (shafts.Count > 0 ? 1 : 0) + (sea.Count > 0 ? 1 : 0);
                 road.Emit(slice, "Road", roadMat != null ? roadMat : m.road, false, dir);
                 var mesh = paint.Bake(dir + "Land.asset");
                 if (mesh != null)
@@ -227,6 +238,10 @@ namespace HalfAware.EditorTools
                 field.Emit(slice, "Field", m.field, false, dir);
                 wheat.Emit(slice, "Wheat", m.wheat, false, dir);
                 flora.Emit(slice, "Flora", m.flora, false, dir);
+                wild.Emit(slice, "Wild", m.wild, false, dir);
+                sea.Emit(slice, "Sea", m.sea, false, dir);
+                var beams = shafts.Emit(slice, "Shafts", m.shaft, false, dir);
+                if (beams != null) beams.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             }
         }
 
@@ -237,6 +252,7 @@ namespace HalfAware.EditorTools
         {
             Grass, Floor, Bark, Rock, RockDark, Foam, Turf, Asphalt, Stone, StoneDark, Wool, Face,
             Heath, HeathDark, Litter, Pasture, Roof, Wall, HillFar, HillNight, Reed, Sand, Line, Moon, Star, Lamp,
+            BeechBark, Wood, Moss, Granite, GraniteDark, Slate,
         }
 
         /// <summary>升の色（sRGB）。Swatch と同じ並び</summary>
@@ -268,6 +284,12 @@ namespace HalfAware.EditorTools
             new Color32(255, 250, 232, 255), // 月
             new Color32(236, 240, 255, 255), // 星
             new Color32(255, 204, 128, 255), // 窓の灯り
+            new Color32(150, 146, 136, 255), // ブナの幹（滑らかな灰）
+            new Color32(104, 82, 58, 255),   // 木の杭と道しるべ
+            new Color32(84, 104, 52, 255),   // 苔
+            new Color32(146, 140, 126, 255), // 石垣の花崗岩
+            new Color32(104, 100, 92, 255),  // 石垣の花崗岩の陰
+            new Color32(92, 96, 100, 255),   // 石垣の粘板岩
         };
 
         /// <summary>
@@ -325,8 +347,9 @@ namespace HalfAware.EditorTools
                 Quad(P(1, -1, -1), P(-1, -1, -1), P(-1, 1, -1), P(1, 1, -1), side);
             }
 
-            /// <summary>多角柱。上へ r1 まで細る。top が色見本の升なら天に蓋をする</summary>
-            public void Prism(Vector3 foot, float r0, float r1, float high, int sides, float turn, Swatch col, Swatch? top, System.Random jitter = null, float rough = 0f)
+            /// <summary>多角柱。上へ r1 まで細る。top が色見本の升なら天に蓋をする。lean は天の輪を横へずらす量（傾いた幹）</summary>
+            public void Prism(Vector3 foot, float r0, float r1, float high, int sides, float turn, Swatch col, Swatch? top, System.Random jitter = null, float rough = 0f,
+                Vector3 lean = default(Vector3))
             {
                 var ring0 = new Vector3[sides];
                 var ring1 = new Vector3[sides];
@@ -338,7 +361,7 @@ namespace HalfAware.EditorTools
                     var j1 = jitter != null ? 1f + ((float)jitter.NextDouble() - 0.5f) * rough : 1f;
                     var hj = jitter != null ? ((float)jitter.NextDouble() - 0.5f) * rough * high * 0.3f : 0f;
                     ring0[i] = foot + d * r0 * j0;
-                    ring1[i] = foot + d * r1 * j1 + Vector3.up * (high + hj);
+                    ring1[i] = foot + d * r1 * j1 + Vector3.up * (high + hj) + lean;
                 }
                 for (var i = 0; i < sides; i++)
                 {
@@ -351,6 +374,41 @@ namespace HalfAware.EditorTools
                     foreach (var p in ring1) c += p;
                     c /= sides;
                     for (var i = 0; i < sides; i++) Tri(c, ring1[(i + 1) % sides], ring1[i], top.Value);
+                }
+            }
+
+            /// <summary>
+            /// 寝かせた丸太。a から b へ、半径 r の sides 角柱。上を向く面（法線の上向きが 0.35 を越える面）を moss、ほかを col で塗る。
+            /// 両端は col の輪で塞ぐ
+            /// </summary>
+            public void Log(Vector3 a, Vector3 b, float r, int sides, Swatch col, Swatch moss)
+            {
+                var axis = (b - a).normalized;
+                var e1 = Vector3.Cross(axis, Vector3.up).sqrMagnitude > 1e-6f ? Vector3.Cross(Vector3.up, axis).normalized : Vector3.right;
+                // Prism と同じ巻き（輪の e1 → e2 が軸から見て Prism の x → z と同じ回り）
+                var e2 = Vector3.Cross(e1, axis);
+                var ring0 = new Vector3[sides];
+                var ring1 = new Vector3[sides];
+                var outward = new Vector3[sides];
+                for (var i = 0; i < sides; i++)
+                {
+                    var t = 2f * Mathf.PI * i / sides;
+                    var d = e1 * Mathf.Cos(t) + e2 * Mathf.Sin(t);
+                    ring0[i] = a + d * r;
+                    ring1[i] = b + d * r * 0.9f;
+                    outward[i] = d;
+                }
+                for (var i = 0; i < sides; i++)
+                {
+                    var n = (i + 1) % sides;
+                    var up = (outward[i] + outward[n]).normalized.y;
+                    Quad(ring0[n], ring0[i], ring1[i], ring1[n], up > 0.35f ? moss : col);
+                }
+                for (var i = 0; i < sides; i++)
+                {
+                    var n = (i + 1) % sides;
+                    Tri(b, ring1[n], ring1[i], col);
+                    Tri(a, ring0[i], ring0[n], col);
                 }
             }
 
@@ -457,7 +515,7 @@ namespace HalfAware.EditorTools
 
         sealed class Mats
         {
-            public Material flora, swatch, road, asphalt, water, field, wheat, glow;
+            public Material flora, swatch, road, asphalt, water, field, wheat, glow, wild, shaft, sea;
         }
 
         static Mats materials;
@@ -472,6 +530,9 @@ namespace HalfAware.EditorTools
                 glow = SwatchMat(true),
                 road = RoadMat(),
                 water = WaterMat(),
+                wild = WildMat(),
+                shaft = ShaftMat(),
+                sea = SeaMat(),
                 // 麦は場面 8 の麦（HalfAware/Wheat）をそのまま使う。場面 8 と同じ畑の絵と色
                 wheat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/Drive/Wheat.mat"),
                 field = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/Drive/FieldCrop.mat"),
