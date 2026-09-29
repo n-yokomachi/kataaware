@@ -54,8 +54,11 @@ namespace HalfAware.EditorTools
         const float BackThick = 0.03f;
         const float BackGap = 0.03f;
 
-        /// <summary>廊下の天井の明かり。部屋の明かり（RoomLight、強さ 10・届き 10 m）より控えめに</summary>
-        const float HallIntensity = 3f;
+        /// <summary>
+        /// 廊下の天井の明かり。部屋の明かり（RoomLight、強さ 10・届き 10 m・影なし）は壁を抜けて廊下も照らすので、足すのは控えめに
+        /// （3 と 1.5 と 0.8 で撮り比べて、見え方の差は小さかった）
+        /// </summary>
+        const float HallIntensity = 1.5f;
         const float HallRange = 3.5f;
         const float HallLampScale = 1.5f;
 
@@ -101,12 +104,15 @@ namespace HalfAware.EditorTools
             var walls = Walls();
             var ceilings = Ceilings();
             if (!AssetDatabase.IsValidFolder(MeshDir)) AssetDatabase.CreateFolder("Assets/Models/generated", "roomshell");
-            Shell(room, FloorName, Bake(FloorName, floors), "Assets/Materials/Room/ConcreteFloor.mat", floors);
-            Shell(room, WallsName, Bake(WallsName, walls), "Assets/Materials/Room/Concrete.mat", walls);
-            Shell(room, CeilingName, Bake(CeilingName, ceilings), "Assets/Materials/Room/ConcreteCeiling.mat", null);
+            var floorMesh = Bake(FloorName, floors, false);
+            var wallMesh = Bake(WallsName, walls);
+            var ceilingMesh = Bake(CeilingName, ceilings, false);
+            Shell(room, FloorName, floorMesh, "Assets/Materials/Room/ConcreteFloor.mat", floors);
+            Shell(room, WallsName, wallMesh, "Assets/Materials/Room/Concrete.mat", walls);
+            Shell(room, CeilingName, ceilingMesh, "Assets/Materials/Room/ConcreteCeiling.mat", null);
             var old = Obsolete(room);
-            sb.AppendFormat("床 {0} 枚・壁 {1} 個・天井 {2} 枚の箱を焼いた（三角 {3}）。前の壁を {4} 個外した",
-                floors.Count, walls.Count, ceilings.Count, (floors.Count + walls.Count + ceilings.Count) * 12, old).AppendLine();
+            sb.AppendFormat("床 {0} 枚・壁 {1} 個・天井 {2} 枚の箱を焼いた（三角 {3}・{4}・{5}）。前の壁を {6} 個外した",
+                floors.Count, walls.Count, ceilings.Count, floorMesh.triangles.Length / 3, wallMesh.triangles.Length / 3, ceilingMesh.triangles.Length / 3, old).AppendLine();
 
             sb.AppendLine(Windows(room));
             sb.AppendLine(Doors(room));
@@ -251,6 +257,10 @@ namespace HalfAware.EditorTools
             return Slabs(RoomPlan.Ceiling, RoomPlan.Ceiling + RoomPlan.Slab);
         }
 
+        /// <summary>
+        /// 床と天井の板。LDK を張り出しの西の線で二つに割り、割った辺と張り出しとの辺の頂点を揃える
+        /// （継ぎ目に T 字の頂点を作らない。LDK の南の壁の西の下だけは板が無いが、壁の下なので見えない）
+        /// </summary>
         static List<Box> Slabs(float low, float high)
         {
             var h = RoomPlan.Wall * 0.5f;
@@ -258,7 +268,7 @@ namespace HalfAware.EditorTools
             var wing = Wing;
             return new List<Box>
             {
-                new Box(new Vector3(ldk.xMin - h, low, ldk.yMin - h), new Vector3(wing.xMin - h, high, ldk.yMax + h)),
+                new Box(new Vector3(ldk.xMin - h, low, ldk.yMin), new Vector3(wing.xMin - h, high, ldk.yMax + h)),
                 new Box(new Vector3(wing.xMin - h, low, ldk.yMin), new Vector3(ldk.xMax + h, high, ldk.yMax + h)),
                 new Box(new Vector3(wing.xMin - h, low, wing.yMin - h), new Vector3(wing.xMax + h, high, ldk.yMin)),
             };
@@ -266,28 +276,26 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 箱を一つの mesh に焼く。面ごとに法線を持ち、uv は世界の座標から（縦の面は横が水平の向き・縦が高さ、横の面は x と z）。
-        /// 同じ名前の mesh があれば中身を上書きする（guid を保つ）
+        /// 同じ名前の mesh があれば中身を上書きする（guid を保つ）。
+        ///
+        /// **隣の箱と接して隠れる面は張らない。** 同じ面の上で向かい合う面は、覆われた所を削る（覆い切られた面は張らず、
+        /// 壁の端の面は窓とドアの抜けの縁の所だけ残す）。残すと、表の面との継ぎ目で奥の面が深さを争って、暗い破線が出る
+        /// （廊下の口の床の継ぎ目で出た）。sides が false なら上と下の面だけ（床と天井の板。横の面は壁の下と上に隠れる）
         /// </summary>
-        static Mesh Bake(string name, List<Box> boxes)
+        static Mesh Bake(string name, List<Box> boxes, bool sides = true)
         {
             var v = new List<Vector3>();
             var n = new List<Vector3>();
             var uv = new List<Vector2>();
             var t = new List<int>();
-            foreach (var b in boxes)
-            {
-                var s = b.Size;
-                var x = new Vector3(s.x, 0f, 0f);
-                var y = new Vector3(0f, s.y, 0f);
-                var z = new Vector3(0f, 0f, s.z);
-                var lo = b.Min;
-                Face(v, n, uv, t, new Vector3(b.Max.x, lo.y, lo.z), y, z, Vector3.right);
-                Face(v, n, uv, t, lo, z, y, Vector3.left);
-                Face(v, n, uv, t, new Vector3(lo.x, b.Max.y, lo.z), z, x, Vector3.up);
-                Face(v, n, uv, t, lo, x, z, Vector3.down);
-                Face(v, n, uv, t, new Vector3(lo.x, lo.y, b.Max.z), x, y, Vector3.forward);
-                Face(v, n, uv, t, lo, y, x, Vector3.back);
-            }
+            for (var i = 0; i < boxes.Count; i++)
+                for (var axis = 0; axis < 3; axis++)
+                {
+                    if (!sides && axis != 1) continue;
+                    foreach (var sign in new[] { 1, -1 })
+                        foreach (var r in Uncovered(boxes, i, axis, sign))
+                            Face(v, n, uv, t, boxes[i], axis, sign, r);
+                }
             var mesh = new Mesh { name = name };
             mesh.SetVertices(v);
             mesh.SetNormals(n);
@@ -297,16 +305,86 @@ namespace HalfAware.EditorTools
             return ProcMesh.Save(mesh, MeshDir + "/" + name + ".asset");
         }
 
-        /// <summary>四隅 p, p+du, p+du+dv, p+dv の面。表は du × dv の向き（Unity の時計回り）</summary>
-        static void Face(List<Vector3> v, List<Vector3> n, List<Vector2> uv, List<int> t, Vector3 p, Vector3 du, Vector3 dv, Vector3 normal)
+        /// <summary>面の上の二つの向き（表が +法線になる順）。x の面は (y, z)、y の面は (z, x)、z の面は (x, y)。裏向きは入れ替える</summary>
+        static void Tangents(int axis, int sign, out int a, out int b)
         {
+            a = (axis + 1) % 3;
+            b = (axis + 2) % 3;
+            if (sign < 0) { var k = a; a = b; b = k; }
+        }
+
+        /// <summary>
+        /// 箱 i の面（axis の向き、sign の側）のうち、向かい合う箱の面に覆われていない所（面の上の二つの向きの範囲、x が a・y が b）。
+        /// 覆う物がどれも一つの向きに面の端から端まで掛かるなら、もう一つの向きで削る。そうでなければ削らずに丸ごと返す
+        /// </summary>
+        static List<Rect> Uncovered(List<Box> boxes, int i, int axis, int sign)
+        {
+            int a, b;
+            Tangents(axis, sign, out a, out b);
+            var me = boxes[i];
+            var plane = sign > 0 ? me.Max[axis] : me.Min[axis];
+            var face = Rect.MinMaxRect(me.Min[a], me.Min[b], me.Max[a], me.Max[b]);
+            var covers = new List<Rect>();
+            for (var j = 0; j < boxes.Count; j++)
+            {
+                if (j == i) continue;
+                var o = boxes[j];
+                var at = sign > 0 ? o.Min[axis] : o.Max[axis];
+                if (Mathf.Abs(at - plane) > 1e-4f) continue;
+                var c = Rect.MinMaxRect(Mathf.Max(face.xMin, o.Min[a]), Mathf.Max(face.yMin, o.Min[b]), Mathf.Min(face.xMax, o.Max[a]), Mathf.Min(face.yMax, o.Max[b]));
+                if (c.width > 1e-4f && c.height > 1e-4f) covers.Add(c);
+            }
+            var left = new List<Rect>();
+            if (covers.Count == 0) { left.Add(face); return left; }
+            var acrossA = covers.TrueForAll(c => c.xMin <= face.xMin + 1e-4f && c.xMax >= face.xMax - 1e-4f);
+            var acrossB = covers.TrueForAll(c => c.yMin <= face.yMin + 1e-4f && c.yMax >= face.yMax - 1e-4f);
+            if (acrossB)
+                foreach (var span in Subtract(face.xMin, face.xMax, covers.ConvertAll(c => new Vector2(c.xMin, c.xMax))))
+                    left.Add(Rect.MinMaxRect(span.x, face.yMin, span.y, face.yMax));
+            else if (acrossA)
+                foreach (var span in Subtract(face.yMin, face.yMax, covers.ConvertAll(c => new Vector2(c.yMin, c.yMax))))
+                    left.Add(Rect.MinMaxRect(face.xMin, span.x, face.xMax, span.y));
+            else left.Add(face);
+            return left;
+        }
+
+        /// <summary>from〜to から cuts の範囲を除いた残り</summary>
+        static List<Vector2> Subtract(float from, float to, List<Vector2> cuts)
+        {
+            cuts.Sort((p, q) => p.x.CompareTo(q.x));
+            var left = new List<Vector2>();
+            var at = from;
+            foreach (var c in cuts)
+            {
+                if (c.x > at + 1e-4f) left.Add(new Vector2(at, Mathf.Min(c.x, to)));
+                at = Mathf.Max(at, c.y);
+            }
+            if (to > at + 1e-4f) left.Add(new Vector2(at, to));
+            return left;
+        }
+
+        /// <summary>箱の面の一部 r（面の上の二つの向きの範囲）を張る。表は du × dv の向き（Unity の時計回り）</summary>
+        static void Face(List<Vector3> v, List<Vector3> n, List<Vector2> uv, List<int> t, Box box, int axis, int sign, Rect r)
+        {
+            int a, b;
+            Tangents(axis, sign, out a, out b);
+            var p = Vector3.zero;
+            p[axis] = sign > 0 ? box.Max[axis] : box.Min[axis];
+            p[a] = r.xMin;
+            p[b] = r.yMin;
+            var du = Vector3.zero;
+            du[a] = r.width;
+            var dv = Vector3.zero;
+            dv[b] = r.height;
+            var normal = Vector3.zero;
+            normal[axis] = sign;
             var i = v.Count;
             foreach (var q in new[] { p, p + du, p + du + dv, p + dv })
             {
                 v.Add(q);
                 n.Add(normal);
-                if (Mathf.Abs(normal.y) > 0.5f) uv.Add(new Vector2(q.x / SpanAcross, q.z / SpanAcross));
-                else if (Mathf.Abs(normal.x) > 0.5f) uv.Add(new Vector2(q.z / SpanAcross, q.y / SpanUp));
+                if (axis == 1) uv.Add(new Vector2(q.x / SpanAcross, q.z / SpanAcross));
+                else if (axis == 0) uv.Add(new Vector2(q.z / SpanAcross, q.y / SpanUp));
                 else uv.Add(new Vector2(q.x / SpanAcross, q.y / SpanUp));
             }
             t.Add(i); t.Add(i + 1); t.Add(i + 2);

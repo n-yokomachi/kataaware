@@ -81,7 +81,7 @@ namespace HalfAware.EditorTools
             AssetDatabase.SaveAssets();
             var sb = new StringBuilder();
             sb.AppendFormat("窓の外を組んだ（夕暮れ）。家 {0} 軒・木 {1} 本・車 {2} 台・街灯 {3} 本・名所 {4}", town.Houses, town.Trees, town.Cars, town.Lamps.Count, town.Landmarks).AppendLine();
-            sb.AppendFormat("三角: 街並み {0}・暈 {1}・空 {2}（頂点 {3}・{4}・{5}）。描く回数は 3（ほかにガラス 2 枚は前から）",
+            sb.AppendFormat("三角: 街並み {0}・暈 {1}・空 {2}（頂点 {3}・{4}・{5}）。描く回数は 3（ほかに窓のガラス 3 枚）",
                 town.Solid.Tris, town.Glow.Tris, town.Sky.Tris, town.Solid.Verts, town.Glow.Verts, town.Sky.Verts).AppendLine();
             sb.AppendLine("mesh の大きさ: " + MeshSizes());
             sb.AppendLine(glass);

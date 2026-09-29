@@ -36,8 +36,9 @@ namespace HalfAware.EditorTools
             var name = TitleBackdrops.FileName(b);
             switch (b)
             {
-                // 玄関の戸の前（南の壁際）から北を見る
-                case TitleBackdrop.Room: return new CheckVillage.View(name, new Vector3(1.0f, 1.6f, -2.4f), 0f, 4f);
+                // 椅子の真後ろ、LDK の南の壁の 0.5 m 手前から北北西を見る。椅子の背で座った体が隠れ、机とモニター、北の窓と本棚、居間の窓の端が入る
+                // （2026-09-30、間取りを作り直した時に選んだ。廊下の口からの目は、座った体の腕が椅子の脇に見えた）
+                case TitleBackdrop.Room: return new CheckVillage.View(name, new Vector3(BuildConnect.SeatAt.x, 1.6f, RoomPlan.Ldk.yMin + 0.6f), -12f, 4f);
                 // 場面 2 の始まりの立ち位置から北へ、通りの奥を見上げる
                 case TitleBackdrop.Alley: return new CheckVillage.View(name, new Vector3(0f, 1.7f, -2.9f), 0f, -14f);
                 // 記憶 0（メイ）の団地を外から。中庭の芝生の北の塀の近くから、棟のデッキの面と折り返す外階段を見上げる

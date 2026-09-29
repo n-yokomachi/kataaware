@@ -29,8 +29,8 @@ namespace HalfAware.EditorTools
         /// <summary>抜ける音。場面 1 の抜く側と同じもの</summary>
         public const string UnplugPath = "Assets/Audio/JackPull.wav";
 
-        /// <summary>ドア。場面 1 の対象と同じ点</summary>
-        static readonly Vector3 DoorAt = new Vector3(0.80f, 1.20f, -2.80f);
+        /// <summary>玄関のドア。場面 1 の対象と同じ点（間取りは RoomPlan）</summary>
+        static readonly Vector3 DoorAt = RoomPlan.DoorItemAt;
         /// <summary>コートハンガーの対象を、掛けたジャケットの襟（フック）からどれだけ下に置くか。場面 3 と同じ</summary>
         const float CoatBelow = 0.15f;
 
@@ -374,7 +374,7 @@ namespace HalfAware.EditorTools
                 made[NoticeIds.Jack] = item;
             }
             var hung = Hung();
-            var coatAt = hung != null ? hung.position + Vector3.down * CoatBelow : new Vector3(1.69f, 1.04f, -2.55f);
+            var coatAt = hung != null ? hung.position + Vector3.down * CoatBelow : new Vector3(RoomPlan.HallMouth.x + 0.9f, 1.04f, RoomPlan.HallMouth.y + 0.45f);
             made[NoticeIds.Coat] = Put(parent, "Coat", coatAt, script, NoticeIds.Coat, BuildConnect.ItemRadius, true);
             made[NoticeIds.Door] = Put(parent, "Door", DoorAt, script, NoticeIds.Door, BuildConnect.ItemRadius, true);
             return made;

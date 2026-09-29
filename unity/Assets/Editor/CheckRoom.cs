@@ -150,7 +150,8 @@ namespace HalfAware.EditorTools
 
             // 6. ドア。必須が残っている間（チップとモニターがまだ）と、済んだ後
             var door = Find(items, RoomIds.Door);
-            Stand(player, new Vector3(0.8f, 0.05f, -1.35f), door.Position);
+            // 廊下の中、玄関のドアの対象から 1.45 m 手前（前の部屋の戸口と同じ離れ）
+            Stand(player, new Vector3(RoomPlan.DoorItemAt.x, 0.05f, RoomPlan.DoorItemAt.z + 1.45f), door.Position);
             var early = new HashSet<string> { RoomIds.Jack, RoomIds.Cigarette, RoomIds.Jacket };
             var before = Pick(player, items, early);
             log.AppendFormat("ドア（ジャケットだけ済み）: 選ばれた物 {0}", before != null ? before.Id : "無し").AppendLine();

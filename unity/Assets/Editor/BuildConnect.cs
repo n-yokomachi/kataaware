@@ -34,8 +34,8 @@ namespace HalfAware.EditorTools
         /// <summary>手首に残す受け口の名前</summary>
         public const string SocketName = "JackSocket";
 
-        /// <summary>戸口の内側。場面 2 の暗転から、ここで部屋の奥を向いて明ける</summary>
-        static readonly Vector3 StartAt = new Vector3(0.80f, 0.05f, -2.45f);
+        /// <summary>玄関の内側（廊下の南の端）。場面 2 の暗転から、ここで廊下の奥（北）を向いて明ける。間取りは RoomPlan</summary>
+        static readonly Vector3 StartAt = new Vector3(RoomPlan.EntranceStand.x, 0.05f, RoomPlan.EntranceStand.y);
         /// <summary>腰を下ろす場所。場面 1 が座って始まるのと同じ点</summary>
         public static readonly Vector3 SeatAt = new Vector3(1.50f, 0.05f, 1.20f);
         /// <summary>ソファの上の売上メモ</summary>
@@ -247,7 +247,7 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 戸口の内側に立たせる。椅子の当たりは入れておく。
+        /// 玄関の内側に立たせる。椅子の当たりは入れておく。
         /// 座位の姿勢（<see cref="SeatedPose.Seated"/>）は直列化されないので、
         /// 解くのは ConnectDirector が再生のたびにやる
         /// </summary>
@@ -282,7 +282,7 @@ namespace HalfAware.EditorTools
 
         // ---- コートハンガー --------------------------------------------------
 
-        /// <summary>玄関先のコートハンガー（Room の子）</summary>
+        /// <summary>廊下の出口の LDK 側のコートハンガー（Room の子）</summary>
         const string RackName = "CoatRack";
         /// <summary>コートハンガーに掛けたジャケット（Room の子）の名前</summary>
         public const string HungName = "CoatJacket";
@@ -300,7 +300,8 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// ジャケットを掛ける腕を、コートハンガーのメッシュから読む。腕は柱から ±x・±z の 4 方向へ、上下 2 段に伸びる。
-        /// 戸口の内側（立って始める所）を向いた 1 本の、下の段（高さの 7〜8 割の所）に掛ける。
+        /// 廊下の口（玄関から歩いてきて LDK へ出る所、<see cref="RoomPlan.HallMouth"/>）を向いた 1 本の、下の段（高さの 7〜8 割の所）に掛ける。
+        /// 前の部屋では戸口の内側（立って始める所）を向けていた。今は立って始める所が廊下の奥なので、そちらを向けると壁の側になる。
         /// 上の段に掛けると、真下の同じ向きの下の段の腕（上の段より 3 cm 長い）が背に刺さる。避けるには裾を 16 度外へ振ることになり、板のように傾いて見えた
         /// </summary>
         static bool FindHook(out Hook hook)
@@ -310,10 +311,9 @@ namespace HalfAware.EditorTools
             var mf = rack != null ? rack.GetComponentInChildren<MeshFilter>(true) : null;
             if (mf == null || mf.sharedMesh == null) { Debug.LogWarning("コートハンガーが無い: Room/" + RackName); return false; }
             var pole = new Vector3(rack.position.x, 0f, rack.position.z);
-            var toStart = StartAt - pole;
-            toStart.y = 0f;
-            var outward = Mathf.Abs(toStart.x) >= Mathf.Abs(toStart.z)
-                ? new Vector3(Mathf.Sign(toStart.x), 0f, 0f) : new Vector3(0f, 0f, Mathf.Sign(toStart.z));
+            var toMouth = new Vector3(RoomPlan.HallMouth.x, 0f, RoomPlan.HallMouth.y) - pole;
+            var outward = Mathf.Abs(toMouth.x) >= Mathf.Abs(toMouth.z)
+                ? new Vector3(Mathf.Sign(toMouth.x), 0f, 0f) : new Vector3(0f, 0f, Mathf.Sign(toMouth.z));
             var side = Vector3.Cross(Vector3.up, outward);
             var world = new List<Vector3>();
             foreach (var v in mf.sharedMesh.vertices) world.Add(mf.transform.TransformPoint(v));
@@ -376,7 +376,7 @@ namespace HalfAware.EditorTools
         static Vector3 CoatAt()
         {
             Hook hook;
-            if (!FindHook(out hook)) return new Vector3(1.68f, 1.05f, -2.55f);
+            if (!FindHook(out hook)) return new Vector3(RoomPlan.HallMouth.x + 0.9f, 1.05f, RoomPlan.HallMouth.y + 0.45f);
             return hook.at + Vector3.down * 0.15f;
         }
 
@@ -743,7 +743,7 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 挿すしぐさの、掴む手の角（<see cref="JackHoldRoll"/>）を選ぶ。座った所（ConnectDirector が座らせる所）で流れを試すので、
-        /// その間だけ Player を椅子へ移し、終わったら戸口の内側へ戻す
+        /// その間だけ Player を椅子へ移し、終わったら玄関の内側へ戻す
         /// </summary>
         static void HoldRoll(JackPlug plug)
         {
@@ -901,7 +901,7 @@ namespace HalfAware.EditorTools
 
             // 挿す前のジャックは肘掛けの置き場にあり、挿す対象の判定点は右の手首の差込口に付いて回る（Items）。
             // 判定点は座ってから開くので、座った所（ConnectDirector が座らせる所）で、座った目から拾える近さにあるかを見る。
-            // 前は判定点を置き場と比べていて、組み立ての間は戸口の内側に立っている手首で測るので、3 m 余り離れていると出ていた
+            // 前は判定点を置き場と比べていて、組み立ての間は玄関の内側に立っている手首で測るので、3 m 余り離れていると出ていた
             var rest = Look("Room/Chair/JackRest");
             GameObject jack;
             var player = Object.FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
