@@ -246,8 +246,11 @@ namespace HalfAware.EditorTools
 
         // ---- エアコン ----------------------------------------------------------------------
 
-        /// <summary>壁掛けのエアコン（0.82 × 0.28 m、奥行き 0.21）。黒に近い灰の筐体、顔の絵（数字の表示と灯り）、下の吹き出しの口と羽、横から下へ降りる配管の覆い</summary>
-        static void AirCon(FurnitureKit kit)
+        /// <summary>
+        /// 壁掛けのエアコン（0.82 × 0.28 m、奥行き 0.21）。黒に近い灰の筐体、顔の絵（数字の表示と灯り）、下の吹き出しの口と羽、右の端から天井へ上る配管の覆い
+        /// （下へ降ろすとソファの上の絵の組に掛かる）。mountY は置く高さ（配管の覆いの長さを天井まで取る）
+        /// </summary>
+        static void AirCon(FurnitureKit kit, float mountY)
         {
             const float W = 0.82f, H = 0.28f, D = 0.21f;
             var white = Sw(Hue.AcWhite);
@@ -255,7 +258,8 @@ namespace HalfAware.EditorTools
             kit.Decal("AcFront", new Vector3(0f, 0.035f, D + 0.0012f), new Vector3(-(W - 0.08f) * 0.5f, 0f, 0f), new Vector3(0f, 0.085f, 0f), Uv(AcFrontArea));
             kit.Box("AcSlot", new Vector3(0f, -H * 0.5f + 0.042f, D - 0.004f), new Vector3(W - 0.12f, 0.03f, 0.012f), Sw(Hue.Slot));
             kit.Box("AcFlap", new Vector3(0f, -H * 0.5f + 0.02f, D - 0.004f), R(38f, 0f, 0f), new Vector3(W - 0.12f, 0.006f, 0.055f), white);
-            kit.Box("AcPipeCover", new Vector3(W * 0.5f - 0.07f, -H * 0.5f - 0.17f, 0.034f), new Vector3(0.075f, 0.34f, 0.066f), white, NoBottom);
+            var rise = Mathf.Max(0.05f, RoomPlan.Ceiling - (mountY + H * 0.5f));
+            kit.Box("AcPipeCover", new Vector3(W * 0.5f - 0.07f, H * 0.5f + rise * 0.5f, 0.034f), new Vector3(0.075f, rise, 0.066f), white, NoBottom);
         }
 
         // ---- 鉢植え --------------------------------------------------------------------

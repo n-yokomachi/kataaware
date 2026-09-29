@@ -903,9 +903,9 @@ namespace HalfAware.EditorTools
         /// </summary>
         public static readonly Picture[] Pictures =
         {
-            new Picture("MilletSpring", 1090f / 850f, 0.36f),
-            new Picture("TurnerTemeraire", 2000f / 1413f, 0.64f),
-            new Picture("GrisPlaceRavignan", 960f / 1267f, 0.46f),
+            new Picture("MilletSpring", 1090f / 850f, 0.33f),
+            new Picture("TurnerTemeraire", 2000f / 1413f, 0.60f),
+            new Picture("GrisPlaceRavignan", 960f / 1267f, 0.8152f),
             new Picture("HammershoiDustMotes", 1609f / 1890f, 0.46f),
         };
 

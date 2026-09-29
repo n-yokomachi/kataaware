@@ -91,7 +91,7 @@ namespace HalfAware.EditorTools
             new Place("Rug", -3.25f, 0f, 1.55f, 0f, 2.10f, 1.70f),
             new Place("LowTable", -3.30f, 0f, 1.62f, 90f),
             new Place("FloorLamp", -4.60f, 0f, 0.42f, 0f),
-            new Place("AirCon", -4.90f, 2.36f, 1.70f, 90f),
+            new Place("AirCon", -4.90f, 2.42f, 1.70f, 90f),
             // 本棚は北の二つの窓の間の壁（x −3.32〜−1.78）
             new Place("Bookcase", -2.60f, 0f, 2.75f, 180f),
             // 台所（南の壁沿い x −5〜−0.6）。南西の角に冷蔵庫、その東に流しとコンロの並び、上の天井に細長い灯り（台所と作業台の間の上）
@@ -120,29 +120,28 @@ namespace HalfAware.EditorTools
         };
 
         /// <summary>
-        /// ソファの上の三枚の組（オーナー「絵画は横並びではなくちょっとデザイン考えて配置」）。前から見て左からターナー（いちばん大きい横長）・グリス（縦長）・ミレー（小さい横長）。
-        /// 大きさに差を付け、上の縁を一本の線（床から 1.78 m、エアコンの配管の覆いの 10 cm 下）に揃えて下の縁を不揃いにし、額と額の間は同じ 9 cm、組の真ん中をソファの真ん中に合わせる
+        /// ソファの上の三枚の組（オーナー「絵画は横並びではなくちょっとデザイン考えて配置」）。一列に並べず、二列の組にする:
+        /// 前から見て左の列に縦長のグリスを大きく、右の列にターナー（上）とミレー（下、右の列の外の縁に揃える）を縦に重ねる。
+        /// 二つの列の上の縁と下の縁を揃えて、組の外形を一つの長方形にし（グリスの高さ = ターナー + 隙間 + ミレー）、隙間はどこも同じ 9 cm。
+        /// 組の真ん中はソファの真ん中、下の縁はソファの背（クッションの頭 0.98 m）から 27 cm 上、上の縁はエアコンの 17 cm 下。
+        /// 大きいグリスはフロアランプの側（左）に置いて暖かい灯りを受けさせ、小さい二枚を窓の側（右）へ寄せて、窓の明るさと釣り合わせる
         /// </summary>
         static Place[] SofaWall()
         {
-            const float wallX = -4.90f, centreZ = 1.70f, topY = 1.78f, gap = 0.09f;
-            var order = new[] { 1, 2, 0 };
-            var sizes = new Vector2[order.Length];
-            var total = gap * (order.Length - 1);
-            for (var i = 0; i < order.Length; i++)
-            {
-                sizes[i] = FrameSize(order[i]);
-                total += sizes[i].x;
-            }
+            const float wallX = -4.90f, centreZ = 1.70f, bottomY = 1.25f, gap = 0.09f;
+            var tall = FrameSize(2);
+            var upper = FrameSize(1);
+            var lower = FrameSize(0);
             // 絵は +x を向くので、前から見て左は −z
-            var z = centreZ - total * 0.5f;
-            var list = new Place[order.Length];
-            for (var i = 0; i < order.Length; i++)
+            var left = centreZ - (tall.x + gap + upper.x) * 0.5f;
+            var topY = bottomY + tall.y;
+            var column = left + tall.x + gap;
+            return new[]
             {
-                list[i] = new Place("Picture" + order[i], wallX, topY - sizes[i].y * 0.5f, z + sizes[i].x * 0.5f, 90f);
-                z += sizes[i].x + gap;
-            }
-            return list;
+                new Place("Picture2", wallX, bottomY + tall.y * 0.5f, left + tall.x * 0.5f, 90f),
+                new Place("Picture1", wallX, topY - upper.y * 0.5f, column + upper.x * 0.5f, 90f),
+                new Place("Picture0", wallX, bottomY + lower.y * 0.5f, column + upper.x - lower.x * 0.5f, 90f),
+            };
         }
 
         /// <summary>置き換える前の家具（Kenney）のうち、同じ名前の新しい物が無い物。組むと外す</summary>
@@ -279,7 +278,7 @@ namespace HalfAware.EditorTools
                 case "Rug": Rug(kit, p.Wide > 0f ? p.Wide : RugWide, p.Length > 0f ? p.Length : RugLong); return true;
                 case "LowTable": LowTable(kit); return true;
                 case "FloorLamp": FloorLamp(kit); return true;
-                case "AirCon": AirCon(kit); return true;
+                case "AirCon": AirCon(kit, p.At.y); return true;
                 case "Bookcase": Bookcase(kit); return true;
                 case "Fridge": Fridge(kit); return true;
                 case "Kitchen": Kitchen(kit, p.Length > 0f ? p.Length : 2.5f); return true;
