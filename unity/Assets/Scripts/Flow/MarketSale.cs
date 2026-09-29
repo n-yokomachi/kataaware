@@ -3,9 +3,12 @@ using System.Collections.Generic;
 namespace HalfAware
 {
     /// <summary>
-    /// 露店でチップを売るくだり。シナリオ 6.4 の台詞をそのまま持つ。
-    /// 買い手ひとりぶんの台詞と、その買い手が去ったあとテーブルに残る枚数を対にする。
-    /// 台詞と枚数を同じところに置いておかないと、暗転のたびにずれる
+    /// 露店でチップを売るくだり。買い手ひとりぶんの形（去ったあとテーブルに残る枚数・女か・置いていく煙草）を持つ。
+    /// 形と枚数を同じところに置いておかないと、暗転のたびにずれる。
+    ///
+    /// **台詞はここに持たない。** 台詞の原稿（docs/scenario/02-alley.md の「買い手A」〜「買い手C」と「締め」）を正とし、
+    /// 写す道具（<c>HalfAware/Apply the scenario (alley)</c>、<see cref="AlleyManuscript"/>）が文面のアセット（AlleyScript）の
+    /// <see cref="AlleyIds.Buyer"/>・<see cref="AlleyIds.Closing"/> へ書く。ここはアセットから引くだけ
     /// </summary>
     public static class MarketSale
     {
@@ -13,81 +16,50 @@ namespace HalfAware
         public const int Chips = 6;
 
         /// <summary>買い手ひとりぶん</summary>
-        public struct Buyer
+        struct Buyer
         {
-            /// <summary>順に流す台詞</summary>
-            public string[] lines;
             /// <summary>この買い手が去ったあと、テーブルに残る枚数</summary>
             public int left;
-            /// <summary>女か。この企画には女の模型しか無いので、男は体格で見分けさせる</summary>
+            /// <summary>女か。足音をヒールにする（<see cref="BuyerSteps"/>）</summary>
             public bool woman;
-            /// <summary>この行が出たところで煙草を置く。置かないなら null</summary>
-            public string putsSmokes;
-            /// <summary>置く煙草の数</summary>
+            /// <summary>置く煙草の数。置かないなら 0</summary>
             public int smokes;
+
+            public Buyer(int left, bool woman, int smokes)
+            {
+                this.left = left;
+                this.woman = woman;
+                this.smokes = smokes;
+            }
         }
 
+        /// <summary>原稿の「買い手A」「買い手B」「買い手C」の順</summary>
         static readonly Buyer[] buyers =
         {
-            new Buyer
-            {
-                lines = new[]
-                {
-                    "買い手A「やあ、今日の品ぞろえは？」",
-                    "私「男が3枚、女が3枚」",
-                    "買い手A「若い女のはあるかな、なければ男」",
-                    "私「どっちもあるよ、好きな方を持っていって」",
-                    "買い手A「へっへ、いつも助かるよ。・・・OK、送金した。それじゃあ」",
-                },
-                left = 4,
-                woman = false,
-            },
-            new Buyer
-            {
-                lines = new[]
-                {
-                    "買い手B「よう、いつものあるか？」",
-                    "私「ちゃんと取り置いてるよ、どうぞ」",
-                    "買い手B「支払いもいつもので？」",
-                    "私「ああ、助かるよ。丁度切らしちゃって」",
-                    "買い手B「はいはい、じゃあこれな」",
-                    "私「どうも」",
-                },
-                left = 2,
-                woman = false,
-                // 「じゃあこれな」は台詞で、煙草を置くのはしぐさ。この行で卓に現れる
-                putsSmokes = "買い手B「はいはい、じゃあこれな」",
-                smokes = 6,
-            },
-            new Buyer
-            {
-                lines = new[]
-                {
-                    "買い手C「初めてなんだけど、子どものはあるかしら？」",
-                    "私「1枚なら。えっと、男の子、8歳、24分38秒」",
-                    "買い手C「それでいいわ。支払いは・・・ああ、しまった、現金でもいい？」",
-                    "私「ええ、いいですよ」",
-                },
-                left = 1,
-                woman = true,
-            },
-        };
-
-        /// <summary>締め。最後の買い手が去ってから出す</summary>
-        static readonly string[] closing =
-        {
-            "6枚あったメモリーチップは、それなりに高価な品であるにも関わらず30分後には売り切れた。これであと1週間は何もしなくても食っていける",
-            "帰ろう",
+            new Buyer(4, false, 0),
+            // 煙草で払う常連。支払いの台詞（原稿の注記「上の行で、買い手Bが煙草をテーブルに置く」）で卓に置く
+            new Buyer(2, false, 6),
+            new Buyer(1, true, 0),
         };
 
         public static int Count { get { return buyers.Length; } }
 
-        public static IReadOnlyList<string> Closing { get { return closing; } }
+        static readonly string[] NoLines = new string[0];
 
-        /// <summary>i 人目の台詞。範囲の外なら空</summary>
-        public static IReadOnlyList<string> Lines(int i)
+        /// <summary>i 人目とのやり取り。文面に無い・範囲の外なら空</summary>
+        public static IReadOnlyList<string> Lines(RoomScript script, int i)
         {
-            return i >= 0 && i < buyers.Length ? buyers[i].lines : new string[0];
+            if (script == null || i < 0 || i >= buyers.Length) return NoLines;
+            var entry = script.Find(AlleyIds.Buyer(i));
+            return entry.id == null ? NoLines : entry.Lines;
+        }
+
+        /// <summary>締め。最後の買い手が去ってから出す。文面に無ければ空</summary>
+        public static IReadOnlyList<string> Closing(RoomScript script)
+        {
+            if (script == null) return NoLines;
+            var entry = script.Find(AlleyIds.Closing);
+            return entry.id == null ? NoLines : entry.Lines;
         }
 
         /// <summary>
@@ -108,12 +80,26 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// i 人目が煙草を置く行。置かなければ null。
-        /// この行が字幕に出たところで卓に煙草を出す
+        /// i 人目が煙草を置く行。置かなければ null。この行が字幕に出たところで卓に煙草を出す。
+        ///
+        /// **その買い手の最後の台詞の行**（やり取りの頭の行と同じ話者の、いちばん後ろの行）。支払いを置いて去る所で、
+        /// 原稿では「買い手B「はいはい、じゃあこれな」」の後に注記がある。行の文面は原稿から引くので、ここに台詞を書かない
         /// </summary>
-        public static string PutsSmokes(int i)
+        public static string PutsSmokes(RoomScript script, int i)
         {
-            return i >= 0 && i < buyers.Length ? buyers[i].putsSmokes : null;
+            if (Smokes(i) <= 0) return null;
+            return LastOwnLine(Lines(script, i));
+        }
+
+        /// <summary>lines の頭の行の話者が、いちばん後ろで話す行。頭の行に話者が無ければ null</summary>
+        public static string LastOwnLine(IReadOnlyList<string> lines)
+        {
+            if (lines == null || lines.Count == 0) return null;
+            var who = Speech.Who(lines[0]);
+            if (string.IsNullOrEmpty(who)) return null;
+            for (var k = lines.Count - 1; k >= 0; k--)
+                if (Speech.Who(lines[k]) == who) return lines[k];
+            return null;
         }
 
         /// <summary>i 人目が置く煙草の数</summary>

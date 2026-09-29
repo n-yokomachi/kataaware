@@ -9,7 +9,9 @@ namespace HalfAware
     /// 見出し（## と ###）ごとに一まとまり（<see cref="Section"/>）にし、その中の
     /// - `**対象の名前**: …` を印に出す字
     /// - `- 「…」` の 1 行を 1 ページ（外側の「」を外し、`&lt;br/&gt;` は改行にする。ルビと傍点の書き方はそのまま）
+    /// - `- 話者「…」` の 1 行を 1 ページ（会話。話者の名と「」を付けたまま。字幕が名前の行と台詞の行に分ける、<see cref="Speech"/>）
     /// - `**リスト**` の後のコードブロックを 1 ページ（行を改行で繋ぎ、頭にリストの印 <see cref="ListFormat.Mark"/> を付ける）
+    /// - `**看板**` の後のコードブロックを 1 ページ（行を改行で繋ぎ、頭に看板の印 <see cref="ListFormat.SignMark"/> を付ける）
     /// - `**二択**: 問い（説明）` を二択の問い（説明の括弧は落とす）
     /// - `「はい」の後:` から後のページを、「はい」の後の文
     /// - `**暗転のカード**` の後の 1 ページを、カード
@@ -68,6 +70,7 @@ namespace HalfAware
         const string LabelKey = "**対象の名前**:";
         const string ChoiceKey = "**二択**:";
         const string ListKey = "**リスト**";
+        const string SignKey = "**看板**";
         const string CardKey = "**暗転のカード**";
         const string AfterYesKey = "「はい」の後:";
         const string Fence = "```";
@@ -125,26 +128,15 @@ namespace HalfAware
                     into = Into.Card;
                     continue;
                 }
-                if (line == ListKey)
+                if (line == ListKey || line == SignKey)
                 {
                     // 空行を挟んでよい。次のコードブロックを 1 ページにする
-                    var at = n + 1;
-                    while (at < lines.Length && lines[at].Trim().Length == 0) at++;
-                    if (at >= lines.Length || !lines[at].Trim().StartsWith(Fence))
-                        throw new ManuscriptException(number, "**リスト** の後にコードブロックが無い");
-                    var rows = new List<string>();
-                    var end = at + 1;
-                    while (end < lines.Length && lines[end].Trim() != Fence)
-                    {
-                        rows.Add(lines[end].TrimEnd());
-                        end++;
-                    }
-                    if (end >= lines.Length) throw new ManuscriptException(at + 1, "コードブロックが閉じていない");
-                    while (rows.Count > 0 && rows[rows.Count - 1].Length == 0) rows.RemoveAt(rows.Count - 1);
-                    if (rows.Count == 0) throw new ManuscriptException(at + 1, "リストが空");
-                    // 頭にリストの印を付ける。1 列だけの行でも画面の真ん中の枠に出す（ListFormat.Mark）
-                    Add(current, into, ListFormat.Mark + string.Join("\n", rows.ToArray()), number);
-                    n = end;
+                    var sign = line == SignKey;
+                    List<string> rows;
+                    n = Block(lines, n, sign ? "看板" : "リスト", out rows);
+                    // 頭に印を付ける。リストは 1 列だけの行でも画面の真ん中の枠に出す（ListFormat.Mark）。
+                    // 看板は同じ枠に、列に組まずに行ごとに真ん中へ寄せて出す（ListFormat.SignMark）
+                    Add(current, into, (sign ? ListFormat.SignMark : ListFormat.Mark) + string.Join("\n", rows.ToArray()), number);
                     continue;
                 }
                 if (line.StartsWith("- 「") && line.EndsWith("」"))
@@ -152,11 +144,45 @@ namespace HalfAware
                     Add(current, into, Page(line.Substring(3, line.Length - 4)), number);
                     continue;
                 }
+                // 会話。`- 話者「…」` は話者の名を付けたまま 1 ページにする（字幕が名前の行と台詞の行に分ける、Speech）
+                if (line.StartsWith("- "))
+                {
+                    var said = line.Substring(2).Trim();
+                    string who, body;
+                    if (Speech.Split(said, out who, out body))
+                    {
+                        Add(current, into, Page(said), number);
+                        continue;
+                    }
+                }
                 if (line.StartsWith("\"") && line.EndsWith("\""))
                     throw new ManuscriptException(number, "オーナーからの指示の行（\"…\"）が残っている。写す前に読んで、原稿から消す: " + line);
                 throw new ManuscriptException(number, "読めない行: " + line);
             }
             return made;
+        }
+
+        /// <summary>
+        /// lines[at]（**リスト** か **看板** の行）の後のコードブロックを読む。空行を挟んでよい。
+        /// 行を rows に返し、コードブロックの閉じの行の番号（0 から）を返す。what はエラーに出す名
+        /// </summary>
+        static int Block(string[] lines, int at, string what, out List<string> rows)
+        {
+            var open = at + 1;
+            while (open < lines.Length && lines[open].Trim().Length == 0) open++;
+            if (open >= lines.Length || !lines[open].Trim().StartsWith(Fence))
+                throw new ManuscriptException(at + 1, "**" + what + "** の後にコードブロックが無い");
+            rows = new List<string>();
+            var end = open + 1;
+            while (end < lines.Length && lines[end].Trim() != Fence)
+            {
+                rows.Add(lines[end].TrimEnd());
+                end++;
+            }
+            if (end >= lines.Length) throw new ManuscriptException(open + 1, "コードブロックが閉じていない");
+            while (rows.Count > 0 && rows[rows.Count - 1].Length == 0) rows.RemoveAt(rows.Count - 1);
+            if (rows.Count == 0) throw new ManuscriptException(open + 1, what + "が空");
+            return end;
         }
 
         static void Add(Section section, Into into, string page, int number)

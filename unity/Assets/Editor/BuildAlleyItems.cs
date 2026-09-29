@@ -9,7 +9,7 @@ namespace HalfAware.EditorTools
     /// 通りの板、小路の口の表示板、自分の露店の看板とテーブル、
     /// テーブルに並べるチップ、買い手が置いていく煙草、買い手そのもの、売るときに立つ場所。
     ///
-    /// 位置はここ（シーン）、文はアセット（WriteAlleyScript）、
+    /// 位置はここ（シーン）、文はアセット（台詞の原稿から写す。HalfAware/Apply the scenario (alley)、AlleyScenario）、
     /// 読み順と売り買いの進行は AlleyDirector が持つ。BuildAlley から呼ぶ
     /// </summary>
     public static class BuildAlleyItems
@@ -49,14 +49,14 @@ namespace HalfAware.EditorTools
             var script = AssetDatabase.LoadAssetAtPath<RoomScript>(ScriptPath);
             if (script == null)
             {
-                Debug.LogWarning("場面 2 の文面が無い。先に HalfAware/Write the alley script を走らせる");
+                Debug.LogWarning("場面 2 の文面が無い。先に HalfAware/Apply the scenario (alley) を走らせる");
                 return;
             }
             var parent = Child(root, "Items");
             Clear(parent);
 
             var signs = 0;
-            for (var i = 0; i < BuildAlley.StreetSignCount && i < WriteAlleyScript.Signs; i++)
+            for (var i = 0; i < BuildAlley.StreetSignCount && i < AlleyIds.Signs; i++)
             {
                 var board = Find(root, "Boards/StreetSign" + i);
                 if (board == null) continue;
@@ -80,6 +80,7 @@ namespace HalfAware.EditorTools
 
             Wire(root, script);
             Echo();
+            Rise();
             Debug.Log(string.Format("場面 2 の対象を立てた。通りの板 {0} 枚、チップ {1} 枚、煙草 {2} 個、買い手 {3} 人",
                 signs, MarketSale.Chips, Smokes.Length, Buyers.Length));
         }
@@ -165,6 +166,7 @@ namespace HalfAware.EditorTools
         static GameObject[] Smokes;
         static GameObject[] Buyers;
         static Transform SellSpot;
+        static BuyerSteps Steps;
 
         /// <summary>
         /// 買い手。卓の手前に立ち、店の方を向く。
@@ -197,7 +199,92 @@ namespace HalfAware.EditorTools
                 made[i] = go;
             }
             Debug.Log(sb.ToString());
+            Steps = MakeSteps(parent);
             return made;
+        }
+
+        /// <summary>
+        /// ヒールの足音の組（Heels1〜6.wav。「Footsteps heels pavement denoised」、YannSauvin、CC0。切り出しは tools/make-ambience.sh の 15 節）。
+        /// 買い手 C（女）が歩いてくる時だけ鳴らすので、足音の組の表（StepSets）には入れない
+        /// </summary>
+        public static readonly string[] HeelSteps =
+        {
+            "Assets/Audio/Heels1.wav", "Assets/Audio/Heels2.wav", "Assets/Audio/Heels3.wav",
+            "Assets/Audio/Heels4.wav", "Assets/Audio/Heels5.wav", "Assets/Audio/Heels6.wav",
+        };
+
+        /// <summary>
+        /// 買い手が歩いてくる足音の音源（<see cref="BuyerSteps"/>）。買い手と同じ入れ物に置く。3D の音で、近づくほど大きく、来る向きから聞こえる。
+        /// 男は通りと同じコンクリートの足音（StepSets.Concrete）、女はヒール（<see cref="HeelSteps"/>）。
+        /// 歩数と間はオーナーが耳で決めるので、組み直しても Inspector の値は既定に戻る（ここで書かない値は BuyerSteps の既定）
+        /// </summary>
+        static BuyerSteps MakeSteps(Transform parent)
+        {
+            var go = new GameObject("Steps");
+            go.transform.SetParent(parent, false);
+            var a = go.AddComponent<AudioSource>();
+            a.playOnAwake = false;
+            a.loop = false;
+            a.spatialBlend = 1f;
+            // 線形で減らす。卓の向こう 1.2 m で元の大きさ、歩き始めの 3.4 m 先で 8 割ほど
+            a.rolloffMode = AudioRolloffMode.Linear;
+            a.minDistance = 1.5f;
+            a.maxDistance = 14f;
+            a.dopplerLevel = 0f;
+            a.volume = 0.6f;
+            a.priority = 110;
+            var steps = go.AddComponent<BuyerSteps>();
+            var so = new SerializedObject(steps);
+            so.FindProperty("source").objectReferenceValue = a;
+            Fill(so, "shoes", StepSets.Clips(StepSets.Concrete));
+            Fill(so, "heels", StepSets.Clips(HeelSteps));
+            so.ApplyModifiedPropertiesWithoutUndo();
+            return steps;
+        }
+
+        static void Fill(SerializedObject so, string field, AudioClip[] clips)
+        {
+            var list = so.FindProperty(field);
+            list.arraySize = clips.Length;
+            for (var i = 0; i < clips.Length; i++) list.GetArrayElementAtIndex(i).objectReferenceValue = clips[i];
+        }
+
+        /// <summary>
+        /// 明けに合わせて環境音と曲をフェードで入れる（<see cref="SoundRise"/>）。雨・雑踏・ヤードのラジオの音源を渡す。
+        /// 秒数はオーナーが耳で決めるので、もう付いていれば書き戻さない
+        /// </summary>
+        static void Rise()
+        {
+            var flow = Object.FindFirstObjectByType<SceneFlow>();
+            if (flow == null) { Debug.LogWarning("SceneFlow が見つからない。明けのフェードを付けられない"); return; }
+            var rise = flow.GetComponent<SoundRise>();
+            if (rise == null) rise = flow.gameObject.AddComponent<SoundRise>();
+            var sounds = new System.Collections.Generic.List<AudioSource>();
+            var cover = Object.FindFirstObjectByType<RainCover>();
+            if (cover != null)
+            {
+                var rain = new SerializedObject(cover).FindProperty("sound").objectReferenceValue as AudioSource;
+                if (rain != null) sounds.Add(rain);
+            }
+            var crowd = Object.FindFirstObjectByType<CrowdNoise>();
+            if (crowd != null)
+            {
+                var noise = new SerializedObject(crowd).FindProperty("sound").objectReferenceValue as AudioSource;
+                if (noise != null) sounds.Add(noise);
+            }
+            var radio = Object.FindFirstObjectByType<StallRadio>();
+            if (radio != null)
+            {
+                var music = new SerializedObject(radio).FindProperty("sound").objectReferenceValue as AudioSource;
+                if (music != null) sounds.Add(music);
+            }
+            var so = new SerializedObject(rise);
+            var list = so.FindProperty("sounds");
+            list.arraySize = sounds.Count;
+            for (var i = 0; i < sounds.Count; i++) list.GetArrayElementAtIndex(i).objectReferenceValue = sounds[i];
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(rise);
+            Debug.Log("明けのフェードに繋いだ音: " + sounds.Count + " 本、" + so.FindProperty("seconds").floatValue + " 秒");
         }
 
         /// <summary>
@@ -431,6 +518,7 @@ namespace HalfAware.EditorTools
             Fill(so, "chips", Chips);
             Fill(so, "buyers", Buyers);
             Fill(so, "smokes", Smokes);
+            so.FindProperty("steps").objectReferenceValue = Steps;
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(director);
         }

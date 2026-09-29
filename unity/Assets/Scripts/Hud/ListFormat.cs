@@ -38,12 +38,26 @@ namespace HalfAware
         public const char Mark = '\u200B';
 
         /// <summary>
-        /// 表に組むか。頭に <see cref="Mark"/> があるか、2 行以上あって、どれかの行が 2 つ以上の塊に分かれていること。
+        /// 看板のページの印。ページの頭に置く（語をつなぐ幅の無い字 U+2060。画面には出ず、<see cref="Ruby.Normalize"/> が落とす）。
+        /// 台詞の原稿で **看板** と書いたページ（英語に日本語訳のルビ、オーナー、2026-09-29）は、リストと同じ画面の真ん中の枠に出し、
+        /// 列に組まずに行ごとに真ん中へ寄せる（<see cref="ComposeSign"/>）。写す道具（<see cref="Manuscript"/>）がこの印を付ける
+        /// </summary>
+        public const char SignMark = '\u2060';
+
+        /// <summary>看板のページか。頭に <see cref="SignMark"/> がある</summary>
+        public static bool IsSign(string text)
+        {
+            return !string.IsNullOrEmpty(text) && text[0] == SignMark;
+        }
+
+        /// <summary>
+        /// 表に組むか（画面の真ん中の枠に出すか）。頭に <see cref="Mark"/> か <see cref="SignMark"/> があるか、
+        /// 2 行以上あって、どれかの行が 2 つ以上の塊に分かれていること。
         /// 1 行だけの文や、区切りの無い文はそのまま出す
         /// </summary>
         public static bool IsList(string text)
         {
-            if (!string.IsNullOrEmpty(text) && text[0] == Mark) return true;
+            if (!string.IsNullOrEmpty(text) && (text[0] == Mark || text[0] == SignMark)) return true;
             var lines = Lines(text);
             if (lines.Count < 2) return false;
             foreach (var line in lines) if (Split(line, MaxColumns).Count >= 2) return true;
@@ -113,6 +127,37 @@ namespace HalfAware
                     if (x > 0.004f) sb.Append("<pos=").Append(x.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)).Append("em>");
                     sb.Append(cells[i]);
                 }
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// 看板のページ（<see cref="SignMark"/>）を、行ごとに真ん中へ寄せた形にする。列には組まない（英語の看板の行は、半角の空白 1 つで語が続く）。
+        /// 行の幅は、ルビを親字の真ん中に揃えて（行の頭でも、<see cref="Ruby.Expand(string,float,float,bool)"/> の centred）ルビまで含めて測り（<see cref="Ruby.Span"/>）、
+        /// いちばん広い行の幅 widthEm の中へ &lt;pos&gt; で置く。ルビが親字より広い行は、ルビの頭が枠の中に収まるだけ親字を内へ寄せる。
+        /// 返すのは原稿の書き方を直した形。出す側は <see cref="Ruby.Expand(string,float,float,bool)"/> を centred で掛ける
+        /// </summary>
+        public static string ComposeSign(string text, float rubyScale, out float widthEm)
+        {
+            var lines = Lines(text);
+            var spans = new float[lines.Count];
+            var leads = new float[lines.Count];
+            widthEm = 0f;
+            for (var i = 0; i < lines.Count; i++)
+            {
+                float lead, tail;
+                var advance = Ruby.Span(lines[i], rubyScale, true, out lead, out tail);
+                leads[i] = lead;
+                spans[i] = lead + advance + tail;
+                if (spans[i] > widthEm) widthEm = spans[i];
+            }
+            var sb = new StringBuilder();
+            for (var i = 0; i < lines.Count; i++)
+            {
+                if (i > 0) sb.Append('\n');
+                var x = (widthEm - spans[i]) * 0.5f + leads[i];
+                if (x > 0.004f) sb.Append("<pos=").Append(x.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)).Append("em>");
+                sb.Append(lines[i]);
             }
             return sb.ToString();
         }

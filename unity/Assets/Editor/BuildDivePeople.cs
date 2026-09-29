@@ -700,7 +700,7 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// 手を後ろで組む（pose 3）。両の手首を腰の後ろで重ね、肘を外の後ろへ逃がして曲げる（<see cref="BodyPoser.Arm"/>）。
         ///
-        /// **場面 2 の形（<see cref="BuildAlleyCrowd.Pose.Behind"/>）は使わない。** あちらは手首を腰の骨の 17 cm 後ろ・2 cm 上に置くので、
+        /// **場面 2 にあった形（BuildAlleyCrowd の Behind。2026-09-29 に外した）は使わない。** あちらは手首を腰の骨の 17 cm 後ろ・2 cm 上に置くので、
         /// 腕がほとんど伸び切り、肘が肩と手首を結ぶ線の上（胴の中）に来る。背中の厚い人（男大 05 のベスト、背を丸めた年寄り）では、
         /// 肘から先がベストの背中の中に沈んだ。手首を背中の皮の <see cref="BehindOff"/> 後ろ、腰の骨の <see cref="BehindUp"/> 上に置いて、
         /// 腕に曲がる余りを作る

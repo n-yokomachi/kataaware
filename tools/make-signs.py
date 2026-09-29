@@ -1,9 +1,13 @@
 # -*- coding: utf-8 -*-
-"""通りの、立ち止まって読む看板のテクスチャを描く。
+"""通りの、立ち止まって読む看板と、小路の口の案内の矢のテクスチャを描く。
 
 ネオン（tools/make-neon.py）は店の灯りで、こちらは目の高さに掛かっている
-塗りの板。調べる対象になるのはこの 5 枚なので、タヴァーンの看板と同じくらい
+塗りの板。調べる対象になるのはこの 5 枚と案内の矢なので、タヴァーンの看板と同じくらい
 しっかり作る。
+
+**板の文面は台詞の原稿（docs/scenario/02-alley.md の **看板**）の英語に揃える。**
+調べると原稿の文面が画面の真ん中の枠に出るので、板に書いてある字と食い違わないように
+（大文字にするのは板の書き方。語は原稿のまま）。原稿の看板を直したら、ここも直して描き直す。
 
   - 地は暗い塗り板。粒子を散らして刷った紙の風合いを出す
   - 枠を二重に回し、隅に留めの鋲を打つ
@@ -118,29 +122,67 @@ def painted(size, seed, lines, base=(26, 24, 26), ink=(226, 214, 186), trim=(178
 
 WIDE = (1024 * SS, 512 * SS)
 SLIM = (1024 * SS, 320 * SS)
+ARROW = (512 * SS, 224 * SS)
+
+
+def yard_arrow(size, point):
+    """小路の口の案内の矢。紺の地に白い枠、矢と仕切りの線、ヤードの名。point が -1 なら矢は左、1 なら右。
+    前の絵（2026-09-19、描いた道具は残っていなかった）の色と寸法を測って写し、原稿に無い二行目（BISTRO · TAVERN · MARKET）を外した"""
+    w, h = size
+    u = w / 512.0                                  # 512 × 224 の絵の 1 画素
+    # 地は前の絵と同じ平らな紺に、暗い点を散らすだけ（光る板なので、塗りの板の粒子と雨垂れは乗せない）
+    im = Image.new('RGB', size, (18, 24, 44))
+    d = ImageDraw.Draw(im)
+    rng = random.Random(61)
+    for _ in range(90):
+        px, py = rng.randrange(w), rng.randrange(h)
+        r = rng.choice((1, 1, 2)) * u * 0.5
+        d.rectangle([px, py, px + r, py + r], fill=rng.choice(((7, 13, 33), (11, 17, 37), (23, 29, 49))))
+    d.rectangle([10 * u, 10 * u, w - 10 * u, h - 10 * u], outline=(224, 228, 236), width=int(5 * u))
+
+    def x(v):                                      # 右を指す時は左右を返す
+        return v * u if point < 0 else w - v * u
+
+    head = [(x(34), 112 * u), (x(85), 67 * u), (x(85), 157 * u)]
+    d.polygon(head, fill=(232, 235, 242))
+    d.rectangle([min(x(84), x(119)), 96 * u, max(x(84), x(119)), 128 * u], fill=(232, 235, 242))
+    d.rectangle([min(x(133), x(136)), 26 * u, max(x(133), x(136)), 197 * u], fill=(96, 106, 130))
+    # 字は仕切りの線と枠の間の真ん中。一行なので縦も真ん中
+    left, right = (136 * u, w - 16 * u) if point < 0 else (16 * u, w - 136 * u)
+    f = font(int(31 * u))
+    text = 'BLEEDING HEART YARD'
+    tw = d.textlength(text, font=f)
+    box = f.getbbox(text)
+    d.text(((left + right) * 0.5 - tw * 0.5, h * 0.5 - (box[3] - box[1]) * 0.5 - box[1]), text, font=f, fill=(224, 228, 236))
+    return im
+
 
 SIGNS = {
     'SignStreetName': (SLIM, lambda s: street_name(s)),
     'SignChemist': (WIDE, lambda s: painted(s, 21, [
         ('HOLBORN CHEMIST', 92, 0.33),
-        ('IMPLANT SUPPLIES · REPAIRS', 50, 0.56),
+        ('IMPLANT SUPPLIES & REPAIRS', 50, 0.56),
         ('OPEN ALL NIGHT', 44, 0.74),
     ], base=(20, 30, 26), trim=(96, 176, 124))),
     'SignPawn': (WIDE, lambda s: painted(s, 31, [
         ('H. GOODCHILD & SON', 80, 0.31),
-        ('PAWNBROKER', 58, 0.54),
+        ('PAWNBROKERS', 58, 0.54),
         ('EST. 1871', 44, 0.74),
     ], base=(30, 22, 18), trim=(186, 140, 62))),
+    # 原稿は二行。前は三行目に BY ORDER を書いていた（原稿に無いので外す）
     'SignNotice': (WIDE, lambda s: painted(s, 41, [
-        ('NANOMACHINE ADVISORY', 80, 0.32),
-        ('FIREWALL YOUR TERMINAL', 54, 0.56),
-        ('BY ORDER', 42, 0.76),
+        ('NANOMACHINE ALERT', 86, 0.38),
+        ('FIREWALL YOUR TERMINAL', 56, 0.64),
     ], base=(18, 22, 34), ink=(214, 222, 236), trim=(108, 132, 186))),
     'SignFitting': (WIDE, lambda s: painted(s, 51, [
         ('NERVE TERMINAL', 86, 0.30),
-        ('FITTING & CALIBRATION', 52, 0.53),
-        ('WALK-IN · NO APPOINTMENT', 44, 0.73),
+        ('FITTING & TUNING', 56, 0.53),
+        ('WALK-INS WELCOME', 46, 0.73),
     ], base=(24, 20, 30), ink=(222, 210, 232), trim=(150, 118, 196))),
+    # 小路の口の案内の矢。表（南から読む）は矢が左（西の小路）を、裏（北から読む）は右を指す。
+    # 前は一枚の絵を裏で左右に返していたので、裏から見ると字が鏡に映したように反っていた
+    'SignYardArrow': (ARROW, lambda s: yard_arrow(s, -1)),
+    'SignYardArrowBack': (ARROW, lambda s: yard_arrow(s, 1)),
 }
 
 

@@ -10,6 +10,8 @@ namespace HalfAware
     /// 字幕のページのうち、並びになっているもの（<see cref="ListFormat.IsList"/>）は、字幕の窓に出さず、画面の真ん中の枠に表で出す。
     /// 枠は二択の札（<see cref="ChoiceView"/>）と同じ板（暗い地・青緑の細い枠・左上と右下の鉤）で、同じ所に浮かべ、
     /// HUD と一緒に粗い画面（<see cref="UiLens"/>）で描く。表の列の揃えは <see cref="ListFormat"/> のまま（行ごとには寄せず、枠を表の幅に合わせる。枠の幅の下限より狭い表は、表の塊のまま真ん中へ寄せる）。
+    /// 看板のページ（<see cref="ListFormat.IsSign"/>。英語に日本語訳のルビ、オーナー、2026-09-29「看板を読んだ時に…リストなどと同じ形式で画面中心に表示」）も
+    /// 同じ枠に出す。看板は列に組まず、行ごとに真ん中へ寄せ、ルビは行の頭でも親字の真ん中に揃える（<see cref="ListFormat.ComposeSign"/>）。
     /// 送れる時だけ、枠の中の右下に送りの印（「E/」＋左クリックのアイコン、<see cref="HudView.Advance"/>）を出す。
     ///
     /// **見た目はここで組む。** シーンにもプレハブにも置かない。<see cref="HudView"/> が初めてリストのページを出すときに、
@@ -108,13 +110,25 @@ namespace HalfAware
             var em = table.fontSize > 0f ? table.fontSize : ListLayout.RowFont;
             // ルビは字幕より大きく振る（ListLayout.RubyScale）。列の幅も行の間も、その大きさで取る
             var scale = ListLayout.RubyScale;
-            var composed = Ruby.Expand(ListFormat.Compose(text, ListLayout.RoomEm, false,
-                cell => string.IsNullOrEmpty(cell) ? 0f : table.GetPreferredValues(cell).x / em, scale),
-                scale, Ruby.LiftFor(scale));
+            string composed;
+            var least = 0f;
+            if (ListFormat.IsSign(text))
+            {
+                // 看板は列に組まず、行ごとに真ん中へ寄せる。ルビは行の頭でも親字の真ん中に揃える
+                float wide;
+                composed = Ruby.Expand(ListFormat.ComposeSign(text, scale, out wide), scale, Ruby.LiftFor(scale), true);
+                // 行の尻から後ろへ出るルビは、TMP の測る幅に入らないことがある。並べた幅を下限にする
+                least = wide * em;
+            }
+            else
+                composed = Ruby.Expand(ListFormat.Compose(text, ListLayout.RoomEm, false,
+                    cell => string.IsNullOrEmpty(cell) ? 0f : table.GetPreferredValues(cell).x / em, scale),
+                    scale, Ruby.LiftFor(scale));
             // ルビ（傍点）のある表は行を開ける。そのままだと下の行のルビが上の行の字にかぶる
             table.lineSpacing = Ruby.Has(text) ? Ruby.SpacingFor(scale) : 0f;
             table.text = composed;
             var size = table.GetPreferredValues(composed);
+            size.x = Mathf.Max(size.x, least);
             var mark = hint.GetPreferredValues(HudView.Advance);
             frame = ListLayout.Lay(size.x, size.y, mark.x);
             root.sizeDelta = frame.size;

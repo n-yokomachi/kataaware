@@ -1162,7 +1162,9 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 置き場所を Rocketbox の人の置き方へ移して、群衆を組む（<see cref="BuildAlleyCrowd.Build"/>）。
-        /// 姿勢の番号は近い形へ移す。壁にもたれる形は無いので、壁ぎわでは手を後ろで組むか腕を組むか片脚に預ける。
+        /// 姿勢の番号は近い形へ移す。壁にもたれる形は無いので、壁ぎわでは手首の端末を見るか腕を組むか片脚に預ける。
+        /// 「手を後ろ」（3）も手首の端末を見る形にする（手を後ろで組む形は外した。<see cref="BuildAlleyCrowd.Pose.Wrist"/>）。
+        /// 乱数は前と同じ順に引くので、姿勢を替えた人のほかは、置き場も向きも誰かも変わらない。
         /// 露店の前の客の「卓に肘をつく」（6）は、座る物が無いので立ち姿にする
         /// </summary>
         static void People(Transform parent, List<Spot> spots, System.Random rng)
@@ -1178,13 +1180,13 @@ namespace HalfAware.EditorTools
                     {
                         case 1: pose = BuildAlleyCrowd.Pose.Rest; break;
                         case 2: pose = BuildAlleyCrowd.Pose.Crossed; break;
-                        case 3: pose = BuildAlleyCrowd.Pose.Behind; break;
+                        case 3: pose = BuildAlleyCrowd.Pose.Wrist; break;
                         case 4: pose = BuildAlleyCrowd.Pose.Turn; break;
                         case 6: pose = rng.NextDouble() < 0.5 ? BuildAlleyCrowd.Pose.Rest : BuildAlleyCrowd.Pose.Stand; break;
                         case 8:
                             {
                                 var r = rng.NextDouble();
-                                pose = r < 0.45 ? BuildAlleyCrowd.Pose.Behind : r < 0.75 ? BuildAlleyCrowd.Pose.Crossed : BuildAlleyCrowd.Pose.Rest;
+                                pose = r < 0.45 ? BuildAlleyCrowd.Pose.Wrist : r < 0.75 ? BuildAlleyCrowd.Pose.Crossed : BuildAlleyCrowd.Pose.Rest;
                                 break;
                             }
                         default: pose = BuildAlleyCrowd.Pose.Stand; break;
@@ -2171,17 +2173,44 @@ namespace HalfAware.EditorTools
                 new Plate("NeonCross",  -1, 39.4f,  4.3f, true,  1.30f),
                 new Plate("NeonLive",    1, 40.6f,  8.8f, false, 2.00f),
             };
-            for (var i = 0; i < plates.Count; i++) Sign(parent, "Sign" + i, plates[i]);
-            Tubes(Child(parent, "Tubes"));
+            // 先に組んだ物（ネオンより前に組む束）の面。看板と管がこれを貫かない所を探す（AlleySolid）。
+            // 後で組む束（出店・板・人など）は、組み直す前の物が残っているので入れない（入れると組み直すたびに置き場が揺れる）
+            var solid = new AlleySolid(new Bounds(new Vector3(0f, 7f, (StreetSouth + StreetNorth) * 0.5f),
+                new Vector3(StreetHalf * 2f + 0.6f, 12f, StreetNorth - StreetSouth + 4f)));
+            solid.AddGroups(parent.parent, BuiltBeforeNeon);
+            var moved = new List<string>();
+            for (var i = 0; i < plates.Count; i++) Sign(parent, "Sign" + i, plates[i], solid, moved);
+            // 突き出す看板の腕も、管が貫かない物に数える
+            foreach (Transform t in parent)
+                if (t.name.EndsWith(".Arm")) solid.Add(t.GetComponent<MeshRenderer>());
+            var cut = Tubes(Child(parent, "Tubes"), solid);
+            Debug.Log("ネオン: 看板 " + plates.Count + " 枚（室外機・庇・窓などを避けて動かした物 " + moved.Count + " 枚"
+                + (moved.Count > 0 ? "。" + string.Join("、", moved.ToArray()) : "") + "）、壁の管は物を貫く所で切った " + cut + " 本");
         }
+
+        /// <summary>ネオンより前に組む束。看板と管はこの面を貫かない（<see cref="AlleySolid"/>）</summary>
+        static readonly string[] BuiltBeforeNeon = { "Shell", "Fixtures", "Lamps", "Puddles", "Heritage", "Terraces" };
+
+        /// <summary>管を短く切って見る長さ。m。これより短い切れ端は捨てる（<see cref="MinTube"/>）</summary>
+        const float TubeStep = 0.15f;
+
+        /// <summary>残す管の切れ端の長さの下限。m。短い切れ端は光る点に見える</summary>
+        const float MinTube = 0.6f;
 
         /// <summary>
         /// 面に這わせる管。看板のあいだを繋いで、壁そのものを光らせる。
         /// 「熱帯植物のように絡みついている」のはこちらの仕事で、看板だけでは足りない
         /// </summary>
-        static void Tubes(Transform parent)
+        /// <summary>
+        /// 壁の管を組む。**管は物を貫かない。** 壁から出ている物（石の帯・室外機・雨樋・窓）に当たる所で切り、
+        /// その前後を別の管にする（物の裏へ回り込んでいるように見える）。前は物の中を通っていて、小路の口の手前で
+        /// 桃色の管が石の帯を貫いていた（オーナー、2026-09-29）。切った本数を返す。
+        /// 乱数は切る前と同じ順に引くので、切らない管の場所は変わらない
+        /// </summary>
+        static int Tubes(Transform parent, AlleySolid solid)
         {
             Clear(parent);
+            var cut = 0;
             var tint = new Color[]
             {
                 new Color(1.00f, 0.16f, 0.67f), new Color(0.16f, 0.92f, 1.00f),
@@ -2207,18 +2236,65 @@ namespace HalfAware.EditorTools
                     var y = (float)(2.2 + rng.NextDouble() * 8.0);
                     var col = tint[rng.Next(tint.Length)];
                     // 横に長く這う管
-                    Strip(parent, "Tube" + n++, new Vector3(x, y, z + span * 0.5f),
+                    cut += Runs(parent, solid, ref n, new Vector3(x, y, z + span * 0.5f),
                         new Vector3(0.06f, 0.09f, span), col);
                     // ときどき縦へ折れる
                     if (rng.NextDouble() < 0.45)
                     {
                         var drop = (float)(1.5 + rng.NextDouble() * 3.5);
-                        Strip(parent, "Tube" + n++, new Vector3(x, y - drop * 0.5f, z + span),
+                        cut += Runs(parent, solid, ref n, new Vector3(x, y - drop * 0.5f, z + span),
                             new Vector3(0.06f, drop, 0.09f), col);
                     }
                     z += span + (float)(0.8 + rng.NextDouble() * 2.5);
                 }
             }
+            return cut;
+        }
+
+        /// <summary>
+        /// 管を一本置く。長い辺に沿って <see cref="TubeStep"/> ずつ区切り、物を貫く区切りを抜いて、続いている所ごとに一本ずつ置く。
+        /// <see cref="MinTube"/> より短い切れ端は置かない。切ったなら 1 を返す
+        /// </summary>
+        static int Runs(Transform parent, AlleySolid solid, ref int n, Vector3 centre, Vector3 size, Color col)
+        {
+            var along = size.z >= size.y ? 2 : 1;           // 横の管は z、縦の管は y に長い
+            var length = size[along];
+            var steps = Mathf.Max(1, Mathf.CeilToInt(length / TubeStep - 1e-3f));
+            var step = length / steps;
+            var clear = new bool[steps];
+            var blocked = 0;
+            for (var k = 0; k < steps; k++)
+            {
+                var c = centre;
+                c[along] = centre[along] - length * 0.5f + step * (k + 0.5f);
+                var half = size * 0.5f;
+                half[along] = step * 0.5f;
+                clear[k] = !solid.Pierces(c, Quaternion.identity, half);
+                if (!clear[k]) blocked++;
+            }
+            if (blocked == 0)
+            {
+                Strip(parent, "Tube" + n++, centre, size, col);
+                return 0;
+            }
+            var from = -1;
+            for (var k = 0; k <= steps; k++)
+            {
+                var open = k < steps && clear[k];
+                if (open && from < 0) from = k;
+                if (open || from < 0) continue;
+                var piece = (k - from) * step;
+                if (piece >= MinTube)
+                {
+                    var c = centre;
+                    c[along] = centre[along] - length * 0.5f + step * (from + k) * 0.5f;
+                    var sz = size;
+                    sz[along] = piece;
+                    Strip(parent, "Tube" + n++, c, sz, col);
+                }
+                from = -1;
+            }
+            return 1;
         }
 
         /// <summary>光る帯をひとつ。細い箱に自発光のマテリアルを貼るだけ</summary>
@@ -2247,8 +2323,12 @@ namespace HalfAware.EditorTools
             return m;
         }
 
-        /// <summary>看板を 1 枚立てる。突き出す物には壁までの腕と灯りを足す</summary>
-        static void Sign(Transform parent, string name, Plate p)
+        /// <summary>
+        /// 看板を 1 枚立てる。突き出す物には壁までの腕と灯りを足す。
+        /// 置き場は、頂点の数（<see cref="Occupied"/>）と看板どうしの重なり（<see cref="Crowded"/>）に加えて、
+        /// 先に組んだ物の面が看板（と裏の板・腕）を貫かないか（solid）で見る。狙いの場所で掛けられなかった物の名を moved に足す
+        /// </summary>
+        static void Sign(Transform parent, string name, Plate p, AlleySolid solid, List<string> moved)
         {
             var tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/" + p.texture + ".png");
             if (tex == null) { Debug.LogWarning("テクスチャが無い: " + p.texture); return; }
@@ -2257,6 +2337,7 @@ namespace HalfAware.EditorTools
             var wallX = p.side * StreetHalf;
             var reach = p.blade ? 0.95f : 0.12f;
             var x = wallX - p.side * reach;
+            var y = p.y;
             var z = p.z;
             {
                 // 看板の場所を探す。壁には石の帯・樋・梯子・庭が先に付いていて、
@@ -2272,26 +2353,65 @@ namespace HalfAware.EditorTools
                     ? new[] { 0f, 0.20f, -0.20f, 0.40f }
                     : new[] { 0f, 0.22f, 0.45f, 0.70f, 1.00f, 1.35f };
                 var shifts = new[] { 0f, 0.65f, -0.65f, 1.30f, -1.30f, 1.95f, -1.95f, 2.60f, -2.60f, 3.25f, -3.25f };
+                // 1. 前と同じ順（高さは狙いのまま）で、頂点と看板どうしの重なりだけを見て最初に空いた所。
+                //    そこが何にも貫かれていなければ、前と同じ所に掛かる
                 var found = false;
                 for (var o = 0; o < outs.Length && !found; o++)
                     for (var k = 0; k < shifts.Length && !found; k++)
                     {
                         var spot = new Vector3(x - p.side * outs[o], p.y, p.z + shifts[k]);
-                        if (Occupied(spot, room) != 0) continue;
-                        // 看板どうしは頂点では捉まらない。
-                        // 大きな四角は角にしか頂点が無いので、範囲の重なりで見る
-                        if (Crowded(parent, spot, room)) continue;
+                        if (!Vacant(parent, spot, room)) continue;
                         x = spot.x;
                         z = spot.z;
                         found = true;
                     }
                 if (!found) Debug.LogWarning("看板を掛けられる隙間が無い: " + name);
+                // 2. 室外機・庇・窓の枠が看板を串刺しにしていたら（角が看板の箱の外にあっても、貫いていれば見つかる）、
+                //    動かす量の少ない順に、貫かれない所を探す。窓の並びや庇の帯は前後へずらしても抜けないので、上下にもずらす
+                var first = Pierced(solid, p, new Vector3(x, y, z), wide, high, wallX);
+                if (first > 0)
+                {
+                    // 前後は狙いから 4.55 m まで、上下は 1.4 m まで。非常階段の前の看板は、前へずらすだけでは踊り場から抜けない
+                    var lifts = new[] { 0f, 0.35f, -0.35f, 0.70f, -0.70f, 1.05f, -1.05f, 1.40f, -1.40f };
+                    var along = new List<float>(shifts) { 3.90f, -3.90f, 4.55f, -4.55f };
+                    var tries = new List<Vector4>();
+                    foreach (var o in outs)
+                        foreach (var up in lifts)
+                            foreach (var k in along)
+                                tries.Add(new Vector4(o, up, k, Cost(o, up, k)));
+                    tries.Sort((u, v) => u.w.CompareTo(v.w));
+                    var least = first;
+                    var best = new Vector3(x, y, z);
+                    var clear = false;
+                    foreach (var t in tries)
+                    {
+                        var spot = new Vector3(wallX - p.side * (reach + t.x), p.y + t.y, p.z + t.z);
+                        if (spot.y - high * 0.5f < 2.3f) continue;      // 人の頭の上に掛ける
+                        if (!Vacant(parent, spot, room)) continue;
+                        var hits = Pierced(solid, p, spot, wide, high, wallX);
+                        if (hits < least)
+                        {
+                            least = hits;
+                            best = spot;
+                        }
+                        if (hits == 0)
+                        {
+                            clear = true;
+                            break;
+                        }
+                    }
+                    moved.Add(name + "（" + p.texture + "、" + Where(x, y, z, wallX) + " → " + Where(best.x, best.y, best.z, wallX)
+                        + (clear ? "" : "。どこも貫かれるので、貫く三角のいちばん少ない所（" + first + " → " + least + "）") + "）");
+                    x = best.x;
+                    y = best.y;
+                    z = best.z;
+                }
             }
 
             var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
             go.name = name;
             go.transform.SetParent(parent, false);
-            go.transform.localPosition = new Vector3(x, p.y, z);
+            go.transform.localPosition = new Vector3(x, y, z);
             // 突き出す物は通りの上下を向き、貼る物は通りの中央を向く
             // 絵が乗るのは板の裏側。壁に貼る物は向きを返さないと字が反転する
             go.transform.localRotation = p.blade
@@ -2307,7 +2427,7 @@ namespace HalfAware.EditorTools
                 var back = GameObject.CreatePrimitive(PrimitiveType.Quad);
                 back.name = name + ".Back";
                 back.transform.SetParent(parent, false);
-                back.transform.localPosition = new Vector3(x, p.y, z - 0.03f);
+                back.transform.localPosition = new Vector3(x, y, z - 0.03f);
                 back.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
                 back.transform.localScale = new Vector3(-wide, high, 1f);
                 back.GetComponent<MeshRenderer>().sharedMaterial = NeonMat(p.texture, tex);
@@ -2316,12 +2436,12 @@ namespace HalfAware.EditorTools
 
             if (!p.blade) return;
             // 壁まで繋ぐ腕
-            Box(parent, name + ".Arm", new Vector3(wallX - p.side * reach * 0.5f, p.y + high * 0.5f - 0.1f, z),
+            Box(parent, name + ".Arm", new Vector3(wallX - p.side * reach * 0.5f, y + high * 0.5f - 0.1f, z),
                 new Vector3(reach, 0.08f, 0.08f), "Metal");
             // 通りへ落ちる色。突き出した物にだけ付ける
             var lamp = new GameObject(name + ".Lamp");
             lamp.transform.SetParent(parent, false);
-            lamp.transform.localPosition = new Vector3(x - p.side * 0.5f, p.y, z);
+            lamp.transform.localPosition = new Vector3(x - p.side * 0.5f, y, z);
             var l = lamp.AddComponent<Light>();
             l.type = LightType.Point;
             l.color = NeonTint(p.texture);
@@ -3375,16 +3495,22 @@ namespace HalfAware.EditorTools
         static void Boards(Transform parent)
         {
             Clear(parent);
-            // 案内板を吊る腕木と灯り
+            // 案内板を吊る腕木と灯り。
+            // 板は壁の柱（壁から 16 cm）と石の帯の外に吊る（ArrowOff）。前は板の端が壁の面まで来ていて、柱と石の帯が板を貫いていた。
+            // 吊りの金具は表と裏の板の間（7 cm の隙間）を通し、板の面を突き抜けない。腕木は右の金具の上まで伸ばす
+            var armZ = LaneZ - 2.6f;
+            var boardX = -StreetHalf + ArrowOff + ArrowSize.x * 0.5f;
+            var hang = ArrowSize.x * 0.5f - 0.35f;
             var arm = new Bank { Texel = 0.7f };
-            arm.Box(new Vector3(-StreetHalf + 0.8f, 3.78f, LaneZ - 2.6f), new Vector3(1.8f, 0.11f, 0.11f));
-            arm.Box(new Vector3(-StreetHalf + 0.16f, 3.35f, LaneZ - 2.6f), new Vector3(0.12f, 0.9f, 0.12f));
+            var armEnd = boardX + hang + 0.08f;
+            arm.Box(new Vector3((-StreetHalf - 0.05f + armEnd) * 0.5f, 3.78f, armZ), new Vector3(armEnd + StreetHalf + 0.05f, 0.11f, 0.11f));
+            arm.Box(new Vector3(-StreetHalf + 0.16f, 3.35f, armZ), new Vector3(0.12f, 0.9f, 0.12f));
             for (var i = -1; i <= 1; i += 2)
-                arm.Box(new Vector3(-StreetHalf + 1.45f + i * 1.15f, 3.50f, LaneZ - 2.6f), new Vector3(0.05f, 0.5f, 0.05f));
+                arm.Box(new Vector3(boardX + i * hang, 3.50f, armZ + 0.035f), new Vector3(0.04f, 0.5f, 0.04f));
             arm.Emit(parent, "SignArm", Mat("Metal"), false, Generated);
             var lamp = new GameObject("ArrowLamp");
             lamp.transform.SetParent(parent, false);
-            lamp.transform.localPosition = new Vector3(-StreetHalf + 1.25f, 4.0f, LaneZ - 2.6f);
+            lamp.transform.localPosition = new Vector3(boardX - 0.2f, 4.0f, armZ);
             var al = lamp.AddComponent<Light>();
             al.type = LightType.Point;
             al.color = new Color(1.00f, 0.94f, 0.82f);
@@ -3392,12 +3518,11 @@ namespace HalfAware.EditorTools
             al.intensity = 14f;
             al.shadows = LightShadows.None;
             // 大通りから小道への案内。歩道の上へ突き出して、南から歩いてくる目に入れる
-            var armZ = LaneZ - 2.6f;
             Board(parent, "SignYardArrow", "SignYardArrow",
-                new Vector3(-StreetHalf + 1.45f, 3.05f, armZ), Vector3.back, new Vector2(2.9f, 1.27f), true, false);
-            // 裏面は絵を左右に返す。返さないと、裏から見た矢が小路と逆を指す
-            Board(parent, "SignYardArrow.N", "SignYardArrow",
-                new Vector3(-StreetHalf + 1.45f, 3.05f, armZ + 0.07f), Vector3.forward, new Vector2(2.9f, 1.27f), true, false, true);
+                new Vector3(boardX, 3.05f, armZ), Vector3.back, ArrowSize, true, false);
+            // 裏面（北から読む）は矢が右を指す別の絵。前は表の絵を左右に返していて、字が鏡に映したように反っていた
+            Board(parent, "SignYardArrow.N", "SignYardArrowBack",
+                new Vector3(boardX, 3.05f, armZ + 0.07f), Vector3.forward, ArrowSize, true, false);
             // 小道の口の脇にも銀板を掛けていたが、すぐ横の案内の矢と
             // 同じことを書いていて重い。案内の矢だけ残す。
             // 調べる対象は BuildAlleyItems で矢の方へ移してある
@@ -3413,6 +3538,12 @@ namespace HalfAware.EditorTools
 
             StreetSigns(parent);
         }
+
+        /// <summary>小路の口の案内の矢の大きさ。m</summary>
+        static readonly Vector2 ArrowSize = new Vector2(2.9f, 1.27f);
+
+        /// <summary>案内の矢の、壁の面から板の端までの隙間。m。壁の柱（壁から 22 cm まで出ている）と石の帯の外に吊る</summary>
+        const float ArrowOff = 0.3f;
 
         /// <summary>通りで読む板の数。BuildAlleyItems が調べる対象を立てる数と揃える</summary>
         public const int StreetSignCount = 5;
@@ -3537,6 +3668,61 @@ namespace HalfAware.EditorTools
             }
             return false;
         }
+
+        /// <summary>
+        /// 看板を spot に掛けると、先に組んだ物の面が看板を貫くか。貫く三角の数を返す（<see cref="AlleySolid"/>。0 なら貫かない）。
+        /// 突き出す物は、表の板と 3 cm 後ろの裏の板をまとめた薄い箱と、壁から板の真ん中までの腕を見る。
+        /// 壁に貼る物は、板の前後 3 cm の薄い箱を見る（壁そのものは板の 12 cm 後ろなので入らない）
+        /// </summary>
+        static int Pierced(AlleySolid solid, Plate p, Vector3 spot, float wide, float high, float wallX)
+        {
+            if (solid == null) return 0;
+            // 板の縁の 3 cm は見ない（PierceEdge）
+            var w = Mathf.Max(0.05f, wide * 0.5f - PierceEdge);
+            var h = Mathf.Max(0.05f, high * 0.5f - PierceEdge);
+            if (p.blade)
+            {
+                var n = solid.Count(spot + new Vector3(0f, 0f, -0.015f), Quaternion.identity, new Vector3(w, h, 0.03f), PierceMost);
+                // 腕は板の上の縁の少し下。壁の付け根の 25 cm は壁の石の帯や柱に埋まってよい（壁に留めてある）
+                var from = wallX - p.side * ArmRoot;
+                var armLength = Mathf.Abs(spot.x - from);
+                if (armLength < 0.05f) return n;
+                return n + solid.Count(new Vector3((from + spot.x) * 0.5f, spot.y + high * 0.5f - 0.1f, spot.z), Quaternion.identity,
+                    new Vector3(armLength * 0.5f, 0.04f, 0.04f), PierceMost);
+            }
+            return solid.Count(spot, Quaternion.identity, new Vector3(0.03f, h, w), PierceMost);
+        }
+
+        /// <summary>看板の縁のうち、貫きを見ない幅。m。縁が柱の角に触れているだけの物まで数えると、どこにも掛けられなくなる</summary>
+        const float PierceEdge = 0.03f;
+
+        /// <summary>頂点が箱に入っておらず（<see cref="Occupied"/>）、先に立てた看板とも重ならない（<see cref="Crowded"/>）か</summary>
+        static bool Vacant(Transform parent, Vector3 spot, Vector3 room)
+        {
+            // 看板どうしは頂点では捉まらない。大きな四角は角にしか頂点が無いので、範囲の重なりで見る
+            return Occupied(spot, room) == 0 && !Crowded(parent, spot, room);
+        }
+
+        /// <summary>
+        /// 貫かれた看板を動かす量。壁から出す 0.5 m・上下の 0.67 m・前後の 1 m を同じ重さに数える。
+        /// 壁に貼る看板が壁から大きく離れると宙に浮いて見え、上下へ大きく動くと隣の窓の並びから外れるので、前後へずらすのを先にする
+        /// </summary>
+        static float Cost(float outward, float lift, float shift)
+        {
+            return Mathf.Abs(outward) * 2f + Mathf.Abs(lift) * 1.5f + Mathf.Abs(shift);
+        }
+
+        /// <summary>置き場を読める形に。壁から・高さ・z</summary>
+        static string Where(float x, float y, float z, float wallX)
+        {
+            return "壁から " + Mathf.Abs(wallX - x).ToString("0.00") + "・高さ " + y.ToString("0.00") + "・z " + z.ToString("0.00");
+        }
+
+        /// <summary>貫く三角を数える上限。これより多ければどれも同じくらい悪い</summary>
+        const int PierceMost = 400;
+
+        /// <summary>突き出す看板の腕のうち、壁の物に埋まってよい付け根の長さ。m</summary>
+        const float ArmRoot = 0.25f;
 
         /// <summary>その箱に入っている頂点の数。壁に向いた板の食い込みを見るのに使う</summary>
         static int Occupied(Vector3 centre, Vector3 half)

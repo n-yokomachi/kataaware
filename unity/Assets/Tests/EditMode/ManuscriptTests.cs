@@ -277,5 +277,154 @@ namespace HalfAware.Tests
             // 前提が未達の時の文は原稿に無い。どれも持たない（ドアは必須が残っている間、狙っても何も出ない）
             foreach (var e in Room().Entries) Assert.AreEqual(0, e.hints.Length, e.id);
         }
+
+        // ---- 看板と会話の書き方 ------------------------------------------------
+
+        const string SignSample =
+            "## 薬局の看板\n" +
+            "\n" +
+            "**対象の名前**: 看板を読む\n" +
+            "\n" +
+            "**看板**\n" +
+            "\n" +
+            "```\n" +
+            "｜Holborn Chemist<ホルボーン薬局>\n" +
+            "｜Open All Night<夜通し営業>\n" +
+            "```\n" +
+            "\n" +
+            "- 「独白。」\n" +
+            "\n" +
+            "### 買い手A\n" +
+            "\n" +
+            "- 買い手A「やあ」\n" +
+            "- 私「どうも<br/>それで」\n";
+
+        [Test]
+        public void ASignBecomesOnePageWithTheSignMark()
+        {
+            var m = Manuscript.Parse(SignSample);
+            var s = m.Find("薬局の看板");
+            Assert.AreEqual("看板を読む", s.Label);
+            Assert.AreEqual(new[] { ListFormat.SignMark + "｜Holborn Chemist<ホルボーン薬局>\n｜Open All Night<夜通し営業>", "独白。" }, s.Pages.ToArray(),
+                "看板は行を改行で繋いで 1 ページにし、頭に看板の印。「と書かれている」は付けない");
+            Assert.IsTrue(ListFormat.IsSign(s.Pages[0]));
+            Assert.IsTrue(ListFormat.IsList(s.Pages[0]), "看板もリストと同じ画面の真ん中の枠に出す");
+            Assert.IsFalse(ListFormat.IsSign(s.Pages[1]));
+        }
+
+        [Test]
+        public void ASpeakerLineKeepsTheSpeaker()
+        {
+            var s = Manuscript.Parse(SignSample).Find("買い手A");
+            Assert.AreEqual(new[] { "買い手A「やあ」", "私「どうも\nそれで」" }, s.Pages.ToArray(), "話者と「」はそのまま。<br/> は改行");
+            string who, said;
+            Assert.IsTrue(Speech.Split(s.Pages[0], out who, out said));
+            Assert.AreEqual("買い手A", who);
+        }
+
+        [Test]
+        public void ASignWithoutACodeBlockIsAnError()
+        {
+            Assert.Throws<ManuscriptException>(() => Manuscript.Parse("## 看板\n\n**看板**\n\n- 「a」\n"));
+        }
+
+        // ---- 場面 2 の原稿 ----------------------------------------------------
+
+        static string AlleyFile
+        {
+            get { return Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", AlleyManuscript.Path)); }
+        }
+
+        static AlleyManuscript.Text Alley()
+        {
+            Assert.That(File.Exists(AlleyFile), Is.True, AlleyFile + " が無い");
+            return AlleyManuscript.Read(File.ReadAllText(AlleyFile, Encoding.UTF8));
+        }
+
+        [Test]
+        public void TheAlleyManuscriptCoversEveryIdInOrder()
+        {
+            var text = Alley();
+            var all = AlleyIds.All;
+            Assert.AreEqual(all.Length, text.Entries.Length);
+            for (var i = 0; i < all.Length; i++) Assert.AreEqual(all[i], text.Entries[i].id);
+            foreach (var e in text.Entries) Assert.AreEqual(0, e.hints.Length, e.id);
+        }
+
+        [Test]
+        public void EveryStreetSignShowsItsBoardThenTheMonologue()
+        {
+            var text = Alley();
+            for (var i = 0; i < AlleyIds.Signs; i++)
+            {
+                var sign = text.Find(AlleyIds.Sign(i));
+                Assert.AreEqual("看板を読む", sign.label, sign.id);
+                Assert.AreEqual(1, sign.lines.Length, sign.id + " は看板の文面だけ");
+                Assert.IsTrue(ListFormat.IsSign(sign.lines[0]), sign.id);
+                StringAssert.DoesNotContain("と書かれている", sign.lines[0]);
+                var page = text.Find(AlleyIds.Page(i));
+                Assert.That(page.lines.Length, Is.GreaterThan(0), page.id);
+                foreach (var line in page.lines) Assert.IsFalse(ListFormat.IsList(line), page.id + " は字幕の窓");
+            }
+            Assert.AreEqual(ListFormat.SignMark + "｜Holborn Chemist<ホルボーン薬局>\n｜Implant Supplies & Repairs<インプラント用品と修理>\n｜Open All Night<夜通し営業>",
+                text.Find(AlleyIds.Sign(1)).lines[0]);
+            Assert.AreEqual(ListFormat.SignMark + "｜H. Goodchild & Son<H・グッドチャイルド・アンド・サン>\nPawnbrokers<質屋>\n｜Est. 1871<創業1871年>",
+                text.Find(AlleyIds.Sign(3)).lines[0]);
+            Assert.AreEqual(2, text.Find(AlleyIds.Page(2)).lines.Length);
+            StringAssert.Contains("｜最小の生活基盤<Minimum Infrastructure>", text.Find(AlleyIds.Page(2)).lines[1]);
+        }
+
+        [Test]
+        public void TheYardBoardIsASignAndTwoPages()
+        {
+            var board = Alley().Find(AlleyIds.Board);
+            Assert.AreEqual("案内板を読む", board.label);
+            Assert.AreEqual(3, board.lines.Length);
+            Assert.AreEqual(ListFormat.SignMark + "｜Bleeding Heart Yard<流血する心臓の庭>", board.lines[0]);
+            Assert.AreEqual("私の露店は一番奥だ", board.lines[2]);
+        }
+
+        [Test]
+        public void TheStallAndTheTable()
+        {
+            var text = Alley();
+            var stall = text.Find(AlleyIds.StallSign);
+            Assert.AreEqual("自分の露店の看板を見る", stall.label);
+            StringAssert.StartsWith("『追憶売ります』の看板。", stall.lines[0]);
+            var table = text.Find(AlleyIds.Table);
+            Assert.AreEqual("チップを置く", table.label);
+            Assert.AreEqual("メモリーチップを置く", table.choice.question);
+            Assert.AreEqual(1, table.lines.Length);
+        }
+
+        [Test]
+        public void TheBuyersTalkAndTheClosingEndsIt()
+        {
+            var text = Alley();
+            Assert.AreEqual(new[] { 5, 6, 4 }, new[] { text.Find(AlleyIds.Buyer(0)).lines.Length, text.Find(AlleyIds.Buyer(1)).lines.Length, text.Find(AlleyIds.Buyer(2)).lines.Length });
+            Assert.AreEqual("買い手A「やあ、今日の品ぞろえは？」", text.Find(AlleyIds.Buyer(0)).lines[0]);
+            Assert.AreEqual("私「どうも」", text.Find(AlleyIds.Buyer(1)).lines[5], "注記（※）は読み飛ばす");
+            Assert.AreEqual("買い手C「初めてなんだけど、子どものはあるかしら？」", text.Find(AlleyIds.Buyer(2)).lines[0]);
+            var closing = text.Find(AlleyIds.Closing).lines;
+            Assert.AreEqual(2, closing.Length);
+            Assert.AreEqual("帰ろう", closing[1]);
+            Assert.AreEqual(0, text.Find(AlleyIds.Opening).lines.Length, "冒頭の独白はまだ原稿に無い");
+        }
+
+        [Test]
+        public void AnAlleyHeadingNotInTheTableIsAnError()
+        {
+            var text = File.ReadAllText(AlleyFile, Encoding.UTF8) + "\n### 買い手D\n\n- 買い手D「どうも」\n";
+            var e = Assert.Throws<ManuscriptException>(() => AlleyManuscript.Read(text));
+            StringAssert.Contains("表に無い見出し「買い手D」", e.Message);
+        }
+
+        [Test]
+        public void AnAlleyHeadingMissingFromTheManuscriptIsAnError()
+        {
+            var text = File.ReadAllText(AlleyFile, Encoding.UTF8).Replace("### 質屋の看板", "### 両替屋の看板");
+            var e = Assert.Throws<ManuscriptException>(() => AlleyManuscript.Read(text));
+            StringAssert.Contains("原稿に無い見出し「質屋の看板」", e.Message);
+        }
     }
 }

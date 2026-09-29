@@ -10,8 +10,9 @@ namespace HalfAware
     /// ここを取り違えるとルビの長さ次第で親字がずれる。
     /// ルビの真ん中は親字の真ん中に揃える（広いルビは両脇の字の上へ掛ける、<see cref="Hang"/>）。
     ///
-    /// 幅は ListFormat.Units（半角いくつぶん）で測る。全角 1 字 = 2、半角 1 字 = 1。
-    /// em になおすと半分なので、ルビの進む幅は Units / 2 × Scale
+    /// 真ん中を揃える幅は、字の送りの実寸（<see cref="Em"/>、Noto Sans JP の送り）で測る。ルビの進む幅は Em(ルビ) × Scale。
+    /// 前は半角 1 字 = 0.5 em と数えていたので、英字の親字（大文字は 0.6〜0.8 em）の上のルビが半文字ほど左へ寄った（2026-09-29）。
+    /// 表の列の幅（<see cref="Width"/>）は今も半角いくつで数える（列の幅は、出す側が親字の実寸を測って広い方を取る、<see cref="ListFormat"/>）
     ///
     /// 傍点（圏点）も同じ仕組みで、字ごとに点を乗せる（<see cref="DotGlyph"/>）。
     /// 文面への書き方は「｜親字《るび》」と、台詞の原稿の「親字&lt;るび&gt;」「&lt;dot&gt;…&lt;/dot&gt;」の二つ（<see cref="Normalize"/>）
@@ -114,11 +115,34 @@ namespace HalfAware
             if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(ruby)) return text ?? string.Empty;
             if (scale <= 0f) return text;
 
-            var baseEm = ListFormat.Units(text) * 0.5f;
-            var rubyEm = ListFormat.Units(ruby) * 0.5f * scale;
+            var baseEm = Em(text);
+            var rubyEm = Em(ruby) * scale;
             if (baseEm <= 0f || rubyEm <= 0f) return text;
 
             float pre, start, post;
+            Place(baseEm, rubyEm, lineStart, out pre, out start, out post);
+            var back = start + rubyEm - pre;            // ルビの尻から親字の頭まで戻すぶん
+
+            var made = new System.Text.StringBuilder();
+            // ルビの外に置く <space> は親字の em で効く
+            if (Mathf.Abs(start) > 0.001f) made.Append(Tag("<space=", start, "em>"));
+            made.Append(Tag("<voffset=", lift, "em>"));
+            if (size > 0f) made.Append("<size=").Append(Num(scale * size)).Append(">");
+            else made.Append("<size=").Append(Num(scale * 100f)).Append("%>");
+            made.Append(ruby);
+            made.Append("</size></voffset>");
+            made.Append(Tag("<space=", -back, "em>"));
+            made.Append(text);
+            if (post > 0.001f) made.Append(Tag("<space=", post, "em>"));
+            return made.ToString();
+        }
+
+        /// <summary>
+        /// 親字の幅 baseEm とルビの幅 rubyEm（どちらも親字の em）から、ルビの置き方を決める。
+        /// pre は親字の前に空けるぶん、start はルビの頭（親字の前の所から。負なら前の字の上へ掛かる）、post は親字の後ろに空けるぶん
+        /// </summary>
+        static void Place(float baseEm, float rubyEm, bool lineStart, out float pre, out float start, out float post)
+        {
             if (rubyEm <= baseEm)
             {
                 // 狭いルビは親字の真ん中へ寄せる
@@ -139,20 +163,101 @@ namespace HalfAware
                 post = pre;
                 start = pre - over;                     // ルビの頭（負なら前の字の上へ掛かる）
             }
-            var back = start + rubyEm - pre;            // ルビの尻から親字の頭まで戻すぶん
+        }
 
-            var made = new System.Text.StringBuilder();
-            // ルビの外に置く <space> は親字の em で効く
-            if (Mathf.Abs(start) > 0.001f) made.Append(Tag("<space=", start, "em>"));
-            made.Append(Tag("<voffset=", lift, "em>"));
-            if (size > 0f) made.Append("<size=").Append(Num(scale * size)).Append(">");
-            else made.Append("<size=").Append(Num(scale * 100f)).Append("%>");
-            made.Append(ruby);
-            made.Append("</size></voffset>");
-            made.Append(Tag("<space=", -back, "em>"));
-            made.Append(text);
-            if (post > 0.001f) made.Append(Tag("<space=", post, "em>"));
-            return made.ToString();
+        // ---- 字の送り ------------------------------------------------------------
+
+        /// <summary>
+        /// 半角の英数と約物（U+0020〜U+007E）の送り。1000 分の 1 em。
+        /// Noto Sans JP（Assets/Fonts/NotoSansJP-Regular.otf）の hmtx から写した（2026-09-29）。
+        /// TMP の字の送り（フォントのアセットは同じフォントから作ってある）と、字の組の詰め（カーニング）を除いて一致する。
+        /// 詰めは「To」で 0.06 em ほどで、真ん中を揃えるには効かないので数えない
+        /// </summary>
+        static readonly short[] Ascii =
+        {
+            224, 323, 474, 555, 555, 921, 680, 278, 338, 338, 467, 555, 278, 347, 278, 392,     //  !"#$%&'()*+,-./
+            555, 555, 555, 555, 555, 555, 555, 555, 555, 555, 278, 278, 555, 555, 555, 474,     // 0123456789:;<=>?
+            946, 608, 657, 638, 688, 589, 552, 689, 728, 293, 535, 646, 543, 812, 723, 742,     // @ABCDEFGHIJKLMNO
+            633, 742, 635, 596, 599, 721, 575, 878, 573, 531, 603, 338, 392, 338, 555, 559,     // PQRSTUVWXYZ[\]^_
+            606, 563, 618, 510, 620, 554, 325, 564, 607, 275, 275, 552, 284, 926, 610, 606,     // `abcdefghijklmno
+            620, 620, 388, 468, 377, 607, 521, 802, 498, 521, 475, 338, 270, 338, 555,          // pqrstuvwxyz{|}~
+        };
+
+        /// <summary>
+        /// text を並べた幅。親字の em で。**書式もルビの書き方もそのまま字として数える**（出る字だけを渡す）。
+        /// 半角の英数と約物は Noto Sans JP の送り（<see cref="Ascii"/>）、全角の字（漢字・仮名・全角の約物）は 1 em、
+        /// 半角の片仮名は 0.5 em、ほかの字（アクセント付きの英字など）は英字の並みの 0.56 em
+        /// </summary>
+        public static float Em(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return 0f;
+            var n = 0f;
+            for (var i = 0; i < text.Length; i++) n += Em(text[i]);
+            return n;
+        }
+
+        /// <summary>字 c の送り。em</summary>
+        public static float Em(char c)
+        {
+            if (c >= ' ' && c <= '~') return Ascii[c - ' '] * 0.001f;
+            if (c == '\n' || c == '\r' || c == '\u200B' || c == '\u2060') return 0f;
+            // 和文の組版で全角に数える約物のうち、Noto Sans JP では詰めてある物（ListFormat.Units は全角に数える）
+            switch (c)
+            {
+                case '‘': case '’': return 0.278f;
+                case '“': case '”': return 0.474f;
+                case '–': return 0.536f;
+                case '—': return 0.894f;
+                case '·': return 0.561f;
+            }
+            if (c >= 'ｦ' && c <= 'ﾟ') return 0.5f;
+            if (char.IsLowSurrogate(c)) return 0f;          // 対の後ろ。前の字で 1 em 数えた
+            if (char.IsHighSurrogate(c)) return 1f;
+            return ListFormat.Units(c.ToString()) == 2 ? 1f : 0.56f;
+        }
+
+        /// <summary>
+        /// 1 行 line（原稿の書き方か、前からの書き方）を <see cref="Expand(string,float,float,bool)"/> で組んだ時の、進む幅（em）。
+        /// ルビが行の頭より前へ掛かるぶんを lead に、行の尻より後ろへ出るぶんを tail に返す（どちらも 0 以上）。
+        /// 行を真ん中に置く時（看板の枠、<see cref="ListFormat.ComposeSign"/>）に、ルビまで含めた幅で寄せるのに使う
+        /// </summary>
+        public static float Span(string line, float scale, bool centred, out float lead, out float tail)
+        {
+            lead = 0f;
+            tail = 0f;
+            line = Normalize(line);
+            if (string.IsNullOrEmpty(line)) return 0f;
+            var x = 0f;
+            var right = 0f;
+            var i = 0;
+            while (i < line.Length)
+            {
+                var tag = TagEnd(line, i);
+                if (tag > i)
+                {
+                    i = tag + 1;
+                    continue;
+                }
+                int baseFrom, baseTo, rubyFrom, rubyTo;
+                if (Group(line, i, out baseFrom, out baseTo, out rubyFrom, out rubyTo))
+                {
+                    var baseEm = Em(line.Substring(baseFrom, baseTo - baseFrom));
+                    var ruby = line.Substring(rubyFrom, rubyTo - rubyFrom);
+                    var dot = ruby == DotMark;
+                    var rubyEm = dot ? Em(DotGlyph) * DotScale : Em(ruby) * scale;
+                    float pre, start, post;
+                    Place(baseEm, rubyEm, !dot && !centred && LineStart(line, i), out pre, out start, out post);
+                    lead = Mathf.Max(lead, -(x + start));
+                    right = Mathf.Max(right, x + start + rubyEm);
+                    x += pre + baseEm + post;
+                    i = rubyTo + 1;
+                    continue;
+                }
+                x += Em(line[i]);
+                i++;
+            }
+            tail = Mathf.Max(0f, right - x);
+            return x;
         }
 
         static string Tag(string open, float value, string close)
@@ -220,6 +325,15 @@ namespace HalfAware
         /// <summary>大きさ scale と持ち上げる高さ lift を渡して直す。大きさを比べて撮るときに使う（傍点は <see cref="DotScale"/> のまま）</summary>
         public static string Expand(string text, float scale, float lift)
         {
+            return Expand(text, scale, lift, false);
+        }
+
+        /// <summary>
+        /// centred が true なら、行の頭でもルビを親字の真ん中に揃える（広いルビは前の空きへ掛ける）。
+        /// 行ごとに真ん中へ寄せて並べる看板の枠（<see cref="ListFormat.ComposeSign"/>）が使う。行の頭より前へ出るぶんは、並べる側が空けておく（<see cref="Span"/>）
+        /// </summary>
+        public static string Expand(string text, float scale, float lift, bool centred)
+        {
             text = Normalize(text);
             if (string.IsNullOrEmpty(text) || text.IndexOf(Head) < 0) return text;
             var made = new System.Text.StringBuilder(text.Length + 64);
@@ -248,7 +362,7 @@ namespace HalfAware
                 var size = sizes.Count > 0 ? sizes[sizes.Count - 1] : 0f;
                 // 傍点は行の頭でも親字の真ん中に打つ
                 if (ruby == DotMark) made.Append(Over(baseText, DotGlyph, DotScale, DotLift, false, size));
-                else made.Append(Over(baseText, ruby, scale, lift, LineStart(text, i), size));
+                else made.Append(Over(baseText, ruby, scale, lift, !centred && LineStart(text, i), size));
                 i = rubyTo + 1;
             }
             return made.ToString();
@@ -437,8 +551,8 @@ namespace HalfAware
         /// </summary>
         public static string Normalize(string text)
         {
-            // リストのページの印（ListFormat.Mark）は、表に組むかを決めるだけの物。組む時と出す時には落とす
-            if (!string.IsNullOrEmpty(text) && text[0] == ListFormat.Mark) text = text.Substring(1);
+            // リストと看板のページの印（ListFormat.Mark・SignMark）は、枠に組むかを決めるだけの物。組む時と出す時には落とす
+            if (!string.IsNullOrEmpty(text) && (text[0] == ListFormat.Mark || text[0] == ListFormat.SignMark)) text = text.Substring(1);
             if (string.IsNullOrEmpty(text) || text.IndexOf('<') < 0) return text;
             var made = new System.Text.StringBuilder(text.Length + 32);
             var head = -1;      // 親字の頭の ｜ を置いた made の位置。ルビを待っている間だけ

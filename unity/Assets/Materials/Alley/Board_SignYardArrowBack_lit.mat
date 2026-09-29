@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Board_SignYardArrow_lit_flip
+  m_Name: Board_SignYardArrowBack_lit
   m_Shader: {fileID: 4800000, guid: 650dd9526735d5b46b79224bc6e94025, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -26,13 +26,13 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: 2800000, guid: 36d403b03f4882b48bf554f7439bd2f4, type: 3}
-        m_Scale: {x: -1, y: 1}
-        m_Offset: {x: 1, y: 0}
+        m_Texture: {fileID: 2800000, guid: e7687cfb580d06e4c8e3b094bfc56b59, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _MainTex:
-        m_Texture: {fileID: 2800000, guid: 36d403b03f4882b48bf554f7439bd2f4, type: 3}
-        m_Scale: {x: -1, y: 1}
-        m_Offset: {x: 1, y: 0}
+        m_Texture: {fileID: 2800000, guid: e7687cfb580d06e4c8e3b094bfc56b59, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
     - _AddPrecomputedVelocity: 0
@@ -56,7 +56,7 @@ Material:
     - _Color: {r: 1.45, g: 1.45, b: 1.5, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
---- !u!114 &3036188341780551758
+--- !u!114 &842955028208365767
 MonoBehaviour:
   m_ObjectHideFlags: 11
   m_CorrespondingSourceObject: {fileID: 0}

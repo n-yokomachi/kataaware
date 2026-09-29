@@ -15,6 +15,7 @@ namespace HalfAware.EditorTools
     /// - 文面の id と、シーンに立てた対象の id が食い違っていないか
     /// - 人が床に立っているか（浮いたり沈んだりしていないか）
     /// - 自分の卓に並べた物が、互いにかぶったり縁からはみ出したりしていないか
+    /// - 通りのネオンの看板・壁の管・案内の矢を、ほかの物の面が貫いていないか
     /// </summary>
     public static class CheckAlley
     {
@@ -41,6 +42,7 @@ namespace HalfAware.EditorTools
             bad += Ids(root);
             bad += Feet(root);
             bad += Table(root);
+            bad += Neon(root);
             if (bad == 0) Debug.Log("見直し: 気になるところは無し");
             else Debug.LogWarning("見直し: 気になるところ " + bad + " 件。上を参照");
         }
@@ -207,7 +209,7 @@ namespace HalfAware.EditorTools
                 }
             foreach (var id in script.Ids())
             {
-                if (AlleyIds.IsPage(id)) continue;                    // 段は看板から引くので、対象は無くてよい
+                if (AlleyIds.IsSaid(id)) continue;                    // 段・冒頭・売り買いの台詞は演出が出すので、対象は無くてよい
                 if (inScene.Contains(id)) continue;
                 Debug.LogWarning("見直し: 文面の " + id + " を出す対象がシーンに無い");
                 bad++;
@@ -361,6 +363,174 @@ namespace HalfAware.EditorTools
             return Mathf.Max(
                 Mathf.Max(outer.xMin - inner.xMin, inner.xMax - outer.xMax),
                 Mathf.Max(outer.yMin - inner.yMin, inner.yMax - outer.yMax));
+        }
+
+        // ---- ネオンのめり込み（2026-09-29） -------------------------------------------
+
+        /// <summary>
+        /// 通りのネオンの看板と壁の管・小路の口の案内の矢を、ほかの物の面が貫いていないか（<see cref="AlleySolid"/>）。
+        /// 看板は縁の 3 cm を見ない（組み立ての見方と同じ）。貫かれている物の名と三角の数を知らせ、件数を返す
+        /// </summary>
+        static int Neon(Transform root)
+        {
+            var neon = root.Find("Neon");
+            if (neon == null) return 0;
+            var solid = new AlleySolid(new Bounds(new Vector3(0f, 7f, (BuildAlley.StreetSouth + BuildAlley.StreetNorth) * 0.5f),
+                new Vector3(BuildAlley.StreetHalf * 2f + 0.6f, 12f, BuildAlley.StreetNorth - BuildAlley.StreetSouth + 4f)));
+            foreach (Transform t in root)
+            {
+                if (t == neon) continue;
+                foreach (var r in t.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    // 案内の矢の板そのもの（表と裏）は見る側。吊りの腕木と金具は板の間を通してある（板の面の間の隙間に入り、面は貫かない）
+                    if (r.transform.parent != null && r.transform.parent.name == "Boards" && (r.name.StartsWith("SignYardArrow") || r.name == "SignArm")) continue;
+                    solid.Add(r);
+                }
+            }
+            var bad = 0;
+            var looked = 0;
+            foreach (Transform t in neon.GetComponentsInChildren<Transform>(true))
+            {
+                var r = t.GetComponent<MeshRenderer>();
+                if (r == null || t.name.EndsWith(".Back") || t.name.EndsWith(".Arm")) continue;
+                looked++;
+                var tube = t.parent != null && t.parent.name == "Tubes";
+                // 管は箱、看板は薄い板（突き出す物は裏の板まで）
+                var half = tube
+                    ? t.localScale * 0.5f
+                    : new Vector3(t.localScale.x * 0.5f - 0.03f, t.localScale.y * 0.5f - 0.03f, 0.02f);
+                var n = solid.Count(t.position, tube ? Quaternion.identity : t.rotation, new Vector3(Mathf.Abs(half.x), Mathf.Abs(half.y), Mathf.Abs(half.z)), 400);
+                if (n == 0) continue;
+                Debug.LogWarning("見直し: ネオン " + t.name + " を物の面が貫いている（三角 " + n + "）" + t.position.ToString("F2"), t.gameObject);
+                bad++;
+            }
+            var boards = root.Find("Boards");
+            foreach (var name in new[] { "SignYardArrow", "SignYardArrow.N" })
+            {
+                var t = boards != null ? boards.Find(name) : null;
+                if (t == null) continue;
+                looked++;
+                var n = solid.Count(t.position, t.rotation, new Vector3(t.localScale.x * 0.5f - 0.03f, t.localScale.y * 0.5f - 0.03f, 0.02f), 400);
+                if (n == 0) continue;
+                Debug.LogWarning("見直し: 案内の矢 " + name + " を物の面が貫いている（三角 " + n + "）", t.gameObject);
+                bad++;
+            }
+            Debug.Log("見直し: ネオンの看板・管と案内の矢 " + looked + " 枚のうち、物に貫かれている物 " + bad + " 枚");
+            return bad;
+        }
+
+        // ---- 看板の枠と売り買いを撮る（2026-09-29） ----------------------------------
+
+        [MenuItem("HalfAware/Shoot the alley text", false, 216)]
+        static void ShootTextMenu()
+        {
+            var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "HalfAwareAlleyText");
+            Debug.Log(ShootText(dir));
+        }
+
+        /// <summary>
+        /// 看板の枠（原稿の **看板**）と、英字のルビのある字幕と、売り買いで買い手 C が浮かび上がる所を dir へ撮る。
+        /// 看板は読む人の立つ所（板の前 2.2 m）から板を見て撮る。終えたら撮る前に開いていたシーンを開き直す（場面は保存しない）
+        /// </summary>
+        public static string ShootText(string dir)
+        {
+            if (EditorApplication.isPlaying) return "再生中は撮らない";
+            var active = UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene();
+            if (active.isDirty) return "開いているシーンに未保存の変更がある: " + active.path;
+            var open = active.path;
+            System.IO.Directory.CreateDirectory(dir);
+            var log = new System.Text.StringBuilder();
+            try
+            {
+                UnityEditor.SceneManagement.EditorSceneManager.OpenScene(AlleyPath, UnityEditor.SceneManagement.OpenSceneMode.Single);
+                var root = GameObject.Find("Alley").transform;
+                var player = Object.FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
+                var script = AssetDatabase.LoadAssetAtPath<RoomScript>("Assets/Data/AlleyScript.asset");
+                // 看板の枠。三行の看板（薬局・質屋）と、ナーヴ・ターミナル、案内板
+                foreach (var i in new[] { 1, 3, 2, 0, 4 })
+                {
+                    var board = root.Find("Boards/StreetSign" + i);
+                    var page = script.Find(AlleyIds.Sign(i)).Lines[0];
+                    Face(player, board);
+                    log.AppendLine(CheckRoom.Shoot(System.IO.Path.Combine(dir, "sign" + i + ".png"), h => h.SetSubtitle(page, SubtitleKind.Line, true)));
+                    log.AppendLine(Frame("看板 " + i));
+                }
+                var arrow = root.Find("Boards/SignYardArrow");
+                var yard = script.Find(AlleyIds.Board);
+                Face(player, arrow);
+                log.AppendLine(CheckRoom.Shoot(System.IO.Path.Combine(dir, "board.png"), h => h.SetSubtitle(yard.Lines[0], SubtitleKind.Line, true)));
+                log.AppendLine(Frame("案内板"));
+                // 英字のルビのある字幕（最小の生活基盤<Minimum Infrastructure>）
+                var nerve = script.Find(AlleyIds.Page(2)).Lines[1];
+                Face(player, root.Find("Boards/StreetSign2"));
+                log.AppendLine(CheckRoom.Shoot(System.IO.Path.Combine(dir, "subtitle_latin_ruby.png"), h => h.SetSubtitle(nerve, SubtitleKind.Line, true)));
+
+                // 売り買い。露店の内側から、買い手 C（3 人目）が浮かび上がる途中と、浮かび上がりきった所
+                var director = Object.FindFirstObjectByType<AlleyDirector>(FindObjectsInactive.Include);
+                var dso = new SerializedObject(director);
+                var spot = (Transform)dso.FindProperty("sellSpot").objectReferenceValue;
+                var pitch = dso.FindProperty("sellPitch").floatValue;
+                var buyers = dso.FindProperty("buyers");
+                var chips = dso.FindProperty("chips");
+                var smokes = dso.FindProperty("smokes");
+                for (var k = 0; k < chips.arraySize; k++)
+                    ((GameObject)chips.GetArrayElementAtIndex(k).objectReferenceValue).SetActive(k < MarketSale.Left(1));
+                for (var k = 0; k < smokes.arraySize; k++)
+                    ((GameObject)smokes.GetArrayElementAtIndex(k).objectReferenceValue).SetActive(k < MarketSale.SmokesBefore(2));
+                var c = (GameObject)buyers.GetArrayElementAtIndex(2).objectReferenceValue;
+                c.SetActive(true);
+                player.PlaceAt(spot.position, spot.eulerAngles.y, HeadTurn.DefaultLimit, 0f, pitch, PlayerController.StandingEyeHeight);
+                var fade = c.GetComponent<BuyerFade>();
+                if (fade != null) fade.Set(0.45f);
+                log.AppendLine(CheckRoom.Shoot(System.IO.Path.Combine(dir, "buyerC_arriving.png"), h => h.SetSubtitle(null)));
+                if (fade != null) fade.Set(1f);
+                var first = MarketSale.Lines(script, 2)[0];
+                log.AppendLine(CheckRoom.Shoot(System.IO.Path.Combine(dir, "buyerC_arrived.png"), h => h.SetSubtitle(first, SubtitleKind.Line, true)));
+                // 足音の歩く所（買い手 C はヒール）
+                var steps = (BuyerSteps)dso.FindProperty("steps").objectReferenceValue;
+                if (steps != null)
+                {
+                    var away = Quaternion.Euler(0f, dso.FindProperty("approachAngle").floatValue, 0f) * -(spot.position - c.transform.position);
+                    var sso = new SerializedObject(steps);
+                    var count = steps.Count(true);
+                    for (var k = 0; k < count; k++)
+                        log.AppendFormat("  ヒールの {0} 歩目 {1:0.00} 秒: {2}", k + 1, k * steps.Interval(true),
+                            BuyerSteps.At(c.transform.position, away, sso.FindProperty("from").floatValue, sso.FindProperty("gait").floatValue, k, count).ToString("F2")).AppendLine();
+                }
+            }
+            catch (System.Exception e)
+            {
+                log.AppendLine("例外: " + e);
+            }
+            finally
+            {
+                UnityEditor.SceneManagement.EditorSceneManager.OpenScene(open, UnityEditor.SceneManagement.OpenSceneMode.Single);
+            }
+            return log.ToString();
+        }
+
+        const string AlleyPath = "Assets/Scenes/Alley.unity";
+
+        /// <summary>板の読む側（絵の乗る面の前 2.2 m、目の高さ）に立ち、板の真ん中を見る</summary>
+        static void Face(PlayerController player, Transform board)
+        {
+            var eye = PlayerController.StandingEyeHeight;
+            var at = board.position - board.forward * Watch;
+            at.y = 0.02f;
+            var lead = new SerializedObject(player).FindProperty("eyeLead").floatValue;
+            var want = Gaze.Toward(at, 0f, true, new Vector3(0f, eye, lead), board.position);
+            player.PlaceAt(at, want.x, 0f, 0f, PlayerController.ClampPitch(want.y), eye);
+        }
+
+        /// <summary>いま出しているリストの枠の大きさ（Dot）</summary>
+        static string Frame(string what)
+        {
+            var hud = Object.FindFirstObjectByType<HudView>(FindObjectsInactive.Include);
+            var list = hud != null ? hud.List : null;
+            if (list == null || !list.Visible) return what + ": 枠が出ていない";
+            var f = list.Frame;
+            return string.Format("{0}: 枠 {1:0}×{2:0} Dot、表 {3:0}×{4:0} Dot",
+                what, f.size.x / ListLayout.Dot, f.size.y / ListLayout.Dot, f.table.width / ListLayout.Dot, f.table.height / ListLayout.Dot);
         }
     }
 }

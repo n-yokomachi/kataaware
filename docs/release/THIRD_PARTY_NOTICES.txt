@@ -163,6 +163,9 @@ Sound effects
   OwlishMedia - Sound Effects Pack (OpenGameArt)
     https://opengameart.org/content/sound-effects-pack
     CC0 1.0 Universal
+  YannSauvin - Footsteps heels pavement denoised (Freesound)
+    https://freesound.org/people/YannSauvin/sounds/778103/
+    CC0 1.0 Universal
   Pixabay - sounds by dragon-studio, tommylynn, fronbondi_skegs, freesound_community and others
     https://pixabay.com/
     Pixabay Content License (https://pixabay.com/service/license-summary/)

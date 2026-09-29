@@ -12,7 +12,7 @@ namespace HalfAware.EditorTools
     ///
     /// 置き場所・向き・二人組は <see cref="BuildAlley"/> の群衆の決め方のまま受け取り、人と姿勢だけをここで決める。
     /// - 人: 通りの人 27 人（<see cref="RocketboxMob.Crowd"/>）と売り手 5 人（<see cref="RocketboxMob.Sellers"/>）を、同じ人が近くに並ばないよう選ぶ
-    /// - 姿勢: 立つ・片脚に預ける・手を後ろで組む・振り向く・腕を組む・座る。骨を曲げた形を焼き、骨を持たない mesh にする
+    /// - 姿勢: 立つ・片脚に預ける・手首の端末を見る・振り向く・腕を組む・座る。骨を曲げた形を焼き、骨を持たない mesh にする
     /// - 服の色は元のまま。肌にはネオンのようなインプラント（<see cref="RocketboxMobPaint"/>）を、人ごと・置くたびに場所と色を変えて描く
     /// - 描く重さ: 一人ずつの物に分け（画面の外の人は描かれない）、近さの段（LODGroup）を二つ持たせる。
     ///   近く（10 m まで）は 1 人 4,500 三角ほど、その先は 1,000 三角ほど。三角を減らすのは UnityMeshSimplifier（組み立てのときだけ使う）
@@ -30,8 +30,11 @@ namespace HalfAware.EditorTools
             Stand,
             /// <summary>重心を片脚に預ける</summary>
             Rest,
-            /// <summary>手を後ろで組む</summary>
-            Behind,
+            /// <summary>
+            /// 左の手首の端末を見る。前は手を後ろで組む形（Behind）だったが、組んだ手が重ねた板のようで指が開き、
+            /// 前腕が背に沈んだ（オーナー、2026-09-29「手の組み方が適当すぎるので、別のポーズにして」）
+            /// </summary>
+            Wrist,
             /// <summary>少し振り向く</summary>
             Turn,
             /// <summary>腕を組む</summary>
@@ -958,8 +961,8 @@ namespace HalfAware.EditorTools
                     Turn(B(HumanBodyBones.LeftUpperArm), right, -6f);
                     Turn(B(HumanBodyBones.LeftLowerArm), right, -14f);
                     break;
-                case Pose.Behind:
-                    Behind(an);
+                case Pose.Wrist:
+                    Wrist(an);
                     break;
                 case Pose.Turn:
                     // 上体と頭を右へ振り向く
@@ -1008,15 +1011,43 @@ namespace HalfAware.EditorTools
                 new Vector3(-0.45f, 0.1f, -1f), new Vector3(-0.9f, -0.2f, 0.2f));
         }
 
-        /// <summary>手を後ろで組む。両の手首を腰の後ろ（腰の骨の 16 cm 後ろ、2 cm 上）へ届かせ、肘は外の後ろへ逃がす</summary>
-        static void Behind(Animator an)
+        /// <summary>
+        /// 左の手首の端末を見る（ナーヴ・ターミナルの画面を腕に出している、場面 2 の街の人のしぐさ）。
+        /// 左の前腕を胸の前へ横に上げ、手首の甲を目の方へ向け、首と頭を下げて左へ振って見る。右の腕は力を抜いて下ろしたまま、肘を少し緩める。
+        ///
+        /// 手首は肩の高さの 15 cm 下、胸の骨の 27 cm 前（胸の肌の 12〜15 cm 前）、体の真ん中の少し左に置き、肘は外の下へ逃がす（<see cref="BodyPoser.Arm"/>）。
+        /// 前腕と手が胸と腹に沈まない。指は中指へ寄せてから軽く曲げる（<see cref="BodyPoser.Close"/>・<see cref="BodyPoser.Grip"/>。立ちの形の開いた指のままだと、手が板に見える）。
+        /// 手の置き場は肩の幅と高さから決める（男女で体の大きさが違う。<see cref="Crossed"/> と同じ）。
+        ///
+        /// **首と頭を先に曲げる。** Rocketbox の骨組みは鎖骨が首の子なので、腕を置いてから首を曲げると、腕ごと前へ振れて手首が狙いから 8 cm ずれた。
+        /// 首を曲げたら、下ろしている右の腕は曲げる前の向きへ戻す（肩が少し前へ出るだけで、腕は下を向いたまま）
+        /// </summary>
+        static void Wrist(Animator an)
         {
-            var hips = an.GetBoneTransform(HumanBodyBones.Hips).position;
-            var elbow = an.GetBoneTransform(HumanBodyBones.LeftLowerArm).position.y;
-            BodyPoser.Arm(an, true, new Vector3(-0.05f, hips.y + 0.02f, hips.z - 0.17f), new Vector3(-0.5f, elbow, hips.z - 0.45f),
-                new Vector3(0.6f, -0.6f, -0.2f), new Vector3(0f, 0f, 1f));
-            BodyPoser.Arm(an, false, new Vector3(0.05f, hips.y + 0.03f, hips.z - 0.18f), new Vector3(0.5f, elbow, hips.z - 0.45f),
-                new Vector3(-0.6f, -0.6f, -0.2f), new Vector3(0f, 0f, 1f));
+            System.Func<HumanBodyBones, Transform> B = an.GetBoneTransform;
+            var right = Vector3.right;
+            // 首と頭を下げ、左の手首へ振る。首は少しだけ（肩ごと前へ出る）、残りは頭
+            var upper = B(HumanBodyBones.RightUpperArm);
+            var hang = upper.rotation;
+            Turn(B(HumanBodyBones.Neck), right, 8f);
+            Turn(B(HumanBodyBones.Head), right, 28f);
+            Turn(B(HumanBodyBones.Head), Vector3.up, -14f);
+            upper.rotation = hang;
+            // 右の腕は下ろしたまま、肘を少し緩めて指も軽く曲げる
+            Turn(upper, right, -4f);
+            Turn(B(HumanBodyBones.RightLowerArm), right, -12f);
+            BodyPoser.Close(an, false, 0.5f);
+            BodyPoser.Grip(an, false, 0.3f);
+            // 左の前腕は胸の前を右の前へ。甲（手のひらの裏）を目の方（上の後ろ）へ向ける
+            var sl = B(HumanBodyBones.LeftUpperArm).position;
+            var sr = upper.position;
+            var half = (sr.x - sl.x) * 0.5f;
+            var y = (sl.y + sr.y) * 0.5f;
+            var z = B(HumanBodyBones.Chest).position.z;
+            BodyPoser.Arm(an, true, new Vector3(-half * 0.10f, y - 0.15f, z + 0.27f), new Vector3(-half * 2.4f, y - 0.55f, z - 0.05f),
+                new Vector3(0.80f, 0.15f, 0.55f), new Vector3(0f, -0.60f, 0.80f));
+            BodyPoser.Close(an, true, 0.6f);
+            BodyPoser.Grip(an, true, 0.35f);
         }
 
         /// <summary>座る。腰は座面の天面（top）の 7.5 cm 上、足首は床に、両手は腿の上（場面 1 の座り方の値を座面の高さへ移した物）</summary>

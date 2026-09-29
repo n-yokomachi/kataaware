@@ -82,9 +82,10 @@ namespace HalfAware.Tests
         [Test]
         public void SlightlyWideRubyOnlyHangsAndLeavesNoGap()
         {
-            // 最小の生活基盤 = 7 em、Minimum Infrastructure = 22 半角 × 0.5 × Scale（0.7 で 7.7 em）。
-            // はみ出すのは片側 0.35 em で Hang の内なので、親字の前後は空けない
-            var ruby = 22f * 0.5f * Ruby.Scale;
+            // 最小の生活基盤 = 7 em、Minimum Infrastructure = 字の送りの実寸で 11.11 em × Scale（0.7 で 7.78 em）。
+            // はみ出すのは片側 0.39 em で Hang の内なので、親字の前後は空けない
+            var ruby = Ruby.Em("Minimum Infrastructure") * Ruby.Scale;
+            Assert.AreEqual(11.11f, Ruby.Em("Minimum Infrastructure"), 1e-3f);
             float start, back, pad;
             Layout(7f, ruby, out start, out back, out pad);
             Assert.AreEqual(0f, pad, 1e-5f);
@@ -92,6 +93,61 @@ namespace HalfAware.Tests
             StringAssert.Contains(Space(-back), made);
             StringAssert.EndsWith("最小の生活基盤", made);
             StringAssert.DoesNotContain("<space=-7em>", made, "親字の幅で戻すと、ルビの長さぶんずれる");
+        }
+
+        [Test]
+        public void TheWidthIsTheFontsAdvance()
+        {
+            // 全角は 1 em。半角の英数は Noto Sans JP の送り（半角 1 字 = 0.5 em ではない）
+            Assert.AreEqual(2f, Ruby.Em("倫敦"), 1e-5f);
+            Assert.AreEqual(1f, Ruby.Em("・"), 1e-5f);
+            Assert.AreEqual(0.728f, Ruby.Em("H"), 1e-5f);
+            Assert.AreEqual(0.224f, Ruby.Em(" "), 1e-5f);
+            // 空白・&・. を含む英語の親字。TMP で並べて測った幅は 8.99 em（2026-09-29）
+            Assert.AreEqual(8.987f, Ruby.Em("H. Goodchild & Son"), 1e-3f);
+            Assert.AreEqual(0f, Ruby.Em(ListFormat.Mark.ToString() + ListFormat.SignMark), "印は幅を持たない");
+        }
+
+        [Test]
+        public void TheRubyOverALatinBaseSitsInItsMiddle()
+        {
+            // Pawnbrokers は字の送りで 6.18 em（TMP で並べると字の組の詰めが入って 6.10 em）。
+            // 半角 11 字 × 0.5 = 5.5 em と数えていた頃は、ルビが 0.3 em 左へ寄った。質屋 = 2 字 × Scale
+            var baseEm = Ruby.Em("Pawnbrokers");
+            Assert.AreEqual(6.182f, baseEm, 1e-3f);
+            var ruby = 2f * Ruby.Scale;
+            var lead = (baseEm - ruby) * 0.5f;
+            var made = Ruby.Over("Pawnbrokers", "質屋");
+            StringAssert.StartsWith(Space(lead), made);
+            StringAssert.Contains(Space(-(lead + ruby)), made);
+            // ルビの真ん中（lead + ruby / 2）が親字の真ん中（baseEm / 2）
+            Assert.AreEqual(baseEm * 0.5f, lead + ruby * 0.5f, 1e-4f);
+        }
+
+        [Test]
+        public void ALatinRubyStepsBackByItsOwnAdvance()
+        {
+            // 英字のルビ（Minimum Infrastructure）も、戻すのは実際に進んだ幅。半角いくつで数えると、後ろの親字がずれる
+            float start, back, pad;
+            Layout(7f, Ruby.Em("Minimum Infrastructure") * Ruby.Scale, out start, out back, out pad);
+            StringAssert.Contains(Space(-back), Ruby.Over("最小の生活基盤", "Minimum Infrastructure"));
+        }
+
+        [Test]
+        public void CentredLinesHangTheRubyForwardEvenAtTheHead()
+        {
+            // 看板の枠は行ごとに真ん中へ寄せる。行の頭でもルビを親字の真ん中に揃え、前へ出るぶんは Span が返す
+            var line = "｜Est. 1871<創業1871年>";
+            var made = Ruby.Expand(line, 0.9f, 1f, true);
+            StringAssert.StartsWith("<space=-", made, "行の頭でも前へ掛ける");
+            StringAssert.StartsWith("<voffset=", Ruby.Expand(line, 0.9f, 1f), "字幕では行の頭のルビを前へ掛けない（前のまま）");
+            float lead, tail;
+            var advance = Ruby.Span(line, 0.9f, true, out lead, out tail);
+            var baseEm = Ruby.Em("Est. 1871");
+            var rubyEm = Ruby.Em("創業1871年") * 0.9f;
+            Assert.AreEqual(baseEm, advance, 1e-4f, "はみ出しが Hang の内なら、親字の前後は空けない");
+            Assert.AreEqual((rubyEm - baseEm) * 0.5f, lead, 1e-4f);
+            Assert.AreEqual(lead, tail, 1e-4f, "両脇へ同じだけ");
         }
 
         [Test]

@@ -114,5 +114,47 @@ namespace HalfAware.Tests
             while ((at = text.IndexOf(needle, at)) >= 0) { n++; at += needle.Length; }
             return n;
         }
+
+        // ---- 看板 --------------------------------------------------------------
+
+        static readonly string Sign = ListFormat.SignMark + "｜H. Goodchild & Son<H・グッドチャイルド・アンド・サン>\nPawnbrokers<質屋>\n｜Est. 1871<創業1871年>";
+
+        [Test]
+        public void ASignPageGoesToTheFrameButIsNotComposedInColumns()
+        {
+            Assert.IsTrue(ListFormat.IsSign(Sign));
+            Assert.IsTrue(ListFormat.IsList(Sign), "看板もリストと同じ枠に出す");
+            Assert.IsFalse(ListFormat.IsSign(ListFormat.Mark + "a  b"));
+            Assert.AreEqual(-1, Ruby.Normalize(Sign).IndexOf(ListFormat.SignMark), "印は出さない");
+        }
+
+        /// <summary>行の頭の pos の値（em）。pos が無ければ 0</summary>
+        static float Head(string row)
+        {
+            if (!row.StartsWith("<pos=")) return 0f;
+            var end = row.IndexOf("em>");
+            return float.Parse(row.Substring(5, end - 5), System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        [Test]
+        public void EverySignRowSitsInTheMiddleWithItsRuby()
+        {
+            // 行ごとに、ルビまで含めた幅の真ん中が、いちばん広い行の真ん中に来る
+            const float scale = 11f / 12f;
+            float wide;
+            var rows = ListFormat.ComposeSign(Sign, scale, out wide).Split('\n');
+            Assert.AreEqual(3, rows.Length);
+            var raw = Ruby.Normalize(Sign).Split('\n');
+            for (var i = 0; i < rows.Length; i++)
+            {
+                float lead, tail;
+                var advance = Ruby.Span(raw[i], scale, true, out lead, out tail);
+                var left = Head(rows[i]) - lead;
+                Assert.GreaterOrEqual(left, -1e-3f, "ルビの頭が枠の外へ出ない: " + rows[i]);
+                Assert.AreEqual(wide * 0.5f, left + (lead + advance + tail) * 0.5f, 2e-3f, "真ん中に来る: " + rows[i]);
+            }
+            // いちばん広いのは H・グッドチャイルド・アンド・サン のルビ（親字より広い）
+            Assert.AreEqual(Ruby.Em("H・グッドチャイルド・アンド・サン") * scale, wide, 2e-3f);
+        }
     }
 }

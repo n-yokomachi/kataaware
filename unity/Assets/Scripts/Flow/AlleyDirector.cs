@@ -10,8 +10,9 @@ namespace HalfAware
     /// 看板と地の文の対応は固定。i 番目の板に i 番目の段が紐づく。
     /// 板はシナリオの順に南から北へ並べてあるので、歩いた順に読めば書かれた順に流れる。
     /// テーブルで「はい」を選ぶと、
-    /// 暗転して露店の内側へ回り、買い手が順に来る。買い手が去るたびに暗転して、
-    /// テーブルの上のチップが減る。
+    /// 暗転して露店の内側へ回り、買い手が順に来る。買い手は足音と一緒に歩いてきて、
+    /// 最後の一歩に合わせて卓の向こうへ浮かび上がる（<see cref="BuyerSteps"/>）。買い手が去るたびに暗転して、
+    /// テーブルの上のチップが減る。台詞は文面のアセットから引く（<see cref="MarketSale"/>）。
     ///
     /// 場面を閉じる判定は SceneFlow が持っている。止め方は二つ使い分ける。
     /// 売り買いのあいだは通して `flow.Held` で閉じるのを押さえ、暗転のあいだだけ
@@ -29,7 +30,7 @@ namespace HalfAware
         [SerializeField] SceneFlow flow;
         [SerializeField] HudView hud;
         [SerializeField] PlayerController player;
-        [Tooltip("看板の段を引く文面のアセット")]
+        [Tooltip("看板の段と売り買いの台詞を引く文面のアセット（台詞の原稿から写した物。HalfAware/Apply the scenario (alley)）")]
         [SerializeField] RoomScript script;
 
         [Header("売り買い")]
@@ -49,9 +50,17 @@ namespace HalfAware
         [SerializeField] float blackSeconds = 0.5f;
         [Tooltip("買い手が浮かび上がる秒数")]
         [SerializeField] float buyerFade = 0.55f;
+        [Tooltip("買い手が歩いてくる足音。足音の終わりに合わせて浮かび上がる。無ければ足音なしで浮かび上がる")]
+        [SerializeField] BuyerSteps steps;
+        [Tooltip("足音の最後の一歩から、浮かび上がりきるまでの秒数。0 で最後の一歩と同時に浮かび上がりきる")]
+        [SerializeField] float stepSettle = 0.15f;
+        [Tooltip("買い手が歩いてくる向きの振り。度。卓の正面から左右へ、一人ずつ交互に振る（ヤードの通路から寄ってくる）")]
+        [SerializeField] float approachAngle = 55f;
 
         bool selling;
-        /// <summary>暗転しているあいだだけ立てる。ここで場面が閉じるのを止める</summary>
+        /// <summary>思い出して来た。冒頭の独白を出さない</summary>
+        bool resumed;
+        /// <summary>暗転しているあいだと、買い手が歩いてくるあいだだけ立てる。ここで場面が閉じるのを止める</summary>
         bool holding;
 
         void Awake()
@@ -66,6 +75,19 @@ namespace HalfAware
             ShowBuyer(-1);
             ShowSmokes(0);
             flow.Examined += Examined;
+        }
+
+        /// <summary>
+        /// 冒頭の独白（原稿の「冒頭」、<see cref="AlleyIds.Opening"/>）。黒から明けきってから出す。今は原稿に行が無いので何も出さない。
+        /// 思い出して来た時は出さない（売り買いの途中なら <see cref="Restore"/> が売り買いを続ける）
+        /// </summary>
+        IEnumerator Start()
+        {
+            if (resumed || script == null) yield break;
+            var opening = script.Find(AlleyIds.Opening);
+            if (opening.id == null || opening.Lines.Count == 0) yield break;
+            for (var t = 0f; t < SceneFlow.FadeInSeconds; t += Time.deltaTime) yield return null;
+            if (!resumed && !selling) flow.Say(opening.Lines);
         }
 
         void OnDestroy()
@@ -130,9 +152,9 @@ namespace HalfAware
                 next = i;
                 flow.Checkpoint();
                 ShowBuyer(i);
-                StartCoroutine(Appear(i, buyerFade));
-                flow.Say(MarketSale.Lines(i));
-                yield return Spoken(MarketSale.PutsSmokes(i), MarketSale.Smokes(i));
+                yield return Arrive(i);
+                flow.Say(MarketSale.Lines(script, i));
+                yield return Spoken(MarketSale.PutsSmokes(script, i), MarketSale.Smokes(i));
                 // 買い手が去る。暗転しているあいだに、持っていったぶんを引く
                 yield return Black(true);
                 ShowBuyer(-1);
@@ -143,7 +165,7 @@ namespace HalfAware
 
             Show(0);
             next = -1;
-            flow.Say(MarketSale.Closing);
+            flow.Say(MarketSale.Closing(script));
             // 締めの文は積んである。読み終えたところで場面が閉じてよい
             flow.Held = false;
             selling = false;
@@ -177,6 +199,8 @@ namespace HalfAware
         /// </summary>
         public void Restore(string data)
         {
+            // 思い出して来た（売り買いの外でも）。冒頭の独白はもう済んでいる
+            resumed = true;
             if (string.IsNullOrEmpty(data)) return;
             var memo = JsonUtility.FromJson<Memo>(data);
             if (memo == null || memo.buyer < 0 || memo.buyer >= MarketSale.Count) return;
@@ -221,6 +245,32 @@ namespace HalfAware
                 yield return null;
             }
             if (waiting) ShowSmokes(count);
+        }
+
+        /// <summary>
+        /// i 人目の買い手が歩いてくる。足音（<see cref="BuyerSteps"/>）を鳴らし、最後の一歩に合わせて浮かび上がらせる。
+        /// 足音の間は字幕が無いので、調べる操作と進行を止めておく（卓の上の物を拾わせない）。足音が無ければ浮かび上がるだけ
+        /// </summary>
+        IEnumerator Arrive(int i)
+        {
+            if (steps == null || i < 0 || i >= buyers.Length || buyers[i] == null)
+            {
+                StartCoroutine(Appear(i, buyerFade));
+                yield break;
+            }
+            holding = true;
+            var woman = MarketSale.Woman(i);
+            var to = buyers[i].transform.position;
+            var toward = sellSpot != null ? sellSpot.position - to : -buyers[i].transform.forward;
+            // 卓の正面（売り手から見て買い手の向こう）から、一人ずつ左右へ振った向きから来る
+            var away = Quaternion.Euler(0f, (i % 2 == 0 ? 1f : -1f) * approachAngle, 0f) * -toward;
+            var walk = steps.Seconds(woman);
+            var wait = Mathf.Max(0f, walk + stepSettle - buyerFade);
+            StartCoroutine(steps.Walk(to, away, woman));
+            for (var t = 0f; t < wait; t += Time.deltaTime) yield return null;
+            StartCoroutine(Appear(i, buyerFade));
+            for (var t = wait; t < Mathf.Max(walk, wait + buyerFade); t += Time.deltaTime) yield return null;
+            holding = false;
         }
 
         /// <summary>暗転と、そこから明けるの両方。あいだは進行を止めておく</summary>
