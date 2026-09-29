@@ -442,6 +442,10 @@ namespace HalfAware.EditorTools
                 Debug.LogWarning("場面 3 の文面が無い。先に HalfAware/Write the connect script を走らせる: " + ScriptPath);
 
             made[ConnectIds.Note] = Put(parent, "Note", NoteAt, script, ConnectIds.Note, ItemRadius, true);
+            // 場面 1 のクリップボードと同じメモ。調べた時に紙をめくる音（オーナー、2026-09-29「メモにインタラクトしたときの紙の音を追加」）
+            var paper = AssetDatabase.LoadAssetAtPath<AudioClip>(PlaceRoomFoley.PaperPath);
+            if (paper != null) PlaceRoomFoley.Paper(made[ConnectIds.Note].GetComponent<Interactable>(), paper);
+            else Debug.LogWarning("メモの紙の音が無い: " + PlaceRoomFoley.PaperPath);
             made[ConnectIds.Coat] = Put(parent, "Coat", CoatAt(), script, ConnectIds.Coat, ItemRadius, true);
             made[ConnectIds.Chair] = Put(parent, "Chair", ChairAt, script, ConnectIds.Chair, ItemRadius, true);
             made[ConnectIds.Monitor] = Put(parent, "Monitor", ScreenAt, script, ConnectIds.Monitor, ItemRadius, false);

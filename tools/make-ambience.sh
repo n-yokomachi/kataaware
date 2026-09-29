@@ -4,12 +4,14 @@
 #         bash make-ambience.sh village   （5 節の村と麦畑の 3 つだけ）
 #         bash make-ambience.sh gravel    （6 節の村の未舗装の道の足音だけ）
 #         bash make-ambience.sh grass     （7 節の芝の足音だけ）
-#         bash make-ambience.sh steps     （11 節の足音の三つの組（硬い床・コンクリート・自室）だけ）
+#         bash make-ambience.sh steps     （11 節の足音の四つの組（硬い床・コンクリート・自室・自室のラグ）だけ）
 #         bash make-ambience.sh garden    （8 節の場面 6 の庭の 4 つだけ）
 #         bash make-ambience.sh bgm       （9 節の場面ごとの BGM の 7 曲だけ）
 #         bash make-ambience.sh ending    （10 節のエンディングの曲「HALF AWARE」の二つの版だけ）
 #         bash make-ambience.sh breath    （12 節の場面 1 の冒頭の呼吸の輪だけ）
 #         bash make-ambience.sh smoke     （13 節の煙草の三つ（箱から一本取る・ジッポ・火が移る）だけ）
+#         bash make-ambience.sh foley     （14 節の場面 1 の物音の二つ（椅子から立つ・紙をめくる）だけ）
+#         bash make-ambience.sh heels     （15 節の場面 2 の買い手のヒールの足音だけ）
 # 出力先は OUT_DIR 直下。中間ファイルは OUT_DIR/tmp に置く。
 set -euo pipefail
 
@@ -34,12 +36,16 @@ SRC_GRASS="$SRC_PIXABAY_DIR/freesound_community-walking-through-grass-80308.mp3"
 SRC_HARD_FLOOR="$SRC_PIXABAY_DIR/oxidvideos-footsteps-on-hard-floor-356919.mp3"
 SRC_CONCRETE="$SRC_PIXABAY_DIR/freesound_community-concrete-footsteps-1-6265.mp3"
 SRC_ROOM_STEP="$SRC_PIXABAY_DIR/freesound_community-step_soundwav-14903.mp3"
+SRC_RUG_STEP="$SRC_PIXABAY_DIR/freesound_community-footsteps_1-30138.mp3"
 # 12 節（場面 1 の冒頭の呼吸）の素材
 SRC_BREATH="$SRC_PIXABAY_DIR/freesound_community-breathing-6811.mp3"
 # 13 節（煙草の三つ）の素材。切り出す範囲はオーナーの指定（Pixabay の元の名前の尻に付けた時刻）
 SRC_PACK="$SRC_PIXABAY_DIR/freesound_community-cigarette-box-handling-shaking-dropping-59285.mp3"
 SRC_ZIPPO="$SRC_PIXABAY_DIR/fronbondi_skegs-foley-zippo-cigarette-lighter-open-and-close-sound-effects-235249.mp3"
 SRC_LIT="$SRC_PIXABAY_DIR/freesound_community-cigarette-suck-107102.mp3"
+# 14 節（場面 1 の物音の二つ）の素材。切り出す範囲はオーナーの指定（Pixabay の元の名前の尻に付けた時刻）
+SRC_COUCH="$SRC_PIXABAY_DIR/freesound_community-couch-quick-rise-up-4_bip-35534.mp3"
+SRC_PAPER="$SRC_PIXABAY_DIR/freesound_community-paper-turn-40077.mp3"
 # 8 節（場面 6 の庭の記憶）の素材
 SRC_HOSE="$SRC_PIXABAY_DIR/freesound_community-watering-62546.mp3"
 SRC_HOSE_STOP="$SRC_PIXABAY_DIR/freesound_community-hose-sounds-24388.mp3"
@@ -951,8 +957,8 @@ done
 fi   # PART=all か ending
 
 # ---------------------------------------------------------------------------
-# 11. 足音の三つの組（HardFloor1〜7.wav / Concrete1〜4.wav / Room1〜6.wav）
-#    三つとも Pixabay の、同じ人が同じ床を何歩も歩いた録音。一歩ずつ切り出して単発にし、
+# 11. 足音の四つの組（HardFloor1〜7.wav / Concrete1〜4.wav / Room1〜6.wav / Rug1〜6.wav）
+#    四つとも Pixabay の、同じ人が同じ床を何歩も歩いた録音。一歩ずつ切り出して単発にし、
 #    Footsteps が組の中から直前と違う物を選び、音量と高さを少し振って鳴らす（足音のランダムさはそちらで出す）。
 #    どれもモノラル 44.1kHz / 16bit。中間は 32bit の浮動小数で持つ。
 #
@@ -977,7 +983,7 @@ fi   # PART=all か ending
 if [ "$PART" = "all" ] || [ "$PART" = "steps" ]; then
 
 STEPS_TARGET=$(steps_target)
-echo "=== 足音の三つの組（目標 ${STEPS_TARGET} LUFS）==="
+echo "=== 足音の四つの組（目標 ${STEPS_TARGET} LUFS）==="
 
 # 11-1. HardFloor1〜7.wav — 場面 8 の共用ガレージ、場面 4 の電車・教室・台所の床（Footsteps on hard floor、OxidVideos）
 #    元は 13.80 秒、48kHz のステレオ mp3。左右の差は和より 19dB 低いので、平均してモノラルに畳む。
@@ -1022,6 +1028,22 @@ echo "--- Room ---"
 ffmpeg -y -v error -i "$SRC_ROOM_STEP" -af "pan=mono|c0=0.5*c0+0.5*c1,aresample=44100,highpass=f=100:poles=2,highpass=f=100:poles=2" -c:a pcm_f32le "$TMP_DIR/room_step_src.wav"
 cut_steps Room "$TMP_DIR/room_step_src.wav" \
   "1.656-2.326 4.117-4.660 8.111-8.747 9.245-9.835 11.001-11.519 11.524-12.078" "$STEPS_TARGET" -1
+
+# 11-4. Rug1〜6.wav — 自室（場面 1・3・5・7）のラグの上（footsteps_1、freesound_community）。オーナー、2026-09-29
+#    「自室のラグの上を歩く時の音を変更」。前はラグの上も板の床と同じ Room1〜6 が鳴っていた。
+#    元は 13.87 秒、24kHz のステレオ mp3（左右は同じ。12kHz より上は無い）。頭の 3 秒は無音（−85dB より下）で、
+#    その後に柔らかい床を 0.6 秒ほどの歩調で 17 歩。一歩は踵から爪先へ転がる擦れ（630Hz〜5kHz）が 0.2 秒ほど続く。
+#    **一歩ごとに 40Hz より下の大きな揺れ（足が床に着いた時の揺れと思われる。中身の帯より 30dB 上）が乗る。**
+#    70Hz より下を 24dB/oct で落とす（2 次を二段）。落とした後、一歩の頂点（5ms 窓の実効値）は −44.6〜−50.5dB、
+#    歩の間の床は −70〜−85dB。
+#    採った六つ（秒）: 3.316 / 3.877 / 4.519 / 5.108 / 9.474 / 10.733 の 10ms 手前から、それぞれ次の一歩の 15ms 手前まで。
+#    避けた物: 5.762・6.371・7.604・8.233・10.068・13.221 秒（擦れが引いた 0.17〜0.25 秒後に二つ目の当たり）、
+#    6.980 秒（ほかより 3〜8dB 弱い）、8.864 秒（頂点の前に 0.2 秒の擦り）、11.323・11.967・12.574 秒（尾の床が
+#    −57〜−65dB。次の一歩の前に擦りが来る）
+echo "--- Rug ---"
+ffmpeg -y -v error -i "$SRC_RUG_STEP" -af "pan=mono|c0=0.5*c0+0.5*c1,aresample=44100,highpass=f=70:poles=2,highpass=f=70:poles=2" -c:a pcm_f32le "$TMP_DIR/rug_step_src.wav"
+cut_steps Rug "$TMP_DIR/rug_step_src.wav" \
+  "3.306-3.862 3.867-4.504 4.509-5.093 5.098-5.747 9.464-10.053 10.723-11.308" "$STEPS_TARGET" -1
 
 fi   # PART=all か steps
 
@@ -1102,6 +1124,48 @@ ffmpeg -y -v error -i "$OUT_DIR/Breathing.wav" -filter_complex "
 fi   # PART=all か breath
 
 # ---------------------------------------------------------------------------
+# 13・14 節の単発の音を切り出して揃える道具。どちらからも呼ぶので、PART の分岐の外に置く
+# 揃える大きさは Drag.wav（吸う息）の momentary の最大、頂点の天井は −3dB（13 節の頭に書いた決まり）
+# ---------------------------------------------------------------------------
+SMOKE_TARGET_M=-30.6
+SMOKE_CEIL=-3
+
+# 一番大きい momentary（400ms の窓）の大きさ。後ろに 1 秒の無音を足して、尻の窓まで数える
+momentary_max () {
+  ffmpeg -hide_banner -nostats -i "$1" -af "apad=pad_dur=1,ebur128=metadata=1,ametadata=print:key=lavfi.r128.M" -f null - 2>&1 \
+    | grep -oE "lavfi.r128.M=[-0-9.]+" | cut -d= -f2 | sort -g | tail -1
+}
+peak_db () {
+  ffmpeg -hide_banner -i "$1" -af "astats=metadata=0" -f null - 2>&1 | grep "Peak level dB" | tail -1 | grep -oE '[-0-9.]+$'
+}
+
+# $1 名前  $2 元  $3 頭（秒）  $4 尻（秒）  $5 低域を落とすフィルター（空なら落とさない）  $6 尻をなだらかにする秒
+# $7 揃える大きさから上げる分（dB。無ければ 0）  $8 頂点の天井（dB。無ければ SMOKE_CEIL）
+smoke_cut () {
+  local name="$1" src="$2" s="$3" e="$4" lo="$5" tail="$6" raise="${7:-0}" ceil="${8:-$SMOKE_CEIL}" len fo m pk gain out
+  len=$(awk "BEGIN{printf \"%.3f\", $e-$s}")
+  fo=$(awk "BEGIN{printf \"%.3f\", $len-$tail}")
+  # 丸ごと 44.1kHz に直してから切る（mp3 の頭で探すより、切り口が標本の単位で決まる）
+  ffmpeg -y -v error -i "$src" \
+    -af "aresample=44100${lo:+,$lo},atrim=start=${s}:end=${e},asetpts=PTS-STARTPTS,afade=t=in:st=0:d=0.005,afade=t=out:st=${fo}:d=${tail}" \
+    -ac 1 -c:a pcm_f32le "$TMP_DIR/${name}_cut.wav"
+  m=$(momentary_max "$TMP_DIR/${name}_cut.wav")
+  pk=$(peak_db "$TMP_DIR/${name}_cut.wav")
+  gain=$(awk "BEGIN{g=$SMOKE_TARGET_M + ($raise) - ($m); c=$ceil - ($pk); printf \"%.2f\", (g < c ? g : c)}")
+  out="$OUT_DIR/${name}.wav"
+  ffmpeg -y -v error -i "$TMP_DIR/${name}_cut.wav" -af "volume=${gain}dB" -ar 44100 -ac 1 -c:a pcm_s16le "$out"
+  printf "  %-13s %6.3f〜%6.3f 秒  %s 秒  momentary 最大 %6s LUFS / 頂点 %6.1f dB → %+6.2f dB → %6s LUFS / 頂点 %6.1f dB\n" \
+    "$name" "$s" "$e" "$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$out")" "$m" "$pk" "$gain" \
+    "$(momentary_max "$out")" "$(peak_db "$out")"
+  ffmpeg -y -v error -i "$out" -filter_complex "
+[0:a]asplit=2[w][s];
+[w]showwavespic=s=1600x300:colors=0x3070c0:scale=log[wv];
+[s]showspectrumpic=s=1600x420:fscale=lin:legend=0:color=intensity:gain=2:stop=20000[sp];
+[wv][sp]vstack=inputs=2[o]
+" -map "[o]" -frames:v 1 "$ANALYSIS_DIR/${name}_sheet.png"
+}
+
+# ---------------------------------------------------------------------------
 # 13. 煙草の三つ（PackPull.wav / Zippo.wav / CigaretteLit.wav）— 場面 1 で煙草を取って火を点けるまで（オーナー、2026-09-28）
 #    「煙草を箱からとる音を追加」「ライターの音にZippoの開閉音を追加する。…開いて、点火して、閉じるまでの音が入っている。
 #    点火したタイミングで、煙草に火が移った音を鳴らして」。切り出す範囲はオーナーの指定（元の名前の尻に付けた時刻）。
@@ -1119,59 +1183,37 @@ fi   # PART=all か breath
 #      （頭の静かな所 −68.6dB、はぜは 0.3dB しか削れない）。聞こえ始めは頭から 0.72 秒
 #    大きさは三つとも、一番大きい 400ms の窓の大きさ（momentary の最大）を Drag.wav（−30.6 LUFS。吸う息。はぜの音で、
 #    前の LighterFlame.wav も −30.3 で並んでいた）に揃え、頂点 −3dB の天井を添えた。Blow.wav（吐く息）は −20.1 で一段大きい。
-#    ただしジッポだけは、そこから 6dB 上げる（オーナー、2026-09-29「ライターの音を大きく」）。−24.6 LUFS、頂点は −4dB ほどで天井に当たらない。
-#    44.1kHz のモノラル、頭 5ms と尻 20〜50ms をなだらかにした
+#    ジッポだけは別に揃える（下の ZIPPO_*）。44.1kHz のモノラル、頭 5ms と尻 20〜50ms をなだらかにした
+#
+#    **ジッポの大きさ**（オーナー、2026-09-29「ライターの音を大きく」、同日「ジッポの音自体まだ小さい」）
+#    一度目は揃えた所から 6dB 上げた（momentary の最大 −24.6 LUFS）が、まだ小さく聞こえた。鳴らす道は三つとも同じ
+#    （Player/Main Camera/Voice、音量 0.4、2D、ミキサー無し）なので、差は素材の中身にある。ジッポの中身は短い当たりが
+#    三つ（蓋を開ける 0.35 秒の金属音・フリントを擦る 50ms・蓋を閉じる 2.43 秒と 2.55 秒の二段）で、間は静か。
+#    400ms の窓で揃えると、短い当たりは窓の中で薄まって数えられ、当たりの胴（響きの尾）は頂点より 20〜30dB 低いまま残る。
+#    100ms の窓の一番大きい所で比べると、箱の音（2.4 秒続く紙と指の擦れ）の −27.9dB に対して、6dB 上げた後でも
+#    蓋を開ける音 −22.0・点火 −34.6・蓋を閉じる音 −24.5dB。**点火は箱の音より 7dB 小さかった**（部屋の空気の音に紛れる）。
+#    そこで当たりの頭を 4 分の 1 に潰して（−30dB から上、アタック 0.3ms、リリース 60ms）胴を持ち上げ、
+#    頂点が天井の −1dB に当たるまで上げる（ほかの二つの天井は −3dB。momentary の最大は −17.1 LUFS）。
+#    100ms の窓で、蓋を開ける音 −15.2・点火 −22.9・蓋を閉じる音 −20.3dB（箱の音より 12.7・5.0・7.6dB 上）。
+#    閾値を −36・−40dB に下げても点火と蓋を開ける音の差は 0.4dB しか縮まず、間の静かな所が 4〜7dB 持ち上がるだけなので −30dB
 # ---------------------------------------------------------------------------
 if [ "$PART" = "all" ] || [ "$PART" = "smoke" ]; then
 
 echo "=== PackPull.wav / Zippo.wav / CigaretteLit.wav ==="
-SMOKE_TARGET_M=-30.6
-SMOKE_CEIL=-3
-# ジッポだけ上げる分（dB）。頂点が −1dB を越えないこと（越えるなら天井 SMOKE_CEIL で止まる）
-ZIPPO_RAISE=6
-
-# 一番大きい momentary（400ms の窓）の大きさ。後ろに 1 秒の無音を足して、尻の窓まで数える
-momentary_max () {
-  ffmpeg -hide_banner -nostats -i "$1" -af "apad=pad_dur=1,ebur128=metadata=1,ametadata=print:key=lavfi.r128.M" -f null - 2>&1 \
-    | grep -oE "lavfi.r128.M=[-0-9.]+" | cut -d= -f2 | sort -g | tail -1
-}
-peak_db () {
-  ffmpeg -hide_banner -i "$1" -af "astats=metadata=0" -f null - 2>&1 | grep "Peak level dB" | tail -1 | grep -oE '[-0-9.]+$'
-}
-
-# $1 名前  $2 元  $3 頭（秒）  $4 尻（秒）  $5 低域を落とすフィルター（空なら落とさない）  $6 尻をなだらかにする秒
-# $7 揃える大きさから上げる分（dB。無ければ 0）
-smoke_cut () {
-  local name="$1" src="$2" s="$3" e="$4" lo="$5" tail="$6" raise="${7:-0}" len fo m pk gain out
-  len=$(awk "BEGIN{printf \"%.3f\", $e-$s}")
-  fo=$(awk "BEGIN{printf \"%.3f\", $len-$tail}")
-  # 丸ごと 44.1kHz に直してから切る（mp3 の頭で探すより、切り口が標本の単位で決まる）
-  ffmpeg -y -v error -i "$src" \
-    -af "aresample=44100${lo:+,$lo},atrim=start=${s}:end=${e},asetpts=PTS-STARTPTS,afade=t=in:st=0:d=0.005,afade=t=out:st=${fo}:d=${tail}" \
-    -ac 1 -c:a pcm_f32le "$TMP_DIR/${name}_cut.wav"
-  m=$(momentary_max "$TMP_DIR/${name}_cut.wav")
-  pk=$(peak_db "$TMP_DIR/${name}_cut.wav")
-  gain=$(awk "BEGIN{g=$SMOKE_TARGET_M + ($raise) - ($m); c=$SMOKE_CEIL - ($pk); printf \"%.2f\", (g < c ? g : c)}")
-  out="$OUT_DIR/${name}.wav"
-  ffmpeg -y -v error -i "$TMP_DIR/${name}_cut.wav" -af "volume=${gain}dB" -ar 44100 -ac 1 -c:a pcm_s16le "$out"
-  printf "  %-13s %6.3f〜%6.3f 秒  %s 秒  momentary 最大 %6s LUFS / 頂点 %6.1f dB → %+6.2f dB → %6s LUFS / 頂点 %6.1f dB\n" \
-    "$name" "$s" "$e" "$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$out")" "$m" "$pk" "$gain" \
-    "$(momentary_max "$out")" "$(peak_db "$out")"
-  ffmpeg -y -v error -i "$out" -filter_complex "
-[0:a]asplit=2[w][s];
-[w]showwavespic=s=1600x300:colors=0x3070c0:scale=log[wv];
-[s]showspectrumpic=s=1600x420:fscale=lin:legend=0:color=intensity:gain=2:stop=20000[sp];
-[wv][sp]vstack=inputs=2[o]
-" -map "[o]" -frames:v 1 "$ANALYSIS_DIR/${name}_sheet.png"
-}
+# ジッポだけの揃え方。当たりを潰す圧縮、揃える大きさから上げる分（dB）、頂点の天井（dB）。
+# 上げる分は天井で止まるように多めに取る（今は天井で止まって、揃える所から 13.5dB 上）
+ZIPPO_COMP="acompressor=threshold=-30dB:ratio=4:attack=0.3:release=60:knee=4"
+ZIPPO_RAISE=14
+ZIPPO_CEIL=-1
 
 LOW_CUT="highpass=f=250:poles=2,highpass=f=250:poles=2"
 smoke_cut PackPull     "$SRC_PACK"  0     2.434 ""          0.030
-smoke_cut Zippo        "$SRC_ZIPPO" 1.630 5.321 "$LOW_CUT"  0.020 "$ZIPPO_RAISE"
+smoke_cut Zippo        "$SRC_ZIPPO" 1.630 5.321 "$LOW_CUT,$ZIPPO_COMP"  0.020 "$ZIPPO_RAISE" "$ZIPPO_CEIL"
 smoke_cut CigaretteLit "$SRC_LIT"   0     3.142 "$LOW_CUT"  0.050
 
 # 点火の時刻: 蓋を開ける音が引いた後（0.6 秒から）で、4ms の窓の実効値が初めて −45dB を越える所（静かな所は −63dB）。
-# SmokeBeats.StrikeInZippo と合わせる。大きさを揃える前の切り出しで測る（揃えた後だと閾値がずれる）
+# SmokeBeats.StrikeInZippo と合わせる。大きさを揃える前の切り出しで測る（揃えた後だと閾値がずれる。
+# 圧縮は −30dB より上しか触らないので、−45dB の越え目は変わらない）
 STRIKE=$(ffmpeg -hide_banner -nostats -i "$TMP_DIR/Zippo_cut.wav" \
   -af "asetnsamples=n=176:p=0,astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level" -f null - 2>&1 \
   | awk '/pts_time/{t=$NF; sub(/.*pts_time:/,"",t)} /RMS_level/{split($0,a,"="); print t, a[2]}' \
@@ -1179,5 +1221,56 @@ STRIKE=$(ffmpeg -hide_banner -nostats -i "$TMP_DIR/Zippo_cut.wav" \
 echo "  Zippo の点火（フリントを擦る音の頭）: ${STRIKE} 秒"
 
 fi   # PART=all か smoke
+
+# ---------------------------------------------------------------------------
+# 14. 場面 1 の物音の二つ（ChairRise.wav / PaperTurn.wav）（オーナー、2026-09-29）
+#    切り出す範囲はオーナーの指定（Pixabay の元の名前の尻に付けた時刻）。
+#    - ChairRise.wav: 「椅子から立ち上がる際の音を追加」。「couch quick rise up 4」（freesound_community）の 4.982〜7.730 秒。
+#      元は 13.70 秒、24kHz のステレオ mp3（左右は同じ。12kHz より上は無い）。ソファのクッションが沈みから戻って
+#      軋む音で、中身は 0.1〜0.9 秒（一番大きいのは 0.5〜0.6 秒）の 80〜600Hz、その後は部屋の静かな所（−62〜−72dB）。
+#      低い揺れは無く（40Hz より下は −78dB）、80Hz より下の分も沈みの音なので、低域は落とさない。
+#      自室の椅子から立つたびに鳴らす（SceneFlow.PlayRise。場面 1 のジャケットの後、モニターの席から戻る時、場面 7 のジャックの後）
+#    - PaperTurn.wav: 「メモにインタラクトしたときの紙の音を追加」。「paper turn」（freesound_community）の 4.043〜6.474 秒。
+#      元は 10.75 秒、24kHz のステレオ mp3（左右は同じ）。紙をめくる擦れと返る音（0.4〜1.2 秒の 1.2〜5kHz）に、
+#      紙か手がマイクに当たった低い揺れ（40〜80Hz、中身の帯より 6〜10dB 上）が乗る。150Hz より下を 24dB/oct で落とす（2 次を二段）。
+#      クリップボードのメモを調べた時に鳴らす（Interactable.sound。場面 1 と、同じ部屋を組み直す場面 3・5・7）
+#    大きさは、一番大きい 400ms の窓（momentary の最大）を −26 LUFS にする（箱から一本取る音の −30.6 より 4.6dB 上。
+#    体ごと動く音と、手元で鳴る紙の音なので、指先の箱の音より一段大きく）。頂点の天井は −3dB。
+#    椅子は −26.0 LUFS・頂点 −9.8dB。紙はめくる瞬間の当たりが鋭く、天井で止まって −26.8 LUFS・頂点 −3.0dB。
+#    鳴らす道は煙草の三つと同じ（Player/Main Camera/Voice、音量 0.4、2D）。44.1kHz のモノラル、頭 5ms と尻 50ms をなだらかにした
+# ---------------------------------------------------------------------------
+if [ "$PART" = "all" ] || [ "$PART" = "foley" ]; then
+
+echo "=== ChairRise.wav / PaperTurn.wav ==="
+# 揃える大きさ（−26 LUFS）の、SMOKE_TARGET_M（−30.6 LUFS）から上の分（dB）
+FOLEY_RAISE=4.6
+smoke_cut ChairRise "$SRC_COUCH" 4.982 7.730 "pan=mono|c0=0.5*c0+0.5*c1"                                                 0.050 "$FOLEY_RAISE"
+smoke_cut PaperTurn "$SRC_PAPER" 4.043 6.474 "pan=mono|c0=0.5*c0+0.5*c1,highpass=f=150:poles=2,highpass=f=150:poles=2" 0.050 "$FOLEY_RAISE"
+
+fi   # PART=all か foley
+
+# ---------------------------------------------------------------------------
+# 15. Heels1〜6.wav — 場面 2 の売り買いで、買い手 C（女）が卓の向こうへ歩いてくるヒールの足音
+#    （オーナー、2026-09-29「買い手が現れるときは足音と一緒に。女性の足音はヒールっぽくしてほしい」）。男の買い手は通りと同じ Concrete1〜4。
+#    「Footsteps heels pavement denoised」（YannSauvin、Freesound、CC0 1.0。https://freesound.org/people/YannSauvin/sounds/778103/）。
+#    Freesound の試聴用の mp3（高い方。48kHz のモノラル、52.5 秒、188kbps）を落として使う（元の wav を落とすには会員の登録が要る）。
+#    unity/RawAssets/audio/freesound/ に置く（git に入れない）。
+#    ヒールで舗道を 0.545 秒ほどの歩調で歩いた録音。雑音を除いてあり、歩の間の床は −57〜−63dB（一歩の頂点の 40〜45dB 下）。
+#    一歩は踵の鋭い当たりに、72〜80ms 後の爪先の当たり（頂点の 7〜24dB 下）が続く。ヒールの「カツ」の形なので、二つ目も一歩に含める
+#    （6・11 節の「二つ目の当たりがある物は外す」は、靴底が二度鳴る物を外す決まりで、ここには当てない）。
+#    100Hz より下は中身より 28dB 低い（−67dB）。ほかの組と揃えて 50Hz より下を落とす（2 次）。
+#    採った六つ（秒）: 2.974 / 3.520 / 4.063 / 4.608 / 5.695 / 6.242 の 10ms 手前から、それぞれ次の一歩の 15ms 手前まで。
+#    避けた物: 5.149 秒（尾の 5.6 秒に −44dB の物音）、6.773・7.364 秒（尾に −44〜−46dB の物音）、
+#    7.852 秒から後（歩調が乱れ、弱い物音が混じる）。大きさは 11 節と同じ（一歩あたり −28.5 LUFS、頂点 −1dB の天井）
+# ---------------------------------------------------------------------------
+SRC_HEELS="${SRC_FREESOUND_DIR:-$SCRIPT_DIR/../unity/RawAssets/audio/freesound}/YannSauvin-footsteps-heels-pavement-denoised-778103-hq.mp3"
+if [ "$PART" = "all" ] || [ "$PART" = "heels" ]; then
+
+echo "=== Heels1〜6.wav（目標 $(steps_target) LUFS）==="
+ffmpeg -y -v error -i "$SRC_HEELS" -af "aresample=44100,highpass=f=50:poles=2" -ac 1 -c:a pcm_f32le "$TMP_DIR/heels_src.wav"
+cut_steps Heels "$TMP_DIR/heels_src.wav" \
+  "2.964-3.505 3.510-4.048 4.053-4.593 4.598-5.134 5.685-6.227 6.232-6.758" "$(steps_target)" -1
+
+fi   # PART=all か heels
 
 echo "=== done ==="

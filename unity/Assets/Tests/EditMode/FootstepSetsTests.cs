@@ -5,7 +5,7 @@ using UnityEngine;
 namespace HalfAware.Tests
 {
     /// <summary>
-    /// 足音の組（tools/make-ambience.sh の 6 節と 11 節で切り出した単発）と、場面 4 の場所ごとの既定の足音
+    /// 足音の組（tools/make-ambience.sh の 6 節と 11 節で切り出した単発。自室のラグの Rug は 11-4）と、場面 4 の場所ごとの既定の足音
     /// </summary>
     public class FootstepSetsTests
     {
@@ -33,6 +33,9 @@ namespace HalfAware.Tests
 
         [Test]
         public void TheRoomSetHasSixSteps() { CheckSet("Room", 6); }
+
+        [Test]
+        public void TheRugSetHasSixSteps() { CheckSet("Rug", 6); }
 
         [Test]
         public void TheGravelSetKeepsSixStepsForTheVillage() { CheckSet("Gravel", 6); }

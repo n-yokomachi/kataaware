@@ -9,14 +9,16 @@ namespace HalfAware
     ///
     /// **冒頭**（オーナー、2026-09-28）: 黒のまま呼吸の輪を鳴らし（5 秒ほど）、ゆっくり瞬くように明ける（<see cref="WakeBlink"/>）。
     /// 明けきってから SceneFlow の起き上がり（椅子に背を預けて天井を見ていた姿勢から座位へ）を始めさせ（<see cref="SceneFlow.OpeningHeld"/>）、
-    /// 起き上がり終えたら呼吸を少し小さくし（breathSettle まで breathSettleSeconds 秒で。オーナー、2026-09-29「最初の呼吸音について、体を起こしたら台詞の前にフェードして少し小さくして」）、
+    /// 起き上がり終えたら呼吸を少し小さくし（breathSettle まで breathSettleSeconds 秒で。オーナー、2026-09-29「最初の呼吸音について、体を起こしたら台詞の前にフェードして少し小さくして」、
+    /// 同日「最初の呼吸音は起き上がってから4割の音量に」）、
     /// 下げきってから最初の独白を流す。暗いうちと瞬きの間は天井を見た形のまま。
     /// 呼吸はジャックが手首から抜けたところで、短く薄れさせて止める（ブツッと切らない。下げた大きさから breathFadeSeconds 秒で消える）。
     ///
     /// **煙草**（オーナー、2026-09-28）: 調べたら（SceneFlow が目を煙草へ向ける）、箱から一本取る音を鳴らし、同時に SceneFlow が
-    /// 原稿の 1 ページ（煙草を取った時の文、RoomScript の cigarette）を出す。読み終えて送り、箱の音も鳴り終わっていたら、その向きのまま
-    /// ジッポを開けて火を点け（点いた瞬間に煙草に火が移った音。煙もそこから）、閉じる（<see cref="Cigarette"/>・<see cref="SmokeBeats"/>）。
-    /// ジッポの音と火が移った音が鳴りきってから座り始めの向きへゆっくり向き直して、二服吸う。二服目を吐いたところで一度だけ画面を黒く覆い、
+    /// 原稿の 1 ページ（煙草を取った時の文、RoomScript の cigarette）を出す。箱の音が鳴り終わったらすぐ、1 ページを読んでいる途中でも、その向きのまま
+    /// ジッポを開けて火を点け（点いた瞬間に煙草に火が移った音。煙もそこから）、閉じる（<see cref="Cigarette"/>・<see cref="SmokeBeats"/>。
+    /// オーナー、2026-09-29「ジッポの音を、タバコを取った音の直後に再生に変更」）。
+    /// ジッポの音と火が移った音が鳴りきり、1 ページも送ってから、座り始めの向きへゆっくり向き直して、二服吸う。二服目を吐いたところで一度だけ画面を黒く覆い、
     /// 場所と時刻のカードを出して、薄れさせて明ける。吸い終わるまで見回しも移動も受け付けない。
     ///
     /// **ジャケット**: 吸い終わったら、座ったまま椅子の右の卓に置いたジャケットを着る。着る音を鳴らし、正面へ向き直してから、
@@ -41,8 +43,8 @@ namespace HalfAware
         [SerializeField, Range(0f, 1f)] float breathVolume = 0.5f;
         [Tooltip("ジャックが手首から抜けてから、呼吸が消えきるまでの秒")]
         [SerializeField] float breathFadeSeconds = 1.2f;
-        [Tooltip("起き上がり終えてから最初の独白の前に、呼吸を下げる先。breathVolume に対する割合（仮置き。オーナーが聴いて決める）")]
-        [SerializeField, Range(0f, 1f)] float breathSettle = 0.6f;
+        [Tooltip("起き上がり終えてから最初の独白の前に、呼吸を下げる先。breathVolume に対する割合（オーナー、2026-09-29「4割の音量に」）")]
+        [SerializeField, Range(0f, 1f)] float breathSettle = 0.4f;
         [Tooltip("起き上がり終えてから、呼吸を下げきるまでの秒。下げきってから最初の独白を出す（仮置き）")]
         [SerializeField] float breathSettleSeconds = 1.5f;
         [Tooltip("ジャックを抜くしぐさ。抜けたところで呼吸を止める。無ければジャックを調べたところで止める")]
@@ -67,7 +69,7 @@ namespace HalfAware
         [Header("煙草とカード。遊びながら詰められるよう Inspector に出してある")]
         [Tooltip("カードを出したまま止まっている秒数。読む時間（2026-09-28 にオーナーの指示で 1.95 秒の 1.5 倍に延ばした）")]
         [SerializeField] float holdSeconds = 2.925f;
-        [Tooltip("ジッポの音と火が移った音が鳴りきってから、座り始めの向きへ向き直すのにかける秒数")]
+        [Tooltip("ジッポの音と火が移った音が鳴りきり、煙草を取った 1 ページも送ってから、座り始めの向きへ向き直すのにかける秒数")]
         [SerializeField] float aimSeconds = 2.5f;
         [Tooltip("向き直してから吸い始めるまでの一拍。秒")]
         [SerializeField] float aimSettleSeconds = 0.4f;
@@ -129,7 +131,7 @@ namespace HalfAware
         /// <summary>ジッポの音と火が移った音が鳴りきってから吸い始めるまでに挟む、向き直す間。秒</summary>
         public float Turn { get { return aimSeconds + aimSettleSeconds; } }
 
-        /// <summary>火を点け始めて（1 ページを送ってから）吸い終わるまでの秒数</summary>
+        /// <summary>火を点け始めてから吸い終わるまでの秒数。1 ページを読んでいて向き直す手前で待った分は含まない</summary>
         public float SmokeSeconds { get { return SmokeBeats.Total(Drags, Turn); } }
 
         /// <summary>冒頭の黒と瞬きの間合い</summary>
@@ -374,20 +376,29 @@ namespace HalfAware
                 }
                 // 吸い終わるまで見回しも受け付けない
                 if (player != null) player.CanLook = false;
-                // 1 ページを読み終えて送り、箱の音も鳴り終わってから火を点ける。
-                // 読んでいる間は止めない（止めると送れない）。送った後、箱の音の残りを待つ間だけ止める
-                while (flow.Talking || Time.time < took + pulling)
+                // 箱の音が鳴り終わる所でジッポが鳴り出すように、火を点け始める。1 ページを読んでいる途中でも待たない。
+                // 読んでいる間は止めない（止めると送れない）。送った後は止める
+                var lightAt = took + SmokeBeats.LightAfterPack(pulling);
+                while (Time.time < lightAt)
                 {
                     if (!flow.Talking) flow.Freeze(FreezeMargin);
                     yield return null;
                 }
                 if (flow.Completed) yield break;
-                if (cigarette != null) cigarette.Light(Drags, Turn);
+                // 向き直す手前で時刻表を止めておき、1 ページを送ってから進める
+                if (cigarette != null) cigarette.Light(Drags, Turn, true);
                 var started = Time.time;
-                // ジッポの音と火が移った音が鳴りきってから、座り始めの向きへ戻す
-                var turnAt = started + SmokeBeats.TurnAt;
-                flow.Freeze(SmokeBeats.TurnAt + aimSeconds + FreezeMargin);
-                while (Time.time < turnAt) yield return null;
+                // ジッポの音と火が移った音が鳴りきり、1 ページも送ってから、座り始めの向きへ戻す
+                while (flow.Talking || Time.time < started + SmokeBeats.TurnAt)
+                {
+                    if (!flow.Talking) flow.Freeze(FreezeMargin);
+                    yield return null;
+                }
+                if (flow.Completed) yield break;
+                if (cigarette != null) cigarette.Release();
+                // 時刻表は向き直す手前で待っていた。ここから数え直す（待った分だけ後ろへずらす）
+                started = Time.time - SmokeBeats.TurnAt;
+                flow.Freeze(aimSeconds + FreezeMargin);
                 yield return AimForward(player, aimSeconds);
                 // 二服目を吐いたところで一度だけ黒く覆い、場所と時刻のカードを出す。一服目は暗くしない
                 var at = started + SmokeBeats.CardAt(Drags - 1, Drags, Turn);
@@ -406,6 +417,8 @@ namespace HalfAware
             {
                 smoking = false;
                 if (player != null) player.CanLook = true;
+                // 途中で抜けても、止めた時刻表を置き去りにしない
+                if (cigarette != null && cigarette.Held) cigarette.Release();
             }
             // 吸い終わりには何も言わない。独白はジャケットを着た後
         }

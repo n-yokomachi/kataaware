@@ -7,6 +7,7 @@ namespace HalfAware
     /// 視点を移し始め、体も椅子に座らせる。座ったまま、独白とモニターの映り込み（<see cref="TerminalReflection"/>）、
     /// 「スリープを解除する」の二択と、「はい」の後の解除の文までを読ませ、どれも終わって映り込みが消えてから、
     /// 体を立たせて元の所と向きへ戻す。「いいえ」なら二択を閉じたところで戻る（流れは <see cref="SeatVisit"/>）。
+    /// 戻り始めたところで椅子から立ち上がる音を鳴らす（<see cref="SceneFlow.PlayRise"/>）。
     ///
     /// 移す・読む・戻す間は、見回しと歩きを止める。移す・戻す間は調べる操作と字幕送りも止める
     /// （着く前に 2 ページ目へ送られて、映り込みが動いている途中で出ないように）。二択を出している間は止めない。
@@ -120,7 +121,10 @@ namespace HalfAware
         {
             Wake();
             if (visit == null || !visit.Busy || flow == null || flow.Player == null) return;
+            var was = visit.Now;
             visit.Tick(Time.deltaTime, flow.Talking, flow.Choosing, reflection != null && reflection.Level > 0f);
+            // 席から戻り始めたところで、椅子から立ち上がる音（オーナー、2026-09-29「椅子から立ち上がる際の音を追加」）
+            if (was == SeatVisit.Phase.Reading && visit.Now == SeatVisit.Phase.Leaving) flow.PlayRise();
             if (visit.Frozen(flow.Talking, flow.Choosing)) flow.Freeze(ConnectDirector.FreezeMargin);
             Place();
             if (!visit.Busy) Finish();

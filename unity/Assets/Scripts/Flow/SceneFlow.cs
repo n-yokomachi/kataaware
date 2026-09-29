@@ -70,8 +70,14 @@ namespace HalfAware
         [SerializeField] Transform chair;
         [Tooltip("椅子を押し下げる距離。椅子の後ろ向きに。メートル")]
         [SerializeField] float chairPushBack = 0.24f;
-        [Tooltip("座っている間、首を左右に振れる角度。度。片側の値。場面ごとに持つ（場面 1 は前方 140 度ほどの 70、ほかは HeadTurn.DefaultLimit の 90）")]
+        [Tooltip("座っている間、首を左右に振れる角度。度。片側の値。場面ごとに持つ（場面 1 は前方 120 度の 60、ほかは HeadTurn.DefaultLimit の 90）")]
         [SerializeField] float seatedHeadLimit = HeadTurn.DefaultLimit;
+
+        [Header("物音")]
+        [Tooltip("物音を鳴らす音源（2D。口元の Voice と同じもの）。無ければ鳴らさない")]
+        [SerializeField] AudioSource foley;
+        [Tooltip("椅子から立ち上がる音（ChairRise.wav）。standAfter で立ち上がり始めた時と、端末の席から戻り始めた時（TerminalSeat）に鳴らす")]
+        [SerializeField] AudioClip rise;
 
         [Header("目覚めの起き上がり")]
         [Tooltip("座位の目線からどれだけ下から始めるか。メートル")]
@@ -197,6 +203,7 @@ namespace HalfAware
             items = new List<IInteractable>(FindObjectsByType<Interactable>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID));
             if (items.Count == 0) Debug.LogWarning("SceneFlow: 調べる対象が 1 つも見つからない", this);
             progress = new SceneProgress(items);
+            WarmFoley();
             seatedSpot = player.transform.position;
             if (chair != null) chairSpot = chair.position;
             if (chairBlocker != null) chairBlocker.SetActive(false);
@@ -317,6 +324,8 @@ namespace HalfAware
                 var said = progress.Examine(selected);
                 subtitles.Enqueue(said);
                 ConsoleLog.Examined(selected.Label, said);
+                // 調べた物の音（紙をめくる音など）。前提が揃わず文だけ出た時は鳴らさない
+                if (ready) Play(Sound(selected));
                 if (ready && Examining != null) Examining(selected);
                 // 二択を持つ対象は、文を読み終えてから問う
                 asking = selected.Asks ? selected : null;
@@ -606,7 +615,10 @@ namespace HalfAware
         {
             if (standUp == null || standUp.Standing) return;
             if (wakeUp != null && !wakeUp.Done) return;   // 起き上がりが先
+            var rising = standUp.Rising;
             standUp.Tick(Time.deltaTime, progress.Done.Contains(standAfter), frozen);
+            // 腰を上げ始めたところで椅子の音。思い出して立った形に置いた時（Finish）は鳴らさない
+            if (!rising && (standUp.Rising || standUp.Standing)) PlayRise();
             player.EyeHeight = standUp.EyeHeight;
             player.CanMove = standUp.Standing;
             StepOffTheChair();
@@ -616,6 +628,37 @@ namespace HalfAware
             if (player.HeadYawLimit > 0f) player.ReleaseHead();
             // 椅子から離れきってから当たりを入れる。座ったまま入れると押し出される
             if (chairBlocker != null) chairBlocker.SetActive(true);
+        }
+
+        // ---- 物音 --------------------------------------------------------------
+
+        /// <summary>椅子から立ち上がる音を鳴らす。立ち上がり始めた時（standAfter）と、端末の席から戻り始めた時（<see cref="TerminalSeat"/>）</summary>
+        public void PlayRise()
+        {
+            Play(rise);
+        }
+
+        /// <summary>調べた時に鳴らす音。<see cref="Interactable"/> のほか（動作確認の偽物など）は持たない</summary>
+        static AudioClip Sound(IInteractable item)
+        {
+            var real = item as Interactable;
+            return real != null ? real.Sound : null;
+        }
+
+        void Play(AudioClip clip)
+        {
+            if (foley == null || clip == null) return;
+            foley.PlayOneShot(clip);
+        }
+
+        /// <summary>
+        /// Web: 物音はどれも先読みしない設定。場面の頭で展開を始めておく。
+        /// 鳴らす時に読み込むと、鳴り出しが展開の後へ延びる（<see cref="SoundLoad"/>）
+        /// </summary>
+        void WarmFoley()
+        {
+            SoundLoad.Warm(rise);
+            foreach (var item in items) SoundLoad.Warm(Sound(item));
         }
 
         /// <summary>

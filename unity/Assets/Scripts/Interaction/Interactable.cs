@@ -19,6 +19,8 @@ namespace HalfAware
         [SerializeField] bool once = true;
         [Tooltip("ここに挙げた id が済むまで選べない。文面に hint がある id については選べて、その文だけ出る")]
         [SerializeField] string[] after = new string[0];
+        [Tooltip("調べた時に鳴らす音。無ければ鳴らさない（場面 1 のクリップボードと場面 3 のメモは紙をめくる音）。SceneFlow の物音の音源で鳴らす")]
+        [SerializeField] AudioClip sound;
 
         public string Id => id;
         public Vector3 Position => transform.position;
@@ -28,6 +30,8 @@ namespace HalfAware
         public bool Required => required;
         public bool Once => once;
         public IReadOnlyList<string> After => after;
+        /// <summary>調べた時に鳴らす音。無ければ null</summary>
+        public AudioClip Sound => sound;
         /// <summary>文面が引けないときは id を出す。印が空欄になって気づけないのを避ける</summary>
         public string Label
         {

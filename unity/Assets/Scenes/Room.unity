@@ -5827,6 +5827,7 @@ MonoBehaviour:
   once: 1
   after:
   - cigarette
+  sound: {fileID: 0}
 --- !u!1 &93936747
 GameObject:
   m_ObjectHideFlags: 0
@@ -7533,6 +7534,7 @@ MonoBehaviour:
   once: 1
   after:
   - jacket
+  sound: {fileID: 8300000, guid: c6a42bc3b6b388b47bec7576e9982e51, type: 3}
 --- !u!1001 &264236336
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -9968,6 +9970,7 @@ MonoBehaviour:
   once: 1
   after:
   - jacket
+  sound: {fileID: 0}
 --- !u!1 &385806762
 GameObject:
   m_ObjectHideFlags: 0
@@ -16108,13 +16111,65 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 6237338181782253096, guid: 180c31635d1957449a2efa9dc44ff809, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 823349233}
+    - targetCorrespondingSourceObject: {fileID: 6237338181782253096, guid: 180c31635d1957449a2efa9dc44ff809, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 823349232}
   m_SourcePrefab: {fileID: 3150474306388093854, guid: 180c31635d1957449a2efa9dc44ff809, type: 3}
 --- !u!4 &823349230 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6426064313870612791, guid: 180c31635d1957449a2efa9dc44ff809, type: 3}
   m_PrefabInstance: {fileID: 823349229}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &823349231 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 6237338181782253096, guid: 180c31635d1957449a2efa9dc44ff809, type: 3}
+  m_PrefabInstance: {fileID: 823349229}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &823349232
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 823349231}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5517116b83bdc81438d9e7bd14799623, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: HalfAware::HalfAware.StepGround
+  clips:
+  - {fileID: 8300000, guid: 86d745a185c65714bb69a75b20e3b4fe, type: 3}
+  - {fileID: 8300000, guid: 187a4c6f89d02064c9b86ebf28ab0969, type: 3}
+  - {fileID: 8300000, guid: d2f2dbc585b60a84f86d480066474b3e, type: 3}
+  - {fileID: 8300000, guid: 1ba80b7b173838342ba74303d599e755, type: 3}
+  - {fileID: 8300000, guid: 0eff49ae22cf4d14d948b839131fb7ef, type: 3}
+  - {fileID: 8300000, guid: b3f1cbd99847cf840ba9c0aeff4b47d0, type: 3}
+  patches: []
+--- !u!65 &823349233
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 823349231}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.5699999, y: 0.005, z: 0.92}
+  m_Center: {x: -0.78499997, y: -0.005, z: -0.46}
 --- !u!1 &825913557
 GameObject:
   m_ObjectHideFlags: 0
@@ -16394,7 +16449,9 @@ MonoBehaviour:
   chairBlocker: {fileID: 588394904}
   chair: {fileID: 1424566611}
   chairPushBack: 0.24
-  seatedHeadLimit: 70
+  seatedHeadLimit: 60
+  foley: {fileID: 154678549}
+  rise: {fileID: 8300000, guid: 2a6b35b3340395c47b1a361acdf6eb5a, type: 3}
   wakeDrop: 0.18
   wakeStartPitch: -50
   wakeSeconds: 2.4
@@ -16434,7 +16491,7 @@ MonoBehaviour:
   breath: {fileID: 721313590}
   breathVolume: 0.5
   breathFadeSeconds: 1.2
-  breathSettle: 0.6
+  breathSettle: 0.4
   breathSettleSeconds: 1.5
   jackPull: {fileID: 375130542}
   jackId: jack
@@ -19502,6 +19559,7 @@ MonoBehaviour:
   once: 1
   after:
   - jacket
+  sound: {fileID: 0}
 --- !u!1 &1035002655
 GameObject:
   m_ObjectHideFlags: 0
@@ -19643,6 +19701,7 @@ MonoBehaviour:
   once: 1
   after:
   - jack
+  sound: {fileID: 0}
 --- !u!1 &1041806885
 GameObject:
   m_ObjectHideFlags: 0
@@ -20286,6 +20345,7 @@ MonoBehaviour:
   once: 1
   after:
   - cigarette
+  sound: {fileID: 0}
 --- !u!1 &1111285816
 GameObject:
   m_ObjectHideFlags: 0
@@ -24362,6 +24422,7 @@ MonoBehaviour:
   required: 1
   once: 1
   after: []
+  sound: {fileID: 0}
 --- !u!1 &1349251401
 GameObject:
   m_ObjectHideFlags: 0
@@ -37232,6 +37293,7 @@ MonoBehaviour:
   once: 1
   after:
   - cigarette
+  sound: {fileID: 0}
 --- !u!1 &1971938905
 GameObject:
   m_ObjectHideFlags: 0
@@ -38098,6 +38160,7 @@ MonoBehaviour:
   - jacket
   - chips
   - terminal
+  sound: {fileID: 0}
 --- !u!1 &2037114057
 GameObject:
   m_ObjectHideFlags: 0

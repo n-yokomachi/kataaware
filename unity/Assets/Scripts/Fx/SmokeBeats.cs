@@ -10,12 +10,14 @@ namespace HalfAware
     /// 点火したタイミングで、煙草に火が移った音を鳴らして」）。ジッポの音（<c>Zippo.wav</c>）は開く・点く・閉じるが一つに入っていて、
     /// 点いた瞬間（<see cref="StrikeInZippo"/>）から煙草に火が移った音（<c>CigaretteLit.wav</c>）を鳴らし、煙もそこから立ちはじめる。
     ///
-    /// **火を点けてから吸い始めるまでに、向き直す間（turn）を挟める。** 場面 1 は煙草を調べた向きのまま火を点け、
-    /// ジッポの音と火が移った音が鳴りきってから座り始めの向きへ戻してから吸う（<see cref="RoomIntroDirector"/>）。場面 5 は挟まない（0）
+    /// **火を点けてから吸い始めるまでに、向き直す間（turn）を挟める。** 場面 1 は煙草を調べた向きのまま、箱から一本取る音が鳴り終わった所で
+    /// ジッポを鳴らし（<see cref="LightAfterPack"/>。オーナー、2026-09-29「ジッポの音を、タバコを取った音の直後に再生に変更」）、
+    /// ジッポの音と火が移った音が鳴りきって、煙草を取った 1 ページも送ってから、座り始めの向きへ戻して吸う（<see cref="RoomIntroDirector"/>）。
+    /// 1 ページを読んでいる間は、向き直す手前で時刻表を止めておく（<see cref="Advance"/>）。場面 5 は挟まない（0）
     /// </summary>
     public static class SmokeBeats
     {
-        /// <summary>火を点け始めて（場面 1 は煙草を取った 1 ページを送って）から、ジッポを開け始めるまで</summary>
+        /// <summary>火を点け始めてから、ジッポを開け始めるまで。場面 1 は箱の音が鳴り終わる所がジッポの頭になるように点け始める</summary>
         public const float ZippoAt = 0.30f;
 
         /// <summary>
@@ -63,6 +65,29 @@ namespace HalfAware
 
         /// <summary>ジッポの音（閉じるまで）と火が移った音が、どちらも鳴りきった時刻。向き直す間を挟むなら、ここから向き直し始める</summary>
         public static float TurnAt { get { return Mathf.Max(ZippoAt + ZippoSeconds, LitAt + LitSeconds); } }
+
+        /// <summary>
+        /// 箱から一本取る音を鳴らしてから、火を点け始める（<see cref="Cigarette.Light"/>）までの秒。
+        /// 箱の音が鳴り終わった所でジッポの音が鳴り出す（packSeconds は箱の音の長さ）。箱の音が <see cref="ZippoAt"/> より短ければすぐ点け始める
+        /// </summary>
+        public static float LightAfterPack(float packSeconds)
+        {
+            return Mathf.Max(0f, packSeconds - ZippoAt);
+        }
+
+        /// <summary>
+        /// 火を点けてからの秒 elapsed を dt 秒進める。held の間は <see cref="TurnAt"/>（向き直す手前）で止める。
+        /// stalled は止めた秒（煙をその分だけ延ばす）。止めていなければ 0
+        /// </summary>
+        public static float Advance(float elapsed, float dt, bool held, out float stalled)
+        {
+            var next = elapsed + Mathf.Max(0f, dt);
+            stalled = 0f;
+            if (!held || next <= TurnAt) return next;
+            var at = Mathf.Max(elapsed, TurnAt);
+            stalled = next - at;
+            return at;
+        }
 
         /// <summary>向き直す間を挟まないときの、最初の一服の時刻</summary>
         public static float FirstDragAt { get { return TurnAt; } }

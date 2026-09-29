@@ -1,7 +1,7 @@
 # 音の出典
 
-出どころは 2 つ。チップとジャックは CC0 1.0（パブリックドメインの献呈）、
-足音と煙草の音（箱から一本取る・ジッポ・火が移る・吸う・吐く）と雨と扉ほかは Pixabay。
+出どころは 2 つ。チップとジャックと、場面 2 の買い手のヒールの足音（Freesound）は CC0 1.0（パブリックドメインの献呈）、
+足音と煙草の音（箱から一本取る・ジッポ・火が移る・吸う・吐く）と場面 1 の物音（椅子から立つ・紙をめくる）と雨と扉ほかは Pixabay。
 前のライターの二つの音（`LighterClick.wav`・`LighterFlame.wav`）は、ジッポの一本（`Zippo.wav`）に置き替えて素材ごと外した（2026-09-28）。
 村の既定の足音だった `Step1`〜`Step5`（Kenney RPG Audio、CC0 1.0）は、どこでも使わなくなったので素材ごと外した（2026-09-28）。
 
@@ -26,13 +26,17 @@ https://pixabay.com/service/license-summary/
 | `Concrete1`〜`Concrete4.wav` | Pixabay `freesound_community-concrete-footsteps-1-6265`（「concrete footsteps 1」。freesound_community。https://pixabay.com/sound-effects/film-special-effects-concrete-footsteps-1-6265/） | Pixabay Content License | 元は 7.58 秒、24kHz のステレオ mp3。硬い靴でコンクリートを歩いた録音から、一つの当たりで終わる一歩を四つ（0.287〜0.969 / 3.181〜3.669 / 4.127〜4.555 / 6.078〜6.420 秒。0.34〜0.68 秒）。14 歩のうちほかは、0.07〜0.16 秒後に二つ目の当たりがあるか、ほかより 12〜25dB 弱くて外した。左右を平均してモノラル 44.1kHz へ、50Hz より下を落とした。切り出しは、頭を一歩の立ち上がり（窓の実効値が頂点の 20dB 下を越える所）の 10ms ほど手前に、尻を次の一歩の立ち上がりの 15ms 手前（その前に擦りが来る物はその手前）に取り、余韻を残して尻 8ms だけなだらかに消した。大きさは一歩あたりの大きさ（0.5 秒おきに 10 回重ねて鳴らした物の integrated loudness。余韻が次の一歩に重なる分まで数える。0.5 秒に収まる音では前の測り方と同じ値）を −28.5 LUFS（前の村の既定の足音 `Step1`〜`Step5` の平均。いまは `tools/make-ambience.sh` の定数 `STEPS_TARGET_LUFS`）に、頂点 −1dB の天井を添えて揃えた。頂点 −1.8〜−4.9dB。前の `Concrete1`〜`4`（Kenney の `Step` から `tools/make-steps.py` で作り直した物）を置き替えた（`tools/make-ambience.sh steps`） |
 | `HardFloor1`〜`HardFloor7.wav` | Pixabay `oxidvideos-footsteps-on-hard-floor-356919`（「Footsteps on hard floor」。作者 OxidVideos。https://pixabay.com/sound-effects/film-special-effects-footsteps-on-hard-floor-356919/） | Pixabay Content License | 元は 13.80 秒、48kHz のステレオ mp3。硬い床を歩いた録音から一歩を七つ（0.229 / 1.391 / 3.215 / 4.484 / 7.012 / 10.674 / 11.290 秒から、次の一歩の手前まで。0.53〜0.63 秒）。二つ目の当たり・擦り・尾の物音のある一歩は外した。左右を平均してモノラル 44.1kHz へ、50Hz より下を落とした。切り出しと大きさは `Concrete` と同じ。頂点 −1.2〜−3.5dB（`tools/make-ambience.sh steps`） |
 | `Room1`〜`Room6.wav` | Pixabay `freesound_community-step_soundwav-14903`（「step_sound.wav」。freesound_community。https://pixabay.com/sound-effects/film-special-effects-step-soundwav-14903/） | Pixabay Content License | 元は 15.50 秒、24kHz のステレオ mp3（左右は同じ）。部屋の床を歩いた録音から一歩を六つ（1.656 / 4.117 / 8.111 / 9.245 / 11.001 / 11.524 秒から。0.52〜0.67 秒）。40Hz より下に −44dB の揺れがずっと乗っているので、100Hz より下を 24dB/oct で落とした。雑音の除去はしていないので、尾の床は頂点より 30〜40dB 下とほかの組より近い。切り出しと大きさは `Concrete` と同じ。頂点 −1.2〜−5.2dB（`tools/make-ambience.sh steps`） |
+| `Rug1`〜`Rug6.wav` | Pixabay `freesound_community-footsteps_1-30138`（「footsteps_1」。freesound_community） | Pixabay Content License | 元は 13.87 秒、24kHz のステレオ mp3（左右は同じ）。頭の 3 秒は無音で、その後に柔らかい床を 0.6 秒ほどの歩調で 17 歩。一歩ごとに 40Hz より下の大きな揺れ（足が床に着いた時の揺れと思われる。中身の帯より 30dB 上）が乗るので、70Hz より下を 24dB/oct で落とした。一歩を六つ（3.316 / 3.877 / 4.519 / 5.108 / 9.474 / 10.733 秒から。0.56〜0.65 秒）。擦れが引いた 0.17〜0.25 秒後に二つ目の当たりがある物、ほかより弱い物、頂点の前に擦りの続く物、尾に次の一歩の擦りが来る物は外した。切り出しと大きさは `Concrete` と同じ。元が小さく（一歩の頂点 −44.6〜−50.5dB）、+31.8〜+36.8dB 持ち上げた。頂点 −7.7〜−10.7dB。自室のラグの上（オーナー、2026-09-29「自室のラグの上を歩く時の音を変更」。`tools/make-ambience.sh steps`） |
 | `PackPull.wav` | Pixabay `freesound_community-cigarette-box-handling-shaking-dropping-59285`（「cigarette box handling shaking dropping」。freesound_community。https://pixabay.com/sound-effects/cigarette-box-handling-shaking-dropping-59285/ 。オーナーが 0〜2.434 秒で切り出したもの） | Pixabay Content License | 元は 133.51 秒、48kHz のモノラル mp3。0〜2.434 秒（頭はデジタルの無音、尻は次の物音の手前の静かな所）を 44.1kHz へ、尻 30ms をなだらかにした。低い揺れはほとんど無いので低域は落としていない。大きさは一番大きい 400ms の窓の大きさ（momentary の最大）を `Drag.wav` と同じ −30.6 LUFS に揃え（+6.2dB）、頂点 −7.8dB。場面 1 で煙草の箱から一本取る音（`tools/make-ambience.sh smoke`） |
-| `Zippo.wav` | Pixabay `fronbondi_skegs-foley-zippo-cigarette-lighter-open-and-close-sound-effects-235249`（「FOLEY - Zippo Cigarette Lighter Open and Close Sound Effects」。作者 Fronbondi_Skegs。https://pixabay.com/sound-effects/foley-zippo-cigarette-lighter-open-and-close-sound-effects-235249/ 。オーナーが 1.630〜5.321 秒で切り出したもの） | Pixabay Content License | 元は 18.74 秒、48kHz のモノラル mp3。1.630〜5.321 秒の 3.691 秒に、蓋を開ける金属音（0.35 秒）・フリントを擦って火が点く音（0.954 秒から 50ms ほどの雑音の塊）・蓋を閉じる音（2.43 秒と 2.55 秒の二段）が入っている。地に 40〜160Hz の揺れ（静かな所で −53dB）が乗っているので、250Hz より下を 24dB/oct で落とした（静かな所が −63.5dB に下がり、三つの音は削れない）。44.1kHz へ、頭 5ms と尻 20ms をなだらかにし、momentary の最大を −24.6 LUFS にした（−4.6dB。元の頂点は 0dB を越えていた）。ほかの煙草の音の揃え先（`Drag.wav` の −30.6 LUFS）より 6dB 大きい（オーナー、2026-09-29「ライターの音を大きく」。前は −30.6 LUFS・頂点 −10.1dB）。頂点 −4.1dB。**点火の時刻（0.954 秒）は `SmokeBeats.StrikeInZippo` が持つ。** 場面 1・5・8 のジッポ。前の `LighterClick.wav`（金属音だけ）と `LighterFlame.wav`（火の音だけ）をこの一本に置き替えた（`tools/make-ambience.sh smoke`） |
+| `Zippo.wav` | Pixabay `fronbondi_skegs-foley-zippo-cigarette-lighter-open-and-close-sound-effects-235249`（「FOLEY - Zippo Cigarette Lighter Open and Close Sound Effects」。作者 Fronbondi_Skegs。https://pixabay.com/sound-effects/foley-zippo-cigarette-lighter-open-and-close-sound-effects-235249/ 。オーナーが 1.630〜5.321 秒で切り出したもの） | Pixabay Content License | 元は 18.74 秒、48kHz のモノラル mp3。1.630〜5.321 秒の 3.691 秒に、蓋を開ける金属音（0.35 秒）・フリントを擦って火が点く音（0.954 秒から 50ms ほどの雑音の塊）・蓋を閉じる音（2.43 秒と 2.55 秒の二段）が入っている。地に 40〜160Hz の揺れ（静かな所で −53dB）が乗っているので、250Hz より下を 24dB/oct で落とした（静かな所が −63.5dB に下がり、三つの音は削れない）。44.1kHz へ、頭 5ms と尻 20ms をなだらかにした。**当たりの頭を 4 分の 1 に潰して胴を持ち上げ**（ffmpeg の acompressor。−30dB から上を比 4、アタック 0.3ms、リリース 60ms）、頂点が −1dB の天井に当たるまで上げた（momentary の最大 −17.1 LUFS。ほかの煙草の音の揃え先 `Drag.wav` の −30.6 LUFS より 13.5dB 上）。オーナー、2026-09-29「ライターの音を大きく」で一度 6dB 上げた（−24.6 LUFS）が、同日「ジッポの音自体まだ小さい」。中身が短い当たり三つと静かな間で、400ms の窓で揃えると当たりが薄まって数えられ、100ms の窓で比べると点火は箱の音より 7dB 小さかった。いまは 100ms の窓で、蓋を開ける音 −15.2・点火 −22.9・蓋を閉じる音 −20.3dB（箱の音の −27.9dB より 12.7・5.0・7.6dB 上）。**点火の時刻（0.954 秒）は `SmokeBeats.StrikeInZippo` が持つ。** 場面 1・5・8 のジッポ。前の `LighterClick.wav`（金属音だけ）と `LighterFlame.wav`（火の音だけ）をこの一本に置き替えた（`tools/make-ambience.sh smoke`） |
 | `CigaretteLit.wav` | Pixabay `freesound_community-cigarette-suck-107102`（「Cigarette suck」。freesound_community。https://pixabay.com/sound-effects/cigarette-suck-107102/ 。オーナーが 0〜3.142 秒で切り出したもの） | Pixabay Content License | 元は 3.53 秒、44.1kHz のモノラル mp3。40Hz より下に大きな揺れ（吸う息がマイクに当たった物と思われる。全体の実効値の大半）が乗り、中身（0.72 秒の口元の当たり、0.88〜1.84 秒の葉が燃える小さなはぜ、その後の細い尾）は 5〜20kHz にある。250Hz より下を 24dB/oct で落とした（頭の静かな所が −68.6dB に下がり、はぜは 0.3dB しか削れない）。頭 5ms と尻 50ms をなだらかにし、momentary の最大を −30.6 LUFS に揃えようとして頂点 −3dB の天井で止めた（+15.8dB、−31.5 LUFS）。聞こえ始めは頭から 0.72 秒。場面 1・5・8 で、ジッポが点いた瞬間から鳴らす「煙草に火が移った音」（`tools/make-ambience.sh smoke`） |
+| `ChairRise.wav` | Pixabay `freesound_community-couch-quick-rise-up-4_bip-35534`（「couch quick rise up 4_bip」。freesound_community。オーナーが 4.982〜7.730 秒で切り出したもの） | Pixabay Content License | 元は 13.70 秒、24kHz のステレオ mp3（左右は同じ）。ソファのクッションが沈みから戻って軋む音で、中身は 0.1〜0.9 秒の 80〜600Hz、その後は部屋の静かな所。低い揺れは無いので低域は落としていない。左右を平均してモノラル 44.1kHz へ、頭 5ms と尻 50ms をなだらかにし、momentary の最大を −26 LUFS に揃えた（+11.5dB）。頂点 −9.8dB。2.748 秒。自室の椅子から立ち上がる音（オーナー、2026-09-29「椅子から立ち上がる際の音を追加」。`tools/make-ambience.sh foley`） |
+| `PaperTurn.wav` | Pixabay `freesound_community-paper-turn-40077`（「paper turn」。freesound_community。オーナーが 4.043〜6.474 秒で切り出したもの） | Pixabay Content License | 元は 10.75 秒、24kHz のステレオ mp3（左右は同じ）。紙をめくる擦れと返る音（0.4〜1.2 秒の 1.2〜5kHz）に、紙か手がマイクに当たった低い揺れ（40〜80Hz）が乗るので、150Hz より下を 24dB/oct で落とした。左右を平均してモノラル 44.1kHz へ、頭 5ms と尻 50ms をなだらかにし、momentary の最大を −26 LUFS に揃えようとして頂点 −3dB の天井で止めた（+3.0dB、−26.8 LUFS）。2.431 秒。場面 1 のクリップボードのメモと場面 3 の同じメモを調べた時の音（オーナー、2026-09-29「メモにインタラクトしたときの紙の音を追加」。`tools/make-ambience.sh foley`） |
 | `Drag.wav` | Pixabay の `crackle`。作品名と作者は未記入 | Pixabay Content License | 前後の無音を落として頂点 −8dB |
 | `Blow.wav` | Pixabay の `blow`。作品名と作者は未記入 | Pixabay Content License | 同上 |
 | `ChipPull.wav` | OpenGameArt「Sound Effects Pack」（https://opengameart.org/content/sound-effects-pack）作者 OwlishMedia の `Technology/plugpull.wav` | CC0 1.0 | 0.02〜0.40 秒、頂点 −6dB |
 | `JackPull.wav` | 同上パックの `Technology/plugpull2.wav` | CC0 1.0 | 3.33 秒から 0.50 秒を切り出し、再生速度 0.85 倍で低く伸ばし、前後の無音を落として頂点 −6dB |
+| `Heels1`〜`Heels6.wav` | Freesound「Footsteps heels pavement denoised」（作者 YannSauvin。https://freesound.org/people/YannSauvin/sounds/778103/ 。落としたのは試聴用の mp3 の高い方で、元の wav は落とすのに会員の登録が要る） | CC0 1.0 | 元は 52.5 秒、48kHz のモノラル mp3（188kbps）。ヒールで舗道を 0.545 秒ほどの歩調で歩いた録音で、雑音は除いてある。踵の鋭い当たりに 72〜80ms 後の爪先の当たりが続く一歩を六つ（2.964〜3.505 / 3.510〜4.048 / 4.053〜4.593 / 4.598〜5.134 / 5.685〜6.227 / 6.232〜6.758 秒。0.53〜0.54 秒）。尾に物音が混じる歩と、7.85 秒から後（歩調が乱れる）は外した。44.1kHz へ、50Hz より下を落とし、切り出しと大きさは足音の組と同じ決まり（一歩あたり −28.5 LUFS、頂点 −1dB の天井。頂点 −1.1〜−3.2dB）。場面 2 の売り買いで、買い手 C（女）が卓の向こうへ歩いてくる足音（`tools/make-ambience.sh heels`）。男の買い手は `Concrete1`〜`4` |
 | `JackPlug.wav` | Pixabay `freesound_community-headphones-jack-plugged-in-97328` | Pixabay Content License | 0.58〜1.10 秒を切り出し、再生速度 0.85 倍で低く伸ばし（`JackPull` と同じ扱いにして、抜くのと挿すので音の質を揃えた）、前後の無音を落として頂点 −6dB。モノラル 44.1kHz、0.22 秒 |
 | `RainLoop.wav` | Pixabay `dragon-studio-copyright-free-rain-sounds-331497` | Pixabay Content License | 60 秒地点から 24 秒を切り出し、モノラル 22.05kHz へ。末尾 1.5 秒を頭に重ねて輪にし、実効値を −22dBFS に揃えた |
 | `DoorShut.wav` | Pixabay `dragon-studio-open-and-close-door-405453` | Pixabay Content License | モノラル 44.1kHz へ、頭から 2.15 秒を切り出して末尾 0.1 秒を落とし、頂点を −3dB に揃えた。開けると閉めるが 1 つに入っている（開ける 〜0.5 秒、間 〜1.0 秒、閉まる 1.45〜1.65 秒） |
@@ -114,6 +118,7 @@ https://pixabay.com/service/license-summary/
   次の一歩を鳴らすと前の余韻の高さも替わる。そのときの余韻は床の空気だけで、頂点（5ms 窓の実効値）より 28〜50dB 下。自室の組が 28〜38dB でいちばん近い）
 - 自室（場面 1・3・5・7）は `Room1`〜`Room6`、場面 2（通り・小道・ヤード）は `Concrete1`〜`Concrete4`、場面 8（共用ガレージ）は `HardFloor1`〜`HardFloor7`
   （オーナーの指定、2026-09-28。組の表は `StepSets`、差し替えは `HalfAware/Put the footsteps in the scene`）。
+  自室のラグの上は `Rug1`〜`Rug6`（2026-09-29）。ラグ（Room/Rug）自身に当たりと `StepGround` を付けてあり、ラグを動かせば一緒に動く（`HalfAware/Put the foley in the room`）
   ガレージと小道の反響は素材に焼かず、足元の `AudioReverbFilter` に持たせる
 - 場面 4（潜る）は場所ごとに既定の組を替え（`DiveDirector` の placeSteps。`BuildDive.PlaceStepPaths`）、一つの場所で床の違う所は床の当たりの `StepGround` で分ける。
   公営住宅は `Concrete`（外階段・踊り場・デッキ・地面の小径）で、住戸の絨毯は `Room`、台所と浴室の陶板は `HardFloor`。公園は `Grass`（芝）で、小径と門の外の歩道は `Concrete`。
@@ -168,7 +173,11 @@ WebGL 書き出しなので、走行の輪と雨とエンジンは取り込み�
 - 雨は `RainLoop`。プレイヤーの頭上で輪にして流し、`RainCover` が屋根の下で音量を 35% まで絞る
 - インプラントジャックを抜く音は `JackPull`。`PullTimeline` の引き抜く段の頭で 1 度だけ鳴らす。チップを抜く音と同じパックから採ったが、低く伸ばして生々しさを足してある
 - 扉は `DoorShut`。自室を出るときに 1 度だけ鳴らし、1.75 秒おいてから暗転へ移る
-- ライターと息は `Cigarette`。`SmokeBeats` の時刻表に沿って、蓋 → 火 → 吸う → 吐く、の順に鳴らす
+- ライターと息は `Cigarette`。`SmokeBeats` の時刻表に沿って、蓋 → 火 → 吸う → 吐く、の順に鳴らす。
+  場面 1 は、箱から一本取る音（`PackPull`）が鳴り終わった所でジッポを鳴らす（煙草を取った 1 ページを読んでいる途中でも待たない）
+- 椅子から立ち上がる音は `ChairRise`。`SceneFlow` の物音の音源（口元の Voice）で、自室の椅子から立ち上がり始めた時に鳴らす。
+  場面 1 はジャケットを着た後の独白を読み終えて立つ時と、端末の席から戻り始めた時（`TerminalSeat`）、場面 7 はジャックの後に立つ時
+- 紙をめくる音は `PaperTurn`。場面 1 のクリップボードのメモと場面 3 の同じメモを調べた時に、同じ音源で鳴らす（`Interactable` の sound）
 - 吐く息の頭で `SmokePuffs.Blow()` を呼び、煙をひと息ぶん足す。音と煙は同じ時刻表から出るのでずれない
 
 ## 足音の差し替え（2026-09-28）
@@ -197,7 +206,8 @@ WebGL 書き出しなので、走行の輪と雨とエンジンは取り込み�
 ## 音量
 
 効果音は AudioSource 側で絞ってある。口元 0.40、足元 0.28。素材そのものは頂点を揃えたまま置く。
-煙草の三つ（`PackPull`・`Zippo`・`CigaretteLit`）は、頂点ではなく一番大きい 400ms の窓の大きさ（momentary の最大）を `Drag.wav`（−30.6 LUFS。前の `LighterFlame.wav` も −30.3 で並んでいた）に揃えてある。ジッポだけはそこから 6dB 上げた（−24.6 LUFS。2026-09-29）。
+煙草の三つ（`PackPull`・`Zippo`・`CigaretteLit`）は、頂点ではなく一番大きい 400ms の窓の大きさ（momentary の最大）を `Drag.wav`（−30.6 LUFS。前の `LighterFlame.wav` も −30.3 で並んでいた）に揃えてある。ジッポだけは当たりを潰してから頂点 −1dB まで上げた（−17.1 LUFS。2026-09-29。6dB 上げただけではまだ小さかった）。
+場面 1 の物音の二つ（`ChairRise`・`PaperTurn`）は、同じ測り方で −26 LUFS（箱の音より 4.6dB 上。紙は頂点 −3dB の天井で止まって −26.8）。
 ジッポは鋭い金属音で頂点が高く出るので、頂点で揃えると一段小さく聞こえる。`Blow.wav`（吐く息）は −20.1 LUFS で一段大きい。
 足音だけは頂点ではなく一歩あたりの大きさ（−28.5 LUFS）で揃えてある（組と組を替えても同じ大きさに聞こえるように）。
 

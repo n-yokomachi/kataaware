@@ -13,6 +13,8 @@ namespace HalfAware.EditorTools
     /// <item><term><see cref="HardFloor"/></term><description>場面 8 の共用ガレージ。場面 4 の電車・教室、台所の家の台所と廊下と玄関、公営住宅の台所と浴室の床</description></item>
     /// <item><term><see cref="Concrete"/></term><description>場面 2 の通り・小路・ヤード。場面 4 の公営住宅の外階段とデッキ、公園の小径と門の外の歩道。村の庭の煉瓦の小路とテラス（村は BuildVillageSound が持つ）</description></item>
     /// <item><term><see cref="Room"/></term><description>自室（場面 1・3・5・7）。場面 4 の公営住宅の部屋の中、台所の家の居間と階段</description></item>
+    /// <item><term><see cref="Rug"/></term><description>自室（場面 1・3・5・7）のラグの上（オーナー、2026-09-29「自室のラグの上を歩く時の音を変更」）。
+    /// ラグに付けた当たりの <see cref="StepGround"/> が持つ（<see cref="PlaceRoomFoley"/>）</description></item>
     /// <item><term><see cref="Grass"/></term><description>場面 4 の公園の芝（村の芝と同じ組）</description></item>
     /// </list>
     /// 村の未舗装の道の Gravel1〜6 は村（BuildVillageSound）だけが使う。
@@ -26,6 +28,8 @@ namespace HalfAware.EditorTools
         public static readonly string[] Concrete = Paths("Concrete", 4);
         /// <summary>自室の床（Pixabay「step_sound.wav」、freesound_community）</summary>
         public static readonly string[] Room = Paths("Room", 6);
+        /// <summary>自室のラグ（Pixabay「footsteps_1」、freesound_community）</summary>
+        public static readonly string[] Rug = Paths("Rug", 6);
         /// <summary>芝（Pixabay「Walking through grass」、freesound_community）</summary>
         public static readonly string[] Grass = Paths("Grass", 6);
 

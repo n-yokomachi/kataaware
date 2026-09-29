@@ -7,6 +7,7 @@ namespace HalfAware
     /// 一本吸い終わるまでの音と煙。SmokeBeats の時刻表どおりに、
     /// ジッポ（開く・点く・閉じる）→ 点いた瞬間に煙草に火が移った音 → 吸う息 → 吐く息、を決めた回数だけ並べる。
     /// ジッポの音と火が移った音が鳴りきってから最初の吸う息までには、向き直す間（turn）を挟める（場面 1）。
+    /// 場面 1 は火を点けたまま、向き直す手前で時刻表を止めておける（hold。煙草を取った 1 ページを送るまで。<see cref="Release"/> で進める）。
     /// 煙は火が点いたところから立ちはじめ、吐く息に合わせてひと吹き足す。
     /// 場面 1・5・8 が同じ仕組みを使う（同じ主人公の同じジッポ）
     /// </summary>
@@ -31,6 +32,8 @@ namespace HalfAware
         int nextBlow;
         bool opened;
         bool caught;
+        /// <summary>向き直す手前で時刻表を止めておくか</summary>
+        bool held;
 
         /// <summary>吐き始めるたびに知らせる。何服目かを渡す。0 から数える</summary>
         public event Action<int> Blew;
@@ -44,6 +47,9 @@ namespace HalfAware
         /// <summary>火を点けてからの秒。吸っていなければ -1。動作確認から読む</summary>
         public float Elapsed { get { return elapsed; } }
 
+        /// <summary>向き直す手前で時刻表を止めているか（止める所に届いていなくても、止める約束なら true）。動作確認から読む</summary>
+        public bool Held { get { return held; } }
+
         void Awake()
         {
             // Web: どの音も先読みしない設定。展開を始めておく。
@@ -51,11 +57,15 @@ namespace HalfAware
             SoundLoad.Warm(zippo, lit, drag, blow);
         }
 
-        /// <summary>火を点ける。drags 服ぶん吸う。turn はジッポの音と火が移った音が鳴りきってから吸い始めるまでに挟む、向き直す間（秒）</summary>
-        public void Light(int drags, float turn = 0f)
+        /// <summary>
+        /// 火を点ける。drags 服ぶん吸う。turn はジッポの音と火が移った音が鳴りきってから吸い始めるまでに挟む、向き直す間（秒）。
+        /// hold なら、向き直す手前（<see cref="SmokeBeats.TurnAt"/>）で時刻表を止め、<see cref="Release"/> を待つ
+        /// </summary>
+        public void Light(int drags, float turn = 0f, bool hold = false)
         {
             this.drags = Mathf.Max(0, drags);
             this.turn = Mathf.Max(0f, turn);
+            held = hold;
             elapsed = 0f;
             nextDrag = 0;
             nextBlow = 0;
@@ -63,17 +73,27 @@ namespace HalfAware
             caught = false;
         }
 
+        /// <summary>向き直す手前で止めていた時刻表を進める。止める所に届く前に呼べば、止めずに進む</summary>
+        public void Release()
+        {
+            held = false;
+        }
+
         /// <summary>途中で止める</summary>
         public void Stop()
         {
             elapsed = -1f;
+            held = false;
             if (puffs != null) puffs.Cancel();
         }
 
         void Update()
         {
             if (elapsed < 0f) return;
-            elapsed += Time.deltaTime;
+            float stalled;
+            elapsed = SmokeBeats.Advance(elapsed, Time.deltaTime, held, out stalled);
+            // 止めた分だけ煙を延ばす。吸い終わる所で煙も尽きるように
+            if (stalled > 0f && puffs != null) puffs.Extend(stalled);
             if (!opened && elapsed >= SmokeBeats.ZippoAt)
             {
                 opened = true;

@@ -13,7 +13,7 @@ namespace HalfAware.EditorTools
     /// - 一服の暗転は一度だけにし、カードを出す秒は前の 1.95 秒の 1.5 倍。カードの文は原稿から写す（<see cref="RoomScenario"/>）
     /// - 煙草の音を繋ぐ（オーナー、2026-09-28）。箱から一本取る音（<c>PackPull.wav</c>）を <see cref="RoomIntroDirector"/> へ、
     ///   ジッポ（<c>Zippo.wav</c>）と煙草に火が移った音（<c>CigaretteLit.wav</c>）を <see cref="Cigarette"/> へ
-    /// - 座っている間の首の限りを 70 度にする（前方 140 度ほど。<see cref="SceneFlow"/> の seatedHeadLimit。ほかの場面は 90 度のまま）
+    /// - 座っている間の首の限りを 60 度にする（前方 120 度。<see cref="SceneFlow"/> の seatedHeadLimit。ほかの場面は 90 度のまま）
     ///
     /// 呼吸の大きさと瞬きの秒は Inspector で詰めるので、前に置いた物があれば書き戻さない（音源の大きさは RoomIntroDirector が鳴らす時に当てる）。
     /// 保存の前に、場面の中の物の一覧（<see cref="PlaceProtagonist.Snapshot"/>）を置く前と比べ、Player/Breath のほかに差が無いことを確かめてから保存する
@@ -33,8 +33,12 @@ namespace HalfAware.EditorTools
         /// <summary>カードを出す秒。前の 1.95 秒の 1.5 倍（オーナー「その暗転表示も今の1.5倍に延長」）</summary>
         public const float HoldSeconds = 1.95f * 1.5f;
 
-        /// <summary>座っている間の首の限り。片側。前方 140 度ほど（オーナー「カメラの回転画角を前方140度くらいにして」）</summary>
-        public const float SeatedHeadLimit = 70f;
+        /// <summary>
+        /// 座っている間の首の限り。片側。前方 120 度（オーナー、2026-09-29「カメラの回転可能範囲を前方120度に」。
+        /// 前は「カメラの回転画角を前方140度くらいにして」の 70 度）。この限りでも、右の卓のジャケットと左の卓の煙草・箱・灰皿は
+        /// 首を振り切れば狙える（2026-09-29 に確かめた。ジャケットは首を右へ振り切って視線から 26 度、選べる角度 40 度の内）
+        /// </summary>
+        public const float SeatedHeadLimit = 60f;
 
         [MenuItem("HalfAware/Put the opening in the room", false, 209)]
         public static void Menu()

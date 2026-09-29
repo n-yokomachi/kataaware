@@ -35,6 +35,13 @@ namespace HalfAware
             puffs.Play();
         }
 
+        /// <summary>立てている煙を seconds 秒だけ長くする。時刻表を止めている間（場面 1 の 1 ページを読んでいる間）に呼ぶ</summary>
+        public void Extend(float seconds)
+        {
+            if (until < 0f || seconds <= 0f) return;
+            until += seconds;
+        }
+
         /// <summary>
         /// ひと息ぶんを吐き出す。細く燻る煙とは別に、前へ向けて大きな塊をまとめて出す
         /// </summary>

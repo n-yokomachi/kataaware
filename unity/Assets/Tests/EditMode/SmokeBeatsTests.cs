@@ -56,6 +56,64 @@ namespace HalfAware.Tests
             Assert.That(SmokeBeats.StrikeInZippo, Is.GreaterThan(0.5f).And.LessThan(2.4f));
         }
 
+        // ---- 箱の音の直後にジッポ（オーナー、2026-09-29） ----------------------------------
+
+        [Test]
+        public void TheZippoStartsTheMomentThePackSoundEnds()
+        {
+            // 「ジッポの音を、タバコを取った音の直後に再生に変更」。箱の音の頭から数えて、ジッポの頭は箱の音の尻に来る
+            var pack = 2.434f;
+            Assert.AreEqual(pack, SmokeBeats.LightAfterPack(pack) + SmokeBeats.ZippoAt, 1e-4f);
+        }
+
+        [Test]
+        public void AShortPackSoundLightsAtOnce()
+        {
+            Assert.AreEqual(0f, SmokeBeats.LightAfterPack(0.1f), 1e-4f);
+            Assert.AreEqual(0f, SmokeBeats.LightAfterPack(0f), 1e-4f);
+        }
+
+        [TestCase("Assets/Audio/PackPull.wav")]
+        public void ThePackSoundIsLongerThanTheLeadIn(string path)
+        {
+            // 箱の音が ZippoAt より短いと、ジッポが箱の音の尻より遅れる
+            var clip = AssetDatabase.LoadAssetAtPath<UnityEngine.AudioClip>(path);
+            Assert.That(clip, Is.Not.Null, path);
+            Assert.Greater(clip.length, SmokeBeats.ZippoAt, path);
+        }
+
+        [Test]
+        public void HeldTheTimetableWaitsBeforeTheTurn()
+        {
+            // 1 ページを読んでいる間は、向き直す手前で止める。止めた分は煙を延ばす
+            float stalled;
+            var t = SmokeBeats.Advance(SmokeBeats.TurnAt - 0.1f, 0.3f, true, out stalled);
+            Assert.AreEqual(SmokeBeats.TurnAt, t, 1e-4f);
+            Assert.AreEqual(0.2f, stalled, 1e-4f);
+            t = SmokeBeats.Advance(t, 0.5f, true, out stalled);
+            Assert.AreEqual(SmokeBeats.TurnAt, t, 1e-4f, "止めたまま");
+            Assert.AreEqual(0.5f, stalled, 1e-4f);
+        }
+
+        [Test]
+        public void HeldTheSoundsStillPlayUpToTheTurn()
+        {
+            // 止めるのは向き直す手前だけ。ジッポも火が移った音も、読んでいる間に鳴る
+            float stalled;
+            var t = SmokeBeats.Advance(0f, SmokeBeats.LitAt + 0.01f, true, out stalled);
+            Assert.AreEqual(SmokeBeats.LitAt + 0.01f, t, 1e-4f);
+            Assert.AreEqual(0f, stalled, 1e-4f);
+        }
+
+        [Test]
+        public void ReleasedTheTimetableRunsOn()
+        {
+            float stalled;
+            var t = SmokeBeats.Advance(SmokeBeats.TurnAt, 0.25f, false, out stalled);
+            Assert.AreEqual(SmokeBeats.TurnAt + 0.25f, t, 1e-4f);
+            Assert.AreEqual(0f, stalled, 1e-4f);
+        }
+
         // ---- 吸う・吐く ----------------------------------------------------------
 
         [Test]
