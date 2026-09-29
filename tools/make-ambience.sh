@@ -1119,6 +1119,7 @@ fi   # PART=all か breath
 #      （頭の静かな所 −68.6dB、はぜは 0.3dB しか削れない）。聞こえ始めは頭から 0.72 秒
 #    大きさは三つとも、一番大きい 400ms の窓の大きさ（momentary の最大）を Drag.wav（−30.6 LUFS。吸う息。はぜの音で、
 #    前の LighterFlame.wav も −30.3 で並んでいた）に揃え、頂点 −3dB の天井を添えた。Blow.wav（吐く息）は −20.1 で一段大きい。
+#    ただしジッポだけは、そこから 6dB 上げる（オーナー、2026-09-29「ライターの音を大きく」）。−24.6 LUFS、頂点は −4dB ほどで天井に当たらない。
 #    44.1kHz のモノラル、頭 5ms と尻 20〜50ms をなだらかにした
 # ---------------------------------------------------------------------------
 if [ "$PART" = "all" ] || [ "$PART" = "smoke" ]; then
@@ -1126,6 +1127,8 @@ if [ "$PART" = "all" ] || [ "$PART" = "smoke" ]; then
 echo "=== PackPull.wav / Zippo.wav / CigaretteLit.wav ==="
 SMOKE_TARGET_M=-30.6
 SMOKE_CEIL=-3
+# ジッポだけ上げる分（dB）。頂点が −1dB を越えないこと（越えるなら天井 SMOKE_CEIL で止まる）
+ZIPPO_RAISE=6
 
 # 一番大きい momentary（400ms の窓）の大きさ。後ろに 1 秒の無音を足して、尻の窓まで数える
 momentary_max () {
@@ -1137,8 +1140,9 @@ peak_db () {
 }
 
 # $1 名前  $2 元  $3 頭（秒）  $4 尻（秒）  $5 低域を落とすフィルター（空なら落とさない）  $6 尻をなだらかにする秒
+# $7 揃える大きさから上げる分（dB。無ければ 0）
 smoke_cut () {
-  local name="$1" src="$2" s="$3" e="$4" lo="$5" tail="$6" len fo m pk gain out
+  local name="$1" src="$2" s="$3" e="$4" lo="$5" tail="$6" raise="${7:-0}" len fo m pk gain out
   len=$(awk "BEGIN{printf \"%.3f\", $e-$s}")
   fo=$(awk "BEGIN{printf \"%.3f\", $len-$tail}")
   # 丸ごと 44.1kHz に直してから切る（mp3 の頭で探すより、切り口が標本の単位で決まる）
@@ -1147,7 +1151,7 @@ smoke_cut () {
     -ac 1 -c:a pcm_f32le "$TMP_DIR/${name}_cut.wav"
   m=$(momentary_max "$TMP_DIR/${name}_cut.wav")
   pk=$(peak_db "$TMP_DIR/${name}_cut.wav")
-  gain=$(awk "BEGIN{g=$SMOKE_TARGET_M - ($m); c=$SMOKE_CEIL - ($pk); printf \"%.2f\", (g < c ? g : c)}")
+  gain=$(awk "BEGIN{g=$SMOKE_TARGET_M + ($raise) - ($m); c=$SMOKE_CEIL - ($pk); printf \"%.2f\", (g < c ? g : c)}")
   out="$OUT_DIR/${name}.wav"
   ffmpeg -y -v error -i "$TMP_DIR/${name}_cut.wav" -af "volume=${gain}dB" -ar 44100 -ac 1 -c:a pcm_s16le "$out"
   printf "  %-13s %6.3f〜%6.3f 秒  %s 秒  momentary 最大 %6s LUFS / 頂点 %6.1f dB → %+6.2f dB → %6s LUFS / 頂点 %6.1f dB\n" \
@@ -1163,7 +1167,7 @@ smoke_cut () {
 
 LOW_CUT="highpass=f=250:poles=2,highpass=f=250:poles=2"
 smoke_cut PackPull     "$SRC_PACK"  0     2.434 ""          0.030
-smoke_cut Zippo        "$SRC_ZIPPO" 1.630 5.321 "$LOW_CUT"  0.020
+smoke_cut Zippo        "$SRC_ZIPPO" 1.630 5.321 "$LOW_CUT"  0.020 "$ZIPPO_RAISE"
 smoke_cut CigaretteLit "$SRC_LIT"   0     3.142 "$LOW_CUT"  0.050
 
 # 点火の時刻: 蓋を開ける音が引いた後（0.6 秒から）で、4ms の窓の実効値が初めて −45dB を越える所（静かな所は −63dB）。

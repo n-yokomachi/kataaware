@@ -343,14 +343,15 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// 字幕の地の下の余白。字の枠（最後の行の下の端の線）から地の下の縁まで。粗い画面の 26 画素（Dot）。
-        /// 前は 14 Dot（最後の行の字の下から地の下の縁までが目で 19 Dot ほど）。オーナーの「下側の余白はもうちょっと」で、
-        /// 最後の行の字の下から地の下の縁まで 30 Dot ほど（前の 1.6 倍）にした（2026-09-29）
+        /// 字幕の地の下の余白。字の枠（最後の行の下の端の線）から地の下の縁まで。粗い画面の 17 画素（Dot）。
+        /// 最後の行の字の下から地の下の縁まで 19 Dot ほど。
+        /// 2026-09-29 にオーナーの「下側の余白はもうちょっと」で 14 Dot から 26 Dot（字の下から 30 Dot ほど）に広げた後、
+        /// 「字幕の下側の余白を今の2/3に」で 17 Dot に詰めた
         /// </summary>
-        public const float SubtitleBottom = 26f * ChoiceLayout.Dot;
+        public const float SubtitleBottom = 17f * ChoiceLayout.Dot;
 
         /// <summary>送りの印の箱の下の縁を、地の下の縁からどれだけ上に置くか。印の字が下の余白の中ほどに来て、最後の行の字にかからない</summary>
-        public const float HintBottom = 7f * ChoiceLayout.Dot;
+        public const float HintBottom = 2f * ChoiceLayout.Dot;
 
         /// <summary>
         /// 地のふだんの色を覚える。**組み立てた色をそのまま正とする。**

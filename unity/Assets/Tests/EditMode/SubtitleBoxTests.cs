@@ -68,7 +68,9 @@ namespace HalfAware.Tests
         public void TheLinePitchAlwaysMakesRoomForARuby()
         {
             // 行の送りは、ルビの有る無しにかかわらず、下の行のルビが上の行の字にかからない間
-            Assert.AreEqual(Ruby.Advance + Ruby.ExtraLineSpacing * 0.01f + SubtitleBox.RubyClear, SubtitleBox.LineEm, 1e-4f);
+            // オーナーの「行間はもう少し空けて」で 2.0 em（台詞の字で 26 Dot）
+            Assert.AreEqual(2.0f, SubtitleBox.LineEm, 1e-4f);
+            Assert.That(SubtitleBox.LineEm, Is.GreaterThanOrEqualTo(Ruby.Advance + Ruby.ExtraLineSpacing * 0.01f), "ルビのための行間を含む");
             var rubyTop = Ruby.Lift + Ruby.RubyTop * Ruby.Scale;
             Assert.That(SubtitleBox.LineEm - rubyTop, Is.GreaterThanOrEqualTo(Ruby.BaseBottom + 0.05f));
             // ルビの上の隙間（上の行の字の下の端まで）は、下の隙間（親字の上の端まで）より広い。ルビが上の行に付いて見えない
@@ -88,8 +90,8 @@ namespace HalfAware.Tests
         [Test]
         public void TheBodyGrowsByTheSamePitchEveryLine()
         {
-            // TMP で 3 行を組んで測った高さ 5.582 em（1 行目 1.80 ＋ 1.745 × 2 ＋ 下の線 0.288）に、ルビの上の隙間 0.1 em × 2
-            Assert.AreEqual(5.582f + SubtitleBox.RubyClear * 2f, SubtitleBox.BodyEm(3), 0.005f);
+            // TMP で 3 行を組んで測った高さ（行の送り 1.745 em で 5.582 em ＝ 1 行目 1.80 ＋ 1.745 × 2 ＋ 下の線 0.288）と同じ式で、送りを 2.0 em にした 6.092 em
+            Assert.AreEqual(1.804f + 2.0f * 2f + 0.288f, SubtitleBox.BodyEm(3), 0.005f);
             for (var rows = 2; rows < SubtitleBox.MaxRows; rows++)
                 Assert.AreEqual(SubtitleBox.LineEm, SubtitleBox.BodyEm(rows + 1) - SubtitleBox.BodyEm(rows), 1e-4f);
         }
@@ -98,7 +100,7 @@ namespace HalfAware.Tests
         public void TheFrameFixesTheLineHeightAndReservesTheRuby()
         {
             var made = SubtitleBox.Frame("一行目\n二行目");
-            StringAssert.StartsWith("<line-height=1.845em>", made);
+            StringAssert.StartsWith("<line-height=2em>", made);
             StringAssert.Contains(SubtitleBox.Headroom, made);
             StringAssert.EndsWith("一行目\n二行目", made);
             Assert.AreEqual(null, SubtitleBox.Frame(null));

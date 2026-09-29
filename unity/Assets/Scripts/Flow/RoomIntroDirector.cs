@@ -9,8 +9,9 @@ namespace HalfAware
     ///
     /// **冒頭**（オーナー、2026-09-28）: 黒のまま呼吸の輪を鳴らし（5 秒ほど）、ゆっくり瞬くように明ける（<see cref="WakeBlink"/>）。
     /// 明けきってから SceneFlow の起き上がり（椅子に背を預けて天井を見ていた姿勢から座位へ）を始めさせ（<see cref="SceneFlow.OpeningHeld"/>）、
-    /// 起き上がり終えてから最初の独白を流す。暗いうちと瞬きの間は天井を見た形のまま。
-    /// 呼吸はジャックが手首から抜けたところで、短く薄れさせて止める（ブツッと切らない）。
+    /// 起き上がり終えたら呼吸を少し小さくし（breathSettle まで breathSettleSeconds 秒で。オーナー、2026-09-29「最初の呼吸音について、体を起こしたら台詞の前にフェードして少し小さくして」）、
+    /// 下げきってから最初の独白を流す。暗いうちと瞬きの間は天井を見た形のまま。
+    /// 呼吸はジャックが手首から抜けたところで、短く薄れさせて止める（ブツッと切らない。下げた大きさから breathFadeSeconds 秒で消える）。
     ///
     /// **煙草**（オーナー、2026-09-28）: 調べたら（SceneFlow が目を煙草へ向ける）、箱から一本取る音を鳴らし、同時に SceneFlow が
     /// 原稿の 1 ページ（煙草を取った時の文、RoomScript の cigarette）を出す。読み終えて送り、箱の音も鳴り終わっていたら、その向きのまま
@@ -25,7 +26,7 @@ namespace HalfAware
     /// **文面（最初の独白・カード・着た後の独白）は台詞の原稿 docs/scenario/01-room.md から写す**（<c>HalfAware/Apply the scenario (room)</c>）。
     /// ここの既定の値は空にしてあり、文面を二か所で持たない。
     ///
-    /// **思い出した時**（<see cref="ISceneMemory"/>）は、黒と瞬きと最初の独白を出さず、ジャックがまだなら呼吸を鳴らしておく。
+    /// **思い出した時**（<see cref="ISceneMemory"/>）は、黒と瞬きと最初の独白を出さず、ジャックがまだなら呼吸を下げた大きさで鳴らしておく（残すのはいつも起き上がりの後）。
     /// ジャケットを着た後なら着た形に置く。煙草は場に残る物が無いので、調べ済みの印だけでよい
     /// </summary>
     public sealed class RoomIntroDirector : MonoBehaviour, ISceneMemory
@@ -40,6 +41,10 @@ namespace HalfAware
         [SerializeField, Range(0f, 1f)] float breathVolume = 0.5f;
         [Tooltip("ジャックが手首から抜けてから、呼吸が消えきるまでの秒")]
         [SerializeField] float breathFadeSeconds = 1.2f;
+        [Tooltip("起き上がり終えてから最初の独白の前に、呼吸を下げる先。breathVolume に対する割合（仮置き。オーナーが聴いて決める）")]
+        [SerializeField, Range(0f, 1f)] float breathSettle = 0.6f;
+        [Tooltip("起き上がり終えてから、呼吸を下げきるまでの秒。下げきってから最初の独白を出す（仮置き）")]
+        [SerializeField] float breathSettleSeconds = 1.5f;
         [Tooltip("ジャックを抜くしぐさ。抜けたところで呼吸を止める。無ければジャックを調べたところで止める")]
         [SerializeField] JackPull jackPull;
         [Tooltip("この id を調べ済みなら、思い出した時に呼吸を鳴らさない")]
@@ -111,6 +116,10 @@ namespace HalfAware
         bool dressing;
         bool breathing;
         bool fading;
+        /// <summary>起き上がりの後、呼吸を下げている途中か</summary>
+        bool settling;
+        /// <summary>ジャックが抜けて薄れ始めた時の呼吸の大きさ。ここから breathFadeSeconds 秒で 0 にする</summary>
+        float fadeFrom;
         /// <summary>座って始めたときの体の向き。煙草のあいだはここへ戻す</summary>
         float seatedYaw;
 
@@ -187,11 +196,12 @@ namespace HalfAware
             if (!enabled) return;
             if (resumed)
             {
-                if (!JackDone) Breathe();
+                // 残すのはいつも起き上がりの後。呼吸は下げた大きさで鳴らす
+                if (!JackDone) Breathe(SettledBreath);
                 return;
             }
             if (flow.Player != null) seatedYaw = flow.Player.Yaw;
-            Breathe();
+            Breathe(breathVolume);
             StartCoroutine(Open());
         }
 
@@ -225,8 +235,40 @@ namespace HalfAware
                 flow.Freeze(FreezeMargin);
                 yield return null;
             }
+            // 起き上がったら、独白の前に呼吸を少し小さくする。下げている間も調べさせない
+            yield return Settle();
             if (flow.Completed) yield break;
             flow.Say(firstLines);
+        }
+
+        /// <summary>起き上がりの後の呼吸の大きさ</summary>
+        public float SettledBreath { get { return breathVolume * breathSettle; } }
+
+        /// <summary>
+        /// 呼吸を、今の大きさから <see cref="SettledBreath"/> へ breathSettleSeconds 秒でなだらかに下げる。
+        /// ジャックが抜けて薄れ始めたら、そちらに任せてやめる
+        /// </summary>
+        IEnumerator Settle()
+        {
+            if (!breathing || breath == null) yield break;
+            settling = true;
+            try
+            {
+                var from = breath.volume;
+                var to = SettledBreath;
+                for (var t = 0f; t < breathSettleSeconds; t += Time.deltaTime)
+                {
+                    flow.Freeze(FreezeMargin);
+                    if (fading || !breathing) yield break;
+                    breath.volume = Mathf.Lerp(from, to, Mathf.SmoothStep(0f, 1f, t / breathSettleSeconds));
+                    yield return null;
+                }
+                if (!fading && breathing) breath.volume = to;
+            }
+            finally
+            {
+                settling = false;
+            }
         }
 
         // ---- 呼吸 ------------------------------------------------------------
@@ -237,12 +279,12 @@ namespace HalfAware
         /// <summary>ジャックが手首から抜けたか。抜くしぐさが無ければ、調べたところで抜けたとみなす</summary>
         bool Unplugged { get { return jackPull != null ? jackPull.Unplugged || jackPull.Pulled : JackDone; } }
 
-        /// <summary>呼吸の輪を鳴らし始める</summary>
-        void Breathe()
+        /// <summary>呼吸の輪を、大きさ volume で鳴らし始める</summary>
+        void Breathe(float volume)
         {
             if (breath == null || breath.clip == null) return;
             breath.loop = true;
-            breath.volume = breathVolume;
+            breath.volume = volume;
             breath.Play();
             breathing = true;
             fading = false;
@@ -259,9 +301,14 @@ namespace HalfAware
         void Update()
         {
             if (!breathing || breath == null) return;
-            if (!fading && Unplugged) fading = true;
+            if (!fading && Unplugged)
+            {
+                fading = true;
+                fadeFrom = breath.volume;
+            }
             if (!fading) return;
-            var step = breathVolume * Time.deltaTime / Mathf.Max(0.01f, breathFadeSeconds);
+            // 薄れ始めた時の大きさ（起き上がりの後なら下げた大きさ）から、breathFadeSeconds 秒で消える
+            var step = fadeFrom * Time.deltaTime / Mathf.Max(0.01f, breathFadeSeconds);
             breath.volume = Mathf.MoveTowards(breath.volume, 0f, step);
             if (breath.volume > 0f) return;
             StopBreath();
@@ -274,7 +321,7 @@ namespace HalfAware
         public string MemoryKey { get { return "room.intro"; } }
 
         /// <summary>冒頭の明けの間と、吸っている間と、着ている間は残さない</summary>
-        public bool Settled { get { return !opening && !smoking && !dressing; } }
+        public bool Settled { get { return !opening && !settling && !smoking && !dressing; } }
 
         /// <summary>着たかは調べ済みの印（jacket）から、呼吸はジャックの印から決まるので、自分では残さない</summary>
         public string Capture() { return null; }

@@ -70,7 +70,7 @@ namespace HalfAware.Tests
             list.Open();
             Assert.AreEqual(1, list.Row, "小見出しの次から");
             Assert.IsTrue(list.Nudge(-2));
-            Assert.AreEqual(0.9f, GameSettings.LookScale.Value, 1e-6f);
+            Assert.AreEqual(1.4f, GameSettings.LookScale.Value, 1e-6f);
             list.MoveRow(1);
             Assert.AreEqual(SettingKind.Reset, list.Selected.Kind);
             list.MoveRow(1);
@@ -81,7 +81,7 @@ namespace HalfAware.Tests
             Assert.IsTrue(list.AtBack, "下の端で止まる");
             list.MoveRow(-1);
             Assert.IsTrue(list.Reset());
-            Assert.AreEqual(1f, GameSettings.LookScale.Value);
+            Assert.AreEqual(1.5f, GameSettings.LookScale.Value);
             list.MoveRow(-5);
             Assert.AreEqual(1, list.Row, "小見出しへは上がらない");
         }
@@ -117,7 +117,7 @@ namespace HalfAware.Tests
                 title.Press(0);
                 Assert.AreEqual(1, title.List.Row);
                 title.Press(2);
-                Assert.AreEqual(1f, GameSettings.LookScale.Value);
+                Assert.AreEqual(1.5f, GameSettings.LookScale.Value);
                 Assert.AreEqual(0, backs);
                 title.Press(3);
                 Assert.AreEqual(1, backs);

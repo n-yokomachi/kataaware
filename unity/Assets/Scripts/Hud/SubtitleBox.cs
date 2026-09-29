@@ -28,14 +28,11 @@ namespace HalfAware
         // 行の高さを <line-height> で決め打ちにして下げさせず、1 行目の上には見えない字をルビの高さに置いて、いつもルビの分を空ける（Frame）
 
         /// <summary>
-        /// ルビと上の行の字のあいだに、さらに空ける間（em）。ルビのための行間（<see cref="Ruby.ExtraLineSpacing"/>）だけでは、
-        /// 粗い画面でルビの上の端が上の行の字の下の端と 1 画素しか離れず、ルビが上の行に付いて見えた（2026-09-29）。0.1 em（台詞の字で 1.3 画素）足して、
-        /// ルビの上の隙間を下の隙間（親字との間）より広くする
+        /// 行の送り（em）。台詞の字（13 Dot）で 26 Dot。ルビの有る無しにかかわらず一定。
+        /// 素の行送り（<see cref="Ruby.Advance"/>、1.448 em）とルビのための行間（<see cref="Ruby.ExtraLineSpacing"/>、0.297 em）の上に、さらに 0.255 em 空ける。
+        /// 2026-09-29 に 1.845 em（ルビの上に 0.1 em 足した間）で組んだ後、オーナーの「行間はもう少し空けて」で 2.0 em に広げた
         /// </summary>
-        public const float RubyClear = 0.1f;
-
-        /// <summary>行の送り（em）。素の行送り（<see cref="Ruby.Advance"/>）に、ルビのための行間（<see cref="Ruby.ExtraLineSpacing"/>）と <see cref="RubyClear"/> を足した一定の間</summary>
-        public const float LineEm = Ruby.Advance + Ruby.ExtraLineSpacing * 0.01f + RubyClear;
+        public const float LineEm = 2.0f;
 
         /// <summary>字の上の端の線（ascent）。Noto Sans JP の字の寸法で 1.16 em（TMP の faceInfo、74.24 / 64）</summary>
         public const float AscentEm = 1.16f;

@@ -32,14 +32,16 @@ namespace HalfAware.Tests
         // ---- 範囲と刻み --------------------------------------------------------
 
         [Test]
-        public void TheCameraSpeedRunsFromAQuarterToTwiceInTwentiethsFromOne()
+        public void TheCameraSpeedRunsFromAQuarterToTwiceInTwentiethsFromOneAndAHalf()
         {
             Assert.AreEqual(0.25f, Look.Min);
             Assert.AreEqual(2f, Look.Max);
             Assert.AreEqual(0.05f, Look.Step);
-            Assert.AreEqual(1f, Look.Default);
+            // 2026-09-29 にオーナーの指示で既定を 1 倍から 1.5 倍にした（「デフォルトのカメラ速度を1.5に」）
+            Assert.AreEqual(1.5f, Look.Default);
             Assert.AreEqual(35, Look.Steps);
-            Assert.AreEqual(1f, Look.Value, "何も書いていなければ既定");
+            Assert.AreEqual(1.5f, Look.Value, "何も書いていなければ既定");
+            Assert.AreEqual("1.50×", Look.Text(Look.Default));
             Assert.AreEqual("HalfAware.Settings.LookScale", Look.Key);
         }
 
@@ -57,7 +59,7 @@ namespace HalfAware.Tests
             Look.Value = 1.02f;
             Assert.AreEqual(1f, Look.Value, 1e-6f);
             Look.Value = float.NaN;
-            Assert.AreEqual(1f, Look.Value, "NaN は既定");
+            Assert.AreEqual(1.5f, Look.Value, "NaN は既定");
             // 刻みで動かしても端数が溜まらない
             Look.Value = 0.25f;
             for (var i = 0; i < 15; i++) Look.Nudge(1);
@@ -69,9 +71,9 @@ namespace HalfAware.Tests
         public void NudgingStopsAtTheEnds()
         {
             Look.Nudge(1);
-            Assert.AreEqual(1.05f, Look.Value, 1e-6f);
+            Assert.AreEqual(1.55f, Look.Value, 1e-6f);
             Look.Nudge(-3);
-            Assert.AreEqual(0.9f, Look.Value, 1e-6f);
+            Assert.AreEqual(1.4f, Look.Value, 1e-6f);
             Look.Nudge(-100);
             Assert.AreEqual(0.25f, Look.Value);
             Look.Nudge(100);
@@ -131,7 +133,7 @@ namespace HalfAware.Tests
             Assert.AreEqual(2, box.Flushes, "書いた後に待っていた分は書かない");
             // 書いた値は、起動し直しても残る
             GameSettings.Forget();
-            Assert.AreEqual(1.45f, Look.Value, 1e-6f);
+            Assert.AreEqual(1.95f, Look.Value, 1e-6f);
         }
 
         [Test]
@@ -139,7 +141,7 @@ namespace HalfAware.Tests
         {
             box.Set(Look.Key, "not a number");
             GameSettings.Forget();
-            Assert.AreEqual(1f, Look.Value);
+            Assert.AreEqual(1.5f, Look.Value);
             box.Set(Look.Key, "9");
             GameSettings.Forget();
             Assert.AreEqual(2f, Look.Value);
@@ -148,7 +150,7 @@ namespace HalfAware.Tests
             Assert.AreEqual(0.75f, Look.Value, 1e-6f);
             box.Set(Look.Key, "NaN");
             GameSettings.Forget();
-            Assert.AreEqual(1f, Look.Value);
+            Assert.AreEqual(1.5f, Look.Value);
         }
 
         [Test]
@@ -173,8 +175,8 @@ namespace HalfAware.Tests
         {
             Look.Value = 0.4f;
             GameSettings.ResetAll();
-            Assert.AreEqual(1f, Look.Value);
-            Assert.AreEqual("1", box.Get(Look.Key));
+            Assert.AreEqual(1.5f, Look.Value);
+            Assert.AreEqual("1.5", box.Get(Look.Key));
         }
 
         // ---- 見回しの速さ ------------------------------------------------------
@@ -184,6 +186,9 @@ namespace HalfAware.Tests
         {
             // 2026-09-28 にオーナーの指示で 1 倍の速さを半分にした（0.042 → 0.021）
             Assert.AreEqual(0.021f, PlayerController.BaseLookSensitivity);
+            // 既定（1.5 倍）で 0.0315 度／画素
+            Assert.AreEqual(0.0315f, PlayerController.LookSensitivity, 1e-7f);
+            Look.Value = 1f;
             Assert.AreEqual(0.021f, PlayerController.LookSensitivity, 1e-7f);
             Look.Value = 0.5f;
             Assert.AreEqual(0.0105f, PlayerController.LookSensitivity, 1e-7f);
@@ -198,7 +203,10 @@ namespace HalfAware.Tests
         {
             // 2026-09-28 にオーナーの指示で、マウスと一緒に半分にした（120 → 60）
             Assert.AreEqual(60f, PlayerController.StickDegreesPerSecond);
-            // 倒しきって 1 秒で 60 度。半分倒せば 30 度。上下も同じ
+            // 既定（1.5 倍）では倒しきって 1 秒で 90 度
+            Assert.AreEqual(90f, PlayerController.StickLookSpeed, 1e-4f);
+            // 1 倍なら倒しきって 1 秒で 60 度。半分倒せば 30 度。上下も同じ
+            Look.Value = 1f;
             var full = PlayerController.LookTurn(new Vector2(1f, 0f), true, 1f);
             Assert.AreEqual(60f, full.x, 1e-4f);
             Assert.AreEqual(0f, full.y, 1e-4f);
@@ -221,7 +229,8 @@ namespace HalfAware.Tests
         [Test]
         public void TheMouseStillTurnsByPixelsWhateverTheFrame()
         {
-            // マウスは動いた画素 × 0.021 度で、秒は関わらない
+            // マウスは動いた画素 × 0.021 度（1 倍の時）で、秒は関わらない
+            Look.Value = 1f;
             var turn = PlayerController.LookTurn(new Vector2(100f, -50f), false, 1f / 60f);
             Assert.AreEqual(2.1f, turn.x, 1e-4f);
             Assert.AreEqual(-1.05f, turn.y, 1e-4f);
@@ -303,18 +312,18 @@ namespace HalfAware.Tests
         {
             var m = OpenSettings();
             m.Move(1);
-            Assert.AreEqual(1.05f, Look.Value, 1e-6f);
+            Assert.AreEqual(1.55f, Look.Value, 1e-6f);
             m.Move(-1);
             m.Move(-1);
             m.Move(-1);
-            Assert.AreEqual(0.9f, Look.Value, 1e-6f);
+            Assert.AreEqual(1.4f, Look.Value, 1e-6f);
             Assert.AreEqual(ConsoleAction.Settings, m.Selected, "ボタンは動かない");
             Assert.AreEqual(ConsolePanel.Settings, m.Panel, "枠は閉じない");
             // 既定に戻すの行では、左右は何もしない
             m.MoveRow(1);
             m.Move(1);
             m.Move(-1);
-            Assert.AreEqual(0.9f, Look.Value, 1e-6f);
+            Assert.AreEqual(1.4f, Look.Value, 1e-6f);
             Assert.AreEqual(ConsoleAction.Settings, m.Selected);
             Assert.AreEqual(ConsolePanel.Settings, m.Panel);
         }
@@ -328,7 +337,7 @@ namespace HalfAware.Tests
             Assert.AreEqual(1.6f, Look.Value, 1e-6f);
             m.MoveRow(1);
             Assert.IsTrue(m.ResetSettings());
-            Assert.AreEqual(1f, Look.Value);
+            Assert.AreEqual(1.5f, Look.Value);
             Assert.AreEqual(ConsolePanel.Settings, m.Panel, "枠は開いたまま");
         }
 
@@ -340,7 +349,7 @@ namespace HalfAware.Tests
             Assert.IsFalse(m.ResetSettings());
             Assert.IsNull(m.SettingRow);
             m.Move(1);
-            Assert.AreEqual(1f, Look.Value);
+            Assert.AreEqual(1.5f, Look.Value);
             Assert.AreEqual(ConsoleAction.Recall, m.Selected);
         }
 
@@ -352,7 +361,7 @@ namespace HalfAware.Tests
             Assert.IsTrue(m.Back(), "右クリック・Esc は枠を閉じる");
             Assert.AreEqual(ConsolePanel.None, m.Panel);
             Assert.AreEqual(ConsoleAction.Settings, m.Selected, "ボタンの選びはそのまま");
-            Assert.AreEqual(1.05f, Look.Value, 1e-6f, "動かした値はそのまま");
+            Assert.AreEqual(1.55f, Look.Value, 1e-6f, "動かした値はそのまま");
             // 枠を閉じた後の左右は、今どおりボタンを選ぶ
             m.Move(-1);
             Assert.AreEqual(ConsoleAction.CloseEyes, m.Selected);
@@ -380,7 +389,7 @@ namespace HalfAware.Tests
             m.Decide("Room");
             Assert.AreEqual(ConsolePanel.Settings, m.Panel);
             m.Move(1);
-            Assert.AreEqual(1.05f, Look.Value, 1e-6f);
+            Assert.AreEqual(1.55f, Look.Value, 1e-6f);
         }
 
         // ---- マウスの押した所 --------------------------------------------------
@@ -398,7 +407,7 @@ namespace HalfAware.Tests
             Assert.AreEqual(0.5f, ConsoleSettings.TrackAt(0.5f, width, inset), 1e-6f);
             Assert.AreEqual(0.25f, Look.AtFraction(ConsoleSettings.TrackAt(0f, width, inset)));
             Assert.AreEqual(2f, Look.AtFraction(ConsoleSettings.TrackAt(1f, width, inset)));
-            // 既定（1 倍）の所は溝の 3/7。その少し脇を押しても 1 倍に揃う
+            // 1 倍の所は溝の 3/7。その少し脇を押しても 1 倍に揃う
             var one = (inset + (width - inset * 2f) * 0.75f / 1.75f) / width;
             Assert.AreEqual(1f, Look.AtFraction(ConsoleSettings.TrackAt(one, width, inset)), 1e-6f);
             Assert.AreEqual(1f, Look.AtFraction(ConsoleSettings.TrackAt(one + 1f / width, width, inset)), 1e-6f);

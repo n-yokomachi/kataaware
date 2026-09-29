@@ -44,12 +44,12 @@ namespace HalfAware.EditorTools
         const float Top = 12f * Dot;
         const float NameHeight = 16f * Dot;
         const float NameGap = 4f * Dot;
-        /// <summary>地の下の余白。<see cref="HudView.SubtitleBottom"/>（26 Dot。前は 14 Dot）</summary>
+        /// <summary>地の下の余白。<see cref="HudView.SubtitleBottom"/>（17 Dot。2026-09-29 に 14 → 26 → 17 Dot）</summary>
         const float Bottom = HudView.SubtitleBottom;
         /// <summary>左右の余白。画面の幅に対する割合。コンソールの枠と揃える</summary>
         const float Side = 0.14f;
         const float HintRight = 0.13f;
-        /// <summary>送りの印の箱の下の縁。<see cref="HudView.HintBottom"/>（7 Dot。前は 8 Dot）</summary>
+        /// <summary>送りの印の箱の下の縁。<see cref="HudView.HintBottom"/>（2 Dot。前は 8 Dot）</summary>
         const float HintBottom = HudView.HintBottom;
 
         /// <summary>E で送る字幕の地より薄い、流れる行の地の濃さ</summary>
@@ -103,7 +103,7 @@ namespace HalfAware.EditorTools
             rect.anchorMax = new Vector2(1f, 0f);
             rect.pivot = new Vector2(0.5f, 0f);
             rect.anchoredPosition = Vector2.zero;
-            // 台詞の字の枠（既定の 2 行ぶん）。行の送りはルビの分を含めた一定の間（SubtitleBox.LineEm、1.845 em）で、1 行目の上にもルビの分を取る。
+            // 台詞の字の枠（既定の 2 行ぶん）。行の送りはルビの分を含めた一定の間（SubtitleBox.LineEm、2.0 em）で、1 行目の上にもルビの分を取る。
             // 前は素の行送りの 19 Dot × 行で、ルビのある文だけ行を開けていた（2026-09-29 に改めた）。遊んでいる間の高さは HudView が行の数から決める
             var body = SubtitleBox.BodyEm(SubtitleBox.BaseRows) * TextFont;
             rect.sizeDelta = new Vector2(0f, Top + NameHeight + NameGap + body + Bottom);
