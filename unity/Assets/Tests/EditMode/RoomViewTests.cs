@@ -19,12 +19,27 @@ namespace HalfAware.Tests
         [Test]
         public void EachWindowSeesAboutSeventySevenDegreesEitherSide()
         {
-            var north = RoomView.Reach(false);
-            var east = RoomView.Reach(true);
-            Assert.AreEqual(-77.5f, north.x, 0.5f);
-            Assert.AreEqual(77.5f, north.y, 0.5f);
-            Assert.AreEqual(12.5f, east.x, 0.5f);
-            Assert.AreEqual(167.5f, east.y, 0.5f);
+            Assert.AreEqual(3, RoomView.Openings.Length, "北の二つと東の一つ");
+            foreach (var o in RoomView.Openings)
+            {
+                var reach = RoomView.Reach(o);
+                var normal = o.East ? 90f : 0f;
+                Assert.AreEqual(normal - 77.5f, reach.x, 0.5f, o.Name);
+                Assert.AreEqual(normal + 77.5f, reach.y, 0.5f, o.Name);
+            }
+        }
+
+        [Test]
+        public void TheLivingWindowIsTheNorthWindowMovedWest()
+        {
+            // 居間の窓は、前からの北の窓と同じ作り・大きさで、間取りの表の居間の窓の所に開く
+            var north = RoomView.Openings[0];
+            var west = RoomView.Openings[1];
+            Assert.AreEqual(north.Inner.y - north.Inner.x, west.Inner.y - west.Inner.x, 1e-4f);
+            Assert.AreEqual(north.Outer.y - north.Outer.x, west.Outer.y - west.Outer.x, 1e-4f);
+            Assert.AreEqual(RoomPlan.WestWindow.Centre, (west.Outer.x + west.Outer.y) * 0.5f, 1e-4f);
+            Assert.AreEqual(RoomPlan.WindowWide, west.Outer.y - west.Outer.x, 1e-4f);
+            Assert.AreEqual(RoomPlan.NorthWindow.Centre, (north.Outer.x + north.Outer.y) * 0.5f, 1e-4f);
         }
 
         [Test]
@@ -35,10 +50,12 @@ namespace HalfAware.Tests
             var worstHigh = -999f;
             var worstUp = -999f;
             var seen = 0;
-            // 体は壁から 0.3 m（当たりの半径）まで寄れ、目はそこから 0.22 m 前に出る
-            var spots = new[] { -2.6f, -2.2f, -1.8f, -1.4f, -1.0f, -0.6f, -0.2f, 0.2f, 0.6f, 1.0f, 1.4f, 1.8f, 2.2f, 2.6f, 2.82f };
-            foreach (var x in spots)
-                foreach (var z in spots)
+            var seenWest = 0;
+            // 体は壁から 0.3 m（当たりの半径）まで寄れ、目はそこから 0.22 m 前に出る。LDK の中を 0.4 m おきに
+            var room = RoomPlan.Ldk;
+            var inset = RoomPlan.Wall * 0.5f + 0.08f;
+            for (var x = room.xMin + inset; x <= room.xMax - inset + 1e-3f; x += 0.4f)
+                for (var z = room.yMin + inset; z <= room.yMax - inset + 1e-3f; z += 0.4f)
                     foreach (var eyeY in new[] { 1.31f, 1.65f })
                     {
                         var eye = new Vector3(x, eyeY, z);
@@ -46,10 +63,11 @@ namespace HalfAware.Tests
                             for (var el = -80f; el <= 80f; el += 4f)
                             {
                                 var dir = Quaternion.Euler(-el, az, 0f) * Vector3.forward;
-                                foreach (var east in new[] { false, true })
+                                foreach (var o in RoomView.Openings)
                                 {
                                     float a, e;
-                                    if (!RoomView.Through(east, eye, dir, out a, out e)) continue;
+                                    if (!RoomView.Through(o, eye, dir, out a, out e)) continue;
+                                    if (o.Name == "NorthWest") seenWest++;
                                     seen++;
                                     if (a < RoomView.ArcFrom) a += 360f;
                                     worstLow = Mathf.Min(worstLow, a);
@@ -59,6 +77,7 @@ namespace HalfAware.Tests
                             }
                     }
             Assert.Greater(seen, 1000, "窓を抜ける向きが一つも無い");
+            Assert.Greater(seenWest, 100, "居間の窓を抜ける向きが無い");
             Assert.GreaterOrEqual(worstLow, RoomView.ArcFrom, "北の窓の左の端が組んだ幅の外");
             Assert.LessOrEqual(worstHigh, RoomView.ArcTo, "東の窓の右の端が組んだ幅の外");
             // 空の球は天頂まで張るが、窓から見上げられるのは仰角 70 度ほどまで
@@ -91,8 +110,8 @@ namespace HalfAware.Tests
         [Test]
         public void EveryLandmarkSitsInAWindow()
         {
-            var north = RoomView.Reach(false);
-            var east = RoomView.Reach(true);
+            var north = RoomView.Reach(RoomView.Openings[0]);
+            var east = RoomView.Reach(RoomView.Openings[2]);
             foreach (var m in RoomView.Landmarks)
             {
                 var inNorth = m.Azimuth > north.x + 3f && m.Azimuth < north.y - 3f;

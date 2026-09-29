@@ -1511,8 +1511,6 @@ namespace HalfAware.EditorTools
             if (old != null) Object.DestroyImmediate(old.gameObject);
             var go = new GameObject("Dust");
             go.transform.SetParent(room, false);
-            go.transform.position = new Vector3(0f, 1.45f, 0f);
-            go.transform.rotation = Quaternion.identity;
 
             var ps = go.AddComponent<ParticleSystem>();
             var main = ps.main;
@@ -1537,7 +1535,8 @@ namespace HalfAware.EditorTools
             var shape = ps.shape;
             shape.enabled = true;
             shape.shapeType = ParticleSystemShapeType.Box;
-            shape.scale = new Vector3(5.6f, 2.6f, 5.6f);
+            // 置き場と撒く箱の広さは LDK に合わせる（間取りは RoomPlan）
+            BuildRoomShell.FitDust(go.transform);
 
             var vel = ps.velocityOverLifetime;
             vel.enabled = true;

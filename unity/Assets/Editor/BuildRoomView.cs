@@ -18,7 +18,8 @@ namespace HalfAware.EditorTools
     ///
     /// <list type="table">
     /// <item><term>置き場</term><description>シーンの根に <c>RoomView</c> を一つ。子は街並み（Town。名所もここ）・暈（Glows）・空（Sky）・
-    /// 窓の影止め（ShadowStop.*）だけ。部屋の物は、窓のガラスのマテリアルを替えることと、カーテンを開けること（<see cref="Curtains"/>）だけ</description></item>
+    /// 窓の影止め（ShadowStop.*。窓三つ）だけ。部屋の物は、窓のガラスのマテリアルを替えることと、カーテンを開けること（<see cref="Curtains"/>）だけ。
+    /// 窓とカーテンそのものは部屋の形の組み立て（<see cref="BuildRoomShell"/>）が置く</description></item>
     /// <item><term>時刻</term><description>夕暮れ（場面 1）と夜（場面 3・5・7）は同じ mesh にマテリアルを替えるだけ（<see cref="SetHour"/>）。
     /// 夜は空を落とし、窓の灯りを増やし（夜のアトラス）、街灯の暈とネオンを強める。場面 3 の組み立て（<see cref="BuildConnect"/>）が
     /// Room を写した直後に夜へ替え、場面 5・7 は場面 3 から写すので夜のまま来る</description></item>
@@ -41,7 +42,7 @@ namespace HalfAware.EditorTools
         const string GlowName = "Glows";
         const string SkyName = "Sky";
 
-        static readonly string[] GlassPaths = { "Room/Window/Glass", "Room/WindowFront/Glass" };
+        static readonly string[] GlassPaths = { "Room/Window/Glass", "Room/WindowFront/Glass", "Room/WindowFrontWest/Glass" };
 
         [MenuItem("HalfAware/Build the room view", false, 211)]
         public static void BuildMenu()
@@ -384,12 +385,14 @@ namespace HalfAware.EditorTools
         /// カーテンを開ける（オーナー「今ってカーテンは半開きなんだっけ？じゃあ開いてOK」）。
         /// 北の窓は左右の襞を窓の抜けの外まで寄せ、座って始めた目から名所の並ぶ側が見えるようにする。
         /// 東の窓は左右へ 0.18 m ずつ寄せる。襞の間隔は元の 0.09 m のまま、レールは寄せた襞に合わせて伸ばす。
+        /// 居間の窓のカーテン（CurtainFrontWest）は北の窓のものを写して西へずらした物（BuildRoomShell）なので、同じ値で同じ開き方になる。
         /// 置く所を決め打ちするので、何度押しても同じ所に来る。カーテンは影を落とすが、日の灯りは窓の影止めで止まるので、部屋の中の当たり方は変わらない
         /// </summary>
         static string Curtains()
         {
             var notes = new List<string>();
             notes.Add(Drape("Room/CurtainFront", true, -2.21f, -0.75f, -1.30f, 1.94f));
+            notes.Add(Drape("Room/CurtainFrontWest", true, -2.21f, -0.75f, -1.30f, 1.94f));
             notes.Add(Drape("Room/CurtainRight", false, -1.34f, -0.02f, -0.50f, 1.80f));
             return "カーテン: " + string.Join("、", notes.ToArray());
         }

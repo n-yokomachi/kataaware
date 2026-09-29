@@ -5,11 +5,11 @@ namespace HalfAware
     /// <summary>
     /// 自室の窓の外の景色の寸法と時刻（シナリオ設計 5 節「窓の外」）。組むのは <c>HalfAware/Build the room view</c>（BuildRoomView）。
     ///
-    /// 部屋は日本の数え方で 5 階。床（y 0）から地面まで 12 m 下がる。窓は東の壁（x 3）と北の壁（z 3）に一つずつ。
-    /// 角度は +z（北）を 0 として東（+x）回りの度（<see cref="BackdropRing"/> と同じ決まり）。
+    /// 部屋は日本の数え方で 5 階。床（y 0）から地面まで 12 m 下がる。窓は北の壁（z 3）に二つ（前からの窓と居間の窓）と、東の壁（x 3）に一つ
+    /// （間取りは <see cref="RoomPlan"/>）。角度は +z（北）を 0 として東（+x）回りの度（<see cref="BackdropRing"/> と同じ決まり）。
     ///
     /// **見えない側は作らない。** 窓から見える向きは、窓の抜けの幅と壁の厚みで決まる（<see cref="Reach"/>）。
-    /// 二つの窓を合わせた向きの幅（<see cref="ArcFrom"/>〜<see cref="ArcTo"/>）だけに空と街並みを張る。
+    /// 窓を合わせた向きの幅（<see cref="ArcFrom"/>〜<see cref="ArcTo"/>）だけに空と街並みを張る。北の二つの窓は同じ作りなので、見える向きの幅も同じ。
     ///
     /// 実行時には呼ばない。純粋な計算なので、ここに置いて試験から見る
     /// </summary>
@@ -29,7 +29,7 @@ namespace HalfAware
         /// <summary>街並みを組む遠さ（原点から）。この先は空の絵の遠い屋根と街の灯り</summary>
         public const float TownReach = 230f;
 
-        /// <summary>空と街並みを張る向きの幅。窓から見える向き（<see cref="Reach"/>。北の窓 ±77.5 度、東の窓 12.5〜167.5 度）に余裕を足した</summary>
+        /// <summary>空と街並みを張る向きの幅。窓から見える向き（<see cref="Reach"/>。北の二つの窓 ±77.5 度、東の窓 12.5〜167.5 度）に余裕を足した</summary>
         public const float ArcFrom = -95f;
         public const float ArcTo = 185f;
 
@@ -149,36 +149,68 @@ namespace HalfAware
         public static readonly Vector2 EastOuter = new Vector2(-0.98f, -0.02f);
         public static readonly Vector2 NorthInner = new Vector2(-1.72f, -0.88f);
         public static readonly Vector2 NorthOuter = new Vector2(-1.78f, -0.82f);
+        /// <summary>居間の窓（部屋の WindowFrontWest）。前からの北の窓と同じ作りを、北の壁に沿って西へずらした所</summary>
+        public static readonly Vector2 NorthWestInner = NorthInner + Vector2.one * WestShift();
+        public static readonly Vector2 NorthWestOuter = NorthOuter + Vector2.one * WestShift();
+
+        static float WestShift()
+        {
+            return RoomPlan.WestWindow.Centre - RoomPlan.NorthWindow.Centre;
+        }
 
         /// <summary>抜けの上下（床から）。内側は窓枠、外側は壁</summary>
         public static readonly Vector2 InnerRise = new Vector2(0.74f, 2.16f);
         public static readonly Vector2 OuterRise = new Vector2(0.68f, 2.22f);
 
+        /// <summary>窓一つの抜け。east なら東の壁（抜けは z の幅）、そうでなければ北の壁（x の幅）</summary>
+        public struct Opening
+        {
+            public string Name;
+            public bool East;
+            public Vector2 Inner;
+            public Vector2 Outer;
+
+            public Opening(string name, bool east, Vector2 inner, Vector2 outer)
+            {
+                Name = name;
+                East = east;
+                Inner = inner;
+                Outer = outer;
+            }
+        }
+
+        /// <summary>三つの窓。前からの北の窓・居間の窓（北の壁の西）・東の窓</summary>
+        public static readonly Opening[] Openings =
+        {
+            new Opening("North", false, NorthInner, NorthOuter),
+            new Opening("NorthWest", false, NorthWestInner, NorthWestOuter),
+            new Opening("East", true, EastInner, EastOuter),
+        };
+
         /// <summary>
         /// 窓一つから見える向きの幅（度）。目は内側の面の枠の抜けと外側の面の壁の抜けの両方を通して見るので、
         /// 法線から振れる角は、枠の一方の縁と壁の向こうの縁を結ぶ向きまでになる
         /// </summary>
-        public static Vector2 Reach(bool east)
+        public static Vector2 Reach(Opening o)
         {
-            var inner = east ? EastInner : NorthInner;
-            var outer = east ? EastOuter : NorthOuter;
-            var swing = Mathf.Atan2(Mathf.Max(outer.y - inner.x, inner.y - outer.x), WallOut - WallIn) * Mathf.Rad2Deg;
-            var normal = east ? 90f : 0f;
+            var swing = Mathf.Atan2(Mathf.Max(o.Outer.y - o.Inner.x, o.Inner.y - o.Outer.x), WallOut - WallIn) * Mathf.Rad2Deg;
+            var normal = o.East ? 90f : 0f;
             return new Vector2(normal - swing, normal + swing);
         }
 
         /// <summary>
-        /// 目 eye から向き dir へ、窓の抜けを通って外が見えるか。壁の内と外の面で抜けの中を通るかで見る。
+        /// 目 eye から向き dir へ、窓 o の抜けを通って外が見えるか。壁の内と外の面で抜けの中を通るかで見る。
         /// azimuth に向き（度）、elevation に仰角（度）を入れる
         /// </summary>
-        public static bool Through(bool east, Vector3 eye, Vector3 dir, out float azimuth, out float elevation)
+        public static bool Through(Opening o, Vector3 eye, Vector3 dir, out float azimuth, out float elevation)
         {
             azimuth = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
             elevation = Mathf.Atan2(dir.y, new Vector2(dir.x, dir.z).magnitude) * Mathf.Rad2Deg;
+            var east = o.East;
             var along = east ? dir.x : dir.z;
             if (along <= 1e-5f) return false;
-            return Pass(east, eye, dir, along, WallIn, east ? EastInner : NorthInner, InnerRise)
-                && Pass(east, eye, dir, along, WallOut, east ? EastOuter : NorthOuter, OuterRise);
+            return Pass(east, eye, dir, along, WallIn, o.Inner, InnerRise)
+                && Pass(east, eye, dir, along, WallOut, o.Outer, OuterRise);
         }
 
         static bool Pass(bool east, Vector3 eye, Vector3 dir, float along, float plane, Vector2 open, Vector2 rise)
