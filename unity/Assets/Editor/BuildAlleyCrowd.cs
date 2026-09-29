@@ -16,10 +16,11 @@ namespace HalfAware.EditorTools
     /// - 服の色は元のまま。肌にはネオンのようなインプラント（<see cref="RocketboxMobPaint"/>）を、人ごと・置くたびに場所と色を変えて描く
     /// - 描く重さ: 一人ずつの物に分け（画面の外の人は描かれない）、近さの段（LODGroup）を二つ持たせる。
     ///   近く（10 m まで）は 1 人 4,500 三角ほど、その先は 1,000 三角ほど。三角を減らすのは UnityMeshSimplifier（組み立てのときだけ使う）
+    /// - その場の動き: 近い段の形には胴・首・頭・腕の骨の重みを付け、実行時に骨を少し曲げて焼き直す（<see cref="CrowdIdle"/>、<c>BuildAlleyCrowdRig</c>）
     ///
     /// 焼いた形・テクスチャ・マテリアルは <see cref="Folder"/>（リポジトリに入れない）へ組み立てのたびに作り直す
     /// </summary>
-    public static class BuildAlleyCrowd
+    public static partial class BuildAlleyCrowd
     {
         public const string Folder = BuildAlley.Generated + "Crowd/";
 
@@ -118,6 +119,15 @@ namespace HalfAware.EditorTools
         /// </summary>
         public static void Build(Transform parent, List<Place> places, int seed, StringBuilder sb)
         {
+            Build(parent, places, seed, sb, new List<Walk>());
+        }
+
+        /// <summary>
+        /// walks の置き場の人は、焼いた形ではなく模型のまま置き、道筋を歩かせる（<see cref="MakeWalker"/>）。
+        /// 人と服の色・インプラントの決め方は同じ（乱数の引く順は変わらない）
+        /// </summary>
+        public static void Build(Transform parent, List<Place> places, int seed, StringBuilder sb, List<Walk> walks)
+        {
             EnsureFolder();
             Begin();
             try
@@ -132,13 +142,21 @@ namespace HalfAware.EditorTools
                 var group = new GameObject("People").transform;
                 group.SetParent(parent, false);
                 var tris = 0;
+                var walking = 0;
                 for (var i = 0; i < apps.Count; i++)
                 {
                     int n0, n1;
-                    Make(group, i, apps[i], out n0, out n1);
+                    var w = walks.FindIndex(x => x.place == i);
+                    if (w >= 0)
+                    {
+                        MakeWalker(group, i, apps[i], walks[w], out n0);
+                        walking++;
+                    }
+                    else Make(group, i, apps[i], out n0, out n1);
                     tris += n0;
                 }
                 Report(apps, sb, tris);
+                if (sb != null) sb.AppendFormat("そのうち歩く人 {0} 人", walking).AppendLine();
             }
             finally
             {
@@ -532,6 +550,7 @@ namespace HalfAware.EditorTools
         {
             people = new Dictionary<RocketboxMob, Person>();
             if (fresh == null) fresh = new HashSet<string>();
+            if (rigs == null) rigs = new Dictionary<string, Rig>();
         }
 
         static void End()
@@ -545,6 +564,7 @@ namespace HalfAware.EditorTools
         public static void Reset()
         {
             fresh = new HashSet<string>();
+            rigs = new Dictionary<string, Rig>();
         }
 
         static Person Prep(RocketboxMob who)
@@ -693,8 +713,10 @@ namespace HalfAware.EditorTools
         {
             var seller = a.who.Part == RocketboxMob.Role.Seller;
             var mats = Materials(a, seller ? 512 : 256, false, a.nth.ToString());
-            var near = Lod(a.who, a.place.pose, 0);
-            var mid = Lod(a.who, a.place.pose, 1);
+            var kind = KindOf(a.place.pose, index);
+            var near = Lod(a.who, a.place.pose, kind, 0);
+            var mid = Lod(a.who, a.place.pose, kind, 1);
+            var rig = rigs[MeshPath(a.who, a.place.pose, KindTail(kind))];
             nearTris = near.triangles.Length / 3;
             midTris = mid.triangles.Length / 3;
 
@@ -705,13 +727,17 @@ namespace HalfAware.EditorTools
             go.transform.localScale = Vector3.one * a.place.scale;
             var r0 = Part(go.transform, "LOD0", near, mats);
             var r1 = Part(go.transform, "LOD1", mid, mats);
+            // その場の動き。煙草は近い段と一緒に消す
+            var props = Idle(go.transform, r0.GetComponent<MeshFilter>(), near, mats, rig, kind, a.place, index);
+            var nearRenderers = new List<Renderer> { r0 };
+            nearRenderers.AddRange(props);
             var lod = go.AddComponent<LODGroup>();
             lod.fadeMode = LODFadeMode.None;
             lod.SetLODs(new[] { new LOD(0.5f, new Renderer[] { r0 }), new LOD(0.01f, new Renderer[] { r1 }) });
             lod.RecalculateBounds();
             lod.SetLODs(new[]
             {
-                new LOD(Relative(lod.size, NearUntil), new Renderer[] { r0 }),
+                new LOD(Relative(lod.size, NearUntil), nearRenderers.ToArray()),
                 // 中ほどの段は通りの先まで消さない（遠くの板は入れない）
                 new LOD(Relative(lod.size, 250f), new Renderer[] { r1 }),
             });
@@ -743,20 +769,27 @@ namespace HalfAware.EditorTools
 
         static string MeshPath(RocketboxMob who, Pose pose, string tail) { return Folder + who.Name + "_" + pose + tail + ".asset"; }
 
-        /// <summary>段ごとの形（0 は近く、1 は中ほど）。組み立ての間に一度だけ焼き直す</summary>
-        static Mesh Lod(RocketboxMob who, Pose pose, int level)
+        /// <summary>
+        /// 段ごとの形（0 は近く、1 は中ほど）。組み立ての間に一度だけ焼き直す。
+        /// 近い段の形は骨の組の重みを持ち（<see cref="CrowdIdle"/> が曲げて焼き直す）、骨の組は <see cref="rigs"/> に置く。
+        /// 煙草を持つ人（kind が Smoke）は指を曲げて焼くので別の形
+        /// </summary>
+        static Mesh Lod(RocketboxMob who, Pose pose, CrowdIdle.Kind kind, int level)
         {
-            var path = MeshPath(who, pose, "_LOD" + level);
+            var tail = KindTail(kind);
+            var path = MeshPath(who, pose, tail + "_LOD" + level);
             if (!fresh.Contains(path))
             {
-                var full = Posed(who, pose);
+                var rig = new Rig();
+                var full = Posed(who, pose, kind, rig);
+                rigs[MeshPath(who, pose, tail)] = rig;
                 var slots = Prep(who).slots;
                 try
                 {
                     foreach (var l in new[] { 0, 1 })
                     {
-                        var m = Simplify(full, slots, who, l == 0 ? NearTriangles : MidTriangles, l == 0, who.Name + "_" + pose + "_LOD" + l);
-                        var p = MeshPath(who, pose, "_LOD" + l);
+                        var m = Simplify(full, slots, who, l == 0 ? NearTriangles : MidTriangles, l == 0, who.Name + "_" + pose + tail + "_LOD" + l);
+                        var p = MeshPath(who, pose, tail + "_LOD" + l);
                         RocketboxJacket.SaveMesh(m, p);
                         fresh.Add(p);
                     }
@@ -773,7 +806,7 @@ namespace HalfAware.EditorTools
         static Mesh Full(RocketboxMob who, Pose pose)
         {
             var path = MeshPath(who, pose, "");
-            var m = Posed(who, pose);
+            var m = Posed(who, pose, CrowdIdle.Kind.None, null);
             RocketboxJacket.SaveMesh(m, path);
             return AssetDatabase.LoadAssetAtPath<Mesh>(path);
         }
@@ -803,9 +836,13 @@ namespace HalfAware.EditorTools
             var verts = full.vertices;
             var norms = full.normals;
             var uvs = full.uv;
+            // 近い段は骨の組の重みも運ぶ（CrowdIdle が曲げて焼き直す）。中ほどの段は動かさないので落とす
+            var weights = near ? full.boneWeights : null;
+            var skinned = weights != null && weights.Length == verts.Length;
             var outV = new List<Vector3>();
             var outN = new List<Vector3>();
             var outU = new List<Vector2>();
+            var outW = new List<BoneWeight>();
             var outT = new List<int[]>();
             for (var i = 0; i < subs; i++)
             {
@@ -817,6 +854,11 @@ namespace HalfAware.EditorTools
                 part.SetVertices(verts);
                 part.SetNormals(norms);
                 part.SetUVs(0, uvs);
+                if (skinned)
+                {
+                    part.boneWeights = weights;
+                    part.bindposes = full.bindposes;
+                }
                 part.SetTriangles(full.GetTriangles(i), 0);
                 Mesh done = part;
                 if (budget < counts[i])
@@ -843,6 +885,7 @@ namespace HalfAware.EditorTools
                 var dv = done.vertices;
                 var dn = done.normals;
                 var du = done.uv;
+                var dw = skinned ? done.boneWeights : null;
                 var o2 = new int[tri.Length];
                 for (var k = 0; k < tri.Length; k++)
                 {
@@ -854,6 +897,7 @@ namespace HalfAware.EditorTools
                         outV.Add(dv[tri[k]]);
                         outN.Add(dn.Length > 0 ? dn[tri[k]] : Vector3.up);
                         outU.Add(du.Length > 0 ? du[tri[k]] : Vector2.zero);
+                        if (skinned) outW.Add(dw != null && dw.Length > tri[k] ? dw[tri[k]] : new BoneWeight { weight0 = 1f });
                     }
                     o2[k] = m;
                 }
@@ -868,6 +912,11 @@ namespace HalfAware.EditorTools
             mesh.SetUVs(0, outU);
             mesh.subMeshCount = subs;
             for (var i = 0; i < subs; i++) mesh.SetTriangles(outT[i], i);
+            if (skinned)
+            {
+                mesh.boneWeights = outW.ToArray();
+                mesh.bindposes = full.bindposes;
+            }
             mesh.RecalculateBounds();
             return mesh;
         }
@@ -894,9 +943,11 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 一人を姿勢に曲げて焼き、骨を持たない mesh にする（面の組は体・頭・髪の房のまま）。
-        /// 原点は足元で、+z を向く。靴の裏（いちばん低い頂点）を 0 に揃える
+        /// 原点は足元で、+z を向く。靴の裏（いちばん低い頂点）を 0 に揃える。
+        /// rig を渡すと、骨の組の重みと置き場を mesh に付け、骨の組としぐさの形を rig に書く（<c>BuildAlleyCrowdRig</c>）。
+        /// kind が Smoke なら、右の手の指を煙草を挟む形に曲げてから焼く
         /// </summary>
-        static Mesh Posed(RocketboxMob who, Pose pose)
+        static Mesh Posed(RocketboxMob who, Pose pose, CrowdIdle.Kind kind, Rig rig)
         {
             var src = AssetDatabase.LoadAssetAtPath<GameObject>(who.Model);
             if (src == null) throw new System.InvalidOperationException("模型が無い（HalfAware/Alley crowd/Import the people）: " + who.Model);
@@ -913,6 +964,7 @@ namespace HalfAware.EditorTools
                 an.applyRootMotion = false;
                 BodyPoser.Stand(an);
                 Apply(an, pose);
+                if (kind == CrowdIdle.Kind.Smoke) Holding(an);
                 var smr = go.GetComponentInChildren<SkinnedMeshRenderer>();
                 smr.BakeMesh(baked, true);
                 var v = baked.vertices;
@@ -931,6 +983,11 @@ namespace HalfAware.EditorTools
                 mesh.SetUVs(0, smr.sharedMesh.uv);
                 mesh.subMeshCount = smr.sharedMesh.subMeshCount;
                 for (var s = 0; s < mesh.subMeshCount; s++) mesh.SetTriangles(smr.sharedMesh.GetTriangles(s), s);
+                if (rig != null)
+                {
+                    Capture(an, smr, low, mesh, rig);
+                    Gesture(an, smr, kind, rig);
+                }
                 mesh.RecalculateBounds();
                 return mesh;
             }

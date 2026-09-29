@@ -1195,8 +1195,65 @@ namespace HalfAware.EditorTools
                 places.Add(new BuildAlleyCrowd.Place { at = s.at, yaw = s.yaw, pose = pose, seller = s.seat == 1, scale = 1f + (s.scale - 1.01f) * 0.5f });
             }
             var sb = new System.Text.StringBuilder();
-            BuildAlleyCrowd.Build(parent, places, 4821, sb);
+            var walks = Walks();
+            // 道筋が、焼いた形のまま立っている人にどれだけ寄るか（歩く人に替えた人の元の置き場は見ない）
+            var standing = new List<Vector3>();
+            for (var i = 0; i < places.Count; i++)
+                if (walks.FindIndex(w => w.place == i) < 0) standing.Add(places[i].at);
+            foreach (var w in walks)
+            {
+                Vector3 near;
+                var gap = BuildAlleyCrowd.Clearance(w, standing, out near);
+                sb.AppendFormat("歩く人 P{0:00}: 道筋 {1:0.0} m、立っている人にいちばん寄る所 {2:0.00} m（{3}）", w.place, CrowdWalk.Length(w.points), gap, near.ToString("F1")).AppendLine();
+                if (gap < 0.8f) Debug.LogWarning("歩く人 P" + w.place.ToString("00") + " の道筋が、立っている人に " + gap.ToString("0.00") + " m まで寄る（" + near.ToString("F1") + "）");
+            }
+            BuildAlleyCrowd.Build(parent, places, 4821, sb, walks);
             Debug.Log(sb.ToString() + "壁や物に近くて見送った場所 " + Skipped);
+        }
+
+        /// <summary>
+        /// 歩く人の道筋（オーナー、2026-09-30「モブに動きがなさ過ぎて流石に違和感がある」）。群衆の置き場のうち、ここに挙げた番号の人を歩く人に替える
+        /// （人と服は同じ。<see cref="BuildAlleyCrowd.MakeWalker"/>）。番号は群衆の置き場の順（乱数を変えなければ動かない）。
+        ///
+        /// 通りは 5 人。車道の東寄りと真ん中を通りの南の外れ（z −21）から北の外れ（z 53）まで往復する人、西寄りを歩いて小路へ折れる人、
+        /// 通りを横切って両側の店を覗く人、北の店を覗いてから北の外れへ歩く人。通りの外れと小路の奥で、写っていない時に向きを変える。
+        /// ヤードは 3 人。通路の南の縁を出店（Stall0・Stall1）を覗きながら、北の縁を出店（Stall2〜4）を覗きながら往復する人と、
+        /// 小路からヤードの口まで来て辺りを見て戻る人。道筋は、立っている人から 0.8 m より寄らない所に引いてある（組み立てのたびに測って出す）
+        /// </summary>
+        static List<BuildAlleyCrowd.Walk> Walks()
+        {
+            var nan = float.NaN;
+            System.Func<int, Vector3[], float[], float[], float, float, bool, BuildAlleyCrowd.Walk> W = (place, pts, waits, faces, speed, start, hidden) =>
+                new BuildAlleyCrowd.Walk { place = place, points = pts, waits = waits, faces = faces, speed = speed, start = start, hidden = hidden };
+            var y = 0.02f;   // ヤードの敷石
+            return new List<BuildAlleyCrowd.Walk>
+            {
+                // 通り。東寄りを南北の外れまで
+                W(12, new[] { new Vector3(2.3f, 0f, -21f), new Vector3(2.3f, 0f, 53f) }, null, null, 1.25f, 0.35f, true),
+                // 通り。真ん中を南北の外れまで
+                W(20, new[] { new Vector3(0.8f, 0f, -19f), new Vector3(0.8f, 0f, 51f) }, null, null, 1.15f, 1.25f, true),
+                // 通り。西寄りを北へ歩き、道の真ん中の人を避けてから小路へ折れる
+                W(21, new[]
+                {
+                    new Vector3(-1.9f, 0f, -21f), new Vector3(-1.9f, 0f, 24f), new Vector3(-0.9f, 0f, 29f), new Vector3(-0.9f, 0f, 31f),
+                    new Vector3(-2.8f, 0f, 33.8f), new Vector3(-5.5f, 0f, 35.0f), new Vector3(-8.5f, 0f, 35.2f),
+                }, null, null, 1.2f, 0.55f, true),
+                // 通りを横切って、東の店と西の店の窓を覗く
+                W(19, new[] { new Vector3(3.3f, 0f, 12.0f), new Vector3(0.4f, 0f, 14.5f), new Vector3(-2.6f, 0f, 16.0f) },
+                    new[] { 3.5f, 0f, 3.0f }, new[] { 90f, nan, 270f }, 1.0f, 0.1f, true),
+                // 北の西の店を覗いてから、北の外れへ
+                W(22, new[] { new Vector3(-2.1f, 0f, 40.5f), new Vector3(0.3f, 0f, 45.0f), new Vector3(0.3f, 0f, 54f) },
+                    new[] { 4f, 0f, 0f }, new[] { 270f, nan, nan }, 1.1f, 1.6f, true),
+                // ヤード。通路の南の縁を、南の出店を覗きながら
+                W(29, new[] { new Vector3(-18.0f, y, 33.4f), new Vector3(-20.0f, y, 33.45f), new Vector3(-23.8f, y, 33.4f), new Vector3(-27.2f, y, 33.3f) },
+                    new[] { 2f, 3.5f, 3f, 2f }, new[] { nan, 180f, 180f, nan }, 0.9f, 0.2f, false),
+                // ヤード。通路の北の縁を、北の出店を覗きながら
+                W(33, new[] { new Vector3(-17.8f, y, 36.7f), new Vector3(-19.8f, y, 36.8f), new Vector3(-22.7f, y, 36.8f), new Vector3(-25.7f, y, 36.9f) },
+                    new[] { 2f, 3f, 3f, 3.5f }, new[] { nan, 0f, 0f, 0f }, 0.9f, 1.1f, false),
+                // 小路からヤードの口まで来て、辺りを見て戻る
+                W(36, new[] { new Vector3(-11.5f, y, 35.1f), new Vector3(-17.8f, y, 35.1f), new Vector3(-19.2f, y, 35.9f) },
+                    new[] { 0f, 0f, 3f }, new[] { nan, nan, 300f }, 1.0f, 0.7f, true),
+            };
         }
 
         /// <summary>
