@@ -44,29 +44,39 @@ namespace HalfAware.EditorTools
         {
             new Subject("01_sofa", new[] { "Room/Sofa", "Room/Pillow", "Room/Blanket", "Room/Binder" }, new[] { "Room/Sofa" }, new Vector3(1f, 0.55f, -0.3f)),
             new Subject("02_fridge", new[] { "Room/Fridge", "Room/Microwave" }, new[] { "Room/Fridge" }, new Vector3(0.35f, 0.3f, 1f), 40f),
-            new Subject("03_kitchen", new[] { "Room/KitchenCabinet", "Room/KitchenSink", "Room/CoffeeMachine" }, new[] { "Room/Kitchen" }, new Vector3(0.1f, 0.55f, 1f)),
-            new Subject("04_bookcase", new[] { "Room/Bookcase" }, new[] { "Room/Bookcase" }, new Vector3(1f, 0.15f, -0.3f), 42f),
+            new Subject("03_kitchen", new[] { "Room/KitchenCabinet", "Room/KitchenSink", "Room/CoffeeMachine" }, new[] { "Room/Kitchen" }, new Vector3(0.1f, 0.55f, 1f), 56f),
+            new Subject("04_bookcase", new[] { "Room/Bookcase" }, new[] { "Room/Bookcase" }, new Vector3(0.3f, 0.15f, -1f), 42f),
             new Subject("05_plant", new[] { "Room/PlantTall" }, new[] { "Room/Plant" }, new Vector3(-0.85f, 0.35f, 0.55f), 44f),
             new Subject("06_rug", new[] { "Room/Rug" }, new[] { "Room/Rug", "Room/LowTable" }, new Vector3(0.9f, 1.25f, -0.45f), 50f),
-            new Subject("07_boxes_entrance", new[] { "Room/BoxA", "Room/BoxB", "Room/BoxC" }, new[] { "Room/ShoeRack", "Room/UmbrellaStand" }, new Vector3(-0.8f, 0.6f, 0.75f)),
+            new Subject("07_boxes_entrance", new[] { "Room/BoxA", "Room/BoxB", "Room/BoxC" }, new[] { "Room/ShoeRack", "Room/UmbrellaStand", "Room/Picture3" }, new Vector3(-0.35f, 0.5f, 1f), 50f),
             new Subject("08_lowtable", null, new[] { "Room/LowTable", "Room/Binder" }, new Vector3(0.8f, 0.9f, -0.5f), 40f),
-            new Subject("09_floorlamp", null, new[] { "Room/FloorLamp" }, new Vector3(1f, 0.25f, -0.6f), 44f),
+            new Subject("09_floorlamp", null, new[] { "Room/FloorLamp" }, new Vector3(1f, 0.25f, 0.4f), 44f),
             new Subject("10_aircon", null, new[] { "Room/AirCon" }, new Vector3(1f, -0.25f, -0.35f), 40f),
-            new Subject("11_workcounter", null, new[] { "Room/WorkCounter", "Room/Stool" }, new Vector3(0.7f, 0.6f, 1f)),
+            new Subject("11_workcounter", null, new[] { "Room/WorkCounter", "Room/Stool", "Room/Bin" }, new Vector3(0.5f, 0.6f, 1f), 56f),
             new Subject("12_serverrack", null, new[] { "Room/ServerRack" }, new Vector3(0.45f, 0.3f, -1f), 44f),
             new Subject("13_chipshelf", null, new[] { "Room/ChipShelf" }, new Vector3(-1f, 0.3f, -0.4f), 42f),
             new Subject("14_bin", null, new[] { "Room/Bin" }, new Vector3(0.3f, 0.8f, 1f), 40f),
             new Subject("15_pictures_sofa_wall", null, new[] { "Room/Picture0", "Room/Picture1", "Room/Picture2" }, new Vector3(1f, 0.05f, 0f), 44f),
             new Subject("16_picture_hammershoi", null, new[] { "Room/Picture3" }, new Vector3(-1f, 0.0f, 0.15f), 36f),
-            new Subject("17_umbrella_shoes_close", null, new[] { "Room/UmbrellaStand" }, new Vector3(-0.3f, 0.7f, 1f), 36f),
+            new Subject("17_umbrella_shoes_close", null, new[] { "Room/UmbrellaStand", "Room/ShoeRack" }, new Vector3(-0.4f, 0.7f, 1f), 40f),
         };
 
         /// <summary>部屋ぜんたい。名前・目・見る所・画角</summary>
         static readonly object[][] Overall =
         {
-            new object[] { "o1_from_se", new Vector3(2.7f, 1.75f, -2.2f), new Vector3(-1.2f, 0.7f, 0.9f), 72f },
-            new object[] { "o2_from_ne", new Vector3(2.6f, 1.85f, 2.6f), new Vector3(-1.6f, 0.6f, -1.2f), 72f },
-            new object[] { "o3_from_nw", new Vector3(-2.2f, 1.7f, 2.5f), new Vector3(0.6f, 0.6f, -2.2f), 72f },
+            new object[] { "o1_from_east_window", new Vector3(2.6f, 1.8f, -1.2f), new Vector3(-3.5f, 0.7f, 1.2f), 72f },
+            new object[] { "o2_from_ne", new Vector3(2.4f, 1.9f, 1.4f), new Vector3(-3.5f, 0.6f, -0.6f), 72f },
+            new object[] { "o3_from_nw", new Vector3(-4.6f, 1.8f, 2.6f), new Vector3(0.5f, 0.6f, -1.0f), 72f },
+            new object[] { "o4_from_kitchen", new Vector3(-3.9f, 1.75f, -0.45f), new Vector3(-1.0f, 0.8f, 2.2f), 72f },
+            new object[] { "o5_hall_to_entrance", new Vector3(0f, 1.6f, -1.8f), new Vector3(0.2f, 0.7f, -4.9f), 64f },
+        };
+
+        /// <summary>家具ひとつを撮る間は、ほかの家具（前の物も後の物も）を写さない。部屋の形・机・椅子などは残す</summary>
+        static readonly string[] Furniture =
+        {
+            "Sofa", "Pillow", "Blanket", "Binder", "Rug", "LowTable", "FloorLamp", "AirCon", "Bookcase", "Books1", "Books2", "Books3", "Books4", "Books5", "Books6",
+            "Fridge", "Microwave", "Kitchen", "KitchenCabinet", "KitchenSink", "CoffeeMachine", "Bin", "WorkCounter", "Stool", "ServerRack", "ChipShelf",
+            "Plant", "PlantTall", "ShoeRack", "UmbrellaStand", "BoxA", "BoxB", "BoxC", "Picture0", "Picture1", "Picture2", "Picture3",
         };
 
         /// <summary>
@@ -127,6 +137,8 @@ namespace HalfAware.EditorTools
                 foreach (var t in before.Values) if (t != null) Object.DestroyImmediate(t);
                 ShaderUtil.allowAsyncCompilation = async;
                 TitleShots.Back(setup);
+                // 組んで捨てた場面の一時的な物を片付ける（溜まるとエディタの読み込み直しが遅くなる）
+                EditorUtility.UnloadUnusedAssetsImmediate();
             }
             File.WriteAllText(Path.Combine(dir, "preview_log.txt"), sb.ToString());
             return sb.ToString().TrimEnd();
@@ -154,6 +166,27 @@ namespace HalfAware.EditorTools
         /// <summary>物の並び（道筋）を囲む箱を、dir の向きから画角いっぱいに撮る。物が一つも無ければ null</summary>
         static Texture2D Frame(Subject s, string[] paths, float fill)
         {
+            var hidden = new List<Renderer>();
+            foreach (var name in Furniture)
+            {
+                if (Array.IndexOf(paths, "Room/" + name) >= 0) continue;
+                var go = GameObject.Find("Room/" + name);
+                if (go == null) continue;
+                foreach (var r in go.GetComponentsInChildren<Renderer>())
+                    if (r.enabled) { r.enabled = false; hidden.Add(r); }
+            }
+            try
+            {
+                return Frame(s, paths, fill, true);
+            }
+            finally
+            {
+                foreach (var r in hidden) r.enabled = true;
+            }
+        }
+
+        static Texture2D Frame(Subject s, string[] paths, float fill, bool alone)
+        {
             var any = false;
             var b = new Bounds();
             foreach (var p in paths)
@@ -168,13 +201,19 @@ namespace HalfAware.EditorTools
                 }
             }
             if (!any) return null;
+            // 天井へ上る煙突などで箱が縦に伸びすぎないよう、撮る広さは床から 2.3 m までに
+            if (b.max.y > 2.3f && b.min.y < 1.5f) b.SetMinMax(b.min, new Vector3(b.max.x, 2.3f, b.max.z));
             var radius = b.extents.magnitude;
             var dist = radius / Mathf.Sin(s.Fov * 0.5f * Mathf.Deg2Rad) * 0.92f;
             var eye = b.center + s.Dir.normalized * dist;
             // 部屋の中に収める（壁の外から撮らない）
-            eye.x = Mathf.Clamp(eye.x, -2.85f, 2.85f);
-            eye.z = Mathf.Clamp(eye.z, -2.85f, 2.85f);
-            eye.y = Mathf.Clamp(eye.y, 0.15f, 2.9f);
+            // 見る物の居る区画（LDK か廊下）の壁の面の内に
+            var inHall = b.center.z < RoomPlan.Ldk.yMin;
+            var area = inHall ? RoomPlan.Hall : RoomPlan.Ldk;
+            var inset = RoomPlan.Wall * 0.5f + 0.1f;
+            eye.x = Mathf.Clamp(eye.x, area.xMin + inset, area.xMax - inset);
+            eye.z = Mathf.Clamp(eye.z, area.yMin + inset, area.yMax - inset);
+            eye.y = Mathf.Clamp(eye.y, 0.15f, RoomPlan.Ceiling - 0.1f);
             return Shoot(eye, b.center, s.Fov, fill);
         }
 

@@ -6,7 +6,7 @@
 | `quaternius/` | Quaternius Ultimate Modular Women（https://quaternius.com/packs/ultimatemodularwomen.html） | 下の注記を参照 |
 | `quaternius/` | Quaternius Ultimate Modular Men（https://quaternius.com/packs/ultimatemodularcharacters.html） | 下の注記を参照 |
 | `rocketbox/` | Microsoft Rocketbox Avatar Library（https://github.com/microsoft/Microsoft-Rocketbox） | MIT。下の注記を参照 |
-| `generated/` | 自作。`Assets/Editor/ProcMesh.cs` で断面を張って作った物 | 本作の一部 |
+| `generated/` | 自作。`Assets/Editor/ProcMesh.cs` で断面を張って作った物と、道具で組んだ物（椅子は `BuildChairShape.cs`、自室の家具は `FurnitureKit.cs`） | 本作の一部 |
 
 Kenney の素材は CC0 なので表示の義務は無いが、どこから来た物かを残すために記録する。
 
@@ -269,3 +269,16 @@ FBX は手を加えずに写し、頭・透け（と眼鏡）は 512、体は 25
 - 縮めた写しは `Assets/Editor/Rocketbox/RocketboxTextures.cs`（メニューの HalfAware/Rocketbox/Shrink the textures。人は `RocketboxPerson.cs` に並べてある）で、元の TGA から作り直せる。線形の光で 4×4 を平均し、透けのある絵は α で重みを付けた
 - 法線と光沢のテクスチャ、付いてくる動き（3ds Max の形式で Unity では読めない）は落としていない
 - 取り込みの設定は `Assets/Editor/Rocketbox/RocketboxImport.cs` が `Assets/Models/rocketbox/` の下にだけ掛ける。Rocketbox に同梱の `FixRocketboxMaxImport.cs` はプロジェクトの全部の取り込みに掛かり、Quaternius の模型を取り込むたびに例外を出すので入れていない
+
+## 額の絵（自室の家具）
+
+自室の家具（`Assets/Editor/BuildFurniture*.cs`）の額に入れる絵。どれも作者の没後 70 年を大きく過ぎたパブリックドメインの絵画で、元の画像は `unity/RawAssets/art/`（git に入れない）に置き、`tools/make-paintings.py` で長い辺 128 画素に縮めた物だけを `Assets/Textures/Furniture/Paintings/` に入れた。組み立ての道具が家具のアトラス（`FurnitureAtlas.png`）の右の半分へ写す。
+
+| 絵 | 作者・年 | 所蔵 | 画像の出所 | Assets の写し |
+|---|---|---|---|---|
+| 『春』（Le Printemps） | ジャン＝フランソワ・ミレー、1868–73 | オルセー美術館 | オーナーが渡した画像（1090×850） | `MilletSpring.png`（128×100） |
+| 『戦艦テメレール号』（The Fighting Temeraire） | J. M. W. ターナー、1839 | ナショナル・ギャラリー（ロンドン） | オーナーが渡した画像（2000×1413） | `TurnerTemeraire.png`（128×90） |
+| 『開いた窓の前の静物（ラヴィニャン広場）』 | フアン・グリス、1915 | フィラデルフィア美術館 | Wikimedia Commons の幅 960 の縮小版（https://commons.wikimedia.org/wiki/File:Juan_Gris_(Jos%C3%A9_Victoriano_Gonz%C3%A1lez_P%C3%A9rez),_Spanish_-_Still_Life_before_an_Open_Window,_Place_Ravignan_-_Google_Art_Project.jpg 。PD-Art・CC-PD-Mark） | `GrisPlaceRavignan.png`（97×128） |
+| 『陽光の中で踊る塵』（Støvkornenes dans i solstrålerne） | ヴィルヘルム・ハマスホイ、1900 | オードロップゴー美術館 | Wikimedia Commons の原寸（https://commons.wikimedia.org/wiki/File:Hammersh%C3%B8i_Dust_motes_dancing.jpg 。1609×1890、CC-PD-Mark） | `HammershoiDustMotes.png`（109×128） |
+
+作者の没年は、ミレー 1875 年、ターナー 1851 年、グリス 1927 年、ハマスホイ 1916 年。絵の写真（平面の絵を正面から写した物）に新しい著作権は生じない扱い（PD-Art）で、Commons でもそう表示されている。

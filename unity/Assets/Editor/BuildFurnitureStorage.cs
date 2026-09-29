@@ -241,6 +241,12 @@ namespace HalfAware.EditorTools
                 if (u.Name == "Patch") patchY = y + high * 0.5f;
                 y += high;
             }
+            // 上の段の棚板。閉じた古いノートと、外付けの箱（灯り一つ）
+            var shelfY = y + U;
+            kit.Box("RackShelf", new Vector3(0f, shelfY + 0.005f, faceZ - 0.2f), new Vector3(0.48f, 0.01f, 0.40f), black);
+            kit.RoundBox("RackLaptop", new Vector3(-0.06f, shelfY + 0.022f, faceZ - 0.16f), R(0f, 6f, 0f), new Vector3(0.33f, 0.024f, 0.23f), 0.006f, Sw(Hue.PlasticGrey), null, 1, 1f, NoBottom);
+            kit.RoundBox("RackDrive", new Vector3(0.17f, shelfY + 0.045f, faceZ - 0.12f), R(0f, -4f, 0f), new Vector3(0.07f, 0.07f, 0.16f), 0.008f, Sw(Hue.PlasticDark), null, 1, 1f, NoBottom);
+            leds.Decal("Led", new Vector3(0.17f + 0.02f, shelfY + 0.06f, faceZ - 0.12f + 0.0805f), new Vector3(-0.0035f, 0f, 0f), new Vector3(0f, 0.0025f, 0f), new Rect(BlinkUv(9), Vector2.zero));
             // ケーブルの束。スイッチとパッチパネルの口から前へ出て、右の柱の前を床へ降り、後ろへ抜ける
             var colours = new[] { Hue.CableBlue, Hue.CableYellow, Hue.CableGrey, Hue.CableBlue, Hue.CableBlack, Hue.CableRed, Hue.CableBlue };
             for (var k = 0; k < colours.Length; k++)
@@ -261,7 +267,7 @@ namespace HalfAware.EditorTools
                     new Vector3(W * 0.5f + 0.03f, 0.006f, 0.05f - k * 0.01f),
                     new Vector3(W * 0.5f + 0.06f, 0.006f, -D * 0.5f - 0.05f),
                 };
-                kit.Tube("RackCable", Smooth(pts, 3), 0.0035f, 4, Sw(colours[k]));
+                kit.Tube("RackCable", Smooth(pts, 2), 0.0035f, 3, Sw(colours[k]));
             }
             // 束ねる帯
             foreach (var by in new[] { 0.3f, 0.6f })
@@ -328,28 +334,28 @@ namespace HalfAware.EditorTools
 
         // ---- 靴置き ----------------------------------------------------------------------
 
-        /// <summary>靴置き（長さ 0.80・奥行き 0.30・高さ 0.48。黒い鉄の枠に木の桟の三段）。下にスニーカーとブーツ、中に革の短靴</summary>
+        /// <summary>靴置き（長さ 0.80・奥行き 0.30・高さ 0.34。黒い鉄の枠に木の桟の二段）。上の段に革の短靴とスニーカー、下の段にブーツ</summary>
         static void ShoeRack(FurnitureKit kit)
         {
-            const float L = 0.80f, D = 0.30f;
+            const float L = 0.80f, D = 0.30f, H = 0.34f;
             var metal = Sw(Hue.Black);
             foreach (var sx in new[] { -1f, 1f })
             {
                 foreach (var sz in new[] { -1f, 1f })
-                    kit.Box("ShoeRackLeg", new Vector3(sx * (L * 0.5f - 0.01f), 0.24f, sz * (D * 0.5f - 0.01f)), new Vector3(0.02f, 0.48f, 0.02f), metal, NoBottom);
-                foreach (var y in new[] { 0.06f, 0.27f, 0.47f })
+                    kit.Box("ShoeRackLeg", new Vector3(sx * (L * 0.5f - 0.01f), H * 0.5f, sz * (D * 0.5f - 0.01f)), new Vector3(0.02f, H, 0.02f), metal, NoBottom);
+                foreach (var y in new[] { 0.06f, H - 0.01f })
                     kit.Box("ShoeRackRail", new Vector3(sx * (L * 0.5f - 0.01f), y, 0f), new Vector3(0.02f, 0.02f, D - 0.02f), metal);
             }
-            foreach (var y in new[] { 0.075f, 0.285f, 0.485f })
+            foreach (var y in new[] { 0.075f, H + 0.006f })
                 for (var k = 0; k < 3; k++)
-                    kit.RoundBox("ShoeRackSlat", new Vector3(0f, y, -D * 0.5f + 0.05f + k * 0.1f), Quaternion.identity, new Vector3(L - 0.04f, 0.012f, 0.07f), 0.003f, Oak, null, 1, 0.5f);
-            // 靴
-            Shoe(kit, new Vector3(-0.28f, 0.081f, 0.0f), 4f, Hue.SneakerWhite, false, 0.27f);
-            Shoe(kit, new Vector3(-0.16f, 0.081f, 0.01f), -3f, Hue.SneakerWhite, false, 0.27f);
-            Shoe(kit, new Vector3(0.10f, 0.081f, -0.01f), 2f, Hue.LeatherBlack, true, 0.29f);
-            Shoe(kit, new Vector3(0.24f, 0.081f, 0.0f), -6f, Hue.LeatherBlack, true, 0.29f);
-            Shoe(kit, new Vector3(-0.08f, 0.291f, 0.0f), 3f, Hue.LeatherBrown, false, 0.28f);
-            Shoe(kit, new Vector3(0.04f, 0.291f, 0.01f), -2f, Hue.LeatherBrown, false, 0.28f);
+                    kit.Box("ShoeRackSlat", new Vector3(0f, y, -D * 0.5f + 0.05f + k * 0.1f), new Vector3(L - 0.04f, 0.012f, 0.07f), Oak);
+            var top = H + 0.012f;
+            Shoe(kit, new Vector3(-0.27f, top, 0.0f), 4f, Hue.LeatherBrown, false, 0.28f);
+            Shoe(kit, new Vector3(-0.15f, top, 0.01f), -3f, Hue.LeatherBrown, false, 0.28f);
+            Shoe(kit, new Vector3(0.10f, top, -0.01f), 8f, Hue.SneakerWhite, false, 0.27f);
+            Shoe(kit, new Vector3(0.23f, top, 0.02f), -5f, Hue.SneakerWhite, false, 0.27f);
+            Shoe(kit, new Vector3(-0.10f, 0.081f, 0.0f), 2f, Hue.LeatherBlack, true, 0.29f);
+            Shoe(kit, new Vector3(0.04f, 0.081f, -0.01f), -6f, Hue.LeatherBlack, true, 0.29f);
         }
 
         /// <summary>靴の片方（前が +z）。底と、つま先へ低く細る甲。boot なら踵の側を高く</summary>
@@ -357,7 +363,7 @@ namespace HalfAware.EditorTools
         {
             using (kit.At(at, yaw))
             {
-                kit.RoundBox("ShoeSole", new Vector3(0f, 0.012f, 0f), Quaternion.identity, new Vector3(0.095f, 0.024f, length), 0.01f, Sw(upper == Hue.SneakerWhite ? Hue.SneakerWhite : Hue.Sole), null, 1, 1f, NoBottom);
+                kit.Box("ShoeSole", new Vector3(0f, 0.012f, 0f), new Vector3(0.095f, 0.024f, length), Sw(upper == Hue.SneakerWhite ? Hue.SneakerWhite : Hue.Sole), NoBottom);
                 var high = boot ? 0.16f : 0.075f;
                 kit.RoundBox("ShoeUpper", new Vector3(0f, 0.024f + high * 0.5f, -0.01f), Quaternion.identity, new Vector3(0.09f, high, length - 0.03f), 0.03f, Sw(upper),
                     (p, c) =>
@@ -366,7 +372,7 @@ namespace HalfAware.EditorTools
                         if (c.y > -0.5f) p.y -= (c.y + 0.5f) / 1.5f * high * (boot ? 0.72f : 0.5f) * toe * toe;
                         p.x *= 1f - 0.18f * toe * toe;
                         return p;
-                    }, 1, 0.06f, NoBottom);
+                    }, 1, 0.12f, NoBottom);
                 if (!boot) kit.Decal("ShoeOpening", new Vector3(0f, 0.024f + high + 0.001f, -0.06f), new Vector3(0.02f, 0f, 0f), new Vector3(0f, 0f, 0.04f), new Rect(SwatchUv(Hue.Black), Vector2.zero));
             }
         }

@@ -53,7 +53,7 @@ namespace HalfAware.EditorTools
                 Puff(new Vector3(0.004f, 0f, 0.008f)), 1, 0.3f, NoBottom);
             // 背の枠（y 0.07〜0.87、少し後ろへ倒す）
             kit.RoundBox("SofaBackFrame", new Vector3(0f, 0.47f, -D * 0.5f + 0.09f), R(-4f, 0f, 0f), new Vector3(L - 0.04f, 0.80f, 0.18f), 0.06f, fabric,
-                Puff(new Vector3(0.006f, 0.01f, 0.012f)), 2, 0.25f, NoBottom);
+                Puff(new Vector3(0.006f, 0.01f, 0.012f)), 1, 0.35f, NoBottom);
             // 肘（y 0.07〜0.67）。上の縁を外へ巻く
             foreach (var s in new[] { -1f, 1f })
             {
@@ -64,7 +64,7 @@ namespace HalfAware.EditorTools
                         p = Puff(new Vector3(0.016f, 0.02f, 0.01f))(p, c);
                         if (c.y > 0.5f) p.x += side * 0.014f * (c.y - 0.5f) * 2f * (1f - c.z * c.z);
                         return p;
-                    }, 2, 0.2f, NoBottom);
+                    }, 2, 0.3f, NoBottom);
             }
             // 座のクッション（y 0.29〜0.47）。寝た体の窪み: 肩（全体の x −0.45）と腰（x 0）
             var cushionW = (L - 0.42f) * 0.5f - 0.004f;
@@ -81,7 +81,7 @@ namespace HalfAware.EditorTools
                         // 前の縁の張りの皺
                         if (c.z > 0.6f && c.y > 0f) p.y += 0.004f * Mathf.Sin(p.x * 38f) * (c.z - 0.6f) * 2.5f;
                         return p;
-                    }, 2, 0.12f, NoBottom);
+                    }, 2, 0.25f, NoBottom);
             }
             // 背のクッション（下の後ろの縁を座の後ろに沈め、上を後ろへ 12 度倒す）。真ん中に寄りかかった横の皺
             foreach (var s in new[] { -1f, 1f })
@@ -94,7 +94,7 @@ namespace HalfAware.EditorTools
                         if (c.z > 0f) p.z -= 0.014f * Mathf.Exp(-(c.y + 0.15f) * (c.y + 0.15f) / 0.02f) * (1f - c.x * c.x) * c.z;
                         if (c.z > 0f) p.z -= 0.010f * Mathf.Exp(-((p.x + s * 0.05f) * (p.x + s * 0.05f)) / 0.03f) * c.z * (c.y < 0.2f ? 1f : 0.3f);
                         return p;
-                    }, 2, 0.13f, NoBottom);
+                    }, 2, 0.2f, FurnitureKit.Sides.Top | FurnitureKit.Sides.Front | FurnitureKit.Sides.Left | FurnitureKit.Sides.Right);
             }
             // 枕（左の肘に寄せて、肘の方を持ち上げる。頭の窪み）
             kit.RoundBox("SofaPillow", new Vector3(-L * 0.5f + 0.40f, SofaSeat + 0.045f, 0.07f), R(0f, 6f, -16f), new Vector3(0.36f, 0.13f, 0.52f), 0.06f, Cotton,
@@ -103,7 +103,7 @@ namespace HalfAware.EditorTools
                     p = Puff(new Vector3(0.02f, 0.045f, 0.02f))(p, c);
                     p = Dent(p, c, 0.02f, 0.01f, 0.10f, 0.13f, 0.035f);
                     return p;
-                }, 2, 0.12f);
+                }, 2, 0.22f);
             // 丸めた毛布（二つの塊）
             FurnitureKit.Deform folds = (p, c) =>
             {
@@ -113,8 +113,8 @@ namespace HalfAware.EditorTools
                 p.z += 0.010f * Mathf.Sin(p.y * 27f - p.x * 13f);
                 return p;
             };
-            kit.RoundBox("Blanket", new Vector3(0.42f, SofaSeat + 0.07f, 0.06f), R(0f, 18f, 3f), new Vector3(0.62f, 0.20f, 0.56f), 0.075f, Wool, folds, 2, 0.1f);
-            kit.RoundBox("BlanketFold", new Vector3(0.20f, SofaSeat + 0.15f, 0.14f), R(4f, -24f, -7f), new Vector3(0.44f, 0.11f, 0.38f), 0.05f, Wool, folds, 2, 0.1f);
+            kit.RoundBox("Blanket", new Vector3(0.42f, SofaSeat + 0.07f, 0.06f), R(0f, 18f, 3f), new Vector3(0.62f, 0.20f, 0.56f), 0.075f, Wool, folds, 1, 0.16f);
+            kit.RoundBox("BlanketFold", new Vector3(0.20f, SofaSeat + 0.15f, 0.14f), R(4f, -24f, -7f), new Vector3(0.44f, 0.11f, 0.38f), 0.05f, Wool, folds, 1, 0.16f);
             // 座の前の縁から垂れる裾
             kit.Sheet("BlanketTail", (u, v) =>
             {
@@ -146,7 +146,7 @@ namespace HalfAware.EditorTools
                 if (c.y > 0.5f) p.y += 0.005f * (Mathf.PerlinNoise(p.x * 9f + 3.1f, p.z * 9f + 7.7f) - 0.5f);
                 return p;
             };
-            kit.RoundBox("RugPile", new Vector3(0f, 0.01f, 0f), Quaternion.identity, new Vector3(wide, 0.02f, lng), 0.006f, Fur, pile, 1, 0.15f, NoBottom, 70f);
+            kit.RoundBox("RugPile", new Vector3(0f, 0.01f, 0f), Quaternion.identity, new Vector3(wide, 0.02f, lng), 0.006f, Fur, pile, 1, 0.45f, NoBottom, 70f);
             // 縁の毛羽。辺に沿って 4.5 cm ごとに、外と上へ跳ねた小さな房
             kit.Begin("RugFluff", 75f);
             var hw = wide * 0.5f;
@@ -284,16 +284,16 @@ namespace HalfAware.EditorTools
                 var radii = new List<float>();
                 for (var i = 0; i < path.Length; i++) radii.Add(Mathf.Lerp(0.016f, 0.006f, (float)i / (path.Length - 1)));
                 kit.TubeR("PlantStem", path, radii, 5, Sw(Hue.Stem));
-                var count = 9 + s;
+                var count = 14 + s * 2;
                 for (var k = 0; k < count; k++)
                 {
-                    var f = 0.32f + 0.68f * k / (count - 1);
+                    var f = 0.2f + 0.8f * k / (count - 1);
                     var at = Along(path, f);
                     var azimuth = (k * 137.5f + s * 57f) * Mathf.Deg2Rad;
                     var elev = Mathf.Lerp(-8f, 42f, f) * Mathf.Deg2Rad;
                     var dir = new Vector3(Mathf.Sin(azimuth) * Mathf.Cos(elev), Mathf.Sin(elev), Mathf.Cos(azimuth) * Mathf.Cos(elev));
-                    var len = Mathf.Lerp(0.30f, 0.20f, f) * (0.9f + 0.2f * Hash(k, s + 40));
-                    Leaf(kit, at + dir * 0.015f, dir, len, len * 0.58f, Mathf.Lerp(0.35f, 0.12f, f), leaf);
+                    var len = Mathf.Lerp(0.36f, 0.24f, f) * (0.9f + 0.2f * Hash(k, s + 40));
+                    Leaf(kit, at + dir * 0.015f, dir, len, len * 0.62f, Mathf.Lerp(0.35f, 0.12f, f), leaf);
                 }
             }
         }
@@ -317,7 +317,7 @@ namespace HalfAware.EditorTools
             kit.Sheet("Leaf", (u, v) =>
             {
                 var s = (u - 0.5f) * 2f;
-                var half = wide * 0.5f * Mathf.Pow(Mathf.Sin(Mathf.PI * Mathf.Clamp01(v)), 0.7f) * (0.55f + 0.6f * v);
+                var half = wide * 0.5f * Mathf.Pow(Mathf.Max(0f, Mathf.Sin(Mathf.PI * Mathf.Clamp01(v))), 0.7f) * (0.55f + 0.6f * v);
                 return at + dir * (len * v) + side * (s * half) + up * (Mathf.Abs(s) * half * 0.35f) - Vector3.up * (droop * v * v * len);
             }, 2, 4, tile, true, 80f);
         }
@@ -334,10 +334,10 @@ namespace HalfAware.EditorTools
             const float M = 0.022f, Depth = 0.026f;
             var moulding = k < 2 ? Sw(Hue.FrameWood) : Sw(Hue.FrameBlack);
             kit.Box("FrameBack", new Vector3(0f, 0f, 0.005f), new Vector3(w + M, h + M, 0.01f), Sw(Hue.Black));
-            kit.RoundBox("FrameTop", new Vector3(0f, (h + M) * 0.5f, Depth * 0.5f), Quaternion.identity, new Vector3(w + 2f * M, M, Depth), 0.004f, moulding, null, 1, 1f);
-            kit.RoundBox("FrameBottom", new Vector3(0f, -(h + M) * 0.5f, Depth * 0.5f), Quaternion.identity, new Vector3(w + 2f * M, M, Depth), 0.004f, moulding, null, 1, 1f);
-            kit.RoundBox("FrameLeft", new Vector3(-(w + M) * 0.5f, 0f, Depth * 0.5f), Quaternion.identity, new Vector3(M, h, Depth), 0.004f, moulding, null, 1, 1f);
-            kit.RoundBox("FrameRight", new Vector3((w + M) * 0.5f, 0f, Depth * 0.5f), Quaternion.identity, new Vector3(M, h, Depth), 0.004f, moulding, null, 1, 1f);
+            kit.Box("FrameTop", new Vector3(0f, (h + M) * 0.5f, Depth * 0.5f), new Vector3(w + 2f * M, M, Depth), moulding);
+            kit.Box("FrameBottom", new Vector3(0f, -(h + M) * 0.5f, Depth * 0.5f), new Vector3(w + 2f * M, M, Depth), moulding);
+            kit.Box("FrameLeft", new Vector3(-(w + M) * 0.5f, 0f, Depth * 0.5f), new Vector3(M, h, Depth), moulding);
+            kit.Box("FrameRight", new Vector3((w + M) * 0.5f, 0f, Depth * 0.5f), new Vector3(M, h, Depth), moulding);
             // 前（+z）から見て絵が裏返らないよう、u は −x へ
             kit.Decal("Canvas", new Vector3(0f, 0f, 0.012f), new Vector3(-w * 0.5f, 0f, 0f), new Vector3(0f, h * 0.5f, 0f), PictureUv[k]);
         }

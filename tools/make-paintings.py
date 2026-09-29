@@ -7,7 +7,7 @@ unity/Assets/Textures/Furniture/Paintings/ に書き、HalfAware/Build the room 
 
   - MilletSpring        ミレー『春』（1868–73、オルセー美術館）。オーナーが渡した画像
   - TurnerTemeraire     ターナー『戦艦テメレール号』（1839、ナショナル・ギャラリー）。オーナーが渡した画像
-  - GrisPlaceRavignan   グリス『開いた窓の前の静物（ラヴィニャン広場）』（1915、フィラデルフィア美術館）。Wikimedia Commons の幅 1024 の縮小版
+  - GrisPlaceRavignan   グリス『開いた窓の前の静物（ラヴィニャン広場）』（1915、フィラデルフィア美術館）。Wikimedia Commons の幅 960 の縮小版
   - HammershoiDustMotes ハマスホイ『陽光の中で踊る塵』（1900、オードロップゴー美術館）。Wikimedia Commons の原寸
 
 出典と許諾は unity/Assets/Models/LICENSES.md の「額の絵」。元の画像が無い絵は飛ばす（額は下塗りの布で組まれる）。

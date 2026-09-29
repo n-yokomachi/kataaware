@@ -110,7 +110,7 @@ namespace HalfAware.EditorTools
             S(0.780f, 0.700f, 0.550f, 0.10f, 0.55f), S(1.000f, 0.850f, 0.600f, 0.10f, 1.20f), S(0.400f, 1.000f, 0.550f, 0.50f, 1.0f), S(0.300f, 0.550f, 1.000f, 0.50f, 1.0f),
             S(1.000f, 0.620f, 0.180f, 0.50f, 1.0f), S(1.000f, 0.280f, 0.250f, 0.50f, 1.0f), S(0.300f, 0.900f, 1.000f, 0.50f, 1.0f), S(0.080f, 0.100f, 0.220f, 0.60f),
             S(0.550f, 0.420f, 0.150f, 0.60f), S(0.450f, 0.220f, 0.120f, 0.25f),
-            S(0.300f, 0.255f, 0.225f, 0.12f), S(0.170f, 0.145f, 0.130f, 0.10f), S(0.340f, 0.130f, 0.140f, 0.05f), S(0.170f, 0.200f, 0.220f, 0.30f),
+            S(0.300f, 0.255f, 0.225f, 0.12f), S(0.170f, 0.145f, 0.130f, 0.10f), S(0.340f, 0.130f, 0.140f, 0.05f), S(0.120f, 0.180f, 0.165f, 0.30f),
             S(0.360f, 0.250f, 0.150f, 0.35f), S(0.200f, 0.130f, 0.080f, 0.35f), S(0.045f, 0.045f, 0.050f, 0.35f), S(0.520f, 0.500f, 0.430f, 0.05f),
             S(0.200f, 0.240f, 0.260f, 0.90f), S(0.030f, 0.030f, 0.035f, 0.40f),
             S(0.700f, 0.700f, 0.680f, 0.30f), S(0.620f, 0.600f, 0.560f, 0.60f), S(0.520f, 0.500f, 0.460f, 0.50f),
@@ -145,12 +145,12 @@ namespace HalfAware.EditorTools
         static Tile Tiled(RectInt area, float metre) { return new Tile(Uv(area), metre); }
         static Tile Whole(Rect uv) { return new Tile(uv, 0f); }
 
-        static Tile Fabric { get { return Tiled(FabricArea, 0.24f); } }
+        static Tile Fabric { get { return Tiled(FabricArea, 0.30f); } }
         static Tile Wool { get { return Tiled(WoolArea, 0.16f); } }
         static Tile Cotton { get { return Tiled(CottonArea, 0.22f); } }
         static Tile Oak { get { return Tiled(OakArea, 0.40f); } }
         static Tile Walnut { get { return Tiled(WalnutArea, 0.40f); } }
-        static Tile SteelBrushed { get { return Tiled(SteelArea, 0.32f); } }
+        static Tile SteelBrushed { get { return Tiled(SteelArea, 0.5f); } }
         static Tile Laminate { get { return Tiled(LaminateArea, 0.32f); } }
         static Tile Fur { get { return Tiled(FurArea, 0.45f); } }
 
@@ -379,7 +379,7 @@ namespace HalfAware.EditorTools
             }
         }
 
-        /// <summary>台所の戸。艶を消した青灰の化粧板</summary>
+        /// <summary>台所の戸。艶を消した深い緑の化粧板</summary>
         static void PaintLaminate(Canvas cv)
         {
             var r = LaminateArea;
@@ -435,21 +435,21 @@ namespace HalfAware.EditorTools
                 var sy = Mathf.FloorToInt(Hash(k, 2) * r.height);
                 var dir = Mathf.FloorToInt(Hash(k, 3) * 4f);
                 var len = 2 + Mathf.FloorToInt(Hash(k, 4) * 2f);
-                var lift = 0.18f + 0.22f * Hash(k, 5);
+                var lift = 0.10f + 0.14f * Hash(k, 5);
                 for (var i = 0; i < len; i++)
                 {
                     var x = sx + (dir == 0 ? i : dir == 1 ? -i : dir == 2 ? i : 0);
                     var y = sy + (dir == 0 ? 0 : dir == 1 ? i : dir == 2 ? i : i);
                     x = ((x % r.width) + r.width) % r.width;
                     y = ((y % r.height) + r.height) % r.height;
-                    px[y * r.width + x] += lift * (i == len - 1 ? 1.3f : 1f);
+                    px[y * r.width + x] += lift * (i == len - 1 ? 1.15f : 1f);
                 }
             }
             for (var k = 0; k < 260; k++)
             {
                 var x = Mathf.FloorToInt(Hash(k, 11) * r.width);
                 var y = Mathf.FloorToInt(Hash(k, 12) * r.height);
-                px[y * r.width + x] *= 0.55f;
+                px[y * r.width + x] *= 0.7f;
             }
             for (var y = 0; y < r.height; y++)
                 for (var x = 0; x < r.width; x++)

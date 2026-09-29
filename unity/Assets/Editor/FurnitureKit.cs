@@ -62,6 +62,8 @@ namespace HalfAware.EditorTools
         string piece;
 
         public int TriangleCount { get; private set; }
+        /// <summary>部品の名前ごとの三角の数（重さの内訳を見るため）</summary>
+        public readonly Dictionary<string, int> PieceTriangles = new Dictionary<string, int>();
         public int VertexCount { get { return verts.Count; } }
 
         public FurnitureKit()
@@ -223,6 +225,9 @@ namespace HalfAware.EditorTools
                 for (var k = 1; k <= 3; k++) tris[sub].Add(part[f * 4 + k]);
             }
             TriangleCount += count;
+            int had;
+            PieceTriangles.TryGetValue(piece ?? "", out had);
+            PieceTriangles[piece ?? ""] = had + count;
             part.Clear();
             shared.Clear();
         }

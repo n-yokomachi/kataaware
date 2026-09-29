@@ -44,49 +44,61 @@ namespace HalfAware.EditorTools
         /// </summary>
         public static readonly bool LayoutSettled = false;
 
-        /// <summary>置き場ひとつ。床の物は足元の真ん中、壁の物は壁に付く背の真ん中。Yaw は 0 で前が +z（北）。Length は長さを変えられる物（台所・作業台）だけ</summary>
+        /// <summary>
+        /// 置き場ひとつ。床の物は足元の真ん中、壁の物は壁に付く背の真ん中。Yaw は 0 で前が +z（北）。
+        /// Length・Wide は大きさを変えられる物だけ（台所・作業台は長さ、ラグは長い辺と短い辺）。0 なら既定
+        /// </summary>
         public struct Place
         {
             public string Name;
             public Vector3 At;
             public float Yaw;
             public float Length;
+            public float Wide;
 
-            public Place(string name, float x, float y, float z, float yaw, float length = 0f)
+            public Place(string name, float x, float y, float z, float yaw, float length = 0f, float wide = 0f)
             {
                 Name = name;
                 At = new Vector3(x, y, z);
                 Yaw = yaw;
                 Length = length;
+                Wide = wide;
             }
         }
 
         /// <summary>
-        /// 置き場の表。**今は段 A の仮置き（6×6 m の今の部屋）。** 間取り（LDK x −5..3・z −1.5..3、南の廊下と玄関）が組まれたら、
-        /// 部屋の形の担当の後にこの表を直して <see cref="LayoutSettled"/> を true にする
+        /// 置き場の表。**段 A の仮置き。** 部屋の形（<see cref="RoomPlan"/>。LDK x −5〜3・z −1.5〜3、南の廊下と玄関）の壁の面に合わせて、
+        /// 親から知らされた区画（台所・作業台・居間・仕事の区画・東の窓の前・玄関の脇）へ置いた。段 B で親の置き場を受けて直し、<see cref="LayoutSettled"/> を true にする
         /// </summary>
         public static readonly Place[] Layout =
         {
-            new Place("Sofa", -2.45f, 0f, 0.45f, 90f),
-            new Place("Rug", -1.20f, 0f, 0.60f, 0f),
-            new Place("LowTable", -1.25f, 0f, 0.55f, 90f),
-            new Place("FloorLamp", -2.60f, 0f, 1.80f, 0f),
-            new Place("AirCon", -2.90f, 2.36f, 0.45f, 90f),
-            new Place("Bookcase", -2.75f, 0f, 2.48f, 90f),
-            new Place("Fridge", -2.58f, 0f, -2.56f, 0f),
-            new Place("Kitchen", -1.01f, 0f, -2.60f, 0f, 2.50f),
-            new Place("Bin", 0.40f, 0f, -2.05f, 0f),
-            new Place("WorkCounter", -0.60f, 0f, -1.40f, 0f, 1.10f),
-            new Place("Stool", -0.60f, 0f, -0.84f, 20f),
+            // 居間（x −5〜−0.5・z 0.5〜3）。ソファは西の壁に背を付けて東を向き、前にラグとローテーブル、南の端にフロアランプ、上の壁にエアコンと三枚の絵
+            new Place("Sofa", -4.45f, 0f, 1.70f, 90f),
+            new Place("Rug", -3.25f, 0f, 1.55f, 0f, 2.10f, 1.70f),
+            new Place("LowTable", -3.30f, 0f, 1.62f, 90f),
+            new Place("FloorLamp", -4.60f, 0f, 0.42f, 0f),
+            new Place("AirCon", -4.90f, 2.36f, 1.70f, 90f),
+            new Place("Picture2", -4.90f, 1.50f, 0.91f, 90f),
+            new Place("Picture1", -4.90f, 1.48f, 1.62f, 90f),
+            new Place("Picture0", -4.90f, 1.48f, 2.41f, 90f),
+            // 本棚は北の二つの窓の間の壁（x −3.32〜−1.78）
+            new Place("Bookcase", -2.60f, 0f, 2.75f, 180f),
+            // 台所（南の壁沿い x −5〜−0.6）。南西の角に冷蔵庫、その東に流しとコンロの並び
+            new Place("Fridge", -4.58f, 0f, -1.06f, 0f),
+            new Place("Kitchen", -2.44f, 0f, -1.10f, 0f, 3.64f),
+            // 作業台（x −4〜−1.2・z −0.1〜0.5）。居間の側に丸椅子、東の端にごみ箱
+            new Place("WorkCounter", -2.60f, 0f, 0.20f, 0f, 2.80f),
+            new Place("Stool", -1.90f, 0f, 0.78f, 20f),
+            new Place("Bin", -0.98f, 0f, -0.36f, 0f),
+            // 仕事の区画（x 0〜3・z 0.3〜3）。机の西の脇にサーバーラック、右の卓と PC の間の東の壁に在庫棚
             new Place("ServerRack", -0.05f, 0f, 2.58f, 180f),
             new Place("ChipShelf", 2.75f, 0f, 1.95f, -90f),
-            new Place("Plant", 2.40f, 0f, -0.50f, 0f),
-            new Place("ShoeRack", 2.74f, 0f, -2.45f, -90f),
-            new Place("UmbrellaStand", 1.48f, 0f, -2.76f, 0f),
-            new Place("Picture0", -2.90f, 1.45f, 0.95f, 90f),
-            new Place("Picture1", -2.90f, 1.45f, 0.05f, 90f),
-            new Place("Picture2", -2.90f, 1.50f, -0.80f, 90f),
-            new Place("Picture3", 2.90f, 1.50f, -1.60f, -90f),
+            // 東の窓の前
+            new Place("Plant", 2.30f, 0f, -0.50f, 0f),
+            // 玄関の脇（廊下 x −0.6〜0.6・z −5.1〜−1.5）。東の壁に靴置きと、その上にハマスホイ、ドアの東の角に傘立て
+            new Place("ShoeRack", 0.35f, 0f, -4.00f, -90f),
+            new Place("Picture3", 0.50f, 1.50f, -4.20f, -90f),
+            new Place("UmbrellaStand", 0.36f, 0f, -4.87f, 0f),
         };
 
         /// <summary>置き換える前の家具（Kenney）のうち、同じ名前の新しい物が無い物。組むと外す</summary>
@@ -153,6 +165,23 @@ namespace HalfAware.EditorTools
             public Mesh Leds;
             public int Triangles;
             public int Vertices;
+            public Dictionary<string, int> Pieces;
+        }
+
+        /// <summary>重さの内訳（家具ごとに、三角の多い部品から top 個）</summary>
+        public static string Weights(int top)
+        {
+            var notes = new List<string>();
+            var sb = new StringBuilder();
+            foreach (var m in Bake(notes))
+            {
+                var list = new List<KeyValuePair<string, int>>(m.Pieces);
+                list.Sort((a, b) => b.Value.CompareTo(a.Value));
+                sb.Append(m.Name).Append(" ").Append(m.Triangles).Append(": ");
+                for (var i = 0; i < list.Count && i < top; i++) sb.Append(list[i].Key).Append(" ").Append(list[i].Value).Append("、");
+                sb.AppendLine();
+            }
+            return sb.ToString();
         }
 
         /// <summary>絵・マテリアル・家具ごとの mesh を焼く（表の物すべて）。場面には触らない</summary>
@@ -168,7 +197,7 @@ namespace HalfAware.EditorTools
                 var kit = new FurnitureKit();
                 FurnitureKit leds = null;
                 if (!Shape(p, kit, ref leds)) { notes.Add("形の無い物: " + p.Name); continue; }
-                var m = new Made { Name = p.Name, Triangles = kit.TriangleCount, Vertices = kit.VertexCount };
+                var m = new Made { Name = p.Name, Triangles = kit.TriangleCount, Vertices = kit.VertexCount, Pieces = kit.PieceTriangles };
                 m.Mesh = SaveMesh(kit.Bake(p.Name), MeshDir + p.Name + ".asset");
                 if (leds != null)
                 {
@@ -187,7 +216,7 @@ namespace HalfAware.EditorTools
             switch (p.Name)
             {
                 case "Sofa": Sofa(kit); return true;
-                case "Rug": Rug(kit, RugWide, RugLong); return true;
+                case "Rug": Rug(kit, p.Wide > 0f ? p.Wide : RugWide, p.Length > 0f ? p.Length : RugLong); return true;
                 case "LowTable": LowTable(kit); return true;
                 case "FloorLamp": FloorLamp(kit); return true;
                 case "AirCon": AirCon(kit); return true;
