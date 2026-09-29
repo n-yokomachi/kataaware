@@ -2335,7 +2335,9 @@ namespace HalfAware.EditorTools
             var wide = Tall(p.texture) ? p.scale : p.scale * 2f;
             var high = Tall(p.texture) ? p.scale * 2f : p.scale;
             var wallX = p.side * StreetHalf;
-            var reach = p.blade ? 0.95f : 0.12f;
+            // 突き出す物は、板の壁の側の縁が壁から 0.2 m 離れるまで出す。横に長い板（NeonOpen の突き出し、幅 3.1 m）は、
+            // 0.95 m のままだと板の壁の側の 0.6 m が建物の中に埋まり、字の頭が壁に隠れていた（2026-09-29）
+            var reach = p.blade ? Mathf.Max(0.95f, wide * 0.5f + 0.2f) : 0.12f;
             var x = wallX - p.side * reach;
             var y = p.y;
             var z = p.z;
