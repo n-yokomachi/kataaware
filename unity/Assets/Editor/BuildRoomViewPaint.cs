@@ -66,11 +66,40 @@ namespace HalfAware.EditorTools
         /// <summary>鉄の柵</summary>
         static readonly RectInt Railing = new RectInt(192, 256, 32, 16);
 
+        // ---- 名所の升（BuildRoomViewLandmarks）。夜のアトラスでは投光で照らした石や灯った窓になる ----
+
+        /// <summary>ホワイト・タワーの一面（円い頭の窓の三段、付け柱、頭の狭間）</summary>
+        static readonly RectInt WhiteTowerFace = new RectInt(0, 320, 64, 64);
+        /// <summary>ホワイト・タワーの角の小塔</summary>
+        static readonly RectInt TurretFace = new RectInt(64, 320, 32, 64);
+        /// <summary>ロンドン塔の城壁（頭の狭間を抜く）と、壁の円い塔</summary>
+        static readonly RectInt CurtainWall = new RectInt(96, 320, 64, 32);
+        static readonly RectInt DrumTower = new RectInt(160, 320, 32, 32);
+        /// <summary>タワーブリッジの塔の一面と、上の歩道橋の格子（抜く）</summary>
+        static readonly RectInt BridgeTower = new RectInt(192, 320, 32, 64);
+        static readonly RectInt BridgeWalk = new RectInt(224, 320, 64, 16);
+        /// <summary>ザ・シャード・ガーキン・ウォーキートーキーのガラス</summary>
+        static readonly RectInt ShardFace = new RectInt(288, 320, 32, 64);
+        static readonly RectInt GherkinFace = new RectInt(320, 320, 32, 64);
+        static readonly RectInt WalkieFace = new RectInt(352, 320, 32, 64);
+        /// <summary>セント・ポール大聖堂のドーム（鉛の肋）・ドラム（列柱）・壁</summary>
+        static readonly RectInt DomeFace = new RectInt(384, 320, 32, 32);
+        static readonly RectInt DrumFace = new RectInt(416, 320, 32, 32);
+        static readonly RectInt CathedralFace = new RectInt(448, 320, 32, 32);
+        /// <summary>川面と護岸</summary>
+        static readonly RectInt WaterFace = new RectInt(480, 320, 32, 32);
+        static readonly RectInt Embankment = new RectInt(480, 352, 32, 16);
+        /// <summary>カナリー・ワーフのワン・カナダ・スクエア（ステンレス）とガラスの塔、O2 の膜</summary>
+        static readonly RectInt CanadaFace = new RectInt(384, 352, 32, 64);
+        static readonly RectInt GlassTower = new RectInt(416, 352, 32, 64);
+        static readonly RectInt O2Face = new RectInt(448, 352, 32, 32);
+
         /// <summary>一色の升（8×8）。下の行に並べる</summary>
         enum Sw
         {
             Road, RoadFar, Pave, Kerb, White, Yellow, Lawn, Garden, Hedge, Gravel, Iron, LampLit, Trunk, Paint, CarGlass,
             Brick, Pot, BeaconLit, FlatRoof, Stone, Area, Lead, WarmLit, Path, PhoneRed, Black, Wall,
+            Gold, BridgeBlue, BridgeLamp, FloodLamp, RedLamp, TipLamp, O2Yellow, NeonPink, NeonCyan, NeonViolet, Portland,
         }
 
         static RectInt Swatch(Sw s)
@@ -610,6 +639,269 @@ namespace HalfAware.EditorTools
             SwatchFill(d, n, Sw.PhoneRed, new Color(0.62f, 0.08f, 0.07f), Solid);
             SwatchFill(d, n, Sw.Black, new Color(0.02f, 0.02f, 0.02f), Solid);
             SwatchFill(d, n, Sw.Wall, new Color(0.40f, 0.36f, 0.31f), Solid);
+            SwatchFill(d, n, Sw.Gold, new Color(0.80f, 0.64f, 0.26f), Solid);
+            SwatchFill(d, n, Sw.BridgeBlue, new Color(0.34f, 0.52f, 0.72f), Solid);
+            SwatchFill(d, n, Sw.BridgeLamp, new Color(0.80f, 0.86f, 1.00f), Lit);
+            SwatchFill(d, n, Sw.FloodLamp, new Color(1.00f, 0.90f, 0.70f), Lit);
+            SwatchFill(d, n, Sw.RedLamp, new Color(1.00f, 0.16f, 0.12f), Lit);
+            SwatchFill(d, n, Sw.TipLamp, new Color(0.92f, 0.95f, 1.00f), Lit);
+            SwatchFill(d, n, Sw.O2Yellow, new Color(0.86f, 0.70f, 0.14f), Solid);
+            SwatchFill(d, n, Sw.NeonPink, new Color(1.00f, 0.24f, 0.66f), Lit);
+            SwatchFill(d, n, Sw.NeonCyan, new Color(0.24f, 0.92f, 1.00f), Lit);
+            SwatchFill(d, n, Sw.NeonViolet, new Color(0.66f, 0.40f, 1.00f), Lit);
+            // 灯りの当たっていない石。夜のアトラスでは投光の灯り（名所の縁や屋根の端を照らす）
+            var portland = Swatch(Sw.Portland);
+            d.Fill(portland.x, portland.y, portland.width, portland.height, new Color(0.74f, 0.71f, 0.64f), Solid);
+            n.Fill(portland.x, portland.y, portland.width, portland.height, Flooded(new Color(0.74f, 0.71f, 0.64f), 0.5f), Lit);
+        }
+
+        // ---- 名所 ------------------------------------------------------------
+
+        static readonly Color Caen = new Color(0.76f, 0.72f, 0.62f);
+        static readonly Color Ragstone = new Color(0.56f, 0.54f, 0.50f);
+        static readonly Color PortlandStone = new Color(0.76f, 0.74f, 0.68f);
+        static readonly Color FloodWarm = new Color(1.00f, 0.88f, 0.66f);
+        static readonly Color FloodCool = new Color(0.84f, 0.88f, 1.00f);
+
+        /// <summary>投光で照らした石の色。up は面の下（0）から上（1）。灯りは足元から当てるので下ほど明るい</summary>
+        static Color Flooded(Color stone, float up, bool cool = false)
+        {
+            var lamp = cool ? FloodCool : FloodWarm;
+            return Mul(Color.Lerp(lamp, stone, 0.4f), 0.78f - 0.3f * up);
+        }
+
+        /// <summary>
+        /// 石の面を一画素。投光で照らした色（光る所）で、夕暮れは点いたばかりの控えめな灯り、夜は強い灯り。
+        /// 夕暮れの空は明るいので、石の色のままでは空に溶けて形が読めなかった。
+        /// dark なら窓や目地の暗がりで、照らさない
+        /// </summary>
+        static void Stone(Sheet d, Sheet n, int x, int y, Color stone, float up, float k, bool dark = false, bool cool = false)
+        {
+            if (dark)
+            {
+                d.Set(x, y, Mul(stone, 0.3f * k), Solid);
+                n.Set(x, y, Mul(stone, 0.18f * k), Solid);
+                return;
+            }
+            d.Set(x, y, Mul(Flooded(stone, up, cool), 0.72f * k), Lit);
+            n.Set(x, y, Mul(Flooded(stone, up, cool), k), Lit);
+        }
+
+        /// <summary>
+        /// ホワイト・タワーの一面。付け柱で四つの間に分け、間ごとに円い頭の小さな窓を三段。
+        /// 頭の 3 画素は狭間（凸凹）で、凹の所を抜く
+        /// </summary>
+        static void PaintWhiteTower(Sheet d, Sheet n, Random r)
+        {
+            var c = WhiteTowerFace;
+            for (var y = 0; y < 64; y++)
+                for (var x = 0; x < 64; x++)
+                {
+                    if (y >= 61 && (x / 3) % 2 == 1)
+                    {
+                        Both(d, n, c.x + x, c.y + y, Caen, Cut);
+                        continue;
+                    }
+                    var pilaster = x % 16 < 2;
+                    var course = y == 22 || y == 42;
+                    var k = (pilaster || course ? 1.06f : 0.94f) + 0.08f * F(r);
+                    // 窓。間ごとに二つ、三段
+                    var bx = x % 16;
+                    var window = false;
+                    foreach (var wy in new[] { 8, 28, 47 })
+                    {
+                        var h = wy == 28 ? 9 : 7;
+                        if ((bx == 5 || bx == 6 || bx == 10 || bx == 11) && y >= wy && y < wy + h) window = true;
+                        if ((bx == 5 || bx == 11) && y == wy + h - 1) window = false;
+                    }
+                    Stone(d, n, c.x + x, c.y + y, Caen, y / 63f, k, window);
+                }
+        }
+
+        static void PaintTurret(Sheet d, Sheet n, Random r)
+        {
+            var c = TurretFace;
+            for (var y = 0; y < 64; y++)
+                for (var x = 0; x < 32; x++)
+                {
+                    var slit = (x == 15 || x == 16) && (y % 14 >= 5 && y % 14 < 10);
+                    Stone(d, n, c.x + x, c.y + y, Caen, y / 63f, 0.92f + 0.1f * F(r), slit);
+                }
+        }
+
+        /// <summary>城壁と円い塔。ケントの石の灰色に矢狭間、頭を狭間に抜く</summary>
+        static void PaintCurtain(Sheet d, Sheet n, Random r)
+        {
+            foreach (var c in new[] { CurtainWall, DrumTower })
+                for (var y = 0; y < c.height; y++)
+                    for (var x = 0; x < c.width; x++)
+                    {
+                        if (y >= c.height - 3 && (x / 3) % 2 == 1)
+                        {
+                            Both(d, n, c.x + x, c.y + y, Ragstone, Cut);
+                            continue;
+                        }
+                        var slit = x % 11 == 5 && y > 10 && y < 16;
+                        var k = 0.88f + 0.18f * F(r) - (y < 3 ? 0.12f : 0f);
+                        Stone(d, n, c.x + x, c.y + y, Ragstone, y / (float)(c.height - 1), k * 0.95f, slit);
+                    }
+        }
+
+        /// <summary>
+        /// タワーブリッジの塔。灰白の石張りに縦長の尖頭窓を二列、角の控え壁。夜は青みの投光と窓の灯り
+        /// </summary>
+        static void PaintBridge(Sheet d, Sheet n, Random r)
+        {
+            var c = BridgeTower;
+            for (var y = 0; y < 64; y++)
+                for (var x = 0; x < 32; x++)
+                {
+                    var buttress = x < 3 || x > 28;
+                    var lancet = (x >= 9 && x <= 12 || x >= 19 && x <= 22) && y >= 18 && y < 50 && (y < 46 || x == 10 || x == 11 || x == 20 || x == 21);
+                    var band = y == 16 || y == 52;
+                    var k = (buttress || band ? 1.05f : 0.95f) + 0.07f * F(r);
+                    if (lancet)
+                    {
+                        // 窓は夕暮れに灯り始め、夜は全部灯る
+                        var lit = new Color(0.95f, 0.86f, 0.62f);
+                        var on = F(r) < 0.35f;
+                        d.Set(c.x + x, c.y + y, on ? lit : new Color(0.20f, 0.20f, 0.28f), on ? Lit : Solid);
+                        n.Set(c.x + x, c.y + y, Mul(lit, 0.9f), Lit);
+                        continue;
+                    }
+                    Stone(d, n, c.x + x, c.y + y, PortlandStone, y / 63f, k, false, true);
+                }
+            // 上の歩道橋の格子。青い鋼の上下の弦と斜めの格子、その間は抜く。弦に灯りの粒
+            var w = BridgeWalk;
+            for (var y = 0; y < 16; y++)
+                for (var x = 0; x < 64; x++)
+                {
+                    var chord = y < 2 || y > 13;
+                    var lattice = (x + y) % 8 == 0 || (x - y + 64) % 8 == 0;
+                    var blue = new Color(0.34f, 0.52f, 0.72f);
+                    if (chord && x % 6 == 3 && (y == 1 || y == 14))
+                    {
+                        d.Set(w.x + x, w.y + y, new Color(0.85f, 0.88f, 1.0f), Lit);
+                        n.Set(w.x + x, w.y + y, new Color(0.80f, 0.70f, 1.0f), Lit);
+                        continue;
+                    }
+                    Both(d, n, w.x + x, w.y + y, Mul(blue, 0.9f + 0.15f * F(r)), chord || lattice ? Solid : Cut);
+                }
+        }
+
+        /// <summary>
+        /// 高いガラスの塔。夕暮れは空と暮れ残りを映した色、夜は暗いガラスに灯った窓。
+        /// top 行から上は頂（シャードの頂の光・ウォーキートーキーの空中庭園）で、どちらの時刻も灯る
+        /// </summary>
+        static void PaintGlass(Sheet d, Sheet n, RectInt c, Color low, Color high, Color night, float pDusk, float pNight, int top, Color crown, System.Func<int, int, float> pattern, Random r)
+        {
+            for (var y = 0; y < c.height; y++)
+                for (var x = 0; x < c.width; x++)
+                {
+                    var up = y / (float)(c.height - 1);
+                    var p = pattern(x, y);
+                    if (y >= top)
+                    {
+                        var on = (x + y) % 3 != 0;
+                        Both(d, n, c.x + x, c.y + y, on ? Mul(crown, 0.85f + 0.15f * F(r)) : Mul(high, 0.6f), on ? Lit : Solid);
+                        continue;
+                    }
+                    var glass = Mul(Color.Lerp(low, high, up), p * (0.94f + 0.08f * F(r)));
+                    var roll = F(r);
+                    var windowRow = y % 3 == 1 && x % 2 == 0;
+                    var lamp = F(r) < 0.8f ? new Color(0.86f, 0.92f, 1.0f) : new Color(1.0f, 0.82f, 0.56f);
+                    d.Set(c.x + x, c.y + y, windowRow && roll < pDusk ? Mul(lamp, 0.8f) : glass, windowRow && roll < pDusk ? Lit : Solid);
+                    n.Set(c.x + x, c.y + y, windowRow && roll < pNight ? Mul(lamp, 0.75f) : Mul(night, p), windowRow && roll < pNight ? Lit : Solid);
+                }
+        }
+
+        /// <summary>セント・ポール大聖堂。鉛のドーム（縦の肋）、列柱のドラム、ポートランドの石の壁</summary>
+        static void PaintStPaul(Sheet d, Sheet n, Random r)
+        {
+            var lead = new Color(0.46f, 0.48f, 0.52f);
+            var c = DomeFace;
+            for (var y = 0; y < 32; y++)
+                for (var x = 0; x < 32; x++)
+                    Stone(d, n, c.x + x, c.y + y, lead, 1f - y / 31f, (x % 4 == 0 ? 1.12f : 0.95f) + 0.05f * F(r), false, true);
+            c = DrumFace;
+            for (var y = 0; y < 32; y++)
+                for (var x = 0; x < 32; x++)
+                {
+                    var column = x % 4 < 2;
+                    var entablature = y < 4 || y > 26;
+                    Stone(d, n, c.x + x, c.y + y, PortlandStone, y / 31f, 0.95f + 0.08f * F(r), !column && !entablature);
+                }
+            c = CathedralFace;
+            for (var y = 0; y < 32; y++)
+                for (var x = 0; x < 32; x++)
+                {
+                    var window = x % 8 >= 3 && x % 8 < 5 && (y % 16 >= 5 && y % 16 < 12);
+                    var cornice = y % 16 == 14;
+                    Stone(d, n, c.x + x, c.y + y, PortlandStone, (y % 16) / 15f, (cornice ? 1.1f : 0.95f) + 0.06f * F(r), window);
+                }
+        }
+
+        static void PaintRiver(Sheet d, Sheet n, Random r)
+        {
+            var c = WaterFace;
+            for (var y = 0; y < 32; y++)
+                for (var x = 0; x < 32; x++)
+                {
+                    var streak = F(r) < 0.12f ? 1.25f : 1f;
+                    d.Set(c.x + x, c.y + y, Mul(new Color(0.34f, 0.29f, 0.44f), (0.9f + 0.1f * F(r)) * streak), Solid);
+                    var glint = F(r) < 0.02f;
+                    n.Set(c.x + x, c.y + y, glint ? new Color(0.9f, 0.75f, 0.5f) * 0.6f : Mul(new Color(0.06f, 0.06f, 0.10f), streak), glint ? Lit : Solid);
+                }
+            c = Embankment;
+            for (var y = 0; y < 16; y++)
+                for (var x = 0; x < 32; x++)
+                {
+                    var joint = y % 4 == 0 || (x + (y / 4) * 4) % 8 == 0;
+                    Both(d, n, c.x + x, c.y + y, Mul(new Color(0.46f, 0.45f, 0.43f), joint ? 0.7f : 0.92f + 0.1f * F(r)), Solid);
+                }
+        }
+
+        /// <summary>カナリー・ワーフの塔と O2</summary>
+        static void PaintDocklands(Sheet d, Sheet n, Random r)
+        {
+            // ワン・カナダ・スクエア。ステンレスの格子に窓
+            PaintGlass(d, n, CanadaFace, new Color(0.50f, 0.52f, 0.58f), new Color(0.66f, 0.66f, 0.72f), new Color(0.16f, 0.17f, 0.20f),
+                0.22f, 0.55f, 64, Color.white, (x, y) => x % 2 == 1 ? 1.1f : 0.85f, r);
+            PaintGlass(d, n, GlassTower, new Color(0.30f, 0.38f, 0.52f), new Color(0.46f, 0.50f, 0.66f), new Color(0.07f, 0.09f, 0.14f),
+                0.18f, 0.5f, 64, Color.white, (x, y) => y % 6 == 0 ? 1.15f : 1f, r);
+            // O2 の白い膜。放射状の縫い目。夜は青紫に照らす
+            var c = O2Face;
+            for (var y = 0; y < 32; y++)
+                for (var x = 0; x < 32; x++)
+                {
+                    var seam = x % 4 == 0;
+                    var white = Mul(new Color(0.84f, 0.84f, 0.82f), (seam ? 0.85f : 1f) - 0.2f * (1f - y / 31f));
+                    d.Set(c.x + x, c.y + y, white, Solid);
+                    n.Set(c.x + x, c.y + y, Mul(new Color(0.58f, 0.46f, 1.0f), (seam ? 0.7f : 0.85f) * (0.6f + 0.4f * y / 31f)), Lit);
+                }
+        }
+
+        /// <summary>名所の升を全部。種は街並みの升とは別に取る（前からの升の絵を変えない）</summary>
+        static void PaintLandmarks(Sheet d, Sheet n)
+        {
+            var r = new Random(Seed + 17);
+            PaintWhiteTower(d, n, r);
+            PaintTurret(d, n, r);
+            PaintCurtain(d, n, r);
+            PaintBridge(d, n, r);
+            // ザ・シャード。尖った面の縦の縁と、頂の開いた骨組みの光
+            PaintGlass(d, n, ShardFace, new Color(0.42f, 0.40f, 0.54f), new Color(0.70f, 0.56f, 0.66f), new Color(0.09f, 0.10f, 0.15f),
+                0.06f, 0.28f, 56, new Color(0.92f, 0.95f, 1.0f), (x, y) => x == 0 || x == 16 ? 1.25f : 1f, r);
+            // ガーキン。菱形の格子と、螺旋に巻く暗い帯
+            PaintGlass(d, n, GherkinFace, new Color(0.26f, 0.34f, 0.40f), new Color(0.40f, 0.44f, 0.54f), new Color(0.06f, 0.09f, 0.10f),
+                0.1f, 0.3f, 60, new Color(0.7f, 0.95f, 1.0f),
+                (x, y) => ((x + y / 2) % 16 < 5 ? 0.62f : 1f) * ((x + y) % 4 == 0 || (x - y + 64) % 4 == 0 ? 1.18f : 1f), r);
+            // ウォーキートーキー。縦の方立てと、頂の空中庭園
+            PaintGlass(d, n, WalkieFace, new Color(0.38f, 0.42f, 0.52f), new Color(0.54f, 0.56f, 0.68f), new Color(0.08f, 0.09f, 0.13f),
+                0.12f, 0.35f, 57, new Color(0.72f, 1.0f, 0.78f), (x, y) => x % 2 == 0 ? 1.1f : 0.9f, r);
+            PaintStPaul(d, n, r);
+            PaintRiver(d, n, r);
+            PaintDocklands(d, n, r);
         }
 
         static void SwatchFill(Sheet d, Sheet n, Sw s, Color c, byte a)
@@ -635,6 +927,7 @@ namespace HalfAware.EditorTools
             for (var i = 0; i < Roofs; i++) PaintRoof(d, n, RoofCell(i), i, r);
             for (var i = 0; i < 3; i++) PaintCanopy(d, n, CanopyCell(i), i, r);
             PaintRailing(d, n);
+            PaintLandmarks(d, n);
             PaintSwatches(d, n);
             dusk = d.Bake();
             night = n.Bake();

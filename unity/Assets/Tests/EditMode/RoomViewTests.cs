@@ -89,6 +89,51 @@ namespace HalfAware.Tests
         }
 
         [Test]
+        public void EveryLandmarkSitsInAWindow()
+        {
+            var north = RoomView.Reach(false);
+            var east = RoomView.Reach(true);
+            foreach (var m in RoomView.Landmarks)
+            {
+                var inNorth = m.Azimuth > north.x + 3f && m.Azimuth < north.y - 3f;
+                var inEast = m.Azimuth > east.x + 3f && m.Azimuth < east.y - 3f;
+                Assert.IsTrue(inNorth || inEast, m.Name + " は窓の外れ（" + m.Azimuth + " 度）");
+            }
+        }
+
+        [Test]
+        public void LandmarksKeepTheRealOrderAndStayNearTheRealBearing()
+        {
+            // 部屋（バーモンジー）から本物の場所への向きと、景色に置いた向き
+            Assert.AreEqual(-59.7f, RoomView.Bearing(51.5045, -0.0865), 0.2f, "ザ・シャード");
+            Assert.AreEqual(78.5f, RoomView.Bearing(51.5049, -0.0195), 0.2f, "ワン・カナダ・スクエア");
+            var marks = RoomView.Landmarks;
+            for (var i = 0; i < marks.Length; i++)
+            {
+                var real = RoomView.Bearing(marks[i].Lat, marks[i].Lon);
+                Assert.AreEqual(real, marks[i].Azimuth, 10f, marks[i].Name + " の向きが本物から離れすぎ");
+                for (var j = i + 1; j < marks.Length; j++)
+                {
+                    var realJ = RoomView.Bearing(marks[j].Lat, marks[j].Lon);
+                    Assert.AreEqual(real < realJ, marks[i].Azimuth < marks[j].Azimuth, marks[i].Name + " と " + marks[j].Name + " の並びが本物と逆");
+                }
+            }
+        }
+
+        [Test]
+        public void TheTowerOfLondonStandsAcrossTheRiver()
+        {
+            foreach (var m in RoomView.Landmarks)
+            {
+                if (m.Name != RoomView.TowerOfLondon) continue;
+                var z = Mathf.Cos(m.Azimuth * Mathf.Deg2Rad) * m.Distance;
+                Assert.Greater(z, RoomView.RiverNorth, "ロンドン塔は川の北岸");
+                return;
+            }
+            Assert.Fail("ロンドン塔が無い");
+        }
+
+        [Test]
         public void TheRoomIsDuskAndItsCopiesAreNight()
         {
             Assert.AreEqual(RoomView.Hour.Dusk, RoomView.HourOf("Room"));

@@ -33,6 +33,74 @@ namespace HalfAware
         public const float ArcFrom = -95f;
         public const float ArcTo = 185f;
 
+        // ---- 部屋の場所と名所 ------------------------------------------------------
+
+        /// <summary>部屋の場所。テムズ川の南岸のバーモンジー（タワーブリッジの南南東 900 m ほど）</summary>
+        public const double Latitude = 51.4985;
+        public const double Longitude = -0.0700;
+
+        /// <summary>テムズ川の南岸と北岸の護岸の縁（z）。作り話の倫敦なので、本物（北へ 600 m ほど）より近い</summary>
+        public const float RiverSouth = 134f;
+        public const float RiverNorth = 264f;
+        /// <summary>タワーブリッジの軸（x）。窓からロンドン塔と重ならないよう、北西の南北の通り（-103.2）より少し西</summary>
+        public const float BridgeX = -115f;
+
+        public const string Shard = "Shard";
+        public const string StPauls = "StPauls";
+        public const string WalkieTalkie = "WalkieTalkie";
+        public const string TowerBridge = "TowerBridge";
+        public const string Gherkin = "Gherkin";
+        public const string TowerOfLondon = "TowerOfLondon";
+        public const string CanaryWharf = "CanaryWharf";
+        public const string O2 = "O2";
+
+        /// <summary>
+        /// 窓から見える名所。Azimuth と Distance は景色に置く向きと遠さ（遠い物はここから縮めて置く）、
+        /// Lat・Lon は本物の場所。向きは本物の並びのまま、重なりを避けて少しずつずらし、遠さは形が読める所まで詰めてある
+        /// </summary>
+        public struct Landmark
+        {
+            public string Name;
+            public float Azimuth;
+            public float Distance;
+            public double Lat;
+            public double Lon;
+
+            public Landmark(string name, float azimuth, float distance, double lat, double lon)
+            {
+                Name = name;
+                Azimuth = azimuth;
+                Distance = distance;
+                Lat = lat;
+                Lon = lon;
+            }
+        }
+
+        /// <summary>北の窓の名所は左（西）から順に、東の窓の名所はその後に</summary>
+        public static readonly Landmark[] Landmarks =
+        {
+            new Landmark(Shard, -53f, 1000f, 51.5045, -0.0865),
+            new Landmark(StPauls, -47f, 800f, 51.5138, -0.0984),
+            new Landmark(WalkieTalkie, -42f, 800f, 51.5113, -0.0836),
+            new Landmark(TowerBridge, Mathf.Atan2(BridgeX, (RiverSouth + RiverNorth) * 0.5f) * Mathf.Rad2Deg,
+                new Vector2(BridgeX, (RiverSouth + RiverNorth) * 0.5f).magnitude, 51.5055, -0.0754),
+            new Landmark(Gherkin, -19f, 900f, 51.5145, -0.0803),
+            new Landmark(TowerOfLondon, -12f, 340f, 51.5081, -0.0760),
+            new Landmark(CanaryWharf, 79f, 1400f, 51.5049, -0.0195),
+            new Landmark(O2, 85.5f, 1700f, 51.5030, 0.0030),
+        };
+
+        /// <summary>部屋から本物の場所への向き（度。北が 0、東が正）。大圏の出だしの向き</summary>
+        public static float Bearing(double lat, double lon)
+        {
+            var p1 = Latitude * Mathf.Deg2Rad;
+            var p2 = lat * Mathf.Deg2Rad;
+            var dl = (lon - Longitude) * Mathf.Deg2Rad;
+            var x = System.Math.Sin(dl) * System.Math.Cos(p2);
+            var y = System.Math.Cos(p1) * System.Math.Sin(p2) - System.Math.Sin(p1) * System.Math.Cos(p2) * System.Math.Cos(dl);
+            return (float)(System.Math.Atan2(x, y) * Mathf.Rad2Deg);
+        }
+
         /// <summary>窓のある壁の内側と外側の面（東の壁は x、北の壁は z）。部屋の壁は 0.2 m 厚</summary>
         public const float WallIn = 2.9f;
         public const float WallOut = 3.1f;

@@ -133,15 +133,14 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 市街の群れ。北東（東の窓からも北の窓からも見える）が一番大きく、北北西と東と南東に小さい群れ。
-        /// 北西（日の沈んだ側）には置かない。暮れ残りの側は落ち着いた屋根の並びのまま
+        /// 市街の群れ。シティ（ガーキンとウォーキートーキーの辺り。北の窓）とカナリー・ワーフ（東の窓）の二か所に寄せ、
+        /// 名所の後ろで輝かせる。絵の塔は名所の形より低く抑え、名所の輪郭を塞がない。
+        /// 西北西（日の沈んだ側）には置かない。暮れ残りはザ・シャードの向こう
         /// </summary>
         static readonly District[] Districts =
         {
-            new District(36f, 22f, 11f, 42, 1.2f),
-            new District(-16f, 10f, 5f, 13, 0.6f),
-            new District(104f, 12f, 6.5f, 18, 0.85f),
-            new District(150f, 8f, 3f, 7, 0.45f),
+            new District(-27f, 15f, 4.8f, 30, 1.2f),
+            new District(80f, 5.5f, 4.5f, 14, 1.0f),
         };
 
         static readonly Color[] NeonColors =

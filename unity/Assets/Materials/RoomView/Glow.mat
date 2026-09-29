@@ -35,6 +35,7 @@ Material:
     - _Cutoff: -1
     - _DstBlend: 1
     - _GlowHaze: 0.45
+    - _GlowShade: 0.5
     - _HazeCurve: 0.8
     - _HazeFar: 420
     - _HazeMax: 0.8

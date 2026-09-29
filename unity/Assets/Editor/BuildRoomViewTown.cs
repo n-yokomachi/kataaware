@@ -10,13 +10,14 @@ namespace HalfAware.EditorTools
     /// <list type="table">
     /// <item><term>通り</term><description>部屋の北の壁の外を東西の通り（A）が、東の壁の外を南北の通り（北は B、南は C）が走り、
     /// 部屋の北東の角の先で交わる。どの通りも車道 6.4 m・歩道 2.4 m・家の前の半地下の明かり取り 1.6 m。
-    /// 北は 56 m おき、南は 44 m おきに東西の通り、東西は 56 m おきに南北の通り</description></item>
+    /// 北は 56 m おき、南は 44 m おきに東西の通り、東西は 56 m おきに南北の通り。北の二本目の東西の通り（F）が川沿いの道で、
+    /// その北は川（<c>BuildRoomViewLandmarks.cs</c>）。南北の通りはみな F で終わる</description></item>
     /// <item><term>家並み</term><description>通りに面した三階建ての連続住宅（間口 5 m・奥行き 10 m・軒 10 m・棟 13.1 m）を、
     /// 区画の南北の縁に一列ずつ。家の正面・裏・屋根・妻壁・煙突。近い家（80 m まで）には煙突の壺・柵・玄関の石段、
     /// 150 m までは煙突の胴だけ</description></item>
     /// <item><term>特別な区画</term><description>北東の角のパブ、B の両側の家並み（B を向く）、東の窓の前の広場
     /// （柵と生け垣と木と小径）、広場の東の家並み（広場を向く）、広場の南の古い集合住宅、北西の教会（座って始めた目から北の窓に入る向き）、
-    /// 北西と南東の遠い公営住宅の塔</description></item>
+    /// 南東の遠い公営住宅の塔。北西の D と F の間の二区画は、名所への見通しを空ける芝の公園</description></item>
     /// <item><term>通りの物</term><description>街灯（柱・灯り・暈・路面の溜まり）、止めてある車、街路樹、横断歩道と灯りの柱、
     /// 赤い電話ボックス、中央の破線と交差点の近くの二重の黄線</description></item>
     /// </list>
@@ -101,6 +102,16 @@ namespace HalfAware.EditorTools
                 t.Add(i); t.Add(i + 3); t.Add(i + 2);
             }
 
+            /// <summary>別の入れ物の面を写して足す。位置は map で動かし、頂点色の α（霞の効き）を haze にする</summary>
+            public void Append(Pile other, System.Func<Vector3, Vector3> map, byte haze)
+            {
+                var start = v.Count;
+                foreach (var p in other.v) v.Add(map(p));
+                u.AddRange(other.u);
+                foreach (var col in other.c) c.Add(new Color32(col.r, col.g, col.b, haze));
+                foreach (var i in other.t) t.Add(start + i);
+            }
+
             public void Tri(Vector3 a, Vector3 b, Vector3 cc, Vector2 ua, Vector2 ub, Vector2 uc, Color ca, Color cb, Color ccol)
             {
                 var i = v.Count;
@@ -127,14 +138,15 @@ namespace HalfAware.EditorTools
         /// <summary>組み上がる物一式と、その途中で使う物</summary>
         sealed class Town
         {
-            public readonly Pile Solid = new Pile();
-            public readonly Pile Glow = new Pile();
+            public Pile Solid = new Pile();
+            public Pile Glow = new Pile();
             public readonly Pile Sky = new Pile();
             public readonly List<Vector3> Lamps = new List<Vector3>();
             public readonly Random R = new Random(Seed);
             public int Houses;
             public int Trees;
             public int Cars;
+            public int Landmarks;
         }
 
         // ---- 見える所 --------------------------------------------------------------
@@ -244,7 +256,6 @@ namespace HalfAware.EditorTools
             SquareGarden(town);
             Pub(town);
             Church(town);
-            TowerBlock(town, new Vector2(-131.2f, 148.8f), new Vector2(30f, 14f), 18f, 4);
             TowerBlock(town, new Vector2(148.8f, -101.2f), new Vector2(14f, 30f), 72f, 4);
             StreetTrees(town);
             Cars(town);
@@ -252,6 +263,7 @@ namespace HalfAware.EditorTools
             PhoneBox(town, new Vector3(33.5f, G + KerbHigh, StreetA + RoadHalf + PavementWide * 0.55f));
             LampPosts(town);
             FarLamps(town);
+            Landmarks(town);
             SkyDome(town);
             return town;
         }
@@ -266,12 +278,16 @@ namespace HalfAware.EditorTools
         {
             var e = StreetEnd;
             var y = G - 0.12f;
-            Face(town, new Vector3(-e, y, -e), new Vector3(e, y, -e), new Vector3(e, y, e), new Vector3(-e, y, e), Sw.Garden, Vector3.up);
+            // 北は川の南岸まで（川と北岸は River が張る）
+            var north = RiverSouth;
+            Face(town, new Vector3(-e, y, -e), new Vector3(e, y, -e), new Vector3(e, y, north), new Vector3(-e, y, north), Sw.Garden, Vector3.up);
         }
 
         /// <summary>東西の通り z がある x の範囲</summary>
         static Vector2 EastWestSpan(float z)
         {
+            // F より北は川
+            if (z > StreetF + 0.01f) return new Vector2(0f, 0f);
             if (z >= StreetA - 0.01f) return new Vector2(-StreetEnd, StreetEnd);
             if (Mathf.Abs(z - StreetMid) < 0.01f) return new Vector2(StreetE, StreetEnd);
             return new Vector2(StreetB, StreetEnd);
@@ -280,8 +296,10 @@ namespace HalfAware.EditorTools
         /// <summary>南北の通り x がある z の範囲。西の通りは A より北だけ（南西は自分の建物の陰で見えない）</summary>
         static Vector2 NorthSouthSpan(float x)
         {
-            if (x < StreetB - 0.01f) return new Vector2(StreetA, StreetEnd);
-            return new Vector2(-StreetEnd, StreetEnd);
+            // どの南北の通りも川沿いの F で終わる。公園を抜ける通り（-47.2）は D で終わる
+            if (Mathf.Abs(x - (-47.2f)) < 0.01f) return new Vector2(StreetA, StreetD);
+            if (x < StreetB - 0.01f) return new Vector2(StreetA, StreetF);
+            return new Vector2(-StreetEnd, StreetF);
         }
 
         static void Streets(Town town)
@@ -363,6 +381,8 @@ namespace HalfAware.EditorTools
                 {
                     var mid = s + 1.5f;
                     if (Crossed(eastWest, line.y, mid)) continue;
+                    // 南北の通りは川沿いの F で終わる
+                    if (!eastWest && s + 3f > StreetF - RoadHalf) continue;
                     var a = eastWest ? new Vector3(s, y, line.y - 0.06f) : new Vector3(line.y - 0.06f, y, s);
                     var b = eastWest ? new Vector3(s + 3f, y, line.y - 0.06f) : new Vector3(line.y - 0.06f, y, s + 3f);
                     var c = eastWest ? new Vector3(s + 3f, y, line.y + 0.06f) : new Vector3(line.y + 0.06f, y, s + 3f);
@@ -434,6 +454,9 @@ namespace HalfAware.EditorTools
         static void Block(Town town, float xa, float xb, float za, float zb)
         {
             var centre = new Vector3((xa + xb) * 0.5f, G, (za + zb) * 0.5f);
+            // F より北は川、北西の D と F の間の二区画は見通しの公園
+            if (za > StreetF - 0.01f) return;
+            if (Park.Contains(new Vector2(centre.x, centre.z))) return;
             // 区画の一番近い角が組む遠さの外なら何も置かない
             var nearest = new Vector3(Mathf.Clamp(0f, xa, xb), G, Mathf.Clamp(0f, za, zb));
             if (Reach(nearest) > RoomView.TownReach) return;
@@ -1059,7 +1082,7 @@ namespace HalfAware.EditorTools
 
         static void FarLamp(Town town, Vector3 head)
         {
-            if (!Seen(head) || Reach(head) < 120f) return;
+            if (!Seen(head) || Reach(head) < 120f || Riverside(head)) return;
             Box(town, head, new Vector3(0.5f, 0.6f, 0.5f), 45f, Sw.LampLit, Sw.LampLit);
             Halo(town, head, 3.2f, LampWarm);
         }

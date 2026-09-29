@@ -12,13 +12,13 @@ namespace HalfAware.EditorTools
     /// <summary>
     /// 自室（<c>Room.unity</c>）の窓の外の景色を組む（シナリオ設計 5 節「窓の外」）。
     ///
-    /// 部屋は 5 階（床から地面まで 12 m、<see cref="RoomView.Ground"/>）。近くは倫敦の落ち着いた住宅街
-    /// （<c>BuildRoomViewTown.cs</c>）、遠くは市街のネオンと滲んだ空（<c>BuildRoomViewSky.cs</c>）。
+    /// 部屋はテムズ川の南岸のバーモンジーの 5 階（床から地面まで 12 m、<see cref="RoomView.Ground"/>）。近くは倫敦の落ち着いた住宅街
+    /// （<c>BuildRoomViewTown.cs</c>）、その先に川と名所（<c>BuildRoomViewLandmarks.cs</c>）、遠くは市街のネオンと滲んだ空（<c>BuildRoomViewSky.cs</c>）。
     /// 窓から見える向きの幅（<see cref="RoomView.ArcFrom"/>〜<see cref="RoomView.ArcTo"/>）の外は作らない。
     ///
     /// <list type="table">
-    /// <item><term>置き場</term><description>シーンの根に <c>RoomView</c> を一つ。子は街並み（Town）・暈（Glows）・空（Sky）・
-    /// 窓の影止め（ShadowStop.*）だけ。部屋の物には触らず、窓のガラスのマテリアルだけを替える</description></item>
+    /// <item><term>置き場</term><description>シーンの根に <c>RoomView</c> を一つ。子は街並み（Town。名所もここ）・暈（Glows）・空（Sky）・
+    /// 窓の影止め（ShadowStop.*）だけ。部屋の物は、窓のガラスのマテリアルを替えることと、カーテンを開けること（<see cref="Curtains"/>）だけ</description></item>
     /// <item><term>時刻</term><description>夕暮れ（場面 1）と夜（場面 3・5・7）は同じ mesh にマテリアルを替えるだけ（<see cref="SetHour"/>）。
     /// 夜は空を落とし、窓の灯りを増やし（夜のアトラス）、街灯の暈とネオンを強める。場面 3 の組み立て（<see cref="BuildConnect"/>）が
     /// Room を写した直後に夜へ替え、場面 5・7 は場面 3 から写すので夜のまま来る</description></item>
@@ -58,24 +58,33 @@ namespace HalfAware.EditorTools
                     return "開いているシーンに未保存の変更がある。保存するか捨ててからもう一度: " + SceneManager.GetSceneAt(i).path;
             var scene = EditorSceneManager.OpenScene(RoomPath, OpenSceneMode.Single);
             var before = Census(scene);
-
-            PaintAll();
-            var town = MakeTown();
-            var root = Place(scene, town, RoomView.Hour.Dusk);
-            var glass = Glass(root.transform);
-
+            var made = Assemble(scene);
             EditorSceneManager.MarkSceneDirty(scene);
             if (!EditorSceneManager.SaveScene(scene)) return "Room.unity を保存できなかった";
             AssetDatabase.SaveAssets();
             var after = Census(scene);
+            return made + System.Environment.NewLine + Compare(before, after);
+        }
 
+        /// <summary>
+        /// 開いている場面へ景色を組む（夕暮れ）。絵・mesh・マテリアルを焼き直し、景色の根を置き直し、ガラスを替え、カーテンを開ける。
+        /// **保存はしない。** 保存するのは <see cref="Build"/>。確かめの撮影（<see cref="CheckRoomView.Preview"/>）は組んで撮ってから捨てる
+        /// </summary>
+        public static string Assemble(Scene scene)
+        {
+            PaintAll();
+            var town = MakeTown();
+            var root = Place(scene, town, RoomView.Hour.Dusk);
+            var glass = Glass(root.transform);
+            var curtains = Curtains();
+            AssetDatabase.SaveAssets();
             var sb = new StringBuilder();
-            sb.AppendFormat("窓の外を組んだ（夕暮れ）。家 {0} 軒・木 {1} 本・車 {2} 台・街灯 {3} 本", town.Houses, town.Trees, town.Cars, town.Lamps.Count).AppendLine();
+            sb.AppendFormat("窓の外を組んだ（夕暮れ）。家 {0} 軒・木 {1} 本・車 {2} 台・街灯 {3} 本・名所 {4}", town.Houses, town.Trees, town.Cars, town.Lamps.Count, town.Landmarks).AppendLine();
             sb.AppendFormat("三角: 街並み {0}・暈 {1}・空 {2}（頂点 {3}・{4}・{5}）。描く回数は 3（ほかにガラス 2 枚は前から）",
                 town.Solid.Tris, town.Glow.Tris, town.Sky.Tris, town.Solid.Verts, town.Glow.Verts, town.Sky.Verts).AppendLine();
             sb.AppendLine("mesh の大きさ: " + MeshSizes());
             sb.AppendLine(glass);
-            sb.Append(Compare(before, after));
+            sb.Append(curtains);
             return sb.ToString();
         }
 
@@ -128,7 +137,14 @@ namespace HalfAware.EditorTools
                 AssetDatabase.CreateAsset(mesh, path);
                 return mesh;
             }
-            EditorUtility.CopySerialized(mesh, existing);
+            // 中身は mesh の口から写す（CopySerialized で写すと、同じ呼び出しの中で撮るときに前の形のまま描かれる）
+            existing.Clear();
+            existing.indexFormat = mesh.indexFormat;
+            existing.SetVertices(mesh.vertices);
+            existing.SetUVs(0, mesh.uv);
+            existing.SetColors(mesh.colors32);
+            existing.SetTriangles(mesh.triangles, 0);
+            existing.RecalculateBounds();
             existing.name = mesh.name;
             Object.DestroyImmediate(mesh);
             EditorUtility.SetDirty(existing);
@@ -212,6 +228,7 @@ namespace HalfAware.EditorTools
             m.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(texture));
             m.SetColor("_Tint", look.Tint);
             m.SetColor("_GlowTint", look.GlowTint);
+            m.SetFloat("_GlowShade", 0.5f);
             Haze(m, look);
             m.SetFloat("_Cutoff", 0.25f);
             m.SetFloat("_Additive", 0f);
@@ -359,6 +376,55 @@ namespace HalfAware.EditorTools
             m.renderQueue = (int)RenderQueue.Transparent;
             EditorUtility.SetDirty(m);
             return m;
+        }
+
+        // ---- カーテン --------------------------------------------------------------
+
+        /// <summary>
+        /// カーテンを開ける（オーナー「今ってカーテンは半開きなんだっけ？じゃあ開いてOK」）。
+        /// 北の窓は左右の襞を窓の抜けの外まで寄せ、座って始めた目から名所の並ぶ側が見えるようにする。
+        /// 東の窓は左右へ 0.18 m ずつ寄せる。襞の間隔は元の 0.09 m のまま、レールは寄せた襞に合わせて伸ばす。
+        /// 置く所を決め打ちするので、何度押しても同じ所に来る。カーテンは影を落とすが、日の灯りは窓の影止めで止まるので、部屋の中の当たり方は変わらない
+        /// </summary>
+        static string Curtains()
+        {
+            var notes = new List<string>();
+            notes.Add(Drape("Room/CurtainFront", true, -2.21f, -0.75f, -1.30f, 1.94f));
+            notes.Add(Drape("Room/CurtainRight", false, -1.34f, -0.02f, -0.50f, 1.80f));
+            return "カーテン: " + string.Join("、", notes.ToArray());
+        }
+
+        /// <summary>
+        /// 襞 Fold1〜5 を left から、Fold6〜10 を right から 0.09 m おきに並べる。alongX なら x に、そうでなければ z に。
+        /// レールは真ん中 rail・長さ span
+        /// </summary>
+        static string Drape(string path, bool alongX, float left, float right, float rail, float span)
+        {
+            var root = GameObject.Find(path);
+            if (root == null) return "無い: " + path;
+            var moved = 0;
+            for (var i = 1; i <= 10; i++)
+            {
+                var fold = root.transform.Find("Fold" + i);
+                if (fold == null) continue;
+                var at = i <= 5 ? left + (i - 1) * 0.09f : right + (i - 6) * 0.09f;
+                var p = fold.localPosition;
+                if (alongX) p.x = at; else p.z = at;
+                fold.localPosition = p;
+                EditorUtility.SetDirty(fold);
+                moved++;
+            }
+            var bar = root.transform.Find("Rail");
+            if (bar != null)
+            {
+                var p = bar.localPosition;
+                var s = bar.localScale;
+                if (alongX) { p.x = rail; s.x = span; } else { p.z = rail; s.z = span; }
+                bar.localPosition = p;
+                bar.localScale = s;
+                EditorUtility.SetDirty(bar);
+            }
+            return string.Format("{0} の襞 {1} 枚", path, moved);
         }
 
         // ---- 物の一覧 --------------------------------------------------------------

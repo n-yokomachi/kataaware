@@ -55,6 +55,38 @@ namespace HalfAware.EditorTools
             Debug.Log(ShootAll(Path.Combine(Path.GetTempPath(), "HalfAwareRoomView")));
         }
 
+        /// <summary>場面 1（夕暮れ）で撮る所</summary>
+        static View[] DuskViews(float seat)
+        {
+            return new[]
+            {
+                new View("1_seat_left", new Vector3(1.5f, 0.05f, 1.2f), 0f, -60f, 0f, seat),
+                new View("2a_east_window", new Vector3(2.0f, 0.05f, -0.5f), 90f, 0f, -2f, Stand),
+                new View("2b_east_window_ne", new Vector3(2.45f, 0.05f, -0.85f), 50f, 0f, 0f, Stand),
+                new View("2c_north_window", new Vector3(-1.3f, 0.05f, 2.0f), 0f, 0f, -4f, Stand),
+                new View("2d_north_window_left", new Vector3(-0.9f, 0.05f, 2.3f), -38f, 0f, -4f, Stand),
+                new View("3a_down_east", new Vector3(2.58f, 0.05f, -0.5f), 90f, 0f, 40f, Stand),
+                new View("3b_down_north", new Vector3(-1.3f, 0.05f, 2.58f), 0f, 0f, 40f, Stand),
+                // 名所の拡大。窓際に立てる目（北の窓は真ん中の桟を避けて左の窓ガラスから）で、画角を 20 度に絞る
+                new View("4a_tower_and_bridge_zoom", new Vector3(-1.5f, 1.65f, 2.8f), -20f, 0f, -3f, 0f, 20f, true),
+                new View("4b_shard_side_zoom", new Vector3(-0.95f, 1.65f, 2.8f), -48f, 0f, -5f, 0f, 24f, true),
+                new View("4c_canary_wharf_zoom", new Vector3(2.82f, 1.65f, -0.72f), 81f, 0f, -2f, 0f, 20f, true),
+            };
+        }
+
+        /// <summary>場面 3（夜）で撮る所</summary>
+        static View[] NightViews()
+        {
+            return new[]
+            {
+                new View("5a_connect_north_window", new Vector3(-1.3f, 0.05f, 2.0f), 0f, 0f, -4f, Stand),
+                new View("5b_connect_north_window_left", new Vector3(-0.9f, 0.05f, 2.3f), -38f, 0f, -4f, Stand),
+                new View("5c_connect_tower_and_bridge_zoom", new Vector3(-1.5f, 1.65f, 2.8f), -20f, 0f, -3f, 0f, 20f, true),
+                new View("5d_connect_east_window_ne", new Vector3(2.45f, 0.05f, -0.85f), 50f, 0f, 0f, Stand),
+                new View("5e_connect_canary_wharf_zoom", new Vector3(2.82f, 1.65f, -0.72f), 81f, 0f, -2f, 0f, 20f, true),
+            };
+        }
+
         /// <summary>場面 1（夕暮れ）と場面 3（夜）の窓を撮って dir に置く</summary>
         public static string ShootAll(string dir)
         {
@@ -71,31 +103,45 @@ namespace HalfAware.EditorTools
                 ShaderUtil.allowAsyncCompilation = false;
                 var room = EditorSceneManager.OpenScene(BuildRoomView.RoomPath, OpenSceneMode.Single);
                 sb.AppendLine("場面 1 の時刻: " + BuildRoomView.HourIn(room));
-                var seat = SeatEye();
-                var views = new[]
-                {
-                    new View("1_seat_left", new Vector3(1.5f, 0.05f, 1.2f), 0f, -60f, 0f, seat),
-                    new View("2a_east_window", new Vector3(2.0f, 0.05f, -0.5f), 90f, 0f, -2f, Stand),
-                    new View("2b_east_window_ne", new Vector3(2.45f, 0.05f, -0.85f), 50f, 0f, 0f, Stand),
-                    new View("2c_north_window", new Vector3(-1.3f, 0.05f, 2.0f), 0f, 0f, -2f, Stand),
-                    new View("2d_north_window_nw", new Vector3(-1.05f, 0.05f, 2.45f), -40f, 0f, 0f, Stand),
-                    new View("3a_down_east", new Vector3(2.58f, 0.05f, -0.5f), 90f, 0f, 40f, Stand),
-                    new View("3b_down_north", new Vector3(-1.3f, 0.05f, 2.58f), 0f, 0f, 40f, Stand),
-                    new View("4a_neon_zoom", new Vector3(2.82f, 1.65f, -0.8f), 45f, 0f, -3f, 0f, 20f, true),
-                    new View("4b_neon_zoom_east", new Vector3(2.82f, 1.65f, -0.72f), 100f, 0f, -3f, 0f, 20f, true),
-                };
-                foreach (var v in views) sb.AppendLine(Shoot(v, dir));
-
+                foreach (var v in DuskViews(SeatEye())) sb.AppendLine(Shoot(v, dir));
                 var connect = EditorSceneManager.OpenScene(BuildConnect.ScenePath, OpenSceneMode.Single);
                 sb.AppendLine("場面 3 の時刻: " + BuildRoomView.HourIn(connect));
-                var night = new[]
-                {
-                    new View("5a_connect_east_window", new Vector3(2.0f, 0.05f, -0.5f), 90f, 0f, -2f, Stand),
-                    new View("5b_connect_east_window_ne", new Vector3(2.45f, 0.05f, -0.85f), 50f, 0f, 0f, Stand),
-                    new View("5c_connect_north_window", new Vector3(-1.3f, 0.05f, 2.0f), 0f, 0f, -2f, Stand),
-                    new View("5d_connect_down_east", new Vector3(2.58f, 0.05f, -0.5f), 90f, 0f, 40f, Stand),
-                };
-                foreach (var v in night) sb.AppendLine(Shoot(v, dir));
+                foreach (var v in NightViews()) sb.AppendLine(Shoot(v, dir));
+            }
+            catch (Exception e)
+            {
+                sb.AppendLine("例外: " + e);
+            }
+            finally
+            {
+                ShaderUtil.allowAsyncCompilation = async;
+                TitleShots.Back(setup);
+            }
+            return sb.ToString().TrimEnd();
+        }
+
+        /// <summary>
+        /// 場面を保存せずに確かめる。Room を開いて景色を組み（<see cref="BuildRoomView.Assemble"/>）、夕暮れの所を撮り、
+        /// 夜へ替えて夜の所を撮って、**組んだ場面は捨てる**（開き直す）。絵・mesh・マテリアルのアセットは焼き直されたまま残る
+        /// </summary>
+        public static string Preview(string dir)
+        {
+            if (EditorApplication.isPlaying) return "再生中は撮らない";
+            for (var i = 0; i < SceneManager.sceneCount; i++)
+                if (SceneManager.GetSceneAt(i).isDirty)
+                    return "開いている場面に未保存の変更がある: " + SceneManager.GetSceneAt(i).path;
+            Directory.CreateDirectory(dir);
+            var setup = EditorSceneManager.GetSceneManagerSetup();
+            var sb = new StringBuilder();
+            var async = ShaderUtil.allowAsyncCompilation;
+            try
+            {
+                ShaderUtil.allowAsyncCompilation = false;
+                var room = EditorSceneManager.OpenScene(BuildRoomView.RoomPath, OpenSceneMode.Single);
+                sb.AppendLine(BuildRoomView.Assemble(room));
+                foreach (var v in DuskViews(SeatEye())) sb.AppendLine(Shoot(v, dir));
+                BuildRoomView.SetHour(RoomView.Hour.Night);
+                foreach (var v in NightViews()) sb.AppendLine(Shoot(v, dir));
             }
             catch (Exception e)
             {

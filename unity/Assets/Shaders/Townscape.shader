@@ -8,6 +8,8 @@
 // _HazeNear から _HazeFar へ濃くなって _HazeMax で止まる。霞の色は、日の沈んだ側（_WarmDir）を向くほど _HazeWarm へ寄る。
 // 空の絵（BuildRoomView の空）も同じ式で地平の色を塗ってあるので、遠い棟が空の地平へ溶ける。
 //
+// **頂点色の α は霞の効きの割合。** ふつうは 1。遠くの名所（BuildRoomViewLandmarks）は α を下げて霞を控える。
+//
 // **足し算にも使う。** 街灯の暈と路面の明かりの溜まりは、同じシェーダーを _Additive 1（Blend One One、ZWrite Off）で描く。
 // そのときは絵の α を明るさにし、頂点色を灯りの色にする。霞は明るさを削る向きに効かせる
 Shader "HalfAware/Townscape"
@@ -26,6 +28,7 @@ Shader "HalfAware/Townscape"
         _HazeMax ("霞の濃さの限り", Range(0, 1)) = 0.85
         _HazeCurve ("霞の立ち上がり。1 で距離どおり、小さいほど近くから", Range(0.3, 2)) = 0.8
         _GlowHaze ("光る所が霞に負ける割合", Range(0, 1)) = 0.45
+        _GlowShade ("光る所に面の陰りを載せる割合", Range(0, 1)) = 0.5
         _Cutoff ("抜く境", Range(-1, 1)) = 0.25
         _Additive ("足し算で描く", Float) = 0
         [Enum(UnityEngine.Rendering.BlendMode)] _SrcBlend ("", Float) = 1
@@ -56,6 +59,7 @@ Shader "HalfAware/Townscape"
             half _HazeMax;
             half _HazeCurve;
             half _GlowHaze;
+            half _GlowShade;
             half _Cutoff;
             half _Additive;
         CBUFFER_END
@@ -105,7 +109,8 @@ Shader "HalfAware/Townscape"
 
                 float3 look = i.positionWS - _WorldSpaceCameraPos;
                 float far = length(look);
-                half k = pow(saturate((far - _HazeNear) / max(_HazeFar - _HazeNear, 1.0)), _HazeCurve) * _HazeMax;
+                // 頂点色の α は霞の効き。遠くの名所は窓から見た大きさのまま近くへ縮めて置くので、遠さのわりに霞ませない
+                half k = pow(saturate((far - _HazeNear) / max(_HazeFar - _HazeNear, 1.0)), _HazeCurve) * _HazeMax * i.color.a;
                 float2 flat = look.xz / max(length(look.xz), 1e-4);
                 half warm = pow(saturate(dot(flat, normalize(_WarmDir.xz))), _WarmWidth);
                 half3 haze = lerp(_Haze.rgb, _HazeWarm.rgb, warm);
@@ -113,7 +118,8 @@ Shader "HalfAware/Townscape"
                 // 光る所の割合。α 0.5 がふつうの面、1 が光る所
                 half glow = saturate((t.a - 0.75h) * 4.0h);
                 half3 lit = t.rgb * i.color.rgb * _Tint.rgb;
-                half3 self = t.rgb * _GlowTint.rgb;
+                // 投光で照らした名所の面が一枚の板に見えないよう、面の陰り（頂点色）を半分だけ載せる
+                half3 self = t.rgb * _GlowTint.rgb * lerp(1.0h, saturate(i.color.rgb), _GlowShade);
                 half3 c = lerp(lit, self, glow);
                 c = lerp(c, haze, k * lerp(1.0h, _GlowHaze, glow));
 
