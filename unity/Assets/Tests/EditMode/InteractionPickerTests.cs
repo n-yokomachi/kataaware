@@ -13,6 +13,11 @@ namespace HalfAware.Tests
 
         static HashSet<string> Done(params string[] ids) => new HashSet<string>(ids);
 
+        // 場面 1 の座った目（首だけ振るので、どこを狙っても同じ所）と、左の机の煙草の箱と灰皿の置き場（Room.unity の Interactable）
+        static readonly Vector3 RoomEye = new Vector3(1.50f, 1.309f, 1.42f);
+        static readonly Vector3 RoomBox = new Vector3(0.80f, 0.70f, 2.10f);
+        static readonly Vector3 RoomAshtray = new Vector3(0.78f, 0.70f, 2.30f);
+
         static IInteractable Pick(ICollection<string> done, params IInteractable[] items) =>
             InteractionPicker.Select(Cam, Fwd, items, done);
 
@@ -21,6 +26,52 @@ namespace HalfAware.Tests
         {
             var picked = Pick(Done(), At("far", 0f, 1.8f), At("near", 0f, 1f), At("behind", 0f, -1f), At("out", 0f, 5f));
             Assert.That(picked.Id, Is.EqualTo("near"));
+        }
+
+        [Test]
+        public void PicksTheItemAtTheCentreOfTheViewOverANearerOneToTheSide()
+        {
+            // 狙った物を選ぶ（2026-09-29）。手前に別の物があっても、視線の真ん中にある方が勝つ。
+            // x=0.25, z=1 は視線から約 14°
+            var picked = Pick(Done(), At("side", 0.25f, 1f), At("aimed", 0f, 1.6f));
+            Assert.That(picked.Id, Is.EqualTo("aimed"));
+        }
+
+        [Test]
+        public void PicksTheNearerOfTwoItemsAlmostInLine()
+        {
+            // 角度の差が TieAngle（約 3°）の内なら、近い方。x=0.03, z=1 は約 1.7°
+            var picked = Pick(Done(), At("far", 0f, 1.8f), At("near", 0.03f, 1f));
+            Assert.That(picked.Id, Is.EqualTo("near"));
+        }
+
+        [Test]
+        public void PicksTheCloserToTheCentreWhenTheAnglesDifferByMoreThanTheTie()
+        {
+            // x=0.1, z=1 は約 5.7°、x=0.02, z=1.8 は約 0.6°。差が TieAngle を越えるので、遠くても真ん中の方
+            var picked = Pick(Done(), At("near", 0.1f, 1f), At("far", 0.02f, 1.8f));
+            Assert.That(picked.Id, Is.EqualTo("far"));
+        }
+
+        [Test]
+        public void TheOrderOfTheItemsDoesNotChangeThePick()
+        {
+            var a = At("a", 0.25f, 1f);
+            var b = At("b", 0f, 1.6f);
+            Assert.That(Pick(Done(), a, b).Id, Is.EqualTo("b"));
+            Assert.That(Pick(Done(), b, a).Id, Is.EqualTo("b"));
+        }
+
+        [Test]
+        public void SeatedAtTheDeskTheAshtrayIsPickedWhenAimedAtEvenThoughTheBoxIsNearer()
+        {
+            // 場面 1 の座った目から、左の机の煙草の箱（1.15 m）と灰皿（1.29 m）は約 7° 離れて並ぶ。
+            // 前は近い方が勝ち、灰皿を狙っても箱が選ばれていた
+            var box = new FakeItem("cigarette-box", RoomBox);
+            var ashtray = new FakeItem("ashtray", RoomAshtray);
+            var items = new IInteractable[] { box, ashtray };
+            Assert.AreSame(ashtray, InteractionPicker.Select(RoomEye, (RoomAshtray - RoomEye).normalized, items, Done()));
+            Assert.AreSame(box, InteractionPicker.Select(RoomEye, (RoomBox - RoomEye).normalized, items, Done()));
         }
 
         [Test]
