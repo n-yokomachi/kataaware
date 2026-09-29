@@ -75,7 +75,7 @@ namespace HalfAware.EditorTools
             finally
             {
                 ShaderUtil.allowAsyncCompilation = async;
-                TitleShots.Back(setup);
+                Back(setup);
             }
             File.WriteAllText(Path.Combine(dir, tag + "_log.txt"), sb.ToString());
             return sb.ToString().TrimEnd();
@@ -116,7 +116,12 @@ namespace HalfAware.EditorTools
             log.AppendLine(Free(P("1f_front_fill"), W(chair, 0.95f, 1.35f, 1.0f), W(chair, 0f, 0.72f, -0.05f), 50f, 1.2f));
             log.AppendLine(Free(P("1g_side_fill"), W(chair, -1.35f, 1.0f, 0.0f), W(chair, 0f, 0.75f, -0.08f), 50f, 1.2f));
             log.AppendLine(Free(P("1h_back_fill"), W(chair, -0.75f, 1.45f, -1.25f), W(chair, 0f, 0.85f, -0.2f), 50f, 1.2f));
+            log.AppendLine(Free(P("1j_footrest_side_fill"), W(chair, -0.85f, 0.45f, 0.62f), W(chair, 0f, 0.22f, 0.22f), 50f, 1.2f));
+            // 部屋の家具と並べて（張り地の色が部屋から浮かないか）
+            log.AppendLine(Free(P("1k_room"), W(chair, -2.6f, 1.65f, -1.9f), W(chair, -0.6f, 0.7f, 0.3f), 0f));
             Body(true);
+            // 座った体の足がフットレストのパッドに乗っている所（低い前から。頭は枠の外）
+            log.AppendLine(Free(P("1i_feet_on_footrest"), W(chair, 0.62f, 0.38f, 0.95f), W(chair, 0f, 0.14f, 0.30f), 50f, 1.2f));
 
             // 2. 座ったまま下を見る。正面・右・左
             player.PlaceAt(foot, body, limit, 0f, PlayerController.PitchDownLimit, seatEye);
@@ -242,7 +247,7 @@ namespace HalfAware.EditorTools
             finally
             {
                 ShaderUtil.allowAsyncCompilation = async;
-                TitleShots.Back(setup);
+                Back(setup);
             }
             return sb.ToString().TrimEnd();
         }
@@ -513,7 +518,74 @@ namespace HalfAware.EditorTools
                 sb.AppendFormat("{0} {1} 点（最も深い {2:0.000} m、{3} {4}）。", piece.Name, n, deepest, who, where.ToString("F3"));
             }
             if (!any) sb.Append("無し");
+
+            // フットレストのパッドに足の裏が乗っているか。パッドの上に来る足の点のうち、いちばん低い点とパッドの上の面の隙間（負は沈み）。
+            // 面の中へ入った点だけを数える上の食い込みでは、パッドを突き抜けた点を数え漏らすので、上の面からの高さで測る
+            var an = pro.GetComponent<Animator>();
+            BuildChair.Piece pad = null;
+            foreach (var piece in made.Pieces) if (piece.Name == "FootPad") pad = piece;
+            if (an != null && pad != null)
+            {
+                foreach (var side in new[] { new[] { HumanBodyBones.LeftFoot, HumanBodyBones.LeftToes }, new[] { HumanBodyBones.RightFoot, HumanBodyBones.RightToes } })
+                {
+                    var own = new HashSet<Transform> { an.GetBoneTransform(side[0]), an.GetBoneTransform(side[1]) };
+                    var over = 0;
+                    var near = 0;
+                    var low = float.MaxValue;
+                    for (var i = 0; i < local.Length; i++)
+                    {
+                        if (!own.Contains(bones[weights[i].boneIndex0])) continue;
+                        float top;
+                        if (!PadTopAt(verts, pad, local[i].x, local[i].z, out top)) continue;
+                        over++;
+                        var gap = local[i].y - top;
+                        low = Mathf.Min(low, gap);
+                        if (Mathf.Abs(gap) <= 0.005f) near++;
+                    }
+                    sb.AppendFormat(" フットレスト: {0}の足はパッドの上に {1} 点、いちばん低い点とパッドの上の面の隙間 {2:0.000} m（負は沈み）、上の面から 5 mm の内に {3} 点。",
+                        side[0] == HumanBodyBones.LeftFoot ? "左" : "右", over, over > 0 ? low : float.NaN, near);
+                }
+            }
             return sb.ToString();
+        }
+
+        /// <summary>部品の上を向いた面のうち、上から見て (x, z) を含む面の高さのいちばん高い所（上の面）</summary>
+        static bool PadTopAt(Vector3[] verts, BuildChair.Piece piece, float x, float z, out float top)
+        {
+            top = float.MinValue;
+            var hit = false;
+            for (var t = 0; t < piece.Triangles.Length; t += 3)
+            {
+                var a = verts[piece.Triangles[t]];
+                var b = verts[piece.Triangles[t + 1]];
+                var c = verts[piece.Triangles[t + 2]];
+                if (Vector3.Cross(b - a, c - a).y <= 0f) continue;
+                // 上から見た三角の中か（重心の座標）
+                var d = (b.z - c.z) * (a.x - c.x) + (c.x - b.x) * (a.z - c.z);
+                if (Mathf.Abs(d) < 1e-12f) continue;
+                var u = ((b.z - c.z) * (x - c.x) + (c.x - b.x) * (z - c.z)) / d;
+                var v = ((c.z - a.z) * (x - c.x) + (a.x - c.x) * (z - c.z)) / d;
+                if (u < 0f || v < 0f || u + v > 1f) continue;
+                var y = u * a.y + v * b.y + (1f - u - v) * c.y;
+                if (y > top) top = y;
+                hit = true;
+            }
+            return hit;
+        }
+
+        /// <summary>
+        /// 撮る前の場面へ戻す。撮るために書き換えた場面は汚れの印が付かないこともあり、そのまま戻すと書き換えた形が開いたまま残る
+        /// （ほかの担当がその場面を保存すると、書き換えた形が入る）。空の場面を挟んでディスクから開き直し、一時的な物を片付ける
+        /// </summary>
+        static void Back(SceneSetup[] setup)
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            var usable = setup != null && setup.Length > 0;
+            if (usable)
+                foreach (var s in setup)
+                    if (string.IsNullOrEmpty(s.path)) usable = false;
+            if (usable) EditorSceneManager.RestoreSceneManagerSetup(setup);
+            EditorUtility.UnloadUnusedAssetsImmediate();
         }
 
         /// <summary>三角 abc の上で p にいちばん近い点</summary>

@@ -14,11 +14,12 @@ namespace HalfAware.EditorTools
     ///
     /// <list type="table">
     /// <item><term>形</term><description>厚い座面（前後に 4 本の畝、脇の盛り上がり、前の丸み）、高い背もたれ（横に 8 本の畝、肩の張り出し、首の絞り）、
-    /// 腰と頭の当て物、幅の広い肘掛け（外に操作盤の受け皿。右は差込口）、リクライニングの機構とレバー、ガスシリンダー、五本脚とキャスター、足置き。
+    /// 腰と頭の当て物、幅の広い肘掛け（外に操作盤の受け皿。右は差込口）、リクライニングの機構とレバー、ガスシリンダー、五本脚とキャスター、
+    /// 座の前の下から引き出すフットレスト（腕と張り地のパッド）。
     /// 頭の後ろに潜行の端末（耳の筐体の小さな画面と灯り、裏の箱の画面と接続口）、そこから背もたれの裏を這って座の下と右の肘掛けへ回るケーブル
     /// （<c>BuildChairShape.cs</c>）</description></item>
     /// <item><term>体との取り合い</term><description>座った体の形（SeatedPose）を組み直さずに済むよう、座面の高さの線・肘掛けの上面・差込口・
-    /// ジャックの置き場は前の椅子と同じ所。足置きは座った形の足の裏に沿わせる</description></item>
+    /// ジャックの置き場は前の椅子と同じ所。フットレストは座った形の足の裏が乗る所まで引き出した形</description></item>
     /// <item><term>置き場</term><description><c>Room/Chair</c> の下の見た目の子を <c>ChairMesh</c> 一つ（マテリアル 5 つ）に替える。
     /// 働きを持つ子（<c>Blocker</c> とその当たり・<c>JackRest</c>・<c>Cable</c>・<c>PortHole</c>）は名前のまま残し、当たりの大きさだけ新しい形に合わせる。
     /// PortHole はケーブルの始まりの置き場として残し、見た目（前の黒い箱）は外す</description></item>
@@ -115,6 +116,7 @@ namespace HalfAware.EditorTools
 
             var port = Port(chair);
             var blocker = Blockers(chair);
+            var push = Push(scene);
             AssetDatabase.SaveAssets();
 
             var sb = new StringBuilder();
@@ -122,7 +124,8 @@ namespace HalfAware.EditorTools
                 made.Triangles, made.Vertices, made.Pieces.Count, mats.Length, MeshSize()).AppendLine();
             sb.AppendLine("マテリアルごとの三角: " + SubmeshLine(mesh));
             sb.AppendLine(port);
-            sb.Append(blocker);
+            sb.AppendLine(blocker);
+            sb.Append(push);
             return sb.ToString();
         }
 
@@ -155,9 +158,16 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
+        /// 立ち上がる時に椅子を後ろへ押し下げる距離（SceneFlow の chairPushBack）。前の椅子は 0.24 m。
+        /// フットレストの先（z 0.445）が、机との間の立ち位置（z 1.68、当たりの半径 0.3 m）の当たりの縁 1.38 から 3 cm 手前に来る所まで下げる。
+        /// 椅子の後ろ（押し下げた背の後ろの端は z 0.27）は床とラグだけ
+        /// </summary>
+        public const float PushBack = 0.38f;
+
+        /// <summary>
         /// 立った後の当たり（Room/Chair/Blocker の子）を新しい形に合わせる。名前は前のまま（Seat・Base・Back・ArmR・ArmL）。
-        /// 前の端は前の椅子と同じ z 0.30 ほどに留める（立ち上がって椅子を 0.24 m 押し下げた時、机との間の立ち位置 z 1.68 の当たりの縁 1.38 に届かない）。
-        /// 足置きは低いので当たりに入れない（入れると立ち位置の当たりに掛かる）
+        /// 床の近くの当たり（Base）はフットレストの先まで伸ばす（場面 3 で椅子の前を歩いてパッドを踏み抜かない）。
+        /// どの当たりも、立ち上がって <see cref="PushBack"/> 下げた時に、机との間の立ち位置の当たりに掛からない
         /// </summary>
         static string Blockers(Transform chair)
         {
@@ -166,14 +176,32 @@ namespace HalfAware.EditorTools
             var sb = new StringBuilder("当たり: ");
             // 座面（脇の盛り上がりまで）
             sb.Append(Box(root, "Seat", new Vector3(0f, 0.40f, 0.04f), new Vector3(0.60f, 0.80f, 0.50f)));
-            // 五本脚（脚の先のキャスターまで）
-            sb.Append(Box(root, "Base", new Vector3(0f, 0.08f, 0f), new Vector3(0.64f, 0.16f, 0.62f)));
+            // 五本脚（脚の先のキャスターまで）とフットレストのパッド
+            sb.Append(Box(root, "Base", new Vector3(0f, 0.08f, 0.07f), new Vector3(0.64f, 0.16f, 0.76f)));
             // 背もたれと頭の後ろの端末
             sb.Append(Box(root, "Back", new Vector3(0f, 0.985f, -0.39f), new Vector3(0.56f, 1.03f, 0.48f)));
             // 肘掛け（外の受け皿と前の操作盤まで）
             sb.Append(Box(root, "ArmR", new Vector3(0.335f, 0.60f, 0.08f), new Vector3(0.18f, 0.40f, 0.52f)));
             sb.Append(Box(root, "ArmL", new Vector3(-0.335f, 0.60f, 0.08f), new Vector3(0.18f, 0.40f, 0.52f)));
             return sb.ToString();
+        }
+
+        /// <summary>場面の SceneFlow の、立ち上がる時に椅子を押し下げる距離を <see cref="PushBack"/> にする（場面 3・5・7 は Room を写して組むので同じ値が行く）</summary>
+        static string Push(Scene scene)
+        {
+            SceneFlow flow = null;
+            foreach (var r in scene.GetRootGameObjects())
+            {
+                flow = r.GetComponentInChildren<SceneFlow>(true);
+                if (flow != null) break;
+            }
+            if (flow == null) return "SceneFlow が無い。椅子の押し下げを書けない";
+            var so = new SerializedObject(flow);
+            var p = so.FindProperty("chairPushBack");
+            var was = p.floatValue;
+            p.floatValue = PushBack;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            return string.Format("立ち上がる時の椅子の押し下げ（SceneFlow の chairPushBack）: {0:0.00} → {1:0.00} m", was, PushBack);
         }
 
         static string Box(Transform root, string name, Vector3 centre, Vector3 size)
@@ -271,10 +299,10 @@ namespace HalfAware.EditorTools
 
         // ---- 絵 --------------------------------------------------------------------
 
-        /// <summary>張り地の色。暗い紫がかった部屋に沈む、茄子紺に近い黒革</summary>
-        static readonly Color Leather = new Color(0.205f, 0.170f, 0.215f);
+        /// <summary>張り地の色。黒を基調にした部屋の家具（つや消しの黒の塗り 0.20 ほど）と明るさを揃えた、紫をわずかに残す黒革</summary>
+        static readonly Color Leather = new Color(0.180f, 0.165f, 0.190f);
         /// <summary>畝の革（少し暗く青い）と縫い糸（くすんだ藤色）</summary>
-        static readonly Color RibLeather = new Color(0.175f, 0.150f, 0.200f);
+        static readonly Color RibLeather = new Color(0.155f, 0.143f, 0.172f);
         static readonly Color Stitch = new Color(0.44f, 0.35f, 0.54f);
 
         /// <summary>乱れの代わりの決まった値（0〜1）。押すたびに同じ絵にする</summary>
@@ -375,7 +403,7 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 操作盤の絵（64×64、点で引く）と、その光る所の絵。下の段に色の升、その上に右と左の肘掛けの前の操作盤と受け皿（前が上）、
-        /// 頭の後ろの画面・耳の画面・接続口の板・分岐の箱の面・耳の灯り・灯りの列、足置きのゴムの筋
+        /// 頭の後ろの画面・耳の画面・接続口の板・分岐の箱の面・耳の灯り・灯りの列
         /// </summary>
         static Texture2D PanelPictures(out Texture2D glow)
         {
@@ -468,12 +496,6 @@ namespace HalfAware.EditorTools
             cv.Fill(strip.x, strip.y, strip.width, strip.height, Plastic);
             var cycle = new[] { CyanLit, CyanLit, VioletLit, CyanLit, AmberLit, CyanLit, VioletLit };
             for (var k = 0; k * 3 + 1 < strip.width; k++) cv.LitFill(strip.x + 1 + k * 3, strip.y + 1, 2, 2, cycle[k % cycle.Length]);
-
-            // 足置きのゴムの筋
-            var f = FootRibs;
-            cv.Fill(f.x, f.y, f.width, f.height, Rubber);
-            for (var y = f.y + 1; y < f.yMax - 1; y += 2) cv.Fill(f.x + 1, y, f.width - 2, 1, new Color(0.085f, 0.085f, 0.095f));
-            for (var x = f.x; x < f.xMax; x++) { cv.Put(x, f.y, new Color(0.13f, 0.13f, 0.15f)); cv.Put(x, f.yMax - 1, new Color(0.13f, 0.13f, 0.15f)); }
 
             glow = SavePicture(cv.Glow, PanelSize, PanelSize, PanelGlowTexture, TextureWrapMode.Clamp);
             return SavePicture(cv.Albedo, PanelSize, PanelSize, PanelTexture, TextureWrapMode.Clamp);

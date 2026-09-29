@@ -79,8 +79,11 @@ namespace HalfAware.EditorTools
         /// <summary>五本脚の脚の先（キャスターの芯）までの半径</summary>
         const float LegReach = 0.30f;
 
-        /// <summary>足置きの上面の線。座った形の足の裏（踵 0.169、つま先 0.096）に沿わせて前へ 17 度下げ、端末の前の形（両手を腿に）の足の裏にも食い込まない高さ</summary>
-        static float FootTop(float z) { return 0.150f - 0.30f * (z - 0.18f); }
+        /// <summary>
+        /// フットレストのパッドの上の面の線。座った形の足の裏（踵 z 0.18 で 0.169、土踏まず z 0.30 で 0.122、指の付け根 z 0.38〜0.40 で 0.096〜0.098）に
+        /// ±5 mm で沿わせて、前へ 18 度下げる（パッドは柔らかいので、足の裏がわずかに沈む所がある）
+        /// </summary>
+        static float FootTop(float z) { return 0.161f - 0.33f * (z - 0.18f); }
 
         // ---- 絵の中の置き場 --------------------------------------------------------
 
@@ -103,7 +106,6 @@ namespace HalfAware.EditorTools
         static readonly RectInt JunctionFace = new RectInt(44, 32, 20, 12);
         static readonly RectInt EarLamp = new RectInt(32, 36, 12, 12);
         static readonly RectInt LedStrip = new RectInt(44, 44, 20, 4);
-        static readonly RectInt FootRibs = new RectInt(0, 52, 32, 12);
 
         /// <summary>色の升（4×4 画素、下の段に 16 個）。ケーブルやキャスターの一色の物は升の真ん中を引く</summary>
         enum Swatch { Rubber, Plastic, Grey, Violet, Teal, Orange, Metal, Label, Cyan, VioletLit, Amber, Green, Brass, Glass, PlasticLight, Red }
@@ -187,29 +189,45 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 座面のクッションの、左右の位置 x での横から見た輪郭（後ろの下から、下の面を前へ、前の丸み、上の面を後ろへ、後ろの丸み）。
+        /// クッションの形（座面と、フットレストのパッド）。上の面と下の面の高さ（x, z から）、前と後ろの端、半分の幅、脇の縁の丸み、
+        /// 上から見た前の角の丸み、脇の端を畳む時に厚みを測る前後の位置
+        /// </summary>
+        sealed class Cushion
+        {
+            public Func<float, float, float> Top;
+            public Func<float, float, float> Under;
+            public float Front, Back, Half, Edge, Corner, MidZ;
+        }
+
+        static readonly Cushion SeatShape = new Cushion
+        {
+            Top = SeatTop, Under = SeatUnder, Front = SeatFront, Back = SeatBack, Half = SeatHalf, Edge = SeatEdge, Corner = SeatCorner, MidZ = 0.03f,
+        };
+
+        /// <summary>
+        /// クッションの、左右の位置 x での横から見た輪郭（後ろの下から、下の面を前へ、前の丸み、上の面を後ろへ、後ろの丸み）。
         /// 脇の縁では輪郭を内へ寄せて丸め（inset）、最後は線に畳んで閉じる（collapse）
         /// </summary>
-        static List<Vector3> SeatRing(float x, bool collapse)
+        static List<Vector3> CushionRing(Cushion c, float x, bool collapse)
         {
             var ax = Mathf.Abs(x);
             var d = 0f;
-            var edge = SeatHalf - SeatEdge;
-            if (ax > edge) d = SeatEdge - Mathf.Sqrt(Mathf.Max(0f, SeatEdge * SeatEdge - (ax - edge) * (ax - edge)));
-            var corner = SeatHalf - SeatCorner;
-            var plan = ax > corner ? SeatCorner - Mathf.Sqrt(Mathf.Max(0f, SeatCorner * SeatCorner - (ax - corner) * (ax - corner))) : 0f;
-            Func<float, float> top = z => SeatTop(x, z) - d;
-            Func<float, float> under = z => SeatUnder(x, z) + d;
+            var edge = c.Half - c.Edge;
+            if (ax > edge) d = c.Edge - Mathf.Sqrt(Mathf.Max(0f, c.Edge * c.Edge - (ax - edge) * (ax - edge)));
+            var corner = c.Half - c.Corner;
+            var plan = ax > corner ? c.Corner - Mathf.Sqrt(Mathf.Max(0f, c.Corner * c.Corner - (ax - corner) * (ax - corner))) : 0f;
+            Func<float, float> top = z => c.Top(x, z) - d;
+            Func<float, float> under = z => c.Under(x, z) + d;
             if (collapse)
             {
                 // 厚みの半分まで寄せて、上と下を真ん中の線で合わせる
-                var mid = 0.5f * (SeatTop(x, 0.03f) + SeatUnder(x, 0.03f));
+                var mid = 0.5f * (c.Top(x, c.MidZ) + c.Under(x, c.MidZ));
                 top = z => mid;
                 under = z => mid;
-                d = 0.5f * (SeatTop(x, 0.03f) - SeatUnder(x, 0.03f));
+                d = 0.5f * (c.Top(x, c.MidZ) - c.Under(x, c.MidZ));
             }
-            var zf = SeatFront - d - plan;
-            var zb = SeatBack + d + plan * 0.5f;
+            var zf = c.Front - d - plan;
+            var zb = c.Back + d + plan * 0.5f;
             // 前の丸み。上と下の真ん中を芯に、厚みの半分を半径にする
             var rn = Mathf.Max(0.0005f, 0.5f * (top(zf - 0.02f) - under(zf - 0.02f)));
             var zc = zf - rn;
@@ -252,30 +270,36 @@ namespace HalfAware.EditorTools
         static void Seat(Shop shop)
         {
             shop.Begin("SeatCushion", 55f, true);
-            // 真ん中の畝（前後に 4 本）。畝ごとに uv を 0 から張るので、境の輪は二重に置く
-            for (var c = 0; c < 4; c++)
+            CushionGrid(shop, SeatShape, ChannelHalf, ChannelWide, 4, 4,
+                new List<float> { 0.17f, 0.195f, 0.215f, 0.235f, 0.25f, 0.262f, 0.271f, 0.278f, 0.283f, SeatHalf });
+            shop.End(Orient.Whole);
+        }
+
+        /// <summary>
+        /// クッションの皮を張る。真ん中に前後の畝（ribs 本、幅 ribWide、畝ごとに segments に割る）、その外の脇（sides の |x| に輪を置き、最後に畳んで閉じる）。
+        /// 畝ごとに uv を 0 から張るので、境の輪は二重に置く
+        /// </summary>
+        static void CushionGrid(Shop shop, Cushion c, float ribHalf, float ribWide, int ribs, int segments, List<float> sides)
+        {
+            for (var r = 0; r < ribs; r++)
             {
-                var x0 = -ChannelHalf + c * ChannelWide;
+                var x0 = -ribHalf + r * ribWide;
                 var xs = new List<float>();
-                for (var i = 0; i <= 4; i++) xs.Add(x0 + ChannelWide * i / 4f);
-                RingGrid(shop, Shop.Upholstery, xs, x => SeatRing(x, false),
-                    (x, arc) => RibUv((x - x0) / ChannelWide, arc / RibTile, false));
+                for (var i = 0; i <= segments; i++) xs.Add(x0 + ribWide * i / segments);
+                RingGrid(shop, Shop.Upholstery, xs, x => CushionRing(c, x, false),
+                    (x, arc) => RibUv((x - x0) / ribWide, arc / RibTile, false));
             }
-            // 脇の盛り上がりと縁（左右）
             foreach (var side in new[] { 1f, -1f })
             {
-                var xs = new List<float> { 0.17f, 0.195f, 0.215f, 0.235f, 0.25f, 0.262f, 0.271f, 0.278f, 0.283f, SeatHalf };
                 var rings = new List<List<Vector3>>();
-                foreach (var ax in xs) rings.Add(SeatRing(side * ax, false));
-                rings.Add(SeatRing(side * SeatHalf, true));
-                var us = new List<float>();
-                foreach (var ax in xs) us.Add(ax);
-                us.Add(SeatHalf + 0.03f);
+                foreach (var ax in sides) rings.Add(CushionRing(c, side * ax, false));
+                rings.Add(CushionRing(c, side * c.Half, true));
+                var us = new List<float>(sides);
+                us.Add(c.Half + 0.03f);
                 // 輪はどの組も x の増える向きに並べる（左だけ逆に並べると、面の表裏が左だけ逆になる）
                 if (side < 0f) { rings.Reverse(); us.Reverse(); }
-                Rings(shop, Shop.Upholstery, rings, (i, arc) => GrainUv((us[i] - ChannelHalf) / GrainTile, arc / GrainTile));
+                Rings(shop, Shop.Upholstery, rings, (i, arc) => GrainUv((us[i] - ribHalf) / GrainTile, arc / GrainTile));
             }
-            shop.End(Orient.Whole);
         }
 
         /// <summary>輪の並び（x ごとに輪郭）から格子を張る</summary>
@@ -688,7 +712,7 @@ namespace HalfAware.EditorTools
             Tube(shop, "LeverL", Shop.Frame, new List<Vector3> { new Vector3(-0.11f, 0.366f, 0.0f), new Vector3(-0.19f, 0.360f, 0.018f), new Vector3(-0.232f, 0.355f, 0.032f) }, 0.006f, 6, false, Vector2.zero, 70f);
             Slab(shop, "LeverGripL", Shop.Panel, new Vector3(-0.25f, 0.354f, 0.038f), Quaternion.Euler(0f, -18f, 0f), new Vector3(0.036f, 0.015f, 0.028f), 0.005f, true, SwatchUv(Swatch.Rubber));
             // 前の張りの摘み
-            Tube(shop, "TensionKnob", Shop.Panel, new List<Vector3> { new Vector3(0f, 0.36f, 0.105f), new Vector3(0f, 0.36f, 0.135f) }, 0.026f, 10, true, SwatchUv(Swatch.Rubber), 70f);
+            Tube(shop, "TensionKnob", Shop.Panel, new List<Vector3> { new Vector3(0f, 0.35f, 0.105f), new Vector3(0f, 0.35f, 0.135f) }, 0.026f, 10, true, SwatchUv(Swatch.Rubber), 70f);
 
             // 背もたれを支える左右の腕（座の下から、クッションの後ろを回って背の殻へ）と、倒れの軸の蓋
             foreach (var sx in new[] { 1f, -1f })
@@ -762,24 +786,65 @@ namespace HalfAware.EditorTools
             }
         }
 
-        // ---- 足置き ------------------------------------------------------------------
+        // ---- フットレスト ------------------------------------------------------------
 
+        /// <summary>フットレストのパッドの半分の幅、前後の端、厚み、畝の範囲の半分と 1 本の幅（前後に 3 本）</summary>
+        const float FootHalf = 0.20f;
+        const float FootBack = 0.20f;
+        const float FootFront = 0.445f;
+        const float FootThick = 0.045f;
+        const float FootRibHalf = 0.15f;
+        const float FootRibWide = 0.10f;
+        /// <summary>引き出す腕の左右の位置（脛と足の外の縁 |x| 0.178 より 2.5 cm 外）と、腕がパッドの脇に付く前後の位置</summary>
+        const float FootArmX = 0.216f;
+        const float FootPivot = 0.30f;
+        /// <summary>引き出したレールの先（腕の上の軸）。座の皿の下の収め口から前へ出る</summary>
+        static readonly Vector3 FootRailEnd = new Vector3(FootArmX, 0.391f, 0.19f);
+
+        /// <summary>パッドの上の面。前後の畝をわずかに（3 mm）立てる</summary>
+        static float FootPadTop(float x, float z)
+        {
+            var y = FootTop(z);
+            if (Mathf.Abs(x) < FootRibHalf)
+            {
+                var f = (x + FootRibHalf) / FootRibWide;
+                f -= Mathf.Floor(f);
+                y += 0.003f * Mathf.Pow(Mathf.Sin(Mathf.PI * f), 1.5f);
+            }
+            return y;
+        }
+
+        static float FootPadUnder(float x, float z) { return FootTop(z) - FootThick; }
+
+        static readonly Cushion FootShape = new Cushion
+        {
+            Top = FootPadTop, Under = FootPadUnder, Front = FootFront, Back = FootBack, Half = FootHalf, Edge = 0.02f, Corner = 0.03f, MidZ = 0.32f,
+        };
+
+        /// <summary>
+        /// 座の前の下から引き出すフットレスト（ゲーミングチェアの引き出し式の脚置きの形）。座の皿の下の収め口から左右のレールが前へ出て、
+        /// 先の軸から腕が下りてパッドの脇を支える。机との間が狭いので伸ばしきらず、座った形の足の裏が乗る所（床の近く）まで下ろした形。
+        /// パッドは座面と同じ張り地で、前後に 3 本の畝
+        /// </summary>
         static void Footrest(Shop shop)
         {
-            // 前へ 17 度下がる板。上の面にゴムの筋。座った形の足の裏がこの面に乗る
-            const float z0 = 0.135f, z1 = 0.445f, thick = 0.018f;
-            var plate = new Vector3[8];
-            plate[0] = new Vector3(-0.155f, FootTop(z0) - thick, z0); plate[1] = new Vector3(0.155f, FootTop(z0) - thick, z0);
-            plate[2] = new Vector3(0.15f, FootTop(z1) - thick, z1); plate[3] = new Vector3(-0.15f, FootTop(z1) - thick, z1);
-            plate[4] = new Vector3(-0.155f, FootTop(z0), z0); plate[5] = new Vector3(0.155f, FootTop(z0), z0);
-            plate[6] = new Vector3(0.15f, FootTop(z1), z1); plate[7] = new Vector3(-0.15f, FootTop(z1), z1);
-            var faces = new int[] { Shop.Shell, Shop.Panel, Shop.Shell, Shop.Shell, Shop.Shell, Shop.Shell };
-            var uvs = new Rect?[] { null, PanelUv(FootRibs), null, null, null, null };
-            Hexa(shop, "FootPlate", plate, faces, uvs, true);
-            // 板の後ろの軸と、ガスシリンダーの覆いから出る腕、下の支え
-            Tube(shop, "FootHinge", Shop.Frame, new List<Vector3> { new Vector3(-0.08f, FootTop(z0) - 0.012f, z0 - 0.004f), new Vector3(0.08f, FootTop(z0) - 0.012f, z0 - 0.004f) }, 0.012f, 8, true, Vector2.zero, 70f);
-            Tube(shop, "FootArm", Shop.Frame, new List<Vector3> { new Vector3(0f, 0.152f, 0.03f), new Vector3(0f, FootTop(z0) - 0.012f, z0 - 0.004f) }, 0.013f, 8, true, Vector2.zero, 70f);
-            Tube(shop, "FootStrut", Shop.Frame, new List<Vector3> { new Vector3(0f, 0.108f, 0.04f), new Vector3(0f, FootTop(0.30f) - thick - 0.004f, 0.30f) }, 0.009f, 6, true, Vector2.zero, 70f);
+            shop.Begin("FootPad", 55f, true);
+            CushionGrid(shop, FootShape, FootRibHalf, FootRibWide, 3, 3, new List<float> { 0.15f, 0.17f, 0.18f, 0.19f, 0.197f, FootHalf });
+            shop.End(Orient.Whole);
+            // 座の皿の下の収め口
+            Slab(shop, "FootHousing", Shop.Shell, new Vector3(0f, 0.391f, 0.095f), Quaternion.identity, new Vector3(0.47f, 0.018f, 0.15f), 0.005f, true);
+            foreach (var sx in new[] { 1f, -1f })
+            {
+                var n = sx > 0f ? "R" : "L";
+                var top = new Vector3(sx * FootRailEnd.x, FootRailEnd.y, FootRailEnd.z);
+                // 引き出したレール
+                Slab(shop, "FootRail" + n, Shop.Chrome, new Vector3(top.x, top.y, 0.14f), Quaternion.identity, new Vector3(0.022f, 0.016f, 0.10f), 0.004f, true);
+                var pad = new Vector3(top.x, FootTop(FootPivot) - 0.5f * FootThick, FootPivot);
+                var seg = pad - top;
+                Tube(shop, "FootKnuckle" + n, Shop.Frame, new List<Vector3> { top - Vector3.right * 0.013f, top + Vector3.right * 0.013f }, 0.013f, 8, true, Vector2.zero, 50f);
+                Slab(shop, "FootArm" + n, Shop.Frame, 0.5f * (top + pad), Quaternion.LookRotation(seg.normalized, Vector3.forward), new Vector3(0.014f, 0.03f, seg.magnitude), 0.005f, true);
+                Tube(shop, "FootPivot" + n, Shop.Frame, new List<Vector3> { new Vector3(sx * 0.197f, pad.y, pad.z), new Vector3(sx * 0.229f, pad.y, pad.z) }, 0.012f, 8, true, Vector2.zero, 50f);
+            }
         }
 
         // ---- 頭の後ろの端末 ------------------------------------------------------------
