@@ -48,6 +48,6 @@ Material:
     - _Haze: {r: 0.46, g: 0.38, b: 0.55, a: 1}
     - _HazeWarm: {r: 0.78, g: 0.52, b: 0.52, a: 1}
     - _Tint: {r: 1, g: 1, b: 1, a: 1}
-    - _WarmDir: {r: -0.92718387, g: 0, b: 0.37460664, a: 0}
+    - _WarmDir: {r: -0.6156615, g: 0, b: 0.7880108, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

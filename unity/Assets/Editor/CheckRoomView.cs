@@ -55,7 +55,7 @@ namespace HalfAware.EditorTools
             Debug.Log(ShootAll(Path.Combine(Path.GetTempPath(), "HalfAwareRoomView")));
         }
 
-        /// <summary>場面 1（夕暮れ）で撮る所</summary>
+        /// <summary>場面 1（夕暮れ）で撮る所。名所はふつうの画角（窓際に立った目）で見て、拡大は形を確かめるためだけ</summary>
         static View[] DuskViews(float seat)
         {
             return new[]
@@ -64,13 +64,13 @@ namespace HalfAware.EditorTools
                 new View("2a_east_window", new Vector3(2.0f, 0.05f, -0.5f), 90f, 0f, -2f, Stand),
                 new View("2b_east_window_ne", new Vector3(2.45f, 0.05f, -0.85f), 50f, 0f, 0f, Stand),
                 new View("2c_north_window", new Vector3(-1.3f, 0.05f, 2.0f), 0f, 0f, -4f, Stand),
-                new View("2d_north_window_left", new Vector3(-0.9f, 0.05f, 2.3f), -38f, 0f, -4f, Stand),
+                new View("2d_north_window_left", new Vector3(-1.0f, 0.05f, 2.1f), -20f, 0f, -4f, Stand),
                 new View("3a_down_east", new Vector3(2.58f, 0.05f, -0.5f), 90f, 0f, 40f, Stand),
                 new View("3b_down_north", new Vector3(-1.3f, 0.05f, 2.58f), 0f, 0f, 40f, Stand),
-                // 名所の拡大。窓際に立てる目（北の窓は真ん中の桟を避けて左の窓ガラスから）で、画角を 20 度に絞る
-                new View("4a_tower_and_bridge_zoom", new Vector3(-1.5f, 1.65f, 2.8f), -20f, 0f, -3f, 0f, 20f, true),
-                new View("4b_shard_side_zoom", new Vector3(-0.95f, 1.65f, 2.8f), -48f, 0f, -5f, 0f, 24f, true),
-                new View("4c_canary_wharf_zoom", new Vector3(2.82f, 1.65f, -0.72f), 81f, 0f, -2f, 0f, 20f, true),
+                // 名所の拡大。窓際に立てる目（真ん中の桟を避けて左右の窓ガラスから）で、画角を絞る
+                new View("4a_tower_and_bridge_zoom", new Vector3(-1.45f, 1.65f, 2.8f), 7f, 0f, -4f, 0f, 30f, true),
+                new View("4b_shard_side_zoom", new Vector3(-1.05f, 1.65f, 2.8f), -18f, 0f, -5f, 0f, 24f, true),
+                new View("4c_canary_wharf_zoom", new Vector3(2.82f, 1.65f, -0.3f), 110f, 0f, -2f, 0f, 22f, true),
             };
         }
 
@@ -80,10 +80,10 @@ namespace HalfAware.EditorTools
             return new[]
             {
                 new View("5a_connect_north_window", new Vector3(-1.3f, 0.05f, 2.0f), 0f, 0f, -4f, Stand),
-                new View("5b_connect_north_window_left", new Vector3(-0.9f, 0.05f, 2.3f), -38f, 0f, -4f, Stand),
-                new View("5c_connect_tower_and_bridge_zoom", new Vector3(-1.5f, 1.65f, 2.8f), -20f, 0f, -3f, 0f, 20f, true),
-                new View("5d_connect_east_window_ne", new Vector3(2.45f, 0.05f, -0.85f), 50f, 0f, 0f, Stand),
-                new View("5e_connect_canary_wharf_zoom", new Vector3(2.82f, 1.65f, -0.72f), 81f, 0f, -2f, 0f, 20f, true),
+                new View("5b_connect_north_window_left", new Vector3(-1.0f, 0.05f, 2.1f), -20f, 0f, -4f, Stand),
+                new View("5c_connect_tower_and_bridge_zoom", new Vector3(-1.45f, 1.65f, 2.8f), 7f, 0f, -4f, 0f, 30f, true),
+                new View("5d_connect_east_window", new Vector3(2.0f, 0.05f, -0.5f), 90f, 0f, -2f, Stand),
+                new View("5e_connect_canary_wharf_zoom", new Vector3(2.82f, 1.65f, -0.3f), 110f, 0f, -2f, 0f, 22f, true),
             };
         }
 

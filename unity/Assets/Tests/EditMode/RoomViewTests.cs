@@ -104,17 +104,17 @@ namespace HalfAware.Tests
         [Test]
         public void LandmarksKeepTheRealOrderAndStayNearTheRealBearing()
         {
-            // 部屋（バーモンジー）から本物の場所への向きと、景色に置いた向き
+            // 部屋（バーモンジー）から本物の場所への向きと、景色に置いた向き。部屋の北の窓は本物の北北西を向く（Turn）
             Assert.AreEqual(-59.7f, RoomView.Bearing(51.5045, -0.0865), 0.2f, "ザ・シャード");
             Assert.AreEqual(78.5f, RoomView.Bearing(51.5049, -0.0195), 0.2f, "ワン・カナダ・スクエア");
             var marks = RoomView.Landmarks;
             for (var i = 0; i < marks.Length; i++)
             {
-                var real = RoomView.Bearing(marks[i].Lat, marks[i].Lon);
-                Assert.AreEqual(real, marks[i].Azimuth, 10f, marks[i].Name + " の向きが本物から離れすぎ");
+                var real = RoomView.Bearing(marks[i].Lat, marks[i].Lon) + RoomView.Turn;
+                Assert.AreEqual(real, marks[i].Azimuth, 15f, marks[i].Name + " の向きが本物から離れすぎ");
                 for (var j = i + 1; j < marks.Length; j++)
                 {
-                    var realJ = RoomView.Bearing(marks[j].Lat, marks[j].Lon);
+                    var realJ = RoomView.Bearing(marks[j].Lat, marks[j].Lon) + RoomView.Turn;
                     Assert.AreEqual(real < realJ, marks[i].Azimuth < marks[j].Azimuth, marks[i].Name + " と " + marks[j].Name + " の並びが本物と逆");
                 }
             }
@@ -126,11 +126,28 @@ namespace HalfAware.Tests
             foreach (var m in RoomView.Landmarks)
             {
                 if (m.Name != RoomView.TowerOfLondon) continue;
-                var z = Mathf.Cos(m.Azimuth * Mathf.Deg2Rad) * m.Distance;
-                Assert.Greater(z, RoomView.RiverNorth, "ロンドン塔は川の北岸");
+                var a = m.Azimuth * Mathf.Deg2Rad;
+                var local = RoomView.RiverLocal(new Vector3(Mathf.Sin(a) * m.Distance, 0f, Mathf.Cos(a) * m.Distance));
+                Assert.Greater(local.y, RoomView.RiverNorth + 30f, "ロンドン塔は川の北岸の丘の上");
+                // 川の座標の行き帰り
+                var back = RoomView.RiverWorld(new Vector3(local.x, 0f, local.y));
+                Assert.AreEqual(Mathf.Sin(a) * m.Distance, back.x, 1e-3f);
+                Assert.AreEqual(Mathf.Cos(a) * m.Distance, back.z, 1e-3f);
                 return;
             }
             Assert.Fail("ロンドン塔が無い");
+        }
+
+        [Test]
+        public void TheBridgeTowersSitInTheRiverAndFrameTheNorthWindow()
+        {
+            Assert.Greater(RoomView.BridgeSouthTower, RoomView.RiverSouth + 10f);
+            Assert.Less(RoomView.BridgeNorthTower, RoomView.RiverNorth - 10f);
+            // 窓際の正面の目から、南の塔は真ん中の桟（0 度）の左、北の塔は右。塔の間の歩道橋は桟の左に見える
+            var south = RoomView.RiverWorld(new Vector3(RoomView.BridgeX, 0f, RoomView.BridgeSouthTower));
+            var north = RoomView.RiverWorld(new Vector3(RoomView.BridgeX, 0f, RoomView.BridgeNorthTower));
+            Assert.Less(Mathf.Atan2(south.x, south.z) * Mathf.Rad2Deg, -8f);
+            Assert.Greater(Mathf.Atan2(north.x, north.z) * Mathf.Rad2Deg, 1f);
         }
 
         [Test]

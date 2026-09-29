@@ -39,11 +39,44 @@ namespace HalfAware
         public const double Latitude = 51.4985;
         public const double Longitude = -0.0700;
 
-        /// <summary>テムズ川の南岸と北岸の護岸の縁（z）。作り話の倫敦なので、本物（北へ 600 m ほど）より近い</summary>
-        public const float RiverSouth = 134f;
-        public const float RiverNorth = 264f;
-        /// <summary>タワーブリッジの軸（x）。窓からロンドン塔と重ならないよう、北西の南北の通り（-103.2）より少し西</summary>
-        public const float BridgeX = -115f;
+        /// <summary>
+        /// 部屋の向き。部屋の北の窓（+z）は、本物では北北西（北から西へ 30 度）を向いている。
+        /// 本物の向きに <see cref="Turn"/> を足すと、景色の中の向きになる（名所の群れが北の窓の正面に来る）
+        /// </summary>
+        public const float Turn = 30f;
+
+        /// <summary>
+        /// テムズ川。本物のように東西に流れる川を、部屋の向きに合わせて <see cref="Turn"/> だけ回した「川の座標」で決める
+        /// （<see cref="RiverLocal"/>。z が川を渡る向き）。南岸と北岸の護岸の縁。作り話の倫敦なので、本物（北へ 600 m ほど）より近い
+        /// </summary>
+        public const float RiverSouth = 96f;
+        public const float RiverNorth = 197f;
+        /// <summary>
+        /// タワーブリッジ（川の座標）。軸の x と、川の中の二本の塔の z。窓から南の塔が左 11.5 度・145 m、北の塔が右 2.5 度・208 m。
+        /// 塔の間（歩道橋の渡る所）を北の窓の真ん中の桟より左に空け、窓際の正面から歩道橋が桟に隠れきらない
+        /// </summary>
+        public const float BridgeX = -96.1f;
+        public const float BridgeSouthTower = 108.6f;
+        public const float BridgeNorthTower = 184.6f;
+
+        /// <summary>景色の中の位置を川の座標へ（x が川に沿う向き、z が川を渡る向き）</summary>
+        public static Vector2 RiverLocal(Vector3 world)
+        {
+            var a = Turn * Mathf.Deg2Rad;
+            return new Vector2(world.x * Mathf.Cos(a) - world.z * Mathf.Sin(a), world.x * Mathf.Sin(a) + world.z * Mathf.Cos(a));
+        }
+
+        /// <summary>川の座標の点を景色の中へ。y はそのまま</summary>
+        public static Vector3 RiverWorld(Vector3 local)
+        {
+            var a = Turn * Mathf.Deg2Rad;
+            return new Vector3(local.x * Mathf.Cos(a) + local.z * Mathf.Sin(a), local.y, -local.x * Mathf.Sin(a) + local.z * Mathf.Cos(a));
+        }
+
+        static Vector3 BridgeCentre()
+        {
+            return RiverWorld(new Vector3(BridgeX, 0f, (BridgeSouthTower + BridgeNorthTower) * 0.5f));
+        }
 
         public const string Shard = "Shard";
         public const string StPauls = "StPauls";
@@ -76,18 +109,21 @@ namespace HalfAware
             }
         }
 
-        /// <summary>北の窓の名所は左（西）から順に、東の窓の名所はその後に</summary>
+        /// <summary>
+        /// 北の窓の名所は左（西）から順に、東の窓の名所はその後に。本物の向き + <see cref="Turn"/> の並びのまま、重ならないよう少しずつずらす（15 度まで。一番ずらしたのはタワーブリッジの南の塔と重なるウォーキートーキー）。
+        /// タワーブリッジは川の座標の塔から出す。ロンドン塔はガーキンの右、窓から B の通りの抜けに見える向き
+        /// </summary>
         public static readonly Landmark[] Landmarks =
         {
-            new Landmark(Shard, -53f, 1000f, 51.5045, -0.0865),
-            new Landmark(StPauls, -47f, 800f, 51.5138, -0.0984),
-            new Landmark(WalkieTalkie, -42f, 800f, 51.5113, -0.0836),
-            new Landmark(TowerBridge, Mathf.Atan2(BridgeX, (RiverSouth + RiverNorth) * 0.5f) * Mathf.Rad2Deg,
-                new Vector2(BridgeX, (RiverSouth + RiverNorth) * 0.5f).magnitude, 51.5055, -0.0754),
-            new Landmark(Gherkin, -19f, 900f, 51.5145, -0.0803),
-            new Landmark(TowerOfLondon, -12f, 340f, 51.5081, -0.0760),
-            new Landmark(CanaryWharf, 79f, 1400f, 51.5049, -0.0195),
-            new Landmark(O2, 85.5f, 1700f, 51.5030, 0.0030),
+            new Landmark(Shard, -27f, 1000f, 51.5045, -0.0865),
+            new Landmark(StPauls, -21.5f, 800f, 51.5138, -0.0984),
+            new Landmark(WalkieTalkie, -17.5f, 800f, 51.5113, -0.0836),
+            new Landmark(TowerBridge, Mathf.Atan2(BridgeCentre().x, BridgeCentre().z) * Mathf.Rad2Deg,
+                new Vector2(BridgeCentre().x, BridgeCentre().z).magnitude, 51.5055, -0.0754),
+            new Landmark(Gherkin, 9f, 900f, 51.5145, -0.0803),
+            new Landmark(TowerOfLondon, 18.5f, 260f, 51.5081, -0.0760),
+            new Landmark(CanaryWharf, 109f, 1400f, 51.5049, -0.0195),
+            new Landmark(O2, 115.5f, 1700f, 51.5030, 0.0030),
         };
 
         /// <summary>部屋から本物の場所への向き（度。北が 0、東が正）。大圏の出だしの向き</summary>

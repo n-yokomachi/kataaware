@@ -17,8 +17,8 @@ namespace HalfAware.EditorTools
     /// </summary>
     public static partial class BuildRoomView
     {
-        /// <summary>日の沈んだ向き（西北西）。8 月の倫敦の 19 時台</summary>
-        public const float SunAzimuth = -68f;
+        /// <summary>日の沈んだ向き。8 月の倫敦の 19 時台の本物の西北西（-68 度）を、部屋の向き（<see cref="RoomView.Turn"/>）で回した向き。ザ・シャードの向こう</summary>
+        public const float SunAzimuth = -68f + RoomView.Turn;
         /// <summary>日の沈んだ側へ霞の色が寄る絞り（向きの余弦の冪）</summary>
         public const float WarmWidth = 2f;
 
@@ -139,8 +139,8 @@ namespace HalfAware.EditorTools
         /// </summary>
         static readonly District[] Districts =
         {
-            new District(-27f, 15f, 4.8f, 30, 1.2f),
-            new District(80f, 5.5f, 4.5f, 14, 1.0f),
+            new District(-9f, 11f, 4.2f, 26, 1.2f),
+            new District(109.5f, 5.5f, 4.5f, 14, 1.0f),
         };
 
         static readonly Color[] NeonColors =

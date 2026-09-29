@@ -5,52 +5,77 @@ namespace HalfAware.EditorTools
 {
     /// <summary>
     /// 窓の外の倫敦の名所（<see cref="BuildRoomView"/>）。部屋はテムズ川の南岸のバーモンジー（<see cref="RoomView.Latitude"/>）で、
-    /// 名所は本物の方角の並びのまま、窓から形が読める大きさと遠さに詰めて置く（向きと遠さは <see cref="RoomView.Landmarks"/>）。
+    /// 部屋の北の窓は本物の北北西を向く（<see cref="RoomView.Turn"/>）。名所は本物の方角の並びのまま、窓から形が読める大きさと遠さに詰めて置く
+    /// （向きと遠さは <see cref="RoomView.Landmarks"/>）。
     ///
     /// <list type="table">
-    /// <item><term>北の窓</term><description>左からザ・シャード、セント・ポール大聖堂、ウォーキートーキー、タワーブリッジ、ガーキン、ロンドン塔</description></item>
+    /// <item><term>北の窓</term><description>左からザ・シャード、セント・ポール大聖堂、ウォーキートーキー、タワーブリッジ（二本の塔が窓の真ん中の桟を挟む）、
+    /// ガーキン、ロンドン塔（窓から B の通りの抜けの先に見える）</description></item>
     /// <item><term>東の窓</term><description>カナリー・ワーフの塔の群れと O2</description></item>
-    /// <item><term>川</term><description>A から二本目の東西の通り（F）の北が川沿いの遊歩道で、その先がテムズ川。
-    /// 川の北岸の丘（タワー・ヒル）にロンドン塔。川の手前の北西の二区画は家並みを置かず芝の公園にして、窓からロンドン塔とタワーブリッジへの見通しを空ける</description></item>
+    /// <item><term>川</term><description>本物のように東西に流れる川を、部屋の向きに合わせて回した「川の座標」（<see cref="RoomView.RiverLocal"/>）で組み、景色へ回して置く。
+    /// D の通りの北は川まで芝の公園で、窓からロンドン塔とタワーブリッジへの見通しを空ける。川の北岸の低い丘（タワー・ヒル）にロンドン塔</description></item>
     /// </list>
     ///
     /// **遠い名所は縮めて近くに置く。** 目のカメラの far は 1000 m、空の球は 450 m。本当の遠さに置くと空の球の向こうになるので、
     /// 決めた遠さで組んでから、目（床の上 1.65 m）を中心に 420 m まで縮める（<see cref="Far"/>）。窓から見た形と大きさは変わらない。
     /// 縮めた物は霞を控える（頂点色の α）。ロンドン塔とタワーブリッジは縮めずに置く。
     ///
-    /// 石の面は、夕暮れのアトラスでは石の色、夜のアトラスでは投光で照らした色（光る所）。塔の頂・橋の歩道橋の灯り・航空障害灯はどちらの時刻も灯る
+    /// 石の名所は投光で照らす（夕暮れは点いたばかり、夜は強く）。ロンドン塔は明るいクリームの石、タワーブリッジは灰色がかった石と青い歩道橋で、
+    /// 二つが一つの城の群れに見えないよう色を分ける。塔の頂・橋の歩道橋の灯り・航空障害灯はどちらの時刻も灯る
     /// </summary>
     public static partial class BuildRoomView
     {
-        /// <summary>川沿いの道（F）。北の歩道の先が遊歩道で、その先が川</summary>
-        const float StreetF = 120.8f;
         const float StreetD = 64.8f;
-        /// <summary>川の南岸と北岸の護岸の縁（z）。川は東西にまっすぐ</summary>
+        /// <summary>川の南岸と北岸の護岸の縁（川の座標の z）</summary>
         const float RiverSouth = RoomView.RiverSouth;
         const float RiverNorth = RoomView.RiverNorth;
+        /// <summary>南岸の川沿いの遊歩道の幅</summary>
+        const float RiverWalk = 8f;
         /// <summary>川面の高さ</summary>
         const float Water = G - 2.5f;
-        /// <summary>タワー・ヒル。ロンドン塔の立つ丘の高さ（地面から）。手前の家並みの棟越しに城壁が見えるよう、本物より少し高い</summary>
-        const float TowerHill = 8f;
-        /// <summary>タワーブリッジの軸（x）</summary>
-        const float BridgeX = RoomView.BridgeX;
+        /// <summary>タワー・ヒル。ロンドン塔の立つ丘の高さ（地面から）</summary>
+        const float TowerHill = 4f;
         /// <summary>縮めた名所を置く遠さ。空の球（450 m）の内</summary>
         const float FarPlace = 420f;
         /// <summary>縮めた名所と、縮めない近い名所の霞の効き（頂点色の α）</summary>
         const byte FarHaze = 80;
         const byte NearHaze = 90;
-
-        /// <summary>見通しのための公園。北西の二区画（D と F の間、北西の南北の通りから B まで）</summary>
-        static readonly Rect Park = Rect.MinMaxRect(-103.2f + RoadHalf + PavementWide, StreetD + RoadHalf + PavementWide,
-            StreetB - RoadHalf - PavementWide, StreetF - RoadHalf - PavementWide);
+        /// <summary>公園の西の縁（北西の南北の通り）。ここから東の D の通りの北は、川まで芝の公園</summary>
+        const float ParkWestStreet = -103.2f;
 
         /// <summary>目。縮めるときの中心</summary>
         static readonly Vector3 Eye = new Vector3(0f, G + 13.65f, 0f);
 
-        /// <summary>F より北（川沿いの遊歩道と川）か。家並み・通り・遠い街灯を置かない</summary>
-        static bool Riverside(Vector3 p)
+        /// <summary>川か、川沿いの遊歩道か（川の座標で南岸から margin 手前より北）。家並み・通り・街灯・木を置かない</summary>
+        static bool Wet(Vector3 p, float margin)
         {
-            return p.z > StreetF + RoadHalf + 0.5f;
+            return RoomView.RiverLocal(p).y > RiverSouth - RiverWalk - margin;
+        }
+
+        /// <summary>見通しの公園か（D の通りの北、公園の西の縁より東）</summary>
+        static bool InPark(Vector3 p)
+        {
+            return p.z > StreetD + RoadHalf + PavementWide - 0.01f && p.x > ParkWestStreet + RoadHalf + PavementWide - 0.01f;
+        }
+
+        /// <summary>家並み・通りを置けない所（川・遊歩道・公園）</summary>
+        static bool Open(Vector3 p, float margin)
+        {
+            return Wet(p, margin) || InPark(p);
+        }
+
+        /// <summary>川の座標の面を景色へ回して、名所の霞の効きで足す</summary>
+        static void InRiverFrame(Town town, byte haze, System.Action build)
+        {
+            var keepSolid = town.Solid;
+            var keepGlow = town.Glow;
+            town.Solid = new Pile();
+            town.Glow = new Pile();
+            build();
+            keepSolid.Append(town.Solid, RoomView.RiverWorld, haze);
+            keepGlow.Append(town.Glow, RoomView.RiverWorld, haze);
+            town.Solid = keepSolid;
+            town.Glow = keepGlow;
         }
 
         static Vector3 At(float azimuth, float distance, float y = G)
@@ -108,17 +133,6 @@ namespace HalfAware.EditorTools
             keepGlow.Append(town.Glow, shrink, FarHaze);
             town.Solid = keepSolid;
             town.Glow = keepGlow;
-            town.Landmarks++;
-        }
-
-        /// <summary>縮めない名所（ロンドン塔・タワーブリッジ）。霞だけを控える</summary>
-        static void Near(Town town, System.Action build)
-        {
-            var keepSolid = town.Solid;
-            town.Solid = new Pile();
-            build();
-            keepSolid.Append(town.Solid, p => p, NearHaze);
-            town.Solid = keepSolid;
             town.Landmarks++;
         }
 
@@ -218,74 +232,131 @@ namespace HalfAware.EditorTools
 
         // ---- 川と公園 --------------------------------------------------------------
 
-        /// <summary>
-        /// テムズ川。川面（40 m ごとに川面の升）と両岸の護岸、南岸の遊歩道、北岸の岸壁と、その先の地面。
-        /// 手前の家並みの棟越しには川面は見えないが、見通しの下で途切れないように張る
-        /// </summary>
-        static void River(Town town)
+        /// <summary>多角形を半平面で切る（Sutherland–Hodgman）。inside が 0 以上の側を残す</summary>
+        static List<Vector2> Clip(List<Vector2> poly, System.Func<Vector2, float> inside)
         {
-            var e = StreetEnd;
-            for (var x = -e; x < e; x += 40f)
-                for (var z = RiverSouth; z < RiverNorth - 0.01f; z += 65f)
-                {
-                    var x1 = Mathf.Min(x + 40f, e);
-                    var z1 = Mathf.Min(z + 65f, RiverNorth);
-                    Face(town, new Vector3(x, Water, z), new Vector3(x1, Water, z), new Vector3(x1, Water, z1), new Vector3(x, Water, z1), Uv(WaterFace), Vector3.up);
-                }
-            for (var x = -e; x < e; x += 16f)
+            var result = new List<Vector2>();
+            for (var i = 0; i < poly.Count; i++)
             {
-                var x1 = Mathf.Min(x + 16f, e);
-                Face(town, new Vector3(x, Water, RiverSouth), new Vector3(x1, Water, RiverSouth), new Vector3(x1, G, RiverSouth), new Vector3(x, G, RiverSouth), Uv(Embankment), Vector3.forward);
-                Face(town, new Vector3(x1, Water, RiverNorth), new Vector3(x, Water, RiverNorth), new Vector3(x, G, RiverNorth), new Vector3(x1, G, RiverNorth), Uv(Embankment), Vector3.back);
+                var a = poly[i];
+                var b = poly[(i + 1) % poly.Count];
+                var fa = inside(a);
+                var fb = inside(b);
+                if (fa >= 0f) result.Add(a);
+                if (fa >= 0f != fb >= 0f) result.Add(Vector2.Lerp(a, b, fa / (fa - fb)));
             }
-            var walk = StreetF + RoadHalf + PavementWide;
-            var top = G + KerbHigh;
-            Face(town, new Vector3(-e, top, walk), new Vector3(e, top, walk), new Vector3(e, top, RiverSouth), new Vector3(-e, top, RiverSouth), Sw.Pave, Vector3.up);
-            Face(town, new Vector3(-e, top, RiverNorth), new Vector3(e, top, RiverNorth), new Vector3(e, top, RiverNorth + 10f), new Vector3(-e, top, RiverNorth + 10f), Sw.Pave, Vector3.up);
-            var far = 440f;
-            Face(town, new Vector3(-e, G - 0.12f, RiverNorth + 10f), new Vector3(e, G - 0.12f, RiverNorth + 10f), new Vector3(e, G - 0.12f, far), new Vector3(-e, G - 0.12f, far), Sw.Garden, Vector3.up);
+            return result;
+        }
+
+        /// <summary>凸な多角形を y の高さの水平な扇に張る</summary>
+        static void FlatFan(Town town, List<Vector2> poly, float y, Sw s)
+        {
+            if (poly.Count < 3) return;
+            var uv = Uv(s).center;
+            var c0 = new Vector3(poly[0].x, y, poly[0].y);
+            for (var i = 1; i + 1 < poly.Count; i++)
+            {
+                var b = new Vector3(poly[i].x, y, poly[i].y);
+                var c = new Vector3(poly[i + 1].x, y, poly[i + 1].y);
+                town.Solid.Tri(c0, b, c, uv, uv, uv, Shade(town, Vector3.up, c0), Shade(town, Vector3.up, b), Shade(town, Vector3.up, c));
+            }
+        }
+
+        /// <summary>景色の中の四角のうち、川沿いの遊歩道より手前の多角形</summary>
+        static List<Vector2> SouthOfRiver(Rect square)
+        {
+            var poly = new List<Vector2> { new Vector2(square.xMin, square.yMin), new Vector2(square.xMax, square.yMin), new Vector2(square.xMax, square.yMax), new Vector2(square.xMin, square.yMax) };
+            return Clip(poly, p => RiverSouth - RiverWalk - RoomView.RiverLocal(new Vector3(p.x, 0f, p.y)).y);
         }
 
         /// <summary>
-        /// 見通しの公園。芝と斜めの小径、縁に低い木（梢は 8 m に届かない。手前の家並みの棟から名所の足元を見通す線の下）
+        /// テムズ川。川の座標で組んで景色へ回す。川面（40 m ごとに川面の升）、両岸の護岸、南岸の遊歩道、北岸の岸壁とその先の地面、
+        /// 両岸の遊歩道の灯り（柱は立てない）
+        /// </summary>
+        static void River(Town town)
+        {
+            InRiverFrame(town, 255, () =>
+            {
+                const float e = 320f;
+                for (var x = -e; x < e; x += 40f)
+                    for (var z = RiverSouth; z < RiverNorth - 0.01f; z += 58f)
+                    {
+                        var z1 = Mathf.Min(z + 58f, RiverNorth);
+                        Face(town, new Vector3(x, Water, z), new Vector3(x + 40f, Water, z), new Vector3(x + 40f, Water, z1), new Vector3(x, Water, z1), Uv(WaterFace), Vector3.up);
+                    }
+                for (var x = -e; x < e; x += 16f)
+                {
+                    Face(town, new Vector3(x, Water, RiverSouth), new Vector3(x + 16f, Water, RiverSouth), new Vector3(x + 16f, G, RiverSouth), new Vector3(x, G, RiverSouth), Uv(Embankment), Vector3.forward);
+                    Face(town, new Vector3(x + 16f, Water, RiverNorth), new Vector3(x, Water, RiverNorth), new Vector3(x, G, RiverNorth), new Vector3(x + 16f, G, RiverNorth), Uv(Embankment), Vector3.back);
+                }
+                var top = G + KerbHigh;
+                Face(town, new Vector3(-e, top, RiverSouth - RiverWalk), new Vector3(e, top, RiverSouth - RiverWalk), new Vector3(e, top, RiverSouth), new Vector3(-e, top, RiverSouth), Sw.Pave, Vector3.up);
+                Face(town, new Vector3(-e, top, RiverNorth), new Vector3(e, top, RiverNorth), new Vector3(e, top, RiverNorth + 10f), new Vector3(-e, top, RiverNorth + 10f), Sw.Pave, Vector3.up);
+                Face(town, new Vector3(-e, G - 0.12f, RiverNorth + 10f), new Vector3(e, G - 0.12f, RiverNorth + 10f), new Vector3(e, G - 0.12f, 440f), new Vector3(-e, G - 0.12f, 440f), Sw.Garden, Vector3.up);
+                for (var x = -e + 10f; x < e; x += 28f)
+                {
+                    var head = new Vector3(x, G + KerbHigh + 5.5f, RiverSouth - 1.2f);
+                    Box(town, head, new Vector3(0.45f, 0.55f, 0.45f), 45f, Sw.LampLit, Sw.LampLit);
+                    Halo(town, head, 2.6f, LampWarm);
+                    var far = new Vector3(x + 14f, G + KerbHigh + 5.5f, RiverNorth + 2f);
+                    Box(town, far, new Vector3(0.45f, 0.55f, 0.45f), 45f, Sw.LampLit, Sw.LampLit);
+                    Halo(town, far, 2.6f, LampWarm);
+                }
+            });
+        }
+
+        /// <summary>
+        /// 見通しの公園。D の通りの北、公園の西の縁より東を、川沿いの遊歩道まで芝にする。川へ向かう小径と、低い木
+        /// （梢は 8 m に届かない。窓から名所の足元を見通す線の下）
         /// </summary>
         static void ParkLawn(Town town)
         {
-            var p = Park;
-            var y = G + 0.04f;
-            Face(town, new Vector3(p.xMin, y, p.yMin), new Vector3(p.xMax, y, p.yMin), new Vector3(p.xMax, y, p.yMax), new Vector3(p.xMin, y, p.yMax), Sw.Lawn, Vector3.up);
-            foreach (var diagonal in new[] { new Vector4(p.xMin, p.yMin, p.xMax, p.yMax), new Vector4(p.xMax, p.yMin, p.xMin, p.yMax) })
+            var west = ParkWestStreet + RoadHalf + PavementWide;
+            var south = StreetD + RoadHalf + PavementWide;
+            FlatFan(town, SouthOfRiver(Rect.MinMaxRect(west, south, StreetEnd, 420f)), G + 0.04f, Sw.Lawn);
+            var across = RoomView.RiverWorld(Vector3.forward);
+            var side = Vector3.Cross(Vector3.up, across) * 1.2f;
+            foreach (var x in new[] { -60f, 12f, 70f })
             {
-                var a = new Vector3(diagonal.x, y + 0.03f, diagonal.y);
-                var b = new Vector3(diagonal.z, y + 0.03f, diagonal.w);
-                var side = Vector3.Cross(Vector3.up, (b - a).normalized) * 1.3f;
+                var a = new Vector3(x, G + 0.07f, south);
+                var k = 0f;
+                while (!Wet(a + across * (k + 4f), 0f) && k < 240f) k += 4f;
+                var b = a + across * k;
                 Face(town, a - side, b - side, b + side, a + side, Sw.Gravel, Vector3.up);
             }
-            for (var x = p.xMin + 6f; x < p.xMax - 4f; x += 13f)
+            for (var x = west + 6f; x < StreetEnd; x += 15f)
             {
-                Tree(town, new Vector3(x, G, p.yMin + 4f), 5.5f, 4.5f, 2.2f);
-                Tree(town, new Vector3(x + 6f, G, p.yMax - 4f), 5.5f, 4.5f, 2.2f);
+                var p = new Vector3(x, G, south + 4f);
+                if (!Wet(p, 6f)) Tree(town, p, 5.5f, 4.5f, 2.2f);
+            }
+            var along = RoomView.RiverWorld(Vector3.right);
+            var start = RoomView.RiverWorld(new Vector3(-320f, G, RiverSouth - RiverWalk - 4f));
+            for (var t = 0f; t < 640f; t += 17f)
+            {
+                var p = start + along * t;
+                if (p.x > west + 3f && p.z > south + 3f && Mathf.Abs(p.x) < StreetEnd) Tree(town, p, 5f, 4.5f, 2.2f);
             }
         }
 
         // ---- ロンドン塔 --------------------------------------------------------------
 
         /// <summary>
-        /// ロンドン塔。川の北岸の丘の上に、外の城壁（角に円い稜堡）、内の城壁（角に円い塔、辺の中ほどに四角い塔）、
-        /// 真ん中にホワイト・タワー。ホワイト・タワーは四隅に小塔（北東だけ円い）を立て、鉛の玉ねぎ形の屋根と金の風見を載せる。
-        /// オーナーが名を挙げた名所なので、本物の 1.45 倍にして形を読ませる
+        /// ロンドン塔。川の座標で組む。川の北岸の低い丘の上に、低い外の城壁（角に円い稜堡）、一段高い内の城壁（角に円い塔、辺の中ほどに四角い塔）、
+        /// 真ん中にホワイト・タワー。城壁は天守よりずっと低く、天守が一段高く抜けて見える。
+        /// 窓からは B の通りの抜けの先（家並みに遮られない向き）に見え、丘の足元まで見通せる
         /// </summary>
         static void TowerOfLondon(Town town)
         {
-            Near(town, () =>
+            InRiverFrame(town, NearHaze, () =>
             {
                 var mark = Mark(RoomView.TowerOfLondon);
-                var c = At(mark.Azimuth, mark.Distance);
+                var local = RoomView.RiverLocal(At(mark.Azimuth, mark.Distance));
+                var c = new Vector3(local.x, G, local.y);
                 var hill = G + TowerHill;
                 // 丘。上の芝と、四方へ下りる斜面
-                var hx = 70f;
-                var hz = 56f;
-                var foot = 6f;
+                var hx = 44f;
+                var hz = 38f;
+                var foot = 4f;
                 var t = new[] { new Vector3(c.x - hx, hill, c.z - hz), new Vector3(c.x + hx, hill, c.z - hz), new Vector3(c.x + hx, hill, c.z + hz), new Vector3(c.x - hx, hill, c.z + hz) };
                 var f = new[] { new Vector3(c.x - hx - foot, G, c.z - hz - foot), new Vector3(c.x + hx + foot, G, c.z - hz - foot), new Vector3(c.x + hx + foot, G, c.z + hz + foot), new Vector3(c.x - hx - foot, G, c.z + hz + foot) };
                 Face(town, t[0], t[1], t[2], t[3], Sw.Lawn, Vector3.up);
@@ -295,12 +366,18 @@ namespace HalfAware.EditorTools
                     Face(town, f[k], f[(k + 1) % 4], t[(k + 1) % 4], t[k], Sw.Lawn, n);
                 }
                 var ground = new Vector3(c.x, hill, c.z);
-                // 外の城壁と稜堡
-                Walls(town, ground, 58f, 50f, 9f, 3f, 7f, 12f, false);
-                // 内の城壁と塔
-                Walls(town, ground, 40f, 34f, 13f, 3.5f, 6f, 17f, true);
+                // 外の城壁と稜堡（低い）、内の城壁と塔（一段高い）、真ん中の天守。
+                // 天守の南の面は窓の方へ少し回す（川に対して 6.5 度）。真正面から少しだけずらし、奥の二つの小塔の頭が脇に覗く
+                var keepSolid = town.Solid;
+                town.Solid = new Pile();
+                Walls(town, ground, 38f, 32f, 4f, 3f, 5.5f, 6f, false);
+                Walls(town, ground, 30f, 26f, 6f, 3f, 4.5f, 9f, true);
                 WhiteTower(town, ground);
+                var turn = Quaternion.Euler(0f, -6.5f, 0f);
+                keepSolid.Append(town.Solid, p => ground + turn * (p - ground), NearHaze);
+                town.Solid = keepSolid;
             });
+            town.Landmarks++;
         }
 
         /// <summary>
@@ -327,21 +404,21 @@ namespace HalfAware.EditorTools
                 Lathe(town, p + Vector3.up * drumHigh, new[] { new Vector2(drum, 0f), new Vector2(0f, 0.01f) }, 10, Uv(Sw.Stone));
                 if (!squares) continue;
                 var half = p + (q - p) * 0.5f;
-                Mass(town, half, 4.5f, 4.5f, 0f, drumHigh - 1f, yaw, Uv(DrumTower), 0f, 0f, Uv(Sw.Stone));
+                Mass(town, half, 4f, 4f, 0f, drumHigh - 1f, yaw, Uv(DrumTower), 0f, 0f, Uv(Sw.Stone));
             }
         }
 
         /// <summary>
-        /// ホワイト・タワー。52 × 46 m、胸壁まで 39 m（本物の 1.45 倍）。南の面を川へ向ける。
-        /// 四隅の小塔は胸壁の上へ 8 m 抜け、玉ねぎ形の鉛の屋根と金の風見を載せる。北東の小塔だけ円い
+        /// ホワイト・タワー。明るいクリームの石の角張った天守。南の面の幅と胸壁までの高さはほぼ同じ（46 × 40 m、胸壁まで 44 m。小塔の頭まで入れると幅と高さが 1.2 対 1 ほど）。
+        /// 窓は小さな半円の窓がまばら（升の絵）。南の面を川へ向ける。四隅の小塔は胸壁の上へ 10 m 抜け、鉛の玉ねぎ形の屋根と金の風見を載せる。北東の小塔だけ円い
         /// </summary>
         static void WhiteTower(Town town, Vector3 ground)
         {
-            const float hx = 26f;
-            const float hz = 23f;
-            const float high = 39f;
-            const float turret = 5f;
-            const float turretHigh = 47f;
+            const float hx = 23f;
+            const float hz = 20f;
+            const float high = 44f;
+            const float turret = 5.5f;
+            const float turretHigh = 54f;
             Mass(town, ground, hx, hz, 0f, high, 0f, Uv(WhiteTowerFace), 0f, 0f, Uv(Sw.Lead));
             var corners = new[] { new Vector2(-hx, -hz), new Vector2(hx, -hz), new Vector2(hx, hz), new Vector2(-hx, hz) };
             foreach (var k in corners)
@@ -355,64 +432,63 @@ namespace HalfAware.EditorTools
                 var r = round ? turret * 1.2f : turret * 1.15f;
                 Lathe(town, cap, new[]
                 {
-                    new Vector2(r, 0f), new Vector2(r * 1.12f, 1.4f), new Vector2(r * 1.05f, 3.4f), new Vector2(r * 0.7f, 5.6f),
-                    new Vector2(r * 0.32f, 7.6f), new Vector2(r * 0.12f, 8.8f), new Vector2(0f, 9.4f),
-                }, 8, Uv(Sw.Lead));
-                Mass(town, cap + Vector3.up * 9.2f, 0.7f, 0.7f, 0f, 3.2f, 0f, Uv(Sw.Gold), 0f, 0f, Uv(Sw.Gold));
+                    new Vector2(r, 0f), new Vector2(r * 1.14f, 1.6f), new Vector2(r * 1.06f, 3.8f), new Vector2(r * 0.7f, 6.2f),
+                    new Vector2(r * 0.32f, 8.4f), new Vector2(r * 0.12f, 9.6f), new Vector2(0f, 10.2f),
+                }, 8, Uv(Sw.LeadRoof));
+                Mass(town, cap + Vector3.up * 10f, 0.8f, 0.8f, 0f, 3.6f, 0f, Uv(Sw.Gold), 0f, 0f, Uv(Sw.Gold));
             }
         }
 
         // ---- タワーブリッジ --------------------------------------------------------------
 
         /// <summary>
-        /// タワーブリッジ。川の中の二本の塔（灰白の石張り、四隅の小塔と鉛の尖り屋根）、塔の間の低い跳ね橋の道と、
-        /// 高い所の二本の歩道橋（青い鋼の格子）、両岸の小さな塔へ下る吊り鎖。本物の 1.2 倍ほど。
-        /// 軸は南北。窓からは斜めに見えて、二本の塔と歩道橋が並んで読める。北の塔とロンドン塔の間にガーキンが入る
+        /// タワーブリッジ。川の座標で組む。川の中の二本の塔（灰色がかった石張り、四隅の小塔と鉛の尖り屋根）、塔の間の低い跳ね橋の道と、
+        /// 高い所の二本の歩道橋（青い鋼の格子）、両岸の小さな塔へ下る吊り鎖。軸は川を渡る向きで、窓からは斜めに見え、
+        /// 二本の塔が北の窓の真ん中の桟を挟んで左右に立ち、間に歩道橋が渡る
         /// </summary>
         static void TowerBridge(Town town)
         {
-            Near(town, () =>
+            InRiverFrame(town, NearHaze, () =>
             {
-                var mid = (RiverSouth + RiverNorth) * 0.5f;
-                var span = 84f;
-                var towers = new[] { mid - span * 0.5f, mid + span * 0.5f };
+                var bx = RoomView.BridgeX;
+                var towers = new[] { RoomView.BridgeSouthTower, RoomView.BridgeNorthTower };
                 var deck = G + 9f;
                 var walkLow = G + 38f;
                 var walkHigh = G + 43f;
                 foreach (var z in towers)
                 {
-                    var foot = new Vector3(BridgeX, Water, z);
-                    Mass(town, foot, 15f, 12f, 0f, G + 1f - Water, 0f, Uv(Embankment), 8f, 0f, Uv(Sw.Stone));
-                    var body = new Vector3(BridgeX, G + 1f, z);
-                    Mass(town, body, 12f, 9f, 0f, 43f, 0f, Uv(BridgeTower), 0f, 0f, Uv(Sw.Lead));
-                    foreach (var k in new[] { new Vector2(-10.5f, -7.5f), new Vector2(10.5f, -7.5f), new Vector2(10.5f, 7.5f), new Vector2(-10.5f, 7.5f) })
+                    var foot = new Vector3(bx, Water, z);
+                    Mass(town, foot, 13f, 11f, 0f, G + 1f - Water, 0f, Uv(Embankment), 8f, 0f, Uv(Sw.Stone));
+                    var body = new Vector3(bx, G + 1f, z);
+                    Mass(town, body, 10f, 8f, 0f, 43f, 0f, Uv(BridgeTower), 0f, 0f, Uv(Sw.Lead));
+                    foreach (var k in new[] { new Vector2(-8.5f, -6.5f), new Vector2(8.5f, -6.5f), new Vector2(8.5f, 6.5f), new Vector2(-8.5f, 6.5f) })
                     {
-                        var turret = new Vector3(BridgeX + k.x, G + 40f, z + k.y);
-                        Mass(town, turret, 2.2f, 2.2f, 0f, 12f, 0f, Uv(Sw.Portland), 0f, 0f, Uv(Sw.Lead));
-                        Pyramid(town, turret + Vector3.up * 12f, 2.4f, 2.4f, 7f, 0f, Uv(Sw.Lead));
+                        var turret = new Vector3(bx + k.x, G + 40f, z + k.y);
+                        Mass(town, turret, 2f, 2f, 0f, 12f, 0f, Uv(BridgeTower), 0f, 0f, Uv(Sw.Lead));
+                        Pyramid(town, turret + Vector3.up * 12f, 2.2f, 2.2f, 7f, 0f, Uv(Sw.LeadRoof));
                     }
-                    Pyramid(town, new Vector3(BridgeX, G + 44f, z), 9f, 6.5f, 12f, 0f, Uv(Sw.Lead));
-                    Mass(town, new Vector3(BridgeX, G + 55f, z), 0.8f, 0.8f, 0f, 7f, 0f, Uv(Sw.Gold), 0f, 0f, Uv(Sw.Gold));
+                    Pyramid(town, new Vector3(bx, G + 44f, z), 7.5f, 5.5f, 12f, 0f, Uv(Sw.LeadRoof));
+                    Mass(town, new Vector3(bx, G + 55f, z), 0.8f, 0.8f, 0f, 7f, 0f, Uv(Sw.Gold), 0f, 0f, Uv(Sw.Gold));
                 }
-                var inner0 = towers[0] + 9f;
-                var inner1 = towers[1] - 9f;
+                var inner0 = towers[0] + 8f;
+                var inner1 = towers[1] - 8f;
                 // 跳ね橋の道と、塔の間の二本の歩道橋
-                Mass(town, new Vector3(BridgeX, deck - 2f, (inner0 + inner1) * 0.5f), 7f, (inner1 - inner0) * 0.5f, 0f, 2f, 0f, Uv(Sw.BridgeBlue), 0f, 0f, Uv(Sw.Road));
-                foreach (var side in new[] { -7.5f, 7.5f })
-                    Mass(town, new Vector3(BridgeX + side, walkLow, (inner0 + inner1) * 0.5f), 1.4f, (inner1 - inner0) * 0.5f, 0f, walkHigh - walkLow, 0f,
+                Mass(town, new Vector3(bx, deck - 2f, (inner0 + inner1) * 0.5f), 7f, (inner1 - inner0) * 0.5f, 0f, 2f, 0f, Uv(Sw.BridgeBlue), 0f, 0f, Uv(Sw.Road));
+                foreach (var side in new[] { -6.5f, 6.5f })
+                    Mass(town, new Vector3(bx + side, walkLow, (inner0 + inner1) * 0.5f), 1.4f, (inner1 - inner0) * 0.5f, 0f, walkHigh - walkLow, 0f,
                         Uv(BridgeWalk), 22f, 0f, Uv(Sw.Lead));
                 // 両岸の小さな塔と、そこへ下る吊り鎖、脇の径間の道
                 var shores = new[] { RiverSouth - 6f, RiverNorth + 6f };
                 for (var i = 0; i < 2; i++)
                 {
                     var shore = shores[i];
-                    var from = towers[i] + (i == 0 ? -9f : 9f);
-                    Mass(town, new Vector3(BridgeX, G, shore), 5f, 5f, 0f, 20f, 0f, Uv(BridgeTower), 0f, 0f, Uv(Sw.Lead));
-                    Pyramid(town, new Vector3(BridgeX, G + 20f, shore), 5.4f, 5.4f, 7f, 0f, Uv(Sw.Lead));
-                    Mass(town, new Vector3(BridgeX, deck - 2f, (from + shore) * 0.5f), 7f, Mathf.Abs(shore - from) * 0.5f, 0f, 2f, 0f, Uv(Sw.BridgeBlue), 0f, 0f, Uv(Sw.Road));
-                    foreach (var side in new[] { -9.5f, 9.5f })
+                    var from = towers[i] + (i == 0 ? -8f : 8f);
+                    Mass(town, new Vector3(bx, G, shore), 5f, 5f, 0f, 20f, 0f, Uv(BridgeTower), 0f, 0f, Uv(Sw.Lead));
+                    Pyramid(town, new Vector3(bx, G + 20f, shore), 5.4f, 5.4f, 7f, 0f, Uv(Sw.LeadRoof));
+                    Mass(town, new Vector3(bx, deck - 2f, (from + shore) * 0.5f), 7f, Mathf.Abs(shore - from) * 0.5f, 0f, 2f, 0f, Uv(Sw.BridgeBlue), 0f, 0f, Uv(Sw.Road));
+                    foreach (var side in new[] { -8f, 8f })
                     {
-                        var x = BridgeX + side;
+                        var x = bx + side;
                         var chain = new[]
                         {
                             new Vector3(x, walkLow, from), new Vector3(x, G + 26f, Mathf.Lerp(from, shore, 0.28f)),
@@ -422,11 +498,12 @@ namespace HalfAware.EditorTools
                     }
                 }
                 // 歩道橋と塔の頂の灯り
-                foreach (var side in new[] { -7.5f, 7.5f })
+                foreach (var side in new[] { -6.5f, 6.5f })
                     for (var k = 0; k <= 3; k++)
-                        Halo(town, new Vector3(BridgeX + side, walkLow - 0.5f, Mathf.Lerp(inner0, inner1, k / 3f)), 6f, new Color(0.5f, 0.45f, 0.9f));
-                foreach (var z in towers) Halo(town, new Vector3(BridgeX, G + 30f, z - 9.5f), 16f, new Color(0.45f, 0.45f, 0.6f));
+                        Halo(town, new Vector3(bx + side, walkLow - 0.5f, Mathf.Lerp(inner0, inner1, k / 3f)), 6f, new Color(0.5f, 0.45f, 0.9f));
+                foreach (var z in towers) Halo(town, new Vector3(bx, G + 30f, z - 8.5f), 14f, new Color(0.4f, 0.45f, 0.65f));
             });
+            town.Landmarks++;
         }
 
         // ---- 遠い名所（決めた遠さで本当の大きさ。Far が縮める） ----------------------------

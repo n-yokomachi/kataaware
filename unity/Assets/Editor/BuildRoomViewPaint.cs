@@ -99,7 +99,7 @@ namespace HalfAware.EditorTools
         {
             Road, RoadFar, Pave, Kerb, White, Yellow, Lawn, Garden, Hedge, Gravel, Iron, LampLit, Trunk, Paint, CarGlass,
             Brick, Pot, BeaconLit, FlatRoof, Stone, Area, Lead, WarmLit, Path, PhoneRed, Black, Wall,
-            Gold, BridgeBlue, BridgeLamp, FloodLamp, RedLamp, TipLamp, O2Yellow, NeonPink, NeonCyan, NeonViolet, Portland,
+            Gold, BridgeBlue, BridgeLamp, FloodLamp, RedLamp, TipLamp, O2Yellow, NeonPink, NeonCyan, NeonViolet, Portland, LeadRoof,
         }
 
         static RectInt Swatch(Sw s)
@@ -653,13 +653,22 @@ namespace HalfAware.EditorTools
             var portland = Swatch(Sw.Portland);
             d.Fill(portland.x, portland.y, portland.width, portland.height, new Color(0.74f, 0.71f, 0.64f), Solid);
             n.Fill(portland.x, portland.y, portland.width, portland.height, Flooded(new Color(0.74f, 0.71f, 0.64f), 0.5f), Lit);
+            // 名所の鉛の屋根。夕暮れは鉛の色、夜は投光の照り返しで淡く光る（照らさないと暗い空に溶けて、小塔の玉ねぎ形の屋根が消えた）
+            var lead = Swatch(Sw.LeadRoof);
+            d.Fill(lead.x, lead.y, lead.width, lead.height, new Color(0.40f, 0.42f, 0.47f), Solid);
+            n.Fill(lead.x, lead.y, lead.width, lead.height, new Color(0.46f, 0.48f, 0.58f), Lit);
         }
 
         // ---- 名所 ------------------------------------------------------------
 
-        static readonly Color Caen = new Color(0.76f, 0.72f, 0.62f);
-        static readonly Color Ragstone = new Color(0.56f, 0.54f, 0.50f);
+        /// <summary>ホワイト・タワーの明るいクリームの石</summary>
+        static readonly Color Caen = new Color(0.90f, 0.83f, 0.66f);
+        /// <summary>ロンドン塔の城壁の、くすんだ灰茶のケントの石</summary>
+        static readonly Color Ragstone = new Color(0.50f, 0.46f, 0.40f);
+        /// <summary>セント・ポールのポートランドの石</summary>
         static readonly Color PortlandStone = new Color(0.76f, 0.74f, 0.68f);
+        /// <summary>タワーブリッジの、灰色がかった石張り</summary>
+        static readonly Color BridgeStone = new Color(0.58f, 0.60f, 0.65f);
         static readonly Color FloodWarm = new Color(1.00f, 0.88f, 0.66f);
         static readonly Color FloodCool = new Color(0.84f, 0.88f, 1.00f);
 
@@ -667,7 +676,8 @@ namespace HalfAware.EditorTools
         static Color Flooded(Color stone, float up, bool cool = false)
         {
             var lamp = cool ? FloodCool : FloodWarm;
-            return Mul(Color.Lerp(lamp, stone, 0.4f), 0.78f - 0.3f * up);
+            // 石の色を残す（灯りの色に寄せすぎると、名所がみな同じ色に揃って見分けられなかった）
+            return Mul(Color.Lerp(lamp, stone, 0.68f), 0.82f - 0.3f * up);
         }
 
         /// <summary>
@@ -688,12 +698,14 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// ホワイト・タワーの一面。付け柱で四つの間に分け、間ごとに円い頭の小さな窓を三段。
-        /// 頭の 3 画素は狭間（凸凹）で、凹の所を抜く
+        /// ホワイト・タワーの一面。付け柱で四つの間に分け、窓は小さな半円の窓がまばら（上の段に間ごとに一つ、中の段に二つ、下の段に一つ）。
+        /// 頭の 3 画素は狭間（凸凹）で、凹の所を抜く。窓を並べすぎると城館や宮殿に見えた
         /// </summary>
         static void PaintWhiteTower(Sheet d, Sheet n, Random r)
         {
             var c = WhiteTowerFace;
+            // 窓の左下（x, y）。幅 2 画素・高さ 5 画素で、頭の両角を落として半円にする
+            var windows = new[] { new Vector2Int(7, 47), new Vector2Int(23, 47), new Vector2Int(39, 47), new Vector2Int(55, 47), new Vector2Int(23, 29), new Vector2Int(39, 29), new Vector2Int(55, 12) };
             for (var y = 0; y < 64; y++)
                 for (var x = 0; x < 64; x++)
                 {
@@ -703,16 +715,15 @@ namespace HalfAware.EditorTools
                         continue;
                     }
                     var pilaster = x % 16 < 2;
-                    var course = y == 22 || y == 42;
-                    var k = (pilaster || course ? 1.06f : 0.94f) + 0.08f * F(r);
-                    // 窓。間ごとに二つ、三段
-                    var bx = x % 16;
+                    var course = y == 58;
+                    var k = (pilaster || course ? 1.05f : 0.96f) + 0.06f * F(r);
                     var window = false;
-                    foreach (var wy in new[] { 8, 28, 47 })
+                    foreach (var w in windows)
                     {
-                        var h = wy == 28 ? 9 : 7;
-                        if ((bx == 5 || bx == 6 || bx == 10 || bx == 11) && y >= wy && y < wy + h) window = true;
-                        if ((bx == 5 || bx == 11) && y == wy + h - 1) window = false;
+                        var wx = x - w.x;
+                        var wy = y - w.y;
+                        if (wx < 0 || wx > 1 || wy < 0 || wy > 4) continue;
+                        window = true;
                     }
                     Stone(d, n, c.x + x, c.y + y, Caen, y / 63f, k, window);
                 }
@@ -724,8 +735,8 @@ namespace HalfAware.EditorTools
             for (var y = 0; y < 64; y++)
                 for (var x = 0; x < 32; x++)
                 {
-                    var slit = (x == 15 || x == 16) && (y % 14 >= 5 && y % 14 < 10);
-                    Stone(d, n, c.x + x, c.y + y, Caen, y / 63f, 0.92f + 0.1f * F(r), slit);
+                    var slit = (x == 15 || x == 16) && (y % 20 >= 8 && y % 20 < 12);
+                    Stone(d, n, c.x + x, c.y + y, Caen, y / 63f, 0.94f + 0.08f * F(r), slit);
                 }
         }
 
@@ -769,7 +780,7 @@ namespace HalfAware.EditorTools
                         n.Set(c.x + x, c.y + y, Mul(lit, 0.9f), Lit);
                         continue;
                     }
-                    Stone(d, n, c.x + x, c.y + y, PortlandStone, y / 63f, k, false, true);
+                    Stone(d, n, c.x + x, c.y + y, BridgeStone, y / 63f, k, false, true);
                 }
             // 上の歩道橋の格子。青い鋼の上下の弦と斜めの格子、その間は抜く。弦に灯りの粒
             var w = BridgeWalk;
