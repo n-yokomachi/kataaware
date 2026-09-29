@@ -895,14 +895,32 @@ namespace HalfAware.EditorTools
             Reach(ConnectIds.Coat, CoatAt());
             Reach(ConnectIds.Chair, ChairAt);
 
-            // 挿す前のジャックは肘掛けの上。判定点がそこから離れていると、
-            // 座っても拾えないか、座る前に部屋の向こうから拾える
+            // 挿す前のジャックは肘掛けの置き場にあり、挿す対象の判定点は右の手首の差込口に付いて回る（Items）。
+            // 判定点は座ってから開くので、座った所（ConnectDirector が座らせる所）で、座った目から拾える近さにあるかを見る。
+            // 前は判定点を置き場と比べていて、組み立ての間は戸口の内側に立っている手首で測るので、3 m 余り離れていると出ていた
             var rest = Look("Room/Chair/JackRest");
             GameObject jack;
-            if (rest != null && items.TryGetValue(ConnectIds.Jack, out jack))
+            var player = Object.FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
+            if (rest != null && player != null && items.TryGetValue(ConnectIds.Jack, out jack))
             {
-                var gap = Vector3.Distance(jack.transform.position, rest.position);
-                if (gap > 0.05f) Debug.LogWarning(string.Format("jack の判定点が肘掛けから {0:F3} m 離れている", gap));
+                var keepAt = player.transform.position;
+                var keepTurn = player.transform.rotation;
+                try
+                {
+                    player.transform.SetPositionAndRotation(SeatAt, Quaternion.identity);
+                    var lead = new SerializedObject(player).FindProperty("eyeLead").floatValue;
+                    var eye = player.transform.TransformPoint(new Vector3(0f, SeatEyeHeight(), lead));
+                    var reach = Vector3.Distance(jack.transform.position, eye);
+                    var toRest = Vector3.Distance(jack.transform.position, rest.position);
+                    if (reach > JackRadius)
+                        Debug.LogWarning(string.Format("jack の判定点（手首）が座った目から {0:F3} m 離れていて、半径 {1:F2} m の外", reach, JackRadius));
+                    else
+                        Debug.Log(string.Format("jack の判定点（手首）は座った目から {0:F3} m（半径 {1:F2} m の内）、肘掛けの置き場から {2:F3} m", reach, JackRadius, toRest));
+                }
+                finally
+                {
+                    player.transform.SetPositionAndRotation(keepAt, keepTurn);
+                }
             }
 
             // 画面のマテリアルが場面 1 と共有のままだと、こちらで灯した画面が向こうでも灯る
