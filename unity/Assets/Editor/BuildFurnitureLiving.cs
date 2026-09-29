@@ -37,7 +37,7 @@ namespace HalfAware.EditorTools
         const float SofaSeat = 0.47f;
 
         /// <summary>
-        /// 布張りのソファ。濃い木の短い脚、台、背の枠、丸く膨らむ肘、座のクッション二つ（寝ている体の窪み）、背のクッション二つ（寄りかかった皺）。
+        /// 黒い革張りのソファ。黒い短い脚、台、背の枠、丸く膨らむ肘、座のクッション二つ（寝ている体の窪み）、背のクッション二つ（寄りかかった皺）。
         /// 左の肘に枕、右寄りに丸めた毛布（座の前の縁から裾が垂れる）。ソファで寝ている
         /// </summary>
         static void Sofa(FurnitureKit kit)
@@ -190,16 +190,16 @@ namespace HalfAware.EditorTools
 
         // ---- ローテーブル ----------------------------------------------------------------
 
-        /// <summary>低い木のテーブル（1.0 × 0.5 m、高さ 0.40）。細る脚、下の棚に雑誌二冊、天板にマグ（飲みかけの珈琲）。メモは別の物（Room/Binder）を載せる</summary>
+        /// <summary>低いテーブル（1.0 × 0.5 m、高さ 0.40）。艶のある黒い石の天板、つや消しの黒の細る脚、下の棚に雑誌二冊、天板にマグ（飲みかけの珈琲）。メモは別の物（Room/Binder）を載せる</summary>
         static void LowTable(FurnitureKit kit)
         {
             const float L = 1.0f, W = 0.5f, H = 0.40f;
-            kit.RoundBox("TableTop", new Vector3(0f, H - 0.0175f, 0f), Quaternion.identity, new Vector3(L, 0.035f, W), 0.012f, Oak, null, 1, 0.5f);
+            kit.RoundBox("TableTop", new Vector3(0f, H - 0.0175f, 0f), Quaternion.identity, new Vector3(L, 0.035f, W), 0.012f, BlackTop, null, 1, 0.5f);
             foreach (var sx in new[] { -1f, 1f })
                 foreach (var sz in new[] { -1f, 1f })
                     kit.Lathe("TableLeg", new Vector3(sx * (L * 0.5f - 0.07f), 0f, sz * (W * 0.5f - 0.07f)), Quaternion.identity,
-                        new[] { new Vector2(0.013f, 0f), new Vector2(0.021f, H - 0.035f) }, 6, Oak);
-            kit.RoundBox("TableShelf", new Vector3(0f, 0.13f, 0f), Quaternion.identity, new Vector3(L - 0.12f, 0.018f, W - 0.13f), 0.004f, Oak, null, 1, 0.5f);
+                        new[] { new Vector2(0.013f, 0f), new Vector2(0.021f, H - 0.035f) }, 6, Whole(Uv(LaminateArea)));
+            kit.RoundBox("TableShelf", new Vector3(0f, 0.13f, 0f), Quaternion.identity, new Vector3(L - 0.12f, 0.018f, W - 0.13f), 0.004f, Laminate, null, 1, 0.5f);
             var pages = Sw(Hue.Paper);
             kit.Box6("Magazine", new Vector3(-0.14f, 0.142f, 0.0f), R(0f, 8f, 0f), new Vector3(0.21f, 0.006f, 0.28f),
                 new[] { pages, pages, pages, Whole(Uv(MagazineArea, 0, 0, 12, 16)), pages, pages });
@@ -246,7 +246,7 @@ namespace HalfAware.EditorTools
 
         // ---- エアコン ----------------------------------------------------------------------
 
-        /// <summary>壁掛けのエアコン（0.82 × 0.28 m、奥行き 0.21）。くすんだ白の筐体、顔の絵（数字の表示と灯り）、下の吹き出しの口と羽、横から下へ降りる配管の覆い</summary>
+        /// <summary>壁掛けのエアコン（0.82 × 0.28 m、奥行き 0.21）。黒に近い灰の筐体、顔の絵（数字の表示と灯り）、下の吹き出しの口と羽、横から下へ降りる配管の覆い</summary>
         static void AirCon(FurnitureKit kit)
         {
             const float W = 0.82f, H = 0.28f, D = 0.21f;
@@ -324,15 +324,31 @@ namespace HalfAware.EditorTools
 
         // ---- 額 ------------------------------------------------------------------------
 
-        /// <summary>額入りの絵（背の真ん中が原点、前が +z）。細い枠（ミレーとターナーは木、グリスとハマスホイは黒）、裏板、枠の前から 1.4 cm 奥の絵</summary>
-        static void Frame(FurnitureKit kit, int k)
+        /// <summary>額の枠の幅</summary>
+        const float FrameBorder = 0.022f;
+
+        /// <summary>絵そのものの大きさ（幅, 高さ）。比は表の値（元の絵の幅 ÷ 高さ。置き場の表のソファの上の組も同じ値から出す）、長い辺が Long</summary>
+        static Vector2 PictureSize(int k)
         {
             var pic = Pictures[k];
-            var a = PictureAspect[k] > 0f ? PictureAspect[k] : pic.Aspect;
-            var w = a >= 1f ? pic.Long : pic.Long * a;
-            var h = a >= 1f ? pic.Long / a : pic.Long;
-            const float M = 0.022f, Depth = 0.026f;
-            var moulding = k < 2 ? Sw(Hue.FrameWood) : Sw(Hue.FrameBlack);
+            var a = pic.Aspect;
+            return a >= 1f ? new Vector2(pic.Long, pic.Long / a) : new Vector2(pic.Long * a, pic.Long);
+        }
+
+        /// <summary>額の外の大きさ（幅, 高さ）</summary>
+        static Vector2 FrameSize(int k)
+        {
+            return PictureSize(k) + Vector2.one * (2f * FrameBorder);
+        }
+
+        /// <summary>額入りの絵（背の真ん中が原点、前が +z）。細い黒い枠、裏板、枠の前から 1.4 cm 奥の絵</summary>
+        static void Frame(FurnitureKit kit, int k)
+        {
+            var size = PictureSize(k);
+            var w = size.x;
+            var h = size.y;
+            const float M = FrameBorder, Depth = 0.026f;
+            var moulding = Sw(Hue.FrameBlack);
             kit.Box("FrameBack", new Vector3(0f, 0f, 0.005f), new Vector3(w + M, h + M, 0.01f), Sw(Hue.Black));
             kit.Box("FrameTop", new Vector3(0f, (h + M) * 0.5f, Depth * 0.5f), new Vector3(w + 2f * M, M, Depth), moulding);
             kit.Box("FrameBottom", new Vector3(0f, -(h + M) * 0.5f, Depth * 0.5f), new Vector3(w + 2f * M, M, Depth), moulding);

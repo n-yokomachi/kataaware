@@ -42,7 +42,7 @@ namespace HalfAware.EditorTools
         /// 間取りが決まったか。決まるまでは Room に組み込まず、組み立ての道具は絵・マテリアル・mesh を焼くだけにする
         /// （仮の置き場で撮るのは <see cref="CheckFurniture.Preview"/>。場面は保存しない）
         /// </summary>
-        public static readonly bool LayoutSettled = false;
+        public static readonly bool LayoutSettled = true;
 
         /// <summary>
         /// 置き場ひとつ。床の物は足元の真ん中、壁の物は壁に付く背の真ん中。Yaw は 0 で前が +z（北）。
@@ -67,55 +67,115 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 置き場の表。**段 A の仮置き。** 部屋の形（<see cref="RoomPlan"/>。LDK x −5〜3・z −1.5〜3、南の廊下と玄関）の壁の面に合わせて、
-        /// 親から知らされた区画（台所・作業台・居間・仕事の区画・東の窓の前・玄関の脇）へ置いた。段 B で親の置き場を受けて直し、<see cref="LayoutSettled"/> を true にする
+        /// 置き場の表。部屋の形（<see cref="RoomPlan"/>。LDK x −5〜3・z −1.5〜3、南の廊下と玄関）の壁の面に合わせて、
+        /// 区画（RoomPlan の Kitchen・Counter・Living・Work、東の窓の前、玄関の脇）へ置く。間取りが変わったらこの表（<see cref="Places"/> と <see cref="SofaWall"/>）だけ直す。
+        /// 玄関の脇の物は、場面 3 の始まりの立ち位置（<see cref="RoomPlan.EntranceStand"/>、体の当たりの半径 0.3 m）に掛からない所へ寄せる
         /// </summary>
-        public static readonly Place[] Layout =
+        public static Place[] Layout
         {
-            // 居間（x −5〜−0.5・z 0.5〜3）。ソファは西の壁に背を付けて東を向き、前にラグとローテーブル、南の端にフロアランプ、上の壁にエアコンと三枚の絵
-            new Place("Sofa", -4.45f, 0f, 1.70f, 90f),
+            get
+            {
+                if (layout != null) return layout;
+                var all = new List<Place>(Places);
+                all.AddRange(SofaWall());
+                return layout = all.ToArray();
+            }
+        }
+
+        static Place[] layout;
+
+        static readonly Place[] Places =
+        {
+            // 居間（x −5〜−0.5・z 0.5〜3）。ソファは西の壁に背を付けて東を向き、前にラグとローテーブル、南の端にフロアランプ、上の壁にエアコンと三枚の絵（SofaWall）
+            new Place("Sofa", -4.40f, 0f, 1.70f, 90f),
             new Place("Rug", -3.25f, 0f, 1.55f, 0f, 2.10f, 1.70f),
             new Place("LowTable", -3.30f, 0f, 1.62f, 90f),
             new Place("FloorLamp", -4.60f, 0f, 0.42f, 0f),
             new Place("AirCon", -4.90f, 2.36f, 1.70f, 90f),
-            new Place("Picture2", -4.90f, 1.50f, 0.91f, 90f),
-            new Place("Picture1", -4.90f, 1.48f, 1.62f, 90f),
-            new Place("Picture0", -4.90f, 1.48f, 2.41f, 90f),
             // 本棚は北の二つの窓の間の壁（x −3.32〜−1.78）
             new Place("Bookcase", -2.60f, 0f, 2.75f, 180f),
-            // 台所（南の壁沿い x −5〜−0.6）。南西の角に冷蔵庫、その東に流しとコンロの並び
+            // 台所（南の壁沿い x −5〜−0.6）。南西の角に冷蔵庫、その東に流しとコンロの並び、上の天井に細長い灯り（台所と作業台の間の上）
             new Place("Fridge", -4.58f, 0f, -1.06f, 0f),
             new Place("Kitchen", -2.44f, 0f, -1.10f, 0f, 3.64f),
-            // 作業台（x −4〜−1.2・z −0.1〜0.5）。居間の側に丸椅子、東の端にごみ箱
-            new Place("WorkCounter", -2.60f, 0f, 0.20f, 0f, 2.80f),
-            new Place("Stool", -1.90f, 0f, 0.78f, 20f),
-            new Place("Bin", -0.98f, 0f, -0.36f, 0f),
-            // 仕事の区画（x 0〜3・z 0.3〜3）。机の西の脇にサーバーラック、右の卓と PC の間の東の壁に在庫棚
-            new Place("ServerRack", -0.05f, 0f, 2.58f, 180f),
+            new Place("KitchenLight", -2.44f, RoomPlan.Ceiling, -0.45f, 0f),
+            // 作業台（x −4〜−1.2・z 0〜0.6。区画より 10 cm 北へ寄せ、台所との間を 0.79 m 空けて体が通れるようにする）。居間の側に丸椅子。ごみ箱は冷蔵庫の前と作業台の西の端の間（廊下の口の動線から外す）
+            new Place("WorkCounter", -2.60f, 0f, 0.30f, 0f, 2.80f),
+            new Place("Stool", -1.90f, 0f, 0.88f, 20f),
+            new Place("Bin", -4.45f, 0f, -0.45f, 0f),
+            // 仕事の区画（x 0〜3・z 0.3〜3）。机・右の卓・PC は前の物と同じ所と広さ。机の西の脇にサーバーラック、右の卓と PC の間の東の壁に在庫棚
+            new Place("Desk", 1.50f, 0f, 2.44f, 180f),
+            new Place("SideTable", 2.648f, 0f, 1.100f, -90f),
+            new Place("Tower", 2.55f, 0f, 2.55f, 180f),
+            new Place("ServerRack", -0.05f, 0f, 2.57f, 180f),
             new Place("ChipShelf", 2.75f, 0f, 1.95f, -90f),
             // 東の窓の前
             new Place("Plant", 2.30f, 0f, -0.50f, 0f),
-            // 玄関の脇（廊下 x −0.6〜0.6・z −5.1〜−1.5）。東の壁に靴置きと、その上にハマスホイ、ドアの東の角に傘立て
-            new Place("ShoeRack", 0.35f, 0f, -4.00f, -90f),
-            new Place("Picture3", 0.50f, 1.50f, -4.20f, -90f),
-            new Place("UmbrellaStand", 0.36f, 0f, -4.87f, 0f),
+            // 廊下の口の LDK 側のコート掛け（場面 3 でジャケットを西の腕に掛ける。柱の位置は前の物のまま）
+            new Place("CoatRack", 0.95f, 0f, -1.05f, 0f),
+            // 玄関の脇（廊下 x −0.6〜0.6・z −5.1〜−1.5）。東の壁に靴置き（寝室のドアの手前まで、長さ 0.66）と、その上にハマスホイ、
+            // ドアの東の角の玄関マットの上に傘立て。どちらも場面 3 の始まり（0, −4.6）の体の当たりから 3 cm 以上空ける
+            new Place("ShoeRack", 0.36f, 0f, -3.99f, -90f, 0.66f),
+            new Place("Picture3", 0.50f, 1.50f, -3.99f, -90f),
+            new Place("UmbrellaStand", 0.37f, 0.02f, -4.87f, 0f),
         };
+
+        /// <summary>
+        /// ソファの上の三枚の組（オーナー「絵画は横並びではなくちょっとデザイン考えて配置」）。前から見て左からターナー（いちばん大きい横長）・グリス（縦長）・ミレー（小さい横長）。
+        /// 大きさに差を付け、上の縁を一本の線（床から 1.78 m、エアコンの配管の覆いの 10 cm 下）に揃えて下の縁を不揃いにし、額と額の間は同じ 9 cm、組の真ん中をソファの真ん中に合わせる
+        /// </summary>
+        static Place[] SofaWall()
+        {
+            const float wallX = -4.90f, centreZ = 1.70f, topY = 1.78f, gap = 0.09f;
+            var order = new[] { 1, 2, 0 };
+            var sizes = new Vector2[order.Length];
+            var total = gap * (order.Length - 1);
+            for (var i = 0; i < order.Length; i++)
+            {
+                sizes[i] = FrameSize(order[i]);
+                total += sizes[i].x;
+            }
+            // 絵は +x を向くので、前から見て左は −z
+            var z = centreZ - total * 0.5f;
+            var list = new Place[order.Length];
+            for (var i = 0; i < order.Length; i++)
+            {
+                list[i] = new Place("Picture" + order[i], wallX, topY - sizes[i].y * 0.5f, z + sizes[i].x * 0.5f, 90f);
+                z += sizes[i].x + gap;
+            }
+            return list;
+        }
 
         /// <summary>置き換える前の家具（Kenney）のうち、同じ名前の新しい物が無い物。組むと外す</summary>
         static readonly string[] Retired =
         {
             "Pillow", "Blanket", "KitchenCabinet", "KitchenSink", "Microwave", "CoffeeMachine", "PlantTall",
-            "Books1", "Books2", "Books3", "Books4", "Books5", "Books6", "BoxA", "BoxB", "BoxC",
+            "Books1", "Books2", "Books3", "Books4", "Books5", "Books6", "BoxA", "BoxB", "BoxC", "Keyboard", "Mouse",
         };
 
         /// <summary>当たりを付けない物（壁の物と、形の中に歩いて入らない物）</summary>
-        static readonly string[] NoBlocker = { "AirCon", "Picture0", "Picture1", "Picture2", "Picture3", "Rug" };
+        static readonly string[] NoBlocker = { "AirCon", "Picture0", "Picture1", "Picture2", "Picture3", "Rug", "KitchenLight" };
 
         /// <summary>ローテーブルの上のメモの置き場（テーブルから見た位置と向き）</summary>
         static readonly Vector3 MemoOnTable = new Vector3(-0.20f, 0.401f, 0.02f);
         const float MemoYaw = 22f;
         /// <summary>メモの調べる対象の、メモの置き場からの高さ（前のソファの上と同じ 3.8 cm）</summary>
         const float MemoItemLift = 0.038f;
+
+        /// <summary>メモの調べる対象の置き場（ローテーブルの上）。場面 3 の同じメモ（<see cref="BuildConnect"/> の note）もここ</summary>
+        public static Vector3 MemoItemAt
+        {
+            get
+            {
+                foreach (var p in Layout)
+                    if (p.Name == "LowTable") return p.At + Quaternion.Euler(0f, p.Yaw, 0f) * MemoOnTable + Vector3.up * MemoItemLift;
+                return Vector3.zero;
+            }
+        }
+
+        /// <summary>台所の天井の灯り。台所と作業台の上だけを少し起こす、控えめな白い灯り</summary>
+        const float KitchenIntensity = 1.2f;
+        const float KitchenRange = 3.0f;
+        static readonly Color KitchenColour = new Color(1.0f, 0.94f, 0.86f);
 
         /// <summary>フロアランプの灯り。部屋の明かりを変えすぎない、弱い暖かい灯り</summary>
         const float LampIntensity = 0.7f;
@@ -229,8 +289,13 @@ namespace HalfAware.EditorTools
                 case "ServerRack": leds = new FurnitureKit(); ServerRack(kit, leds); return true;
                 case "ChipShelf": ChipShelf(kit); return true;
                 case "Plant": Plant(kit); return true;
-                case "ShoeRack": ShoeRack(kit); return true;
+                case "ShoeRack": ShoeRack(kit, p.Length > 0f ? p.Length : 0.8f); return true;
                 case "UmbrellaStand": UmbrellaStand(kit); return true;
+                case "Desk": Desk(kit); return true;
+                case "SideTable": SideTable(kit); return true;
+                case "Tower": Tower(kit); return true;
+                case "CoatRack": CoatRack(kit); return true;
+                case "KitchenLight": KitchenLight(kit); return true;
             }
             if (p.Name.StartsWith("Picture"))
             {
@@ -257,6 +322,8 @@ namespace HalfAware.EditorTools
                 var old = room.Find(name);
                 if (old != null) Object.DestroyImmediate(old.gameObject);
             }
+            // 前の机の当たり（椅子を押し下げて立った所との隙間はこの箱で測ってある）は、世界の同じ箱のまま残す
+            var keepDesk = WorldBox(room.Find("Desk"));
             foreach (var p in Layout)
             {
                 var m = made.Find(x => x.Name == p.Name);
@@ -276,8 +343,10 @@ namespace HalfAware.EditorTools
                 mr.receiveShadows = true;
                 t.gameObject.isStatic = false;
                 if (System.Array.IndexOf(NoBlocker, p.Name) < 0) Blocker(t, p.Name, m.Mesh);
+                if (p.Name == "Desk" && keepDesk.HasValue) Keep(t, keepDesk.Value);
                 if (m.Leds != null) Leds(t, m.Leds, blinkMat);
-                if (p.Name == "FloorLamp") Lamp(t);
+                if (p.Name == "FloorLamp") Glow(t, new Vector3(0f, LampBulbY, 0f), LampColour, LampIntensity, LampRange);
+                if (p.Name == "KitchenLight") Glow(t, new Vector3(0f, -KitchenGlowDrop, 0f), KitchenColour, KitchenIntensity, KitchenRange);
             }
             notes.Add(Memo(scene, room));
             AssetDatabase.SaveAssets();
@@ -308,6 +377,7 @@ namespace HalfAware.EditorTools
             var b = mesh.bounds;
             if (name == "Plant") b = new Bounds(new Vector3(0f, 0.19f, 0f), new Vector3(0.38f, 0.38f, 0.38f));
             if (name == "FloorLamp") b = new Bounds(new Vector3(0f, 0.75f, 0f), new Vector3(0.30f, 1.5f, 0.30f));
+            if (name == "CoatRack") b = new Bounds(new Vector3(0f, 0.77f, 0f), new Vector3(0.40f, 1.54f, 0.40f));
             if (name == "Kitchen" || name == "WorkCounter") b = new Bounds(new Vector3(b.center.x, 0.47f, b.center.z), new Vector3(b.size.x, 0.94f, b.size.z));
             box.center = b.center;
             box.size = b.size;
@@ -341,8 +411,8 @@ namespace HalfAware.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        /// <summary>フロアランプの灯り（傘の中の弱い点光源）</summary>
-        static void Lamp(Transform t)
+        /// <summary>灯り（子の Glow に、影を落とさない点光源）。フロアランプの傘の中と、台所の天井の灯具の下</summary>
+        static void Glow(Transform t, Vector3 at, Color colour, float intensity, float range)
         {
             var child = t.Find("Glow");
             if (child == null)
@@ -350,15 +420,33 @@ namespace HalfAware.EditorTools
                 child = new GameObject("Glow").transform;
                 child.SetParent(t, false);
             }
-            child.localPosition = new Vector3(0f, LampBulbY, 0f);
+            child.localPosition = at;
             child.localRotation = Quaternion.identity;
             var l = child.GetComponent<Light>();
             if (l == null) l = child.gameObject.AddComponent<Light>();
             l.type = LightType.Point;
-            l.color = LampColour;
-            l.intensity = LampIntensity;
-            l.range = LampRange;
+            l.color = colour;
+            l.intensity = intensity;
+            l.range = range;
             l.shadows = LightShadows.None;
+        }
+
+        /// <summary>物の当たり（BoxCollider）の世界の箱。無ければ null</summary>
+        static Bounds? WorldBox(Transform t)
+        {
+            var box = t != null ? t.GetComponent<BoxCollider>() : null;
+            if (box == null) return null;
+            return box.bounds;
+        }
+
+        /// <summary>当たりを世界の箱 world に合わせる（物は y まわりにしか回っていない）</summary>
+        static void Keep(Transform t, Bounds world)
+        {
+            var box = t.GetComponent<BoxCollider>();
+            if (box == null) box = t.gameObject.AddComponent<BoxCollider>();
+            box.center = t.InverseTransformPoint(world.center);
+            var size = t.InverseTransformVector(world.size);
+            box.size = new Vector3(Mathf.Abs(size.x), Mathf.Abs(size.y), Mathf.Abs(size.z));
         }
 
         /// <summary>ラグ。物は作り直さず、mesh・マテリアル・置き場を替え、当たりの広さを新しい形に合わせる（当たりの世界の高さと足音の地面はそのまま）</summary>
@@ -408,6 +496,7 @@ namespace HalfAware.EditorTools
             if (table == null || binder == null) return "メモかローテーブルが無い";
             binder.position = table.TransformPoint(MemoOnTable);
             binder.rotation = Quaternion.Euler(0f, table.eulerAngles.y + MemoYaw, 0f);
+            if ((binder.position + Vector3.up * MemoItemLift - MemoItemAt).sqrMagnitude > 1e-6f) return "メモの置き場が表から出した MemoItemAt と合わない（Room が原点に無い？）";
             Interactable item = null;
             foreach (var it in Object.FindObjectsByType<Interactable>(FindObjectsInactive.Include, FindObjectsSortMode.None))
                 if (it.gameObject.scene == scene && it.Id == RoomIds.Clipboard) item = it;

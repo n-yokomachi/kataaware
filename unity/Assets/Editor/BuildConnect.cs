@@ -38,8 +38,8 @@ namespace HalfAware.EditorTools
         static readonly Vector3 StartAt = new Vector3(RoomPlan.EntranceStand.x, 0.05f, RoomPlan.EntranceStand.y);
         /// <summary>腰を下ろす場所。場面 1 が座って始まるのと同じ点</summary>
         public static readonly Vector3 SeatAt = new Vector3(1.50f, 0.05f, 1.20f);
-        /// <summary>ソファの上の売上メモ</summary>
-        static readonly Vector3 NoteAt = new Vector3(-2.40f, 0.67f, 0.19f);
+        /// <summary>ローテーブルの上の売上メモ。場面 1 のメモと同じ所（置き場は家具の表 BuildFurniture.Layout）</summary>
+        static readonly Vector3 NoteAt = BuildFurniture.MemoItemAt;
         /// <summary>椅子。座面ではなく、立って見下ろせる高さに置く</summary>
         static readonly Vector3 ChairAt = new Vector3(1.50f, 0.75f, 1.20f);
         /// <summary>モニター。monitor / list / dive は順に開くので同じ点でよい</summary>

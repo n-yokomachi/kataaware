@@ -12,13 +12,13 @@ namespace HalfAware.EditorTools
         const float BookcaseHigh = 1.85f;
 
         /// <summary>
-        /// 濃い木の本棚（幅 0.90・奥行き 0.30・高さ 1.85、棚は 5 段）。段ごとに本を詰める: 立てた本の並び（背の色・高さ・厚み・奥行きがばらばら、
+        /// つや消しの黒の本棚（幅 0.90・奥行き 0.30・高さ 1.85、棚は 5 段）。段ごとに本を詰める: 立てた本の並び（背の色・高さ・厚み・奥行きがばらばら、
         /// 端の一冊は傾く）、寝かせて積んだ本、空のチップケースの列、隙間。背表紙は 32 種の絵から選ぶ
         /// </summary>
         static void Bookcase(FurnitureKit kit)
         {
             const float W = BookcaseWide, D = BookcaseDeep, H = BookcaseHigh;
-            var wood = Walnut;
+            var wood = Laminate;
             kit.Box("BookcaseSide", new Vector3(-W * 0.5f + 0.01f, H * 0.5f, 0f), new Vector3(0.02f, H, D), wood, NoBottom);
             kit.Box("BookcaseSide", new Vector3(W * 0.5f - 0.01f, H * 0.5f, 0f), new Vector3(0.02f, H, D), wood, NoBottom);
             kit.Box("BookcaseTop", new Vector3(0f, H - 0.01f, 0f), new Vector3(W, 0.02f, D), wood);
@@ -265,7 +265,7 @@ namespace HalfAware.EditorTools
                     new Vector3(bundleX, 0.05f, bundleZ),
                     new Vector3(bundleX + 0.01f, 0.006f, bundleZ - 0.04f),
                     new Vector3(W * 0.5f + 0.03f, 0.006f, 0.05f - k * 0.01f),
-                    new Vector3(W * 0.5f + 0.06f, 0.006f, -D * 0.5f - 0.05f),
+                    new Vector3(W * 0.5f + 0.06f, 0.006f, -D * 0.5f + 0.02f),
                 };
                 kit.Tube("RackCable", Smooth(pts, 2), 0.0035f, 3, Sw(colours[k]));
             }
@@ -334,10 +334,11 @@ namespace HalfAware.EditorTools
 
         // ---- 靴置き ----------------------------------------------------------------------
 
-        /// <summary>靴置き（長さ 0.80・奥行き 0.30・高さ 0.34。黒い鉄の枠に木の桟の二段）。上の段に革の短靴とスニーカー、下の段にブーツ</summary>
-        static void ShoeRack(FurnitureKit kit)
+        /// <summary>靴置き（長さ length・奥行き 0.28・高さ 0.34。黒い鉄の枠に木の桟の二段）。上の段に革の短靴とスニーカー、下の段にブーツ</summary>
+        static void ShoeRack(FurnitureKit kit, float length)
         {
-            const float L = 0.80f, D = 0.30f, H = 0.34f;
+            var L = Mathf.Max(0.6f, length);
+            const float D = 0.28f, H = 0.34f;
             var metal = Sw(Hue.Black);
             foreach (var sx in new[] { -1f, 1f })
             {
@@ -348,12 +349,13 @@ namespace HalfAware.EditorTools
             }
             foreach (var y in new[] { 0.075f, H + 0.006f })
                 for (var k = 0; k < 3; k++)
-                    kit.Box("ShoeRackSlat", new Vector3(0f, y, -D * 0.5f + 0.05f + k * 0.1f), new Vector3(L - 0.04f, 0.012f, 0.07f), Oak);
+                    kit.Box("ShoeRackSlat", new Vector3(0f, y, -D * 0.5f + 0.05f + k * 0.1f), new Vector3(L - 0.04f, 0.012f, 0.07f), Laminate);
             var top = H + 0.012f;
-            Shoe(kit, new Vector3(-0.27f, top, 0.0f), 4f, Hue.LeatherBrown, false, 0.28f);
-            Shoe(kit, new Vector3(-0.15f, top, 0.01f), -3f, Hue.LeatherBrown, false, 0.28f);
-            Shoe(kit, new Vector3(0.10f, top, -0.01f), 8f, Hue.SneakerWhite, false, 0.27f);
-            Shoe(kit, new Vector3(0.23f, top, 0.02f), -5f, Hue.SneakerWhite, false, 0.27f);
+            var s = L / 0.8f;
+            Shoe(kit, new Vector3(-0.27f * s, top, 0.0f), 4f, Hue.LeatherBrown, false, 0.27f);
+            Shoe(kit, new Vector3(-0.15f * s, top, 0.01f), -3f, Hue.LeatherBrown, false, 0.27f);
+            Shoe(kit, new Vector3(0.10f * s, top, -0.01f), 8f, Hue.SneakerWhite, false, 0.26f);
+            Shoe(kit, new Vector3(0.23f * s, top, 0.02f), -5f, Hue.SneakerWhite, false, 0.26f);
             Shoe(kit, new Vector3(-0.10f, 0.081f, 0.0f), 2f, Hue.LeatherBlack, true, 0.29f);
             Shoe(kit, new Vector3(0.04f, 0.081f, -0.01f), -6f, Hue.LeatherBlack, true, 0.29f);
         }
