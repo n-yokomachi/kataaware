@@ -66,12 +66,12 @@ namespace HalfAware.EditorTools
         const float TopRise = 0.03f;
         /// <summary>
         /// ボタン留め（菱形）。同じ段のボタンの間の半分、段の間（倒れた向きに沿って）、一段目の高さ、菱形の膨らみの高さ、ボタンの窪みの深さ。
-        /// 粗い画面でも菱形の膨らみが読めるよう、大きな菱形（幅 16 cm・高さ 24 cm）を深く（4.5 cm）膨らませ、ボタンの所を 1.8 cm 窪ませ、数は 13 個に減らした
+        /// 粗い画面でも菱形の膨らみが読めるよう、大きな菱形（幅 16 cm・高さ 24 cm）を深く（5 cm）膨らませ、ボタンの所を 1.8 cm 窪ませ、数は 13 個に減らした
         /// </summary>
         const float TuftDx = 0.08f;
         const float TuftDs = 0.12f;
         const float TuftS0 = 0.19f;
-        const float TuftPuff = 0.045f;
+        const float TuftPuff = 0.05f;
         const float TuftDip = 0.018f;
 
         /// <summary>肘掛けの上面の線。前の椅子と同じ高さと傾き（前へ 4 度下がる）。ジャックの置き場（z −0.07）で 0.6758</summary>
@@ -114,41 +114,66 @@ namespace HalfAware.EditorTools
         static float FootTop(float z) { return 0.161f - 0.33f * (z - 0.18f); }
 
         // ---- 絵の中の置き場 --------------------------------------------------------
+        //
+        // 椅子の絵は一枚（128×128、点で引く）に、地の色（α は艶）・法線・光る所の三つを同じ置き場で持つ。
+        // 左下の 64×64 は操作盤の絵と色の升、ほかは革の面ごとの絵（背もたれの前・裏、肘掛け、座面、フットレスト）。
+        // 革の面の細かい起伏（ボタンの窪み、菱形の折り目の鋭さ、縫い目、皺）は mesh に持たせず、地の色の陰と法線の絵に描く。
+        // 輪郭を作る起伏（背もたれの厚みと縁の巻き、菱形の膨らみ、肘掛けと座面の厚み）は mesh に残す
 
-        /// <summary>張り地の絵（64×64、縦横とも繰り返す黒革の地）と、その 1 枚の大きさ（m）</summary>
-        const int UpholsteryW = 64;
-        const int UpholsteryH = 64;
-        const float GrainTile = 0.32f;
-
-        /// <summary>操作盤の絵（64×64）の置き場。画素で (x, y, 幅, 高さ)、y は下から</summary>
-        const int PanelSize = 64;
+        /// <summary>椅子の絵の一辺の画素</summary>
+        const int AtlasSize = 128;
+        /// <summary>操作盤の絵の置き場（画素で x, y, 幅, 高さ。y は下から）</summary>
         static readonly RectInt RightPod = new RectInt(0, 4, 16, 16);
         static readonly RectInt LeftPod = new RectInt(16, 4, 16, 16);
-        static readonly RectInt RearScreen = new RectInt(32, 4, 24, 16);
         static readonly RectInt EarScreen = new RectInt(32, 20, 12, 16);
-        static readonly RectInt PortPlate = new RectInt(44, 20, 20, 12);
         static readonly RectInt JunctionFace = new RectInt(44, 32, 20, 12);
         static readonly RectInt EarLamp = new RectInt(32, 36, 12, 12);
         static readonly RectInt LedStrip = new RectInt(44, 44, 20, 4);
+        /// <summary>頭の後ろの箱の裏の面（画面・灯りの列・接続口・四隅の螺子を一枚に）と、操作盤の外の面（留めた螺子二つ）</summary>
+        static readonly RectInt CrownFace = new RectInt(0, 20, 26, 28);
+        static readonly RectInt PodSide = new RectInt(44, 48, 16, 6);
+        /// <summary>革の面の絵の置き場</summary>
+        static readonly RectInt BackFrontArea = new RectInt(64, 64, 64, 64);
+        static readonly RectInt BackRearArea = new RectInt(32, 64, 32, 64);
+        static readonly RectInt ArmArea = new RectInt(0, 64, 32, 64);
+        static readonly RectInt SeatArea = new RectInt(64, 0, 64, 40);
+        static readonly RectInt FootArea = new RectInt(64, 40, 40, 24);
+        /// <summary>革の面の絵が覆う広さ（椅子の座標、m）。座面とフットレストと肘掛けは上から、背もたれは前の基準の面へ真っすぐに写す</summary>
+        const float SeatAreaZ0 = -0.215f, SeatAreaZ1 = 0.29f;
+        const float FootAreaZ0 = 0.20f, FootAreaZ1 = 0.445f;
+        const float ArmAreaX0 = 0.20f, ArmAreaX1 = 0.37f;
+        const float ArmAreaZ0 = -0.19f, ArmAreaZ1 = 0.255f;
 
-        /// <summary>色の升（4×4 画素、下の段に 16 個）。ケーブルやキャスターの一色の物は升の真ん中を引く</summary>
-        enum Swatch { Rubber, Plastic, Grey, Violet, Teal, Orange, Metal, Label, Cyan, VioletLit, Amber, Green, Brass, Glass, PlasticLight, Red }
+        /// <summary>
+        /// 色の升（4×4 画素）。下の段に 16 個、左上の段（y 60）に金属と漆と革の 4 個。ケーブルや金具のような一色の物は升の真ん中を引く
+        /// </summary>
+        enum Swatch { Rubber, Plastic, Grey, Violet, Teal, Orange, Metal, Label, Cyan, VioletLit, Amber, Green, Brass, Glass, PlasticLight, Red, Chrome, Steel, Lacquer, Leather }
 
         static Vector2 SwatchUv(Swatch s)
         {
-            return new Vector2(((int)s * 4 + 2f) / PanelSize, 2f / PanelSize);
+            var i = (int)s;
+            return new Vector2(((i % 16) * 4 + 2f) / AtlasSize, (i < 16 ? 2f : 62f) / AtlasSize);
         }
 
         /// <summary>画素の置き場を uv の矩形にする。点で引くので、縁の画素の外を拾わないよう内へ少し寄せる</summary>
-        static Rect Uv(RectInt r, int w, int h)
+        static Rect PanelUv(RectInt r)
         {
-            return new Rect((r.x + 0.05f) / w, (r.y + 0.05f) / h, (r.width - 0.1f) / w, (r.height - 0.1f) / h);
+            return new Rect((r.x + 0.05f) / AtlasSize, (r.y + 0.05f) / AtlasSize, (r.width - 0.1f) / AtlasSize, (r.height - 0.1f) / AtlasSize);
         }
 
-        static Rect PanelUv(RectInt r) { return Uv(r, PanelSize, PanelSize); }
+        /// <summary>置き場 r の中の (u, v)（0〜1）を uv に。縁の画素の外を拾わないよう、半画素内に留める</summary>
+        static Vector2 AreaUv(RectInt r, float u, float v)
+        {
+            var px = Mathf.Clamp(u * r.width, 0.5f, r.width - 0.5f);
+            var py = Mathf.Clamp(v * r.height, 0.5f, r.height - 0.5f);
+            return new Vector2((r.x + px) / AtlasSize, (r.y + py) / AtlasSize);
+        }
 
-        /// <summary>革の地の uv。m で渡し、1 枚の大きさで割る（絵は縦横とも繰り返す）</summary>
-        static Vector2 GrainUv(float u, float v) { return new Vector2(u / GrainTile, v / GrainTile); }
+        static Vector2 BackFrontUv(float x, float s) { return AreaUv(BackFrontArea, (x + BackHalfW) / (2f * BackHalfW), s / BackLength); }
+        static Vector2 BackRearUv(float x, float s) { return AreaUv(BackRearArea, (x + BackHalfW) / (2f * BackHalfW), s / BackLength); }
+        static Vector2 SeatUv(float x, float z) { return AreaUv(SeatArea, (x + SeatHalf) / (2f * SeatHalf), (z - SeatAreaZ0) / (SeatAreaZ1 - SeatAreaZ0)); }
+        static Vector2 FootUv(float x, float z) { return AreaUv(FootArea, (x + FootHalf) / (2f * FootHalf), (z - FootAreaZ0) / (FootAreaZ1 - FootAreaZ0)); }
+        static Vector2 ArmUv(float x, float z) { return AreaUv(ArmArea, (Mathf.Abs(x) - ArmAreaX0) / (ArmAreaX1 - ArmAreaX0), (z - ArmAreaZ0) / (ArmAreaZ1 - ArmAreaZ0)); }
 
         // ---- 組み立て ----------------------------------------------------------------
 
@@ -193,14 +218,14 @@ namespace HalfAware.EditorTools
         static float Smooth(float a, float b, float x) { return Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(a, b, x)); }
 
         /// <summary>
-        /// 縫い目の溝（上の平らな面と、脇と前の丸みの境）。脇は |x| = weltX の線を前の縫い目まで、前は z = weltZ の線を脇の縫い目まで。
-        /// 平らな板に見えないよう、上の面をクッションの形に区切る
+        /// 縫い目の溝（0〜1。上の平らな面と、脇と前の丸みの境）。脇は |x| = weltX の線を前の縫い目まで、前は z = weltZ の線を脇の縫い目まで。
+        /// 平らな板に見えないよう、上の面をクッションの形に区切る。mesh には持たせず、絵（陰と法線）に描く
         /// </summary>
         static float Welt(float x, float z, float weltX, float weltZ)
         {
             var ax = Mathf.Abs(x);
-            var side = Mathf.Exp(-Mathf.Pow((ax - weltX) / 0.005f, 2f)) * (1f - Smooth(weltZ - 0.006f, weltZ + 0.004f, z));
-            var front = Mathf.Exp(-Mathf.Pow((z - weltZ) / 0.005f, 2f)) * (1f - Smooth(weltX - 0.006f, weltX + 0.004f, ax));
+            var side = Mathf.Exp(-Mathf.Pow((ax - weltX) / 0.006f, 2f)) * (1f - Smooth(weltZ - 0.006f, weltZ + 0.004f, z));
+            var front = Mathf.Exp(-Mathf.Pow((z - weltZ) / 0.006f, 2f)) * (1f - Smooth(weltX - 0.006f, weltX + 0.004f, ax));
             return Mathf.Max(side, front);
         }
 
@@ -208,11 +233,10 @@ namespace HalfAware.EditorTools
         const float SeatWeltX = 0.205f;
         const float SeatWeltZ = 0.232f;
 
-        /// <summary>座面の上の面の高さ。尻の沈む所をわずかに窪ませ、縁の縫い目を 5 mm 沈める</summary>
+        /// <summary>座面の上の面の高さ。尻の沈む所をわずかに窪ませる</summary>
         static float SeatTop(float x, float z)
         {
-            return SeatLevel(z) - 0.005f * Mathf.Exp(-Mathf.Pow((z - 0.03f) / 0.12f, 2f)) * (1f - Smooth(0.12f, 0.20f, Mathf.Abs(x)))
-                - 0.005f * Welt(x, z, SeatWeltX, SeatWeltZ);
+            return SeatLevel(z) - 0.005f * Mathf.Exp(-Mathf.Pow((z - 0.03f) / 0.12f, 2f)) * (1f - Smooth(0.12f, 0.20f, Mathf.Abs(x)));
         }
 
         /// <summary>クッションの下の面。前の真ん中だけ、ふくらはぎの上へ上げる</summary>
@@ -223,25 +247,23 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// クッションの形（座面と、フットレストのパッド）。上の面と下の面の高さ（x, z から）、前と後ろの端、半分の幅、脇の縁の丸み、
-        /// 上から見た前の角の丸み、脇の端を畳む時に厚みを測る前後の位置
+        /// 上から見た前の角の丸み、脇の端を畳む時に厚みを測る前後の位置、絵の uv（上から写す）
         /// </summary>
         sealed class Cushion
         {
             public Func<float, float, float> Top;
             public Func<float, float, float> Under;
             public float Front, Back, Half, Edge, Corner, MidZ;
-            /// <summary>上の面に足して置く前後の位置（縫い目の所）</summary>
-            public float[] TopZ = new float[0];
+            public Func<float, float, Vector2> Uv;
         }
 
         static readonly Cushion SeatShape = new Cushion
         {
-            Top = SeatTop, Under = SeatUnder, Front = SeatFront, Back = SeatBack, Half = SeatHalf, Edge = SeatEdge, Corner = SeatCorner, MidZ = 0.03f,
-            TopZ = new[] { SeatWeltZ - 0.006f, SeatWeltZ, SeatWeltZ + 0.006f },
+            Top = SeatTop, Under = SeatUnder, Front = SeatFront, Back = SeatBack, Half = SeatHalf, Edge = SeatEdge, Corner = SeatCorner, MidZ = 0.03f, Uv = SeatUv,
         };
 
         /// <summary>
-        /// クッションの、左右の位置 x での横から見た輪郭（後ろの下から、下の面を前へ、前の丸み、上の面を後ろへ、後ろの丸み）。
+        /// クッションの、左右の位置 x での横から見た輪郭（後ろの下から、下の面を前へ、前の丸み、上の面を後ろへ、後ろの丸み。12 点で閉じる）。
         /// 脇の縁では輪郭を内へ寄せて丸め（inset）、最後は線に畳んで閉じる（collapse）
         /// </summary>
         static List<Vector3> CushionRing(Cushion c, float x, bool collapse)
@@ -275,31 +297,27 @@ namespace HalfAware.EditorTools
             var yk = 0.5f * (top(zk) + under(zk));
 
             var pts = new List<Vector3>();
-            // 下の面（後ろから前へ）
-            for (var i = 0; i <= 3; i++)
-            {
-                var z = Mathf.Lerp(zk, zc, i / 3f);
-                pts.Add(new Vector3(x, i == 0 ? yk - rk : i == 3 ? yn - rn : under(z), z));
-            }
+            // 下の面（後ろから前へ。ふくらはぎの逃げの曲がりを真ん中の一点で）
+            pts.Add(new Vector3(x, yk - rk, zk));
+            var zm = Mathf.Lerp(zk, zc, 0.6f);
+            pts.Add(new Vector3(x, under(zm), zm));
+            pts.Add(new Vector3(x, yn - rn, zc));
             // 前の丸み（下から上へ）
-            for (var i = 1; i <= 4; i++)
+            foreach (var deg in new[] { -45f, 0f, 45f, 90f })
             {
-                var a = Mathf.Lerp(-90f, 90f, i / 4f) * Mathf.Deg2Rad;
+                var a = deg * Mathf.Deg2Rad;
                 pts.Add(new Vector3(x, yn + rn * Mathf.Sin(a), zc + rn * Mathf.Cos(a)));
             }
             // 上の面（前から後ろへ）
-            var tops = new List<float> { 0.12f, 0.25f, 0.40f, 0.55f, 0.70f, 0.85f, 1f };
-            foreach (var tz in c.TopZ) tops.Add(Mathf.Clamp(Mathf.InverseLerp(zc, zk, tz), 0.004f, 0.11f));
-            tops.Sort();
-            foreach (var k in tops)
+            foreach (var k in new[] { 0.3f, 0.65f, 1f })
             {
                 var z = Mathf.Lerp(zc, zk, k);
                 pts.Add(new Vector3(x, k >= 1f ? yk + rk : top(z), z));
             }
-            // 後ろの丸み（上から下へ）
-            for (var i = 1; i <= 2; i++)
+            // 後ろの丸み（上から下へ。最後は始まりの点に戻る）
+            foreach (var deg in new[] { 180f, 270f })
             {
-                var a = Mathf.Lerp(90f, 270f, i / 2f) * Mathf.Deg2Rad;
+                var a = deg * Mathf.Deg2Rad;
                 pts.Add(new Vector3(x, yk + rk * Mathf.Sin(a), zk + rk * Mathf.Cos(a)));
             }
             return pts;
@@ -308,13 +326,13 @@ namespace HalfAware.EditorTools
         static void Seat(Shop shop)
         {
             shop.Begin("SeatCushion", 55f, true);
-            CushionGrid(shop, SeatShape, new List<float> { 0f, 0.07f, 0.14f, SeatWeltX - 0.012f, SeatWeltX - 0.006f, SeatWeltX, SeatWeltX + 0.006f, SeatHalf - SeatEdge + 0.004f, 0.232f, 0.246f, 0.257f, 0.265f, SeatHalf });
+            CushionGrid(shop, SeatShape, new List<float> { 0f, 0.09f, 0.17f, SeatHalf - SeatEdge, 0.24f, 0.258f, 0.268f, SeatHalf });
             shop.End(Orient.Whole);
         }
 
         /// <summary>
         /// クッションの皮を張る。輪は左の端（畳んで閉じる）から右の端まで、x の増える向きに並べる（halves は真ん中から右の端までの |x|）。
-        /// 革の地は縦横とも繰り返すので、uv は x と輪郭に沿った長さから振る
+        /// 絵は上から写す（脇と前の丸みは縫い目の外の無地の所を引く）
         /// </summary>
         static void CushionGrid(Shop shop, Cushion c, List<float> halves)
         {
@@ -324,23 +342,17 @@ namespace HalfAware.EditorTools
             var rings = new List<List<Vector3>> { CushionRing(c, -c.Half, true) };
             foreach (var x in xs) rings.Add(CushionRing(c, x, false));
             rings.Add(CushionRing(c, c.Half, true));
-            Rings(shop, Shop.Upholstery, rings, (i, arc) => GrainUv(rings[i][0].x, arc));
+            Rings(shop, Shop.Upholstery, rings, p => c.Uv(p.x, p.z));
         }
 
-        /// <summary>同じ点の数の輪を並べて格子を張る。uv は（輪の番号, 輪郭に沿った長さ）から</summary>
-        static void Rings(Shop shop, int sub, List<List<Vector3>> rings, Func<int, float, Vector2> uv)
+        /// <summary>同じ点の数の輪を並べて格子を張る。uv は点の位置から</summary>
+        static void Rings(Shop shop, int sub, List<List<Vector3>> rings, Func<Vector3, Vector2> uv)
         {
             var n = rings[0].Count;
             var idx = new int[rings.Count, n];
             for (var i = 0; i < rings.Count; i++)
-            {
-                var arc = 0f;
                 for (var j = 0; j < n; j++)
-                {
-                    if (j > 0) arc += Vector3.Distance(rings[i][j - 1], rings[i][j]);
-                    idx[i, j] = shop.V(rings[i][j], uv(i, arc));
-                }
-            }
+                    idx[i, j] = shop.V(rings[i][j], uv(rings[i][j]));
             for (var i = 0; i < rings.Count - 1; i++)
                 for (var j = 0; j < n - 1; j++)
                     shop.Q(sub, idx[i, j], idx[i, j + 1], idx[i + 1, j + 1], idx[i + 1, j]);
@@ -390,7 +402,10 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// ボタン留めの膨らみ（0〜1）。ボタンを結ぶ斜めの線（菱形の辺）で 0、菱形の真ん中で 1。ボタンは (i·TuftDx, TuftS0 + j·TuftDs)、i + j が偶数の所
         /// </summary>
-        static float TuftDome(float x, float s)
+        static float TuftDome(float x, float s) { return TuftDome(x, s, 0.8f); }
+
+        /// <summary>ボタン留めの膨らみ。power が小さいほど頂が平らで折り目の際が急（法線の絵は 0.8 で枕の形に、mesh は 1.3 で折り目の際をなだらかに）</summary>
+        static float TuftDome(float x, float s, float power)
         {
             var a = x / TuftDx;
             var b = (s - TuftS0) / TuftDs;
@@ -398,7 +413,7 @@ namespace HalfAware.EditorTools
             var n = 0.5f * (b - a);
             var fm = m - Mathf.Floor(m);
             var fn = n - Mathf.Floor(n);
-            return Mathf.Pow(Mathf.Max(0f, Mathf.Sin(Mathf.PI * fm) * Mathf.Sin(Mathf.PI * fn)), 0.8f);
+            return Mathf.Pow(Mathf.Max(0f, Mathf.Sin(Mathf.PI * fm) * Mathf.Sin(Mathf.PI * fn)), power);
         }
 
         /// <summary>いちばん近いボタンの位置 (x, s)</summary>
@@ -419,11 +434,14 @@ namespace HalfAware.EditorTools
             return Smooth(BackBorder, BackBorder + 0.03f, side) * Smooth(TopBand, TopBand + 0.03f, top) * Smooth(0.10f, 0.16f, s);
         }
 
+        /// <summary>背もたれの前の面の細かさ。下の面（菱形の膨らみ無し）、mesh の形（菱形の膨らみまで）、本当の面（絵に描く窪みと溝まで）</summary>
+        enum BackDetail { Base, Mesh, Full }
+
         /// <summary>
         /// 背もたれの前の面（前の基準の面から前へ）。縁は真ん中の面まで丸く巻いて下ろし（裏の面と合う）、脇は太い巻きを縫い目で区切り、
-        /// 上は前へ膨らむ頭の当ての巻きを縫い目で区切り、内の面は菱形のボタン留めで膨らませてボタンの所を窪ませる
+        /// 上は前へ膨らむ頭の当ての巻きを縫い目で区切り、内の面は菱形のボタン留めで膨らませる。detail で細かさを選ぶ
         /// </summary>
-        static float BackFrontT(float x, float s)
+        static float BackFrontT(float x, float s, BackDetail detail)
         {
             var side = BackW(s) - Mathf.Abs(x);
             var top = BackLength - s;
@@ -432,18 +450,89 @@ namespace HalfAware.EditorTools
             var sideRise = BorderRise * RollR(side, 0.04f) * (1f - Smooth(BackBorder - 0.028f, BackBorder - 0.004f, side));
             var topRise = top < TopBand ? TopRise * Mathf.Pow(Mathf.Sin(Mathf.PI * top / TopBand), 0.8f) : 0f;
             var rise = Mathf.Lerp(topRise, sideRise, Smooth(TopBand - 0.012f, TopBand + 0.012f, top));
-            // 縫い目（脇の巻きと内の面の間、頭の当てと内の面の間）
+            // ボタン留めの膨らみ
+            var inside = detail == BackDetail.Base ? 0f : TuftInside(x, s);
+            // mesh の膨らみは低め（6 割）。絵は上から真っすぐに写すので、mesh の膨らみを高くすると、折り目の際の急な斜面に一画素が引き伸ばされて明るい筋になる。
+            // 膨らみの丸い陰影は法線の絵（本当の高さ）が持つ
+            var puff = detail == BackDetail.Full ? TuftPuff : TuftPuff * 0.6f;
+            var tuft = inside > 0f ? inside * puff * TuftDome(x, s, detail == BackDetail.Full ? 0.8f : 1.3f) : 0f;
+            var fineDepth = detail == BackDetail.Full ? BackFine(x, s) : 0f;
+            return BackMid + RollR(s, BackRound) * (h + rise + tuft - fineDepth);
+        }
+
+        static float BackFrontT(float x, float s) { return BackFrontT(x, s, BackDetail.Mesh); }
+
+        /// <summary>背もたれの前の面の点（細かさ detail で）</summary>
+        static Vector3 BackFrontP(float x, float s, BackDetail detail) { return Back(x, s, BackFrontT(x, s, detail)); }
+
+        /// <summary>
+        /// 背もたれの前の、下の面（菱形の膨らみ無し）の向き。接線（x の向き）・従接線（s の向き）・法線。
+        /// ボタン留めの面の mesh の法線はこの法線にし、膨らみと窪みの陰影は法線の絵で出す（粗い mesh でも膨らみが丸く陰る）
+        /// </summary>
+        static void BackBaseFrame(float x, float s, out Vector3 tangent, out Vector3 bitangent, out Vector3 normal)
+        {
+            const float e = 0.004f;
+            tangent = (BackFrontP(x + e, s, BackDetail.Base) - BackFrontP(x - e, s, BackDetail.Base)).normalized;
+            var along = BackFrontP(x, s + e, BackDetail.Base) - BackFrontP(x, s - e, BackDetail.Base);
+            normal = Vector3.Cross(along, tangent).normalized;
+            if (Vector3.Dot(normal, BackFwd) < 0f) normal = -normal;
+            bitangent = Vector3.Cross(normal, tangent).normalized;
+            if (Vector3.Dot(bitangent, along) < 0f) bitangent = -bitangent;
+        }
+
+        /// <summary>
+        /// 背もたれの前の面の、絵に描く法線（接線の座標。x は絵の右＝椅子の右、y は絵の上＝背もたれの上）。
+        /// 本当の面（菱形の膨らみ・ボタンの窪み・折り目・縫い目）の法線を、下の面の向きで表す
+        /// </summary>
+        static Vector3 BackFrontNormal(float x, float s, float dx, float ds)
+        {
+            Vector3 t, b, n;
+            BackBaseFrame(x, s, out t, out b, out n);
+            var ux = BackFrontP(x + dx, s, BackDetail.Full) - BackFrontP(x - dx, s, BackDetail.Full);
+            var us = BackFrontP(x, s + ds, BackDetail.Full) - BackFrontP(x, s - ds, BackDetail.Full);
+            var real = Vector3.Cross(us, ux).normalized;
+            if (Vector3.Dot(real, n) < 0f) real = -real;
+            var ts = new Vector3(Vector3.Dot(real, t), Vector3.Dot(real, b), Vector3.Dot(real, n));
+            // 傾きは 40 度までに抑える。部屋の明かりでは椅子の明るさの多くが照り返し（斜めから見るほど強い）なので、
+            // 折り目の際の急な画素が一画素の明るい筋になる
+            var tilt = new Vector2(ts.x, ts.y);
+            var limit = Mathf.Tan(40f * Mathf.Deg2Rad) * ts.z;
+            if (tilt.magnitude > limit) tilt = tilt.normalized * limit;
+            return new Vector3(tilt.x, tilt.y, ts.z).normalized;
+        }
+
+        /// <summary>
+        /// 背もたれの前の面の細かい窪み（m、正で窪む）。ボタンの窪みと、脇と上の縫い目の溝。mesh には持たせず、絵に描く
+        /// （菱形の折り目は膨らみの形そのものが持つ。溝を足すと、明かりを受けた片側が細い明るい線になって筋に見えた）
+        /// </summary>
+        static float BackFine(float x, float s)
+        {
+            var side = BackW(s) - Mathf.Abs(x);
+            var top = BackLength - s;
             var seam = Mathf.Max(top > TopBand - 0.01f ? Groove(side - BackBorder) : 0f, Groove(top - TopBand) * Smooth(0.005f, 0.03f, side));
-            // ボタン留め
+            var depth = SeamDeep * seam;
             var inside = TuftInside(x, s);
-            var tuft = 0f;
             if (inside > 0f)
             {
                 var near = TuftNearest(x, s);
                 var dip = TuftDip * Mathf.Exp(-Mathf.Pow((new Vector2(x, s) - near).magnitude / 0.015f, 2f));
-                tuft = inside * (TuftPuff * TuftDome(x, s) - dip);
+                depth += inside * dip;
             }
-            return BackMid + RollR(s, BackRound) * (h + rise - SeamDeep * seam + tuft);
+            return depth;
+        }
+
+        /// <summary>菱形の折り目（ボタンを結ぶ斜めの線）への近さ（0〜1。線の上で 1、1.2 cm ほどで消える）。地の色の陰に使う</summary>
+        static float TuftCrease(float x, float s)
+        {
+            var a = x / TuftDx;
+            var b = (s - TuftS0) / TuftDs;
+            var m = 0.5f * (a + b);
+            var n = 0.5f * (b - a);
+            // m・n の 1 あたりの長さ（m）
+            var unit = 1f / (0.5f * Mathf.Sqrt(1f / (TuftDx * TuftDx) + 1f / (TuftDs * TuftDs)));
+            var dm = Mathf.Abs(m - Mathf.Round(m)) * unit;
+            var dn = Mathf.Abs(n - Mathf.Round(n)) * unit;
+            return Mathf.Exp(-Mathf.Pow(Mathf.Min(dm, dn) / 0.012f, 2f));
         }
 
         /// <summary>背もたれの裏の面（前の基準の面から前へ。負）。平らな裏から、縁で真ん中の面まで丸く巻き上げる</summary>
@@ -468,74 +557,109 @@ namespace HalfAware.EditorTools
             return list;
         }
 
-        /// <summary>背もたれの格子の段（倒れた向きに沿った高さ s）。下と上の縁の巻き、縫い目の所は細かく。step は内の段の間</summary>
-        static List<float> BackRows(float step)
+        /// <summary>
+        /// 背もたれの格子の段（倒れた向きに沿った高さ s）。下の縁の巻き、ボタン留めの格子の段（ボタンと菱形の真ん中と折り目の中ほどに乗る、6 cm おき）、
+        /// 頭の当ての巻き
+        /// </summary>
+        static List<float> BackRows()
         {
-            var ss = new List<float> { 0f, 0.006f, 0.016f, 0.03f, 0.046f, 0.062f, 0.078f };
-            for (var s = 0.10f; s < BackLength - TopBand - 0.02f; s += step) ss.Add(s);
-            foreach (var s in new[] { -0.008f, 0f, 0.008f }) ss.Add(BackLength - TopBand + s);
-            foreach (var s in new[] { 0.81f, 0.835f, 0.86f, 0.882f, 0.9f, 0.915f, 0.928f, 0.938f, 0.945f, 0.95f }) ss.Add(s);
+            var ss = new List<float> { 0f, 0.035f, 0.07f };
+            for (var s = TuftS0 - TuftDs * 0.5f; s <= BackLength - TopBand + 0.001f; s += TuftDs * 0.5f) ss.Add(s);
+            foreach (var s in new[] { 0.83f, 0.87f, 0.90f, 0.925f, 0.942f, BackLength }) ss.Add(s);
             return ss;
         }
 
-        /// <summary>段 s の格子の横の位置。縁から edge の離れの所を左右に置き、内は count 個を等しい間で</summary>
-        static List<float> BackColumns(float s, float[] edge, int count, float inner)
+        /// <summary>
+        /// 段 s の格子の横の位置（前）。縁の巻き（縁から 0・3・6 cm）と、縫い目の内の一列、ボタン留めの格子の列（4 cm おきに 9 列）。
+        /// 上と下の縁で幅が狭くなる所は、格子の列を幅に合わせて詰める
+        /// </summary>
+        static List<float> BackFrontColumns(float s)
         {
             var w = BackW(s);
+            var lat = Mathf.Min(1f, (w - 0.09f) / (4f * TuftDx * 0.5f));
+            var edge = new[] { 0f, 0.03f, 0.06f };
             var xs = new List<float>();
             foreach (var e in edge) xs.Add(-w + e);
-            for (var i = 0; i < count; i++) xs.Add(count == 1 ? 0f : Mathf.Lerp(-(w - inner), w - inner, (float)i / (count - 1)));
+            var last = 4f * TuftDx * 0.5f * lat;
+            xs.Add(-0.5f * ((w - 0.06f) + last));
+            for (var k = -4; k <= 4; k++) xs.Add(k * TuftDx * 0.5f * lat);
+            xs.Add(0.5f * ((w - 0.06f) + last));
             for (var k = edge.Length - 1; k >= 0; k--) xs.Add(w - edge[k]);
             return xs;
         }
 
-        static readonly float[] FrontEdge = { 0f, 0.006f, 0.016f, 0.03f, 0.046f, 0.06f, 0.069f, 0.075f, 0.081f };
-        static readonly float[] RearEdge = { 0f, 0.006f, 0.02f, 0.04f, 0.07f };
+        /// <summary>段 s の格子の横の位置（裏）。縁の巻きと真ん中だけ</summary>
+        static List<float> BackRearColumns(float s)
+        {
+            var w = BackW(s);
+            return new List<float> { -w, -w + 0.025f, -w + 0.06f, 0f, w - 0.06f, w - 0.025f, w };
+        }
 
         /// <summary>
         /// 背もたれ。前も裏も黒革で包んだ厚いクッション（横から見て縁が 14 cm の厚みで丸く巻く）。脇は太い巻きを縫い目で区切り、
-        /// 上は前へ膨らむ頭の当ての巻き、内は大きな菱形のボタン留め（13 個）。肩から上を広く、腰を細く絞る
+        /// 上は前へ膨らむ頭の当ての巻き、内は大きな菱形のボタン留め（13 個）。肩から上を広く、腰を細く絞る。
+        /// mesh はボタン留めの格子に合わせた粗い格子で、菱形の膨らみ（真ん中が高く、折り目が低い）までを持つ。
+        /// ボタンの窪み・折り目の鋭さ・縫い目は絵（陰と法線）に描く
         /// </summary>
         static void Backrest(Shop shop)
         {
-            // 前。四角は谷の側の対角で割る（菱形の折り目と縫い目を面の辺に乗せ、粗い格子でも折り目を鋭く見せる）
+            var ss = BackRows();
+            // 前。四角は、四隅の真ん中の本当の高さに近い方の対角で割る（菱形の折り目は面の辺に、膨らみの頂は尾根に乗る）
             shop.Begin("BackCushion", 50f, true);
             var front = new List<List<int>>();
-            foreach (var s in BackRows(0.027f))
+            var at = new List<List<Vector2>>();
+            foreach (var s in ss)
             {
                 var row = new List<int>();
-                foreach (var x in BackColumns(s, FrontEdge, 19, 0.10f)) row.Add(shop.V(Back(x, s, BackFrontT(x, s)), GrainUv(x, s)));
+                var xs = BackFrontColumns(s);
+                var rowAt = new List<Vector2>();
+                foreach (var x in xs)
+                {
+                    row.Add(shop.V(Back(x, s, BackFrontT(x, s)), BackFrontUv(x, s)));
+                    rowAt.Add(new Vector2(x, s));
+                }
                 front.Add(row);
+                at.Add(rowAt);
             }
             for (var j = 0; j < front.Count - 1; j++)
                 for (var i = 0; i < front[j].Count - 1; i++)
-                    Valley(shop, Shop.Upholstery, front[j][i], front[j + 1][i], front[j + 1][i + 1], front[j][i + 1], BackFwd);
+                {
+                    var mid = 0.25f * (at[j][i] + at[j + 1][i] + at[j + 1][i + 1] + at[j][i + 1]);
+                    Split(shop, Shop.Upholstery, front[j][i], front[j + 1][i], front[j + 1][i + 1], front[j][i + 1], Back(mid.x, mid.y, BackFrontT(mid.x, mid.y)), BackFwd);
+                }
             shop.End(Orient.Toward, BackFwd);
+            // ボタン留めの面の法線は下の面の法線にする（膨らみの陰影は法線の絵が持つ）
+            for (var j = 0; j < front.Count; j++)
+                for (var i = 0; i < front[j].Count; i++)
+                {
+                    var p = at[j][i];
+                    if (TuftInside(p.x, p.y) <= 0f) continue;
+                    Vector3 t, b, n;
+                    BackBaseFrame(p.x, p.y, out t, out b, out n);
+                    shop.SetNormal(front[j][i], n);
+                }
 
-            // 裏（段は粗く、横は縁の巻きだけ細かく。脇の縁は前と同じ線の上に乗る）。体の側から見て裏の面の向こうは中なので、食い込みの確かめには数えない
+            // 裏（前と同じ段で、横は縁の巻きと真ん中だけ。脇の縁は前と同じ点に乗る）。体の側から見て裏の面の向こうは中なので、食い込みの確かめには数えない
             shop.Begin("BackRear", 50f, false);
             var rear = new List<List<int>>();
-            foreach (var s in BackRows(0.09f))
+            foreach (var s in ss)
             {
                 var row = new List<int>();
-                foreach (var x in BackColumns(s, RearEdge, 3, 0.10f)) row.Add(shop.V(Back(x, s, BackRearT(x, s)), GrainUv(x, s + 1f)));
+                foreach (var x in BackRearColumns(s)) row.Add(shop.V(Back(x, s, BackRearT(x, s)), BackRearUv(x, s)));
                 rear.Add(row);
             }
             for (var j = 0; j < rear.Count - 1; j++)
                 for (var i = 0; i < rear[j].Count - 1; i++)
                     shop.Q(Shop.Upholstery, rear[j][i], rear[j + 1][i], rear[j + 1][i + 1], rear[j][i + 1]);
             shop.End(Orient.Toward, -BackFwd);
-
-            // ボタン（革を包んだ釦）
-            foreach (var b in Buttons())
-                Disc(shop, "Button", Back(b.x, b.y, BackFrontT(b.x, b.y) + 0.002f), BackFwd, 0.009f, 6, SwatchUv(Swatch.Rubber));
         }
 
-        /// <summary>四角 a-b-c-d を、二つの対角のうち dir の向きに低い方（谷）で割る</summary>
-        static void Valley(Shop shop, int sub, int a, int b, int c, int d, Vector3 dir)
+        /// <summary>四角 a-b-c-d を、二つの対角のうち、真ん中の高さ（dir の向き）が本当の面の真ん中 centre に近い方で割る</summary>
+        static void Split(Shop shop, int sub, int a, int b, int c, int d, Vector3 centre, Vector3 dir)
         {
-            var ac = Vector3.Dot(shop.Pos(a) + shop.Pos(c), dir);
-            var bd = Vector3.Dot(shop.Pos(b) + shop.Pos(d), dir);
+            var h = Vector3.Dot(centre, dir);
+            var ac = Mathf.Abs(0.5f * Vector3.Dot(shop.Pos(a) + shop.Pos(c), dir) - h);
+            var bd = Mathf.Abs(0.5f * Vector3.Dot(shop.Pos(b) + shop.Pos(d), dir) - h);
             if (ac <= bd) shop.Q(sub, a, b, c, d);
             else
             {
@@ -550,13 +674,13 @@ namespace HalfAware.EditorTools
         static List<Vector3> OverTop(float x, float s0, float s1, float gap)
         {
             var sec = new List<Vector2>();
-            foreach (var d in new[] { 0.09f, 0.07f, 0.05f, 0.035f, 0.022f, 0.012f, 0.005f, 0.001f })
+            foreach (var d in new[] { 0.06f, 0.03f, 0.012f, 0.003f })
             {
                 var s = BackLength - d;
                 if (s >= s0) sec.Add(new Vector2(s, BackRearT(x, s)));
             }
             sec.Add(new Vector2(BackLength, BackMid));
-            foreach (var d in new[] { 0.001f, 0.005f, 0.012f, 0.022f, 0.035f, 0.05f, 0.07f, 0.09f })
+            foreach (var d in new[] { 0.003f, 0.012f, 0.03f, 0.06f })
             {
                 var s = BackLength - d;
                 if (s >= s1) sec.Add(new Vector2(s, BackFrontT(x, s)));
@@ -575,8 +699,8 @@ namespace HalfAware.EditorTools
         // ---- 肘掛け ----------------------------------------------------------------
 
         /// <summary>
-        /// 肘掛けの当て物の断面（前後の位置 z）。内の下から、内の下の角、内の脇（わずかに膨らむ）、内の上の角の太い丸み、上、外の上の角、外の脇、
-        /// 外の下の角、外の下、下の面。上の面の一番高い所が肘掛けの上面の線（PadTop）
+        /// 肘掛けの当て物の断面（前後の位置 z。11 点で閉じる）。内の下、内の脇（わずかに膨らむ）、内の上の角の太い丸み、上、外の上の角、外の脇、
+        /// 外の下。上の面の一番高い所が肘掛けの上面の線（PadTop）
         /// </summary>
         static List<Vector3> PadRing(float sx, float z, bool collapse)
         {
@@ -596,36 +720,23 @@ namespace HalfAware.EditorTools
             var yb = bottom + d;
             if (collapse) { xi = xo = 0.5f * (inner + PadOuter); yt = yb = 0.5f * (top + bottom); }
             var rt = Mathf.Min(PadRound(z), 0.5f * Mathf.Max(0.0005f, yt - yb), 0.5f * Mathf.Max(0.0005f, xo - xi));
-            var rb = Mathf.Min(0.01f, 0.25f * Mathf.Max(0.0005f, yt - yb), 0.25f * Mathf.Max(0.0005f, xo - xi));
             var bulge = collapse ? 0f : 0.004f * Mathf.Clamp01((yt - yb) / 0.05f);
-            var pts = new List<Vector3>();
-            // 内の下の角（下から脇へ）
-            for (var i = 0; i <= 2; i++)
+            var mid = Mathf.Lerp(yb, yt - rt, 0.5f);
+            // 下の角の寄せ（畳んだ端では 0。端の点を一つに集める）
+            var foot = collapse ? 0f : 0.006f;
+            var pts = new List<Vector3>
             {
-                var a = Mathf.Lerp(270f, 180f, i / 2f) * Mathf.Deg2Rad;
-                pts.Add(new Vector3(xi + rb + rb * Mathf.Cos(a), yb + rb + rb * Mathf.Sin(a), z));
-            }
-            pts.Add(new Vector3(xi - bulge, Mathf.Lerp(yb + rb, yt - rt, 0.5f), z));
-            // 内の上の角
-            for (var i = 0; i <= 4; i++)
-            {
-                var a = Mathf.Lerp(180f, 90f, i / 4f) * Mathf.Deg2Rad;
-                pts.Add(new Vector3(xi + rt + rt * Mathf.Cos(a), yt - rt + rt * Mathf.Sin(a), z));
-            }
-            pts.Add(new Vector3(0.5f * (xi + xo), yt + 0.001f, z));
-            // 外の上の角
-            for (var i = 0; i <= 4; i++)
-            {
-                var a = Mathf.Lerp(90f, 0f, i / 4f) * Mathf.Deg2Rad;
-                pts.Add(new Vector3(xo - rt + rt * Mathf.Cos(a), yt - rt + rt * Mathf.Sin(a), z));
-            }
-            pts.Add(new Vector3(xo + bulge, Mathf.Lerp(yb + rb, yt - rt, 0.5f), z));
-            // 外の下の角
-            for (var i = 0; i <= 2; i++)
-            {
-                var a = Mathf.Lerp(0f, -90f, i / 2f) * Mathf.Deg2Rad;
-                pts.Add(new Vector3(xo - rb + rb * Mathf.Cos(a), yb + rb + rb * Mathf.Sin(a), z));
-            }
+                new Vector3(xi + foot, yb, z),
+                new Vector3(xi - bulge, mid, z),
+                new Vector3(xi, yt - rt, z),
+                new Vector3(xi + rt * (1f - 0.7071f), yt - rt * (1f - 0.7071f), z),
+                new Vector3(xi + rt, yt, z),
+                new Vector3(xo - rt, yt, z),
+                new Vector3(xo - rt * (1f - 0.7071f), yt - rt * (1f - 0.7071f), z),
+                new Vector3(xo, yt - rt, z),
+                new Vector3(xo + bulge, mid, z),
+                new Vector3(xo - foot, yb, z),
+            };
             pts.Add(pts[0]);
             for (var i = 0; i < pts.Count; i++) pts[i] = new Vector3(sx * pts[i].x, pts[i].y, pts[i].z);
             return pts;
@@ -633,20 +744,20 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 肘掛け。厚く丸い革の当て物（肘を置く後ろ半分は 7.2 cm の厚みで上の角を太く丸め、前の端へ細くする）を、黒い漆の台に載せ、
-        /// 磨いた金属の腕が座の皿の下から支える。前の端の外の脇に、後から金具で留めた操作盤（黒い金属の箱と、当て物の下から回り込む金属の留め具）。
-        /// 操作盤のケーブルは腕に沿って座の下へ
+        /// 磨いた金属の腕が座の皿の下から支える。前の端の外の脇に、後から金具で留めた操作盤（黒い金属の箱と、当て物の下から回り込む金属の留め具。
+        /// 外の面の螺子は絵）。操作盤のケーブルは腕に沿って座の下へ
         /// </summary>
         static void Arm(Shop shop, float sx)
         {
             var name = sx > 0f ? "R" : "L";
             // 当て物
             shop.Begin("ArmPad" + name, 55f, true);
-            var zs = new[] { PadBack + 0.004f, PadBack + 0.012f, PadBack + 0.024f, PadBack + 0.04f, -0.10f, -0.03f, 0.04f, 0.09f, 0.13f, 0.17f, 0.20f, PadFront - 0.03f, PadFront - 0.014f, PadFront - 0.005f };
+            var zs = new[] { PadBack + 0.012f, PadBack + 0.04f, -0.08f, 0.04f, 0.12f, 0.19f, PadFront - 0.022f, PadFront - 0.008f, PadFront - 0.002f };
             var rings = new List<List<Vector3>>();
             rings.Add(PadRing(sx, PadBack, true));
             foreach (var z in zs) rings.Add(PadRing(sx, z, false));
             rings.Add(PadRing(sx, PadFront, true));
-            Rings(shop, Shop.Upholstery, rings, (i, arc) => GrainUv(arc, rings[i][0].z));
+            Rings(shop, Shop.Upholstery, rings, p => ArmUv(p.x, p.z));
             shop.End(Orient.Whole);
 
             // 当て物の下の黒い漆の台（厚い後ろ半分の下）
@@ -673,9 +784,9 @@ namespace HalfAware.EditorTools
                 new Vector3(sx * 0.27f, 0.435f, -0.11f),
                 new Vector3(sx * 0.20f, 0.418f, -0.11f),
             };
-            Tube(shop, "ArmSupport" + name, Shop.Chrome, Spline(support, 8), 0.014f, 6, false, Vector2.zero, 65f);
+            Tube(shop, "ArmSupport" + name, Shop.Chrome, Spline(support, 6), 0.014f, 4, false, Vector2.zero, 65f);
 
-            // 前の操作盤。後ろの低い縁から前の高い縁へ上がる斜めの面を、座った目の方（後ろ・上・内）へ向ける
+            // 前の操作盤。後ろの低い縁から前の高い縁へ上がる斜めの面を、座った目の方（後ろ・上・内）へ向ける。外の面は螺子二つの絵
             var pod = new Vector3[8];
             var pi = sx * PodInner;
             var po = sx * PodOuter;
@@ -684,25 +795,22 @@ namespace HalfAware.EditorTools
             pod[2] = new Vector3(po, podUnder, PodFront - 0.03f); pod[3] = new Vector3(pi, podUnder, PodFront - 0.03f);
             pod[4] = new Vector3(pi, 0.645f, PodBack); pod[5] = new Vector3(po, 0.662f, PodBack);
             pod[6] = new Vector3(po, 0.716f, PodFront); pod[7] = new Vector3(pi, 0.70f, PodFront);
-            var faces = new int[] { Shop.Frame, Shop.Panel, Shop.Frame, Shop.Frame, Shop.Frame, Shop.Frame };
-            var podUvs = new Rect?[] { null, PanelUv(sx > 0f ? RightPod : LeftPod), null, null, null, null };
+            var faces = new int[] { Shop.Frame, Shop.Panel, Shop.Frame, Shop.Frame, Shop.Frame, Shop.Panel };
+            var podUvs = new Rect?[] { null, PanelUv(sx > 0f ? RightPod : LeftPod), null, null, null, PanelUv(PodSide) };
             Hexa(shop, "ArmPod" + name, pod, faces, podUvs, true, sx < 0f);
             // 留め具。当て物の下を横切る板と、当て物の外の脇に立つ板（L の形）で操作盤を抱える
-            Slab(shop, "PodClampUnder" + name, Shop.Chrome, new Vector3(sx * 0.355f, 0.603f, 0.23f), Quaternion.identity, new Vector3(0.15f, 0.006f, 0.06f), 0.002f, true);
-            Slab(shop, "PodClampSide" + name, Shop.Chrome, new Vector3(sx * 0.3485f, 0.629f, 0.23f), Quaternion.identity, new Vector3(0.005f, 0.052f, 0.05f), 0.0015f, true);
-            // 留めた螺子（操作盤の外の面に二つ）
-            foreach (var z in new[] { 0.215f, 0.27f })
-                Disc(shop, "PodScrew" + name, new Vector3(sx * (PodOuter + 0.0008f), 0.63f, z), new Vector3(sx, 0f, 0f), 0.004f, 6, SwatchUv(Swatch.Metal));
+            Slab(shop, "PodClampUnder" + name, Shop.Chrome, new Vector3(sx * 0.355f, 0.603f, 0.23f), Quaternion.identity, new Vector3(0.15f, 0.006f, 0.06f), 0f, true);
+            Slab(shop, "PodClampSide" + name, Shop.Chrome, new Vector3(sx * 0.3485f, 0.629f, 0.23f), Quaternion.identity, new Vector3(0.005f, 0.052f, 0.05f), 0f, true);
         }
 
         /// <summary>右の肘掛けの差込口。革に螺子で留めた金属の角の板に、金属の縁、黒い穴、穴を囲む紫の灯り（ジャックを挿す所の合図）</summary>
         static void Port(Shop shop)
         {
             var c = PortAt;
-            Slab(shop, "PortPlate", Shop.Chrome, new Vector3(c.x, PadTop(c.z) + 0.0025f, c.z), Quaternion.Euler(4f, 0f, 0f), new Vector3(0.056f, 0.004f, 0.056f), 0.0015f, true);
-            Tube(shop, "PortBezel", Shop.Chrome, new List<Vector3> { new Vector3(c.x, 0.648f, c.z), new Vector3(c.x, 0.6725f, c.z) }, 0.022f, 10, true, Vector2.zero, 70f);
-            Ring(shop, "PortGlow", new Vector3(c.x, 0.6735f, c.z), Vector3.up, 0.0145f, 0.0195f, 12, SwatchUv(Swatch.VioletLit));
-            Disc(shop, "PortHole", new Vector3(c.x, 0.6740f, c.z), Vector3.up, 0.0135f, 10, SwatchUv(Swatch.Rubber));
+            Slab(shop, "PortPlate", Shop.Chrome, new Vector3(c.x, PadTop(c.z) + 0.0025f, c.z), Quaternion.Euler(4f, 0f, 0f), new Vector3(0.056f, 0.004f, 0.056f), 0f, true);
+            Tube(shop, "PortBezel", Shop.Chrome, new List<Vector3> { new Vector3(c.x, 0.648f, c.z), new Vector3(c.x, 0.6725f, c.z) }, 0.022f, 8, true, Vector2.zero, 70f);
+            Ring(shop, "PortGlow", new Vector3(c.x, 0.6735f, c.z), Vector3.up, 0.0145f, 0.0195f, 8, SwatchUv(Swatch.VioletLit));
+            Disc(shop, "PortHole", new Vector3(c.x, 0.6740f, c.z), Vector3.up, 0.0145f, 8, SwatchUv(Swatch.Rubber));
         }
 
         // ---- 座の下 ------------------------------------------------------------------
@@ -710,16 +818,16 @@ namespace HalfAware.EditorTools
         static void Undercarriage(Shop shop)
         {
             // 座の皿（黒い漆）
-            Slab(shop, "SeatPan", Shop.Shell, new Vector3(0f, 0.4175f, -0.03f), Quaternion.identity, new Vector3(0.53f, 0.035f, 0.40f), 0.012f, true);
+            Slab(shop, "SeatPan", Shop.Shell, new Vector3(0f, 0.4175f, -0.03f), Quaternion.identity, new Vector3(0.53f, 0.035f, 0.40f), 0f, true);
             // リクライニングの機構の箱
-            Slab(shop, "Mechanism", Shop.Frame, new Vector3(0f, 0.372f, -0.02f), Quaternion.identity, new Vector3(0.24f, 0.055f, 0.25f), 0.01f, true);
+            Slab(shop, "Mechanism", Shop.Frame, new Vector3(0f, 0.372f, -0.02f), Quaternion.identity, new Vector3(0.24f, 0.055f, 0.25f), 0f, true);
             // 右はリクライニングのレバー、左は高さのレバー。先に黒い握り
-            Tube(shop, "LeverR", Shop.Chrome, new List<Vector3> { new Vector3(0.11f, 0.366f, 0.04f), new Vector3(0.19f, 0.360f, 0.058f), new Vector3(0.232f, 0.355f, 0.072f) }, 0.006f, 6, false, Vector2.zero, 70f);
-            Slab(shop, "LeverGripR", Shop.Panel, new Vector3(0.25f, 0.354f, 0.078f), Quaternion.Euler(0f, 18f, 0f), new Vector3(0.036f, 0.015f, 0.028f), 0.005f, true, SwatchUv(Swatch.Rubber));
-            Tube(shop, "LeverL", Shop.Chrome, new List<Vector3> { new Vector3(-0.11f, 0.366f, 0.0f), new Vector3(-0.19f, 0.360f, 0.018f), new Vector3(-0.232f, 0.355f, 0.032f) }, 0.006f, 6, false, Vector2.zero, 70f);
-            Slab(shop, "LeverGripL", Shop.Panel, new Vector3(-0.25f, 0.354f, 0.038f), Quaternion.Euler(0f, -18f, 0f), new Vector3(0.036f, 0.015f, 0.028f), 0.005f, true, SwatchUv(Swatch.Rubber));
+            Tube(shop, "LeverR", Shop.Chrome, new List<Vector3> { new Vector3(0.11f, 0.366f, 0.04f), new Vector3(0.19f, 0.360f, 0.058f), new Vector3(0.232f, 0.355f, 0.072f) }, 0.006f, 4, false, Vector2.zero, 70f);
+            Slab(shop, "LeverGripR", Shop.Panel, new Vector3(0.25f, 0.354f, 0.078f), Quaternion.Euler(0f, 18f, 0f), new Vector3(0.036f, 0.015f, 0.028f), 0f, true, SwatchUv(Swatch.Rubber));
+            Tube(shop, "LeverL", Shop.Chrome, new List<Vector3> { new Vector3(-0.11f, 0.366f, 0.0f), new Vector3(-0.19f, 0.360f, 0.018f), new Vector3(-0.232f, 0.355f, 0.032f) }, 0.006f, 4, false, Vector2.zero, 70f);
+            Slab(shop, "LeverGripL", Shop.Panel, new Vector3(-0.25f, 0.354f, 0.038f), Quaternion.Euler(0f, -18f, 0f), new Vector3(0.036f, 0.015f, 0.028f), 0f, true, SwatchUv(Swatch.Rubber));
             // 前の張りの摘み
-            Tube(shop, "TensionKnob", Shop.Panel, new List<Vector3> { new Vector3(0f, 0.35f, 0.105f), new Vector3(0f, 0.35f, 0.135f) }, 0.026f, 10, true, SwatchUv(Swatch.Rubber), 70f);
+            Tube(shop, "TensionKnob", Shop.Panel, new List<Vector3> { new Vector3(0f, 0.35f, 0.105f), new Vector3(0f, 0.35f, 0.135f) }, 0.026f, 6, true, SwatchUv(Swatch.Rubber), 70f);
 
             // 背もたれを支える左右の磨いた金属の腕（座の下から、座のクッションの後ろを回って背もたれの裏へ）と、倒れの軸の蓋
             foreach (var sx in new[] { 1f, -1f })
@@ -731,30 +839,30 @@ namespace HalfAware.EditorTools
                     new Vector3(sx * 0.13f, 0.43f, -0.268f),
                     Back(sx * 0.13f, 0.13f, -BackThick + 0.004f),
                 };
-                Tube(shop, "ReclineArm" + (sx > 0f ? "R" : "L"), Shop.Chrome, Spline(path, 8), 0.012f, 6, false, Vector2.zero, 70f);
-                Tube(shop, "ReclineHub" + (sx > 0f ? "R" : "L"), Shop.Chrome, new List<Vector3> { new Vector3(sx * 0.115f, 0.418f, -0.26f), new Vector3(sx * 0.152f, 0.418f, -0.26f) }, 0.022f, 10, true, Vector2.zero, 70f);
+                Tube(shop, "ReclineArm" + (sx > 0f ? "R" : "L"), Shop.Chrome, Spline(path, 5), 0.012f, 4, false, Vector2.zero, 70f);
+                Tube(shop, "ReclineHub" + (sx > 0f ? "R" : "L"), Shop.Chrome, new List<Vector3> { new Vector3(sx * 0.115f, 0.418f, -0.26f), new Vector3(sx * 0.152f, 0.418f, -0.26f) }, 0.022f, 6, true, Vector2.zero, 70f);
             }
 
             // ガスシリンダー。磨いた覆いと芯
-            TubeR(shop, "ColumnCover", Shop.Chrome, new List<Vector3> { new Vector3(0f, 0.10f, 0f), new Vector3(0f, 0.235f, 0f) }, new List<float> { 0.046f, 0.038f }, 12, true, Vector2.zero, 70f);
-            Tube(shop, "ColumnRod", Shop.Chrome, new List<Vector3> { new Vector3(0f, 0.225f, 0f), new Vector3(0f, 0.345f, 0f) }, 0.024f, 10, false, Vector2.zero, 70f);
-            Tube(shop, "ColumnCollar", Shop.Frame, new List<Vector3> { new Vector3(0f, 0.328f, 0f), new Vector3(0f, 0.346f, 0f) }, 0.04f, 10, true, Vector2.zero, 70f);
+            TubeR(shop, "ColumnCover", Shop.Chrome, new List<Vector3> { new Vector3(0f, 0.10f, 0f), new Vector3(0f, 0.235f, 0f) }, new List<float> { 0.046f, 0.038f }, 8, true, Vector2.zero, 70f);
+            Tube(shop, "ColumnRod", Shop.Chrome, new List<Vector3> { new Vector3(0f, 0.225f, 0f), new Vector3(0f, 0.345f, 0f) }, 0.024f, 6, false, Vector2.zero, 70f);
+            Tube(shop, "ColumnCollar", Shop.Frame, new List<Vector3> { new Vector3(0f, 0.328f, 0f), new Vector3(0f, 0.346f, 0f) }, 0.04f, 6, true, Vector2.zero, 70f);
         }
 
         // ---- 五本脚とキャスター --------------------------------------------------------
 
         static void Base(Shop shop)
         {
-            Tube(shop, "Hub", Shop.Chrome, new List<Vector3> { new Vector3(0f, 0.075f, 0f), new Vector3(0f, 0.132f, 0f) }, 0.056f, 12, true, Vector2.zero, 70f);
+            Tube(shop, "Hub", Shop.Chrome, new List<Vector3> { new Vector3(0f, 0.075f, 0f), new Vector3(0f, 0.132f, 0f) }, 0.056f, 8, true, Vector2.zero, 70f);
             for (var k = 0; k < 5; k++)
             {
-                // 一本は真後ろ。前の二本は左右へ 36 度（机の側へ脚を突き出さない）。磨いた金属
+                // 一本は真後ろ。前の二本は左右へ 36 度（机の側へ脚を突き出さない）。磨いた金属。断面は上の細い台形
                 var a = (180f + 72f * k) * Mathf.Deg2Rad;
                 var dir = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a));
                 var side = Vector3.Cross(Vector3.up, dir);
                 shop.Begin("Leg" + k, 40f, true);
                 var rings = new List<List<Vector3>>();
-                foreach (var r in new[] { 0.03f, 0.13f, 0.22f, LegReach })
+                foreach (var r in new[] { 0.03f, 0.16f, LegReach })
                 {
                     var k2 = Mathf.InverseLerp(0.03f, LegReach, r);
                     var w = Mathf.Lerp(0.026f, 0.017f, k2);
@@ -763,33 +871,24 @@ namespace HalfAware.EditorTools
                     var c = dir * r;
                     var ring = new List<Vector3>
                     {
-                        c - side * w * 0.8f + Vector3.up * yb,
-                        c + side * w * 0.8f + Vector3.up * yb,
-                        c + side * w + Vector3.up * Mathf.Lerp(yb, yt, 0.55f),
-                        c + side * w * 0.6f + Vector3.up * yt,
-                        c - side * w * 0.6f + Vector3.up * yt,
-                        c - side * w + Vector3.up * Mathf.Lerp(yb, yt, 0.55f),
+                        c - side * w + Vector3.up * yb,
+                        c + side * w + Vector3.up * yb,
+                        c + side * w * 0.65f + Vector3.up * yt,
+                        c - side * w * 0.65f + Vector3.up * yt,
                     };
                     ring.Add(ring[0]);
                     rings.Add(ring);
                 }
-                Rings(shop, Shop.Chrome, rings, (i, arc) => Vector2.zero);
+                Rings(shop, Shop.Chrome, rings, p => Vector2.zero);
                 // 先の蓋
                 var tip = rings[rings.Count - 1];
-                var ci = shop.V((tip[0] + tip[1] + tip[2] + tip[3] + tip[4] + tip[5]) / 6f, Vector2.zero);
-                var ids = new int[6];
-                for (var i = 0; i < 6; i++) ids[i] = shop.V(tip[i], Vector2.zero);
-                for (var i = 0; i < 6; i++) shop.T(Shop.Chrome, ci, ids[i], ids[(i + 1) % 6]);
+                shop.Q(Shop.Chrome, shop.V(tip[0], Vector2.zero), shop.V(tip[1], Vector2.zero), shop.V(tip[2], Vector2.zero), shop.V(tip[3], Vector2.zero));
                 shop.End(Orient.Each);
 
-                // キャスター。黒い覆いと、並んだ二つの車
+                // キャスター。黒い覆いと、二つ並んだ車（一つの筒で見せる）
                 var at = dir * LegReach;
-                Slab(shop, "CasterHood" + k, Shop.Shell, at + Vector3.up * 0.046f, Quaternion.LookRotation(dir), new Vector3(0.034f, 0.03f, 0.05f), 0.008f, true);
-                foreach (var s in new[] { -1f, 1f })
-                {
-                    var hub = at + side * (0.017f * s) + Vector3.up * 0.026f;
-                    Tube(shop, "Wheel" + k + (s > 0 ? "a" : "b"), Shop.Panel, new List<Vector3> { hub - side * 0.007f, hub + side * 0.007f }, 0.026f, 8, true, SwatchUv(Swatch.Rubber), 50f);
-                }
+                Slab(shop, "CasterHood" + k, Shop.Shell, at + Vector3.up * 0.046f, Quaternion.LookRotation(dir), new Vector3(0.034f, 0.03f, 0.05f), 0f, true);
+                Tube(shop, "Wheel" + k, Shop.Panel, new List<Vector3> { at - side * 0.026f + Vector3.up * 0.026f, at + side * 0.026f + Vector3.up * 0.026f }, 0.026f, 6, true, SwatchUv(Swatch.Rubber), 50f);
             }
         }
 
@@ -806,16 +905,15 @@ namespace HalfAware.EditorTools
         /// <summary>引き出したレールの先（腕の上の軸）。座の皿の下の収め口から前へ出る</summary>
         static readonly Vector3 FootRailEnd = new Vector3(FootArmX, 0.391f, 0.19f);
 
-        /// <summary>フットレストのパッドの縫い目の所（脇の丸みのすぐ内と、前の丸みのすぐ後ろ）</summary>
+        /// <summary>フットレストのパッドの縫い目の所（脇の丸みのすぐ内と、前の丸みのすぐ後ろ。絵に描く）</summary>
         const float FootWeltX = 0.168f;
         const float FootWeltZ = 0.405f;
-        static float FootPadTop(float x, float z) { return FootTop(z) - 0.004f * Welt(x, z, FootWeltX, FootWeltZ); }
+        static float FootPadTop(float x, float z) { return FootTop(z); }
         static float FootPadUnder(float x, float z) { return FootTop(z) - FootThick; }
 
         static readonly Cushion FootShape = new Cushion
         {
-            Top = FootPadTop, Under = FootPadUnder, Front = FootFront, Back = FootBack, Half = FootHalf, Edge = 0.02f, Corner = 0.03f, MidZ = 0.32f,
-            TopZ = new[] { FootWeltZ - 0.006f, FootWeltZ, FootWeltZ + 0.006f },
+            Top = FootPadTop, Under = FootPadUnder, Front = FootFront, Back = FootBack, Half = FootHalf, Edge = 0.02f, Corner = 0.03f, MidZ = 0.32f, Uv = FootUv,
         };
 
         /// <summary>
@@ -826,21 +924,21 @@ namespace HalfAware.EditorTools
         static void Footrest(Shop shop)
         {
             shop.Begin("FootPad", 55f, true);
-            CushionGrid(shop, FootShape, new List<float> { 0f, 0.07f, 0.13f, FootWeltX - 0.006f, FootWeltX, FootWeltX + 0.006f, FootHalf - 0.02f, 0.19f, 0.197f, FootHalf });
+            CushionGrid(shop, FootShape, new List<float> { 0f, 0.12f, FootHalf - 0.02f, 0.194f, FootHalf });
             shop.End(Orient.Whole);
             // 座の皿の下の収め口
-            Slab(shop, "FootHousing", Shop.Shell, new Vector3(0f, 0.391f, 0.095f), Quaternion.identity, new Vector3(0.47f, 0.018f, 0.15f), 0.005f, true);
+            Slab(shop, "FootHousing", Shop.Shell, new Vector3(0f, 0.391f, 0.095f), Quaternion.identity, new Vector3(0.47f, 0.018f, 0.15f), 0f, true);
             foreach (var sx in new[] { 1f, -1f })
             {
                 var n = sx > 0f ? "R" : "L";
                 var top = new Vector3(sx * FootRailEnd.x, FootRailEnd.y, FootRailEnd.z);
                 // 引き出したレール
-                Slab(shop, "FootRail" + n, Shop.Chrome, new Vector3(top.x, top.y, 0.14f), Quaternion.identity, new Vector3(0.022f, 0.016f, 0.10f), 0.004f, true);
+                Slab(shop, "FootRail" + n, Shop.Chrome, new Vector3(top.x, top.y, 0.14f), Quaternion.identity, new Vector3(0.022f, 0.016f, 0.10f), 0f, true);
                 var pad = new Vector3(top.x, FootTop(FootPivot) - 0.5f * FootThick, FootPivot);
                 var seg = pad - top;
-                Tube(shop, "FootKnuckle" + n, Shop.Frame, new List<Vector3> { top - Vector3.right * 0.013f, top + Vector3.right * 0.013f }, 0.013f, 8, true, Vector2.zero, 50f);
-                Slab(shop, "FootArm" + n, Shop.Chrome, 0.5f * (top + pad), Quaternion.LookRotation(seg.normalized, Vector3.forward), new Vector3(0.014f, 0.03f, seg.magnitude), 0.005f, true);
-                Tube(shop, "FootPivot" + n, Shop.Frame, new List<Vector3> { new Vector3(sx * 0.197f, pad.y, pad.z), new Vector3(sx * 0.229f, pad.y, pad.z) }, 0.012f, 8, true, Vector2.zero, 50f);
+                Tube(shop, "FootKnuckle" + n, Shop.Frame, new List<Vector3> { top - Vector3.right * 0.013f, top + Vector3.right * 0.013f }, 0.013f, 6, true, Vector2.zero, 50f);
+                Slab(shop, "FootArm" + n, Shop.Chrome, 0.5f * (top + pad), Quaternion.LookRotation(seg.normalized, Vector3.forward), new Vector3(0.014f, 0.03f, seg.magnitude), 0f, true);
+                Tube(shop, "FootPivot" + n, Shop.Frame, new List<Vector3> { new Vector3(sx * 0.197f, pad.y, pad.z), new Vector3(sx * 0.229f, pad.y, pad.z) }, 0.012f, 6, true, Vector2.zero, 50f);
             }
         }
 
@@ -848,12 +946,14 @@ namespace HalfAware.EditorTools
 
         /// <summary>裏の端末の箱の高さの寄せ（背もたれの上の縁の巻きに掛からないよう、上の縁から 6.5 cm 下に箱の上の縁を置く）</summary>
         const float CrownDs = -0.045f;
+        /// <summary>裏の端末の箱の裏の面（前の基準の面から前へ。負）</summary>
+        const float CrownOut = -0.165f;
         /// <summary>耳の筐体の高さ（倒れた向きに沿って）と、左右の位置（背もたれの肩の縁の 3.6 cm 外）</summary>
         const float EarS = 0.83f;
         static float EarX { get { return BackW(EarS) + 0.036f; } }
 
         /// <summary>
-        /// 後から取り付けた潜行の装置。背もたれの裏の頭の所に黒い金属の箱（裏へ向いた画面・灯りの列・接続口と挿さった三本の端子）を、
+        /// 後から取り付けた潜行の装置。背もたれの裏の頭の所に黒い金属の箱（裏の面に画面・灯りの列・接続口・四隅の螺子の絵、挿さった三本の端子）を、
         /// 背もたれの上の縁の巻きを越えて前へ掛かる二本の磨いた金属の留め具で留める。箱の脇から磨いた金属の腕を背もたれの縁の外へ回し、
         /// 背もたれの肩の外に耳の筐体（右は前を向いた小さな画面、左は灯りの輪）を出す。
         /// どれも頭の後ろ（前へ 0.33 m より後ろ）にあり、座った目と、背を預けて天井を仰ぐ目の後ろに来る
@@ -861,13 +961,13 @@ namespace HalfAware.EditorTools
         static void Crown(Shop shop)
         {
             var rot = Quaternion.LookRotation(BackFwd, BackUp);
-            const float tOut = -0.165f;
+            const float tOut = CrownOut;
             var earX = EarX;
             foreach (var sx in new[] { 1f, -1f })
             {
                 var n = sx > 0f ? "R" : "L";
                 var c = Back(sx * earX, EarS, 0.0f);
-                Slab(shop, "EarPod" + n, Shop.Frame, c, rot, new Vector3(0.058f, 0.15f, 0.10f), 0.012f, true);
+                Slab(shop, "EarPod" + n, Shop.Frame, c, rot, new Vector3(0.058f, 0.15f, 0.10f), 0f, true);
                 var face = Back(sx * earX, EarS, 0.0505f);
                 if (sx > 0f)
                     Decal(shop, "EarScreen", face, Vector3.right * 0.021f, BackUp * 0.056f, BackFwd, PanelUv(EarScreen));
@@ -884,11 +984,13 @@ namespace HalfAware.EditorTools
                     Back(sx * (earX - 0.012f), EarS + 0.003f, -0.08f),
                     Back(sx * earX, EarS, -0.045f),
                 };
-                Tube(shop, "EarMount" + n, Shop.Chrome, Spline(arm, 8), 0.009f, 6, false, Vector2.zero, 60f);
+                Tube(shop, "EarMount" + n, Shop.Chrome, Spline(arm, 5), 0.009f, 4, false, Vector2.zero, 60f);
             }
 
-            // 裏の箱（角を面取りした黒い金属の箱。前の面は背の裏に 4 mm 埋める）
-            Slab(shop, "CrownBox", Shop.Frame, Back(0f, 0.795f + CrownDs, 0.5f * (tOut - BackThick + 0.004f)), rot, new Vector3(0.25f, 0.27f, -BackThick + 0.004f - tOut), 0.016f, true);
+            // 裏の箱（黒い金属の箱。前の面は背の裏に 4 mm 埋める）と、裏の面の絵（画面・灯りの列・接続口・四隅の螺子）
+            var boxS = 0.795f + CrownDs;
+            Slab(shop, "CrownBox", Shop.Frame, Back(0f, boxS, 0.5f * (tOut - BackThick + 0.004f)), rot, new Vector3(0.25f, 0.27f, -BackThick + 0.004f - tOut), 0f, true);
+            Decal(shop, "CrownFace", Back(0f, boxS, tOut - 0.0008f), Vector3.right * 0.125f, BackUp * 0.135f, -BackFwd, PanelUv(CrownFace));
             // 箱の上の縁から背もたれの上の縁の巻きを越えて前へ掛かる留め具（二本）
             foreach (var x in new[] { -0.08f, 0.08f })
             {
@@ -896,37 +998,34 @@ namespace HalfAware.EditorTools
                 var strap = new List<Vector3>
                 {
                     Back(x, top - 0.03f, tOut - 0.004f),
-                    Back(x, top - 0.004f, tOut - 0.004f),
-                    Back(x, top + 0.004f, tOut + 0.006f),
+                    Back(x, top + 0.004f, tOut + 0.002f),
                     Back(x, top + 0.004f, -0.105f),
                 };
                 strap.AddRange(OverTop(x, top + 0.012f, BackLength - 0.065f, 0.006f));
-                Tube(shop, "CrownStrap", Shop.Chrome, Spline(strap, 6), 0.006f, 6, false, Vector2.zero, 60f);
+                Tube(shop, "CrownStrap", Shop.Chrome, Spline(strap, 10), 0.006f, 3, false, Vector2.zero, 60f);
             }
-            var rear = -BackFwd;
-            var face2 = tOut - 0.0008f;
-            Decal(shop, "CrownScreen", Back(0f, 0.838f + CrownDs, face2), Vector3.right * 0.075f, BackUp * 0.05f, rear, PanelUv(RearScreen));
-            Decal(shop, "CrownLeds", Back(0f, 0.899f + CrownDs, face2), Vector3.right * 0.08f, BackUp * 0.007f, rear, PanelUv(LedStrip));
-            Decal(shop, "CrownPorts", Back(0f, 0.72f + CrownDs, face2), Vector3.right * 0.085f, BackUp * 0.043f, rear, PanelUv(PortPlate));
-            // 四隅の螺子
-            foreach (var x in new[] { -0.105f, 0.105f })
-                foreach (var s in new[] { 0.685f + CrownDs, 0.905f + CrownDs })
-                    Disc(shop, "CrownScrew", Back(x, s, face2 - 0.0002f), rear, 0.005f, 6, SwatchUv(Swatch.Metal));
             // 挿さった三本の端子（金属の胴と、色の付いた根元）
             var colours = new[] { Swatch.Grey, Swatch.Rubber, Swatch.Violet };
             for (var i = 0; i < 3; i++)
             {
                 var x = (i - 1) * 0.05f;
-                Tube(shop, "Plug" + i, Shop.Panel, new List<Vector3> { Back(x, 0.715f + CrownDs, tOut + 0.004f), Back(x, 0.715f + CrownDs, tOut - 0.024f) }, 0.011f, 8, true, SwatchUv(Swatch.Metal), 50f);
-                Tube(shop, "PlugBoot" + i, Shop.Panel, new List<Vector3> { Back(x, 0.715f + CrownDs, tOut - 0.024f), Back(x, 0.715f + CrownDs, tOut - 0.040f) }, 0.0085f, 8, true, SwatchUv(colours[i]), 50f);
+                var s = 0.715f + CrownDs;
+                Tube(shop, "Plug" + i, Shop.Panel, new List<Vector3> { Back(x, s, tOut + 0.004f), Back(x, s, tOut - 0.024f) }, 0.011f, 4, false, SwatchUv(Swatch.Metal), 50f);
+                Tube(shop, "PlugBoot" + i, Shop.Panel, new List<Vector3> { Back(x, s, tOut - 0.024f), Back(x, s, tOut - 0.040f) }, 0.0085f, 4, true, SwatchUv(colours[i]), 50f);
             }
 
             // 腰の後ろの分岐の箱
             const float jOut = -0.155f;
-            Slab(shop, "Junction", Shop.Frame, Back(0f, 0.23f, 0.5f * (jOut - BackThick + 0.004f)), rot, new Vector3(0.17f, 0.135f, -BackThick + 0.004f - jOut), 0.012f, true);
-            Decal(shop, "JunctionFace", Back(0f, 0.231f, jOut - 0.0008f), Vector3.right * 0.07f, BackUp * 0.045f, rear, PanelUv(JunctionFace));
+            Slab(shop, "Junction", Shop.Frame, Back(0f, 0.23f, 0.5f * (jOut - BackThick + 0.004f)), rot, new Vector3(0.17f, 0.135f, -BackThick + 0.004f - jOut), 0f, true);
+            Decal(shop, "JunctionFace", Back(0f, 0.231f, jOut - 0.0008f), Vector3.right * 0.07f, BackUp * 0.045f, -BackFwd, PanelUv(JunctionFace));
             // 背の半ばでケーブルを束ねる留め具
-            Slab(shop, "CableClip", Shop.Frame, Back(0f, 0.452f, -0.114f), rot, new Vector3(0.13f, 0.024f, 0.036f), 0.006f, true);
+            Slab(shop, "CableClip", Shop.Frame, Back(0f, 0.452f, -0.114f), rot, new Vector3(0.13f, 0.024f, 0.036f), 0f, true);
+        }
+
+        /// <summary>ケーブル。太い物は断面を四角、細い物は三角にする（粗い画面では丸く見える）</summary>
+        static void Cable(Shop shop, string name, List<Vector3> path, int steps, float radius, Swatch colour)
+        {
+            Tube(shop, name, Shop.Panel, Spline(path, steps), radius, radius >= 0.008f ? 4 : 3, false, SwatchUv(colour), 65f);
         }
 
         /// <summary>
@@ -936,7 +1035,7 @@ namespace HalfAware.EditorTools
         /// </summary>
         static void Wiring(Shop shop)
         {
-            const float tOut = -0.165f;
+            const float tOut = CrownOut;
             var plugs = new[]
             {
                 new { x = -0.05f, r = 0.006f, c = Swatch.Grey },
@@ -958,7 +1057,7 @@ namespace HalfAware.EditorTools
                     Back(p.x * 0.8f, 0.325f, -0.142f),
                     Back(p.x * 0.8f, 0.285f, -0.130f),
                 };
-                Tube(shop, "Cable" + i, Shop.Panel, Spline(path, 16), p.r, 6, false, SwatchUv(p.c), 65f);
+                Cable(shop, "Cable" + i, path, 9, p.r, p.c);
             }
             // 耳の筐体から、背もたれの肩の縁の外を回って裏の箱の脇へ
             var earX = EarX;
@@ -972,7 +1071,7 @@ namespace HalfAware.EditorTools
                     Back(sx * 0.20f, EarS - 0.07f, -0.128f),
                     Back(sx * 0.125f, EarS - 0.085f, -0.13f),
                 };
-                Tube(shop, "EarCable" + (sx > 0f ? "R" : "L"), Shop.Panel, Spline(path, 10), 0.0055f, 6, false, SwatchUv(sx > 0f ? Swatch.Grey : Swatch.Teal), 65f);
+                Cable(shop, "EarCable" + (sx > 0f ? "R" : "L"), path, 6, 0.0055f, sx > 0f ? Swatch.Grey : Swatch.Teal);
             }
             // 分岐の箱から座の下の機構へ（太い一本）
             var down = new List<Vector3>
@@ -984,7 +1083,7 @@ namespace HalfAware.EditorTools
                 new Vector3(0f, 0.385f, -0.21f),
                 new Vector3(0f, 0.378f, -0.13f),
             };
-            Tube(shop, "TrunkCable", Shop.Panel, Spline(down, 16), 0.011f, 6, false, SwatchUv(Swatch.Rubber), 65f);
+            Cable(shop, "TrunkCable", down, 8, 0.011f, Swatch.Rubber);
             // 分岐の箱から右の肘掛けの金属の腕へ（腕に沿って差込口まで通る）
             var arm = new List<Vector3>
             {
@@ -994,7 +1093,7 @@ namespace HalfAware.EditorTools
                 new Vector3(0.33f, 0.50f, -0.17f),
                 new Vector3(0.318f, 0.475f, -0.085f),
             };
-            Tube(shop, "ArmCable", Shop.Panel, Spline(arm, 14), 0.0065f, 6, false, SwatchUv(Swatch.Violet), 65f);
+            Cable(shop, "ArmCable", arm, 7, 0.0065f, Swatch.Violet);
             // 肘掛けの操作盤から、当て物の下と金属の腕に沿って座の下へ
             foreach (var sx in new[] { 1f, -1f })
             {
@@ -1008,18 +1107,11 @@ namespace HalfAware.EditorTools
                     new Vector3(sx * 0.285f, 0.44f, -0.12f),
                     new Vector3(sx * 0.22f, 0.42f, -0.13f),
                 };
-                Tube(shop, "PodCable" + (sx > 0f ? "R" : "L"), Shop.Panel, Spline(path, 14), 0.005f, 6, false, SwatchUv(sx > 0f ? Swatch.Violet : Swatch.Grey), 65f);
+                Cable(shop, "PodCable" + (sx > 0f ? "R" : "L"), path, 7, 0.005f, sx > 0f ? Swatch.Violet : Swatch.Grey);
             }
         }
 
         // ---- 道具 ------------------------------------------------------------------
-
-        static Rect SwatchRect(Swatch s)
-        {
-            var uv = SwatchUv(s);
-            var e = 0.5f / PanelSize;
-            return new Rect(uv.x - e, uv.y - e, 2f * e, 2f * e);
-        }
 
         /// <summary>Catmull-Rom で点の間を刻む。端の点は通る</summary>
         static List<Vector3> Spline(List<Vector3> pts, int steps)
@@ -1147,7 +1239,7 @@ namespace HalfAware.EditorTools
             shop.End(Orient.None);
         }
 
-        /// <summary>角を面取りした箱。uv はどの面も swatch（色の升）か 0</summary>
+        /// <summary>角を面取りした箱（bevel が 0 なら面取り無しの 12 の三角の箱）。uv はどの面も swatch（色の升）か 0</summary>
         static void Slab(Shop shop, string name, int sub, Vector3 centre, Quaternion rot, Vector3 size, float bevel, bool solid, Vector2 uv = default(Vector2))
         {
             shop.Begin(name, 20f, solid);
@@ -1173,6 +1265,11 @@ namespace HalfAware.EditorTools
                     var p3 = A(ax, sg * hs[ax], u, -(hs[u] - b), w, hs[w] - b);
                     shop.Q(sub, shop.V(p0, uv), shop.V(p1, uv), shop.V(p2, uv), shop.V(p3, uv));
                 }
+            if (b <= 0f)
+            {
+                shop.End(Orient.Each);
+                return;
+            }
             // 12 の稜の面取り
             for (var a0 = 0; a0 < 3; a0++)
                 for (var a1 = a0 + 1; a1 < 3; a1++)
@@ -1257,7 +1354,7 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 椅子の面を溜める入れ物。部品（Begin〜End）ごとに、同じ位置の頂点の法線を、折れの角（crease）より緩い面どうしだけ均す。
-        /// マテリアルごとの面の組（張り地・殻・金具・磨いた金属・操作盤の絵）に分けて一つの mesh に焼く
+        /// 面の組（張り地・漆・金具・磨いた金属・操作盤の絵）に分けて溜め、焼く時に一つの組（マテリアル一つ）にまとめる
         /// </summary>
         sealed class Shop
         {
@@ -1299,6 +1396,9 @@ namespace HalfAware.EditorTools
             }
 
             public Vector3 Pos(int i) { return verts[i]; }
+
+            /// <summary>部品を閉じた後に、頂点の法線を決めた向きに置き換える</summary>
+            public void SetNormal(int i, Vector3 n) { norms[i] = n.normalized; }
 
             public void T(int sub, int a, int b, int c)
             {
@@ -1428,15 +1528,37 @@ namespace HalfAware.EditorTools
                 return new Vector3Int(Mathf.RoundToInt(p.x * 10000f), Mathf.RoundToInt(p.y * 10000f), Mathf.RoundToInt(p.z * 10000f));
             }
 
+            /// <summary>
+            /// 一つの mesh に焼く。面の組は一つにまとめ（マテリアル一つ・描く回数一つ）、uv を持たない漆・金具・磨いた金属の面は、
+            /// 絵の色の升（<see cref="Swatch.Lacquer"/>・<see cref="Swatch.Steel"/>・<see cref="Swatch.Chrome"/>）を引く。法線の絵のために接線も焼く
+            /// </summary>
             public Mesh Bake(string meshName)
             {
+                var fallback = new Dictionary<int, Vector2>
+                {
+                    { Shell, SwatchUv(Swatch.Lacquer) },
+                    { Frame, SwatchUv(Swatch.Steel) },
+                    { Chrome, SwatchUv(Swatch.Chrome) },
+                };
+                var all = new List<int>();
+                for (var i = 0; i < Count; i++)
+                {
+                    Vector2 swatch;
+                    var has = fallback.TryGetValue(i, out swatch);
+                    foreach (var v in tris[i])
+                    {
+                        if (has && uvs[v] == Vector2.zero) uvs[v] = swatch;
+                        all.Add(v);
+                    }
+                }
                 var mesh = new Mesh { name = meshName };
                 if (verts.Count > 65000) mesh.indexFormat = IndexFormat.UInt32;
                 mesh.SetVertices(verts);
                 mesh.SetNormals(norms);
                 mesh.SetUVs(0, uvs);
-                mesh.subMeshCount = Count;
-                for (var i = 0; i < Count; i++) mesh.SetTriangles(tris[i], i, false);
+                mesh.subMeshCount = 1;
+                mesh.SetTriangles(all, 0, false);
+                mesh.RecalculateTangents();
                 mesh.RecalculateBounds();
                 return mesh;
             }

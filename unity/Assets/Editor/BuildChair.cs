@@ -21,11 +21,15 @@ namespace HalfAware.EditorTools
     /// 背もたれの裏と金属の腕に沿って這わせたケーブル（<c>BuildChairShape.cs</c>）</description></item>
     /// <item><term>体との取り合い</term><description>座った体の形（SeatedPose）を組み直さずに済むよう、座面の高さの線・肘掛けの上面・差込口・
     /// ジャックの置き場は前の椅子と同じ所。フットレストは座った形の足の裏が乗る所まで引き出した形</description></item>
-    /// <item><term>置き場</term><description><c>Room/Chair</c> の下の見た目の子を <c>ChairMesh</c> 一つ（マテリアル 5 つ）に替える。
+    /// <item><term>軽さ</term><description>輪郭を作る起伏（背もたれの厚みと縁の巻き、菱形の膨らみ、肘掛けと座面の厚み、脚の形）は mesh に残し、
+    /// 面の上の細かい起伏（ボタンの窪み、折り目の鋭さ、縫い目、皺、螺子）は絵（地の色に焼いた窪みの陰と、法線の絵）へ移す（オーナー、2026-09-30
+    /// 「椅子も含めて重くなりそうなところはテクスチャを張ることで軽くして」「テクスチャに変えても立体感は失われないように」）。
+    /// マテリアルは一つ（描く回数 1）</description></item>
+    /// <item><term>置き場</term><description><c>Room/Chair</c> の下の見た目の子を <c>ChairMesh</c> 一つ（マテリアル 1 つ）に替える。
     /// 働きを持つ子（<c>Blocker</c> とその当たり・<c>JackRest</c>・<c>Cable</c>・<c>PortHole</c>）は名前のまま残し、当たりの大きさだけ新しい形に合わせる。
     /// PortHole はケーブルの始まりの置き場として残し、見た目（前の黒い箱）は外す</description></item>
     /// <item><term>焼き物</term><description>mesh は <c>Assets/Models/generated/chair/Chair.asset</c>、絵は <c>Assets/Textures/Chair/</c>（点で引く粗い絵）、
-    /// マテリアルは <c>Assets/Materials/Room/ChairUpholstery.mat</c>・<c>ChairPanel.mat</c>（ほかは部屋の PanelDark・SteelDark・Steel）。
+    /// マテリアルは <c>Assets/Materials/Room/Chair.mat</c>（URP Lit。絵は 128×128 の地の色と艶・法線・光る所の三枚）。
     /// 何度押しても上書きで同じ物になる</description></item>
     /// </list>
     ///
@@ -39,11 +43,11 @@ namespace HalfAware.EditorTools
         public const string MeshName = "ChairMesh";
         public const string MeshPath = "Assets/Models/generated/chair/Chair.asset";
         public const string TextureDir = "Assets/Textures/Chair/";
-        public const string UpholsteryTexture = TextureDir + "ChairUpholstery.png";
-        public const string PanelTexture = TextureDir + "ChairPanel.png";
-        public const string PanelGlowTexture = TextureDir + "ChairPanelGlow.png";
-        public const string UpholsteryMaterial = "Assets/Materials/Room/ChairUpholstery.mat";
-        public const string PanelMaterial = "Assets/Materials/Room/ChairPanel.mat";
+        /// <summary>椅子の絵（地の色と艶・法線・光る所）とマテリアル（一つ）</summary>
+        public const string AtlasTexture = TextureDir + "Chair.png";
+        public const string NormalTexture = TextureDir + "ChairNormal.png";
+        public const string GlowTexture = TextureDir + "ChairGlow.png";
+        public const string ChairMaterial = "Assets/Materials/Room/Chair.mat";
 
         /// <summary>残す子（働きを持つ物）。ほかの子は見た目なので組み直すたびに捨てる</summary>
         static readonly string[] Keep = { "Blocker", "JackRest", "Cable", "PortHole" };
@@ -121,21 +125,12 @@ namespace HalfAware.EditorTools
             AssetDatabase.SaveAssets();
 
             var sb = new StringBuilder();
-            sb.AppendFormat("椅子を組んだ。三角 {0}・頂点 {1}・部品 {2}・マテリアル {3}（描く回数 {3}）。mesh {4:0.00} MB",
-                made.Triangles, made.Vertices, made.Pieces.Count, mats.Length, MeshSize()).AppendLine();
-            sb.AppendLine("マテリアルごとの三角: " + SubmeshLine(mesh));
+            sb.AppendFormat("椅子を組んだ。三角 {0}・頂点 {1}・部品 {2}・マテリアル {3}（描く回数 {3}）。mesh {4:0.00} MB。絵 {5}×{5} を 3 枚（地の色と艶・法線・光る所）",
+                made.Triangles, made.Vertices, made.Pieces.Count, mats.Length, MeshSize(), AtlasSize).AppendLine();
             sb.AppendLine(port);
             sb.AppendLine(blocker);
             sb.Append(push);
             return sb.ToString();
-        }
-
-        static string SubmeshLine(Mesh mesh)
-        {
-            var names = new[] { "張り地", "殻", "金具", "磨いた金属", "操作盤" };
-            var parts = new List<string>();
-            for (var i = 0; i < mesh.subMeshCount && i < names.Length; i++) parts.Add(names[i] + " " + mesh.GetSubMesh(i).indexCount / 3);
-            return string.Join("・", parts.ToArray());
         }
 
         static float MeshSize()
@@ -244,6 +239,7 @@ namespace HalfAware.EditorTools
             existing.SetVertices(mesh.vertices);
             existing.SetNormals(mesh.normals);
             existing.SetUVs(0, mesh.uv);
+            existing.SetTangents(mesh.tangents);
             existing.subMeshCount = mesh.subMeshCount;
             for (var i = 0; i < mesh.subMeshCount; i++) existing.SetTriangles(mesh.GetTriangles(i), i, false);
             existing.RecalculateBounds();
@@ -255,49 +251,36 @@ namespace HalfAware.EditorTools
 
         // ---- マテリアル --------------------------------------------------------------
 
-        /// <summary>張り地・殻・金具・磨いた金属・操作盤の順（mesh の面の組の順）</summary>
+        /// <summary>
+        /// 椅子のマテリアル一つ（URP Lit）。地の色の絵（α は艶）・法線の絵・光る所の絵を一枚ずつ。金属も革も同じ一つで描く（描く回数 1）
+        /// </summary>
         static Material[] Materials()
         {
-            var upholstery = Lit(UpholsteryMaterial, "ChairUpholstery");
-            upholstery.SetTexture("_BaseMap", UpholsteryPicture());
-            upholstery.SetTexture("_MainTex", upholstery.GetTexture("_BaseMap"));
-            upholstery.SetColor("_BaseColor", Color.white);
-            upholstery.SetFloat("_Metallic", 0f);
-            upholstery.SetFloat("_Smoothness", UpholsteryGloss);
-            upholstery.DisableKeyword("_EMISSION");
-            EditorUtility.SetDirty(upholstery);
-
-            Texture2D glow;
-            var panel = Lit(PanelMaterial, "ChairPanel");
-            panel.SetTexture("_BaseMap", PanelPictures(out glow));
-            panel.SetTexture("_MainTex", panel.GetTexture("_BaseMap"));
-            panel.SetColor("_BaseColor", Color.white);
-            panel.SetFloat("_Metallic", 0.1f);
-            panel.SetFloat("_Smoothness", 0.4f);
-            panel.SetTexture("_EmissionMap", glow);
-            panel.SetColor("_EmissionColor", Color.white * 1.1f);
-            panel.EnableKeyword("_EMISSION");
-            panel.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
-            EditorUtility.SetDirty(panel);
-
-            return new[]
+            Texture2D normal, glow;
+            var atlas = Pictures(out normal, out glow);
+            var m = AssetDatabase.LoadAssetAtPath<Material>(ChairMaterial);
+            if (m == null)
             {
-                upholstery,
-                AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/Room/PanelDark.mat"),
-                AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/Room/SteelDark.mat"),
-                AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/Room/Steel.mat"),
-                panel,
-            };
-        }
-
-        /// <summary>部屋の Steel.mat を写した Lit のマテリアル。在れば使う</summary>
-        static Material Lit(string path, string name)
-        {
-            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
-            if (m != null) return m;
-            m = new Material(AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/Room/Steel.mat")) { name = name };
-            AssetDatabase.CreateAsset(m, path);
-            return m;
+                m = new Material(AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/Room/Steel.mat")) { name = "Chair" };
+                AssetDatabase.CreateAsset(m, ChairMaterial);
+            }
+            m.SetTexture("_BaseMap", atlas);
+            m.SetTexture("_MainTex", atlas);
+            m.SetColor("_BaseColor", Color.white);
+            m.SetColor("_Color", Color.white);
+            m.SetFloat("_Metallic", 0f);
+            m.SetFloat("_Smoothness", 1f);
+            m.SetFloat("_SmoothnessTextureChannel", 1f);
+            m.EnableKeyword("_SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A");
+            m.SetTexture("_BumpMap", normal);
+            m.SetFloat("_BumpScale", 1f);
+            m.EnableKeyword("_NORMALMAP");
+            m.SetTexture("_EmissionMap", glow);
+            m.SetColor("_EmissionColor", Color.white * 1.1f);
+            m.EnableKeyword("_EMISSION");
+            m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            EditorUtility.SetDirty(m);
+            return new[] { m };
         }
 
         // ---- 絵 --------------------------------------------------------------------
@@ -307,7 +290,14 @@ namespace HalfAware.EditorTools
         /// 白く返って明るい灰色の板に見えるので、艶は控えめにし、照り返しは縁の丸みとボタン留めの膨らみに細く乗る程度にする
         /// </summary>
         static readonly Color Leather = new Color(0.066f, 0.061f, 0.066f);
-        const float UpholsteryGloss = 0.30f;
+        const float LeatherGloss = 0.30f;
+        /// <summary>
+        /// 金属と漆の色と艶（前の部屋のマテリアル Steel・SteelDark・PanelDark の見え方に寄せる）。一つのマテリアルで描くので金属の度合いは持たせず、
+        /// 金属は地の色を暗めにして艶を強くし、照り返しで金属らしく見せる
+        /// </summary>
+        static readonly Color ChromeColour = new Color(0.28f, 0.29f, 0.32f);
+        static readonly Color SteelColour = new Color(0.09f, 0.095f, 0.11f);
+        static readonly Color LacquerColour = new Color(0.06f, 0.065f, 0.08f);
 
         /// <summary>乱れの代わりの決まった値（0〜1）。押すたびに同じ絵にする</summary>
         static float Hash(int x, int y)
@@ -318,40 +308,6 @@ namespace HalfAware.EditorTools
                 h = (h ^ (h >> 13)) * 1274126177u;
                 return ((h ^ (h >> 16)) & 0xffff) / 65535f;
             }
-        }
-
-        /// <summary>
-        /// 張り地の絵（64×64、点で引く、縦横とも繰り返す。1 画素 5 mm）。黒革の細かい粒と、ところどころの浅い皺（明るい筋のすぐ下に暗い筋）
-        /// </summary>
-        static Texture2D UpholsteryPicture()
-        {
-            var v = new float[UpholsteryW * UpholsteryH];
-            for (var y = 0; y < UpholsteryH; y++)
-                for (var x = 0; x < UpholsteryW; x++)
-                    v[y * UpholsteryW + x] = 0.90f + 0.16f * Hash(x, y) + 0.06f * Hash(x / 4, y / 4 + 50);
-            for (var k = 0; k < 30; k++)
-            {
-                var sx = Mathf.FloorToInt(Hash(k, 31) * UpholsteryW);
-                var sy = Mathf.FloorToInt(Hash(k, 32) * UpholsteryH);
-                var len = 3 + Mathf.FloorToInt(Hash(k, 33) * 4f);
-                var dx = Hash(k, 34) > 0.5f ? 1 : -1;
-                for (var i = 0; i < len; i++)
-                {
-                    var x = ((sx + i * dx) % UpholsteryW + UpholsteryW) % UpholsteryW;
-                    var y = (sy + i / 2) % UpholsteryH;
-                    var y2 = (y + UpholsteryH - 1) % UpholsteryH;
-                    v[y * UpholsteryW + x] += 0.35f;
-                    v[y2 * UpholsteryW + x] *= 0.72f;
-                }
-            }
-            var px = new Color[v.Length];
-            for (var i = 0; i < v.Length; i++)
-            {
-                var c = Leather * v[i];
-                c.a = 1f;
-                px[i] = c;
-            }
-            return SavePicture(px, UpholsteryW, UpholsteryH, UpholsteryTexture, TextureWrapMode.Repeat);
         }
 
         static readonly Color Plastic = new Color(0.075f, 0.075f, 0.09f);
@@ -366,25 +322,44 @@ namespace HalfAware.EditorTools
         static readonly Color GreenLit = new Color(0.40f, 1.00f, 0.55f);
         static readonly Color RedLit = new Color(1.00f, 0.28f, 0.25f);
 
-        /// <summary>操作盤の絵を描く入れ物。albedo と光る所（glow）を同じ升目で持つ</summary>
+        /// <summary>椅子の絵を描く入れ物（128×128）。地の色・艶・光る所・法線を同じ升目で持つ</summary>
         sealed class Canvas
         {
-            public readonly Color[] Albedo = new Color[PanelSize * PanelSize];
-            public readonly Color[] Glow = new Color[PanelSize * PanelSize];
+            public readonly Color[] Albedo = new Color[AtlasSize * AtlasSize];
+            public readonly float[] Gloss = new float[AtlasSize * AtlasSize];
+            public readonly Color[] Glow = new Color[AtlasSize * AtlasSize];
+            public readonly Color[] Normal = new Color[AtlasSize * AtlasSize];
+            /// <summary>この後に置く画素の艶</summary>
+            public float Shine = 0.4f;
+
+            public Canvas()
+            {
+                for (var i = 0; i < Normal.Length; i++) Normal[i] = new Color(0.5f, 0.5f, 1f);
+            }
 
             public void Put(int x, int y, Color c)
             {
-                if (x < 0 || y < 0 || x >= PanelSize || y >= PanelSize) return;
-                Albedo[y * PanelSize + x] = c;
-                Glow[y * PanelSize + x] = Color.black;
+                if (x < 0 || y < 0 || x >= AtlasSize || y >= AtlasSize) return;
+                Albedo[y * AtlasSize + x] = c;
+                Gloss[y * AtlasSize + x] = Shine;
+                Glow[y * AtlasSize + x] = Color.black;
             }
 
             /// <summary>光る画素。albedo には色を半分に落として置く（灯っていない所から見ても色が分かる）</summary>
             public void Lit(int x, int y, Color c, float level = 1f)
             {
-                if (x < 0 || y < 0 || x >= PanelSize || y >= PanelSize) return;
-                Albedo[y * PanelSize + x] = c * 0.5f;
-                Glow[y * PanelSize + x] = c * level;
+                if (x < 0 || y < 0 || x >= AtlasSize || y >= AtlasSize) return;
+                Albedo[y * AtlasSize + x] = c * 0.5f;
+                Gloss[y * AtlasSize + x] = 0.6f;
+                Glow[y * AtlasSize + x] = c * level;
+            }
+
+            /// <summary>法線（接線の座標。x は絵の右、y は絵の上）</summary>
+            public void Bump(int x, int y, Vector3 n)
+            {
+                if (x < 0 || y < 0 || x >= AtlasSize || y >= AtlasSize) return;
+                n.Normalize();
+                Normal[y * AtlasSize + x] = new Color(n.x * 0.5f + 0.5f, n.y * 0.5f + 0.5f, n.z * 0.5f + 0.5f);
             }
 
             public void Fill(int x, int y, int w, int h, Color c)
@@ -403,40 +378,61 @@ namespace HalfAware.EditorTools
                 for (var i = r.x; i < r.xMax; i++) { Put(i, r.y, edge); Put(i, r.yMax - 1, edge); }
                 for (var j = r.y; j < r.yMax; j++) { Put(r.x, j, edge); Put(r.xMax - 1, j, edge); }
             }
+
+            /// <summary>地の色に艶を α として重ねた絵</summary>
+            public Color[] AlbedoWithGloss()
+            {
+                var o = new Color[Albedo.Length];
+                for (var i = 0; i < o.Length; i++) { o[i] = Albedo[i]; o[i].a = Gloss[i]; }
+                return o;
+            }
         }
 
         /// <summary>
-        /// 操作盤の絵（64×64、点で引く）と、その光る所の絵。下の段に色の升、その上に右と左の肘掛けの前の操作盤（前が上）、
-        /// 頭の後ろの画面・耳の画面・接続口の板・分岐の箱の面・耳の灯り・灯りの列
+        /// 椅子の絵（128×128、点で引く）を描いて置く。地の色（α は艶）・法線・光る所の三枚。
+        /// 左下の 64×64 は操作盤・画面・色の升、ほかは革の面ごとの絵（背もたれの前と裏、肘掛け、座面、フットレスト）
         /// </summary>
-        static Texture2D PanelPictures(out Texture2D glow)
+        static Texture2D Pictures(out Texture2D normal, out Texture2D glow)
         {
             var cv = new Canvas();
-            cv.Fill(0, 0, PanelSize, PanelSize, Plastic);
+            PanelPictures(cv);
+            LeatherPictures(cv);
+            normal = SavePicture(cv.Normal, AtlasSize, AtlasSize, NormalTexture, PictureKind.Normal);
+            glow = SavePicture(cv.Glow, AtlasSize, AtlasSize, GlowTexture, PictureKind.Colour);
+            return SavePicture(cv.AlbedoWithGloss(), AtlasSize, AtlasSize, AtlasTexture, PictureKind.ColourWithGloss);
+        }
+
+        /// <summary>
+        /// 操作盤の絵。下の段に色の升、その上に右と左の肘掛けの前の操作盤（前が上）、耳の画面・分岐の箱の面・耳の灯り・灯りの列、
+        /// 頭の後ろの箱の裏の面（画面・灯りの列・接続口・四隅の螺子）、操作盤の外の面（螺子二つ）。左上の段に金属と漆と革の色の升
+        /// </summary>
+        static void PanelPictures(Canvas cv)
+        {
+            cv.Shine = 0.35f;
+            cv.Fill(0, 0, 64, 64, Plastic);
 
             // 色の升
             var swatches = new[] { Rubber, Plastic, new Color(0.33f, 0.34f, 0.36f), new Color(0.28f, 0.15f, 0.42f), new Color(0.07f, 0.33f, 0.36f), new Color(0.60f, 0.28f, 0.07f),
                 new Color(0.42f, 0.43f, 0.47f), new Color(0.70f, 0.70f, 0.68f), CyanLit, VioletLit, AmberLit, GreenLit, new Color(0.52f, 0.42f, 0.22f), GlassDark, PlasticLight, RedLit };
+            var gloss = new[] { 0.15f, 0.35f, 0.4f, 0.4f, 0.4f, 0.4f, 0.7f, 0.3f, 0.6f, 0.6f, 0.6f, 0.6f, 0.6f, 0.7f, 0.35f, 0.6f };
             for (var k = 0; k < swatches.Length; k++)
             {
+                cv.Shine = gloss[k];
                 if (k >= (int)Swatch.Cyan && k <= (int)Swatch.Green || k == (int)Swatch.Red) cv.LitFill(k * 4, 0, 4, 4, swatches[k]);
                 else cv.Fill(k * 4, 0, 4, 4, swatches[k]);
             }
+            // 左上の段: 磨いた金属・黒い金属・黒い漆・黒革
+            var metals = new[] { ChromeColour, SteelColour, LacquerColour, Leather };
+            var metalGloss = new[] { 0.85f, 0.35f, 0.3f, LeatherGloss };
+            for (var k = 0; k < metals.Length; k++)
+            {
+                cv.Shine = metalGloss[k];
+                cv.Fill(k * 4, 60, 4, 4, metals[k]);
+            }
 
+            cv.Shine = 0.35f;
             RightPodPicture(cv, RightPod);
             LeftPodPicture(cv, LeftPod);
-
-            // 頭の後ろの箱の画面。紫の見出し、脳波のような波形二本、文字の行
-            var s = RearScreen;
-            cv.Frame(s, GlassDark, Edge);
-            cv.LitFill(s.x + 2, s.yMax - 3, s.width - 4, 1, VioletLit, 0.7f);
-            for (var x = s.x + 2; x < s.xMax - 2; x++)
-            {
-                cv.Lit(x, s.y + 8 + Mathf.RoundToInt(3f * Mathf.Sin(x * 0.75f) * Mathf.Sin(x * 0.21f + 0.4f)), CyanLit);
-                cv.Lit(x, s.y + 4 + Mathf.RoundToInt(1.4f * Mathf.Sin(x * 1.3f + 1f)), GreenLit, 0.6f);
-            }
-            for (var x = s.x + 2; x < s.x + 11; x += 2) cv.Lit(x, s.yMax - 5, CyanLit, 0.5f);
-            cv.LitFill(s.x + 14, s.yMax - 5, 6, 1, AmberLit, 0.6f);
 
             // 耳の小さな画面（縦長）。輪の印と、潜行の深さの棒
             var e = EarScreen;
@@ -450,25 +446,6 @@ namespace HalfAware.EditorTools
             cv.LitFill(e.x + 2, e.y + 3, 6, 1, GreenLit);
             cv.LitFill(e.x + 2, e.y + 5, 4, 1, GreenLit, 0.8f);
             cv.LitFill(e.x + 2, e.y + 7, 8, 1, VioletLit, 0.6f);
-
-            // 接続口の板。三つの受け口（挿さった端子の後ろ）と、その上の灯り
-            var p = PortPlate;
-            cv.Frame(p, PlasticLight, Edge);
-            var sockets = new[] { p.x + 4, p.x + 10, p.x + 16 };
-            var leds = new[] { VioletLit, CyanLit, AmberLit };
-            for (var k = 0; k < 3; k++)
-            {
-                for (var y = p.y + 3; y < p.y + 8; y++)
-                    for (var x = sockets[k] - 2; x <= sockets[k] + 2; x++)
-                    {
-                        var d = new Vector2(x - sockets[k], y - (p.y + 5)).magnitude;
-                        if (d <= 1.2f) cv.Put(x, y, Rubber);
-                        else if (d <= 2.3f) cv.Put(x, y, new Color(0.42f, 0.43f, 0.47f));
-                    }
-                cv.Lit(sockets[k], p.y + 9, leds[k]);
-                cv.Put(sockets[k] - 1, p.y + 1, Ink);
-                cv.Put(sockets[k] + 1, p.y + 1, Ink);
-            }
 
             // 分岐の箱の面。通気の溝、灯りの列、琥珀の縞
             var j2 = JunctionFace;
@@ -499,8 +476,152 @@ namespace HalfAware.EditorTools
             var cycle = new[] { CyanLit, CyanLit, VioletLit, CyanLit, AmberLit, CyanLit, VioletLit };
             for (var k = 0; k * 3 + 1 < strip.width; k++) cv.LitFill(strip.x + 1 + k * 3, strip.y + 1, 2, 2, cycle[k % cycle.Length]);
 
-            glow = SavePicture(cv.Glow, PanelSize, PanelSize, PanelGlowTexture, TextureWrapMode.Clamp);
-            return SavePicture(cv.Albedo, PanelSize, PanelSize, PanelTexture, TextureWrapMode.Clamp);
+            CrownFacePicture(cv, CrownFace);
+            PodSidePicture(cv, PodSide);
+        }
+
+        /// <summary>留めた螺子（2×2 画素。明るい頭と、暗い溝）</summary>
+        static void Screw(Canvas cv, int x, int y)
+        {
+            cv.Shine = 0.7f;
+            cv.Put(x, y, new Color(0.46f, 0.47f, 0.50f));
+            cv.Put(x + 1, y, new Color(0.30f, 0.31f, 0.34f));
+            cv.Put(x, y + 1, new Color(0.56f, 0.57f, 0.60f));
+            cv.Put(x + 1, y + 1, new Color(0.46f, 0.47f, 0.50f));
+            // 頭の丸み（左上が明るく、右下が暗い。法線で明かりに応じて返す）
+            cv.Bump(x, y + 1, new Vector3(-0.5f, 0.5f, 1f));
+            cv.Bump(x + 1, y + 1, new Vector3(0.5f, 0.5f, 1f));
+            cv.Bump(x, y, new Vector3(-0.5f, -0.5f, 1f));
+            cv.Bump(x + 1, y, new Vector3(0.5f, -0.5f, 1f));
+        }
+
+        /// <summary>
+        /// 頭の後ろの箱の裏の面（26×28。x は椅子の右、y は背もたれに沿って上）。黒い金属の地に、上に灯りの列、その下に画面（紫の見出し、脳波のような波形二本）、
+        /// 下に接続口の板（三つの受け口と灯り。挿さった端子の後ろ）、四隅の螺子
+        /// </summary>
+        static void CrownFacePicture(Canvas cv, RectInt r)
+        {
+            cv.Shine = 0.5f;
+            cv.Frame(r, SteelColour, new Color(0.26f, 0.27f, 0.31f));
+            var x0 = r.x;
+            var y0 = r.y;
+            // 画面
+            var s = new RectInt(x0 + 5, y0 + 13, 16, 10);
+            cv.Shine = 0.6f;
+            cv.Frame(s, GlassDark, Edge);
+            cv.LitFill(s.x + 2, s.yMax - 2, s.width - 4, 1, VioletLit, 0.7f);
+            for (var x = s.x + 1; x < s.xMax - 1; x++)
+            {
+                cv.Lit(x, s.y + 5 + Mathf.RoundToInt(1.6f * Mathf.Sin(x * 0.9f) * Mathf.Sin(x * 0.27f + 0.4f)), CyanLit);
+                cv.Lit(x, s.y + 2 + Mathf.RoundToInt(0.8f * Mathf.Sin(x * 1.3f + 1f)), GreenLit, 0.6f);
+            }
+            // 灯りの列
+            var cycle = new[] { CyanLit, VioletLit, CyanLit, AmberLit, CyanLit, VioletLit };
+            for (var k = 0; k < 6; k++) cv.Lit(x0 + 6 + k * 3, y0 + 25, cycle[k]);
+            // 接続口の板
+            cv.Shine = 0.35f;
+            var p = new RectInt(x0 + 4, y0 + 2, 18, 9);
+            cv.Frame(p, PlasticLight, Edge);
+            var sockets = new[] { x0 + 8, x0 + 13, x0 + 18 };
+            var leds = new[] { VioletLit, CyanLit, AmberLit };
+            for (var k = 0; k < 3; k++)
+            {
+                cv.Fill(sockets[k] - 1, p.y + 3, 3, 3, new Color(0.42f, 0.43f, 0.47f));
+                cv.Put(sockets[k], p.y + 4, Rubber);
+                cv.Lit(sockets[k], p.y + 7, leds[k]);
+            }
+            // 四隅の螺子
+            foreach (var x in new[] { x0 + 1, x0 + r.width - 3 })
+                foreach (var y in new[] { y0 + 1, y0 + r.height - 3 })
+                    Screw(cv, x, y);
+        }
+
+        /// <summary>操作盤の外の面（16×6。x は後ろから前、y は下から上）。黒い金属の地に、留めた螺子二つ</summary>
+        static void PodSidePicture(Canvas cv, RectInt r)
+        {
+            cv.Shine = 0.5f;
+            cv.Fill(r.x, r.y, r.width, r.height, SteelColour);
+            Screw(cv, r.x + 3, r.y + 2);
+            Screw(cv, r.x + 11, r.y + 2);
+        }
+
+        /// <summary>革の地の明るさ（1 の前後）。細かい粒と、ところどころの浅い皺の筋</summary>
+        static float Grain(int x, int y)
+        {
+            var v = 0.93f + 0.10f * Hash(x, y) + 0.05f * Hash(x / 3, y / 3 + 50);
+            // 皺（明るい筋のすぐ下に暗い筋）。ところどころ
+            var k = Hash(x / 5 + 7, y / 3 + 13);
+            if (k > 0.93f && (x + y) % 3 == 0) v += 0.18f;
+            return v;
+        }
+
+        /// <summary>
+        /// 革の面の絵。置き場の画素ごとに、椅子の座標へ戻して細かい起伏（depth、m、正で窪む）を測り、
+        /// 地の色には窪みの陰（明かりの向きに依らない、窪みほど暗い陰）を焼き込み、法線の絵には窪みの斜面を描く（明かりに応じた陰影が出る）。
+        /// normal を渡した面（背もたれの前）は、法線をそれで決める
+        /// </summary>
+        static void PaintLeather(Canvas cv, RectInt r, float x0, float x1, float y0, float y1, System.Func<float, float, float> depth, System.Func<float, float, float> shade,
+            System.Func<float, float, float, float, Vector3> normal = null, System.Func<float, float, float> matte = null)
+        {
+            var dx = (x1 - x0) / r.width;
+            var dy = (y1 - y0) / r.height;
+            for (var j = 0; j < r.height; j++)
+                for (var i = 0; i < r.width; i++)
+                {
+                    var x = x0 + (i + 0.5f) * dx;
+                    var y = y0 + (j + 0.5f) * dy;
+                    var d = depth(x, y);
+                    var dark = Mathf.Clamp01(d / 0.012f);
+                    var c = Leather * (Grain(r.x + i, r.y + j) * (1f - 0.5f * dark) * shade(x, y));
+                    c.a = 1f;
+                    cv.Shine = Mathf.Lerp(LeatherGloss, 0.12f, Mathf.Max(dark, matte != null ? matte(x, y) : 0f));
+                    cv.Put(r.x + i, r.y + j, c);
+                    if (normal != null)
+                    {
+                        cv.Bump(r.x + i, r.y + j, normal(x, y, dx, dy));
+                        continue;
+                    }
+                    // 高さ（-depth）の傾き
+                    var gx = -(depth(x + dx, y) - depth(x - dx, y)) / (2f * dx);
+                    var gy = -(depth(x, y + dy) - depth(x, y - dy)) / (2f * dy);
+                    cv.Bump(r.x + i, r.y + j, new Vector3(-gx, -gy, 1f));
+                }
+        }
+
+        /// <summary>
+        /// 革の面の絵を描く。背もたれの前（菱形のボタン留めの窪み・折り目の鋭い溝・脇と上の縫い目）、裏（無地）、
+        /// 肘掛け（上の面の縁の縫い目）、座面とフットレスト（縁の縫い目）
+        /// </summary>
+        static void LeatherPictures(Canvas cv)
+        {
+            System.Func<float, float, float> none = (x, y) => 0f;
+            System.Func<float, float, float> plain = (x, y) => 1f;
+            // 背もたれの前。ボタン留めの菱形は、膨らみの頂を少し明るく、折り目に寄るほど暗くして、形の読みを助ける（明かりの向きに依らない陰）
+            PaintLeather(cv, BackFrontArea, -BackHalfW, BackHalfW, 0f, BackLength,
+                (x, s) => Mathf.Abs(x) > BackW(s) ? 0f : BackFine(x, s),
+                (x, s) =>
+                {
+                    var inside = Mathf.Abs(x) > BackW(s) ? 0f : TuftInside(x, s);
+                    // 折り目の際の急な斜面は窪みの陰で暗くする（明かりを受けた側が一画素の明るい筋にならないように）
+                    return 1f + inside * (0.18f * TuftDome(x, s) - 0.10f - 0.5f * TuftCrease(x, s));
+                },
+                (x, s, ex, es) => Mathf.Abs(x) > BackW(s) - 0.002f ? Vector3.forward : BackFrontNormal(x, s, 1.5f * ex, 1.5f * es),
+                // 折り目の際（急な斜面）は艶を落とす（照り返しが一画素の明るい筋にならないように）
+                (x, s) => Mathf.Abs(x) > BackW(s) ? 0f : TuftInside(x, s) * TuftCrease(x, s));
+            // 背もたれの裏（無地）
+            PaintLeather(cv, BackRearArea, -BackHalfW, BackHalfW, 0f, BackLength, none, plain);
+            // 肘掛けの上の面（上から写す）。上の面と脇の面の境の縫い目
+            PaintLeather(cv, ArmArea, ArmAreaX0, ArmAreaX1, ArmAreaZ0, ArmAreaZ1,
+                (x, z) =>
+                {
+                    if (z < PadBack + 0.02f || z > PadFront - 0.02f) return 0f;
+                    var r = PadRound(z);
+                    var seam = Mathf.Max(Mathf.Exp(-Mathf.Pow((x - (PadIn(z) + 0.3f * r)) / 0.004f, 2f)), Mathf.Exp(-Mathf.Pow((x - (PadOuter - 0.3f * r)) / 0.004f, 2f)));
+                    return 0.004f * seam;
+                }, plain);
+            // 座面とフットレスト（上から写す）
+            PaintLeather(cv, SeatArea, -SeatHalf, SeatHalf, SeatAreaZ0, SeatAreaZ1, (x, z) => 0.005f * Welt(x, z, SeatWeltX, SeatWeltZ), plain);
+            PaintLeather(cv, FootArea, -FootHalf, FootHalf, FootAreaZ0, FootAreaZ1, (x, z) => 0.004f * Welt(x, z, FootWeltX, FootWeltZ), plain);
         }
 
         /// <summary>
@@ -523,6 +644,8 @@ namespace HalfAware.EditorTools
             cv.Fill(x0 + 2, y0 + 4, 5, 1, Edge);
             cv.Fill(x0 + 9, y0 + 4, 5, 1, Edge);
             cv.LitFill(x0 + 10, y0 + 3, 3, 1, VioletLit);
+            // 釦の出っ張り（上の縁が明るく返る）
+            for (var x = x0 + 2; x < x0 + 14; x++) if (x < x0 + 7 || x >= x0 + 9) cv.Bump(x, y0 + 4, new Vector3(0f, 0.6f, 1f));
         }
 
         /// <summary>
@@ -548,6 +671,8 @@ namespace HalfAware.EditorTools
                         var a = Mathf.Atan2(v.y, v.x) * Mathf.Rad2Deg;
                         if (a > -50f && a < 230f) cv.Lit(x, y, VioletLit);
                     }
+                    // 摘みの丸み
+                    if (d < 2.6f && d > 0.5f) cv.Bump(x, y, new Vector3(v.x / d * 0.5f, v.y / d * 0.5f, 1f));
                 }
             foreach (var bx in new[] { x0 + 11, x0 + 13 })
             {
@@ -556,10 +681,13 @@ namespace HalfAware.EditorTools
             }
         }
 
+        /// <summary>絵の種類。地の色（α 無し）、地の色と艶（α）、法線</summary>
+        enum PictureKind { Colour, ColourWithGloss, Normal }
+
         /// <summary>絵を置き（中身が変わった時だけ書く）、点で引く・mipmap 無し・圧縮無しで取り込む</summary>
-        static Texture2D SavePicture(Color[] px, int w, int h, string path, TextureWrapMode wrap)
+        static Texture2D SavePicture(Color[] px, int w, int h, string path, PictureKind kind)
         {
-            var tex = new Texture2D(w, h, TextureFormat.RGB24, false, false);
+            var tex = new Texture2D(w, h, kind == PictureKind.ColourWithGloss ? TextureFormat.RGBA32 : TextureFormat.RGB24, false, kind == PictureKind.Normal);
             tex.SetPixels(px);
             tex.Apply();
             var bytes = tex.EncodeToPNG();
@@ -570,16 +698,19 @@ namespace HalfAware.EditorTools
             if (!same) File.WriteAllBytes(full, bytes);
             AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
             var imp = AssetImporter.GetAtPath(path) as TextureImporter;
-            if (imp != null && (imp.mipmapEnabled || imp.filterMode != FilterMode.Point || imp.wrapMode != wrap
-                || imp.textureCompression != TextureImporterCompression.Uncompressed || imp.npotScale != TextureImporterNPOTScale.None))
+            var type = kind == PictureKind.Normal ? TextureImporterType.NormalMap : TextureImporterType.Default;
+            var alpha = kind == PictureKind.ColourWithGloss ? TextureImporterAlphaSource.FromInput : TextureImporterAlphaSource.None;
+            if (imp != null && (imp.textureType != type || imp.alphaSource != alpha || imp.mipmapEnabled || imp.filterMode != FilterMode.Point
+                || imp.wrapMode != TextureWrapMode.Clamp || imp.textureCompression != TextureImporterCompression.Uncompressed || imp.npotScale != TextureImporterNPOTScale.None))
             {
-                imp.textureType = TextureImporterType.Default;
-                imp.sRGBTexture = true;
+                imp.textureType = type;
+                imp.sRGBTexture = kind != PictureKind.Normal;
                 imp.mipmapEnabled = false;
                 imp.filterMode = FilterMode.Point;
-                imp.wrapMode = wrap;
+                imp.wrapMode = TextureWrapMode.Clamp;
                 imp.npotScale = TextureImporterNPOTScale.None;
-                imp.alphaSource = TextureImporterAlphaSource.None;
+                imp.alphaSource = alpha;
+                imp.alphaIsTransparency = false;
                 imp.textureCompression = TextureImporterCompression.Uncompressed;
                 imp.SaveAndReimport();
             }
