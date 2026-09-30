@@ -23,7 +23,8 @@ namespace HalfAware
     ///
     /// **吸い終えた後も煙が立ち続ける**（オーナー、2026-09-29「タバコ吸った後だけど、しばらくは煙草の煙を出し続けるようにして。
     /// その状態で、モニターへのインタラクトを必須にし、モニターへのインタラクトが終わったら煙草の煙を止め、ジャケットへのインタラクトを有効化」）。
-    /// 吸う音・吐く音は無く、細く燻る煙だけが続く。座ったままモニター（terminalId）を調べ、「はい」で済ませて文を読み終えたら、
+    /// 吸う音・吐く音は無く、肘掛けに置いた右手の煙草（指先の骨）から細い一筋の煙が立ちのぼり（<see cref="SmokePuffs.MakeWisp"/>）、
+    /// 正面のモニターの前に煙が漂って、画面の文字と映り込みの顔にある程度かぶる（<see cref="SmokePuffs.MakeHaze"/>）。座ったままモニター（terminalId）を調べ、「はい」で済ませて文を読み終えたら、
     /// 煙を snuffSeconds 秒で細くして止める（<see cref="Cigarette.Snuff"/>）。「いいえ」なら済んでいないので煙は続く。
     /// ジャケットの前提はモニター（<see cref="RoomIds.After"/>）。
     ///
@@ -332,6 +333,19 @@ namespace HalfAware
             Fade();
         }
 
+        /// <summary>
+        /// 吸い終えた後の一筋を出す所。肘掛けに置いた右手の、人差し指の中の骨（煙草を挟む所）。無ければ右手、それも無ければ null（口元から）
+        /// </summary>
+        Transform Fingertip()
+        {
+            var player = flow != null ? flow.Player : null;
+            var pose = player != null ? player.GetComponentInChildren<SeatedPose>(true) : null;
+            var animator = pose != null ? pose.Animator : null;
+            if (animator == null || !animator.isHuman) return null;
+            var bone = animator.GetBoneTransform(HumanBodyBones.RightIndexIntermediate);
+            return bone != null ? bone : animator.GetBoneTransform(HumanBodyBones.RightHand);
+        }
+
         /// <summary>モニターを済ませて読み終えたら、立ち続けていた煙を細くして止める</summary>
         void Snuff()
         {
@@ -386,7 +400,7 @@ namespace HalfAware
             // 吸い終えてモニターがまだなら、煙が立ち続けている形で始める
             if (flow.Progress.Done.Contains(cigaretteId) && !flow.Progress.Done.Contains(terminalId) && cigarette != null)
             {
-                cigarette.Smolder();
+                cigarette.Smolder(Fingertip());
                 smoldering = true;
             }
         }
@@ -438,7 +452,7 @@ namespace HalfAware
                 if (cigarette != null)
                 {
                     cigarette.Light(Drags, Turn, true);
-                    cigarette.Linger();
+                    cigarette.Linger(Fingertip());
                     smoldering = true;
                 }
                 var started = Time.time;

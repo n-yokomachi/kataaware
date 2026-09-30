@@ -73,16 +73,19 @@ namespace HalfAware
             caught = false;
         }
 
-        /// <summary>吸い終えた後も煙を立て続ける（場面 1。モニターを済ませるまで）。<see cref="Light"/> の後に呼ぶ</summary>
-        public void Linger()
+        /// <summary>
+        /// 吸い終えた後も煙を立て続ける（場面 1。モニターを済ませるまで）。<see cref="Light"/> の後に呼ぶ。
+        /// 吸い終えたら、口元の煙から hand（右手の指先の骨）の一筋に替わる
+        /// </summary>
+        public void Linger(Transform hand = null)
         {
-            if (puffs != null) puffs.Linger();
+            if (puffs != null) puffs.Linger(hand);
         }
 
-        /// <summary>吸い終えた後の、煙が立ち続けている形で始める（場面 1 を思い出した時）。音は鳴らさない</summary>
-        public void Smolder()
+        /// <summary>吸い終えた後の、指先から一筋の煙が立っている形で始める（場面 1 を思い出した時）。音は鳴らさない</summary>
+        public void Smolder(Transform hand = null)
         {
-            if (puffs != null) puffs.Smolder();
+            if (puffs != null) puffs.Smolder(hand);
         }
 
         /// <summary>立ち続けていた煙を seconds 秒で細くして止める</summary>

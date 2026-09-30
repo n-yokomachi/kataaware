@@ -14,7 +14,7 @@ namespace HalfAware
     ///
     /// 向き直す・読む間は、見回しと歩きを止める。向き直す間は調べる操作と字幕送りも止める
     /// （向き直す前に 2 ページ目へ送られて、映り込みが動いている途中で出ないように）。二択を出している間は止めない。
-    /// 読んでいる間だけ、両手を腿に置いて肩を落とした形（<see cref="SeatedPose"/> の二つ目の形）にする。
+    /// 座った形は変えない（右手は煙草を持って肘掛けに置いたまま。前の、立った所から座らせた時の、両手を腿に置いた二つ目の形は使わない）。
     ///
     /// **「はい」でスリープを解除したら、机のモニター 5 枚を起動する**（<see cref="TerminalScreen"/>、オーナー、2026-09-28
     /// 「モニターのスリープを解除したときに、別の場面の時と同じようにコンソール的なものを表示して」）。場面 3 でジャックを繋いだ時と同じ、
@@ -25,7 +25,7 @@ namespace HalfAware
     public sealed class TerminalSeat : MonoBehaviour, ISceneMemory
     {
         [SerializeField] SceneFlow flow;
-        [Tooltip("座った形。読んでいる間だけ二つ目の形（両手を腿に置いて肩を落とす）にする")]
+        [Tooltip("座った形（確かめの撮影が使う。遊ぶ間は形を変えない）")]
         [SerializeField] SeatedPose pose;
         [Tooltip("モニターの映り込み。消えきってから戻す")]
         [SerializeField] TerminalReflection reflection;
@@ -108,10 +108,7 @@ namespace HalfAware
         {
             Wake();
             if (visit == null || !visit.Busy || flow == null || flow.Player == null) return;
-            var was = visit.Now;
             visit.Tick(Time.deltaTime, flow.Talking, flow.Choosing, reflection != null && reflection.Level > 0f);
-            // 向き直し終えて読み始めたら、両手を腿に置いた形。正面を向いているので、腕の入れ替わりは目に入らない
-            if (was == SeatVisit.Phase.Going && visit.Now == SeatVisit.Phase.Reading && pose != null) pose.UseAlternate = true;
             if (visit.Frozen(flow.Talking, flow.Choosing)) flow.Freeze(ConnectDirector.FreezeMargin);
             // 戻す段は置き直さない（その向きのまま）
             if (visit.Now == SeatVisit.Phase.Going || visit.Now == SeatVisit.Phase.Reading) Place();
@@ -173,10 +170,9 @@ namespace HalfAware
             screen.Scroll(true);
         }
 
-        /// <summary>読み終えたら、座った形を戻して見回しを返す。座ったままなので歩きは返さない（立つのはジャケットの後。SceneFlow）</summary>
+        /// <summary>読み終えたら、見回しを返す。座ったままなので歩きは返さない（立つのはジャケットの後。SceneFlow）</summary>
         void Finish()
         {
-            if (pose != null) pose.UseAlternate = false;
             flow.Player.CanLook = true;
         }
     }
