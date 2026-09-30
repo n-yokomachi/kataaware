@@ -164,57 +164,6 @@ namespace HalfAware.EditorTools
             }
         }
 
-        /// <summary>
-        /// 買い手を一人作る（群衆と同じ人の作りで、段を持たない一つの形）。
-        /// ふだんは群衆と同じ透かさないマテリアルで描く。自分の番に AlleyDirector が出して濃さを上げるあいだだけ、
-        /// 透かせるマテリアルへ差し替える（<see cref="BuyerFade"/>）。
-        /// 透かせる側のまま置くと深さを書かないので、口の中や後ろ頭の髪の塗りが顔の上に描かれ、顔が崩れた（女大 15 は顔が上下逆に見えた）
-        /// </summary>
-        public static GameObject Buyer(Transform parent, string name, RocketboxMob who, Pose pose, Vector3 at, float yaw, int seed, StringBuilder sb)
-        {
-            EnsureFolder();
-            Begin();
-            try
-            {
-                var rng = new System.Random(seed);
-                var a = new Appearance { who = who, place = new Place { at = at, yaw = yaw, pose = pose, scale = 1f }, nth = 0 };
-                PickKinds(a, Prep(who), rng, new List<Appearance>());
-                var used = new List<Color>();
-                for (var i = 0; i < a.implants.Count; i++)
-                {
-                    var im = a.implants[i];
-                    im.color = Pick(rng, used, used);
-                    used.Add(im.color);
-                    a.implants[i] = im;
-                }
-                var mats = Materials(a, 512, true, "Buyer");
-                // 浮かび上がるあいだの透かせる組。髪の房は切り抜きのまま（濃さの α で切り抜かれて現れる）
-                var fade = new Material[mats.Length];
-                for (var i = 0; i < mats.Length; i++)
-                {
-                    var path = AssetDatabase.GetAssetPath(mats[i]);
-                    fade[i] = mats[i].IsKeywordEnabled("_ALPHATEST_ON") ? mats[i]
-                        : Save(Faded(mats[i]), path.Substring(0, path.Length - ".mat".Length) + "_Fade.mat");
-                }
-                var mesh = Full(who, pose);
-                var go = new GameObject(name);
-                go.transform.SetParent(parent, false);
-                go.transform.position = at;
-                go.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
-                go.AddComponent<MeshFilter>().sharedMesh = mesh;
-                var r = go.AddComponent<MeshRenderer>();
-                r.sharedMaterials = mats;
-                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                go.AddComponent<BuyerFade>().Bind(mats, fade);
-                if (sb != null) sb.AppendFormat("{0}: {1}（{2}、{3}）、{4} 三角", name, who.Label, pose, Describe(a), mesh.triangles.Length / 3).AppendLine();
-                return go;
-            }
-            finally
-            {
-                End();
-            }
-        }
-
         // ---- 人の選び ---------------------------------------------------------
 
         /// <summary>
@@ -1210,26 +1159,6 @@ namespace HalfAware.EditorTools
             // 卓の上の豆電球で白く飛ばないよう、買い手は色を暗くする（<see cref="BuyerTone"/>）。
             // 浮かび上がるあいだは _BaseColor が全部の面の組に上書きされるので、どの組も同じ色にしておく
             if (buyer) m.SetColor("_BaseColor", new Color(BuyerTone, BuyerTone, BuyerTone, 1f));
-            return m;
-        }
-
-        /// <summary>
-        /// 買い手が浮かび上がるあいだの、透かせる写し。深さは書かない（URP の見直しが透かせる側では必ず切る）ので、
-        /// 濃さを上げきったら透かさない組へ戻す（<see cref="BuyerFade"/>）
-        /// </summary>
-        static Material Faded(Material solid)
-        {
-            var m = new Material(solid) { name = solid.name + "_Fade" };
-            m.SetFloat("_Surface", 1f);
-            m.SetFloat("_Blend", 0f);
-            m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
-            m.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            m.SetFloat("_SrcBlendAlpha", (float)UnityEngine.Rendering.BlendMode.One);
-            m.SetFloat("_DstBlendAlpha", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            m.SetFloat("_ZWrite", 0f);
-            m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-            m.SetOverrideTag("RenderType", "Transparent");
-            m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
             return m;
         }
 

@@ -169,12 +169,19 @@ namespace HalfAware.EditorTools
         static BuyerSteps Steps;
 
         /// <summary>
-        /// 買い手。卓の手前に立ち、店の方を向く。
+        /// 買い手。卓の手前に立ち、主人公の方を向く。
         ///
         /// 6.4 のとおり 1 人目と 2 人目は男、3 人目は女（<see cref="RocketboxMob.Buyers"/>）。
         /// A は若い女の記憶を欲しがる常連（男大 14）、B は煙草で払う常連（男大 02）、C は初めての客（女大 15）。
         /// 人の作りは群衆と同じ（服の色は元のまま、肌にインプラント）で、寄りで見るのでテクスチャは 512 のまま、三角も減らさない。
-        /// はじめは伏せておき、その買い手の番だけ AlleyDirector が出して、濃さを上げて浮かび上がらせる
+        /// はじめは伏せておき、その買い手の番だけ AlleyDirector が出して、主人公の視界の左右の外から歩かせる（<see cref="BuyerWalk"/>、
+        /// オーナー、2026-09-30「画面奥から登場させると時間かかるから、画面の左右から出てくる感じ」）。
+        ///
+        /// 道筋（露店の座。x は露店の右、z は売り手の側が正）は、入り口（<see cref="BuyerFromSide"/>、<see cref="BuyerFromFront"/>）→
+        /// 露店の手前の柱（±1.30、−1.10）の外（±<see cref="BuyerPastSide"/>、<see cref="BuyerPastFront"/>）→ 止まる所。
+        /// 入り口は、露店の内側に立って 8 度見下ろした始まりの視界（縦 70 度、キャンバスは 16:9 のままなので横に片側 51 度）の外で、
+        /// 足元まで体の半分の幅（0.25 m）より外。主人公の左の入り口はヤードの北の壁（z 44）に 0.35 m まで寄るので、視界の縁から 0.19 m しか余さない。
+        /// 入ってくる側は一人ずつ替える（A は主人公の左、B は右、C は左。主人公の左は露店の +x）。去る時は来た側へ戻るので、次の買い手と擦れ違わない
         /// </summary>
         static GameObject[] MakeBuyers(Transform parent, Vector3 at, Quaternion spin, float yaw)
         {
@@ -185,22 +192,64 @@ namespace HalfAware.EditorTools
             // 看板の幅（1.5 m）の内側に収める。
             // 外へ外れると、看板と人が別々に見えて花が無い
             var sway = new[] { -0.26f, 0.22f, -0.06f };
+            // 主人公の立つ所（SellSpot と同じ）。止まった買い手はここを向く
+            var seller = at + spin * new Vector3(0f, 0f, 0.95f);
             var sb = new System.Text.StringBuilder("買い手\n");
             for (var i = 0; i < made.Length && i < RocketboxMob.Buyers.Length; i++)
             {
                 var who = RocketboxMob.Buyers[i];
-                // 卓を浅くしたので、前端は露店の中心から 0.80 m、
-                // 体が入るのは 1.12 m から。縁に寄って立たせる
-                var spot = at + front * 1.18f + spin * new Vector3(sway[i], 0f, 0f);
+                // 卓を浅くしたので、前端は露店の中心から 0.80 m、体が入るのは 1.12 m から。
+                // 露店の看板（SignMemories、下の縁 1.77 m）が 1.12 m の所に下がっていて、縁に寄って 1.18 m に立たせると
+                // 背の高い A と B（頭のてっぺん 1.80〜1.82 m）の頭を板が切った。板から顔まで空くよう 1.30 m に立たせる
+                var spot = at + front * 1.30f + spin * new Vector3(sway[i], 0f, 0f);
                 spot.y = Ground(spot);
-                var go = BuildAlleyCrowd.Buyer(parent, "Buyer" + i, who, poses[i % poses.Length], spot, yaw, 7300 + i, sb);
+                var side = BuyerSide(i);
+                var route = new[]
+                {
+                    at + spin * new Vector3(BuyerFromSide(side), 0f, BuyerFromFront),
+                    at + spin * new Vector3(side * BuyerPastSide, 0f, BuyerPastFront),
+                    spot,
+                };
+                for (var k = 0; k < route.Length - 1; k++) route[k].y = Ground(route[k]);
+                var go = BuildAlleyCrowd.Buyer(parent, "Buyer" + i, who, poses[i % poses.Length], route, seller, 7300 + i, null, sb);
                 if (go == null) continue;
                 go.SetActive(false);
                 made[i] = go;
             }
             Debug.Log(sb.ToString());
             Steps = MakeSteps(parent);
+            foreach (var go in made)
+            {
+                if (go == null) continue;
+                var so = new SerializedObject(go.GetComponent<BuyerWalk>());
+                so.FindProperty("steps").objectReferenceValue = Steps;
+                // ヒールで歩くかは売り買いの形（MarketSale）から。模型の男女と食い違えば知らせる
+                var i = System.Array.IndexOf(made, go);
+                if (so.FindProperty("heels").boolValue != MarketSale.Woman(i))
+                    Debug.LogWarning("買い手 " + go.name + " の模型の男女が、売り買いの形（MarketSale.Woman）と食い違う");
+                so.FindProperty("heels").boolValue = MarketSale.Woman(i);
+                so.ApplyModifiedPropertiesWithoutUndo();
+            }
             return made;
+        }
+
+        /// <summary>買い手の入り口の、露店の中心から横への m（露店の座）。side は <see cref="BuyerSide"/>。左は北の壁が近いので短い</summary>
+        public static float BuyerFromSide(float side)
+        {
+            return side > 0f ? 3.55f : -3.7f;
+        }
+
+        /// <summary>買い手の入り口の、露店の中心から前後への m（露店の座。負が買い手の側）</summary>
+        public const float BuyerFromFront = -1.35f;
+        /// <summary>露店の手前の柱の外を通る所。横の m</summary>
+        public const float BuyerPastSide = 1.35f;
+        /// <summary>露店の手前の柱の外を通る所。前後の m（柱は −1.10 にあり、0.52 m 離れる）</summary>
+        public const float BuyerPastFront = -1.62f;
+
+        /// <summary>i 人目の買い手が入ってくる側。1 は主人公の左（露店の +x）、-1 は右。A は左、B は右、C は左</summary>
+        public static float BuyerSide(int i)
+        {
+            return i % 2 == 0 ? 1f : -1f;
         }
 
         /// <summary>
@@ -216,7 +265,7 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// 買い手が歩いてくる足音の音源（<see cref="BuyerSteps"/>）。買い手と同じ入れ物に置く。3D の音で、近づくほど大きく、来る向きから聞こえる。
         /// 男は通りと同じコンクリートの足音（StepSets.Concrete）、女はヒール（<see cref="HeelSteps"/>）。
-        /// 歩数と間はオーナーが耳で決めるので、組み直しても Inspector の値は既定に戻る（ここで書かない値は BuyerSteps の既定）
+        /// いつ鳴らすかは歩く買い手（<see cref="BuyerWalk"/>）が歩きの足の着地に揃えて決める
         /// </summary>
         static BuyerSteps MakeSteps(Transform parent)
         {
@@ -518,7 +567,6 @@ namespace HalfAware.EditorTools
             Fill(so, "chips", Chips);
             Fill(so, "buyers", Buyers);
             Fill(so, "smokes", Smokes);
-            so.FindProperty("steps").objectReferenceValue = Steps;
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(director);
         }

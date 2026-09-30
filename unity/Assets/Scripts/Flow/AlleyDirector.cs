@@ -10,9 +10,11 @@ namespace HalfAware
     /// 看板と地の文の対応は固定。i 番目の板に i 番目の段が紐づく。
     /// 板はシナリオの順に南から北へ並べてあるので、歩いた順に読めば書かれた順に流れる。
     /// テーブルで「はい」を選ぶと、
-    /// 暗転して露店の内側へ回り、買い手が順に来る。買い手は足音と一緒に歩いてきて、
-    /// 最後の一歩に合わせて卓の向こうへ浮かび上がる（<see cref="BuyerSteps"/>）。買い手が去るたびに暗転して、
-    /// テーブルの上のチップが減る。台詞は文面のアセットから引く（<see cref="MarketSale"/>）。
+    /// 暗転して露店の内側へ回り、買い手が順に来る。買い手は主人公の視界の左右の外から足音と一緒に歩いて入ってきて、
+    /// 卓の向こうで止まり、主人公の方を向いて話す（<see cref="BuyerWalk"/>、オーナー、2026-09-30）。入ってくる側は一人ずつ替える
+    /// （A は左、B は右、C は左）。去る時は歩き出すところで持っていったぶんのチップが卓から減り、来た側へ歩いて出ていく
+    /// （次の買い手は反対の側から来るので擦れ違わない）。最後の買い手が出ていったら暗転して、残りのチップも無くなり
+    /// （締めの「30分後には売り切れた」）、締めの独白へ。台詞は文面のアセットから引く（<see cref="MarketSale"/>）。
     ///
     /// 場面を閉じる判定は SceneFlow が持っている。止め方は二つ使い分ける。
     /// 売り買いのあいだは通して `flow.Held` で閉じるのを押さえ、暗転のあいだだけ
@@ -22,7 +24,8 @@ namespace HalfAware
     /// **売り買いの途中は、買い手と買い手の間を区切りにする**（<see cref="ISceneMemory"/>、設計書 5 節）。
     /// 売り買いの間は歩けず、字幕か暗転がずっと続くので、自由に動けるフレームが無い。
     /// 次の買い手を出す直前に <see cref="SceneFlow.Checkpoint"/> で写しを取り、思い出した時は
-    /// 露店の内側に立ち、卓のチップと煙草をその買い手が来る前の数にして、その買い手から続ける
+    /// 露店の内側に立ち、卓のチップと煙草をその買い手が来る前の数にして、その買い手が卓の向こうの止まる所に
+    /// 立った形で始める（歩き出しからはやり直さない）
     /// </summary>
     [DefaultExecutionOrder(-5)]
     public sealed class AlleyDirector : MonoBehaviour, ISceneMemory
@@ -40,7 +43,7 @@ namespace HalfAware
         [SerializeField] float sellPitch = 8f;
         [Tooltip("テーブルの上に並べるチップ。左から順に消える")]
         [SerializeField] GameObject[] chips = new GameObject[0];
-        [Tooltip("卓の向こうに立つ買い手。台詞のあいだだけ出す")]
+        [Tooltip("卓の向こうに立つ買い手。自分の番だけ出す。BuyerWalk を持っていれば視界の外から歩いてくる")]
         [SerializeField] GameObject[] buyers = new GameObject[0];
         [Tooltip("買い手 B が置いていく煙草。その行で順に出る")]
         [SerializeField] GameObject[] smokes = new GameObject[0];
@@ -48,19 +51,13 @@ namespace HalfAware
         [SerializeField] float fadeSeconds = 1.0f;
         [Tooltip("暗転したまま置く秒数")]
         [SerializeField] float blackSeconds = 0.5f;
-        [Tooltip("買い手が浮かび上がる秒数")]
-        [SerializeField] float buyerFade = 0.55f;
-        [Tooltip("買い手が歩いてくる足音。足音の終わりに合わせて浮かび上がる。無ければ足音なしで浮かび上がる")]
-        [SerializeField] BuyerSteps steps;
-        [Tooltip("足音の最後の一歩から、浮かび上がりきるまでの秒数。0 で最後の一歩と同時に浮かび上がりきる")]
-        [SerializeField] float stepSettle = 0.15f;
-        [Tooltip("買い手が歩いてくる向きの振り。度。卓の正面から左右へ、一人ずつ交互に振る（ヤードの通路から寄ってくる）")]
-        [SerializeField] float approachAngle = 55f;
+        [Tooltip("買い手が出ていってから、次の買い手が歩き出すまでの秒")]
+        [SerializeField] float betweenSeconds = 0.4f;
 
         bool selling;
         /// <summary>思い出して来た。冒頭の独白を出さない</summary>
         bool resumed;
-        /// <summary>暗転しているあいだと、買い手が歩いてくるあいだだけ立てる。ここで場面が閉じるのを止める</summary>
+        /// <summary>暗転しているあいだと、買い手が歩いてくる・出ていくあいだだけ立てる。ここで場面が閉じるのを止める</summary>
         bool holding;
 
         void Awake()
@@ -139,31 +136,38 @@ namespace HalfAware
             Show(MarketSale.Chips);
             yield return new WaitForSeconds(blackSeconds);
             yield return Black(false);
-            yield return Buyers(0);
+            yield return Buyers(0, false);
         }
 
         /// <summary>
-        /// from 人目の買い手から売り切れるまで。買い手を出す直前を区切りにして写しを取る（思い出すとそこから続く）
+        /// from 人目の買い手から売り切れるまで。買い手を出す直前を区切りにして写しを取る（思い出すとそこから続く）。
+        /// standing なら from 人目はもう止まる所に立っている（思い出した時）
         /// </summary>
-        IEnumerator Buyers(int from)
+        IEnumerator Buyers(int from, bool standing)
         {
             for (var i = from; i < MarketSale.Count; i++)
             {
                 next = i;
                 flow.Checkpoint();
-                ShowBuyer(i);
-                yield return Arrive(i);
+                if (!(standing && i == from)) yield return Arrive(i);
                 flow.Say(MarketSale.Lines(script, i));
                 yield return Spoken(MarketSale.PutsSmokes(script, i), MarketSale.Smokes(i));
-                // 買い手が去る。暗転しているあいだに、持っていったぶんを引く
-                yield return Black(true);
-                ShowBuyer(-1);
+                // 買い手が去る。歩き出すところで、持っていったぶんが卓から減る
                 Show(MarketSale.Left(i));
-                yield return new WaitForSeconds(blackSeconds);
-                yield return Black(false);
+                yield return Depart(i);
+                if (i < MarketSale.Count - 1)
+                    for (var t = 0f; t < betweenSeconds; t += Time.deltaTime)
+                    {
+                        flow.Freeze(0.25f);
+                        yield return null;
+                    }
             }
 
+            // 締めの「30分後には売り切れた」。暗転のあいだに残りも無くなる
+            yield return Black(true);
             Show(0);
+            yield return new WaitForSeconds(blackSeconds);
+            yield return Black(false);
             next = -1;
             flow.Say(MarketSale.Closing(script));
             // 締めの文は積んである。読み終えたところで場面が閉じてよい
@@ -195,7 +199,7 @@ namespace HalfAware
 
         /// <summary>
         /// 売り買いの途中なら、暗転も音も無しに露店の内側へ立たせ、卓をその買い手が来る前の形にして、
-        /// 黒から明けきってからその買い手を出す
+        /// その買い手を卓の向こうの止まる所に立ち姿で立たせる。黒から明けきってから台詞を出す
         /// </summary>
         public void Restore(string data)
         {
@@ -211,11 +215,14 @@ namespace HalfAware
             Seat();
             Show(MarketSale.Left(memo.buyer - 1));
             ShowSmokes(MarketSale.SmokesBefore(memo.buyer));
-            ShowBuyer(-1);
+            // その買い手は卓の向こうの止まる所に立った形で始める（歩き出しの途中からはやり直さない）
+            ShowBuyer(memo.buyer);
+            var walk = Walker(memo.buyer);
+            if (walk != null) walk.Stand();
             if (Application.isPlaying) StartCoroutine(Resume(memo.buyer));
         }
 
-        /// <summary>黒から明けきるのを待ってから、その買い手から続ける。待つ間は調べさせない</summary>
+        /// <summary>黒から明けきるのを待ってから、その買い手の台詞から続ける。待つ間は調べさせない</summary>
         IEnumerator Resume(int from)
         {
             for (var t = 0f; t < SceneFlow.FadeInSeconds; t += Time.deltaTime)
@@ -223,7 +230,7 @@ namespace HalfAware
                 flow.Freeze(0.25f);
                 yield return null;
             }
-            yield return Buyers(from);
+            yield return Buyers(from, true);
         }
 
         /// <summary>
@@ -248,29 +255,53 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// i 人目の買い手が歩いてくる。足音（<see cref="BuyerSteps"/>）を鳴らし、最後の一歩に合わせて浮かび上がらせる。
-        /// 足音の間は字幕が無いので、調べる操作と進行を止めておく（卓の上の物を拾わせない）。足音が無ければ浮かび上がるだけ
+        /// i 人目の買い手が視界の外から歩いてきて、止まる所で止まる（<see cref="BuyerWalk"/>）。
+        /// 歩く間は字幕が無いので、調べる操作と進行を止めておく（卓の上の物を拾わせない）。BuyerWalk が無ければ、その場に出すだけ
         /// </summary>
         IEnumerator Arrive(int i)
         {
-            if (steps == null || i < 0 || i >= buyers.Length || buyers[i] == null)
+            var walk = Walker(i);
+            if (walk == null)
             {
-                StartCoroutine(Appear(i, buyerFade));
+                ShowBuyer(i);
+                yield break;
+            }
+            ShowBuyer(-1);
+            holding = true;
+            try
+            {
+                yield return walk.Enter();
+            }
+            finally
+            {
+                holding = false;
+            }
+        }
+
+        /// <summary>i 人目の買い手が来た側へ歩いて出ていき、伏せる。BuyerWalk が無ければ、その場で伏せる</summary>
+        IEnumerator Depart(int i)
+        {
+            var walk = Walker(i);
+            if (walk == null)
+            {
+                ShowBuyer(-1);
                 yield break;
             }
             holding = true;
-            var woman = MarketSale.Woman(i);
-            var to = buyers[i].transform.position;
-            var toward = sellSpot != null ? sellSpot.position - to : -buyers[i].transform.forward;
-            // 卓の正面（売り手から見て買い手の向こう）から、一人ずつ左右へ振った向きから来る
-            var away = Quaternion.Euler(0f, (i % 2 == 0 ? 1f : -1f) * approachAngle, 0f) * -toward;
-            var walk = steps.Seconds(woman);
-            var wait = Mathf.Max(0f, walk + stepSettle - buyerFade);
-            StartCoroutine(steps.Walk(to, away, woman));
-            for (var t = 0f; t < wait; t += Time.deltaTime) yield return null;
-            StartCoroutine(Appear(i, buyerFade));
-            for (var t = wait; t < Mathf.Max(walk, wait + buyerFade); t += Time.deltaTime) yield return null;
-            holding = false;
+            try
+            {
+                yield return walk.Leave();
+            }
+            finally
+            {
+                holding = false;
+            }
+            ShowBuyer(-1);
+        }
+
+        BuyerWalk Walker(int i)
+        {
+            return i >= 0 && i < buyers.Length && buyers[i] != null ? buyers[i].GetComponent<BuyerWalk>() : null;
         }
 
         /// <summary>暗転と、そこから明けるの両方。あいだは進行を止めておく</summary>
@@ -305,54 +336,7 @@ namespace HalfAware
         void ShowBuyer(int which)
         {
             for (var i = 0; i < buyers.Length; i++)
-            {
-                if (buyers[i] == null) continue;
-                buyers[i].SetActive(i == which);
-                if (i == which) Tint(buyers[i], 0f);     // 出したては透明。Appear で濃くする
-            }
-        }
-
-        /// <summary>
-        /// 買い手が浮かび上がる。ぱっと現れると人が湧いたように見える。
-        /// マテリアルは 3 人で共通なので、濃さは描画部ごとの上書きで持たせる
-        /// </summary>
-        IEnumerator Appear(int which, float seconds)
-        {
-            if (which < 0 || which >= buyers.Length || buyers[which] == null) yield break;
-            var who = buyers[which];
-            if (seconds <= 0f) { Tint(who, 1f); yield break; }
-            for (var t = 0f; t < seconds; t += Time.deltaTime)
-            {
-                if (who == null || !who.activeSelf) yield break;
-                Tint(who, t / seconds);
-                yield return null;
-            }
-            if (who != null) Tint(who, 1f);
-        }
-
-        static readonly int BaseColour = Shader.PropertyToID("_BaseColor");
-        MaterialPropertyBlock paint;
-
-        /// <summary>
-        /// 買い手の濃さ。0 で透明、1 で元の色。
-        /// 買い手が BuyerFade を持っていれば、浮かび上がるあいだだけ透かせるマテリアルに差し替える（ふだんは透かさない）
-        /// </summary>
-        void Tint(GameObject who, float amount)
-        {
-            var fade = who.GetComponent<BuyerFade>();
-            if (fade != null)
-            {
-                fade.Set(amount);
-                return;
-            }
-            var r = who.GetComponent<Renderer>();
-            if (r == null) return;
-            if (paint == null) paint = new MaterialPropertyBlock();
-            r.GetPropertyBlock(paint);
-            var colour = r.sharedMaterial == null ? Color.black : r.sharedMaterial.GetColor(BaseColour);
-            colour.a *= Mathf.Clamp01(amount);
-            paint.SetColor(BaseColour, colour);
-            r.SetPropertyBlock(paint);
+                if (buyers[i] != null) buyers[i].SetActive(i == which);
         }
 
         /// <summary>卓の上の煙草を count 個見せる</summary>

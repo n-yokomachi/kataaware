@@ -329,7 +329,8 @@ namespace HalfAware.Tests
             b.flow.Restore(memo);
             Assert.AreEqual(MarketSale.Left(1), Shown(b.chips), "二人目が去った後の枚数");
             Assert.AreEqual(6, Shown(b.smokes), "二人目が置いていった煙草は卓に残る");
-            Assert.AreEqual(0, Shown(b.buyers), "買い手は明けてから出す");
+            Assert.AreEqual(1, Shown(b.buyers), "その買い手だけ");
+            Assert.IsTrue(b.buyers[2].activeSelf, "三人目が、歩き出しからではなく止まる所に立った形で始まる");
             Assert.That(Vector3.Distance(b.player.transform.position, b.spot.position), Is.LessThan(1e-4f), "露店の内側");
             Assert.IsFalse(b.player.CanMove);
             Assert.IsTrue(b.flow.Held, "売り切れるまで場面を閉じない");

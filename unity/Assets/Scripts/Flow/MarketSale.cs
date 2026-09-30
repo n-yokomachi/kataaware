@@ -20,7 +20,7 @@ namespace HalfAware
         {
             /// <summary>この買い手が去ったあと、テーブルに残る枚数</summary>
             public int left;
-            /// <summary>女か。足音をヒールにする（<see cref="BuyerSteps"/>）</summary>
+            /// <summary>女か。ヒールの足音で歩いてくる（組み立てが <see cref="BuyerWalk"/> に写す）</summary>
             public bool woman;
             /// <summary>置く煙草の数。置かないなら 0</summary>
             public int smokes;

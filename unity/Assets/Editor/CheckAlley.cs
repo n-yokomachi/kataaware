@@ -16,6 +16,7 @@ namespace HalfAware.EditorTools
     /// - 人が床に立っているか（浮いたり沈んだりしていないか）
     /// - 自分の卓に並べた物が、互いにかぶったり縁からはみ出したりしていないか
     /// - 通りのネオンの看板・壁の管・案内の矢を、ほかの物の面が貫いていないか
+    /// - 売り買いの買い手が、歩いてきて止まるまでに露店の看板と柱に当たらないか
     /// </summary>
     public static class CheckAlley
     {
@@ -43,6 +44,7 @@ namespace HalfAware.EditorTools
             bad += Feet(root);
             bad += Table(root);
             bad += Neon(root);
+            bad += Buyers(root);
             if (bad == 0) Debug.Log("見直し: 気になるところは無し");
             else Debug.LogWarning("見直し: 気になるところ " + bad + " 件。上を参照");
         }
@@ -241,6 +243,95 @@ namespace HalfAware.EditorTools
             Debug.LogWarning(string.Format("見直し: 人の最下点が {0}（{1} のあたり）。床にめり込んでいる",
                 low.ToString("F3"), at.ToString("F1")));
             return 1;
+        }
+
+        /// <summary>
+        /// 売り買いの買い手（<see cref="BuyerWalk"/>）が、歩いてきて止まるまでに露店の看板（卓の向こうに 1.77 m まで下がった板）を頭で貫かないか、
+        /// 露店の手前の柱に寄りすぎないか。道筋の終わりの 1.2 m を 0.2 m おきと、止まった立ち姿で、体の形を焼いて見る。
+        /// 見終えたら伏せる（伏せると PersonMotion が骨を模型の素へ戻すので、シーンに骨の上書きが残らない）
+        /// </summary>
+        static int Buyers(Transform root)
+        {
+            var buyers = root.Find("Items/Buyers");
+            if (buyers == null) return 0;
+            var boards = new List<Transform>();
+            foreach (var name in new[] { "Boards/SignMemories", "Boards/SignMemories.Back" })
+            {
+                var t = root.Find(name);
+                if (t != null && t.GetComponent<MeshFilter>() != null) boards.Add(t);
+            }
+            var poles = new List<Renderer>();
+            foreach (var name in new[] { "Market/MyStall/Stall/Pole0", "Market/MyStall/Stall/Pole1" })
+            {
+                var t = root.Find(name);
+                if (t != null && t.GetComponent<Renderer>() != null) poles.Add(t.GetComponent<Renderer>());
+            }
+            var bad = 0;
+            var baked = new Mesh();
+            try
+            {
+                foreach (Transform b in buyers)
+                {
+                    var walk = b.GetComponent<BuyerWalk>();
+                    if (walk == null || walk.Path.Length == 0) continue;
+                    var was = b.gameObject.activeSelf;
+                    b.gameObject.SetActive(true);
+                    try
+                    {
+                        var skin = b.GetComponentInChildren<SkinnedMeshRenderer>();
+                        var length = BuyerWalk.Length(walk.Path);
+                        var hits = 0;
+                        for (var d = Mathf.Max(0f, length - 1.2f); d <= length + 0.1f; d += 0.2f)
+                        {
+                            walk.Preview(d >= length ? -1f : d);
+                            skin.BakeMesh(baked, true);
+                            foreach (var v in baked.vertices)
+                            {
+                                var w = skin.transform.TransformPoint(v);
+                                if (w.y < 1.2f) continue;
+                                foreach (var board in boards)
+                                {
+                                    var box = board.GetComponent<MeshFilter>().sharedMesh.bounds;
+                                    box.Expand(0.02f);
+                                    if (box.Contains(board.InverseTransformPoint(w))) hits++;
+                                }
+                            }
+                        }
+                        if (hits > 0)
+                        {
+                            Debug.LogWarning("見直し: 買い手 " + b.name + " の頭が露店の看板を貫く（頂点 " + hits + "）");
+                            bad++;
+                        }
+                        // 柱。道筋の中心から柱の外形まで。体の半分の幅と腕の振りで 0.35 m は要る
+                        var near = float.MaxValue;
+                        for (var d = 0f; d <= length; d += 0.05f)
+                        {
+                            Vector3 heading;
+                            var at = buyers.TransformPoint(BuyerWalk.Along(walk.Path, d, out heading));
+                            foreach (var pole in poles)
+                            {
+                                var c = pole.bounds.ClosestPoint(new Vector3(at.x, pole.bounds.center.y, at.z));
+                                near = Mathf.Min(near, new Vector2(c.x - at.x, c.z - at.z).magnitude);
+                            }
+                        }
+                        if (near < 0.35f)
+                        {
+                            Debug.LogWarning("見直し: 買い手 " + b.name + " の道筋が露店の柱に " + near.ToString("0.00") + " m まで寄る");
+                            bad++;
+                        }
+                    }
+                    finally
+                    {
+                        b.localPosition = walk.Path[walk.Path.Length - 1];
+                        b.gameObject.SetActive(was);
+                    }
+                }
+            }
+            finally
+            {
+                Object.DestroyImmediate(baked);
+            }
+            return bad;
         }
 
         /// <summary>
@@ -465,7 +556,7 @@ namespace HalfAware.EditorTools
                 Face(player, root.Find("Boards/StreetSign2"));
                 log.AppendLine(CheckRoom.Shoot(System.IO.Path.Combine(dir, "subtitle_latin_ruby.png"), h => h.SetSubtitle(nerve, SubtitleKind.Line, true)));
 
-                // 売り買い。露店の内側から、買い手 C（3 人目）が浮かび上がる途中と、浮かび上がりきった所
+                // 売り買い。露店の内側から、買い手 C（3 人目）が視界の左の外から歩いてくる途中と、止まった所
                 var director = Object.FindFirstObjectByType<AlleyDirector>(FindObjectsInactive.Include);
                 var dso = new SerializedObject(director);
                 var spot = (Transform)dso.FindProperty("sellSpot").objectReferenceValue;
@@ -480,23 +571,17 @@ namespace HalfAware.EditorTools
                 var c = (GameObject)buyers.GetArrayElementAtIndex(2).objectReferenceValue;
                 c.SetActive(true);
                 player.PlaceAt(spot.position, spot.eulerAngles.y, HeadTurn.DefaultLimit, 0f, pitch, PlayerController.StandingEyeHeight);
-                var fade = c.GetComponent<BuyerFade>();
-                if (fade != null) fade.Set(0.45f);
-                log.AppendLine(CheckRoom.Shoot(System.IO.Path.Combine(dir, "buyerC_arriving.png"), h => h.SetSubtitle(null)));
-                if (fade != null) fade.Set(1f);
+                var walk = c.GetComponent<BuyerWalk>();
+                if (walk != null)
+                {
+                    var length = BuyerWalk.Length(walk.Path);
+                    walk.Preview(length * 0.45f);
+                    log.AppendLine(CheckRoom.Shoot(System.IO.Path.Combine(dir, "buyerC_arriving.png"), h => h.SetSubtitle(null)));
+                    walk.Preview(-1f);
+                    log.AppendFormat("  買い手 C の道筋 {0:0.00} m、歩いて {1:0.0} 秒", length, walk.ArriveSeconds()).AppendLine();
+                }
                 var first = MarketSale.Lines(script, 2)[0];
                 log.AppendLine(CheckRoom.Shoot(System.IO.Path.Combine(dir, "buyerC_arrived.png"), h => h.SetSubtitle(first, SubtitleKind.Line, true)));
-                // 足音の歩く所（買い手 C はヒール）
-                var steps = (BuyerSteps)dso.FindProperty("steps").objectReferenceValue;
-                if (steps != null)
-                {
-                    var away = Quaternion.Euler(0f, dso.FindProperty("approachAngle").floatValue, 0f) * -(spot.position - c.transform.position);
-                    var sso = new SerializedObject(steps);
-                    var count = steps.Count(true);
-                    for (var k = 0; k < count; k++)
-                        log.AppendFormat("  ヒールの {0} 歩目 {1:0.00} 秒: {2}", k + 1, k * steps.Interval(true),
-                            BuyerSteps.At(c.transform.position, away, sso.FindProperty("from").floatValue, sso.FindProperty("gait").floatValue, k, count).ToString("F2")).AppendLine();
-                }
             }
             catch (System.Exception e)
             {
