@@ -120,6 +120,9 @@ namespace HalfAware.EditorTools
             log.AppendLine(Free(P("1k_room"), W(chair, -2.6f, 1.65f, -1.9f), W(chair, -0.6f, 0.7f, 0.3f), 0f));
             // 背もたれの前を正面から（机と椅子の間の、座った目より少し前の高さから。ボタン留めの菱形の読み）
             log.AppendLine(Free(P("1l_front"), W(chair, 0f, 1.30f, 0.62f), W(chair, 0f, 0.98f, -0.30f), 0f));
+            // 座面とフットレストの寄り（斜め前の上から）と、台座の寄り（低い斜めから）
+            log.AppendLine(Free(P("1n_seat_close"), W(chair, 0.32f, 1.12f, 0.58f), W(chair, 0f, 0.36f, 0.12f), 50f));
+            log.AppendLine(Free(P("1o_base_close"), W(chair, 0.75f, 0.42f, -0.55f), W(chair, 0f, 0.12f, 0f), 0f));
             Body(true);
             // 座った体の足がフットレストのパッドに乗っている所（低い前から。頭は枠の外）
             log.AppendLine(Free(P("1i_feet_on_footrest"), W(chair, 0.62f, 0.38f, 0.95f), W(chair, 0f, 0.14f, 0.30f), 50f, 1.2f));

@@ -104,8 +104,8 @@ namespace HalfAware.EditorTools
         /// <summary>差込口（Room/Chair/PortHole。ケーブルの始まり）。前の椅子と同じ所</summary>
         public static readonly Vector3 PortAt = new Vector3(0.286f, 0.670f, 0.150f);
 
-        /// <summary>五本脚の脚の先（キャスターの芯）までの半径</summary>
-        const float LegReach = 0.30f;
+        /// <summary>台座（逆さの漏斗の形）の床に接する縁の半径</summary>
+        const float PedestalReach = 0.29f;
 
         /// <summary>
         /// フットレストのパッドの上の面の線。座った形の足の裏（踵 z 0.18 で 0.169、土踏まず z 0.30 で 0.122、指の付け根 z 0.38〜0.40 で 0.096〜0.098）に
@@ -145,9 +145,9 @@ namespace HalfAware.EditorTools
         const float ArmAreaZ0 = -0.19f, ArmAreaZ1 = 0.255f;
 
         /// <summary>
-        /// 色の升（4×4 画素）。下の段に 16 個、左上の段（y 60）に金属と漆と革の 4 個。ケーブルや金具のような一色の物は升の真ん中を引く
+        /// 色の升（4×4 画素）。下の段に 16 個、左上の段（y 60）に金属と漆と革と黒い磨いた金属の 5 個。ケーブルや金具のような一色の物は升の真ん中を引く
         /// </summary>
-        enum Swatch { Rubber, Plastic, Grey, Violet, Teal, Orange, Metal, Label, Cyan, VioletLit, Amber, Green, Brass, Glass, PlasticLight, Red, Chrome, Steel, Lacquer, Leather }
+        enum Swatch { Rubber, Plastic, Grey, Violet, Teal, Orange, Metal, Label, Cyan, VioletLit, Amber, Green, Brass, Glass, PlasticLight, Red, Chrome, Steel, Lacquer, Leather, BlackChrome }
 
         static Vector2 SwatchUv(Swatch s)
         {
@@ -218,22 +218,54 @@ namespace HalfAware.EditorTools
         static float Smooth(float a, float b, float x) { return Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(a, b, x)); }
 
         /// <summary>
-        /// 縫い目の溝（0〜1。上の平らな面と、脇と前の丸みの境）。脇は |x| = weltX の線を前の縫い目まで、前は z = weltZ の線を脇の縫い目まで。
-        /// 平らな板に見えないよう、上の面をクッションの形に区切る。mesh には持たせず、絵（陰と法線）に描く
+        /// 縁の縫い目の線までの離れ（m）。上の平らな面と、脇と前の丸みの境。脇は |x| = weltX の線を前の縫い目まで、前は z = weltZ の線を脇の縫い目まで
         /// </summary>
-        static float Welt(float x, float z, float weltX, float weltZ)
+        static float WeltDistance(float x, float z, float weltX, float weltZ)
         {
             var ax = Mathf.Abs(x);
-            var side = Mathf.Exp(-Mathf.Pow((ax - weltX) / 0.006f, 2f)) * (1f - Smooth(weltZ - 0.006f, weltZ + 0.004f, z));
-            var front = Mathf.Exp(-Mathf.Pow((z - weltZ) / 0.006f, 2f)) * (1f - Smooth(weltX - 0.006f, weltX + 0.004f, ax));
-            return Mathf.Max(side, front);
+            var corner = new Vector2(ax - weltX, z - weltZ).magnitude;
+            var side = z <= weltZ ? Mathf.Abs(ax - weltX) : corner;
+            var front = ax <= weltX ? Mathf.Abs(z - weltZ) : corner;
+            return Mathf.Min(side, front);
         }
+
+        /// <summary>玉縁（縫い目に沿った細い革の紐）の高さ（m、上へ正）。縫い目の線からの離れ d で、線の上で 3 mm 盛り上がり、両脇の縫い目で窪む</summary>
+        static float Piping(float d)
+        {
+            return 0.003f * Mathf.Exp(-Mathf.Pow(d / 0.004f, 2f)) - 0.0025f * Mathf.Exp(-Mathf.Pow((Mathf.Abs(d) - 0.008f) / 0.003f, 2f));
+        }
+
+        /// <summary>
+        /// クッションの上の面の細かい起伏（m、上へ正）。菱形のボタン留めの膨らみとボタンの窪み、縁の玉縁。mesh には持たせず、絵（陰と法線）に描く。
+        /// 座面とフットレストは体の当たる面なので、上の面の高さ（mesh）は変えない
+        /// </summary>
+        static float CushionFine(Lattice l, float inside, float puff, float dip, float x, float z, float weltX, float weltZ)
+        {
+            var h = Piping(WeltDistance(x, z, weltX, weltZ));
+            if (inside > 0f)
+            {
+                var near = Nearest(l, x, z);
+                var hole = dip * Mathf.Exp(-Mathf.Pow((new Vector2(x, z) - near).magnitude / 0.012f, 2f));
+                h += inside * (puff * Dome(l, x, z) - hole);
+            }
+            return h;
+        }
+
+        /// <summary>座面のボタン留めの面の内か（縁の縫い目の 1.5 cm 内から、背もたれの下に隠れる後ろの所まで）</summary>
+        static float SeatTuftInside(float x, float z)
+        {
+            var ax = Mathf.Abs(x);
+            return (1f - Smooth(SeatWeltX - 0.035f, SeatWeltX - 0.012f, ax)) * (1f - Smooth(SeatWeltZ - 0.035f, SeatWeltZ - 0.012f, z)) * Smooth(-0.16f, -0.11f, z);
+        }
+
+        /// <summary>座面の上の面の細かい起伏（菱形の膨らみ 2.2 cm、ボタンの窪み 1.4 cm、玉縁）</summary>
+        static float SeatFine(float x, float z) { return CushionFine(SeatLattice, SeatTuftInside(x, z), 0.022f, 0.014f, x, z, SeatWeltX, SeatWeltZ); }
 
         /// <summary>座面の縫い目の所（脇の丸みの始まりのすぐ内と、前の丸みの始まりのすぐ後ろ）</summary>
         const float SeatWeltX = 0.205f;
         const float SeatWeltZ = 0.232f;
 
-        /// <summary>座面の上の面の高さ。尻の沈む所をわずかに窪ませる</summary>
+        /// <summary>座面の上の面の高さ（mesh）。尻の沈む所をわずかに窪ませる。ボタン留めと玉縁は絵に描く（<see cref="SeatFine"/>）</summary>
         static float SeatTop(float x, float z)
         {
             return SeatLevel(z) - 0.005f * Mathf.Exp(-Mathf.Pow((z - 0.03f) / 0.12f, 2f)) * (1f - Smooth(0.12f, 0.20f, Mathf.Abs(x)));
@@ -406,10 +438,32 @@ namespace HalfAware.EditorTools
         /// ボタン留めの膨らみ（0〜1）。菱形ごとの丸い枕の形: 真ん中が高く、四つの辺（折り目）で 0、四つの角（ボタン）で 0。
         /// 菱形の中の位置 (fm, fn) の放物線の積を 0.7 乗して、頂をなだらかに、折り目の際を少し急にする
         /// </summary>
-        static float TuftDome(float x, float s)
+        static float TuftDome(float x, float s) { return Dome(BackLattice, x, s); }
+
+        /// <summary>いちばん近いボタンの位置 (x, s)</summary>
+        static Vector2 TuftNearest(float x, float s) { return Nearest(BackLattice, x, s); }
+
+        /// <summary>ボタン留めの菱形の格子。同じ段のボタンの間の半分 Dx、段の間 Dy、ボタンの段の一つの位置 Y0。ボタンは (i·Dx, Y0 + j·Dy)、i + j が偶数の所</summary>
+        struct Lattice
         {
-            var a = x / TuftDx;
-            var b = (s - TuftS0) / TuftDs;
+            public float Dx, Dy, Y0;
+            public Lattice(float dx, float dy, float y0) { Dx = dx; Dy = dy; Y0 = y0; }
+        }
+
+        static readonly Lattice BackLattice = new Lattice(TuftDx, TuftDs, TuftS0);
+        /// <summary>座面の菱形（幅 14 cm・奥行き 20 cm）。前の縫い目の 3 cm 後ろにボタンの段。背もたれの菱形と同じ形の小さめ</summary>
+        static readonly Lattice SeatLattice = new Lattice(0.07f, 0.10f, 0.20f);
+        /// <summary>フットレストの菱形（幅 12 cm・奥行き 18 cm）</summary>
+        static readonly Lattice FootLattice = new Lattice(0.06f, 0.09f, 0.37f);
+
+        /// <summary>
+        /// ボタン留めの膨らみ（0〜1）。菱形ごとの丸い枕の形: 真ん中が高く、四つの辺（折り目）と四つの角（ボタン）で 0。
+        /// 菱形の中の位置 (fm, fn) の放物線の積を 0.7 乗して、頂をなだらかに、折り目の際を少し急にする
+        /// </summary>
+        static float Dome(Lattice l, float x, float y)
+        {
+            var a = x / l.Dx;
+            var b = (y - l.Y0) / l.Dy;
             var m = 0.5f * (a + b);
             var n = 0.5f * (b - a);
             var fm = m - Mathf.Floor(m);
@@ -417,14 +471,35 @@ namespace HalfAware.EditorTools
             return Mathf.Pow(Mathf.Max(0f, 16f * fm * (1f - fm) * fn * (1f - fn)), 0.7f);
         }
 
-        /// <summary>いちばん近いボタンの位置 (x, s)</summary>
-        static Vector2 TuftNearest(float x, float s)
+        /// <summary>いちばん近いボタンの位置</summary>
+        static Vector2 Nearest(Lattice l, float x, float y)
         {
-            var a = x / TuftDx;
-            var b = (s - TuftS0) / TuftDs;
+            var a = x / l.Dx;
+            var b = (y - l.Y0) / l.Dy;
             var m = Mathf.Round(0.5f * (a + b));
             var n = Mathf.Round(0.5f * (b - a));
-            return new Vector2((m - n) * TuftDx, TuftS0 + (m + n) * TuftDs);
+            return new Vector2((m - n) * l.Dx, l.Y0 + (m + n) * l.Dy);
+        }
+
+        /// <summary>菱形の折り目（ボタンを結ぶ斜めの線）への近さ（0〜1。線の上で 1、1.2 cm ほどで消える）。地の色の陰と艶に使う</summary>
+        static float Crease(Lattice l, float x, float y)
+        {
+            var a = x / l.Dx;
+            var b = (y - l.Y0) / l.Dy;
+            var m = 0.5f * (a + b);
+            var n = 0.5f * (b - a);
+            // m・n の 1 あたりの長さ（m）
+            var unit = 1f / (0.5f * Mathf.Sqrt(1f / (l.Dx * l.Dx) + 1f / (l.Dy * l.Dy)));
+            var dm = Mathf.Abs(m - Mathf.Round(m)) * unit;
+            var dn = Mathf.Abs(n - Mathf.Round(n)) * unit;
+            return Mathf.Exp(-Mathf.Pow(Mathf.Min(dm, dn) / 0.012f, 2f));
+        }
+
+        /// <summary>ボタンの周り（0〜1。ボタンの上で 1、同じ段のボタンの間の 3 割ほどで消える）。地の色の陰と艶に使う</summary>
+        static float ButtonRing(Lattice l, float x, float y)
+        {
+            var near = Nearest(l, x, y);
+            return Mathf.Exp(-Mathf.Pow((new Vector2(x, y) - near).magnitude / (0.3f * l.Dx), 2f));
         }
 
         /// <summary>ボタン留めの面の内か（1 で内、縫い目と縁の巻きと腰の下の所で 0 へ）</summary>
@@ -522,19 +597,8 @@ namespace HalfAware.EditorTools
             return depth;
         }
 
-        /// <summary>菱形の折り目（ボタンを結ぶ斜めの線）への近さ（0〜1。線の上で 1、1.2 cm ほどで消える）。地の色の陰に使う</summary>
-        static float TuftCrease(float x, float s)
-        {
-            var a = x / TuftDx;
-            var b = (s - TuftS0) / TuftDs;
-            var m = 0.5f * (a + b);
-            var n = 0.5f * (b - a);
-            // m・n の 1 あたりの長さ（m）
-            var unit = 1f / (0.5f * Mathf.Sqrt(1f / (TuftDx * TuftDx) + 1f / (TuftDs * TuftDs)));
-            var dm = Mathf.Abs(m - Mathf.Round(m)) * unit;
-            var dn = Mathf.Abs(n - Mathf.Round(n)) * unit;
-            return Mathf.Exp(-Mathf.Pow(Mathf.Min(dm, dn) / 0.012f, 2f));
-        }
+        /// <summary>背もたれの菱形の折り目への近さ</summary>
+        static float TuftCrease(float x, float s) { return Crease(BackLattice, x, s); }
 
         /// <summary>背もたれの裏の面（前の基準の面から前へ。負）。平らな裏から、縁で真ん中の面まで丸く巻き上げる</summary>
         static float BackRearT(float x, float s)
@@ -845,52 +909,50 @@ namespace HalfAware.EditorTools
             }
 
             // ガスシリンダー。磨いた覆いと芯
-            TubeR(shop, "ColumnCover", Shop.Chrome, new List<Vector3> { new Vector3(0f, 0.10f, 0f), new Vector3(0f, 0.235f, 0f) }, new List<float> { 0.046f, 0.038f }, 8, true, Vector2.zero, 70f);
             Tube(shop, "ColumnRod", Shop.Chrome, new List<Vector3> { new Vector3(0f, 0.225f, 0f), new Vector3(0f, 0.345f, 0f) }, 0.024f, 6, false, Vector2.zero, 70f);
             Tube(shop, "ColumnCollar", Shop.Frame, new List<Vector3> { new Vector3(0f, 0.328f, 0f), new Vector3(0f, 0.346f, 0f) }, 0.04f, 6, true, Vector2.zero, 70f);
         }
 
-        // ---- 五本脚とキャスター --------------------------------------------------------
+        // ---- 台座 ------------------------------------------------------------------
 
+        /// <summary>
+        /// 台座。一本の柱が床の近くで逆さの漏斗（ラッパ形）に広がる、黒く磨いた金属の台（キャスターは無い。部屋の黒い家具に揃え、照り返しで金属に見せる）。
+        /// 床に接する縁は丸く巻く。
+        /// 柱の上にガスシリンダーの芯と襟、その上にリクライニングの機構（<see cref="Undercarriage"/>）
+        /// </summary>
         static void Base(Shop shop)
         {
-            Tube(shop, "Hub", Shop.Chrome, new List<Vector3> { new Vector3(0f, 0.075f, 0f), new Vector3(0f, 0.132f, 0f) }, 0.056f, 8, true, Vector2.zero, 70f);
-            for (var k = 0; k < 5; k++)
+            // 輪郭（半径, 高さ）。床に接する縁の下から、縁の丸い巻き、なだらかに細る漏斗、柱
+            var profile = new[]
             {
-                // 一本は真後ろ。前の二本は左右へ 36 度（机の側へ脚を突き出さない）。磨いた金属。断面は上の細い台形
-                var a = (180f + 72f * k) * Mathf.Deg2Rad;
-                var dir = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a));
-                var side = Vector3.Cross(Vector3.up, dir);
-                shop.Begin("Leg" + k, 40f, true);
-                var rings = new List<List<Vector3>>();
-                foreach (var r in new[] { 0.03f, 0.16f, LegReach })
-                {
-                    var k2 = Mathf.InverseLerp(0.03f, LegReach, r);
-                    var w = Mathf.Lerp(0.026f, 0.017f, k2);
-                    var yt = Mathf.Lerp(0.128f, 0.086f, k2);
-                    var yb = Mathf.Lerp(0.084f, 0.062f, k2);
-                    var c = dir * r;
-                    var ring = new List<Vector3>
-                    {
-                        c - side * w + Vector3.up * yb,
-                        c + side * w + Vector3.up * yb,
-                        c + side * w * 0.65f + Vector3.up * yt,
-                        c - side * w * 0.65f + Vector3.up * yt,
-                    };
-                    ring.Add(ring[0]);
-                    rings.Add(ring);
-                }
-                Rings(shop, Shop.Chrome, rings, p => Vector2.zero);
-                // 先の蓋
-                var tip = rings[rings.Count - 1];
-                shop.Q(Shop.Chrome, shop.V(tip[0], Vector2.zero), shop.V(tip[1], Vector2.zero), shop.V(tip[2], Vector2.zero), shop.V(tip[3], Vector2.zero));
-                shop.End(Orient.Each);
+                new Vector2(PedestalReach - 0.028f, 0f), new Vector2(PedestalReach - 0.007f, 0.004f), new Vector2(PedestalReach, 0.013f),
+                new Vector2(PedestalReach - 0.006f, 0.023f), new Vector2(PedestalReach - 0.028f, 0.029f),
+                new Vector2(0.20f, 0.037f), new Vector2(0.145f, 0.05f), new Vector2(0.10f, 0.072f), new Vector2(0.07f, 0.10f),
+                new Vector2(0.053f, 0.14f), new Vector2(0.045f, 0.19f), new Vector2(0.041f, 0.235f),
+            };
+            Lathe(shop, "Pedestal", Shop.Panel, profile, 18, 40f, SwatchUv(Swatch.BlackChrome));
+            // 柱の上の蓋（芯の周り）
+            Ring(shop, "PedestalTop", new Vector3(0f, 0.235f, 0f), Vector3.up, 0.023f, 0.041f, 12, SwatchUv(Swatch.BlackChrome));
+        }
 
-                // キャスター。黒い覆いと、二つ並んだ車（一つの筒で見せる）
-                var at = dir * LegReach;
-                Slab(shop, "CasterHood" + k, Shop.Shell, at + Vector3.up * 0.046f, Quaternion.LookRotation(dir), new Vector3(0.034f, 0.03f, 0.05f), 0f, true);
-                Tube(shop, "Wheel" + k, Shop.Panel, new List<Vector3> { at - side * 0.026f + Vector3.up * 0.026f, at + side * 0.026f + Vector3.up * 0.026f }, 0.026f, 6, true, SwatchUv(Swatch.Rubber), 50f);
-            }
+        /// <summary>回し形。輪郭（半径, 高さ）を下から上へ並べ、y の軸のまわりに回した面。面は軸から外へ向ける</summary>
+        static void Lathe(Shop shop, string name, int sub, Vector2[] profile, int sides, float crease, Vector2 uv)
+        {
+            shop.Begin(name, crease, false);
+            var idx = new int[profile.Length, sides];
+            for (var i = 0; i < profile.Length; i++)
+                for (var k = 0; k < sides; k++)
+                {
+                    var a = (float)k / sides * Mathf.PI * 2f;
+                    idx[i, k] = shop.V(new Vector3(profile[i].x * Mathf.Cos(a), profile[i].y, profile[i].x * Mathf.Sin(a)), uv);
+                }
+            for (var i = 0; i < profile.Length - 1; i++)
+                for (var k = 0; k < sides; k++)
+                {
+                    var k1 = (k + 1) % sides;
+                    shop.QOut(sub, idx[i, k], idx[i + 1, k], idx[i + 1, k1], idx[i, k1], new Vector3(0f, 0.5f * (profile[i].y + profile[i + 1].y), 0f));
+                }
+            shop.End(Orient.None);
         }
 
         // ---- フットレスト ------------------------------------------------------------
@@ -906,9 +968,26 @@ namespace HalfAware.EditorTools
         /// <summary>引き出したレールの先（腕の上の軸）。座の皿の下の収め口から前へ出る</summary>
         static readonly Vector3 FootRailEnd = new Vector3(FootArmX, 0.391f, 0.19f);
 
-        /// <summary>フットレストのパッドの縫い目の所（脇の丸みのすぐ内と、前の丸みのすぐ後ろ。絵に描く）</summary>
+        /// <summary>フットレストのパッドの縫い目の所（脇の丸みのすぐ内と、前の丸みのすぐ後ろ。絵に玉縁を描く）</summary>
         const float FootWeltX = 0.168f;
         const float FootWeltZ = 0.405f;
+
+        /// <summary>フットレストのボタン留めの面の内か</summary>
+        static float FootTuftInside(float x, float z)
+        {
+            return (1f - Smooth(FootWeltX - 0.03f, FootWeltX - 0.01f, Mathf.Abs(x))) * (1f - Smooth(FootWeltZ - 0.03f, FootWeltZ - 0.01f, z)) * Smooth(FootBack + 0.015f, FootBack + 0.045f, z);
+        }
+
+        /// <summary>フットレストの上の面の細かい起伏（菱形の膨らみ 1.6 cm、ボタンの窪み 1 cm、玉縁）。足の裏が乗る面の高さ（mesh）は変えない</summary>
+        static float FootFine(float x, float z) { return CushionFine(FootLattice, FootTuftInside(x, z), 0.016f, 0.010f, x, z, FootWeltX, FootWeltZ); }
+
+        /// <summary>肘掛けの当て物の上の面の細かい起伏。上の面と脇の面の境（内と外）の玉縁</summary>
+        static float ArmFine(float ax, float z)
+        {
+            if (z < PadBack + 0.02f || z > PadFront - 0.02f) return 0f;
+            var r = PadRound(z);
+            return Piping(Mathf.Min(Mathf.Abs(ax - (PadIn(z) + 0.3f * r)), Mathf.Abs(ax - (PadOuter - 0.3f * r))));
+        }
         static float FootPadTop(float x, float z) { return FootTop(z); }
         static float FootPadUnder(float x, float z) { return FootTop(z) - FootThick; }
 

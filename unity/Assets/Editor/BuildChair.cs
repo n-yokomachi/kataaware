@@ -16,7 +16,8 @@ namespace HalfAware.EditorTools
     /// <list type="table">
     /// <item><term>形</term><description>椅子: 縁に縫い目を回した厚く柔らかい革の座面、前も裏も革で包んだ厚く幅の広い背もたれ
     /// （脇の太い巻きと上の頭の当ての巻きを縫い目で区切り、内は大きな菱形のボタン留め）、黒い漆の台に載せた厚く丸い革の肘掛けと、
-    /// それを支える磨いた金属の腕、磨いた金属の五本脚とガスシリンダー、リクライニングの機構とレバー、座の前の下から引き出す革のフットレスト。後から付けた物: 頭の後ろの黒い金属の箱（背もたれの上の縁に掛けた留め具で留める）と耳の筐体、
+    /// それを支える磨いた金属の腕、一本の柱が床の近くで逆さの漏斗の形に広がる磨いた金属の台座（キャスター無し）とガスシリンダー、リクライニングの機構とレバー、
+    /// 座の前の下から引き出す革のフットレスト。座面・フットレストにも背もたれと揃う菱形のボタン留めと縁の玉縁、肘掛けの上にも玉縁。後から付けた物: 頭の後ろの黒い金属の箱（背もたれの上の縁に掛けた留め具で留める）と耳の筐体、
     /// 左右の肘掛けの前の操作盤（当て物の下から回り込む留め具で留める）、右の肘掛けの差込口（螺子で留めた金属の板）、
     /// 背もたれの裏と金属の腕に沿って這わせたケーブル（<c>BuildChairShape.cs</c>）</description></item>
     /// <item><term>体との取り合い</term><description>座った体の形（SeatedPose）を組み直さずに済むよう、座面の高さの線・肘掛けの上面・差込口・
@@ -156,13 +157,16 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// 立ち上がる時に椅子を後ろへ押し下げる距離（SceneFlow の chairPushBack）。始めの椅子は 0.24 m。
         /// フットレスト（当たりは持たない）の先（z 0.445）が、机との間の立ち位置（z 1.68、当たりの半径 0.3 m）の当たりの縁 1.38 から 3 cm 手前に来る所まで下げる。
-        /// 椅子の後ろ（押し下げた背の後ろの端は z 0.27）は床とラグだけ
+        /// 椅子の後ろ（押し下げた背の後ろの端は z 0.27）は床とラグだけ。
+        /// 台座をキャスターの無い逆さの漏斗の形にしてからも、押し下げは真っすぐ 0.38 m のまま。台座の床に接する縁は丸く巻いた滑らかな縁で、
+        /// 床の上を滑らせて下げる形に見える。回して退けても、前へ 0.445 m 出て幅 0.4 m あるフットレストが立ち位置から外れるには
+        /// 同じだけ下げる必要があり（30 度回して 0.25 m 下げると、フットレストの角が立ち位置の芯から 0.17 m に入る）、短くすると立った足の下にフットレストが来る
         /// </summary>
         public const float PushBack = 0.38f;
 
         /// <summary>
         /// 立った後の当たり（Room/Chair/Blocker の子）を新しい形に合わせる。名前は前のまま（Seat・Base・Back・ArmR・ArmL）。
-        /// **どの当たりも床から立てる。** 床の近くに低い段（五本脚だけの低い箱や、足元の空いた背・肘掛けの箱）があると、
+        /// **どの当たりも床から立てる。** 床の近くに低い段（前の椅子の五本脚だけの低い箱や、足元の空いた背・肘掛けの箱）があると、
         /// 体の当たり（段を 0.3 m まで乗り越える）が乗り上げて、椅子の脇や前を歩くと目線が上下にかくついた（オーナー、2026-09-30）。
         /// フットレストには当たりを持たせない（パッドは床から 3〜17 cm の低い物で、乗り上げの元になる）。
         /// どの当たりも、立ち上がって <see cref="PushBack"/> 下げた時に、机との間の立ち位置の当たりに掛からない
@@ -174,8 +178,8 @@ namespace HalfAware.EditorTools
             var sb = new StringBuilder("当たり: ");
             // 座面
             sb.Append(Box(root, "Seat", new Vector3(0f, 0.40f, 0.04f), new Vector3(0.60f, 0.80f, 0.50f)));
-            // 五本脚（脚の先のキャスターまで）
-            sb.Append(Box(root, "Base", new Vector3(0f, 0.40f, 0f), new Vector3(0.64f, 0.80f, 0.62f)));
+            // 台座（床に接する丸い縁まで）
+            sb.Append(Box(root, "Base", new Vector3(0f, 0.40f, 0f), new Vector3(0.58f, 0.80f, 0.58f)));
             // 背もたれと頭の後ろの端末・耳の筐体
             sb.Append(Box(root, "Back", new Vector3(0f, 0.75f, -0.39f), new Vector3(0.62f, 1.50f, 0.48f)));
             // 肘掛け（前の操作盤まで）
@@ -298,6 +302,7 @@ namespace HalfAware.EditorTools
         static readonly Color ChromeColour = new Color(0.28f, 0.29f, 0.32f);
         static readonly Color SteelColour = new Color(0.09f, 0.095f, 0.11f);
         static readonly Color LacquerColour = new Color(0.06f, 0.065f, 0.08f);
+        static readonly Color BlackChromeColour = new Color(0.10f, 0.105f, 0.12f);
 
         /// <summary>乱れの代わりの決まった値（0〜1）。押すたびに同じ絵にする</summary>
         static float Hash(int x, int y)
@@ -421,9 +426,9 @@ namespace HalfAware.EditorTools
                 if (k >= (int)Swatch.Cyan && k <= (int)Swatch.Green || k == (int)Swatch.Red) cv.LitFill(k * 4, 0, 4, 4, swatches[k]);
                 else cv.Fill(k * 4, 0, 4, 4, swatches[k]);
             }
-            // 左上の段: 磨いた金属・黒い金属・黒い漆・黒革
-            var metals = new[] { ChromeColour, SteelColour, LacquerColour, Leather };
-            var metalGloss = new[] { 0.85f, 0.35f, 0.3f, LeatherGloss };
+            // 左上の段: 磨いた金属・黒い金属・黒い漆・黒革・黒く磨いた金属（台座）
+            var metals = new[] { ChromeColour, SteelColour, LacquerColour, Leather, BlackChromeColour };
+            var metalGloss = new[] { 0.85f, 0.35f, 0.3f, LeatherGloss, 0.85f };
             for (var k = 0; k < metals.Length; k++)
             {
                 cv.Shine = metalGloss[k];
@@ -589,51 +594,51 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 革の面の絵を描く。背もたれの前（菱形のボタン留めの窪み・折り目の鋭い溝・脇と上の縫い目）、裏（無地）、
-        /// 肘掛け（上の面の縁の縫い目）、座面とフットレスト（縁の縫い目）
+        /// ボタン留めの面の、向きの無い陰（地の色に掛ける 1 の前後）。膨らみの頂を明るく、折り目とボタンの周りを暗くして、菱形の一つ一つを塊として読ませる
+        /// </summary>
+        static float TuftShade(Lattice l, float inside, float x, float y)
+        {
+            if (inside <= 0f) return 1f;
+            return Mathf.Max(0.2f, 1f + inside * (0.45f * Dome(l, x, y) - 0.2f - 0.5f * Crease(l, x, y) - 0.5f * ButtonRing(l, x, y)));
+        }
+
+        /// <summary>
+        /// ボタン留めの面の艶。部屋の明かりでは椅子の明るさの多くが照り返しなので、地の色の陰だけでは折り目が暗くならない。
+        /// 折り目とボタンの周りは艶を消して照り返しを落とし（菱形の輪郭）、膨らみの頂は艶を少し足す（菱形ごとの照り）。玉縁の紐の上は少し照る
+        /// </summary>
+        static float TuftGloss(Lattice l, float inside, float hole, float x, float y, float piping)
+        {
+            var hollow = Mathf.Max(hole, inside * Mathf.Max(Crease(l, x, y), ButtonRing(l, x, y)));
+            var gloss = Mathf.Lerp(LeatherGloss + 0.15f * inside * Dome(l, x, y), 0.02f, hollow);
+            return Mathf.Clamp(gloss + 30f * piping, 0.02f, 0.5f);
+        }
+
+        /// <summary>
+        /// 革の面の絵を描く。背もたれの前（菱形のボタン留めの膨らみと窪み、脇と上の縫い目）、裏（無地）、
+        /// 肘掛け（上の面の縁の玉縁）、座面とフットレスト（背もたれと揃う菱形のボタン留めと、縁の玉縁）
         /// </summary>
         static void LeatherPictures(Canvas cv)
         {
             System.Func<float, float, float> none = (x, y) => 0f;
             System.Func<float, float, float> plain = (x, y) => 1f;
-            // 背もたれの前。ボタン留めの菱形は、膨らみの頂を少し明るく、折り目に寄るほど暗くして、形の読みを助ける（明かりの向きに依らない陰）
+            // 背もたれの前。菱形の一つ一つを塊として読ませる、向きの無い陰と艶（TuftShade・TuftGloss）。法線は膨らみの無い下の面の向きで表した本当の面の法線
             PaintLeather(cv, BackFrontArea, -BackHalfW, BackHalfW, 0f, BackLength,
                 (x, s) => Mathf.Abs(x) > BackW(s) ? 0f : BackFine(x, s),
-                (x, s) =>
-                {
-                    var inside = Mathf.Abs(x) > BackW(s) ? 0f : TuftInside(x, s);
-                    // 菱形の一つ一つを塊として読ませる、向きの無い陰: 膨らみの頂を明るく、折り目とボタンの周りを暗く
-                    var near = TuftNearest(x, s);
-                    var ring = Mathf.Exp(-Mathf.Pow((new Vector2(x, s) - near).magnitude / 0.024f, 2f));
-                    return Mathf.Max(0.2f, 1f + inside * (0.45f * TuftDome(x, s) - 0.2f - 0.5f * TuftCrease(x, s) - 0.5f * ring));
-                },
+                (x, s) => Mathf.Abs(x) > BackW(s) ? 1f : TuftShade(BackLattice, TuftInside(x, s), x, s),
                 (x, s, ex, es) => Mathf.Abs(x) > BackW(s) - 0.002f ? Vector3.forward : BackFrontNormal(x, s, 1.5f * ex, 1.5f * es),
-                // 艶。部屋の明かりでは椅子の明るさの多くが照り返しなので、地の色の陰だけでは折り目が暗くならない。
-                // 折り目とボタンの周りは艶を消して照り返しを落とし（菱形の輪郭）、膨らみの頂は艶を少し足す（菱形ごとの照り）
-                (x, s) =>
-                {
-                    if (Mathf.Abs(x) > BackW(s)) return LeatherGloss;
-                    var inside = TuftInside(x, s);
-                    var near = TuftNearest(x, s);
-                    var ring = Mathf.Exp(-Mathf.Pow((new Vector2(x, s) - near).magnitude / 0.024f, 2f));
-                    var dip = Mathf.Clamp01(BackFine(x, s) / 0.012f);
-                    var hollow = Mathf.Max(dip, inside * Mathf.Max(TuftCrease(x, s), ring));
-                    return Mathf.Lerp(LeatherGloss + 0.15f * inside * TuftDome(x, s), 0.02f, hollow);
-                });
+                (x, s) => Mathf.Abs(x) > BackW(s) ? LeatherGloss : TuftGloss(BackLattice, TuftInside(x, s), Mathf.Clamp01(BackFine(x, s) / 0.012f), x, s, 0f));
             // 背もたれの裏（無地）
             PaintLeather(cv, BackRearArea, -BackHalfW, BackHalfW, 0f, BackLength, none, plain);
-            // 肘掛けの上の面（上から写す）。上の面と脇の面の境の縫い目
-            PaintLeather(cv, ArmArea, ArmAreaX0, ArmAreaX1, ArmAreaZ0, ArmAreaZ1,
-                (x, z) =>
-                {
-                    if (z < PadBack + 0.02f || z > PadFront - 0.02f) return 0f;
-                    var r = PadRound(z);
-                    var seam = Mathf.Max(Mathf.Exp(-Mathf.Pow((x - (PadIn(z) + 0.3f * r)) / 0.004f, 2f)), Mathf.Exp(-Mathf.Pow((x - (PadOuter - 0.3f * r)) / 0.004f, 2f)));
-                    return 0.004f * seam;
-                }, plain);
-            // 座面とフットレスト（上から写す）
-            PaintLeather(cv, SeatArea, -SeatHalf, SeatHalf, SeatAreaZ0, SeatAreaZ1, (x, z) => 0.005f * Welt(x, z, SeatWeltX, SeatWeltZ), plain);
-            PaintLeather(cv, FootArea, -FootHalf, FootHalf, FootAreaZ0, FootAreaZ1, (x, z) => 0.004f * Welt(x, z, FootWeltX, FootWeltZ), plain);
+            // 肘掛けの上の面（上から写す）。上の面と脇の面の境の玉縁
+            PaintLeather(cv, ArmArea, ArmAreaX0, ArmAreaX1, ArmAreaZ0, ArmAreaZ1, (x, z) => -ArmFine(x, z), plain, null,
+                (x, z) => Mathf.Clamp(LeatherGloss + 30f * ArmFine(x, z), 0.1f, 0.45f));
+            // 座面とフットレスト（上から写す）。背もたれと揃う菱形のボタン留めと、縁の玉縁
+            PaintLeather(cv, SeatArea, -SeatHalf, SeatHalf, SeatAreaZ0, SeatAreaZ1, (x, z) => -SeatFine(x, z),
+                (x, z) => TuftShade(SeatLattice, SeatTuftInside(x, z), x, z), null,
+                (x, z) => TuftGloss(SeatLattice, SeatTuftInside(x, z), 0f, x, z, Piping(WeltDistance(x, z, SeatWeltX, SeatWeltZ))));
+            PaintLeather(cv, FootArea, -FootHalf, FootHalf, FootAreaZ0, FootAreaZ1, (x, z) => -FootFine(x, z),
+                (x, z) => TuftShade(FootLattice, FootTuftInside(x, z), x, z), null,
+                (x, z) => TuftGloss(FootLattice, FootTuftInside(x, z), 0f, x, z, Piping(WeltDistance(x, z, FootWeltX, FootWeltZ))));
         }
 
         /// <summary>
