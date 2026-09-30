@@ -65,7 +65,6 @@ namespace HalfAware.EditorTools
                 var room = EditorSceneManager.OpenScene(BuildChair.RoomPath, OpenSceneMode.Single);
                 if (build) sb.AppendLine(BuildChair.Assemble(room));
                 sb.AppendLine(Clash(room));
-                sb.AppendLine("端末の前の形（両手を腿に）の " + Clash(room, true));
                 RoomShots(room, dir, tag, sb);
             }
             catch (Exception e)
@@ -100,7 +99,7 @@ namespace HalfAware.EditorTools
             var chair = BuildChair.Find(room, BuildChair.ChairPath);
             var home = chair.position;
             var pose = Object.FindFirstObjectByType<SeatedPose>(FindObjectsInactive.Include);
-            Seat(pose, false);
+            Seat(pose);
             log.AppendFormat("座った足元 {0}、目 {1:0.000}（背を預けた始まりは {2:0.000}、上へ {3:0} 度）、首の限り {4}、椅子の押し下げ {5:0.00}",
                 foot.ToString("F2"), seatEye, seatEye - drop, -startPitch, limit, push).AppendLine();
             string P(string name) { return Path.Combine(dir, tag + "_" + name + ".png"); }
@@ -137,14 +136,14 @@ namespace HalfAware.EditorTools
             player.PlaceAt(foot, body, limit, 0f, 0f, seatEye);
             log.AppendLine(CheckRoom.Shoot(P("3b_after_rising"), null));
 
-            // 4. 首を右へ振りきってジャケットを狙う（印の文字も）
+            // 4. 首を右へ振りきってジャケットを狙う（印の文字も。ジャケットはモニターの後なので、ジャック・煙草・モニターを済ませた形で選ぶ）
             var items = Items();
             var jacket = Find(items, RoomIds.Jacket);
             if (jacket != null)
             {
                 var aim = Aim(foot, body, seatEye, lead, jacket.Position, limit);
                 player.PlaceAt(foot, body, limit, aim.x, aim.y, seatEye);
-                var picked = InteractionPicker.Select(player.Eye.position, player.Eye.forward, items, new HashSet<string> { RoomIds.Jack, RoomIds.Cigarette }, InteractionPicker.MaxAngle);
+                var picked = InteractionPicker.Select(player.Eye.position, player.Eye.forward, items, new HashSet<string> { RoomIds.Jack, RoomIds.Cigarette, RoomIds.Terminal }, InteractionPicker.MaxAngle);
                 log.AppendFormat("ジャケットへ: 首 {0:0.0} 度（限り {1}）・下へ {2:0.0} 度。選ばれた物: {3}", aim.x, limit, aim.y, picked != null ? picked.Id : "無し").AppendLine();
                 log.AppendLine(CheckRoom.Shoot(P("4_jacket_aim"), h => h.SetPrompt(picked != null ? HudView.Prompt(picked.Label) : null)));
                 // 左の煙草も狙えるか
@@ -167,10 +166,10 @@ namespace HalfAware.EditorTools
                 }
             }
 
-            // 5. モニターの映り込み（端末の前に座り、両手を腿に置いた形）
+            // 5. モニターの映り込み（場面 1 でモニターを読む間の形。座った形のまま、正面のモニターへ向き直した所）
             log.AppendLine(Mirror(P("5_reflection"), player, chair));
             chair.position = home;
-            Seat(pose, false);
+            Seat(pose);
 
             // 6. ジャックの置き場の寄り。場面 3 と同じく、手首のジャックを肘掛けの置き場へ移して撮る
             Park(chair);
@@ -185,6 +184,7 @@ namespace HalfAware.EditorTools
                 log.AppendLine(Free(P("7a_stand_between"), eye, eye + Quaternion.Euler(35f, 180f, 0f) * Vector3.forward, 0f));
                 log.AppendLine(Free(P("7b_stand_gap_side"), new Vector3(0.25f, 1.75f, 1.55f), new Vector3(1.5f, 0.55f, 1.45f), 0f));
                 log.AppendLine(Gap(chair, spot));
+                log.AppendLine(Walk(chair, player, spot));
             }
             chair.position = home;
         }
@@ -206,7 +206,7 @@ namespace HalfAware.EditorTools
                 var chair = BuildChair.Find(connect, BuildChair.ChairPath);
                 var player = Object.FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
                 var pose = Object.FindFirstObjectByType<SeatedPose>(FindObjectsInactive.Include);
-                Seat(pose, false);
+                Seat(pose);
                 var eye = BuildConnect.SeatEyeHeight();
                 var lead = new SerializedObject(player).FindProperty("eyeLead").floatValue;
                 var rest = chair.Find("JackRest");
@@ -233,7 +233,7 @@ namespace HalfAware.EditorTools
                 {
                     var scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
                     var p = Object.FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
-                    Seat(Object.FindFirstObjectByType<SeatedPose>(FindObjectsInactive.Include), false);
+                    Seat(Object.FindFirstObjectByType<SeatedPose>(FindObjectsInactive.Include));
                     p.PlaceAt(BuildConnect.SeatAt, 0f, HeadTurn.DefaultLimit, -45f, PlayerController.PitchDownLimit, BuildConnect.SeatEyeHeight());
                     var n = Path.GetFileNameWithoutExtension(path).ToLowerInvariant();
                     sb.AppendLine(n + ": 椅子の子 " + BuildChair.ChairChildren(scene));
@@ -260,12 +260,12 @@ namespace HalfAware.EditorTools
             return chair.TransformPoint(new Vector3(x, y, z));
         }
 
-        /// <summary>座った形を当てる。alternate なら端末の前の形（両手を腿に）</summary>
-        static void Seat(SeatedPose pose, bool alternate)
+        /// <summary>座った形を当てる（二つ目の形は場面 8 のハンドルの形なので、ここでは使わない）</summary>
+        static void Seat(SeatedPose pose)
         {
             if (pose == null) return;
             pose.Seated = true;
-            pose.UseAlternate = alternate;
+            pose.UseAlternate = false;
             pose.Bind();
             pose.Apply();
         }
@@ -345,6 +345,64 @@ namespace HalfAware.EditorTools
                 front, spot.position.ToString("F2"), near, nearest, radius, nearest - radius, seen);
         }
 
+        /// <summary>
+        /// 立ち上がった後（椅子を押し下げ、当たりを入れた形）に、体の当たり（CharacterController）を椅子の前と脇に沿って歩かせ、
+        /// 当たりに乗り上げて足元が上がらないかを見る（足元の高さの動きがそのまま目線の上下になる）。
+        /// 歩きごとに下へ押して床に着け直すので、低い段に乗り上げた時だけ足元が上がる
+        /// </summary>
+        static string Walk(Transform chair, PlayerController player, Transform spot)
+        {
+            var cc = player.GetComponent<CharacterController>();
+            var blocker = chair.Find("Blocker");
+            if (cc == null || blocker == null) return "歩き: 体の当たりか椅子の当たりが無い";
+            var keepAt = player.transform.position;
+            var keepOn = blocker.gameObject.activeSelf;
+            blocker.gameObject.SetActive(true);
+            var sb = new StringBuilder("立ち上がった後の歩き（足元の上がり）: ");
+            var c = chair.position;
+            var y = spot.position.y;
+            var paths = new[]
+            {
+                new { name = "椅子の前を横切る", from = new Vector3(c.x - 0.8f, y, spot.position.z - 0.12f), to = new Vector3(c.x + 0.8f, y, spot.position.z - 0.12f) },
+                new { name = "立ち位置から椅子へ", from = spot.position, to = new Vector3(c.x, y, c.z) },
+                new { name = "立ち位置から椅子の右の前へ斜めに", from = spot.position, to = new Vector3(c.x + 0.6f, y, c.z + 0.1f) },
+                new { name = "立ち位置から椅子の左の前へ斜めに", from = spot.position, to = new Vector3(c.x - 0.6f, y, c.z + 0.1f) },
+            };
+            try
+            {
+                foreach (var p in paths)
+                {
+                    cc.enabled = false;
+                    player.transform.position = p.from;
+                    cc.enabled = true;
+                    Physics.SyncTransforms();
+                    // 置いた直後は床に接したまま。一度動かすと床から皮の厚み（skinWidth）だけ浮いた所に落ち着くので、そこを床とする
+                    cc.Move(Vector3.down * 0.2f);
+                    cc.Move(new Vector3(0.001f, 0f, 0f));
+                    cc.Move(Vector3.down * 0.2f);
+                    var floor = player.transform.position.y;
+                    var rise = 0f;
+                    var step = (p.to - p.from) / 60f;
+                    for (var i = 0; i < 60; i++)
+                    {
+                        cc.Move(new Vector3(step.x, 0f, step.z));
+                        cc.Move(Vector3.down * 0.2f);
+                        rise = Mathf.Max(rise, player.transform.position.y - floor);
+                    }
+                    var went = new Vector2(player.transform.position.x - p.from.x, player.transform.position.z - p.from.z).magnitude;
+                    sb.AppendFormat("{0} {1:0.000} m（進んだ {2:0.00} / {3:0.00} m）。", p.name, rise, went, new Vector2(p.to.x - p.from.x, p.to.z - p.from.z).magnitude);
+                }
+            }
+            finally
+            {
+                cc.enabled = false;
+                player.transform.position = keepAt;
+                cc.enabled = true;
+                blocker.gameObject.SetActive(keepOn);
+            }
+            return sb.ToString();
+        }
+
         // ---- 撮る ------------------------------------------------------------------
 
         /// <summary>
@@ -402,8 +460,8 @@ namespace HalfAware.EditorTools
             player.PlaceAt(ss.FindProperty("seatSpot").vector3Value, ss.FindProperty("seatYaw").floatValue, 0f, 0f,
                 ss.FindProperty("seatPitch").floatValue, ss.FindProperty("seatEyeHeight").floatValue);
             chair.position = ss.FindProperty("chairSeated").vector3Value;
-            Seat((SeatedPose)ss.FindProperty("pose").objectReferenceValue, true);
-            foreach (var g in Object.FindObjectsByType<Garment>(FindObjectsInactive.Include, FindObjectsSortMode.None)) g.Worn = true;
+            Seat((SeatedPose)ss.FindProperty("pose").objectReferenceValue);
+            // ジャケットはモニターの後に着るので、読む間は着ていない（保存してある形のまま）
             try
             {
                 reflection.Aim(player.Eye.position, 1f);
@@ -422,22 +480,21 @@ namespace HalfAware.EditorTools
                         Object.DestroyImmediate(p.target);
                         p.target = null;
                     }
-                foreach (var g in Object.FindObjectsByType<Garment>(FindObjectsInactive.Include, FindObjectsSortMode.None)) g.Worn = false;
             }
         }
 
         // ---- 食い込み ------------------------------------------------------------------
 
         /// <summary>
-        /// 座った体（保存してある座った形。alternate なら端末の前の形）の頂点が、椅子の中身の詰まった部品の面より 5 mm 以上内にあるかを部品ごとに数える。
+        /// 座った体（保存してある座った形）の頂点が、椅子の中身の詰まった部品の面より 5 mm 以上内にあるかを部品ごとに数える。
         /// 部品の面は BuildChair.Shape で組み直して測る（保存した mesh と同じ形）。前の椅子（箱を並べた物）は箱の中で測る
         /// </summary>
-        public static string Clash(Scene room, bool alternate = false)
+        public static string Clash(Scene room)
         {
             var chair = BuildChair.Find(room, BuildChair.ChairPath);
             var pro = BuildChair.Find(room, "Player/Protagonist");
             if (chair == null || pro == null) return "椅子か主人公が無い";
-            Seat(pro.GetComponent<SeatedPose>(), alternate);
+            Seat(pro.GetComponent<SeatedPose>());
             var skin = SkinPoint.BodyOf(pro);
             var baked = new Mesh();
             skin.BakeMesh(baked, true);

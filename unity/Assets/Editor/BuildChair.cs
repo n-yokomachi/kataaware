@@ -10,14 +10,15 @@ using UnityEngine.SceneManagement;
 namespace HalfAware.EditorTools
 {
     /// <summary>
-    /// 自室（<c>Room.unity</c>）の椅子を組む（シナリオ設計 5 節）。潜り手が一日の大半を過ごし、長い潜行に体を預ける専用の椅子。
+    /// 自室（<c>Room.unity</c>）の椅子を組む（シナリオ設計 5 節）。潜り手が一日の大半を過ごし、長い潜行に体を預ける椅子。
+    /// 上等な黒革の重役の椅子に、仕事の道具として後から電子機器を金具で留め、ケーブルを這わせた形。
     ///
     /// <list type="table">
-    /// <item><term>形</term><description>厚い座面（前後に 4 本の畝、脇の盛り上がり、前の丸み）、高い背もたれ（横に 8 本の畝、肩の張り出し、首の絞り）、
-    /// 腰と頭の当て物、幅の広い肘掛け（外に操作盤の受け皿。右は差込口）、リクライニングの機構とレバー、ガスシリンダー、五本脚とキャスター、
-    /// 座の前の下から引き出すフットレスト（腕と張り地のパッド）。
-    /// 頭の後ろに潜行の端末（耳の筐体の小さな画面と灯り、裏の箱の画面と接続口）、そこから背もたれの裏を這って座の下と右の肘掛けへ回るケーブル
-    /// （<c>BuildChairShape.cs</c>）</description></item>
+    /// <item><term>形</term><description>椅子: 厚く柔らかい革の座面、黒い漆の殻に収めた高い背もたれ（ダイヤ形のボタン留め）と頭の当て物、
+    /// 黒い漆の台に載せた丸みのある革の肘掛けと、それを支える磨いた金属の腕、磨いた金属の五本脚とガスシリンダー、リクライニングの機構とレバー、
+    /// 座の前の下から引き出す革のフットレスト。後から付けた物: 頭の後ろの黒い金属の箱（背もたれの上の縁に掛けた留め具で留める）と耳の筐体、
+    /// 左右の肘掛けの前の操作盤（当て物の下から回り込む留め具で留める）、右の肘掛けの差込口（螺子で留めた金属の板）、
+    /// 背もたれの裏と金属の腕に沿って這わせたケーブル（<c>BuildChairShape.cs</c>）</description></item>
     /// <item><term>体との取り合い</term><description>座った体の形（SeatedPose）を組み直さずに済むよう、座面の高さの線・肘掛けの上面・差込口・
     /// ジャックの置き場は前の椅子と同じ所。フットレストは座った形の足の裏が乗る所まで引き出した形</description></item>
     /// <item><term>置き場</term><description><c>Room/Chair</c> の下の見た目の子を <c>ChairMesh</c> 一つ（マテリアル 5 つ）に替える。
@@ -158,15 +159,17 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 立ち上がる時に椅子を後ろへ押し下げる距離（SceneFlow の chairPushBack）。前の椅子は 0.24 m。
-        /// フットレストの先（z 0.445）が、机との間の立ち位置（z 1.68、当たりの半径 0.3 m）の当たりの縁 1.38 から 3 cm 手前に来る所まで下げる。
+        /// 立ち上がる時に椅子を後ろへ押し下げる距離（SceneFlow の chairPushBack）。始めの椅子は 0.24 m。
+        /// フットレスト（当たりは持たない）の先（z 0.445）が、机との間の立ち位置（z 1.68、当たりの半径 0.3 m）の当たりの縁 1.38 から 3 cm 手前に来る所まで下げる。
         /// 椅子の後ろ（押し下げた背の後ろの端は z 0.27）は床とラグだけ
         /// </summary>
         public const float PushBack = 0.38f;
 
         /// <summary>
         /// 立った後の当たり（Room/Chair/Blocker の子）を新しい形に合わせる。名前は前のまま（Seat・Base・Back・ArmR・ArmL）。
-        /// 床の近くの当たり（Base）はフットレストの先まで伸ばす（場面 3 で椅子の前を歩いてパッドを踏み抜かない）。
+        /// **どの当たりも床から立てる。** 床の近くに低い段（五本脚だけの低い箱や、足元の空いた背・肘掛けの箱）があると、
+        /// 体の当たり（段を 0.3 m まで乗り越える）が乗り上げて、椅子の脇や前を歩くと目線が上下にかくついた（オーナー、2026-09-30）。
+        /// フットレストには当たりを持たせない（パッドは床から 3〜17 cm の低い物で、乗り上げの元になる）。
         /// どの当たりも、立ち上がって <see cref="PushBack"/> 下げた時に、机との間の立ち位置の当たりに掛からない
         /// </summary>
         static string Blockers(Transform chair)
@@ -174,15 +177,15 @@ namespace HalfAware.EditorTools
             var root = chair.Find("Blocker");
             if (root == null) return "当たり（Blocker）が無い";
             var sb = new StringBuilder("当たり: ");
-            // 座面（脇の盛り上がりまで）
+            // 座面
             sb.Append(Box(root, "Seat", new Vector3(0f, 0.40f, 0.04f), new Vector3(0.60f, 0.80f, 0.50f)));
-            // 五本脚（脚の先のキャスターまで）とフットレストのパッド
-            sb.Append(Box(root, "Base", new Vector3(0f, 0.08f, 0.07f), new Vector3(0.64f, 0.16f, 0.76f)));
-            // 背もたれと頭の後ろの端末
-            sb.Append(Box(root, "Back", new Vector3(0f, 0.985f, -0.39f), new Vector3(0.56f, 1.03f, 0.48f)));
-            // 肘掛け（外の受け皿と前の操作盤まで）
-            sb.Append(Box(root, "ArmR", new Vector3(0.335f, 0.60f, 0.08f), new Vector3(0.18f, 0.40f, 0.52f)));
-            sb.Append(Box(root, "ArmL", new Vector3(-0.335f, 0.60f, 0.08f), new Vector3(0.18f, 0.40f, 0.52f)));
+            // 五本脚（脚の先のキャスターまで）
+            sb.Append(Box(root, "Base", new Vector3(0f, 0.40f, 0f), new Vector3(0.64f, 0.80f, 0.62f)));
+            // 背もたれと頭の後ろの端末・耳の筐体
+            sb.Append(Box(root, "Back", new Vector3(0f, 0.75f, -0.39f), new Vector3(0.62f, 1.50f, 0.48f)));
+            // 肘掛け（前の操作盤まで）
+            sb.Append(Box(root, "ArmR", new Vector3(0.345f, 0.40f, 0.07f), new Vector3(0.20f, 0.80f, 0.54f)));
+            sb.Append(Box(root, "ArmL", new Vector3(-0.345f, 0.40f, 0.07f), new Vector3(0.20f, 0.80f, 0.54f)));
             return sb.ToString();
         }
 
@@ -260,7 +263,7 @@ namespace HalfAware.EditorTools
             upholstery.SetTexture("_MainTex", upholstery.GetTexture("_BaseMap"));
             upholstery.SetColor("_BaseColor", Color.white);
             upholstery.SetFloat("_Metallic", 0f);
-            upholstery.SetFloat("_Smoothness", 0.36f);
+            upholstery.SetFloat("_Smoothness", 0.55f);
             upholstery.DisableKeyword("_EMISSION");
             EditorUtility.SetDirty(upholstery);
 
@@ -299,11 +302,8 @@ namespace HalfAware.EditorTools
 
         // ---- 絵 --------------------------------------------------------------------
 
-        /// <summary>張り地の色。黒を基調にした部屋の家具（つや消しの黒の塗り 0.20 ほど）と明るさを揃えた、紫をわずかに残す黒革</summary>
-        static readonly Color Leather = new Color(0.180f, 0.165f, 0.190f);
-        /// <summary>畝の革（少し暗く青い）と縫い糸（くすんだ藤色）</summary>
-        static readonly Color RibLeather = new Color(0.155f, 0.143f, 0.172f);
-        static readonly Color Stitch = new Color(0.44f, 0.35f, 0.54f);
+        /// <summary>張り地の色。部屋の黒い家具（ソファの黒い革 0.06〜0.075 ほど）に揃えた黒革。艶（Smoothness）で面の丸みと窪みを読ませる</summary>
+        static readonly Color Leather = new Color(0.090f, 0.083f, 0.092f);
 
         /// <summary>乱れの代わりの決まった値（0〜1）。押すたびに同じ絵にする</summary>
         static float Hash(int x, int y)
@@ -317,36 +317,36 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 張り地の絵（64×32、点で引く）。左の 32 画素が革の地（1 画素 1 cm）、次の 16 画素が畝の帯（真ん中が膨らんで明るく、両の縫い目の際に藤色の縫い糸）、
-        /// 右の 16 画素は同じ帯に小さな穴を並べた物（腰と頭の当て物）。縦は繰り返す
+        /// 張り地の絵（64×64、点で引く、縦横とも繰り返す。1 画素 5 mm）。黒革の細かい粒と、ところどころの浅い皺（明るい筋のすぐ下に暗い筋）
         /// </summary>
         static Texture2D UpholsteryPicture()
         {
-            var px = new Color[UpholsteryW * UpholsteryH];
+            var v = new float[UpholsteryW * UpholsteryH];
             for (var y = 0; y < UpholsteryH; y++)
                 for (var x = 0; x < UpholsteryW; x++)
+                    v[y * UpholsteryW + x] = 0.90f + 0.16f * Hash(x, y) + 0.06f * Hash(x / 4, y / 4 + 50);
+            for (var k = 0; k < 30; k++)
+            {
+                var sx = Mathf.FloorToInt(Hash(k, 31) * UpholsteryW);
+                var sy = Mathf.FloorToInt(Hash(k, 32) * UpholsteryH);
+                var len = 3 + Mathf.FloorToInt(Hash(k, 33) * 4f);
+                var dx = Hash(k, 34) > 0.5f ? 1 : -1;
+                for (var i = 0; i < len; i++)
                 {
-                    Color c;
-                    if (x < 32)
-                    {
-                        var v = 0.90f + 0.12f * Hash(x, y);
-                        if (Hash(x / 3, y + 71) > 0.92f) v *= 0.84f;
-                        c = Leather * v;
-                    }
-                    else
-                    {
-                        var i = (x - 32) % 16;
-                        var perforated = x >= 48;
-                        var f = (i + 0.5f) / 16f;
-                        var shade = 0.74f + 0.30f * Mathf.Sin(Mathf.PI * f);
-                        c = RibLeather * shade * (0.95f + 0.07f * Hash(x, y + 13));
-                        if (i == 0 || i == 15) c *= 0.62f;
-                        if ((i == 1 || i == 14) && y % 4 != 3) c = Stitch;
-                        if (perforated && i >= 4 && i <= 11 && y % 2 == 0 && (i + (y / 2) % 2) % 2 == 0) c *= 0.55f;
-                    }
-                    c.a = 1f;
-                    px[y * UpholsteryW + x] = c;
+                    var x = ((sx + i * dx) % UpholsteryW + UpholsteryW) % UpholsteryW;
+                    var y = (sy + i / 2) % UpholsteryH;
+                    var y2 = (y + UpholsteryH - 1) % UpholsteryH;
+                    v[y * UpholsteryW + x] += 0.35f;
+                    v[y2 * UpholsteryW + x] *= 0.72f;
                 }
+            }
+            var px = new Color[v.Length];
+            for (var i = 0; i < v.Length; i++)
+            {
+                var c = Leather * v[i];
+                c.a = 1f;
+                px[i] = c;
+            }
             return SavePicture(px, UpholsteryW, UpholsteryH, UpholsteryTexture, TextureWrapMode.Repeat);
         }
 
@@ -402,7 +402,7 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 操作盤の絵（64×64、点で引く）と、その光る所の絵。下の段に色の升、その上に右と左の肘掛けの前の操作盤と受け皿（前が上）、
+        /// 操作盤の絵（64×64、点で引く）と、その光る所の絵。下の段に色の升、その上に右と左の肘掛けの前の操作盤（前が上）、
         /// 頭の後ろの画面・耳の画面・接続口の板・分岐の箱の面・耳の灯り・灯りの列
         /// </summary>
         static Texture2D PanelPictures(out Texture2D glow)
@@ -419,8 +419,6 @@ namespace HalfAware.EditorTools
                 else cv.Fill(k * 4, 0, 4, 4, swatches[k]);
             }
 
-            RightDeckPicture(cv, RightDeck);
-            LeftDeckPicture(cv, LeftDeck);
             RightPodPicture(cv, RightPod);
             LeftPodPicture(cv, LeftPod);
 
@@ -499,38 +497,6 @@ namespace HalfAware.EditorTools
 
             glow = SavePicture(cv.Glow, PanelSize, PanelSize, PanelGlowTexture, TextureWrapMode.Clamp);
             return SavePicture(cv.Albedo, PanelSize, PanelSize, PanelTexture, TextureWrapMode.Clamp);
-        }
-
-        /// <summary>
-        /// 右の肘掛けの受け皿（x は内から外、y は後ろから前）。後ろに滑り止めの筋、前に差込口の具合を示す灯り三つと紫の帯
-        /// </summary>
-        static void RightDeckPicture(Canvas cv, RectInt r)
-        {
-            cv.Frame(r, Plastic, Edge);
-            var x0 = r.x;
-            var y0 = r.y;
-            for (var y = y0 + 2; y < y0 + 13; y += 2) cv.Fill(x0 + 2, y, 8, 1, PlasticLight);
-            cv.Fill(x0 + 2, y0 + 17, 8, 1, Ink * 0.6f);
-            var leds = new[] { CyanLit, CyanLit, VioletLit };
-            for (var k = 0; k < 3; k++) cv.LitFill(x0 + 1 + k * 4, y0 + 20, 2, 2, leds[k]);
-            cv.LitFill(x0 + 2, y0 + 24, 8, 1, VioletLit, 0.8f);
-        }
-
-        /// <summary>左の肘掛けの受け皿（x は外から内、y は後ろから前）。後ろに滑り止めの筋、真ん中に切り替え二つ、前に緑と琥珀の灯り</summary>
-        static void LeftDeckPicture(Canvas cv, RectInt r)
-        {
-            cv.Frame(r, Plastic, Edge);
-            var x0 = r.x;
-            var y0 = r.y;
-            for (var y = y0 + 2; y < y0 + 11; y += 2) cv.Fill(x0 + 2, y, 8, 1, PlasticLight);
-            foreach (var bx in new[] { x0 + 2, x0 + 7 })
-            {
-                cv.Fill(bx, y0 + 13, 3, 6, PlasticLight);
-                cv.Fill(bx + 1, y0 + 16, 1, 3, Ink);
-            }
-            cv.LitFill(x0 + 2, y0 + 22, 2, 2, GreenLit);
-            cv.LitFill(x0 + 6, y0 + 22, 2, 2, GreenLit);
-            cv.LitFill(x0 + 9, y0 + 22, 2, 2, AmberLit);
         }
 
         /// <summary>
