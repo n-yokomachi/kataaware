@@ -499,12 +499,23 @@ namespace HalfAware.EditorTools
 
         // ---- ドア ------------------------------------------------------------------
 
+        /// <summary>表から外したドアの名前（オーナー「玄関横の収納扉が目立ちすぎる。扉自体を削除」）</summary>
+        static readonly string[] RetiredDoors = { "DoorStore" };
+
         /// <summary>玄関のドア（前の Door）を移し、閉じた部屋のドアをその複製で置く。どれも戸の向こうに板を立てる</summary>
         static string Doors(Transform room)
         {
             var template = room.Find(RoomPlan.Entrance.Name);
             if (template == null) return "玄関のドア（Room/" + RoomPlan.Entrance.Name + "）が無い。ドアを置けない";
             var notes = new List<string>();
+            // 表から外したドア（物入れ）は物ごと外す。壁の抜けも表から作るので、その所はただの壁になる
+            foreach (var name in RetiredDoors)
+            {
+                var old = room.Find(name);
+                if (old == null) continue;
+                Object.DestroyImmediate(old.gameObject);
+                notes.Add(name + "（外した）");
+            }
             foreach (var d in RoomPlan.Doors)
             {
                 var t = room.Find(d.Name);

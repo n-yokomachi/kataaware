@@ -84,7 +84,7 @@ namespace HalfAware.Tests
         [Test]
         public void EachDoorFitsItsWallWithoutOverlapping()
         {
-            Assert.AreEqual(5, RoomPlan.Doors.Length, "玄関と、風呂・トイレ・物入れ・寝室");
+            Assert.AreEqual(4, RoomPlan.Doors.Length, "玄関と、風呂・トイレ・寝室（物入れはドアを付けない）");
             var e = RoomPlan.Entrance;
             Assert.IsTrue(e.AlongX, "玄関は南の端の壁");
             Assert.AreEqual(RoomPlan.Hall.yMin, e.Centre.y, 1e-4f);
@@ -107,8 +107,8 @@ namespace HalfAware.Tests
                     Assert.IsTrue(s.x >= span.y + 0.1f || s.y <= span.x - 0.1f, d.Name + " と " + o.Name + " の枠が重なる");
                 }
             }
-            // 閉じた部屋はどれも、自分の区画の廊下側の辺にドアがある
-            foreach (var pair in new[] { ("DoorBath", RoomPlan.Bath), ("DoorToilet", RoomPlan.Toilet), ("DoorStore", RoomPlan.Store), ("DoorBedroom", RoomPlan.Bedroom) })
+            // 閉じた部屋（物入れを除く）はどれも、自分の区画の廊下側の辺にドアがある
+            foreach (var pair in new[] { ("DoorBath", RoomPlan.Bath), ("DoorToilet", RoomPlan.Toilet), ("DoorBedroom", RoomPlan.Bedroom) })
             {
                 var d = System.Array.Find(RoomPlan.Doors, x => x.Name == pair.Item1);
                 Assert.IsNotNull(d.Name, pair.Item1);

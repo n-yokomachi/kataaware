@@ -54,7 +54,7 @@ namespace HalfAware.EditorTools
                         var t = 0.022f + 0.02f * Hash(k, n + level * 9);
                         var h = wide - 0.02f * Hash(k + 4, n);
                         var d = 0.14f + 0.06f * Hash(k + 8, n);
-                        var spine = Mathf.FloorToInt(Hash(k + n * 5, level + 11) * 32f);
+                        var spine = Spine(level, n, k);
                         // 背を前へ向けたまま寝かせる（高さの軸を横へ）
                         var turn = R(0f, (Hash(k, n + 20) - 0.5f) * 10f, 90f);
                         Book(kit, new Vector3(x + h * 0.5f + 0.005f, y + t * 0.5f, front - d * 0.5f - 0.01f * Hash(k, 2)), turn, new Vector3(t, h, d), spine);
@@ -87,7 +87,7 @@ namespace HalfAware.EditorTools
                         if (t < 0.012f) break;
                         var h = Mathf.Min(room - 0.01f, 0.17f + 0.11f * Hash(k + n * 7, level + 29));
                         var d = 0.13f + 0.08f * Hash(k + 11, n + level);
-                        var spine = Mathf.FloorToInt(Hash(k + n * 3, level * 5 + 31) * 32f);
+                        var spine = Spine(level, n, k);
                         var lean = k == run - 1 && Hash(n, level + 37) > 0.55f && right - x > 0.08f;
                         if (lean)
                         {
@@ -106,6 +106,20 @@ namespace HalfAware.EditorTools
                 n++;
                 if (n > 60) break;
             }
+        }
+
+        /// <summary>段ごとの色の組（背表紙の色の組の番号を三つ）。同じ段の中で、塊二つずつ同じ組にまとめて並べる</summary>
+        static readonly int[][] ShelfColours =
+        {
+            new[] { 5, 0, 6 }, new[] { 2, 3, 1 }, new[] { 4, 7, 0 }, new[] { 1, 5, 2 }, new[] { 6, 3, 4 },
+        };
+
+        /// <summary>段 level の n 番目の塊の k 冊目の背表紙（オーナー「ある程度の色のまとまりごとに並べて」）。色の組は段と塊で決め、組の中の変わりは乱れで選ぶ</summary>
+        static int Spine(int level, int n, int k)
+        {
+            var row = ShelfColours[level % ShelfColours.Length];
+            var family = row[(n / 2) % row.Length];
+            return family * SpineVariants + Mathf.FloorToInt(Hash(k + n * 7, level + 13) * SpineVariants) % SpineVariants;
         }
 
         /// <summary>本一冊。size は (厚み, 高さ, 奥行き)。前（+z）が背表紙、左右が表紙の色、上下が頁の小口</summary>

@@ -46,7 +46,7 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 置き場ひとつ。床の物は足元の真ん中、壁の物は壁に付く背の真ん中。Yaw は 0 で前が +z（北）。
-        /// Length・Wide は大きさを変えられる物だけ（台所・作業台は長さ、ラグは長い辺と短い辺）。0 なら既定
+        /// Length・Wide は大きさを変えられる物だけ（台所・作業台・靴置きは長さ、ラグは長い辺と短い辺、鉢植えは Wide が葉の広がりの割合）。0 なら既定
         /// </summary>
         public struct Place
         {
@@ -98,18 +98,18 @@ namespace HalfAware.EditorTools
             new Place("Fridge", -4.58f, 0f, -1.06f, 0f),
             new Place("Kitchen", -2.44f, 0f, -1.10f, 0f, 3.64f),
             new Place("KitchenLight", -2.44f, RoomPlan.Ceiling, -0.45f, 0f),
-            // 作業台（x −4〜−1.2・z 0〜0.6。区画より 10 cm 北へ寄せ、台所との間を 0.79 m 空けて体が通れるようにする）。居間の側に丸椅子。ごみ箱は冷蔵庫の前と作業台の西の端の間（廊下の口の動線から外す）
+            // 作業台（x −4〜−1.2・z 0〜0.6。区画より 10 cm 北へ寄せ、台所との間を 0.79 m 空けて体が通れるようにする）。居間の側に丸椅子、西の端の天板の下にワインセラー。
+            // ごみ箱は置かない（流しの下の戸棚の中にある扱い。オーナー「冷蔵庫前にあるごみ箱も移動」）
             new Place("WorkCounter", -2.60f, 0f, 0.30f, 0f, 2.80f),
             new Place("Stool", -1.90f, 0f, 0.88f, 20f),
-            new Place("Bin", -4.45f, 0f, -0.45f, 0f),
             // 仕事の区画（x 0〜3・z 0.3〜3）。机・右の卓・PC は前の物と同じ所と広さ。机の西の脇にサーバーラック、右の卓と PC の間の東の壁に在庫棚
             new Place("Desk", 1.50f, 0f, 2.44f, 180f),
             new Place("SideTable", 2.648f, 0f, 1.100f, -90f),
             new Place("Tower", 2.55f, 0f, 2.55f, 180f),
             new Place("ServerRack", -0.05f, 0f, 2.57f, 180f),
             new Place("ChipShelf", 2.75f, 0f, 1.95f, -90f),
-            // 東の窓の前
-            new Place("Plant", 2.30f, 0f, -0.50f, 0f),
+            // 東の窓の脇の、南東の角（窓の抜けとカーテンに掛けない。オーナー「窓の真ん前に観葉植物があるのが微妙。もっと壁に寄せて」）
+            new Place("Plant", 2.42f, 0f, -1.04f, 200f, 0f, 0.62f),
             // 廊下の口の LDK 側のコート掛け（場面 3 でジャケットを西の腕に掛ける。柱の位置は前の物のまま）
             new Place("CoatRack", 0.95f, 0f, -1.05f, 0f),
             // 玄関の脇（廊下 x −0.6〜0.6・z −5.1〜−1.5）。東の壁に靴置き（寝室のドアの手前まで、長さ 0.66）と、その上にハマスホイ、
@@ -121,8 +121,9 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// ソファの上の三枚の組（オーナー「絵画は横並びではなくちょっとデザイン考えて配置」）。一列に並べず、二列の組にする:
-        /// 前から見て左の列に縦長のグリスを大きく、右の列にターナー（上）とミレー（下、右の列の外の縁に揃える）を縦に重ねる。
-        /// 二つの列の上の縁と下の縁を揃えて、組の外形を一つの長方形にし（グリスの高さ = ターナー + 隙間 + ミレー）、隙間はどこも同じ 9 cm。
+        /// 前から見て左の列に縦長のグリスを大きく、右の列にミレー（上、大きい枠。オーナー「ターナーの代わりにミレーの絵を大きくして」）と
+        /// ターナー（下、小さい枠。右の列の外の縁に揃える）を縦に重ねる。
+        /// 二つの列の上の縁と下の縁を揃えて、組の外形を一つの長方形にし（グリスの高さ = ミレー + 隙間 + ターナー）、隙間はどこも同じ 9 cm。
         /// 組の真ん中はソファの真ん中、下の縁はソファの背（クッションの頭 0.98 m）から 27 cm 上、上の縁はエアコンの 17 cm 下。
         /// 大きいグリスはフロアランプの側（左）に置いて暖かい灯りを受けさせ、小さい二枚を窓の側（右）へ寄せて、窓の明るさと釣り合わせる
         /// </summary>
@@ -130,8 +131,8 @@ namespace HalfAware.EditorTools
         {
             const float wallX = -4.90f, centreZ = 1.70f, bottomY = 1.25f, gap = 0.09f;
             var tall = FrameSize(2);
-            var upper = FrameSize(1);
-            var lower = FrameSize(0);
+            var upper = FrameSize(0);
+            var lower = FrameSize(1);
             // 絵は +x を向くので、前から見て左は −z
             var left = centreZ - (tall.x + gap + upper.x) * 0.5f;
             var topY = bottomY + tall.y;
@@ -139,8 +140,8 @@ namespace HalfAware.EditorTools
             return new[]
             {
                 new Place("Picture2", wallX, bottomY + tall.y * 0.5f, left + tall.x * 0.5f, 90f),
-                new Place("Picture1", wallX, topY - upper.y * 0.5f, column + upper.x * 0.5f, 90f),
-                new Place("Picture0", wallX, bottomY + lower.y * 0.5f, column + upper.x - lower.x * 0.5f, 90f),
+                new Place("Picture0", wallX, topY - upper.y * 0.5f, column + upper.x * 0.5f, 90f),
+                new Place("Picture1", wallX, bottomY + lower.y * 0.5f, column + upper.x - lower.x * 0.5f, 90f),
             };
         }
 
@@ -148,11 +149,14 @@ namespace HalfAware.EditorTools
         static readonly string[] Retired =
         {
             "Pillow", "Blanket", "KitchenCabinet", "KitchenSink", "Microwave", "CoffeeMachine", "PlantTall",
-            "Books1", "Books2", "Books3", "Books4", "Books5", "Books6", "BoxA", "BoxB", "BoxC", "Keyboard", "Mouse",
+            "Books1", "Books2", "Books3", "Books4", "Books5", "Books6", "BoxA", "BoxB", "BoxC", "Keyboard", "Mouse", "Bin",
         };
 
-        /// <summary>当たりを付けない物（壁の物と、形の中に歩いて入らない物）</summary>
-        static readonly string[] NoBlocker = { "AirCon", "Picture0", "Picture1", "Picture2", "Picture3", "Rug", "KitchenLight" };
+        /// <summary>
+        /// 当たりを付けない物（壁の物と、床に敷く物）。
+        /// 靴置きは当たりを付けない（オーナー「靴箱のコリジョン判定を削除」。玄関の内側を狭くしない）
+        /// </summary>
+        static readonly string[] NoBlocker = { "AirCon", "Picture0", "Picture1", "Picture2", "Picture3", "Rug", "KitchenLight", "ShoeRack" };
 
         /// <summary>ローテーブルの上のメモの置き場（テーブルから見た位置と向き）</summary>
         static readonly Vector3 MemoOnTable = new Vector3(-0.20f, 0.401f, 0.02f);
@@ -282,12 +286,11 @@ namespace HalfAware.EditorTools
                 case "Bookcase": Bookcase(kit); return true;
                 case "Fridge": Fridge(kit); return true;
                 case "Kitchen": Kitchen(kit, p.Length > 0f ? p.Length : 2.5f); return true;
-                case "Bin": Bin(kit); return true;
                 case "WorkCounter": WorkCounter(kit, p.Length > 0f ? p.Length : 1.2f); return true;
                 case "Stool": Stool(kit); return true;
                 case "ServerRack": leds = new FurnitureKit(); ServerRack(kit, leds); return true;
                 case "ChipShelf": ChipShelf(kit); return true;
-                case "Plant": Plant(kit); return true;
+                case "Plant": Plant(kit, p.Wide > 0f ? p.Wide : 1f); return true;
                 case "ShoeRack": ShoeRack(kit, p.Length > 0f ? p.Length : 0.8f); return true;
                 case "UmbrellaStand": UmbrellaStand(kit); return true;
                 case "Desk": Desk(kit); return true;
@@ -323,6 +326,13 @@ namespace HalfAware.EditorTools
             }
             // 前の机の当たり（椅子を押し下げて立った所との隙間はこの箱で測ってある）は、世界の同じ箱のまま残す
             var keepDesk = WorldBox(room.Find("Desk"));
+            // 伸ばした後の箱からは、前の机の天板の高さ（0.653）へ戻して覚える
+            if (keepDesk.HasValue && keepDesk.Value.max.y > 1f)
+            {
+                var k = keepDesk.Value;
+                k.SetMinMax(k.min, new Vector3(k.max.x, 0.653f, k.max.z));
+                keepDesk = k;
+            }
             foreach (var p in Layout)
             {
                 var m = made.Find(x => x.Name == p.Name);
@@ -342,7 +352,17 @@ namespace HalfAware.EditorTools
                 mr.receiveShadows = true;
                 t.gameObject.isStatic = false;
                 if (System.Array.IndexOf(NoBlocker, p.Name) < 0) Blocker(t, p.Name, m.Mesh);
-                if (p.Name == "Desk" && keepDesk.HasValue) Keep(t, keepDesk.Value);
+                else
+                {
+                    var stale = t.GetComponent<BoxCollider>();
+                    if (stale != null) Object.DestroyImmediate(stale);
+                }
+                if (p.Name == "Desk" && keepDesk.HasValue)
+                {
+                    var kept = keepDesk.Value;
+                    kept.SetMinMax(kept.min, new Vector3(kept.max.x, Mathf.Max(kept.max.y, BlockerHigh), kept.max.z));
+                    Keep(t, kept);
+                }
                 if (m.Leds != null) Leds(t, m.Leds, blinkMat);
                 if (p.Name == "FloorLamp") Glow(t, new Vector3(0f, LampBulbY, 0f), LampColour, LampIntensity, LampRange);
                 if (p.Name == "KitchenLight") Glow(t, new Vector3(0f, -KitchenGlowDrop, 0f), KitchenColour, KitchenIntensity, KitchenRange);
@@ -368,7 +388,13 @@ namespace HalfAware.EditorTools
             return go.transform;
         }
 
-        /// <summary>当たり。形の広さの箱（鉢植えは鉢、フロアランプは台と柱）</summary>
+        /// <summary>
+        /// 床に置く物の当たりの箱の高さ。体（CharacterController。段を越える高さ 0.3 m・半径 0.3 m）が、低い物（丸椅子・ローテーブル・ソファ・鉢）を
+        /// 段として乗り越えないよう、見えない箱を床から 1.8 m まで伸ばす（オーナー「カウンター前の椅子やローテーブルの上には絶対に乗れないように」）
+        /// </summary>
+        public const float BlockerHigh = 1.8f;
+
+        /// <summary>当たり。形の広さの箱（鉢植えは鉢、フロアランプは台と柱、コート掛けは柱と掛けたコート）を、床から <see cref="BlockerHigh"/> まで伸ばす</summary>
         static void Blocker(Transform t, string name, Mesh mesh)
         {
             var box = t.GetComponent<BoxCollider>();
@@ -376,8 +402,10 @@ namespace HalfAware.EditorTools
             var b = mesh.bounds;
             if (name == "Plant") b = new Bounds(new Vector3(0f, 0.19f, 0f), new Vector3(0.38f, 0.38f, 0.38f));
             if (name == "FloorLamp") b = new Bounds(new Vector3(0f, 0.75f, 0f), new Vector3(0.30f, 1.5f, 0.30f));
-            if (name == "CoatRack") b = new Bounds(new Vector3(0f, 0.77f, 0f), new Vector3(0.40f, 1.54f, 0.40f));
-            if (name == "Kitchen" || name == "WorkCounter") b = new Bounds(new Vector3(b.center.x, 0.47f, b.center.z), new Vector3(b.size.x, 0.94f, b.size.z));
+            if (name == "CoatRack") b = new Bounds(new Vector3(0.10f, 0.77f, 0f), new Vector3(0.60f, 1.54f, 0.50f));
+            // 床から立つ物は、上の面を段で越えられない高さまで伸ばす（見えない箱）
+            if (t.position.y < 0.05f && b.min.y < 0.1f && b.max.y < BlockerHigh)
+                b.SetMinMax(new Vector3(b.min.x, 0f, b.min.z), new Vector3(b.max.x, BlockerHigh, b.max.z));
             box.center = b.center;
             box.size = b.size;
             box.isTrigger = false;

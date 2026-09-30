@@ -9,7 +9,7 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 上下二枚の扉の冷蔵庫（幅 0.60・奥行き 0.66・高さ 1.78）。ヘアラインの鋼の筐体、上の冷凍と下の冷蔵の扉（継ぎ目 1.5 cm）、
-        /// 右の縦の取っ手、左の蝶番、冷凍の扉に温度の表示、下の吸気の格子。扉に磁石で留めたメモとテイクアウトのメニュー
+        /// 右の縦の取っ手、左の蝶番、冷凍の扉に温度の表示、下の吸気の格子（扉の磁石とメモは外した。オーナー「冷蔵庫のマグネット類も撤去」）
         /// </summary>
         static void Fridge(FurnitureKit kit)
         {
@@ -35,18 +35,6 @@ namespace HalfAware.EditorTools
                 kit.Box("FridgeHinge", new Vector3(-W * 0.5f + 0.03f, y, face - 0.02f), new Vector3(0.04f, 0.014f, 0.05f), Sw(Hue.SteelDark));
             // 温度の表示
             kit.Decal("FridgeDisplay", new Vector3(-0.13f, 1.63f, face + 0.0015f), new Vector3(-0.045f, 0f, 0f), new Vector3(0f, 0.0225f, 0f), Uv(FridgeDisplayArea));
-            // 磁石のメモとメニュー（少し傾けて貼る）
-            Note(kit, new Vector3(-0.09f, 1.02f, face + 0.002f), 0.09f, 0.12f, 4f, Uv(MemoArea), Hue.MagnetRed);
-            Note(kit, new Vector3(0.10f, 0.83f, face + 0.0025f), 0.10f, 0.135f, -3f, Uv(MenuArea), Hue.MagnetYellow);
-            kit.Lathe("Magnet", new Vector3(0.06f, 1.34f, face), R(90f, 0f, 0f), new[] { new Vector2(0.012f, 0f), new Vector2(0.012f, 0.008f) }, 8, Sw(Hue.MagnetBlue), false, true);
-        }
-
-        /// <summary>扉に貼った紙（幅 w・高さ h、tilt 度だけ傾ける）と、上の縁の磁石</summary>
-        static void Note(FurnitureKit kit, Vector3 at, float w, float h, float tilt, Rect uv, Hue magnet)
-        {
-            var rot = Quaternion.Euler(0f, 0f, tilt);
-            kit.Decal("Note", at, rot * new Vector3(-w * 0.5f, 0f, 0f), rot * new Vector3(0f, h * 0.5f, 0f), uv);
-            kit.Lathe("Magnet", at + rot * new Vector3(0f, h * 0.5f - 0.012f, 0f), R(90f, 0f, 0f), new[] { new Vector2(0.011f, 0f), new Vector2(0.011f, 0.009f) }, 8, Sw(magnet), false, true);
         }
 
         // ---- 台所 ----------------------------------------------------------------------
@@ -72,13 +60,14 @@ namespace HalfAware.EditorTools
         const float Ceiling = RoomPlan.Ceiling;
 
         /// <summary>
-        /// 壁沿いの台所（長さ length、奥行き 0.60。原点は足元の真ん中、前が +z、背が壁）。左（西）から、IH と換気扇のフード、抽斗の列、流し（蛇口と水切りかご）、残りは戸棚。
-        /// 化粧板の扉と引き出しに金属の取っ手、木の天板、奥へ引っ込めた台輪。流しと抽斗の上の壁に調味料の棚（二段）、右の上に吊り戸棚。
-        /// 天板の上に電気ケトルとコーヒーメーカー、右の端に電子レンジ
+        /// 壁沿いの台所（長さ length、奥行き 0.60。原点は足元の真ん中、前が +z、背が壁）。左（西、冷蔵庫の側）から、
+        /// 作業できる天板（冷蔵庫の脇に 0.65 m、下は引き出し）→ 流し（蛇口と水切りかご）→ 天板（下は戸、上にケトルとコーヒーメーカー）→
+        /// IH（実物の大きさの三口、幅 0.60）と真上の換気扇のフード → 残りは戸棚（上に電子レンジ、壁に吊り戸棚）。
+        /// 流しと真ん中の天板の上の壁に調味料の棚（二段）。オーナー「IHのコンロが小さいうえに冷蔵庫に近すぎない？」
         /// </summary>
         static void Kitchen(FurnitureKit kit, float length)
         {
-            var L = Mathf.Max(2.0f, length);
+            var L = Mathf.Max(2.9f, length);
             var x0 = -L * 0.5f;
             const float back = -KitchenDeep * 0.5f;
             const float doorFront = 0.27f;
@@ -86,16 +75,17 @@ namespace HalfAware.EditorTools
             kit.Box6("KitchenCarcass", new Vector3(0f, 0.10f + 0.39f, back + 0.28f), Quaternion.identity, new Vector3(L, 0.78f, 0.56f), Carcass(true), NoBottom);
             kit.Box("KitchenPlinth", new Vector3(0f, 0.05f, back + 0.25f), new Vector3(L - 0.01f, 0.10f, 0.50f), Sw(Hue.Black), NoBottom);
             // 区画
-            var hob = new Vector2(x0, x0 + 0.60f);
-            var drawers = new Vector2(hob.y, hob.y + 0.45f);
-            var sink = new Vector2(drawers.y, drawers.y + 0.80f);
-            var rest = new Vector2(sink.y, L * 0.5f);
+            var prep = new Vector2(x0, x0 + 0.65f);
+            var sink = new Vector2(prep.y, prep.y + 0.80f);
+            var mid = new Vector2(sink.y, sink.y + 0.85f);
+            var hob = new Vector2(mid.y, mid.y + 0.65f);
+            var rest = new Vector2(hob.y, L * 0.5f);
             // 戸と引き出し
-            Doors(kit, hob.x, hob.y, 1, true, doorFront);
-            DrawerStack(kit, drawers.x, drawers.y, doorFront);
+            DrawerStack(kit, prep.x, prep.y, doorFront);
             Doors(kit, sink.x, sink.y, 2, false, doorFront);
-            var restDoors = Mathf.Max(1, Mathf.RoundToInt((rest.y - rest.x) / 0.6f));
-            if (rest.y - rest.x > 0.2f) Doors(kit, rest.x, rest.y, restDoors, false, doorFront);
+            Doors(kit, mid.x, mid.y, 2, false, doorFront);
+            Doors(kit, hob.x, hob.y, 1, true, doorFront);
+            if (rest.y - rest.x > 0.2f) Doors(kit, rest.x, rest.y, Mathf.Max(1, Mathf.RoundToInt((rest.y - rest.x) / 0.6f)), false, doorFront);
             // 天板（流しの口を抜いて四枚）
             var basin = new Vector4(sink.x + 0.06f, sink.x + 0.46f, -0.16f, 0.18f);
             const float topY = CounterTop - 0.015f;
@@ -107,11 +97,11 @@ namespace HalfAware.EditorTools
             Sink(kit, basin, sink);
             Hob(kit, hob);
             // 天板の上の物
-            Kettle(kit, new Vector3(drawers.x + 0.13f, CounterTop, -0.12f), 200f);
-            CoffeeMaker(kit, new Vector3(drawers.x + 0.33f, CounterTop, -0.14f), 0f);
-            if (rest.y - rest.x >= 0.5f) Microwave(kit, new Vector3(rest.y - 0.27f, CounterTop, -0.08f), -4f);
+            Kettle(kit, new Vector3(mid.x + 0.16f, CounterTop, -0.12f), 200f);
+            CoffeeMaker(kit, new Vector3(mid.x + 0.44f, CounterTop, -0.14f), 0f);
+            if (rest.y - rest.x >= 0.5f) Microwave(kit, new Vector3(rest.y - 0.26f, CounterTop, -0.08f), -4f);
             // 壁の物
-            Shelves(kit, drawers.x + 0.02f, sink.y - 0.02f);
+            Shelves(kit, sink.x + 0.02f, mid.y - 0.02f);
             if (rest.y - rest.x >= 0.45f) WallCabinet(kit, rest.x + 0.02f, rest.y);
         }
 
@@ -234,12 +224,12 @@ namespace HalfAware.EditorTools
             }
         }
 
-        /// <summary>IH の天板（黒い硝子に輪の絵）と、上の換気扇のフード（前へ張り出す箱と、天井へ上る煙突。下に網と明かり）</summary>
+        /// <summary>IH の天板（幅 0.60・奥行き 0.52 の黒い硝子に三つの輪の絵）と、真上の換気扇のフード（前へ張り出す箱と、天井へ上る煙突。下に網と明かり）</summary>
         static void Hob(FurnitureKit kit, Vector2 module)
         {
             var cx = (module.x + module.y) * 0.5f;
             var glass = Sw(Hue.GlassDark);
-            kit.Box6("Hob", new Vector3(cx, CounterTop + 0.003f, 0.0f), Quaternion.identity, new Vector3(0.56f, 0.006f, 0.50f),
+            kit.Box6("Hob", new Vector3(cx, CounterTop + 0.003f, 0.0f), Quaternion.identity, new Vector3(0.60f, 0.006f, 0.52f),
                 new[] { glass, glass, glass, Whole(Uv(HobArea)), glass, glass }, NoBottom);
             var steel = SteelBrushed;
             const float hoodLow = 1.56f;
@@ -400,17 +390,6 @@ namespace HalfAware.EditorTools
             }
         }
 
-        // ---- ごみ箱 --------------------------------------------------------------------
-
-        /// <summary>ペダルのごみ箱（鋼の胴、磨いた蓋、黒い台とペダル）</summary>
-        static void Bin(FurnitureKit kit)
-        {
-            kit.Lathe("BinFoot", Vector3.zero, Quaternion.identity, new[] { new Vector2(0.125f, 0f), new Vector2(0.13f, 0.02f), new Vector2(0.128f, 0.025f) }, 14, Sw(Hue.Black));
-            kit.Lathe("Bin", Vector3.zero, Quaternion.identity, new[] { new Vector2(0.126f, 0.02f), new Vector2(0.13f, 0.42f) }, 14, SteelBrushed);
-            kit.Lathe("BinLid", Vector3.zero, Quaternion.identity, new[] { new Vector2(0.134f, 0.415f), new Vector2(0.135f, 0.43f), new Vector2(0.12f, 0.448f), new Vector2(0.07f, 0.46f), new Vector2(0f, 0.463f) }, 14, Sw(Hue.Chrome));
-            kit.RoundBox("BinPedal", new Vector3(0f, 0.025f, 0.14f), R(-10f, 0f, 0f), new Vector3(0.09f, 0.012f, 0.06f), 0.004f, Sw(Hue.Black), null, 1, 1f);
-        }
-
         // ---- 作業台と丸椅子 ------------------------------------------------------------
 
         /// <summary>
@@ -435,10 +414,25 @@ namespace HalfAware.EditorTools
                 }
             }
             kit.RoundBox("CounterTop", new Vector3(0f, top - 0.0175f, 0.0f), Quaternion.identity, new Vector3(L, 0.035f, 0.60f), 0.006f, BlackTop, null, 1, 1f);
+            WineCellar(kit, -L * 0.5f + 0.025f, 0.15f);
             // まな板と布巾
             kit.RoundBox("ChoppingBoard", new Vector3(-L * 0.25f, top + 0.009f, -0.05f), R(0f, 8f, 0f), new Vector3(0.38f, 0.018f, 0.26f), 0.006f, Walnut, null, 1, 0.5f);
             kit.RoundBox("TeaTowel", new Vector3(L * 0.2f, top + 0.006f, -0.08f), R(0f, -14f, 0f), new Vector3(0.22f, 0.012f, 0.15f), 0.005f, Cotton,
                 (p, c) => { p.y += 0.003f * Mathf.Sin(p.x * 60f) * (c.y > 0f ? 1f : 0f); return p; }, 1, 0.05f, NoBottom);
+        }
+
+        /// <summary>
+        /// 作業台の西の端（廊下の口から遠い端）の天板の下に組み込んだ小型のワインセラー（幅 0.30・高さ 0.80）。黒い枠と、居間の側（+z）を向いた硝子の戸
+        /// （中の棚と寝かせた瓶が見え、上の奥が薄く灯る）、縦の取っ手。left は西の端の外の縁、face は箱の居間の側の面（オーナー「カウンターの奥の方の端に小型のワインセラーを置いて」）
+        /// </summary>
+        static void WineCellar(FurnitureKit kit, float left, float face)
+        {
+            const float W = 0.30f, H = 0.80f;
+            var cx = left + W * 0.5f;
+            var black = Sw(Hue.RackBlack);
+            var glass = Whole(Uv(WineArea));
+            kit.Box6("WineCellar", new Vector3(cx, 0.10f + H * 0.5f, face + 0.012f), Quaternion.identity, new Vector3(W, H, 0.024f), new[] { black, black, black, black, black, glass });
+            kit.RoundBox("WineCellarHandle", new Vector3(cx + W * 0.5f - 0.03f, 0.10f + H * 0.55f, face + 0.036f), Quaternion.identity, new Vector3(0.014f, 0.30f, 0.016f), 0.005f, Sw(Hue.Chrome), null, 1, 1f);
         }
 
         /// <summary>丸椅子（木の丸い座、黒い鉄の四本の脚は開き、足掛けの輪）</summary>

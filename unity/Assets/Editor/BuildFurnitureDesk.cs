@@ -127,7 +127,7 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 床に立つコート掛け（前の Kenney の物と同じ高さ 1.54 m）。黒い重い台、黒い柱と頭の玉、下の段に ±x・±z の四本の腕（先が上へ反り、玉が付く）、
-        /// 上の段に斜め四本の短い腕。上の段の北東の腕に毛糸のマフラー、下の段の東の腕に帆布のトートバッグ。
+        /// 上の段に斜め四本の短い腕。下の段の東の腕に丈の長い暗いコート、上の段の北東の腕につばのある帽子（オーナー「ハンガーのバッグ・マフラーを削除し、コート、ハットをかけて」）。
         /// **下の段の腕の形は場面 3 のジャケットの掛け方（<see cref="BuildConnect"/> の FindHook）が読む。** 腕は柱から 0.247 m、腕の先の下の面は床から 1.197 m（前の物とほぼ同じ）。
         /// 廊下の口を向く西の腕は、場面 3・5・7 でジャケットが掛かるので空けておく
         /// </summary>
@@ -145,46 +145,80 @@ namespace HalfAware.EditorTools
             var highS = new[] { 0.012f, 0.08f, 0.14f, 0.165f, 0.172f };
             var highY = new[] { 1.400f, 1.415f, 1.437f, 1.452f, 1.470f };
             for (var k = 0; k < 4; k++) Arm(kit, 45f + k * 90f, highS, highY, 0.007f, 0.010f);
-            // 北東の上の腕に掛けたマフラー（腕を挟んで前と後ろへ垂れる）
-            var dir = Quaternion.Euler(0f, 45f, 0f) * Vector3.forward;
-            var across = Vector3.Cross(Vector3.up, dir).normalized;
-            var hook = dir * 0.12f + Vector3.up * 1.445f;
-            kit.Sheet("Scarf", (u, v) =>
-            {
-                var along = dir * ((u - 0.5f) * 0.16f);
-                Vector3 p;
-                if (v < 0.45f) p = hook + across * (0.018f + 0.01f * (0.45f - v)) + Vector3.down * ((0.45f - v) / 0.45f * 0.44f);
-                else if (v < 0.55f)
-                {
-                    var a = (v - 0.45f) / 0.1f * Mathf.PI;
-                    p = hook + across * (0.018f * Mathf.Cos(a)) + Vector3.up * (0.012f * Mathf.Sin(a));
-                }
-                else p = hook - across * (0.018f + 0.012f * (v - 0.55f)) + Vector3.down * ((v - 0.55f) / 0.45f * 0.52f);
-                var sway = Mathf.Sin(v * 9f + u * 2f) * 0.01f;
-                return p + along + dir * sway;
-            }, 3, 12, Wool, true, 70f);
-            // 東の下の腕のトートバッグ（持ち手の輪二本と、垂れた袋）
-            var east = Vector3.right;
-            var at = east * 0.20f + Vector3.up * 1.20f;
-            foreach (var s in new[] { -1f, 1f })
-            {
-                var loop = new List<Vector3>
-                {
-                    at + Vector3.forward * (s * 0.012f) + Vector3.up * 0.012f,
-                    at + Vector3.forward * (s * 0.05f) + Vector3.down * 0.08f + east * 0.02f * s,
-                    at + Vector3.forward * (s * 0.10f) + Vector3.down * 0.22f + east * 0.01f,
-                };
-                kit.Tube("ToteHandle", Smooth(loop, 3), 0.006f, 4, Sw(Hue.Canvas));
-                kit.Tube("ToteHandle", Smooth(new List<Vector3> { loop[0], at + Vector3.forward * (s * 0.05f) + Vector3.down * 0.08f + east * 0.05f, at + Vector3.forward * (s * 0.10f) + Vector3.down * 0.22f + east * 0.04f }, 3), 0.006f, 4, Sw(Hue.Canvas));
-            }
-            kit.RoundBox("Tote", at + east * 0.028f + Vector3.down * 0.40f, R(0f, 90f, 4f), new Vector3(0.34f, 0.37f, 0.06f), 0.02f, Sw(Hue.Canvas),
+            // 東の下の腕に、丈の長い暗いコート（襟の吊り紐を腕に掛け、前を東へ向けて垂らす）
+            var hook = Vector3.right * 0.217f + Vector3.up * 1.197f;
+            using (kit.At(hook, 90f)) Coat(kit);
+            // 北東の上の腕の先に、つばのある帽子（頭の内側を腕の先の玉に引っ掛け、少し傾く）
+            var tip = Quaternion.Euler(0f, 45f, 0f) * Vector3.forward * 0.172f + Vector3.up * 1.47f;
+            using (kit.At(tip + Vector3.down * 0.105f, Quaternion.Euler(0f, 45f, 0f) * Quaternion.Euler(-18f, 0f, 0f))) Hat(kit);
+        }
+
+        /// <summary>
+        /// 丈の長いコート（原点は襟の後ろの吊り紐＝掛ける所、前が +z、下へ 1.02 m）。暗い灰茶のウール。
+        /// 板に見えないよう、形の縁（輪郭）で読ませる: 吊り紐から急に落ちる撫で肩、肩の山から身頃の脇の外へ垂れる筒の袖と袖口、
+        /// 首の後ろに立つ襟、前の V の襟と打ち合わせの線と釦、腰の雨蓋のポケット、背の半ベルトと裾の割れ、裾の広がりと脇の縦の襞
+        /// </summary>
+        static void Coat(FurnitureKit kit)
+        {
+            var wool = Sw(Hue.CoatWool);
+            var seam = Sw(Hue.HatBand);
+            const float top = -0.02f, length = 1.02f, deep = 0.13f, zc = 0.075f;
+            const float half = 0.22f;
+            // 身頃。t は上から下への割合（0 が襟の付け根、1 が裾）
+            kit.RoundBox("CoatBody", new Vector3(0f, top - length * 0.5f, zc), Quaternion.identity, new Vector3(half * 2f, length, deep), 0.045f, wool,
                 (p, c) =>
                 {
-                    p = Puff(new Vector3(0.0f, 0.0f, 0.02f))(p, c);
-                    if (c.y > 0.6f) p.z *= 0.6f;
-                    p.x += 0.006f * Mathf.Sin(p.y * 30f);
+                    var t = (1f - c.y) * 0.5f;
+                    // 撫で肩（吊り紐の所で幅 0.17 m、肩の山まで 15 cm で広がる）、腰で少し締まり、裾で広がる
+                    var wide = t < 0.15f ? Mathf.Lerp(0.38f, 1f, Mathf.Sin(t / 0.15f * Mathf.PI * 0.5f))
+                        : t < 0.45f ? Mathf.Lerp(1f, 0.96f, (t - 0.15f) / 0.3f) : Mathf.Lerp(0.96f, 1.14f, (t - 0.45f) / 0.55f);
+                    p.x *= wide;
+                    // 吊られた所は薄く
+                    p.z *= Mathf.Lerp(0.5f, 1f, Mathf.Clamp01(t / 0.12f));
+                    // 裾の脇の縦の襞（前の打ち合わせと背の真ん中には寄せない）
+                    p.z += 0.016f * Mathf.Sin(p.x * 25f + 0.6f) * Mathf.Clamp01((t - 0.6f) / 0.35f) * Mathf.SmoothStep(0f, 1f, (Mathf.Abs(p.x) - 0.06f) / 0.06f);
                     return p;
-                }, 1, 0.12f);
+                }, 1, 0.07f, FurnitureKit.Sides.All, 60f);
+            var front = zc + deep * 0.5f;
+            var back = zc - deep * 0.5f;
+            // 首の後ろに立つ襟（脇は前へ回り込む）
+            kit.RoundBox("CoatCollar", new Vector3(0f, -0.05f, 0.035f), R(-8f, 0f, 0f), new Vector3(0.20f, 0.08f, 0.045f), 0.015f, wool,
+                (p, c) => { p.z += 3.5f * p.x * p.x; return p; }, 1, 0.05f, FurnitureKit.Sides.All, 60f);
+            // 前の V の襟（襟の脇から打ち合わせへ下りる）
+            foreach (var s in new[] { -1f, 1f })
+                kit.RoundBox("CoatLapel", new Vector3(s * 0.050f, -0.25f, front + 0.008f), R(0f, 0f, -s * 20f), new Vector3(0.07f, 0.22f, 0.016f), 0.006f, wool, null, 1, 1f);
+            // 打ち合わせの線と釦
+            kit.Box("CoatPlacket", new Vector3(0.025f, -0.65f, front + 0.002f), new Vector3(0.012f, 0.68f, 0.004f), seam);
+            for (var i = 0; i < 3; i++)
+                kit.Lathe("CoatButton", new Vector3(0.0f, -0.38f - i * 0.14f, front + 0.001f), R(90f, 0f, 0f), new[] { new Vector2(0.013f, 0f), new Vector2(0.013f, 0.004f), new Vector2(0f, 0.007f) }, 6, seam);
+            // 腰の雨蓋のポケット
+            foreach (var s in new[] { -1f, 1f })
+                kit.Box("CoatPocket", new Vector3(s * 0.125f, -0.585f, front + 0.005f), R(0f, 0f, s * 4f), new Vector3(0.14f, 0.045f, 0.01f), wool);
+            // 背の半ベルト（二つの釦）と裾の割れ
+            kit.Box("CoatBelt", new Vector3(0f, -0.46f, back - 0.005f), new Vector3(0.22f, 0.045f, 0.012f), wool);
+            foreach (var s in new[] { -1f, 1f })
+                kit.Lathe("CoatButton", new Vector3(s * 0.09f, -0.46f, back - 0.011f), R(-90f, 0f, 0f), new[] { new Vector2(0.010f, 0f), new Vector2(0.010f, 0.003f), new Vector2(0f, 0.005f) }, 6, seam);
+            kit.Box("CoatVent", new Vector3(0f, -0.875f, back - 0.002f), new Vector3(0.008f, 0.23f, 0.004f), seam);
+            // 袖。肩の山から身頃の脇の外へ少し出て垂れ、肘で少し前へ折れる。袖口は少し太い筒で閉じる
+            foreach (var s in new[] { -1f, 1f })
+            {
+                var path = new[]
+                {
+                    new Vector3(s * 0.170f, -0.115f, 0.078f), new Vector3(s * 0.205f, -0.20f, 0.084f), new Vector3(s * 0.232f, -0.32f, 0.090f),
+                    new Vector3(s * 0.242f, -0.45f, 0.096f), new Vector3(s * 0.243f, -0.56f, 0.104f), new Vector3(s * 0.240f, -0.64f, 0.110f),
+                };
+                kit.TubeR("CoatSleeve", path, new[] { 0.030f, 0.054f, 0.054f, 0.051f, 0.049f, 0.047f }, 8, wool, true, 60f);
+                kit.TubeR("CoatCuff", new[] { new Vector3(s * 0.240f, -0.62f, 0.110f), new Vector3(s * 0.238f, -0.69f, 0.112f) }, new[] { 0.051f, 0.051f }, 8, wool, true, 60f);
+            }
+        }
+
+        /// <summary>つばのある帽子（原点はつばの付け根の真ん中、上が +y）。つまんだ頭、帯、ぐるりのつば</summary>
+        static void Hat(FurnitureKit kit)
+        {
+            var felt = Sw(Hue.HatFelt);
+            kit.Lathe("HatCrown", Vector3.zero, Quaternion.identity, new[] { new Vector2(0.092f, 0f), new Vector2(0.090f, 0.07f), new Vector2(0.080f, 0.105f), new Vector2(0.045f, 0.118f), new Vector2(0f, 0.108f) }, 12, felt);
+            kit.Lathe("HatBand", Vector3.zero, Quaternion.identity, new[] { new Vector2(0.094f, 0.004f), new Vector2(0.093f, 0.03f) }, 12, Sw(Hue.HatBand));
+            kit.Lathe("HatBrim", Vector3.zero, Quaternion.identity, new[] { new Vector2(0.09f, 0.002f), new Vector2(0.165f, 0.012f), new Vector2(0.168f, 0.004f), new Vector2(0.09f, -0.004f) }, 16, felt);
         }
 
         /// <summary>コート掛けの腕一本。yaw の向きへ、柱からの隔たり s と高さ y の点を通る筒と、先の玉</summary>

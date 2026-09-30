@@ -8,7 +8,7 @@ namespace HalfAware
     /// 座標は前の 6 × 6 m のワンルームと同じ（x が東、z が北、床の上面が y 0）。区画は壁の中心の線で持ち、壁の厚みは <see cref="Wall"/>。
     /// 北に LDK（8 × 4.5 m）、その南に張り出し（廊下と、廊下の両脇の風呂・トイレ・物入れ・寝室）。
     /// 廊下は北の端で LDK の南の壁に戸の無い開口で開き、南の端が玄関のドア。
-    /// **風呂・トイレ・物入れ・寝室は中を作らない。** 廊下の壁のドアだけ（閉じたまま開かない。調べる対象にもしない）。
+    /// **風呂・トイレ・物入れ・寝室は中を作らない。** 廊下の壁のドアだけ（閉じたまま開かない。調べる対象にもしない）。物入れはドアも付けず、ただの壁にする。
     ///
     /// 実行時には呼ばない。組み立て（部屋の形・場面 3 の立ち位置・ドアの調べる対象）と試験が、この表を読む
     /// </summary>
@@ -125,14 +125,13 @@ namespace HalfAware
 
         /// <summary>
         /// 玄関（廊下の南の端）と、廊下の両脇の閉じた部屋のドア。玄関は前の部屋の <c>Door</c> を移し、ほかはその複製。
-        /// 物入れは廊下に沿って 0.5 m しか無いので細い戸
+        /// 物入れはドアを付けない（オーナー「玄関横の収納扉が目立ちすぎる。扉自体を削除」）。区画（<see cref="Store"/>）は残し、廊下の側は壁のまま
         /// </summary>
         public static readonly Door[] Doors =
         {
             new Door("Door", new Vector2(0f, -5.1f), new Vector2(0f, 1f), 0.9f),
             new Door("DoorBath", new Vector2(-0.6f, -2.3f), new Vector2(1f, 0f), 0.8f),
             new Door("DoorToilet", new Vector2(-0.6f, -3.85f), new Vector2(1f, 0f), 0.7f),
-            new Door("DoorStore", new Vector2(-0.6f, -4.68f), new Vector2(1f, 0f), 0.55f),
             new Door("DoorBedroom", new Vector2(0.6f, -3.2f), new Vector2(-1f, 0f), 0.8f),
         };
 

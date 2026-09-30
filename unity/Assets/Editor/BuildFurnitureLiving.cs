@@ -208,12 +208,12 @@ namespace HalfAware.EditorTools
             Mug(kit, new Vector3(0.30f, H, 0.10f), 150f);
         }
 
-        /// <summary>マグ（くすんだ青緑の陶器、飲みかけの珈琲、取っ手）</summary>
+        /// <summary>マグ（艶のある黒い陶器、飲みかけの珈琲、取っ手。オーナー「テーブルのマグカップも黒に」）</summary>
         static void Mug(FurnitureKit kit, Vector3 at, float yaw)
         {
             using (kit.At(at, yaw))
             {
-                var glaze = Sw(Hue.MugTeal);
+                var glaze = Sw(Hue.PianoBlack);
                 kit.Lathe("Mug", Vector3.zero, Quaternion.identity, new[] { new Vector2(0.034f, 0f), new Vector2(0.038f, 0.004f), new Vector2(0.040f, 0.090f), new Vector2(0.039f, 0.095f), new Vector2(0.035f, 0.094f), new Vector2(0.035f, 0.012f) }, 12, glaze, true, false);
                 kit.Lathe("MugCoffee", Vector3.zero, Quaternion.identity, new[] { new Vector2(0.035f, 0.066f), new Vector2(0f, 0.066f) }, 12, Sw(Hue.Coffee));
                 kit.Tube("MugHandle", new[] { new Vector3(0.038f, 0.078f, 0f), new Vector3(0.060f, 0.075f, 0f), new Vector3(0.067f, 0.050f, 0f), new Vector3(0.059f, 0.026f, 0f), new Vector3(0.038f, 0.022f, 0f) }, 0.0065f, 5, glaze);
@@ -268,7 +268,7 @@ namespace HalfAware.EditorTools
         /// 大きな鉢植え（フィドルリーフ・フィグのような、幅の広い葉を重ねた木）。濃い釉の鉢と受け皿、土、三本の幹、
         /// 幹ごとに螺旋に付く葉（下ほど大きく垂れ、上ほど立つ。主脈で少し折れ、先が垂れる）。萎れた葉・枯れ葉は無し
         /// </summary>
-        static void Plant(FurnitureKit kit)
+        static void Plant(FurnitureKit kit, float spread)
         {
             var pot = Sw(Hue.PotDark);
             kit.Lathe("PlantSaucer", Vector3.zero, Quaternion.identity, new[] { new Vector2(0.19f, 0.025f), new Vector2(0.18f, 0f) }, 16, pot);
@@ -284,7 +284,9 @@ namespace HalfAware.EditorTools
             };
             for (var s = 0; s < stems.Length; s++)
             {
-                var path = stems[s];
+                // 幹の傾きを spread だけ寄せる（葉の広がりを細くして、壁の角に収める）
+                var path = new Vector3[stems[s].Length];
+                for (var i = 0; i < path.Length; i++) path[i] = new Vector3(stems[s][i].x * spread, stems[s][i].y, stems[s][i].z * spread);
                 var radii = new List<float>();
                 for (var i = 0; i < path.Length; i++) radii.Add(Mathf.Lerp(0.016f, 0.006f, (float)i / (path.Length - 1)));
                 kit.TubeR("PlantStem", path, radii, 5, Sw(Hue.Stem));
@@ -296,7 +298,7 @@ namespace HalfAware.EditorTools
                     var azimuth = (k * 137.5f + s * 57f) * Mathf.Deg2Rad;
                     var elev = Mathf.Lerp(-8f, 42f, f) * Mathf.Deg2Rad;
                     var dir = new Vector3(Mathf.Sin(azimuth) * Mathf.Cos(elev), Mathf.Sin(elev), Mathf.Cos(azimuth) * Mathf.Cos(elev));
-                    var len = Mathf.Lerp(0.36f, 0.24f, f) * (0.9f + 0.2f * Hash(k, s + 40));
+                    var len = Mathf.Lerp(0.36f, 0.24f, f) * (0.9f + 0.2f * Hash(k, s + 40)) * Mathf.Lerp(1f, spread, 0.9f);
                     Leaf(kit, at + dir * 0.015f, dir, len, len * 0.62f, Mathf.Lerp(0.35f, 0.12f, f), leaf);
                 }
             }

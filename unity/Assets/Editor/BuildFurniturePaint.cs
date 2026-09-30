@@ -57,6 +57,8 @@ namespace HalfAware.EditorTools
         static readonly RectInt KeysArea = new RectInt(0, 144, 32, 12);
         static readonly RectInt PcFrontArea = new RectInt(32, 144, 12, 28);
         static readonly RectInt PcSideArea = new RectInt(44, 144, 24, 28);
+        // 作業台の端のワインセラーの硝子の戸（中の棚と寝かせた瓶の底、上の灯り）
+        static readonly RectInt WineArea = new RectInt(68, 144, 20, 44);
         // 額の絵の升（右の半分）
         static readonly RectInt[] PaintingSlots =
         {
@@ -74,7 +76,7 @@ namespace HalfAware.EditorTools
             MagnetRed, MagnetYellow, MagnetBlue, MugTeal, PlateWhite, AcWhite, Slot, FrameBlack, FrameWood, Canvas,
             LampShade, Bulb, LedGreen, LedBlue, LedAmber, LedRed, LedCyan, TinNavy, TinGold, Terracotta,
             Fabric, FabricDark, Wool, Laminate, Oak, Walnut, RackBlack, Foam, Water, CableBlack,
-            WireWhite, Ceramic, Enamel, PianoBlack, Diffuser, LedViolet,
+            WireWhite, Ceramic, Enamel, PianoBlack, Diffuser, LedViolet, CoatWool, HatFelt, HatBand,
         }
 
         struct Swatch
@@ -96,7 +98,7 @@ namespace HalfAware.EditorTools
             S(0.035f, 0.035f, 0.040f, 0.30f), S(0.050f, 0.050f, 0.055f, 0.15f), S(0.090f, 0.090f, 0.100f, 0.35f), S(0.300f, 0.300f, 0.310f, 0.35f),
             S(0.600f, 0.590f, 0.560f, 0.35f), S(0.450f, 0.460f, 0.480f, 0.55f), S(0.180f, 0.180f, 0.200f, 0.50f), S(0.620f, 0.630f, 0.660f, 0.80f),
             S(0.550f, 0.420f, 0.200f, 0.60f), S(0.035f, 0.032f, 0.032f, 0.45f),
-            S(0.560f, 0.550f, 0.520f, 0.10f), S(0.720f, 0.700f, 0.630f, 0.10f), S(0.640f, 0.610f, 0.530f, 0.10f), S(0.450f, 0.360f, 0.250f, 0.10f),
+            S(0.080f, 0.076f, 0.078f, 0.12f), S(0.720f, 0.700f, 0.630f, 0.10f), S(0.640f, 0.610f, 0.530f, 0.10f), S(0.450f, 0.360f, 0.250f, 0.10f),
             S(0.030f, 0.035f, 0.040f, 0.85f), S(0.080f, 0.050f, 0.035f, 0.85f), S(0.100f, 0.060f, 0.030f, 0.70f), S(0.780f, 0.780f, 0.760f, 0.30f),
             S(0.120f, 0.100f, 0.090f, 0.20f), S(0.500f, 0.060f, 0.050f, 0.60f),
             S(0.220f, 0.100f, 0.050f, 0.60f), S(0.060f, 0.030f, 0.020f, 0.70f), S(0.550f, 0.400f, 0.100f, 0.70f), S(0.550f, 0.500f, 0.350f, 0.70f),
@@ -114,11 +116,12 @@ namespace HalfAware.EditorTools
             S(0.780f, 0.700f, 0.550f, 0.10f, 0.55f), S(1.000f, 0.850f, 0.600f, 0.10f, 1.20f), S(0.400f, 1.000f, 0.550f, 0.50f, 1.0f), S(0.300f, 0.550f, 1.000f, 0.50f, 1.0f),
             S(1.000f, 0.620f, 0.180f, 0.50f, 1.0f), S(1.000f, 0.280f, 0.250f, 0.50f, 1.0f), S(0.300f, 0.900f, 1.000f, 0.50f, 1.0f), S(0.080f, 0.100f, 0.220f, 0.60f),
             S(0.550f, 0.420f, 0.150f, 0.60f), S(0.450f, 0.220f, 0.120f, 0.25f),
-            S(0.075f, 0.070f, 0.072f, 0.42f), S(0.050f, 0.047f, 0.048f, 0.30f), S(0.340f, 0.130f, 0.140f, 0.05f), S(0.060f, 0.060f, 0.065f, 0.22f),
+            S(0.075f, 0.070f, 0.072f, 0.42f), S(0.050f, 0.047f, 0.048f, 0.30f), S(0.072f, 0.068f, 0.070f, 0.05f), S(0.060f, 0.060f, 0.065f, 0.22f),
             S(0.035f, 0.035f, 0.040f, 0.80f), S(0.200f, 0.130f, 0.080f, 0.35f), S(0.045f, 0.045f, 0.050f, 0.35f), S(0.520f, 0.500f, 0.430f, 0.05f),
             S(0.200f, 0.240f, 0.260f, 0.90f), S(0.030f, 0.030f, 0.035f, 0.40f),
             S(0.700f, 0.700f, 0.680f, 0.30f), S(0.620f, 0.600f, 0.560f, 0.60f), S(0.045f, 0.045f, 0.050f, 0.75f),
             S(0.030f, 0.030f, 0.034f, 0.88f), S(0.860f, 0.850f, 0.820f, 0.20f, 0.95f), S(0.660f, 0.400f, 1.000f, 0.50f, 1.0f),
+            S(0.105f, 0.098f, 0.094f, 0.10f), S(0.085f, 0.078f, 0.072f, 0.14f), S(0.030f, 0.028f, 0.028f, 0.35f),
         };
 
         // ---- uv ----------------------------------------------------------------------
@@ -343,7 +346,7 @@ namespace HalfAware.EditorTools
                     cv.Put(r.x + x, r.y + y, baseC * px[y * r.width + x], gloss[y * r.width + x]);
         }
 
-        /// <summary>毛布。くすんだ葡萄色の編み目（縦に並ぶ V の目）</summary>
+        /// <summary>毛布（タオルケット）。黒い毛糸の編み目（縦に並ぶ V の目）。黒の中で目の明るさの差を大きく取り、形が読めるように</summary>
         static void PaintWool(Canvas cv)
         {
             var r = WoolArea;
@@ -355,14 +358,14 @@ namespace HalfAware.EditorTools
                     var row = y % 4;
                     // V の目: 列の真ん中へ向かって一段ずつ下がる
                     var v = Mathf.Abs(col - 1.5f) - (row * 0.5f);
-                    var stitch = v < 0.6f && v > -0.9f ? 1.12f : 0.84f;
-                    if (col == 0 && row == 3) stitch = 0.7f;
+                    var stitch = v < 0.6f && v > -0.9f ? 1.45f : 0.78f;
+                    if (col == 0 && row == 3) stitch = 0.6f;
                     var n = 0.92f + 0.14f * TileNoise(x, y, r.width, 8, 23);
                     cv.Put(r.x + x, r.y + y, baseC * (stitch * n), 0.05f);
                 }
         }
 
-        /// <summary>枕の綿。くすんだ白に細い縞（刻み目）</summary>
+        /// <summary>枕（と布巾）の綿。黒い布に、少し明るい細い縞と織りの揺らぎ</summary>
         static void PaintCotton(Canvas cv)
         {
             var r = CottonArea;
@@ -370,9 +373,9 @@ namespace HalfAware.EditorTools
             for (var y = 0; y < r.height; y++)
                 for (var x = 0; x < r.width; x++)
                 {
-                    var stripe = x % 8 == 3 ? new Color(0.40f, 0.44f, 0.52f) : baseC;
-                    var n = 0.92f + 0.10f * TileNoise(x, y, r.width, 8, 5) + 0.04f * Hash(x + 7, y);
-                    cv.Put(r.x + x, r.y + y, stripe * n, 0.10f);
+                    var stripe = x % 8 == 3 ? baseC * 1.9f : baseC;
+                    var n = 0.88f + 0.20f * TileNoise(x, y, r.width, 8, 5) + 0.08f * Hash(x + 7, y);
+                    cv.Put(r.x + x, r.y + y, stripe * n, x % 8 == 3 ? 0.25f : 0.12f);
                 }
         }
 
@@ -577,25 +580,32 @@ namespace HalfAware.EditorTools
             if (gap > 0) for (var x = x0 + 4; x < x0 + 60; x += 2) cv.Put(x, y0 + 7, dark, 0.2f);
         }
 
-        /// <summary>背表紙（4×32 を 32 種）。地の色、上と下の帯、真ん中の題の字の線、下の著者、版元の印</summary>
+        /// <summary>背表紙の色の組（くすんだ色）。背表紙の絵は組ごとに四つ（k = 組 × 4 + 変わり）で、本棚は同じ組をまとめて並べる</summary>
+        static readonly Color[] SpineFamilies =
+        {
+            new Color(0.20f, 0.12f, 0.075f), new Color(0.085f, 0.16f, 0.11f), new Color(0.075f, 0.09f, 0.17f), new Color(0.24f, 0.24f, 0.25f),
+            new Color(0.50f, 0.47f, 0.39f), new Color(0.045f, 0.045f, 0.05f), new Color(0.26f, 0.065f, 0.08f), new Color(0.30f, 0.26f, 0.15f),
+        };
+
+        public const int SpineVariants = 4;
+
+        /// <summary>
+        /// 背表紙（4×32 を 32 種）。色は八つの組（くすんだ焦げ茶・深緑・紺・灰・生成り・黒・えんじ・枯れた黄土）を四つずつ、明るさを少し変える。
+        /// 上と下の帯、真ん中の題の字の線、下の著者、版元の印（字は落ち着いた生成りと鈍い金、明るい地には黒）
+        /// </summary>
         static void PaintSpines(Canvas cv)
         {
-            var hues = new[]
-            {
-                new Color(0.42f, 0.10f, 0.09f), new Color(0.09f, 0.13f, 0.28f), new Color(0.12f, 0.24f, 0.15f), new Color(0.55f, 0.42f, 0.18f),
-                new Color(0.06f, 0.06f, 0.07f), new Color(0.66f, 0.62f, 0.52f), new Color(0.32f, 0.33f, 0.35f), new Color(0.30f, 0.18f, 0.10f),
-                new Color(0.10f, 0.30f, 0.32f), new Color(0.35f, 0.08f, 0.16f), new Color(0.32f, 0.34f, 0.14f), new Color(0.72f, 0.70f, 0.64f),
-                new Color(0.55f, 0.24f, 0.10f), new Color(0.18f, 0.12f, 0.26f), new Color(0.46f, 0.46f, 0.40f), new Color(0.14f, 0.18f, 0.20f),
-            };
-            var ink = new[] { new Color(0.80f, 0.74f, 0.52f), new Color(0.78f, 0.78f, 0.74f), new Color(0.05f, 0.05f, 0.05f) };
+            var ink = new[] { new Color(0.62f, 0.54f, 0.36f), new Color(0.66f, 0.64f, 0.58f), new Color(0.05f, 0.05f, 0.05f) };
             for (var k = 0; k < 32; k++)
             {
                 var x0 = SpineArea.x + (k % 16) * 4;
                 var y0 = SpineArea.y + (k / 16) * 32;
-                var baseC = hues[(k * 7 + k / 16 * 3) % hues.Length];
-                var light = baseC.grayscale > 0.4f;
+                var family = (k / SpineVariants) % SpineFamilies.Length;
+                var variant = k % SpineVariants;
+                var baseC = SpineFamilies[family] * (0.86f + 0.1f * variant);
+                var light = baseC.grayscale > 0.35f;
                 var text = light ? ink[2] : ink[Hash(k, 3) > 0.5f ? 0 : 1];
-                var gloss = Hash(k, 9) > 0.6f ? 0.45f : 0.15f;
+                var gloss = Hash(k, 9) > 0.6f ? 0.40f : 0.15f;
                 for (var y = 0; y < 32; y++)
                     for (var x = 0; x < 4; x++)
                     {
@@ -604,7 +614,7 @@ namespace HalfAware.EditorTools
                         if (x == 0 || x == 3) c *= 0.82f;
                         cv.Put(x0 + x, y0 + y, c, gloss);
                     }
-                var style = k % 4;
+                var style = variant;
                 // 帯
                 if (style == 0 || style == 2)
                 {
@@ -613,7 +623,7 @@ namespace HalfAware.EditorTools
                 }
                 if (style == 1)
                 {
-                    var band = hues[(k * 5 + 3) % hues.Length];
+                    var band = baseC * 0.6f;
                     for (var y = 22; y < 27; y++) for (var x = 0; x < 4; x++) cv.Put(x0 + x, y0 + y, band, 0.2f);
                 }
                 if (style == 3) for (var y = 0; y < 5; y++) for (var x = 0; x < 4; x++) cv.Put(x0 + x, y0 + y, ink[2] * 0.6f + baseC * 0.4f, 0.2f);
@@ -642,7 +652,7 @@ namespace HalfAware.EditorTools
                 for (var x = 0; x < h.width; x++)
                 {
                     var c = C(Hue.GlassDark) * (0.9f + 0.2f * Hash(x, y + 5));
-                    foreach (var ring in new[] { new Vector3(10.5f, 18.5f, 7.5f), new Vector3(22.5f, 14.5f, 6f) })
+                    foreach (var ring in new[] { new Vector3(8.5f, 10.5f, 7.2f), new Vector3(23.5f, 11.5f, 7.2f), new Vector3(22.5f, 23.5f, 4.6f) })
                     {
                         var d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(ring.x, ring.y));
                         if (Mathf.Abs(d - ring.z) < 0.6f) c = new Color(0.20f, 0.20f, 0.22f);
@@ -876,7 +886,43 @@ namespace HalfAware.EditorTools
                         else if (d < 3.0f && (Mathf.FloorToInt(Mathf.Atan2(y + 0.5f - c.y, x + 0.5f - c.x) * 3f) & 1) == 0) cv.Put(x, y, new Color(0.08f, 0.07f, 0.10f), 0.6f);
                     }
             for (var x = g.x + 2; x < g.xMax - 2; x++) cv.Lit(x, g.y + 2, C(Hue.LedViolet), 0.35f);
+            PaintWine(cv);
             cv.Fill(g.x + 3, g.y + 5, 8, 3, new Color(0.10f, 0.10f, 0.11f), 0.5f);
+        }
+
+        /// <summary>
+        /// ワインセラーの硝子の戸（20×44。下が床の側）。暗い硝子の枠、中に五段の棚（薄く青白く灯る縁）、寝かせた瓶の底（深緑・黒・えんじの丸と照り）、
+        /// 上の奥の灯りの帯。灯りは薄く（部屋の暗さを変えない）
+        /// </summary>
+        static void PaintWine(Canvas cv)
+        {
+            var w = WineArea;
+            cv.Fill(w, new Color(0.04f, 0.04f, 0.045f), 0.5f);
+            var inside = new RectInt(w.x + 2, w.y + 2, w.width - 4, w.height - 4);
+            for (var y = inside.y; y < inside.yMax; y++)
+                for (var x = inside.x; x < inside.xMax; x++)
+                    cv.Put(x, y, new Color(0.02f, 0.025f, 0.03f) * (0.9f + 0.3f * (float)(y - inside.y) / inside.height), 0.9f);
+            var glass = new[] { new Color(0.06f, 0.14f, 0.08f), new Color(0.03f, 0.03f, 0.03f), new Color(0.16f, 0.04f, 0.05f) };
+            for (var shelf = 0; shelf < 5; shelf++)
+            {
+                var y0 = inside.y + 1 + shelf * 8;
+                for (var x = inside.x; x < inside.xMax; x++) cv.Lit(x, y0, new Color(0.45f, 0.55f, 0.65f), 0.12f);
+                for (var b = 0; b < 3; b++)
+                {
+                    if (Hash(shelf, b + 40) < 0.2f) continue;
+                    var c = new Vector2(inside.x + 3f + b * 5f, y0 + 4.5f);
+                    var tint = glass[(shelf + b * 2) % glass.Length];
+                    for (var y = y0 + 1; y < y0 + 8; y++)
+                        for (var x = inside.x; x < inside.xMax; x++)
+                        {
+                            var d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), c);
+                            if (d < 2.4f) cv.Put(x, y, d < 1.0f ? tint * 0.6f : tint * (1.6f + 0.4f * Hash(x, y)), 0.85f);
+                            // 瓶の底の縁の照り（中の灯りを受けて薄く光る。台の陰でも瓶が読める）
+                            if (d >= 1.6f && d < 2.4f && x < c.x && y > c.y) cv.Lit(x, y, tint * 3.0f + new Color(0.12f, 0.12f, 0.14f), 0.35f);
+                        }
+                }
+            }
+            for (var x = inside.x + 1; x < inside.xMax - 1; x++) cv.Lit(x, inside.yMax - 1, new Color(0.60f, 0.75f, 0.95f), 0.45f);
         }
 
         // ---- 額の絵 ------------------------------------------------------------------
@@ -903,9 +949,9 @@ namespace HalfAware.EditorTools
         /// </summary>
         public static readonly Picture[] Pictures =
         {
-            new Picture("MilletSpring", 1090f / 850f, 0.33f),
-            new Picture("TurnerTemeraire", 2000f / 1413f, 0.60f),
-            new Picture("GrisPlaceRavignan", 960f / 1267f, 0.8152f),
+            new Picture("MilletSpring", 1090f / 850f, 0.56f),
+            new Picture("TurnerTemeraire", 2000f / 1413f, 0.38f),
+            new Picture("GrisPlaceRavignan", 960f / 1267f, 0.8392f),
             new Picture("HammershoiDustMotes", 1609f / 1890f, 0.46f),
         };
 

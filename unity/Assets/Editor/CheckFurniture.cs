@@ -52,10 +52,9 @@ namespace HalfAware.EditorTools
             new Subject("08_lowtable", null, new[] { "Room/LowTable", "Room/Binder" }, new Vector3(0.8f, 0.9f, -0.5f), 40f),
             new Subject("09_floorlamp", null, new[] { "Room/FloorLamp" }, new Vector3(1f, 0.25f, 0.4f), 44f),
             new Subject("10_aircon", null, new[] { "Room/AirCon" }, new Vector3(1f, -0.25f, -0.35f), 40f),
-            new Subject("11_workcounter", null, new[] { "Room/WorkCounter", "Room/Stool", "Room/Bin" }, new Vector3(0.5f, 0.6f, 1f), 56f),
+            new Subject("11_workcounter", null, new[] { "Room/WorkCounter", "Room/Stool" }, new Vector3(0.5f, 0.6f, 1f), 56f),
             new Subject("12_serverrack", null, new[] { "Room/ServerRack" }, new Vector3(0.45f, 0.3f, -1f), 44f),
             new Subject("13_chipshelf", null, new[] { "Room/ChipShelf" }, new Vector3(-1f, 0.3f, -0.4f), 42f),
-            new Subject("14_bin", null, new[] { "Room/Bin" }, new Vector3(0.3f, 0.8f, 1f), 40f),
             new Subject("15_pictures_sofa_wall", null, new[] { "Room/Picture0", "Room/Picture1", "Room/Picture2" }, new Vector3(1f, 0.05f, 0f), 44f),
             new Subject("16_picture_hammershoi", null, new[] { "Room/Picture3" }, new Vector3(-1f, 0.0f, 0.15f), 36f),
             new Subject("17_umbrella_shoes_close", null, new[] { "Room/UmbrellaStand", "Room/ShoeRack" }, new Vector3(-0.4f, 0.7f, 1f), 40f),
@@ -154,20 +153,23 @@ namespace HalfAware.EditorTools
         /// <summary>組み込んで保存した後の撮る所。名前・目・見る所・画角（0 なら目のカメラのまま）</summary>
         static readonly object[][] FinalViews =
         {
-            new object[] { "f01_hall_mouth_to_ldk", new Vector3(0.0f, 1.6f, -1.3f), new Vector3(-2.2f, 0.9f, 1.2f), 70f },
-            new object[] { "f02_kitchen_side_to_living", new Vector3(-4.2f, 1.6f, -0.5f), new Vector3(-3.6f, 0.9f, 2.2f), 70f },
-            new object[] { "f03_living_to_work", new Vector3(-3.8f, 1.6f, 2.2f), new Vector3(1.6f, 0.9f, 1.6f), 70f },
-            new object[] { "f04_entrance_to_hall", new Vector3(-0.25f, 1.6f, -4.75f), new Vector3(0.4f, 1.2f, -3.2f), 64f },
-            new object[] { "f04b_entrance_shoes_umbrella", new Vector3(-0.35f, 1.55f, -3.3f), new Vector3(0.35f, 0.5f, -4.6f), 64f },
-            new object[] { "f06_sofa_wall_pictures", new Vector3(-2.3f, 1.6f, 1.7f), new Vector3(-4.9f, 1.62f, 1.7f), 60f },
-            new object[] { "f06b_living_wide", new Vector3(-1.0f, 1.65f, 2.3f), new Vector3(-4.9f, 1.25f, 1.45f), 72f },
-            new object[] { "f07_kitchen_light_and_worktop", new Vector3(-1.3f, 1.7f, 0.9f), new Vector3(-2.6f, 1.1f, -1.1f), 64f },
-            new object[] { "f07b_kitchen_ceiling_light", new Vector3(-0.9f, 1.5f, 1.3f), new Vector3(-2.6f, 2.2f, -0.8f), 70f },
-            new object[] { "f08_black_furniture_overall", new Vector3(2.4f, 1.9f, 1.4f), new Vector3(-3.5f, 0.6f, -0.6f), 72f },
-            new object[] { "f09_coat_rack", new Vector3(-0.3f, 1.5f, -0.2f), new Vector3(0.95f, 1.0f, -1.05f), 50f },
-            new object[] { "f10a_desk_from_behind_chair", new Vector3(1.5f, 1.75f, 0.2f), new Vector3(1.7f, 0.6f, 2.2f), 62f },
-            new object[] { "f10b_desk_and_side_table", new Vector3(0.3f, 1.5f, 1.0f), new Vector3(2.4f, 0.6f, 1.8f), 62f },
-            new object[] { "f11_low_table", new Vector3(-2.4f, 1.3f, 0.9f), new Vector3(-3.3f, 0.4f, 1.6f), 56f },
+            // 全体（台所・居間・玄関・仕事の区画）
+            new object[] { "a1_kitchen_overall", new Vector3(-2.2f, 1.7f, 1.4f), new Vector3(-2.6f, 0.9f, -1.2f), 72f },
+            new object[] { "a2_living_overall", new Vector3(-1.0f, 1.65f, 2.3f), new Vector3(-4.9f, 1.25f, 1.45f), 72f },
+            new object[] { "a3_entrance_overall", new Vector3(0.0f, 1.6f, -1.9f), new Vector3(0.1f, 0.8f, -4.9f), 64f },
+            new object[] { "a4_work_overall", new Vector3(-0.4f, 1.7f, 0.4f), new Vector3(2.2f, 0.8f, 2.2f), 70f },
+            // 直した所ごと
+            new object[] { "b01_plant_corner", new Vector3(1.0f, 1.6f, 0.7f), new Vector3(2.6f, 1.0f, -0.8f), 60f },
+            new object[] { "b02_coat_rack_coat_hat", new Vector3(-0.3f, 1.5f, -0.2f), new Vector3(0.95f, 1.0f, -1.05f), 50f },
+            new object[] { "b02b_coat_rack_from_ne", new Vector3(2.0f, 1.5f, 0.1f), new Vector3(1.0f, 1.0f, -1.1f), 50f },
+            new object[] { "b04_bookcase_spines", new Vector3(-2.6f, 1.2f, 1.25f), new Vector3(-2.6f, 0.95f, 2.75f), 55f },
+            new object[] { "b05_black_blanket_pillow_mug", new Vector3(-2.6f, 1.3f, 1.0f), new Vector3(-3.8f, 0.5f, 1.7f), 56f },
+            new object[] { "b06_fridge_no_magnets", new Vector3(-3.8f, 1.5f, -0.3f), new Vector3(-4.58f, 1.0f, -1.1f), 55f },
+            new object[] { "b07_sofa_wall_pictures", new Vector3(-2.3f, 1.6f, 1.7f), new Vector3(-4.9f, 1.65f, 1.7f), 60f },
+            new object[] { "b09_hall_west_wall_no_store_door", new Vector3(0.50f, 1.6f, -3.2f), new Vector3(-0.6f, 1.0f, -4.65f), 60f },
+            new object[] { "b10_wine_cellar", new Vector3(-3.35f, 1.0f, 1.25f), new Vector3(-3.85f, 0.5f, 0.45f), 55f },
+            new object[] { "b11_kitchen_run_fridge_to_ih", new Vector3(-0.9f, 1.7f, -0.4f), new Vector3(-3.2f, 1.0f, -1.2f), 70f },
+            new object[] { "b11b_ih_and_hood", new Vector3(-1.6f, 1.75f, -0.3f), new Vector3(-1.65f, 1.1f, -1.2f), 60f },
         };
 
         /// <summary>
@@ -187,7 +189,7 @@ namespace HalfAware.EditorTools
             {
                 ShaderUtil.allowAsyncCompilation = false;
                 EditorSceneManager.OpenScene(BuildFurniture.RoomPath, OpenSceneMode.Single);
-                Seated(dir, "f05", sb);
+                Seated(dir, "a5", sb);
                 Body(false);
                 foreach (var v in FinalViews)
                 {
@@ -196,11 +198,11 @@ namespace HalfAware.EditorTools
                 }
                 EditorSceneManager.OpenScene(BuildConnect.ScenePath, OpenSceneMode.Single);
                 Body(false);
-                Save(Shoot(new Vector3(0f, 1.6f, -4.3f), new Vector3(0.6f, 1.1f, -1.2f), 64f, 0f), Path.Combine(dir, "f13_connect_start_to_hall_mouth.png"));
+                Save(Shoot(new Vector3(0f, 1.6f, -4.3f), new Vector3(0.6f, 1.1f, -1.2f), 64f, 0f), Path.Combine(dir, "b08_connect_start_shoe_rack.png"));
                 // ジャケットがコート掛けに掛かっている場面（場面 3 では掛けた後、場面 5・7 は掛かったまま始まる）
                 EditorSceneManager.OpenScene(BuildNotice.ScenePath, OpenSceneMode.Single);
                 Body(false);
-                Save(Shoot(new Vector3(-0.3f, 1.5f, -0.2f), new Vector3(0.95f, 1.0f, -1.05f), 50f, 0f), Path.Combine(dir, "f12_coat_rack_with_jacket.png"));
+                Save(Shoot(new Vector3(-0.3f, 1.5f, -0.2f), new Vector3(0.95f, 1.0f, -1.05f), 50f, 0f), Path.Combine(dir, "b02c_coat_rack_with_jacket_scene7.png"));
                 sb.AppendLine("撮った 場面 3 の廊下と、場面 7 のジャケットの掛かったコート掛け");
             }
             catch (Exception e)
@@ -323,6 +325,17 @@ namespace HalfAware.EditorTools
                 }
             }
             sb.AppendFormat("{0}: 行ける升 {1}（{2:0.0} m²）", tag, count, count * Cell * Cell).AppendLine();
+            // 乗れてしまう物: 床から立つ当たりで、上の面が体の段を越える高さ（0.3 m）の 3 倍より低い物（床と敷物は数えない）
+            var low = new List<string>();
+            foreach (var c in Object.FindObjectsByType<Collider>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+            {
+                if (c.isTrigger || (root != null && c.transform.IsChildOf(root))) continue;
+                var name = c.transform.name;
+                if (name == "Floor" || name == "Rug" || name == "Doormat") continue;
+                var bb = c.bounds;
+                if (bb.min.y < 0.1f && bb.max.y < 0.9f) low.Add(string.Format("{0}（上の面 {1:0.00} m）", name, bb.max.y));
+            }
+            sb.AppendLine("  床から立つ低い当たり（乗れてしまう物）: " + (low.Count == 0 ? "無し" : string.Join("、", low.ToArray())));
             var targets = new List<Vector3>();
             foreach (var it in Object.FindObjectsByType<Interactable>(FindObjectsInactive.Include, FindObjectsSortMode.None))
             {
