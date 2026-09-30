@@ -34,6 +34,8 @@ namespace HalfAware.EditorTools
         public const string TextureDir = "Assets/Textures/Furniture/";
         public const string AtlasTexture = TextureDir + "FurnitureAtlas.png";
         public const string GlowTexture = TextureDir + "FurnitureGlow.png";
+        /// <summary>法線の絵（絵に描いた高さから作る。溝・縫い目・皺・戸の縁の面取りを、明かりの向きに応じた陰影で読ませる）</summary>
+        public const string NormalTexture = TextureDir + "FurnitureNormal.png";
         public const string BlinkTexture = TextureDir + "RackBlink.png";
         public const string AtlasMaterial = "Assets/Materials/Room/Furniture.mat";
         public const string BlinkMaterial = "Assets/Materials/Room/FurnitureBlink.mat";
@@ -250,10 +252,10 @@ namespace HalfAware.EditorTools
         /// <summary>絵・マテリアル・家具ごとの mesh を焼く（表の物すべて）。場面には触らない</summary>
         public static List<Made> Bake(List<string> notes)
         {
-            Texture2D glow;
-            var atlas = PaintAtlas(out glow, notes);
+            Texture2D glow, normal;
+            var atlas = PaintAtlas(out glow, out normal, notes);
             var blink = PaintBlink();
-            Materials(atlas, glow, blink);
+            Materials(atlas, glow, normal, blink);
             var made = new List<Made>();
             foreach (var p in Layout)
             {
@@ -394,11 +396,43 @@ namespace HalfAware.EditorTools
         /// </summary>
         public const float BlockerHigh = 1.8f;
 
-        /// <summary>当たり。形の広さの箱（鉢植えは鉢、フロアランプは台と柱、コート掛けは柱と掛けたコート）を、床から <see cref="BlockerHigh"/> まで伸ばす</summary>
+        /// <summary>
+        /// 決めた当たりの箱（物の中の座標）。形を軽くした時（オーナー「重くなりそうなところはテクスチャを張ることで軽くして」）に mesh の広さが少し変わっても、
+        /// 当たりと歩ける所を変えないよう、軽くする前に組んだ Room の当たりをそのまま持つ。表に無い物は形の広さから出す
+        /// </summary>
+        static readonly Dictionary<string, Bounds> SettledBoxes = new Dictionary<string, Bounds>
+        {
+            { "Sofa", new Bounds(new Vector3(0f, 0.9f, 0.013902247f), new Vector3(2.07968545f, 1.8f, 0.98144424f)) },
+            { "Rug", new Bounds(new Vector3(0.000433415174f, 0f, 0.000156104565f), new Vector3(1.73890615f, 0.01f, 2.139471f)) },
+            { "LowTable", new Bounds(new Vector3(0f, 0.9f, 0f), new Vector3(1f, 1.8f, 0.5f)) },
+            { "FloorLamp", new Bounds(new Vector3(0f, 0.9f, 0f), new Vector3(0.3f, 1.8f, 0.3f)) },
+            { "Bookcase", new Bounds(new Vector3(0f, 0.925f, 0f), new Vector3(0.9f, 1.85f, 0.3f)) },
+            { "Fridge", new Bounds(new Vector3(0f, 0.9f, 0.0192500055f), new Vector3(0.6f, 1.8f, 0.698500037f)) },
+            { "Kitchen", new Bounds(new Vector3(0f, 1.5f, 0.00774998963f), new Vector3(3.64000034f, 3f, 0.6155f)) },
+            { "WorkCounter", new Bounds(new Vector3(0f, 0.9f, -0.02275002f), new Vector3(2.8f, 1.8f, 0.645500064f)) },
+            { "Stool", new Bounds(new Vector3(0f, 0.9f, -7.686019E-05f), new Vector3(0.366f, 1.8f, 0.365846276f)) },
+            { "SideTable", new Bounds(new Vector3(0f, 0.9f, 0f), new Vector3(1.068f, 1.8f, 0.44f)) },
+            { "Tower", new Bounds(new Vector3(0.000500001f, 0.9f, 0.000499993563f), new Vector3(0.241f, 1.8f, 0.461000025f)) },
+            { "ServerRack", new Bounds(new Vector3(0.03150958f, 0.9f, 0.0150785744f), new Vector3(0.6130191f, 1.8f, 0.6301572f)) },
+            { "ChipShelf", new Bounds(new Vector3(0f, 0.9f, 0f), new Vector3(0.5f, 1.8f, 0.28f)) },
+            { "Plant", new Bounds(new Vector3(0f, 0.9f, 0f), new Vector3(0.38f, 1.8f, 0.38f)) },
+            { "CoatRack", new Bounds(new Vector3(0.099999994f, 0.9f, 0f), new Vector3(0.6f, 1.8f, 0.5f)) },
+            { "UmbrellaStand", new Bounds(new Vector3(0f, 0.9f, 0f), new Vector3(0.210584432f, 1.8f, 0.216f)) },
+        };
+
+        /// <summary>当たり。決めた箱（<see cref="SettledBoxes"/>）があればそれを、無ければ形の広さの箱（鉢植えは鉢、フロアランプは台と柱、コート掛けは柱と掛けたコート）を、床から <see cref="BlockerHigh"/> まで伸ばす</summary>
         static void Blocker(Transform t, string name, Mesh mesh)
         {
             var box = t.GetComponent<BoxCollider>();
             if (box == null) box = t.gameObject.AddComponent<BoxCollider>();
+            Bounds settled;
+            if (SettledBoxes.TryGetValue(name, out settled))
+            {
+                box.center = settled.center;
+                box.size = settled.size;
+                box.isTrigger = false;
+                return;
+            }
             var b = mesh.bounds;
             if (name == "Plant") b = new Bounds(new Vector3(0f, 0.19f, 0f), new Vector3(0.38f, 0.38f, 0.38f));
             if (name == "FloorLamp") b = new Bounds(new Vector3(0f, 0.75f, 0f), new Vector3(0.30f, 1.5f, 0.30f));
@@ -505,7 +539,8 @@ namespace HalfAware.EditorTools
             mr.receiveShadows = true;
             var ground = rug.GetComponent<StepGround>();
             if (box == null) return "ラグ: mesh と置き場を替えた（当たりと足音の地面はまだ付いていない。PlaceRoomFoley が付ける）";
-            var b = mesh.bounds;
+            Bounds b;
+            if (!SettledBoxes.TryGetValue("Rug", out b)) b = mesh.bounds;
             var lo = rug.InverseTransformPoint(new Vector3(rug.position.x, bottom, rug.position.z)).y;
             var hi = rug.InverseTransformPoint(new Vector3(rug.position.x, top, rug.position.z)).y;
             box.center = new Vector3(b.center.x, (lo + hi) * 0.5f, b.center.z);
@@ -534,7 +569,7 @@ namespace HalfAware.EditorTools
 
         // ---- マテリアル --------------------------------------------------------------
 
-        static void Materials(Texture2D atlas, Texture2D glow, Texture2D blink)
+        static void Materials(Texture2D atlas, Texture2D glow, Texture2D normal, Texture2D blink)
         {
             var m = Lit(AtlasMaterial, "Furniture");
             m.SetTexture("_BaseMap", atlas);
@@ -548,6 +583,10 @@ namespace HalfAware.EditorTools
             m.SetTexture("_EmissionMap", glow);
             m.SetColor("_EmissionColor", Color.white);
             m.EnableKeyword("_EMISSION");
+            // 法線の絵（高さを描いた所だけ傾き、ほかは平ら）。mesh は接線を持つ（FurnitureKit.Bake）
+            m.SetTexture("_BumpMap", normal);
+            m.SetFloat("_BumpScale", 1f);
+            m.EnableKeyword("_NORMALMAP");
             m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
             EditorUtility.SetDirty(m);
 
@@ -600,6 +639,7 @@ namespace HalfAware.EditorTools
             existing.SetVertices(mesh.vertices);
             existing.SetNormals(mesh.normals);
             existing.SetUVs(0, mesh.uv);
+            existing.SetTangents(mesh.tangents);
             existing.subMeshCount = mesh.subMeshCount;
             for (var i = 0; i < mesh.subMeshCount; i++) existing.SetTriangles(mesh.GetTriangles(i), i, false);
             existing.RecalculateBounds();

@@ -59,6 +59,17 @@ namespace HalfAware.EditorTools
         static readonly RectInt PcSideArea = new RectInt(44, 144, 24, 28);
         // 作業台の端のワインセラーの硝子の戸（中の棚と寝かせた瓶の底、上の灯り）
         static readonly RectInt WineArea = new RectInt(68, 144, 20, 44);
+        // 戸と引き出しの前板（つや消しの黒）と、冷蔵庫の扉（艶のある黒）。縁を面取りした一枚（面いっぱいに張る）
+        static readonly RectInt FrontBevelArea = new RectInt(136, 188, 64, 64);
+        // 棚の瓶・缶・挽き器に巻く絵（4×16 を 16 種）
+        static readonly RectInt JarStripArea = new RectInt(136, 144, 64, 16);
+        // 立てて並べたチップケースの列（4×12 の背を 14 本）、寝かせて積んだケースの前、ばらのチップを入れた浅い箱の上
+        static readonly RectInt CaseRowArea = new RectInt(200, 144, 56, 12);
+        static readonly RectInt CaseStackArea = new RectInt(200, 156, 16, 12);
+        static readonly RectInt ChipTrayArea = new RectInt(216, 156, 16, 12);
+        // コートの前と背（24×48。下が裾）。打ち合わせと釦・ポケットの雨蓋・裾の襞（前）、背の縫い目・半ベルトと釦・裾の割れ（背）
+        static readonly RectInt CoatFrontArea = new RectInt(88, 188, 24, 48);
+        static readonly RectInt CoatBackArea = new RectInt(112, 188, 24, 48);
         // 額の絵の升（右の半分）
         static readonly RectInt[] PaintingSlots =
         {
@@ -161,6 +172,13 @@ namespace HalfAware.EditorTools
         static Tile SteelBrushed { get { return Tiled(SteelArea, 0.5f); } }
         static Tile Laminate { get { return Tiled(LaminateArea, 0.32f); } }
         static Tile Fur { get { return Tiled(FurArea, 0.45f); } }
+        /// <summary>ソファの隠れがちな所（台・背の枠）の革。繰り返しを粗くして面の割りを減らす</summary>
+        static Tile FabricBig { get { return Tiled(FabricArea, 0.60f); } }
+        /// <summary>戸と引き出しの前板（縁を面取りした一枚を、面いっぱいに張る）</summary>
+        static Tile FrontBevel { get { return Whole(Uv(FrontBevelArea)); } }
+
+        /// <summary>棚の物に巻く絵（0〜15）。<see cref="PaintJars"/> の並び</summary>
+        static Tile JarStrip(int k) { return Whole(Uv(JarStripArea, (k & 15) * 4, 0, 4, 16)); }
 
         /// <summary>背表紙の絵（0〜31）の uv</summary>
         static Rect SpineUv(int k)
@@ -185,6 +203,21 @@ namespace HalfAware.EditorTools
         {
             public readonly Color[] Albedo = new Color[AtlasW * AtlasH];
             public readonly Color[] Glow = new Color[AtlasW * AtlasH];
+            /// <summary>高さ（0 が地の面、正が出っ張り、負が凹み。単位は画素の幅くらい）。法線の絵は <see cref="Bumps"/> に入れた升の中だけ作る</summary>
+            public readonly float[] Height = new float[AtlasW * AtlasH];
+            public readonly List<Bump> Bumps = new List<Bump>();
+
+            public void Raise(int x, int y, float h)
+            {
+                if (x < 0 || y < 0 || x >= AtlasW || y >= AtlasH) return;
+                Height[y * AtlasW + x] = h;
+            }
+
+            /// <summary>高さを描いた升を法線の絵に入れる。wrap なら繰り返す地（升の端を折り返して継ぎ目を出さない）、strength は傾きの強さ</summary>
+            public void Bumpy(RectInt r, bool wrap, float strength)
+            {
+                Bumps.Add(new Bump { Area = r, Wrap = wrap, Strength = strength });
+            }
 
             public void Put(int x, int y, Color c, float smooth)
             {
@@ -240,6 +273,14 @@ namespace HalfAware.EditorTools
             }
         }
 
+        /// <summary>高さを描いた升</summary>
+        struct Bump
+        {
+            public RectInt Area;
+            public bool Wrap;
+            public float Strength;
+        }
+
         /// <summary>乱れの代わりの決まった値（0〜1）。押すたびに同じ絵にする</summary>
         static float Hash(int x, int y)
         {
@@ -272,7 +313,7 @@ namespace HalfAware.EditorTools
         // ---- 描く --------------------------------------------------------------------
 
         /// <summary>アトラスと光る所の絵を描いて置く。額の絵は Paintings の縮めた絵から写す（無ければ下塗りの布）</summary>
-        static Texture2D PaintAtlas(out Texture2D glow, List<string> notes)
+        static Texture2D PaintAtlas(out Texture2D glow, out Texture2D normal, List<string> notes)
         {
             var cv = new Canvas();
             for (var i = 0; i < cv.Albedo.Length; i++) { cv.Albedo[i] = new Color(0.1f, 0.1f, 0.1f, 0.2f); cv.Glow[i] = Color.black; }
@@ -303,7 +344,12 @@ namespace HalfAware.EditorTools
             PaintKitchenBits(cv);
             PaintLabels(cv);
             PaintDesk(cv);
+            PaintBevels(cv);
+            PaintJars(cv);
+            PaintCases(cv);
+            PaintCoat(cv);
             PaintPaintings(cv, notes);
+            normal = PaintNormal(cv);
             glow = SavePicture(cv.Glow, AtlasW, AtlasH, GlowTexture, TextureWrapMode.Clamp, false);
             return SavePicture(cv.Albedo, AtlasW, AtlasH, AtlasTexture, TextureWrapMode.Clamp, true);
         }
@@ -341,6 +387,7 @@ namespace HalfAware.EditorTools
                     gloss[y * r.width + x] = 0.55f;
                 }
             }
+            // 法線の絵は付けない（艶のある革に一画素ごとの傾きを付けると、照りが粒になって革の面が乱れる。皺は地の色の筋で読ませる）
             for (var y = 0; y < r.height; y++)
                 for (var x = 0; x < r.width; x++)
                     cv.Put(r.x + x, r.y + y, baseC * px[y * r.width + x], gloss[y * r.width + x]);
@@ -457,10 +504,14 @@ namespace HalfAware.EditorTools
                     var side = Mathf.Abs(u) * 2f;
                     var lateral = Mathf.Repeat(v * 7f - side * 1.6f, 1f);
                     if (lateral < 0.12f && side > 0.08f && side < 0.85f) c = Color.Lerp(c, vein, 0.45f);
-                    if (Mathf.Abs(u) < 0.04f) c = vein;
-                    if (side > 0.9f) c *= 0.7f;
+                    var h = 0f;
+                    if (lateral < 0.12f && side > 0.08f && side < 0.85f) h = -0.5f;
+                    if (Mathf.Abs(u) < 0.04f) { c = vein; h = 1f; }
+                    if (side > 0.9f) { c *= 0.7f; h = -0.6f; }
                     cv.Put(r.x + x, r.y + y, c, 0.45f);
+                    cv.Raise(r.x + x, r.y + y, h);
                 }
+            cv.Bumpy(r, false, 1.3f);
         }
 
         /// <summary>ラグの毛足。灰に藤の混じった地に、毛先の明るい房と、根元の暗い隙間。房の向きはばらばら</summary>
@@ -505,7 +556,9 @@ namespace HalfAware.EditorTools
                     var v = px[y * r.width + x];
                     var tint = Color.Lerp(baseC, new Color(0.27f, 0.25f, 0.29f), Mathf.Clamp01(v - 0.9f));
                     cv.Put(r.x + x, r.y + y, tint * v, 0.02f);
+                    cv.Raise(r.x + x, r.y + y, (v - 0.8f) * 1.2f);
                 }
+            cv.Bumpy(r, true, 1.0f);
         }
 
         /// <summary>
@@ -557,7 +610,28 @@ namespace HalfAware.EditorTools
             // 側板の孔（y 48〜63）
             for (var y = 48; y < 64; y++)
                 for (var x = 0; x < 64; x++)
-                    cv.Put(r.x + x, r.y + y, (x % 3 == 1 && y % 3 == 1) ? new Color(0.01f, 0.01f, 0.01f) : black * 1.4f, 0.35f);
+                {
+                    var hole = x % 3 == 1 && y % 3 == 1;
+                    cv.Put(r.x + x, r.y + y, hole ? new Color(0.01f, 0.01f, 0.01f) : black * 1.4f, 0.35f);
+                    cv.Raise(r.x + x, r.y + y, hole ? -1f : 0f);
+                }
+            // 前の柱へ留める耳（どの機械も左右の 3 画素。前は板で出していた）と螺子
+            foreach (var band in new[] { new Vector2Int(0, 8), new Vector2Int(24, 4), new Vector2Int(28, 4), new Vector2Int(32, 4), new Vector2Int(36, 4) })
+                foreach (var ex in new[] { 0, 61 })
+                {
+                    cv.Fill(r.x + ex, r.y + band.x, 3, band.y, silver * 0.8f, 0.45f);
+                    cv.Put(r.x + ex + 1, r.y + band.x + band.y / 2, new Color(0.10f, 0.10f, 0.11f), 0.3f);
+                }
+            // 高さ: 暗い差し口と口の列は凹み、耳は少し出る
+            for (var y = 0; y < 48; y++)
+                for (var x = 0; x < 64; x++)
+                {
+                    var c = cv.Get(r.x + x, r.y + y);
+                    var ear = x < 3 || x > 60;
+                    // 顔の地（灰 0.13 前後）より暗い所（差し口・口・孔）を凹みに、明るい所（取っ手・札）を少し出す
+                    cv.Raise(r.x + x, r.y + y, ear ? 0.5f : Mathf.Clamp((c.grayscale - 0.10f) * 8f, -0.8f, 0.4f));
+                }
+            cv.Bumpy(r, false, 1.1f);
         }
 
         /// <summary>2U の機械。bays 個の差し口（幅 bayW、高さ 3）に小さな灯り、左右の耳</summary>
@@ -925,6 +999,271 @@ namespace HalfAware.EditorTools
             for (var x = inside.x + 1; x < inside.xMax - 1; x++) cv.Lit(x, inside.yMax - 1, new Color(0.60f, 0.75f, 0.95f), 0.45f);
         }
 
+        // ---- 形の細かさを移した絵 ------------------------------------------------------
+        //
+        // 輪郭を作る所は mesh に残し、面の上の細かい起伏（戸の縁の面取り・溝・縫い目・釦・棚の物の札）をここで絵と高さにする。
+        // 地の色には向きの無い陰（隙間の暗さ）だけを焼き、向きのある陰影は法線の絵（高さから作る）に任せて部屋の明かりに従わせる
+
+        /// <summary>戸と引き出しの前板（つや消しの黒。64 画素で、面いっぱいに張っても面取りの幅が 1〜2 cm に収まる）。縁の 2 画素を面取りに（高さを下げて法線を外へ倒す）、一番外の画素は少し明るく艶を上げる（角の照り返し）</summary>
+        static void PaintBevels(Canvas cv)
+        {
+            Bevel(cv, FrontBevelArea, C(Hue.Laminate), 0.22f, 0.45f, 57);
+        }
+
+        static void Bevel(Canvas cv, RectInt r, Color baseC, float smooth, float edgeSmooth, int seed)
+        {
+            for (var y = 0; y < r.height; y++)
+                for (var x = 0; x < r.width; x++)
+                {
+                    var edge = Mathf.Min(Mathf.Min(x, r.width - 1 - x), Mathf.Min(y, r.height - 1 - y));
+                    var n = 0.95f + 0.07f * TileNoise(x, y, r.width, 16, seed) + 0.03f * Hash(x, y + seed);
+                    cv.Put(r.x + x, r.y + y, baseC * n * (edge == 0 ? 1.35f : 1f), edge == 0 ? edgeSmooth : smooth);
+                    cv.Raise(r.x + x, r.y + y, edge == 0 ? -1f : edge == 1 ? -0.35f : 0f);
+                }
+            cv.Bumpy(r, false, 1.6f);
+        }
+
+        /// <summary>
+        /// 棚の物に巻く絵（4×16 を 16 種。下が底、上の画素が蓋、横は周で 0 と 3 の列が前）。
+        /// 0 パプリカ・1 ターメリック・2 香草・3 クミン・4 胡椒・5 塩・6 砂糖（瓶）、7 胡椒の挽き器、8 茶色のソース・9 ケチャップ・10 醤油・11 油・12 酢（瓶）、13 紅茶の缶・14 珈琲の缶・15 陶器
+        /// </summary>
+        static void PaintJars(Canvas cv)
+        {
+            var cream = new Color(0.70f, 0.66f, 0.56f);
+            var kraft = new Color(0.52f, 0.40f, 0.26f);
+            var lidBlack = C(Hue.LidBlack);
+            var lidWhite = C(Hue.LidWhite);
+            // 瓶（中身の色が硝子越しに見える）
+            Wrap(cv, 0, C(Hue.Paprika), lidBlack, 3, cream, new Color(0.55f, 0.14f, 0.06f), 4, 9, true);
+            Wrap(cv, 1, C(Hue.Turmeric), lidBlack, 3, cream, new Color(0.72f, 0.52f, 0.08f), 4, 9, true);
+            Wrap(cv, 2, C(Hue.Herbs), lidBlack, 3, kraft, new Color(0.22f, 0.34f, 0.12f), 4, 9, true);
+            Wrap(cv, 3, C(Hue.Cumin), lidBlack, 3, kraft, new Color(0.40f, 0.24f, 0.10f), 4, 9, true);
+            Wrap(cv, 4, C(Hue.Pepper), lidBlack, 3, new Color(0.08f, 0.08f, 0.08f), new Color(0.78f, 0.78f, 0.74f), 4, 9, true);
+            Wrap(cv, 5, C(Hue.Salt), lidWhite, 3, new Color(0.78f, 0.78f, 0.76f), new Color(0.12f, 0.24f, 0.52f), 4, 10, true);
+            Wrap(cv, 6, C(Hue.Sugar), lidWhite, 3, Color.clear, Color.clear, 0, 0, true);
+            // 挽き器（黒い木。上の摘みが少し明るい）
+            Wrap(cv, 7, C(Hue.Walnut) * 0.8f, C(Hue.Walnut) * 1.2f, 3, Color.clear, Color.clear, 0, 0, false);
+            // 瓶（肩から上は首。蓋は上の二画素）
+            Wrap(cv, 8, C(Hue.BrownSauce), lidBlack, 2, new Color(0.10f, 0.14f, 0.30f), new Color(0.72f, 0.58f, 0.24f), 2, 8, true);
+            Wrap(cv, 9, C(Hue.Ketchup), C(Hue.LidRed), 2, new Color(0.74f, 0.72f, 0.66f), new Color(0.60f, 0.08f, 0.06f), 2, 8, true);
+            Wrap(cv, 10, C(Hue.Soy), C(Hue.LidRed), 2, new Color(0.50f, 0.08f, 0.06f), new Color(0.05f, 0.05f, 0.05f), 2, 7, true);
+            Wrap(cv, 11, C(Hue.Oil), C(Hue.Cork), 2, new Color(0.16f, 0.30f, 0.12f), new Color(0.72f, 0.66f, 0.30f), 2, 8, true);
+            Wrap(cv, 12, C(Hue.Vinegar), lidBlack, 2, Color.clear, Color.clear, 0, 0, true);
+            // 缶（紺に金の帯と白い札、黒に橙の帯）
+            Wrap(cv, 13, C(Hue.TinNavy), C(Hue.TinGold), 2, new Color(0.78f, 0.76f, 0.70f), C(Hue.TinGold), 5, 9, false);
+            for (var x = 0; x < 4; x++)
+            {
+                cv.Put(JarStripArea.x + 52 + x, JarStripArea.y + 2, C(Hue.TinGold), 0.6f);
+                cv.Put(JarStripArea.x + 52 + x, JarStripArea.y + 11, C(Hue.TinGold), 0.6f);
+            }
+            Wrap(cv, 14, new Color(0.05f, 0.05f, 0.05f), new Color(0.05f, 0.05f, 0.05f), 2, new Color(0.62f, 0.30f, 0.08f), new Color(0.62f, 0.30f, 0.08f), 6, 8, false);
+            Wrap(cv, 15, C(Hue.Ceramic), C(Hue.Ceramic), 1, Color.clear, Color.clear, 0, 0, false);
+        }
+
+        /// <summary>巻く絵の一本。label の地が透明なら札無し。札は前の二列（0 と 3）の rows from〜to、真ん中に印。glass なら 1 の列に照り</summary>
+        static void Wrap(Canvas cv, int k, Color body, Color lid, int lidRows, Color label, Color mark, int from, int to, bool glass)
+        {
+            var x0 = JarStripArea.x + k * 4;
+            var y0 = JarStripArea.y;
+            for (var y = 0; y < 16; y++)
+                for (var x = 0; x < 4; x++)
+                {
+                    var c = body * (0.92f + 0.12f * Hash(x0 + x, y));
+                    var smooth = glass ? 0.8f : 0.5f;
+                    if (glass && x == 1) { c = c * 1.35f + new Color(0.05f, 0.05f, 0.05f); smooth = 0.95f; }
+                    if (y == 0) c *= 0.75f;
+                    var front = x == 0 || x == 3;
+                    if (label.a > 0f && front && y >= from && y <= to)
+                    {
+                        c = label * (0.95f + 0.08f * Hash(x, y + k));
+                        if (y > from && y < to && x == 0) c = mark;
+                        smooth = 0.3f;
+                    }
+                    if (y >= 16 - lidRows) { c = lid * (y == 16 - lidRows ? 0.8f : 1f); smooth = 0.45f; }
+                    cv.Put(x0 + x, y0 + y, c, smooth);
+                }
+        }
+
+        /// <summary>チップケースの列（立てた背の並び）・寝かせて積んだケースの前・ばらのチップの浅い箱の上。ケースの境は凹み（法線の絵）と暗い筋</summary>
+        static void PaintCases(Canvas cv)
+        {
+            var inkBlack = new Color(0.06f, 0.06f, 0.07f);
+            var tags = new[] { C(Hue.LedCyan) * 0.7f, new Color(0.45f, 0.30f, 0.65f), C(Hue.LedAmber) * 0.8f, C(Hue.LedGreen) * 0.6f, C(Hue.LedRed) * 0.6f, new Color(0.45f, 0.45f, 0.47f) };
+            var smoke = C(Hue.CaseSmoke) * 1.2f;
+            var gap = new Color(0.02f, 0.02f, 0.025f);
+            var row = CaseRowArea;
+            for (var k = 0; k < row.width / 4; k++)
+            {
+                var x0 = row.x + k * 4;
+                cv.Fill(x0, row.y, 4, 12, smoke, 0.7f);
+                cv.Fill(x0 + 1, row.y + 2, 2, 8, C(Hue.LabelWhite), 0.15f);
+                cv.Fill(x0 + 1, row.y + 9, 2, 1, tags[(k * 5) % tags.Length], 0.2f);
+                for (var y = 3; y < 8; y++) if (Hash(k + 11, y) > 0.35f) cv.Put(x0 + 1 + (y & 1), row.y + y, inkBlack, 0.15f);
+                for (var y = 0; y < 12; y++) { cv.Put(x0, row.y + y, gap, 0.3f); cv.Raise(x0, row.y + y, -1f); }
+            }
+            cv.Bumpy(row, false, 1.0f);
+            var st = CaseStackArea;
+            for (var j = 0; j < st.height / 2; j++)
+            {
+                var y = st.y + j * 2;
+                for (var x = 0; x < st.width; x++)
+                {
+                    cv.Put(st.x + x, y, gap, 0.3f);
+                    cv.Raise(st.x + x, y, -1f);
+                    var label = x >= 5 && x <= 10 && j % 2 == 0;
+                    cv.Put(st.x + x, y + 1, label ? C(Hue.LabelWhite) * 0.9f : smoke, label ? 0.15f : 0.7f);
+                }
+                cv.Put(st.x + 5, y + 1, tags[j % tags.Length], 0.2f);
+            }
+            cv.Bumpy(st, false, 1.0f);
+            var tr = ChipTrayArea;
+            cv.Fill(tr, C(Hue.PlasticDark) * 0.8f, 0.35f);
+            for (var y = 0; y < tr.height; y++)
+                for (var x = 0; x < tr.width; x++)
+                {
+                    var rim = x == 0 || y == 0 || x == tr.width - 1 || y == tr.height - 1;
+                    if (rim) cv.Put(tr.x + x, tr.y + y, C(Hue.PlasticDark) * 1.4f, 0.4f);
+                    cv.Raise(tr.x + x, tr.y + y, rim ? 0.6f : 0f);
+                }
+            for (var k = 0; k < 6; k++)
+            {
+                var cx = tr.x + 2 + Mathf.FloorToInt(Hash(k, 60) * 10f);
+                var cy = tr.y + 2 + Mathf.FloorToInt(Hash(k, 61) * 7f);
+                var chip = k % 3 == 0 ? C(Hue.CaseBlue) : C(Hue.PlasticGrey);
+                for (var y = 0; y < 2; y++)
+                    for (var x = 0; x < 3; x++)
+                    {
+                        cv.Put(cx + x, cy + y, y == 1 && x == 1 ? C(Hue.Brass) : chip, 0.5f);
+                        cv.Raise(cx + x, cy + y, 0.4f);
+                    }
+            }
+            cv.Bumpy(tr, false, 1.0f);
+        }
+
+        /// <summary>
+        /// コートの前と背（24×48、下が裾。前は +z の面、背は −z の面にいっぱいに張る）。暗い灰茶のウールの地。
+        /// 前: 真ん中の打ち合わせの線（溝）、V の襟の奥の影、釦三つ、腰の雨蓋のポケット二つ、裾の縦の襞。
+        /// 背: 真ん中の縫い目、半ベルトと釦二つ、裾の割れ、裾の襞。襞と凹凸は法線の絵で、陰の向きは部屋の明かりに従う
+        /// </summary>
+        static void PaintCoat(Canvas cv)
+        {
+            var wool = C(Hue.CoatWool);
+            var seam = C(Hue.HatBand);
+            foreach (var back in new[] { false, true })
+            {
+                var r = back ? CoatBackArea : CoatFrontArea;
+                for (var y = 0; y < r.height; y++)
+                    for (var x = 0; x < r.width; x++)
+                    {
+                        var n = 0.93f + 0.10f * TileNoise(x, y, 32, 8, back ? 131 : 129) + 0.04f * Hash(x, y + (back ? 7 : 3));
+                        // 裾の縦の襞（下の四割。真ん中は寄せない）
+                        var hem = Mathf.Clamp01((20f - y) / 20f);
+                        var fold = Mathf.Sin((x + 0.5f) * Mathf.PI * 2f / 6f) * hem * Mathf.Clamp01(Mathf.Abs(x - 11.5f) / 4f);
+                        cv.Put(r.x + x, r.y + y, wool * n * (1f + 0.10f * fold) * (y == 0 ? 0.75f : 1f), 0.10f);
+                        cv.Raise(r.x + x, r.y + y, 0.9f * fold);
+                    }
+                if (!back)
+                {
+                    // 打ち合わせ（真ん中の少し右。上は V の襟の奥へ）
+                    for (var y = 0; y < 34; y++)
+                    {
+                        cv.Put(r.x + 12, r.y + y, seam, 0.2f);
+                        cv.Raise(r.x + 12, r.y + y, -1f);
+                        cv.Raise(r.x + 13, r.y + y, 0.4f);
+                    }
+                    // V の襟の奥（襟の板の間から覗く暗がり）
+                    for (var y = 34; y < 46; y++)
+                        for (var x = 0; x < r.width; x++)
+                            if (Mathf.Abs(x - 12f) < (y - 33) * 0.45f)
+                            {
+                                cv.Put(r.x + x, r.y + y, wool * 0.45f, 0.1f);
+                                cv.Raise(r.x + x, r.y + y, -0.8f);
+                            }
+                    // 釦三つ（打ち合わせの左）
+                    foreach (var by in new[] { 31, 24, 17 })
+                    {
+                        cv.Fill(r.x + 10, r.y + by, 2, 2, wool * 0.55f, 0.45f);
+                        cv.Put(r.x + 10, r.y + by + 1, wool * 1.5f, 0.6f);
+                        for (var y = 0; y < 2; y++) for (var x = 0; x < 2; x++) cv.Raise(r.x + 10 + x, r.y + by + y, 0.8f);
+                    }
+                    // 腰の雨蓋のポケット（蓋の下の縁に影）
+                    foreach (var px in new[] { 3, 15 })
+                        for (var x = 0; x < 7; x++)
+                        {
+                            cv.Put(r.x + px + x, r.y + 21, wool * 1.12f, 0.12f);
+                            cv.Put(r.x + px + x, r.y + 20, wool * 1.02f, 0.12f);
+                            cv.Put(r.x + px + x, r.y + 19, wool * 0.8f, 0.1f);
+                            cv.Raise(r.x + px + x, r.y + 21, 0.5f);
+                            cv.Raise(r.x + px + x, r.y + 20, 0.5f);
+                            cv.Raise(r.x + px + x, r.y + 19, -0.3f);
+                        }
+                }
+                else
+                {
+                    // 背の真ん中の縫い目と裾の割れ
+                    for (var y = 0; y < 44; y++)
+                    {
+                        var vent = y < 11;
+                        cv.Put(r.x + 12, r.y + y, vent ? seam : wool * 0.8f, 0.15f);
+                        cv.Raise(r.x + 12, r.y + y, vent ? -1f : -0.35f);
+                    }
+                    // 半ベルト（腰の高さ）と釦二つ。高さは付けず、地の色の明るい帯と下の縁の薄い陰だけ（法線で付けると背を横切る溝に見えた）
+                    for (var x = 6; x < 18; x++)
+                    {
+                        cv.Put(r.x + x, r.y + 27, wool * 1.08f, 0.12f);
+                        cv.Put(r.x + x, r.y + 26, wool * 1.05f, 0.12f);
+                        cv.Put(r.x + x, r.y + 25, wool * 0.94f, 0.1f);
+                    }
+                    foreach (var bx in new[] { 7, 16 })
+                    {
+                        cv.Put(r.x + bx, r.y + 26, wool * 0.75f, 0.45f);
+                        cv.Put(r.x + bx, r.y + 27, wool * 1.35f, 0.6f);
+                    }
+                    // 襟の付け根の縫い目
+                    for (var x = 4; x < 20; x++) { cv.Put(r.x + x, r.y + 45, wool * 0.7f, 0.1f); cv.Raise(r.x + x, r.y + 45, -0.5f); }
+                }
+                cv.Bumpy(r, false, 0.9f);
+            }
+        }
+
+        /// <summary>高さから法線の絵を作る（高さを描いた升の中だけ。ほかは平ら）。x が u、y が v の向き（接線の空間）</summary>
+        static Texture2D PaintNormal(Canvas cv)
+        {
+            var px = new Color[AtlasW * AtlasH];
+            var flat = new Color(0.5f, 0.5f, 1f, 1f);
+            for (var i = 0; i < px.Length; i++) px[i] = flat;
+            foreach (var b in cv.Bumps)
+            {
+                var r = b.Area;
+                for (var y = r.y; y < r.yMax; y++)
+                    for (var x = r.x; x < r.xMax; x++)
+                    {
+                        var dx = (HeightAt(cv, b, x + 1, y) - HeightAt(cv, b, x - 1, y)) * 0.5f * b.Strength;
+                        var dy = (HeightAt(cv, b, x, y + 1) - HeightAt(cv, b, x, y - 1)) * 0.5f * b.Strength;
+                        var n = new Vector3(-dx, -dy, 1f).normalized;
+                        px[y * AtlasW + x] = new Color(n.x * 0.5f + 0.5f, n.y * 0.5f + 0.5f, n.z * 0.5f + 0.5f, 1f);
+                    }
+            }
+            return SaveNormal(px, AtlasW, AtlasH, NormalTexture);
+        }
+
+        /// <summary>升の中の高さ。升の外へ出たら、繰り返す地なら折り返し、そうでなければ端の画素</summary>
+        static float HeightAt(Canvas cv, Bump b, int x, int y)
+        {
+            var r = b.Area;
+            if (b.Wrap)
+            {
+                x = r.x + ((x - r.x) % r.width + r.width) % r.width;
+                y = r.y + ((y - r.y) % r.height + r.height) % r.height;
+            }
+            else
+            {
+                x = Mathf.Clamp(x, r.x, r.xMax - 1);
+                y = Mathf.Clamp(y, r.y, r.yMax - 1);
+            }
+            return cv.Height[y * AtlasW + x];
+        }
+
         // ---- 額の絵 ------------------------------------------------------------------
 
         /// <summary>額に入れる絵。名前（Paintings/ の下の絵の名）・縦横の比（絵が無い時の額の形）・長い辺の実寸（m）</summary>
@@ -1071,6 +1410,34 @@ namespace HalfAware.EditorTools
                 imp.npotScale = TextureImporterNPOTScale.None;
                 imp.alphaSource = source;
                 imp.alphaIsTransparency = false;
+                imp.textureCompression = TextureImporterCompression.Uncompressed;
+                imp.SaveAndReimport();
+            }
+            return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+        }
+
+        /// <summary>法線の絵を置き（中身が変わった時だけ書く）、法線の絵として点で引く・mipmap 無し・圧縮無しで取り込む</summary>
+        static Texture2D SaveNormal(Color[] px, int w, int h, string path)
+        {
+            var tex = new Texture2D(w, h, TextureFormat.RGB24, false, true);
+            tex.SetPixels(px);
+            tex.Apply();
+            var bytes = tex.EncodeToPNG();
+            Object.DestroyImmediate(tex);
+            var full = Path.Combine(Directory.GetCurrentDirectory(), path);
+            Directory.CreateDirectory(Path.GetDirectoryName(full));
+            var same = File.Exists(full) && System.Linq.Enumerable.SequenceEqual(File.ReadAllBytes(full), bytes);
+            if (!same) File.WriteAllBytes(full, bytes);
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+            var imp = AssetImporter.GetAtPath(path) as TextureImporter;
+            if (imp != null && (imp.textureType != TextureImporterType.NormalMap || imp.mipmapEnabled || imp.filterMode != FilterMode.Point || imp.wrapMode != TextureWrapMode.Clamp
+                || imp.textureCompression != TextureImporterCompression.Uncompressed || imp.npotScale != TextureImporterNPOTScale.None))
+            {
+                imp.textureType = TextureImporterType.NormalMap;
+                imp.mipmapEnabled = false;
+                imp.filterMode = FilterMode.Point;
+                imp.wrapMode = TextureWrapMode.Clamp;
+                imp.npotScale = TextureImporterNPOTScale.None;
                 imp.textureCompression = TextureImporterCompression.Uncompressed;
                 imp.SaveAndReimport();
             }

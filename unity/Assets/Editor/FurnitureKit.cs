@@ -256,6 +256,8 @@ namespace HalfAware.EditorTools
             mesh.subMeshCount = subs;
             for (var i = 0; i < subs; i++) mesh.SetTriangles(tris[i], i, false);
             mesh.RecalculateBounds();
+            // 法線の絵を引くための接線（uv の u の向き）。色の升（uv が一点）の面は向きが決まらないが、そこの法線の絵は平らなので陰影は変わらない
+            mesh.RecalculateTangents();
             return mesh;
         }
 

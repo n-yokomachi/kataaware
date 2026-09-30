@@ -42,36 +42,40 @@ namespace HalfAware.EditorTools
 
         static readonly Subject[] Subjects =
         {
-            new Subject("01_sofa", new[] { "Room/Sofa", "Room/Pillow", "Room/Blanket", "Room/Binder" }, new[] { "Room/Sofa" }, new Vector3(1f, 0.55f, -0.3f)),
-            new Subject("02_fridge", new[] { "Room/Fridge", "Room/Microwave" }, new[] { "Room/Fridge" }, new Vector3(0.35f, 0.3f, 1f), 40f),
-            new Subject("03_kitchen", new[] { "Room/KitchenCabinet", "Room/KitchenSink", "Room/CoffeeMachine" }, new[] { "Room/Kitchen" }, new Vector3(0.1f, 0.55f, 1f), 56f),
+            new Subject("01_sofa", new[] { "Room/Sofa" }, new[] { "Room/Sofa" }, new Vector3(1f, 0.55f, -0.3f)),
+            new Subject("02_fridge", new[] { "Room/Fridge" }, new[] { "Room/Fridge" }, new Vector3(0.35f, 0.3f, 1f), 40f),
+            new Subject("03_kitchen", new[] { "Room/Kitchen" }, new[] { "Room/Kitchen" }, new Vector3(0.1f, 0.55f, 1f), 56f),
             new Subject("04_bookcase", new[] { "Room/Bookcase" }, new[] { "Room/Bookcase" }, new Vector3(0.3f, 0.15f, -1f), 42f),
-            new Subject("05_plant", new[] { "Room/PlantTall" }, new[] { "Room/Plant" }, new Vector3(-0.85f, 0.35f, 0.55f), 44f),
-            new Subject("06_rug", new[] { "Room/Rug" }, new[] { "Room/Rug", "Room/LowTable" }, new Vector3(0.9f, 1.25f, -0.45f), 50f),
-            new Subject("07_boxes_entrance", new[] { "Room/BoxA", "Room/BoxB", "Room/BoxC" }, new[] { "Room/ShoeRack", "Room/UmbrellaStand", "Room/Picture3" }, new Vector3(-0.35f, 0.5f, 1f), 50f),
-            new Subject("08_lowtable", null, new[] { "Room/LowTable", "Room/Binder" }, new Vector3(0.8f, 0.9f, -0.5f), 40f),
-            new Subject("09_floorlamp", null, new[] { "Room/FloorLamp" }, new Vector3(1f, 0.25f, 0.4f), 44f),
-            new Subject("10_aircon", null, new[] { "Room/AirCon" }, new Vector3(1f, -0.25f, -0.35f), 40f),
-            new Subject("11_workcounter", null, new[] { "Room/WorkCounter", "Room/Stool" }, new Vector3(0.5f, 0.6f, 1f), 56f),
-            new Subject("12_serverrack", null, new[] { "Room/ServerRack" }, new Vector3(0.45f, 0.3f, -1f), 44f),
-            new Subject("13_chipshelf", null, new[] { "Room/ChipShelf" }, new Vector3(-1f, 0.3f, -0.4f), 42f),
-            new Subject("15_pictures_sofa_wall", null, new[] { "Room/Picture0", "Room/Picture1", "Room/Picture2" }, new Vector3(1f, 0.05f, 0f), 44f),
-            new Subject("16_picture_hammershoi", null, new[] { "Room/Picture3" }, new Vector3(-1f, 0.0f, 0.15f), 36f),
-            new Subject("17_umbrella_shoes_close", null, new[] { "Room/UmbrellaStand", "Room/ShoeRack" }, new Vector3(-0.4f, 0.7f, 1f), 40f),
+            new Subject("05_plant", new[] { "Room/Plant" }, new[] { "Room/Plant" }, new Vector3(-0.85f, 0.35f, 0.55f), 44f),
+            new Subject("06_rug", new[] { "Room/Rug", "Room/LowTable" }, new[] { "Room/Rug", "Room/LowTable" }, new Vector3(0.9f, 1.25f, -0.45f), 50f),
+            new Subject("07_boxes_entrance", new[] { "Room/ShoeRack", "Room/UmbrellaStand", "Room/Picture3" }, new[] { "Room/ShoeRack", "Room/UmbrellaStand", "Room/Picture3" }, new Vector3(-0.35f, 0.5f, 1f), 50f),
+            new Subject("08_lowtable", new[] { "Room/LowTable", "Room/Binder" }, new[] { "Room/LowTable", "Room/Binder" }, new Vector3(0.8f, 0.9f, -0.5f), 40f),
+            new Subject("09_floorlamp", new[] { "Room/FloorLamp" }, new[] { "Room/FloorLamp" }, new Vector3(1f, 0.25f, 0.4f), 44f),
+            new Subject("10_aircon", new[] { "Room/AirCon" }, new[] { "Room/AirCon" }, new Vector3(1f, -0.25f, -0.35f), 40f),
+            new Subject("11_workcounter", new[] { "Room/WorkCounter", "Room/Stool" }, new[] { "Room/WorkCounter", "Room/Stool" }, new Vector3(0.5f, 0.6f, 1f), 56f),
+            new Subject("12_serverrack", new[] { "Room/ServerRack" }, new[] { "Room/ServerRack" }, new Vector3(0.45f, 0.3f, -1f), 44f),
+            new Subject("13_chipshelf", new[] { "Room/ChipShelf" }, new[] { "Room/ChipShelf" }, new Vector3(-1f, 0.3f, -0.4f), 42f),
+            new Subject("15_pictures_sofa_wall", new[] { "Room/Picture0", "Room/Picture1", "Room/Picture2" }, new[] { "Room/Picture0", "Room/Picture1", "Room/Picture2" }, new Vector3(1f, 0.05f, 0f), 44f),
+            new Subject("16_picture_hammershoi", new[] { "Room/Picture3" }, new[] { "Room/Picture3" }, new Vector3(-1f, 0.0f, 0.15f), 36f),
+            new Subject("17_umbrella_shoes_close", new[] { "Room/UmbrellaStand", "Room/ShoeRack" }, new[] { "Room/UmbrellaStand", "Room/ShoeRack" }, new Vector3(-0.4f, 0.7f, 1f), 40f),
             new Subject("18_coat_rack", new[] { "Room/CoatRack" }, new[] { "Room/CoatRack" }, new Vector3(-1f, 0.2f, 0.6f), 44f),
-            new Subject("19_desk", new[] { "Room/Desk", "Room/Keyboard", "Room/Mouse", "Room/Tower" }, new[] { "Room/Desk", "Room/Tower" }, new Vector3(-0.3f, 0.8f, -1f), 56f),
+            new Subject("19_desk", new[] { "Room/Desk", "Room/Tower" }, new[] { "Room/Desk", "Room/Tower" }, new Vector3(-0.3f, 0.8f, -1f), 56f),
             new Subject("20_side_table", new[] { "Room/SideTable" }, new[] { "Room/SideTable" }, new Vector3(-1f, 0.5f, -0.3f), 44f),
-            new Subject("21_kitchen_light", null, new[] { "Room/KitchenLight", "Room/Kitchen" }, new Vector3(0.2f, 0.2f, 1f), 60f),
+            new Subject("21_kitchen_light", new[] { "Room/KitchenLight", "Room/Kitchen" }, new[] { "Room/KitchenLight", "Room/Kitchen" }, new Vector3(0.2f, 0.2f, 1f), 60f),
         };
 
         /// <summary>部屋ぜんたい。名前・目・見る所・画角</summary>
         static readonly object[][] Overall =
         {
-            new object[] { "o1_from_east_window", new Vector3(2.6f, 1.8f, -1.2f), new Vector3(-3.5f, 0.7f, 1.2f), 72f },
-            new object[] { "o2_from_ne", new Vector3(2.4f, 1.9f, 1.4f), new Vector3(-3.5f, 0.6f, -0.6f), 72f },
-            new object[] { "o3_from_nw", new Vector3(-4.6f, 1.8f, 2.6f), new Vector3(0.5f, 0.6f, -1.0f), 72f },
-            new object[] { "o4_from_kitchen", new Vector3(-3.9f, 1.75f, -0.45f), new Vector3(-1.0f, 0.8f, 2.2f), 72f },
-            new object[] { "o5_hall_to_entrance", new Vector3(0f, 1.6f, -1.8f), new Vector3(0.2f, 0.7f, -4.9f), 64f },
+            new object[] { "o1_kitchen_overall", new Vector3(-2.2f, 1.7f, 1.4f), new Vector3(-2.6f, 0.9f, -1.2f), 72f },
+            new object[] { "o2_living_overall", new Vector3(-1.0f, 1.65f, 2.3f), new Vector3(-4.9f, 1.25f, 1.45f), 72f },
+            new object[] { "o3_entrance_overall", new Vector3(0.0f, 1.6f, -1.9f), new Vector3(0.1f, 0.8f, -4.9f), 64f },
+            new object[] { "o4_work_overall", new Vector3(-0.4f, 1.7f, 0.4f), new Vector3(2.2f, 0.8f, 2.2f), 70f },
+            new object[] { "o5_coat_rack_back", new Vector3(-0.3f, 1.5f, -0.2f), new Vector3(0.95f, 1.0f, -1.05f), 50f },
+            new object[] { "o6_coat_rack_front", new Vector3(2.0f, 1.5f, 0.1f), new Vector3(1.0f, 1.0f, -1.1f), 50f },
+            new object[] { "o7_ih_and_hood", new Vector3(-1.6f, 1.75f, -0.3f), new Vector3(-1.65f, 1.1f, -1.2f), 60f },
+            new object[] { "o8_sofa_close", new Vector3(-2.6f, 1.3f, 1.0f), new Vector3(-3.8f, 0.5f, 1.7f), 56f },
+            new object[] { "o9_wine_cellar", new Vector3(-3.35f, 1.0f, 1.25f), new Vector3(-3.85f, 0.5f, 0.45f), 55f },
         };
 
         /// <summary>家具ひとつを撮る間は、ほかの家具（前の物も後の物も）を写さない。部屋の形・机・椅子などは残す</summary>

@@ -5,34 +5,44 @@ namespace HalfAware.EditorTools
 {
     public static partial class BuildFurniture
     {
+        // 軽くした形（オーナー「重くなりそうなところはテクスチャを張ることで軽くして」「テクスチャに変えても立体感は失われないように」）:
+        // 箱の出入り・戸の厚み・目立つ取っ手の出っ張り・棚の物の輪郭は mesh に残し、戸の縁の面取り・札・細かい機器は絵（法線の絵を含む）へ移した。
+        // 角を丸めた箱は、丸めが輪郭を作る所だけに残し、ほかは角の立った箱にして、隠れる面（壁に付く背・床に付く底・棚の奥）は張らない
+
+        /// <summary>背（−z）を張らない箱。壁に付く物・奥の見えない物</summary>
+        const FurnitureKit.Sides NoBack = (FurnitureKit.Sides)59;
+        /// <summary>背と底を張らない箱</summary>
+        const FurnitureKit.Sides Open = (FurnitureKit.Sides)58;
+
         // ---- 冷蔵庫 --------------------------------------------------------------------
 
         /// <summary>
-        /// 上下二枚の扉の冷蔵庫（幅 0.60・奥行き 0.66・高さ 1.78）。ヘアラインの鋼の筐体、上の冷凍と下の冷蔵の扉（継ぎ目 1.5 cm）、
-        /// 右の縦の取っ手、左の蝶番、冷凍の扉に温度の表示、下の吸気の格子（扉の磁石とメモは外した。オーナー「冷蔵庫のマグネット類も撤去」）
+        /// 上下二枚の扉の冷蔵庫（幅 0.60・奥行き 0.66・高さ 1.78）。ヘアラインの鋼の筐体、上の冷凍と下の冷蔵の扉（継ぎ目 1.5 cm。縁の面取りは絵）、
+        /// 右の縦の取っ手と足、左の蝶番、冷凍の扉に温度の表示、下の吸気の格子（扉の磁石とメモは外した。オーナー「冷蔵庫のマグネット類も撤去」）
         /// </summary>
         static void Fridge(FurnitureKit kit)
         {
             const float W = 0.60f, H = 1.78f;
             var steel = SteelBrushed;
-            kit.RoundBox("FridgeBody", new Vector3(0f, 0.08f + (H - 0.08f) * 0.5f, -0.03f), Quaternion.identity, new Vector3(W, H - 0.08f, 0.60f), 0.015f, steel, null, 1, 0.5f, NoBottom);
-            kit.Box("FridgeKick", new Vector3(0f, 0.04f, -0.05f), new Vector3(W - 0.04f, 0.08f, 0.56f), Sw(Hue.SteelDark), NoBottom);
+            // 筐体（背と底は壁と床に付く）
+            kit.Box("FridgeBody", new Vector3(0f, 0.08f + (H - 0.08f) * 0.5f, -0.03f), Quaternion.identity, new Vector3(W, H - 0.08f, 0.60f), steel, Open);
+            kit.Box("FridgeKick", new Vector3(0f, 0.04f, -0.05f), new Vector3(W - 0.04f, 0.08f, 0.56f), Sw(Hue.SteelDark), Open);
             kit.Decal("FridgeGrille", new Vector3(0f, 0.045f, 0.2305f), new Vector3(-(W - 0.08f) * 0.5f, 0f, 0f), new Vector3(0f, 0.025f, 0f), Uv(GrilleArea));
-            // 扉（前の面 z 0.3275）
+            // 扉（前の面 z 0.3275。厚み 5.5 cm。艶のある黒の扉は縁の丸めの照り返しが境目を読ませるので、丸めた角のまま）
             const float front = 0.30f;
-            kit.RoundBox("FreezerDoor", new Vector3(0f, 1.475f, front), Quaternion.identity, new Vector3(W - 0.005f, 0.60f, 0.055f), 0.012f, Sw(Hue.PianoBlack), null, 1, 1f);
-            kit.RoundBox("FridgeDoor", new Vector3(0f, 0.625f, front), Quaternion.identity, new Vector3(W - 0.005f, 1.07f, 0.055f), 0.012f, Sw(Hue.PianoBlack), null, 1, 1f);
+            kit.RoundBox("FreezerDoor", new Vector3(0f, 1.475f, front), Quaternion.identity, new Vector3(W - 0.005f, 0.60f, 0.055f), 0.012f, Sw(Hue.PianoBlack), null, 1, NoStep, NoBack);
+            kit.RoundBox("FridgeDoor", new Vector3(0f, 0.625f, front), Quaternion.identity, new Vector3(W - 0.005f, 1.07f, 0.055f), 0.012f, Sw(Hue.PianoBlack), null, 1, NoStep, NoBack);
             var face = front + 0.0275f;
             // 取っ手（右の縦の棒と、扉へ留める足）
             foreach (var span in new[] { new Vector2(1.22f, 1.50f), new Vector2(0.78f, 1.10f) })
             {
-                kit.RoundBox("FridgeHandle", new Vector3(W * 0.5f - 0.045f, (span.x + span.y) * 0.5f, face + 0.032f), Quaternion.identity, new Vector3(0.022f, span.y - span.x, 0.018f), 0.008f, Sw(Hue.Chrome), null, 1, 1f);
+                kit.Box("FridgeHandle", new Vector3(W * 0.5f - 0.045f, (span.x + span.y) * 0.5f, face + 0.032f), Quaternion.identity, new Vector3(0.022f, span.y - span.x, 0.018f), Sw(Hue.Chrome), NoBack);
                 foreach (var y in new[] { span.x + 0.02f, span.y - 0.02f })
-                    kit.Box("FridgeHandleFoot", new Vector3(W * 0.5f - 0.045f, y, face + 0.013f), new Vector3(0.016f, 0.02f, 0.026f), Sw(Hue.Chrome));
+                    kit.Box("FridgeHandleFoot", new Vector3(W * 0.5f - 0.045f, y, face + 0.013f), Quaternion.identity, new Vector3(0.016f, 0.02f, 0.026f), Sw(Hue.Chrome), (FurnitureKit.Sides)51);
             }
             // 蝶番
             foreach (var y in new[] { 1.785f, 1.168f, 0.085f })
-                kit.Box("FridgeHinge", new Vector3(-W * 0.5f + 0.03f, y, face - 0.02f), new Vector3(0.04f, 0.014f, 0.05f), Sw(Hue.SteelDark));
+                kit.Box("FridgeHinge", new Vector3(-W * 0.5f + 0.03f, y, face - 0.02f), Quaternion.identity, new Vector3(0.04f, 0.014f, 0.05f), Sw(Hue.SteelDark), NoBack);
             // 温度の表示
             kit.Decal("FridgeDisplay", new Vector3(-0.13f, 1.63f, face + 0.0015f), new Vector3(-0.045f, 0f, 0f), new Vector3(0f, 0.0225f, 0f), Uv(FridgeDisplayArea));
         }
@@ -42,8 +52,8 @@ namespace HalfAware.EditorTools
         /// <summary>台の高さ（天板の上面）と奥行き</summary>
         const float CounterTop = 0.91f;
         const float KitchenDeep = 0.60f;
-        /// <summary>戸と引き出しの前板（つや消しの黒の一枚。繰り返さない）</summary>
-        static Tile Front { get { return Whole(Uv(LaminateArea)); } }
+        /// <summary>戸と引き出しの前板（つや消しの黒の一枚。縁の面取りは絵）</summary>
+        static Tile Front { get { return FrontBevel; } }
 
         /// <summary>戸と戸の隙間の半分。隙間から暗い箱の前の面が覗いて、戸の割り付けが粗い画面でも読める</summary>
         const float DoorGap = 0.004f;
@@ -71,9 +81,9 @@ namespace HalfAware.EditorTools
             var x0 = -L * 0.5f;
             const float back = -KitchenDeep * 0.5f;
             const float doorFront = 0.27f;
-            // 箱と台輪
-            kit.Box6("KitchenCarcass", new Vector3(0f, 0.10f + 0.39f, back + 0.28f), Quaternion.identity, new Vector3(L, 0.78f, 0.56f), Carcass(true), NoBottom);
-            kit.Box("KitchenPlinth", new Vector3(0f, 0.05f, back + 0.25f), new Vector3(L - 0.01f, 0.10f, 0.50f), Sw(Hue.Black), NoBottom);
+            // 箱と台輪（背は壁、底は床）
+            kit.Box6("KitchenCarcass", new Vector3(0f, 0.10f + 0.39f, back + 0.28f), Quaternion.identity, new Vector3(L, 0.78f, 0.56f), Carcass(true), Open);
+            kit.Box("KitchenPlinth", new Vector3(0f, 0.05f, back + 0.25f), Quaternion.identity, new Vector3(L - 0.01f, 0.10f, 0.50f), Sw(Hue.Black), Open);
             // 区画
             var prep = new Vector2(x0, x0 + 0.65f);
             var sink = new Vector2(prep.y, prep.y + 0.80f);
@@ -86,14 +96,14 @@ namespace HalfAware.EditorTools
             Doors(kit, mid.x, mid.y, 2, false, doorFront);
             Doors(kit, hob.x, hob.y, 1, true, doorFront);
             if (rest.y - rest.x > 0.2f) Doors(kit, rest.x, rest.y, Mathf.Max(1, Mathf.RoundToInt((rest.y - rest.x) / 0.6f)), false, doorFront);
-            // 天板（流しの口を抜いて四枚）
+            // 天板（流しの口を抜いて四枚。背は壁、底は箱の上）
             var basin = new Vector4(sink.x + 0.06f, sink.x + 0.46f, -0.16f, 0.18f);
             const float topY = CounterTop - 0.015f;
             var top = BlackTop;
-            kit.RoundBox("Worktop", new Vector3((x0 + basin.x) * 0.5f, topY, 0.005f), Quaternion.identity, new Vector3(basin.x - x0, 0.03f, KitchenDeep + 0.01f), 0.005f, top, null, 1, 1f);
-            kit.RoundBox("Worktop", new Vector3((basin.y + L * 0.5f) * 0.5f, topY, 0.005f), Quaternion.identity, new Vector3(L * 0.5f - basin.y, 0.03f, KitchenDeep + 0.01f), 0.005f, top, null, 1, 1f);
-            kit.RoundBox("Worktop", new Vector3((basin.x + basin.y) * 0.5f, topY, (basin.w + 0.31f) * 0.5f), Quaternion.identity, new Vector3(basin.y - basin.x, 0.03f, 0.31f - basin.w), 0.005f, top, null, 1, 1f);
-            kit.RoundBox("Worktop", new Vector3((basin.x + basin.y) * 0.5f, topY, (back + basin.z) * 0.5f), Quaternion.identity, new Vector3(basin.y - basin.x, 0.03f, basin.z - back), 0.005f, top, null, 1, 1f);
+            kit.Box("Worktop", new Vector3((x0 + basin.x) * 0.5f, topY, 0.005f), Quaternion.identity, new Vector3(basin.x - x0, 0.03f, KitchenDeep + 0.01f), top, Open);
+            kit.Box("Worktop", new Vector3((basin.y + L * 0.5f) * 0.5f, topY, 0.005f), Quaternion.identity, new Vector3(L * 0.5f - basin.y, 0.03f, KitchenDeep + 0.01f), top, Open);
+            kit.Box("Worktop", new Vector3((basin.x + basin.y) * 0.5f, topY, (basin.w + 0.31f) * 0.5f), Quaternion.identity, new Vector3(basin.y - basin.x, 0.03f, 0.31f - basin.w), top, (FurnitureKit.Sides)14);
+            kit.Box("Worktop", new Vector3((basin.x + basin.y) * 0.5f, topY, (back + basin.z) * 0.5f), Quaternion.identity, new Vector3(basin.y - basin.x, 0.03f, basin.z - back), top, (FurnitureKit.Sides)10);
             Sink(kit, basin, sink);
             Hob(kit, hob);
             // 天板の上の物
@@ -117,17 +127,23 @@ namespace HalfAware.EditorTools
                 if (handleTop)
                 {
                     // コンロの下は、上に薄い引き出し一段
-                    kit.RoundBox("KitchenDrawerFront", new Vector3(cx, 0.80f, front + 0.009f), Quaternion.identity, new Vector3(b - a, 0.14f, 0.018f), 0.005f, Front, null, 1, 1f);
+                    Panel(kit, "KitchenDrawerFront", new Vector3(cx, 0.80f, front + 0.009f), new Vector3(b - a, 0.14f, 0.018f));
                     Pull(kit, new Vector3(cx, 0.84f, front + 0.018f), true, 0.14f);
-                    kit.RoundBox("KitchenDoor", new Vector3(cx, 0.41f, front + 0.009f), Quaternion.identity, new Vector3(b - a, 0.62f, 0.018f), 0.005f, Front, null, 1, 1f);
+                    Panel(kit, "KitchenDoor", new Vector3(cx, 0.41f, front + 0.009f), new Vector3(b - a, 0.62f, 0.018f));
                     Pull(kit, new Vector3(cx, 0.66f, front + 0.018f), true, 0.14f);
                     continue;
                 }
-                kit.RoundBox("KitchenDoor", new Vector3(cx, 0.49f, front + 0.009f), Quaternion.identity, new Vector3(b - a, 0.775f, 0.018f), 0.005f, Front, null, 1, 1f);
+                Panel(kit, "KitchenDoor", new Vector3(cx, 0.49f, front + 0.009f), new Vector3(b - a, 0.775f, 0.018f));
                 // 取っ手は合わせ目の側（二枚なら内寄り、一枚なら右寄り）
                 var hx = count == 2 ? (i == 0 ? b - 0.04f : a + 0.04f) : b - 0.04f;
                 Pull(kit, new Vector3(hx, 0.76f, front + 0.018f), false, 0.12f);
             }
+        }
+
+        /// <summary>戸・引き出しの前板一枚（厚みのある箱。背は箱に付く。縁の面取りは絵）</summary>
+        static void Panel(FurnitureKit kit, string name, Vector3 centre, Vector3 size)
+        {
+            kit.Box(name, centre, Quaternion.identity, size, Front, NoBack);
         }
 
         static void DrawerStack(FurnitureKit kit, float from, float to, float front)
@@ -138,19 +154,21 @@ namespace HalfAware.EditorTools
             foreach (var h in heights)
             {
                 var mid = y - h * 0.5f;
-                kit.RoundBox("KitchenDrawerFront", new Vector3(cx, mid, front + 0.009f), Quaternion.identity, new Vector3(to - from - 2f * DoorGap, h - 2f * DoorGap, 0.018f), 0.005f, Front, null, 1, 1f);
+                Panel(kit, "KitchenDrawerFront", new Vector3(cx, mid, front + 0.009f), new Vector3(to - from - 2f * DoorGap, h - 2f * DoorGap, 0.018f));
                 Pull(kit, new Vector3(cx, y - 0.045f, front + 0.018f), true, 0.14f);
                 y -= h;
             }
         }
 
-        /// <summary>棒の取っ手（横か縦）。足二本で戸から浮かせる</summary>
+        /// <summary>棒の取っ手（横か縦）。戸から浮いた細い角棒と、戸へ留める二本の足（戸と棒の間の隙間が見える）</summary>
         static void Pull(FurnitureKit kit, Vector3 at, bool horizontal, float length)
         {
             var along = horizontal ? Vector3.right : Vector3.up;
-            kit.Tube("Pull", new[] { at + along * (-length * 0.5f) + Vector3.forward * 0.022f, at + along * (length * 0.5f) + Vector3.forward * 0.022f }, 0.0055f, 6, Sw(Hue.Chrome), true);
+            var size = horizontal ? new Vector3(length, 0.009f, 0.009f) : new Vector3(0.009f, length, 0.009f);
+            kit.Box("Pull", at + Vector3.forward * 0.0215f, Quaternion.identity, size, Sw(Hue.Chrome), NoBack);
+            var foot = new Vector3(0.007f, 0.007f, 0.017f);
             foreach (var s in new[] { -1f, 1f })
-                kit.Tube("PullFoot", new[] { at + along * (s * (length * 0.5f - 0.012f)), at + along * (s * (length * 0.5f - 0.012f)) + Vector3.forward * 0.022f }, 0.004f, 5, Sw(Hue.Chrome));
+                kit.Box("PullFoot", at + along * (s * (length * 0.5f - 0.012f)) + Vector3.forward * 0.0085f, Quaternion.identity, foot, Sw(Hue.Chrome), (FurnitureKit.Sides)51);
         }
 
         /// <summary>流し。鋼の槽（内へ向いた五枚）と縁、排水口、グースネックの蛇口とレバー、右の水切りの板と、かご（皿・マグ・コップ）</summary>
@@ -166,23 +184,24 @@ namespace HalfAware.EditorTools
             Inner(kit, new Vector3(x0, bottom, z0), new Vector3(x0, bottom, z1), new Vector3(x0, CounterTop, z1), new Vector3(x0, CounterTop, z0), Vector3.right, steel);
             Inner(kit, new Vector3(x1, bottom, z0), new Vector3(x1, bottom, z1), new Vector3(x1, CounterTop, z1), new Vector3(x1, CounterTop, z0), Vector3.left, steel);
             kit.End();
-            kit.Lathe("SinkDrain", new Vector3((x0 + x1) * 0.5f, bottom + 0.001f, (z0 + z1) * 0.5f), Quaternion.identity, new[] { new Vector2(0.03f, 0f), new Vector2(0f, 0f) }, 10, Sw(Hue.SteelDark));
-            // 縁
+            kit.Lathe("SinkDrain", new Vector3((x0 + x1) * 0.5f, bottom + 0.001f, (z0 + z1) * 0.5f), Quaternion.identity, new[] { new Vector2(0.03f, 0f), new Vector2(0f, 0f) }, 6, Sw(Hue.SteelDark));
+            // 縁（天板から 4 mm。上の面だけ）
             const float rim = 0.012f;
-            kit.Box("SinkRim", new Vector3((x0 + x1) * 0.5f, CounterTop + 0.002f, z0 - rim * 0.5f), new Vector3(x1 - x0 + 2f * rim, 0.004f, rim), steel, NoBottom);
-            kit.Box("SinkRim", new Vector3((x0 + x1) * 0.5f, CounterTop + 0.002f, z1 + rim * 0.5f), new Vector3(x1 - x0 + 2f * rim, 0.004f, rim), steel, NoBottom);
-            kit.Box("SinkRim", new Vector3(x0 - rim * 0.5f, CounterTop + 0.002f, (z0 + z1) * 0.5f), new Vector3(rim, 0.004f, z1 - z0), steel, NoBottom);
-            kit.Box("SinkRim", new Vector3(x1 + rim * 0.5f, CounterTop + 0.002f, (z0 + z1) * 0.5f), new Vector3(rim, 0.004f, z1 - z0), steel, NoBottom);
+            const FurnitureKit.Sides up = FurnitureKit.Sides.Top;
+            kit.Box("SinkRim", new Vector3((x0 + x1) * 0.5f, CounterTop + 0.002f, z0 - rim * 0.5f), Quaternion.identity, new Vector3(x1 - x0 + 2f * rim, 0.004f, rim), steel, up);
+            kit.Box("SinkRim", new Vector3((x0 + x1) * 0.5f, CounterTop + 0.002f, z1 + rim * 0.5f), Quaternion.identity, new Vector3(x1 - x0 + 2f * rim, 0.004f, rim), steel, up);
+            kit.Box("SinkRim", new Vector3(x0 - rim * 0.5f, CounterTop + 0.002f, (z0 + z1) * 0.5f), Quaternion.identity, new Vector3(rim, 0.004f, z1 - z0), steel, up);
+            kit.Box("SinkRim", new Vector3(x1 + rim * 0.5f, CounterTop + 0.002f, (z0 + z1) * 0.5f), Quaternion.identity, new Vector3(rim, 0.004f, z1 - z0), steel, up);
             // 蛇口
             var tx = (x0 + x1) * 0.5f;
             var chrome = Sw(Hue.Chrome);
-            kit.Lathe("TapBase", new Vector3(tx, CounterTop, -0.225f), Quaternion.identity, new[] { new Vector2(0.026f, 0f), new Vector2(0.024f, 0.012f), new Vector2(0.018f, 0.05f) }, 10, chrome, false, false);
-            kit.Tube("TapNeck", new[] { new Vector3(tx, CounterTop + 0.04f, -0.225f), new Vector3(tx, CounterTop + 0.20f, -0.225f), new Vector3(tx, CounterTop + 0.265f, -0.19f), new Vector3(tx, CounterTop + 0.265f, -0.13f), new Vector3(tx, CounterTop + 0.23f, -0.085f), new Vector3(tx, CounterTop + 0.19f, -0.08f) }, 0.011f, 7, chrome, true);
-            kit.Tube("TapLever", new[] { new Vector3(tx + 0.02f, CounterTop + 0.045f, -0.225f), new Vector3(tx + 0.07f, CounterTop + 0.06f, -0.215f) }, 0.006f, 5, chrome, true);
+            kit.Lathe("TapBase", new Vector3(tx, CounterTop, -0.225f), Quaternion.identity, new[] { new Vector2(0.026f, 0f), new Vector2(0.018f, 0.05f) }, 6, chrome, false, false);
+            kit.Tube("TapNeck", new[] { new Vector3(tx, CounterTop + 0.04f, -0.225f), new Vector3(tx, CounterTop + 0.21f, -0.225f), new Vector3(tx, CounterTop + 0.265f, -0.16f), new Vector3(tx, CounterTop + 0.235f, -0.09f), new Vector3(tx, CounterTop + 0.19f, -0.08f) }, 0.011f, 5, chrome, true);
+            kit.Tube("TapLever", new[] { new Vector3(tx + 0.02f, CounterTop + 0.045f, -0.225f), new Vector3(tx + 0.07f, CounterTop + 0.06f, -0.215f) }, 0.006f, 4, chrome);
             // 水切りの板とかご
             var dx0 = x1 + 0.03f;
             var dx1 = Mathf.Min(module.y - 0.02f, dx0 + 0.30f);
-            kit.Box("Drainer", new Vector3((dx0 + dx1) * 0.5f, CounterTop + 0.003f, 0.0f), new Vector3(dx1 - dx0, 0.006f, 0.34f), steel, NoBottom);
+            kit.Box("Drainer", new Vector3((dx0 + dx1) * 0.5f, CounterTop + 0.003f, 0.0f), Quaternion.identity, new Vector3(dx1 - dx0, 0.006f, 0.34f), steel, up);
             DishRack(kit, new Vector3((dx0 + dx1) * 0.5f, CounterTop + 0.006f, -0.01f), dx1 - dx0 - 0.02f);
         }
 
@@ -193,7 +212,7 @@ namespace HalfAware.EditorTools
             kit.QFacing(FurnitureKit.Atlas, kit.V(a, uv), kit.V(b, uv), kit.V(c, uv), kit.V(d, uv), want);
         }
 
-        /// <summary>水切りかご（細い線の籠）に、立てた皿三枚・伏せたマグ・コップ</summary>
+        /// <summary>水切りかご（細い線の籠: 上下の枠と四隅の柱）に、立てた皿三枚・伏せたマグ・コップ</summary>
         static void DishRack(FurnitureKit kit, Vector3 at, float wide)
         {
             var wire = Sw(Hue.WireWhite);
@@ -202,25 +221,22 @@ namespace HalfAware.EditorTools
             using (kit.At(at, 0f))
             {
                 foreach (var y in new[] { 0.01f, high })
-                    kit.Tube("RackWire", new[] { new Vector3(-hx, y, -hz), new Vector3(hx, y, -hz), new Vector3(hx, y, hz), new Vector3(-hx, y, hz), new Vector3(-hx, y, -hz) }, 0.003f, 4, wire);
-                for (var i = 0; i <= 4; i++)
-                {
-                    var x = Mathf.Lerp(-hx, hx, i / 4f);
-                    kit.Tube("RackWire", new[] { new Vector3(x, 0.01f, -hz), new Vector3(x, 0f, -hz * 0.5f), new Vector3(x, 0f, hz * 0.5f), new Vector3(x, 0.01f, hz) }, 0.0025f, 4, wire);
-                    kit.Tube("RackWire", new[] { new Vector3(x, 0.01f, hz), new Vector3(x, high, hz) }, 0.0025f, 4, wire);
-                    kit.Tube("RackWire", new[] { new Vector3(x, 0.01f, -hz), new Vector3(x, high, -hz) }, 0.0025f, 4, wire);
-                }
-                // 皿（縦に立てて、少し後ろへ倒す）
+                    kit.Tube("RackWire", new[] { new Vector3(-hx, y, -hz), new Vector3(hx, y, -hz), new Vector3(hx, y, hz), new Vector3(-hx, y, hz), new Vector3(-hx, y, -hz) }, 0.003f, 3, wire);
+                foreach (var sx in new[] { -1f, 1f })
+                    foreach (var sz in new[] { -1f, 1f })
+                        kit.Tube("RackWire", new[] { new Vector3(sx * hx, 0.01f, sz * hz), new Vector3(sx * hx, high, sz * hz) }, 0.0025f, 3, wire);
+                // 皿（縦に立てて、少し後ろへ倒す。浅い円錐の一枚を両面に）
                 for (var i = 0; i < 3; i++)
                 {
                     var x = -hx + 0.035f + i * 0.028f;
-                    kit.Lathe("Plate", new Vector3(x, 0.115f, -0.02f), R(0f, 0f, 90f) * R(-8f, 0f, 0f), new[] { new Vector2(0f, -0.006f), new Vector2(0.075f, -0.004f), new Vector2(0.11f, 0.008f) }, 10, Sw(Hue.PlateWhite), false, false);
-                    kit.Lathe("Plate", new Vector3(x, 0.115f, -0.02f), R(0f, 0f, 90f) * R(-8f, 0f, 0f), new[] { new Vector2(0.11f, 0.008f), new Vector2(0.10f, 0.009f), new Vector2(0f, -0.002f) }, 10, Sw(Hue.PlateWhite), false, false);
+                    var rot = R(0f, 0f, 90f) * R(-8f, 0f, 0f);
+                    kit.Lathe("Plate", new Vector3(x, 0.115f, -0.02f), rot, new[] { new Vector2(0f, -0.004f), new Vector2(0.11f, 0.008f) }, 8, Sw(Hue.PlateWhite), false, false);
+                    kit.Lathe("Plate", new Vector3(x, 0.115f, -0.02f), rot, new[] { new Vector2(0f, -0.004f), new Vector2(0.11f, 0.008f) }, 8, Sw(Hue.PlateWhite), false, false, true);
                 }
                 // 伏せたマグとコップ
                 using (kit.At(new Vector3(hx - 0.06f, 0.10f, 0.06f), R(180f, 30f, 0f)))
-                    kit.Lathe("RackMug", Vector3.zero, Quaternion.identity, new[] { new Vector2(0.034f, 0f), new Vector2(0.038f, 0.004f), new Vector2(0.039f, 0.09f), new Vector2(0.033f, 0.09f) }, 10, Sw(Hue.Ceramic), true, false);
-                kit.Lathe("RackGlass", new Vector3(hx - 0.06f, 0.012f, -0.06f), Quaternion.identity, new[] { new Vector2(0.028f, 0f), new Vector2(0.033f, 0.11f), new Vector2(0.03f, 0.11f), new Vector2(0.026f, 0.01f) }, 10, Sw(Hue.GlassClear), true, false);
+                    kit.Lathe("RackMug", Vector3.zero, Quaternion.identity, new[] { new Vector2(0.036f, 0f), new Vector2(0.039f, 0.09f) }, 6, Sw(Hue.Ceramic), true, false);
+                kit.Lathe("RackGlass", new Vector3(hx - 0.06f, 0.012f, -0.06f), Quaternion.identity, new[] { new Vector2(0.028f, 0f), new Vector2(0.033f, 0.11f) }, 6, Sw(Hue.GlassClear), true, false);
             }
         }
 
@@ -230,12 +246,12 @@ namespace HalfAware.EditorTools
             var cx = (module.x + module.y) * 0.5f;
             var glass = Sw(Hue.GlassDark);
             kit.Box6("Hob", new Vector3(cx, CounterTop + 0.003f, 0.0f), Quaternion.identity, new Vector3(0.60f, 0.006f, 0.52f),
-                new[] { glass, glass, glass, Whole(Uv(HobArea)), glass, glass }, NoBottom);
+                new[] { glass, glass, glass, Whole(Uv(HobArea)), glass, glass }, Open);
             var steel = SteelBrushed;
             const float hoodLow = 1.56f;
-            kit.RoundBox("Hood", new Vector3(cx, hoodLow + 0.06f, -0.06f), Quaternion.identity, new Vector3(0.60f, 0.12f, 0.48f), 0.01f, steel, null, 1, 0.5f, FurnitureKit.Sides.All);
+            kit.Box("Hood", new Vector3(cx, hoodLow + 0.06f, -0.06f), Quaternion.identity, new Vector3(0.60f, 0.12f, 0.48f), steel, NoBack);
             kit.Decal("HoodFilter", new Vector3(cx, hoodLow - 0.001f, -0.06f), new Vector3(0.25f, 0f, 0f), new Vector3(0f, 0f, -0.2f), Uv(FilterArea));
-            kit.Box("HoodFlue", new Vector3(cx, (hoodLow + 0.12f + Ceiling) * 0.5f, -0.19f), new Vector3(0.26f, Ceiling - hoodLow - 0.12f, 0.22f), steel, NoBottom);
+            kit.Box("HoodFlue", new Vector3(cx, (hoodLow + 0.12f + Ceiling) * 0.5f, -0.19f), Quaternion.identity, new Vector3(0.26f, Ceiling - hoodLow - 0.12f, 0.22f), steel, Open);
         }
 
         /// <summary>電気ケトル（黒い台、細る胴、注ぎ口、取っ手、青く灯る釦）</summary>
@@ -244,10 +260,10 @@ namespace HalfAware.EditorTools
             using (kit.At(at, yaw))
             {
                 var body = Sw(Hue.Enamel);
-                kit.Lathe("KettleBase", Vector3.zero, Quaternion.identity, new[] { new Vector2(0.085f, 0f), new Vector2(0.088f, 0.018f), new Vector2(0.08f, 0.02f) }, 12, Sw(Hue.PlasticDark), false, true);
-                kit.Lathe("Kettle", Vector3.zero, Quaternion.identity, new[] { new Vector2(0.075f, 0.02f), new Vector2(0.078f, 0.05f), new Vector2(0.068f, 0.18f), new Vector2(0.055f, 0.215f), new Vector2(0.04f, 0.225f), new Vector2(0f, 0.23f) }, 12, body);
-                kit.Tube("KettleSpout", new[] { new Vector3(0f, 0.17f, 0.06f), new Vector3(0f, 0.19f, 0.09f), new Vector3(0f, 0.205f, 0.105f) }, 0.014f, 6, body, true);
-                kit.Tube("KettleHandle", new[] { new Vector3(0f, 0.19f, -0.058f), new Vector3(0f, 0.20f, -0.10f), new Vector3(0f, 0.16f, -0.115f), new Vector3(0f, 0.08f, -0.108f), new Vector3(0f, 0.05f, -0.075f) }, 0.012f, 6, Sw(Hue.PlasticDark), true);
+                kit.Lathe("KettleBase", Vector3.zero, Quaternion.identity, new[] { new Vector2(0.088f, 0f), new Vector2(0.086f, 0.02f) }, 8, Sw(Hue.PlasticDark), false, true);
+                kit.Lathe("Kettle", Vector3.zero, Quaternion.identity, new[] { new Vector2(0.077f, 0.02f), new Vector2(0.068f, 0.18f), new Vector2(0.045f, 0.222f), new Vector2(0f, 0.23f) }, 8, body);
+                kit.Tube("KettleSpout", new[] { new Vector3(0f, 0.17f, 0.06f), new Vector3(0f, 0.19f, 0.09f), new Vector3(0f, 0.205f, 0.105f) }, 0.014f, 4, body, true);
+                kit.Tube("KettleHandle", new[] { new Vector3(0f, 0.19f, -0.058f), new Vector3(0f, 0.20f, -0.105f), new Vector3(0f, 0.12f, -0.115f), new Vector3(0f, 0.05f, -0.075f) }, 0.012f, 4, Sw(Hue.PlasticDark));
                 kit.Decal("KettleSwitch", new Vector3(0f, 0.045f, -0.112f), new Vector3(0.008f, 0f, 0f), new Vector3(0f, 0.008f, 0f), Uv(KettleSwitchArea));
             }
         }
@@ -258,13 +274,13 @@ namespace HalfAware.EditorTools
             using (kit.At(at, yaw))
             {
                 var black = Sw(Hue.PlasticDark);
-                kit.RoundBox("CoffeeBase", new Vector3(0f, 0.02f, 0.02f), Quaternion.identity, new Vector3(0.18f, 0.04f, 0.24f), 0.01f, black, null, 1, 1f, NoBottom);
-                kit.RoundBox("CoffeeTower", new Vector3(0f, 0.17f, -0.07f), Quaternion.identity, new Vector3(0.18f, 0.30f, 0.09f), 0.015f, black, null, 1, 1f, NoBottom);
-                kit.RoundBox("CoffeeHead", new Vector3(0f, 0.285f, 0.03f), Quaternion.identity, new Vector3(0.18f, 0.07f, 0.13f), 0.02f, black, null, 1, 1f);
+                kit.Box("CoffeeBase", new Vector3(0f, 0.02f, 0.02f), Quaternion.identity, new Vector3(0.18f, 0.04f, 0.24f), black, FurnitureKit.Sides.NoBottom);
+                kit.Box("CoffeeTower", new Vector3(0f, 0.17f, -0.07f), Quaternion.identity, new Vector3(0.18f, 0.30f, 0.09f), black, FurnitureKit.Sides.NoBottom);
+                kit.Box("CoffeeHead", new Vector3(0f, 0.285f, 0.03f), Quaternion.identity, new Vector3(0.18f, 0.07f, 0.13f), black, FurnitureKit.Sides.All);
                 kit.Decal("CoffeeFace", new Vector3(0f, 0.09f, -0.0245f), new Vector3(-0.07f, 0f, 0f), new Vector3(0f, 0.08f, 0f), Uv(CoffeeFaceArea));
-                kit.Lathe("CoffeePot", new Vector3(0f, 0.04f, 0.045f), Quaternion.identity, new[] { new Vector2(0.06f, 0f), new Vector2(0.068f, 0.05f), new Vector2(0.055f, 0.12f), new Vector2(0.045f, 0.14f) }, 12, Sw(Hue.GlassCoffee), true, false);
-                kit.Lathe("CoffeePotLid", new Vector3(0f, 0.04f, 0.045f), Quaternion.identity, new[] { new Vector2(0.047f, 0.14f), new Vector2(0.047f, 0.155f), new Vector2(0f, 0.16f) }, 10, black);
-                kit.Tube("CoffeePotHandle", new[] { new Vector3(0f, 0.16f, 0.105f), new Vector3(0f, 0.16f, 0.14f), new Vector3(0f, 0.08f, 0.14f), new Vector3(0f, 0.07f, 0.11f) }, 0.008f, 5, black);
+                kit.Lathe("CoffeePot", new Vector3(0f, 0.04f, 0.045f), Quaternion.identity, new[] { new Vector2(0.066f, 0f), new Vector2(0.066f, 0.06f), new Vector2(0.046f, 0.14f) }, 8, Sw(Hue.GlassCoffee), false, false);
+                kit.Lathe("CoffeePotLid", new Vector3(0f, 0.04f, 0.045f), Quaternion.identity, new[] { new Vector2(0.047f, 0.14f), new Vector2(0f, 0.16f) }, 8, black);
+                kit.Tube("CoffeePotHandle", new[] { new Vector3(0f, 0.16f, 0.105f), new Vector3(0f, 0.15f, 0.14f), new Vector3(0f, 0.07f, 0.11f) }, 0.008f, 3, black);
             }
         }
 
@@ -274,20 +290,20 @@ namespace HalfAware.EditorTools
             using (kit.At(at, yaw))
             {
                 const float W = 0.46f, H = 0.27f, D = 0.36f;
-                kit.RoundBox("MicrowaveBody", new Vector3(0f, H * 0.5f + 0.012f, 0f), Quaternion.identity, new Vector3(W, H, D), 0.012f, Sw(Hue.SteelDark), null, 1, 1f, NoBottom);
+                kit.Box("MicrowaveBody", new Vector3(0f, H * 0.5f + 0.012f, 0f), Quaternion.identity, new Vector3(W, H, D), Sw(Hue.SteelDark), FurnitureKit.Sides.NoBottom);
+                // 脚（筐体の下の陰。前の二つだけ見える）
                 foreach (var sx in new[] { -1f, 1f })
-                    foreach (var sz in new[] { -1f, 1f })
-                        kit.Box("MicrowaveFoot", new Vector3(sx * (W * 0.5f - 0.04f), 0.006f, sz * (D * 0.5f - 0.04f)), new Vector3(0.03f, 0.012f, 0.03f), Sw(Hue.Rubber), NoBottom);
+                    kit.Box("MicrowaveFoot", new Vector3(sx * (W * 0.5f - 0.04f), 0.006f, D * 0.5f - 0.04f), Quaternion.identity, new Vector3(0.03f, 0.012f, 0.03f), Sw(Hue.Rubber), (FurnitureKit.Sides)8);
                 var face = D * 0.5f + 0.001f;
                 kit.Decal("MicrowaveDoor", new Vector3(-0.055f, H * 0.5f + 0.012f, face), new Vector3(-0.165f, 0f, 0f), new Vector3(0f, 0.12f, 0f), Uv(MicrowaveDoorArea));
                 kit.Decal("MicrowavePanel", new Vector3(0.17f, H * 0.5f + 0.012f, face), new Vector3(-0.05f, 0f, 0f), new Vector3(0f, 0.12f, 0f), Uv(MicrowavePanelArea));
-                kit.RoundBox("MicrowaveHandle", new Vector3(0.10f, H * 0.5f + 0.012f, face + 0.012f), Quaternion.identity, new Vector3(0.016f, 0.20f, 0.02f), 0.006f, Sw(Hue.Chrome), null, 1, 1f);
+                kit.Box("MicrowaveHandle", new Vector3(0.10f, H * 0.5f + 0.012f, face + 0.010f), Quaternion.identity, new Vector3(0.016f, 0.20f, 0.02f), Sw(Hue.Chrome), NoBack);
             }
         }
 
         /// <summary>
-        /// 調味料の棚（壁に付けた木の板二段と黒い金物）。下の段に香辛料の瓶の列・塩・胡椒の挽き器・茶色のソース・ケチャップ・醤油・油と酢の瓶、
-        /// 上の段に紅茶の缶・珈琲の缶・砂糖の瓶・紅茶の箱・香辛料の小袋
+        /// 調味料の棚（壁に付けた板二段と黒い金物）。下の段に香辛料の瓶の列・塩・胡椒の挽き器・茶色のソース・ケチャップ・醤油・油と酢の瓶、
+        /// 上の段に紅茶の缶・珈琲の缶・砂糖の瓶・紅茶の箱・香辛料の小袋。瓶と缶は六角の筒（輪郭）に、中身・札・蓋を巻いた絵（<see cref="PaintJars"/>）
         /// </summary>
         static void Shelves(FurnitureKit kit, float from, float to)
         {
@@ -295,80 +311,64 @@ namespace HalfAware.EditorTools
             const float deep = 0.18f;
             var cx = (from + to) * 0.5f;
             var levels = new[] { 1.30f, 1.62f };
+            var board = Whole(Uv(LaminateArea));
             foreach (var y in levels)
             {
-                kit.Box("SpiceShelf", new Vector3(cx, y - 0.0125f, back + deep * 0.5f), new Vector3(to - from, 0.025f, deep), Laminate);
+                kit.Box("SpiceShelf", new Vector3(cx, y - 0.0125f, back + deep * 0.5f), Quaternion.identity, new Vector3(to - from, 0.025f, deep), board, NoBack);
                 foreach (var bx in new[] { from + 0.08f, to - 0.08f })
-                {
-                    kit.Box("ShelfBracket", new Vector3(bx, y - 0.045f, back + 0.006f), new Vector3(0.02f, 0.07f, 0.012f), Sw(Hue.Black));
-                    kit.Box("ShelfBracket", new Vector3(bx, y - 0.031f, back + 0.07f), R(-35f, 0f, 0f), new Vector3(0.012f, 0.012f, 0.14f), Sw(Hue.Black));
-                }
+                    kit.Box("ShelfBracket", new Vector3(bx, y - 0.031f, back + 0.07f), R(-35f, 0f, 0f), new Vector3(0.012f, 0.012f, 0.14f), Sw(Hue.Black), NoBack);
             }
             var z = back + deep * 0.5f;
             var y0 = levels[0];
             // 下の段: 香辛料の瓶の列（中身の色と札）
-            var spices = new[] { Hue.Paprika, Hue.Turmeric, Hue.Herbs, Hue.Cumin, Hue.Pepper, Hue.Paprika };
-            var spiceLabels = new[] { 2, 3, 4, 5, 1, 2 };
+            var spices = new[] { 0, 1, 2, 3, 4, 0 };
             var x0 = from + 0.05f;
             for (var i = 0; i < spices.Length; i++)
-                Jar(kit, new Vector3(x0 + i * 0.05f, y0, z + 0.03f - (i % 2) * 0.05f), 0.021f, 0.085f, spices[i], Hue.LidBlack, spiceLabels[i]);
+                Jar(kit, new Vector3(x0 + i * 0.05f, y0, z + 0.03f - (i % 2) * 0.05f), 0.021f, 0.085f, spices[i]);
             var x = x0 + spices.Length * 0.05f + 0.03f;
-            Jar(kit, new Vector3(x, y0, z), 0.034f, 0.12f, Hue.Salt, Hue.LidWhite, 0);
+            Jar(kit, new Vector3(x, y0, z), 0.034f, 0.12f, 5);
             x += 0.08f;
             // 胡椒の挽き器（背の高い黒い木）
-            kit.Lathe("PepperMill", new Vector3(x, y0, z + 0.02f), Quaternion.identity, new[] { new Vector2(0.024f, 0f), new Vector2(0.027f, 0.03f), new Vector2(0.019f, 0.12f), new Vector2(0.024f, 0.15f), new Vector2(0.016f, 0.18f), new Vector2(0.005f, 0.19f), new Vector2(0f, 0.19f) }, 8, Sw(Hue.Walnut), true, false);
+            kit.Lathe("PepperMill", new Vector3(x, y0, z + 0.02f), Quaternion.identity, new[] { new Vector2(0.026f, 0f), new Vector2(0.019f, 0.12f), new Vector2(0.024f, 0.15f), new Vector2(0.005f, 0.19f) }, 6, JarStrip(7));
             x += 0.06f;
-            Bottle(kit, new Vector3(x, y0, z), 0.030f, 0.15f, 0.013f, 0.045f, Hue.BrownSauce, Hue.LidBlack, 6);
+            Bottle(kit, new Vector3(x, y0, z), 0.030f, 0.15f, 0.013f, 0.045f, 8);
             x += 0.07f;
-            Bottle(kit, new Vector3(x, y0, z + 0.01f), 0.032f, 0.16f, 0.015f, 0.02f, Hue.Ketchup, Hue.LidRed, 7);
+            Bottle(kit, new Vector3(x, y0, z + 0.01f), 0.032f, 0.16f, 0.015f, 0.02f, 9);
             x += 0.07f;
-            Bottle(kit, new Vector3(x, y0, z - 0.02f), 0.024f, 0.13f, 0.009f, 0.04f, Hue.Soy, Hue.LidRed, 8);
+            Bottle(kit, new Vector3(x, y0, z - 0.02f), 0.024f, 0.13f, 0.009f, 0.04f, 10);
             x += 0.06f;
-            Bottle(kit, new Vector3(x, y0, z + 0.02f), 0.030f, 0.22f, 0.010f, 0.07f, Hue.Oil, Hue.Cork, 9);
+            Bottle(kit, new Vector3(x, y0, z + 0.02f), 0.030f, 0.22f, 0.010f, 0.07f, 11);
             x += 0.07f;
-            if (x < to - 0.04f) Bottle(kit, new Vector3(x, y0, z - 0.02f), 0.027f, 0.19f, 0.010f, 0.06f, Hue.Vinegar, Hue.LidBlack, -1);
+            if (x < to - 0.04f) Bottle(kit, new Vector3(x, y0, z - 0.02f), 0.027f, 0.19f, 0.010f, 0.06f, 12);
             // 上の段
             var y1 = levels[1];
             x = from + 0.07f;
-            Tin(kit, new Vector3(x, y1, z), 0.045f, 0.15f, Uv(TeaTinArea), Hue.TinGold);
+            Jar(kit, new Vector3(x, y1, z), 0.045f, 0.15f, 13);
             x += 0.11f;
-            Tin(kit, new Vector3(x, y1, z + 0.01f), 0.05f, 0.13f, Uv(CoffeeTinArea), Hue.Black);
+            Jar(kit, new Vector3(x, y1, z + 0.01f), 0.05f, 0.13f, 14);
             x += 0.11f;
-            Jar(kit, new Vector3(x, y1, z), 0.04f, 0.13f, Hue.Sugar, Hue.LidWhite, -1);
+            Jar(kit, new Vector3(x, y1, z), 0.04f, 0.13f, 6);
             x += 0.12f;
             var paper = Sw(Hue.Cardboard);
             kit.Box6("TeaBox", new Vector3(x, y1 + 0.06f, z), R(0f, -6f, 0f), new Vector3(0.14f, 0.12f, 0.09f),
-                new[] { paper, paper, paper, paper, paper, Whole(Uv(TeaBoxArea)) }, NoBottom);
+                new[] { paper, paper, paper, paper, paper, Whole(Uv(TeaBoxArea)) }, Open);
             x += 0.12f;
             for (var i = 0; i < 3 && x < to - 0.03f; i++, x += 0.045f)
                 kit.Box6("Sachet", new Vector3(x, y1 + 0.045f, z + 0.02f), R(-12f, 0f, 4f - i * 5f), new Vector3(0.06f, 0.08f, 0.008f),
-                    new[] { Sw(Hue.Steel), Sw(Hue.Steel), Sw(Hue.Steel), Sw(Hue.Steel), Sw(Hue.Steel), Whole(Uv(SachetArea, i * 6, 0, 6, 8)) }, NoBottom);
+                    new[] { Sw(Hue.Steel), Sw(Hue.Steel), Sw(Hue.Steel), Sw(Hue.Steel), Sw(Hue.Steel), Whole(Uv(SachetArea, i * 6, 0, 6, 8)) }, (FurnitureKit.Sides)58);
         }
 
-        /// <summary>硝子の瓶（中身の色）と蓋、札（label が負なら札無し）</summary>
-        static void Jar(FurnitureKit kit, Vector3 at, float r, float h, Hue contents, Hue lid, int label)
+        /// <summary>瓶と缶（六角の筒と蓋。中身・札・蓋は巻いた絵 strip）</summary>
+        static void Jar(FurnitureKit kit, Vector3 at, float r, float h, int strip)
         {
-            kit.Lathe("Jar", at, Quaternion.identity, new[] { new Vector2(r * 0.9f, 0f), new Vector2(r, 0.006f), new Vector2(r, h - 0.02f), new Vector2(r * 0.85f, h - 0.012f) }, 8, Sw(contents), true, false);
-            kit.Lathe("JarLid", at, Quaternion.identity, new[] { new Vector2(r * 0.88f, h - 0.014f), new Vector2(r * 0.9f, h), new Vector2(0f, h + 0.002f) }, 8, Sw(lid));
-            if (label >= 0)
-                kit.Lathe("JarLabel", at, Quaternion.identity, new[] { new Vector2(r + 0.0015f, h * 0.25f), new Vector2(r + 0.0015f, h * 0.7f) }, 8, Whole(Uv(JarLabelArea, label * 8, 0, 8, 8)), false, false, false, 60f, -110f, 220f);
+            kit.Lathe("Jar", at, Quaternion.identity, new[] { new Vector2(r, 0f), new Vector2(r, h) }, 6, JarStrip(strip), false, true);
         }
 
-        /// <summary>瓶（胴・肩・首）と蓋、札（label が負なら札無し）</summary>
-        static void Bottle(FurnitureKit kit, Vector3 at, float r, float h, float neck, float neckLong, Hue body, Hue cap, int label)
+        /// <summary>瓶（胴・肩・首の六角の筒。札と蓋は巻いた絵 strip）</summary>
+        static void Bottle(FurnitureKit kit, Vector3 at, float r, float h, float neck, float neckLong, int strip)
         {
             var shoulder = h - neckLong;
-            kit.Lathe("Bottle", at, Quaternion.identity, new[] { new Vector2(r * 0.92f, 0f), new Vector2(r, 0.008f), new Vector2(r, shoulder - 0.02f), new Vector2(neck * 1.2f, shoulder + 0.01f), new Vector2(neck, h - 0.012f) }, 8, Sw(body), true, false);
-            kit.Lathe("BottleCap", at, Quaternion.identity, new[] { new Vector2(neck * 1.15f, h - 0.014f), new Vector2(neck * 1.15f, h), new Vector2(0f, h + 0.002f) }, 8, Sw(cap));
-            if (label >= 0)
-                kit.Lathe("BottleLabel", at, Quaternion.identity, new[] { new Vector2(r + 0.0015f, shoulder * 0.25f), new Vector2(r + 0.0015f, shoulder * 0.8f) }, 8, Whole(Uv(JarLabelArea, label * 8, 0, 8, 8)), false, false, false, 60f, -110f, 220f);
-        }
-
-        /// <summary>筒の缶（胴に巻いた絵と、蓋）</summary>
-        static void Tin(FurnitureKit kit, Vector3 at, float r, float h, Rect wrap, Hue lid)
-        {
-            kit.Lathe("Tin", at, Quaternion.identity, new[] { new Vector2(r, 0f), new Vector2(r, h - 0.012f) }, 10, Whole(wrap), false, false);
-            kit.Lathe("TinLid", at, Quaternion.identity, new[] { new Vector2(r + 0.002f, h - 0.014f), new Vector2(r + 0.002f, h), new Vector2(0f, h) }, 10, Sw(lid));
+            kit.Lathe("Bottle", at, Quaternion.identity, new[] { new Vector2(r, 0f), new Vector2(r, shoulder), new Vector2(neck, h) }, 6, JarStrip(strip), false, true);
         }
 
         /// <summary>吊り戸棚（化粧板の戸と、下の縁の取っ手）</summary>
@@ -377,14 +377,14 @@ namespace HalfAware.EditorTools
             var back = -KitchenDeep * 0.5f;
             const float deep = 0.33f, low = 1.46f, high = 2.16f;
             var cx = (from + to) * 0.5f;
-            kit.Box6("WallCabinet", new Vector3(cx, (low + high) * 0.5f, back + deep * 0.5f - 0.009f), Quaternion.identity, new Vector3(to - from, high - low, deep - 0.018f), Carcass(true));
+            kit.Box6("WallCabinet", new Vector3(cx, (low + high) * 0.5f, back + deep * 0.5f - 0.009f), Quaternion.identity, new Vector3(to - from, high - low, deep - 0.018f), Carcass(true), NoBack);
             var count = Mathf.Max(1, Mathf.RoundToInt((to - from) / 0.5f));
             var w = (to - from) / count;
             for (var i = 0; i < count; i++)
             {
                 var a = from + w * i + DoorGap;
                 var b = from + w * (i + 1) - DoorGap;
-                kit.RoundBox("WallCabinetDoor", new Vector3((a + b) * 0.5f, (low + high) * 0.5f, back + deep - 0.009f), Quaternion.identity, new Vector3(b - a, high - low - 2f * DoorGap, 0.018f), 0.005f, Front, null, 1, 1f);
+                Panel(kit, "WallCabinetDoor", new Vector3((a + b) * 0.5f, (low + high) * 0.5f, back + deep - 0.009f), new Vector3(b - a, high - low - 2f * DoorGap, 0.018f));
                 var hx = count == 1 ? a + 0.04f : (i % 2 == 0 ? b - 0.04f : a + 0.04f);
                 Pull(kit, new Vector3(hx, low + 0.08f, back + deep), false, 0.10f);
             }
@@ -400,8 +400,8 @@ namespace HalfAware.EditorTools
         {
             var L = Mathf.Max(0.8f, length);
             const float top = 0.93f;
-            kit.Box6("CounterCarcass", new Vector3(0f, 0.10f + 0.40f, -0.075f), Quaternion.identity, new Vector3(L - 0.02f, 0.80f, 0.45f), Carcass(false), NoBottom);
-            kit.Box("CounterPlinth", new Vector3(0f, 0.05f, -0.06f), new Vector3(L - 0.04f, 0.10f, 0.38f), Sw(Hue.Black), NoBottom);
+            kit.Box6("CounterCarcass", new Vector3(0f, 0.10f + 0.40f, -0.075f), Quaternion.identity, new Vector3(L - 0.02f, 0.80f, 0.45f), Carcass(false), FurnitureKit.Sides.NoBottom);
+            kit.Box("CounterPlinth", new Vector3(0f, 0.05f, -0.06f), Quaternion.identity, new Vector3(L - 0.04f, 0.10f, 0.38f), Sw(Hue.Black), FurnitureKit.Sides.NoBottom);
             var count = Mathf.Max(1, Mathf.RoundToInt(L / 0.55f));
             var w = (L - 0.02f) / count;
             for (var i = 0; i < count; i++)
@@ -409,16 +409,17 @@ namespace HalfAware.EditorTools
                 var cx = -L * 0.5f + 0.01f + w * (i + 0.5f);
                 using (kit.At(new Vector3(0f, 0f, -0.30f), 180f))
                 {
-                    kit.RoundBox("CounterDoor", new Vector3(-cx, 0.49f, 0.009f), Quaternion.identity, new Vector3(w - 2f * DoorGap, 0.775f, 0.018f), 0.005f, Front, null, 1, 1f);
+                    Panel(kit, "CounterDoor", new Vector3(-cx, 0.49f, 0.009f), new Vector3(w - 2f * DoorGap, 0.775f, 0.018f));
                     Pull(kit, new Vector3(-cx + w * 0.5f - 0.04f, 0.76f, 0.018f), false, 0.12f);
                 }
             }
-            kit.RoundBox("CounterTop", new Vector3(0f, top - 0.0175f, 0.0f), Quaternion.identity, new Vector3(L, 0.035f, 0.60f), 0.006f, BlackTop, null, 1, 1f);
+            // 天板（丸椅子の側へ張り出した所の下の面だけ、別に張る）
+            kit.Box("CounterTop", new Vector3(0f, top - 0.0175f, 0.0f), Quaternion.identity, new Vector3(L, 0.035f, 0.60f), BlackTop, FurnitureKit.Sides.NoBottom);
+            kit.Box("CounterTop", new Vector3(0f, top - 0.035f, 0.22f), Quaternion.identity, new Vector3(L, 0.0005f, 0.16f), Sw(Hue.Oak), FurnitureKit.Sides.Bottom);
             WineCellar(kit, -L * 0.5f + 0.025f, 0.15f);
             // まな板と布巾
-            kit.RoundBox("ChoppingBoard", new Vector3(-L * 0.25f, top + 0.009f, -0.05f), R(0f, 8f, 0f), new Vector3(0.38f, 0.018f, 0.26f), 0.006f, Walnut, null, 1, 0.5f);
-            kit.RoundBox("TeaTowel", new Vector3(L * 0.2f, top + 0.006f, -0.08f), R(0f, -14f, 0f), new Vector3(0.22f, 0.012f, 0.15f), 0.005f, Cotton,
-                (p, c) => { p.y += 0.003f * Mathf.Sin(p.x * 60f) * (c.y > 0f ? 1f : 0f); return p; }, 1, 0.05f, NoBottom);
+            kit.Box("ChoppingBoard", new Vector3(-L * 0.25f, top + 0.009f, -0.05f), R(0f, 8f, 0f), new Vector3(0.38f, 0.018f, 0.26f), Walnut, FurnitureKit.Sides.NoBottom);
+            kit.Box("TeaTowel", new Vector3(L * 0.2f, top + 0.006f, -0.08f), R(0f, -14f, 0f), new Vector3(0.22f, 0.012f, 0.15f), Cotton, FurnitureKit.Sides.NoBottom);
         }
 
         /// <summary>
@@ -431,29 +432,29 @@ namespace HalfAware.EditorTools
             var cx = left + W * 0.5f;
             var black = Sw(Hue.RackBlack);
             var glass = Whole(Uv(WineArea));
-            kit.Box6("WineCellar", new Vector3(cx, 0.10f + H * 0.5f, face + 0.012f), Quaternion.identity, new Vector3(W, H, 0.024f), new[] { black, black, black, black, black, glass });
-            kit.RoundBox("WineCellarHandle", new Vector3(cx + W * 0.5f - 0.03f, 0.10f + H * 0.55f, face + 0.036f), Quaternion.identity, new Vector3(0.014f, 0.30f, 0.016f), 0.005f, Sw(Hue.Chrome), null, 1, 1f);
+            kit.Box6("WineCellar", new Vector3(cx, 0.10f + H * 0.5f, face + 0.012f), Quaternion.identity, new Vector3(W, H, 0.024f), new[] { black, black, black, black, black, glass }, NoBack);
+            kit.Box("WineCellarHandle", new Vector3(cx + W * 0.5f - 0.03f, 0.10f + H * 0.55f, face + 0.034f), Quaternion.identity, new Vector3(0.014f, 0.30f, 0.02f), Sw(Hue.Chrome), NoBack);
         }
 
-        /// <summary>丸椅子（木の丸い座、黒い鉄の四本の脚は開き、足掛けの輪）</summary>
+        /// <summary>丸椅子（艶のある黒い丸い座、黒い鉄の四本の脚は開き、足掛けの輪）</summary>
         static void Stool(FurnitureKit kit)
         {
             const float seat = 0.66f;
-            kit.Lathe("StoolSeat", Vector3.zero, Quaternion.identity, new[] { new Vector2(0.16f, seat - 0.035f), new Vector2(0.172f, seat - 0.02f), new Vector2(0.17f, seat - 0.004f), new Vector2(0.16f, seat), new Vector2(0f, seat + 0.004f) }, 16, BlackTop, true, false);
+            kit.Lathe("StoolSeat", Vector3.zero, Quaternion.identity, new[] { new Vector2(0.16f, seat - 0.035f), new Vector2(0.172f, seat - 0.018f), new Vector2(0.16f, seat), new Vector2(0f, seat + 0.004f) }, 10, BlackTop, true, false);
             var metal = Sw(Hue.Black);
             for (var k = 0; k < 4; k++)
             {
                 var a = (45f + k * 90f) * Mathf.Deg2Rad;
                 var dir = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a));
-                kit.Tube("StoolLeg", new[] { dir * 0.11f + Vector3.up * (seat - 0.035f), dir * 0.20f }, 0.012f, 6, metal, true);
+                kit.Tube("StoolLeg", new[] { dir * 0.11f + Vector3.up * (seat - 0.035f), dir * 0.20f }, 0.012f, 4, metal);
             }
             var ring = new List<Vector3>();
-            for (var k = 0; k <= 16; k++)
+            for (var k = 0; k <= 10; k++)
             {
-                var a = k / 16f * Mathf.PI * 2f;
+                var a = k / 10f * Mathf.PI * 2f;
                 ring.Add(new Vector3(Mathf.Sin(a) * 0.175f, 0.25f, Mathf.Cos(a) * 0.175f));
             }
-            kit.Tube("StoolRing", ring, 0.008f, 5, metal);
+            kit.Tube("StoolRing", ring, 0.008f, 4, metal);
         }
     }
 }
