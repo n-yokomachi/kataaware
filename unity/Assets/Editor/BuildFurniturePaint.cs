@@ -53,8 +53,9 @@ namespace HalfAware.EditorTools
         static readonly RectInt DrawerLabelArea = new RectInt(184, 128, 24, 4);
         static readonly RectInt PagesArea = new RectInt(208, 128, 8, 8);
         static readonly RectInt BoxLabelArea = new RectInt(216, 128, 24, 8);
-        // 仕事の机の周り（鍵盤の上の面、PC の前と横の硝子）
-        static readonly RectInt KeysArea = new RectInt(0, 144, 32, 12);
+        // 仕事の机の周り（PC の前と横の硝子）
+        // 鍵盤のキーの並び（1 キー幅 = 4 画素で 15 キー幅。下の 20 画素が五列の上の面、その上の 5 画素が五列の前の面）
+        static readonly RectInt KeysArea = new RectInt(136, 160, 60, 25);
         static readonly RectInt PcFrontArea = new RectInt(32, 144, 12, 28);
         static readonly RectInt PcSideArea = new RectInt(44, 144, 24, 28);
         // 作業台の端のワインセラーの硝子の戸（中の棚と寝かせた瓶の底、上の灯り）
@@ -88,6 +89,7 @@ namespace HalfAware.EditorTools
             LampShade, Bulb, LedGreen, LedBlue, LedAmber, LedRed, LedCyan, TinNavy, TinGold, Terracotta,
             Fabric, FabricDark, Wool, Laminate, Oak, Walnut, RackBlack, Foam, Water, CableBlack,
             WireWhite, Ceramic, Enamel, PianoBlack, Diffuser, LedViolet, CoatWool, HatFelt, HatBand,
+            Sumi, KeySumi, PadCloth,
         }
 
         struct Swatch
@@ -133,6 +135,7 @@ namespace HalfAware.EditorTools
             S(0.700f, 0.700f, 0.680f, 0.30f), S(0.620f, 0.600f, 0.560f, 0.60f), S(0.045f, 0.045f, 0.050f, 0.75f),
             S(0.030f, 0.030f, 0.034f, 0.88f), S(0.860f, 0.850f, 0.820f, 0.20f, 0.95f), S(0.660f, 0.400f, 1.000f, 0.50f, 1.0f),
             S(0.105f, 0.098f, 0.094f, 0.10f), S(0.085f, 0.078f, 0.072f, 0.14f), S(0.030f, 0.028f, 0.028f, 0.35f),
+            S(0.058f, 0.058f, 0.062f, 0.28f), S(0.090f, 0.090f, 0.094f, 0.18f), S(0.085f, 0.085f, 0.090f, 0.06f),
         };
 
         // ---- uv ----------------------------------------------------------------------
@@ -914,22 +917,10 @@ namespace HalfAware.EditorTools
             cv.Fill(bl.x + 7, bl.y + 3, 3, 1, C(Hue.LedCyan) * 0.6f, 0.2f);
         }
 
-        /// <summary>仕事の机の周りの顔: 鍵盤（黒い鍵と薄い刻印の列、長い空白の鍵）、PC の前（縦の通気の溝・紫の灯りの線・電源の輪）、PC の横の硝子（中の紫の輪の扇と灯りの帯）</summary>
+        /// <summary>仕事の机の周りの顔: 鍵盤のキーの並び、PC の前（縦の通気の溝・紫の灯りの線・電源の輪）、PC の横の硝子（中の紫の輪の扇と灯りの帯）</summary>
         static void PaintDesk(Canvas cv)
         {
-            var k = KeysArea;
-            cv.Fill(k, new Color(0.10f, 0.10f, 0.11f), 0.35f);
-            for (var row = 0; row < 4; row++)
-                for (var col = 0; col < 10; col++)
-                {
-                    var x = k.x + 1 + col * 3;
-                    var y = k.y + 3 + row * 2;
-                    if (row == 0 && col >= 3 && col <= 6) continue;
-                    cv.Put(x, y, new Color(0.24f, 0.24f, 0.26f), 0.35f);
-                    cv.Put(x + 1, y, new Color(0.20f, 0.20f, 0.22f), 0.35f);
-                    if (Hash(col, row + 20) > 0.55f) cv.Lit(x, y, new Color(0.50f, 0.36f, 0.80f), 0.35f);
-                }
-            cv.Fill(k.x + 10, k.y + 1, 12, 1, new Color(0.24f, 0.24f, 0.26f), 0.35f);
+            PaintKeys(cv);
             // PC の前（下が床、上が天板の側）
             var f = PcFrontArea;
             cv.Fill(f, new Color(0.035f, 0.035f, 0.04f), 0.4f);
@@ -997,6 +988,66 @@ namespace HalfAware.EditorTools
                 }
             }
             for (var x = inside.x + 1; x < inside.xMax - 1; x++) cv.Lit(x, inside.yMax - 1, new Color(0.60f, 0.75f, 0.95f), 0.45f);
+        }
+
+        /// <summary>
+        /// 鍵盤のキーの幅の並び（キー幅 1 = 4 画素）。使う人から見て左から、五列（数字の列 → 空白の列）。
+        /// 60% の小さな並び（矢印キー無し、左の Caps の位置に Control、右上は二つに割れた Backspace の位置）。最後の列は空白の両脇を開ける（<see cref="KeyRowSpan"/>）
+        /// </summary>
+        static readonly int[][] KeyRows =
+        {
+            new[] { 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4 },
+            new[] { 6, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 6 },
+            new[] { 7, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 9 },
+            new[] { 9, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 7, 4 },
+            new[] { 4, 6, 24, 6, 4 },
+        };
+
+        /// <summary>列ごとのキーの並びの幅（画素）と、使う人から見た左の端（画素）。空白の列は両脇 8 画素（キー幅 2）を開ける</summary>
+        static Vector2Int KeyRowSpan(int row)
+        {
+            var w = 0;
+            foreach (var k in KeyRows[row]) w += k;
+            return new Vector2Int(row == 4 ? 8 : 0, w);
+        }
+
+        /// <summary>
+        /// 鍵盤のキー（無刻印の墨色。オーナー「HHKBの墨を再現してほしい」「キーボードは無刻印でいい」）。
+        /// 列ごとに上の面（4 画素。v が前へ増える）と前の面（1 画素）。キーの境は暗い溝（法線の絵で凹む）、キーの前と奥の縁は少し暗く面取り。
+        /// 使う人は鍵盤の +z の側にいるので、u の増える +x は使う人から見て右から左。画素の列は左右を返して描く
+        /// </summary>
+        static void PaintKeys(Canvas cv)
+        {
+            var r = KeysArea;
+            var cap = C(Hue.KeySumi);
+            var gap = C(Hue.Sumi) * 0.45f;
+            cv.Fill(r, C(Hue.Sumi), 0.28f);
+            for (var row = 0; row < KeyRows.Length; row++)
+            {
+                var span = KeyRowSpan(row);
+                var at = span.x;
+                foreach (var w in KeyRows[row])
+                {
+                    for (var i = 0; i < w; i++)
+                    {
+                        var col = r.xMax - 1 - (at + i);
+                        var edge = i == w - 1;
+                        for (var j = 0; j < 4; j++)
+                        {
+                            var n = 0.94f + 0.08f * Hash(col, r.y + row * 4 + j);
+                            var rim = j == 0 || j == 3;
+                            var c = edge ? gap : cap * n * (rim ? 0.85f : 1f);
+                            cv.Put(col, r.y + row * 4 + j, c, edge ? 0.1f : 0.18f);
+                            cv.Raise(col, r.y + row * 4 + j, edge ? -1f : rim ? -0.35f : 0f);
+                        }
+                        cv.Put(col, r.y + 20 + row, edge ? gap : cap * 0.9f, 0.18f);
+                        cv.Raise(col, r.y + 20 + row, edge ? -1f : 0f);
+                    }
+                    at += w;
+                }
+            }
+            cv.Bumpy(new RectInt(r.x, r.y, r.width, 20), false, 1.0f);
+            cv.Bumpy(new RectInt(r.x, r.y + 20, r.width, 5), false, 1.0f);
         }
 
         // ---- 形の細かさを移した絵 ------------------------------------------------------

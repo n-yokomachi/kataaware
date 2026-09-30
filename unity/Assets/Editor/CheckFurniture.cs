@@ -76,6 +76,7 @@ namespace HalfAware.EditorTools
             new object[] { "o7_ih_and_hood", new Vector3(-1.6f, 1.75f, -0.3f), new Vector3(-1.65f, 1.1f, -1.2f), 60f },
             new object[] { "o8_sofa_close", new Vector3(-2.6f, 1.3f, 1.0f), new Vector3(-3.8f, 0.5f, 1.7f), 56f },
             new object[] { "o9_wine_cellar", new Vector3(-3.35f, 1.0f, 1.25f), new Vector3(-3.85f, 0.5f, 0.45f), 55f },
+            new object[] { "o10_keyboard_close", new Vector3(1.55f, 1.0f, 1.86f), new Vector3(1.55f, 0.66f, 2.20f), 42f },
         };
 
         /// <summary>家具ひとつを撮る間は、ほかの家具（前の物も後の物も）を写さない。部屋の形・机・椅子などは残す</summary>
@@ -398,12 +399,13 @@ namespace HalfAware.EditorTools
             var lead = new SerializedObject(player).FindProperty("eyeLead").floatValue;
             var foot = player.transform.position;
             var body = player.transform.eulerAngles.y;
-            foreach (var head in new[] { -60f, 60f })
+            foreach (var head in new[] { -60f, 60f, 0f })
             {
                 var rot = Quaternion.Euler(0f, body, 0f);
                 var at = foot + rot * new Vector3(0f, eye, lead);
-                var look = at + rot * Quaternion.Euler(8f, head, 0f) * Vector3.forward;
-                Save(Shoot(at, look, 0f, 0f), Path.Combine(dir, tag + "_seated_" + (head < 0f ? "left" : "right") + ".png"));
+                // 首を振らない時は、座った目から机の上（鍵盤とマウス）を見下ろす
+                var look = at + rot * Quaternion.Euler(head == 0f ? 38f : 8f, head, 0f) * Vector3.forward;
+                Save(Shoot(at, look, 0f, 0f), Path.Combine(dir, tag + "_seated_" + (head < 0f ? "left" : head > 0f ? "right" : "down") + ".png"));
             }
         }
 

@@ -71,16 +71,49 @@ namespace HalfAware.EditorTools
                 }
                 kit.Tube("DeskCable", pts, 0.0045f, 3, Sw(colours[k]));
             }
-            // 鍵盤とマウス（前の置き場のまま）
-            var keys = Whole(Uv(KeysArea));
-            var dark = Sw(Hue.PlasticGrey);
-            kit.Box6("Keyboard", new Vector3(-0.05f, Top + 0.011f, 0.26f), R(2f, 2f, 0f), new Vector3(0.44f, 0.022f, 0.14f), new[] { dark, dark, dark, keys, dark, dark }, NoBottom);
-            kit.Tube("KeyboardCable", new[] { new Vector3(-0.05f, Top + 0.012f, 0.19f), new Vector3(-0.04f, Top + 0.004f, 0.10f), new Vector3(0.06f, Top + 0.004f, -0.12f), new Vector3(0.10f, Top + 0.004f, -0.30f) }, 0.003f, 3, Sw(Hue.CableBlack));
-            kit.Box("MousePad", new Vector3(-0.52f, Top + 0.0015f, 0.26f), Quaternion.identity, new Vector3(0.28f, 0.003f, 0.23f), Sw(Hue.PlasticGrey), NoBottom);
-            // マウス（前へ低くなる背。前後に二つ割りの角の立った箱）
+            // 鍵盤（前の置き場の真ん中のまま）と、奥から受けの穴へ這うケーブル
+            Keyboard(kit, new Vector3(-0.05f, Top, 0.26f), 2f);
+            kit.Tube("KeyboardCable", new[] { new Vector3(0.01f, Top + 0.012f, 0.203f), new Vector3(0.02f, Top + 0.004f, 0.13f), new Vector3(0.07f, Top + 0.004f, -0.12f), new Vector3(0.10f, Top + 0.004f, -0.30f) }, 0.003f, 3, Sw(Hue.CableBlack));
+            // マウスパッドとマウス（落ち着いた黒。前の紫の灯りはやめた。パッドは艶の無い濃い灰の布で、黒い石の天板とマウスの間に差を残す）
+            kit.Box("MousePad", new Vector3(-0.52f, Top + 0.0015f, 0.26f), Quaternion.identity, new Vector3(0.28f, 0.003f, 0.23f), Sw(Hue.PadCloth), NoBottom);
+            // マウス（前へ低くなる背。前後に二つ割りの角の立った箱。艶のある黒で、パッドの上で照りが形を読ませる）
             kit.RoundBox("Mouse", new Vector3(-0.52f, Top + 0.02f, 0.27f), R(0f, -6f, 0f), new Vector3(0.062f, 0.034f, 0.108f), 0f, Sw(Hue.PianoBlack),
                 (p, c) => { if (c.y > 0f) p.y -= 0.008f * (c.z + 1f) * 0.5f * c.y; p.x *= 1f - 0.12f * c.y * c.y; return p; }, 0, 0.06f, NoBottom, 45f);
-            kit.Decal("MouseGlow", new Vector3(-0.52f, Top + 0.0372f, 0.30f), new Vector3(0.004f, 0f, 0f), new Vector3(0f, 0f, 0.018f), new Rect(SwatchUv(Hue.LedViolet), Vector2.zero));
+        }
+
+        /// <summary>
+        /// 小さな鍵盤（オーナー「キーボードがちょっとゲーミング感強かったので、HHKBの墨を再現してほしい」「キーボードは無刻印でいい」。見た目を寄せるだけで、名前や印は入れない）。
+        /// 60% の並び（幅 0.294・奥行き 0.110、矢印キー無し）。原点は足元の真ん中、前（+z）が使う人。墨色の筐体は前が低く奥が高い楔（前 1.3 cm・奥 2.5 cm）、
+        /// その上に五列のキーを列ごとの箱で載せる。列ごとに高さと傾きを変えた段付き（数字の列が使う人の側へ最も傾き、空白の列は奥へ倒れる）で、
+        /// 段と筐体の傾きは形、キーの割り付けの溝は絵と法線の絵（<see cref="PaintKeys"/>）。キーは無刻印の墨色、光る所は無い
+        /// </summary>
+        static void Keyboard(FurnitureKit kit, Vector3 at, float yaw)
+        {
+            const float W = 0.294f, D = 0.110f, front = 0.013f, back = 0.025f, U = 0.01905f;
+            using (kit.At(at, yaw))
+            {
+                var sumi = Sw(Hue.Sumi);
+                kit.RoundBox("KeyboardCase", new Vector3(0f, front * 0.5f, 0f), Quaternion.identity, new Vector3(W, front, D), 0f, sumi,
+                    (p, c) => { if (c.y > 0f) p.y += (back - front) * (0.5f - p.z / D); return p; }, 0, NoStep, NoBottom, 30f);
+                var slope = Mathf.Atan2(back - front, D) * Mathf.Rad2Deg;
+                var sculpt = new[] { 10f, 4f, 0f, -4f, -9f };
+                var high = new[] { 0.0115f, 0.0105f, 0.0098f, 0.0102f, 0.0108f };
+                var side = Sw(Hue.KeySumi);
+                for (var row = 0; row < 5; row++)
+                {
+                    var z = (row - 2) * U;
+                    var plate = front + (back - front) * (0.5f - z / D);
+                    var span = KeyRowSpan(row);
+                    var wide = span.y / 4f * U;
+                    // キーの並び（キー幅 15）を筐体の真ん中に。使う人から見た左（+x）の端から span.x（空白の列はキー幅 2）だけ右（−x）へ寄せて並べる
+                    var cx = 7.5f * U - span.x / 4f * U - wide * 0.5f;
+                    var top = Whole(Uv(KeysArea, KeysArea.width - span.x - span.y, row * 4, span.y, 4));
+                    var face = Whole(Uv(KeysArea, KeysArea.width - span.x - span.y, 20 + row, span.y, 1));
+                    using (kit.At(new Vector3(cx, plate - 0.002f, z), R(slope + sculpt[row], 0f, 0f)))
+                        kit.Box6("KeyRow", new Vector3(0f, high[row] * 0.5f, 0f), Quaternion.identity, new Vector3(wide - 0.0015f, high[row], U - 0.0026f),
+                            new[] { side, side, side, top, side, face }, Open);
+                }
+            }
         }
 
         /// <summary>
