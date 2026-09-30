@@ -23,41 +23,41 @@ namespace HalfAware
         [Tooltip("吐いた煙を撒く広さ。メートル")]
         [SerializeField] float blowSpread = 0.13f;
 
-        [Header("吸い終えた後の一筋（場面 1。右手の指先から）")]
-        [Tooltip("一筋の粒を出す数。毎秒。粒が重なって筋に見えるだけ出す")]
-        [SerializeField] float wispRate = 26f;
-        [Tooltip("昇る速さ。m/秒（粒ごとにこの 0.85〜1.15 倍）")]
-        [SerializeField] float wispRise = 0.15f;
-        [Tooltip("粒の寿命。秒。昇る速さとの積がおおよその高さ")]
-        [SerializeField] float wispLife = 5f;
-        [Tooltip("昇りながら体の内側（x）と前（y）へ流れる速さ。m/秒。指先は目の右下のすぐ近くで、まっすぐ昇ると視界の右の縁にしか入らない。正面の視界へ寄せる")]
-        [SerializeField] Vector2 wispDrift = new Vector2(0.05f, 0.06f);
-        [Tooltip("出る所の粒の大きさ。m。昇るほど wispSpread 倍まで太る")]
-        [SerializeField] float wispSize = 0.026f;
-        [Tooltip("昇りきった所の太り方。出る所の大きさに対する倍")]
-        [SerializeField] float wispSpread = 4f;
-        [Tooltip("横の揺れの強さ。昇るほど強くなる")]
-        [SerializeField] float wispSway = 0.09f;
-        [Tooltip("粒の濃さ（不透明さ）。口元の燻る煙（0.17〜0.26）より明るく")]
-        [SerializeField, Range(0f, 1f)] float wispAlpha = 0.6f;
-        [Tooltip("指先の骨から、煙草の火の所までの高さ。m")]
-        [SerializeField] float wispLift = 0.02f;
+        // ---- 吸い終えた後の一筋（場面 1。右手の指先から）。場面ファイルに持たせない（複数の担当が場面を保存し直すので、古い値が残らないよう定数にする）
+        /// <summary>一筋の粒を出す数。毎秒。粒が重なって筋に見えるだけ出す</summary>
+        const float WispRate = 26f;
+        /// <summary>昇る速さ。m/秒（粒ごとにこの 0.85〜1.15 倍）</summary>
+        const float WispRise = 0.15f;
+        /// <summary>粒の寿命。秒。昇る速さとの積がおおよその高さ</summary>
+        const float WispLife = 5f;
+        /// <summary>昇りながら体の内側（x）と前（y）へ流れる速さ。m/秒。指先は目の右下のすぐ近くで、まっすぐ昇ると視界の右の縁にしか入らない。正面の視界へ寄せる</summary>
+        static readonly Vector2 WispDrift = new Vector2(0.05f, 0.06f);
+        /// <summary>出る所の粒の大きさ。m。昇るほど WispSpread 倍まで太る</summary>
+        const float WispSize = 0.026f;
+        /// <summary>昇りきった所の太り方。出る所の大きさに対する倍</summary>
+        const float WispSpread = 4f;
+        /// <summary>横の揺れの強さ。昇るほど強くなる</summary>
+        const float WispSway = 0.09f;
+        /// <summary>粒の濃さ（不透明さ）。口元の燻る煙（0.17〜0.26）より明るく</summary>
+        const float WispAlpha = 0.6f;
+        /// <summary>指先の骨から、煙草の火の所までの高さ。m</summary>
+        const float WispLift = 0.02f;
 
-        [Header("吸い終えた後にモニターの前を漂う煙（場面 1）")]
-        [Tooltip("漂う粒を出す数。毎秒")]
-        [SerializeField] float hazeRate = 12f;
-        [Tooltip("漂う粒の寿命。秒（この 0.8〜1.2 倍）")]
-        [SerializeField] float hazeLife = 7f;
-        [Tooltip("漂う粒の大きさ。m（この 0.8〜1.3 倍）。目から 0.5〜0.8 m 先なので、一粒で画面の一部を覆う")]
-        [SerializeField] float hazeSize = 0.32f;
-        [Tooltip("漂う粒の濃さ（不透明さ）。重なった所だけ濃くなり、全部は隠さない")]
-        [SerializeField, Range(0f, 1f)] float hazeAlpha = 0.55f;
-        [Tooltip("漂わせる箱の真ん中。体（Player の根）から見て、右・上・前。m。座った目の少し下、モニターの手前")]
-        [SerializeField] Vector3 hazeCentre = new Vector3(0f, 1.12f, 0.85f);
-        [Tooltip("漂わせる箱の広さ。右・上・前。m。正面のモニターの幅を覆う")]
-        [SerializeField] Vector3 hazeBox = new Vector3(1.0f, 0.45f, 0.3f);
-        [Tooltip("漂う速さ（横と上下のゆっくりした流れ）。m/秒")]
-        [SerializeField] float hazeDrift = 0.03f;
+        // ---- 吸い終えた後にモニターの前を漂う煙（場面 1）。同じく定数
+        /// <summary>漂う粒を出す数。毎秒</summary>
+        const float HazeRate = 12f;
+        /// <summary>漂う粒の寿命。秒（この 0.8〜1.2 倍）</summary>
+        const float HazeLife = 7f;
+        /// <summary>漂う粒の大きさ。m（この 0.8〜1.3 倍）。目から 0.5〜0.8 m 先なので、一粒で画面の一部を覆う</summary>
+        const float HazeSize = 0.32f;
+        /// <summary>漂う粒の濃さ（不透明さ）。重なった所だけ濃くなり、全部は隠さない</summary>
+        const float HazeAlpha = 0.55f;
+        /// <summary>漂わせる箱の真ん中。体（Player の根）から見て、右・上・前。m。座った目の少し下、モニターの手前</summary>
+        static readonly Vector3 HazeCentre = new Vector3(0f, 1.12f, 0.85f);
+        /// <summary>漂わせる箱の広さ。右・上・前。m。正面のモニターの幅を覆う</summary>
+        static readonly Vector3 HazeBox = new Vector3(1.0f, 0.45f, 0.3f);
+        /// <summary>漂う速さ（横と上下のゆっくりした流れ）。m/秒</summary>
+        const float HazeDrift = 0.03f;
 
         float until = -1f;
         /// <summary>時刻が来ても止めずに立て続けるか</summary>
@@ -192,18 +192,18 @@ namespace HalfAware
         {
             if (wisp != null) return wisp;
             var at = anchor != null ? anchor : transform;
-            var ps = NewSystem("SmokeWisp", at, at.position + Vector3.up * wispLift);
+            var ps = NewSystem("SmokeWisp", at, at.position + Vector3.up * WispLift);
 
             var main = ps.main;
-            main.startLifetime = new ParticleSystem.MinMaxCurve(wispLife * 0.85f, wispLife * 1.1f);
-            // 大きさは昇りきった所の大きさで持ち、昇るほど太る曲線（出る所で 1/wispSpread）を掛ける
-            main.startSize = new ParticleSystem.MinMaxCurve(wispSize * wispSpread * 0.8f, wispSize * wispSpread * 1.2f);
+            main.startLifetime = new ParticleSystem.MinMaxCurve(WispLife * 0.85f, WispLife * 1.1f);
+            // 大きさは昇りきった所の大きさで持ち、昇るほど太る曲線（出る所で 1/WispSpread）を掛ける
+            main.startSize = new ParticleSystem.MinMaxCurve(WispSize * WispSpread * 0.8f, WispSize * WispSpread * 1.2f);
             main.startColor = new ParticleSystem.MinMaxGradient(
-                new Color(0.90f, 0.89f, 0.87f, wispAlpha), new Color(0.84f, 0.83f, 0.81f, wispAlpha * 0.8f));
+                new Color(0.90f, 0.89f, 0.87f, WispAlpha), new Color(0.84f, 0.83f, 0.81f, WispAlpha * 0.8f));
             main.maxParticles = 200;
 
             var emission = ps.emission;
-            emission.rateOverTime = wispRate;
+            emission.rateOverTime = WispRate;
 
             // 一点から出す
             var shape = ps.shape;
@@ -212,18 +212,18 @@ namespace HalfAware
             shape.radius = 0.002f;
 
             // 昇る。粒ごとに速さを少し違えて、筋が途切れず伸びるように。体の内側と前へ少し流し、正面の視界へ寄せる
-            var drift = Body(new Vector3(-wispDrift.x, 0f, wispDrift.y), false);
+            var drift = Body(new Vector3(-WispDrift.x, 0f, WispDrift.y), false);
             var velocity = ps.velocityOverLifetime;
             velocity.enabled = true;
             velocity.space = ParticleSystemSimulationSpace.World;
             velocity.x = new ParticleSystem.MinMaxCurve(drift.x - 0.004f, drift.x + 0.004f);
-            velocity.y = new ParticleSystem.MinMaxCurve(wispRise * 0.85f, wispRise * 1.15f);
+            velocity.y = new ParticleSystem.MinMaxCurve(WispRise * 0.85f, WispRise * 1.15f);
             velocity.z = new ParticleSystem.MinMaxCurve(drift.z - 0.004f, drift.z + 0.004f);
 
             // 横の揺れ。出る所では細くまっすぐ、昇るほど大きく揺れる
             var noise = ps.noise;
             noise.enabled = true;
-            noise.strength = new ParticleSystem.MinMaxCurve(wispSway, AnimationCurve.EaseInOut(0f, 0.05f, 1f, 1f));
+            noise.strength = new ParticleSystem.MinMaxCurve(WispSway, AnimationCurve.EaseInOut(0f, 0.05f, 1f, 1f));
             noise.frequency = 0.9f;
             noise.scrollSpeed = 0.35f;
             noise.damping = true;
@@ -233,7 +233,7 @@ namespace HalfAware
             // 昇るほど太る
             var size = ps.sizeOverLifetime;
             size.enabled = true;
-            size.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.EaseInOut(0f, 1f / Mathf.Max(1f, wispSpread), 1f, 1f));
+            size.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.EaseInOut(0f, 1f / Mathf.Max(1f, WispSpread), 1f, 1f));
 
             // 出てすぐ濃くなり、昇るにつれ薄れて消える
             AlphaOverLife(ps, 0.08f, 0.7f, 0.6f);
@@ -242,7 +242,7 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// 吸い終えた後にモニターの前を漂う煙を作る（まだ無ければ）。体（Player の根）の前の箱（hazeCentre・hazeBox）の中に、
+        /// 吸い終えた後にモニターの前を漂う煙を作る（まだ無ければ）。体（Player の根）の前の箱（HazeCentre・HazeBox）の中に、
         /// 大きく薄い粒をゆっくり出し、低い周波数の揺れで流す。粒はゆっくり膨らみ、現れて消える。
         /// エディタで撮るときにも呼ぶ（その時は呼んだ側が撮った後に消す）
         /// </summary>
@@ -250,32 +250,32 @@ namespace HalfAware
         {
             if (haze != null) return haze;
             var body = transform.root;
-            var ps = NewSystem("SmokeHaze", body, body.position + Body(hazeCentre, true));
+            var ps = NewSystem("SmokeHaze", body, body.position + Body(HazeCentre, true));
             // 箱は体の向きに合わせる
             ps.transform.rotation = Quaternion.LookRotation(Flat(body.forward), Vector3.up);
 
             var main = ps.main;
-            main.startLifetime = new ParticleSystem.MinMaxCurve(hazeLife * 0.8f, hazeLife * 1.2f);
-            main.startSize = new ParticleSystem.MinMaxCurve(hazeSize * 0.8f, hazeSize * 1.3f);
+            main.startLifetime = new ParticleSystem.MinMaxCurve(HazeLife * 0.8f, HazeLife * 1.2f);
+            main.startSize = new ParticleSystem.MinMaxCurve(HazeSize * 0.8f, HazeSize * 1.3f);
             main.startColor = new ParticleSystem.MinMaxGradient(
-                new Color(0.86f, 0.85f, 0.83f, hazeAlpha), new Color(0.80f, 0.79f, 0.77f, hazeAlpha * 0.7f));
+                new Color(0.86f, 0.85f, 0.83f, HazeAlpha), new Color(0.80f, 0.79f, 0.77f, HazeAlpha * 0.7f));
             main.maxParticles = 120;
 
             var emission = ps.emission;
-            emission.rateOverTime = hazeRate;
+            emission.rateOverTime = HazeRate;
 
             var shape = ps.shape;
             shape.enabled = true;
             shape.shapeType = ParticleSystemShapeType.Box;
-            shape.scale = hazeBox;
+            shape.scale = HazeBox;
 
             // ゆっくり流れる。横と上下へ少しずつ、粒ごとに違う向きへ
             var velocity = ps.velocityOverLifetime;
             velocity.enabled = true;
             velocity.space = ParticleSystemSimulationSpace.World;
-            velocity.x = new ParticleSystem.MinMaxCurve(-hazeDrift, hazeDrift);
-            velocity.y = new ParticleSystem.MinMaxCurve(-hazeDrift * 0.3f, hazeDrift * 0.6f);
-            velocity.z = new ParticleSystem.MinMaxCurve(-hazeDrift * 0.5f, hazeDrift * 0.5f);
+            velocity.x = new ParticleSystem.MinMaxCurve(-HazeDrift, HazeDrift);
+            velocity.y = new ParticleSystem.MinMaxCurve(-HazeDrift * 0.3f, HazeDrift * 0.6f);
+            velocity.z = new ParticleSystem.MinMaxCurve(-HazeDrift * 0.5f, HazeDrift * 0.5f);
 
             // 大きくゆっくりうねる
             var noise = ps.noise;
