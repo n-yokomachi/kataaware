@@ -7,12 +7,12 @@ namespace HalfAware
     /// 出どころは口元に置き、粒は世界の座標で動かす。首を振っても煙は置き去りになる。
     ///
     /// **場面 1 は吸い終えても煙を立て続ける**（<see cref="Linger"/>。オーナー、2026-09-29「タバコ吸った後だけど、しばらくは煙草の煙を出し続けるようにして」）。
-    /// 吸い終えたら口元の煙を止め、二つに替える（口元の燻る煙のままでは、机の上の薄い靄にしか見えなかった）。
-    /// - 一筋（<see cref="MakeWisp"/>）: 肘掛けに置いた右手の指先（煙草）の一点から細く昇り、昇るほど揺れて太り、薄れて消える
-    /// - 漂う煙（<see cref="MakeHaze"/>）: 正面のモニターの前に大きく薄い粒をゆっくり漂わせ、画面の文字と映り込みの顔に**ある程度**かぶせる
-    ///   （オーナー「モニターの文字や映り込みの顔をある程度隠すために煙をかぶせてほしい」。顔の輪郭・ほくろ・目がところどころ紛れる程度で、
-    ///   全部は隠さない。粒が流れて、隠れる所が少しずつ変わる）。字幕の窓と真ん中の枠は UI なので煙の外
-    /// どちらも吸い終えた後に立ち続ける間だけで、吸っている間（場面 1・5・8）の口元の煙は変えない。
+    /// 吸い終えたら口元の煙を止め、肘掛けに置いた右手の指先（煙草）の一点から昇る一筋に替える（<see cref="MakeWisp"/>）。
+    /// 口元の燻る煙のままでは、机の上の薄い靄にしか見えなかった。一筋は空気の流れに乗って机の方（前）へ流れ、昇りながら広がって薄れ、
+    /// その途中で正面のモニターの前を横切る（オーナー「ここまであからさまにしなくていい。煙の量は変えず、でも流れによってモニターにかぶるように」）。
+    /// 流れはゆっくり揺らいで向きと強さが少しずつ変わる（<see cref="Draft"/>）ので、映り込みの顔や画面の文字にかかるのは時々・部分的に。
+    /// わざと顔の前に留めはしない。前に試した、モニターの前に別に漂わせる煙はやめた。
+    /// 一筋は吸い終えた後に立ち続ける間だけで、吸っている間（場面 1・5・8）の口元の煙は変えない。
     /// モニターを済ませたら、出す数と粒の大きさを <see cref="Fade"/> の秒で細くして止める（ふっと消さない。出ていた粒は寿命まで流れて、顔と文字がはっきり見えてくる）
     /// </summary>
     public sealed class SmokePuffs : MonoBehaviour
@@ -28,36 +28,29 @@ namespace HalfAware
         const float WispRate = 26f;
         /// <summary>昇る速さ。m/秒（粒ごとにこの 0.85〜1.15 倍）</summary>
         const float WispRise = 0.15f;
-        /// <summary>粒の寿命。秒。昇る速さとの積がおおよその高さ</summary>
-        const float WispLife = 5f;
-        /// <summary>昇りながら体の内側（x）と前（y）へ流れる速さ。m/秒。指先は目の右下のすぐ近くで、まっすぐ昇ると視界の右の縁にしか入らない。正面の視界へ寄せる</summary>
-        static readonly Vector2 WispDrift = new Vector2(0.05f, 0.06f);
+        /// <summary>粒の寿命。秒。昇る速さとの積がおおよその高さ、流れる速さとの積がおおよその流れる先</summary>
+        const float WispLife = 5.5f;
+        /// <summary>
+        /// 空気の流れ。体の内側（x）と前（y）へ流す速さ。m/秒。指先（机の手前の右）から、昇りながら机とモニターの方へ流れ、
+        /// 寿命の間に 0.7 m ほど前へ進んで、目の高さの辺りでモニターの前を横切る
+        /// </summary>
+        static readonly Vector2 WispDraft = new Vector2(0.04f, 0.13f);
+        /// <summary>流れの向きの揺らぎ。度（片側）。ゆっくり左右へ振れる</summary>
+        const float WispWander = 28f;
+        /// <summary>流れの強さの揺らぎ。1 に対する割合（片側）</summary>
+        const float WispGust = 0.3f;
+        /// <summary>流れが揺らぐ速さ。一巡りがおおよそこの逆数の秒</summary>
+        const float WispWanderRate = 0.05f;
         /// <summary>出る所の粒の大きさ。m。昇るほど WispSpread 倍まで太る</summary>
         const float WispSize = 0.026f;
-        /// <summary>昇りきった所の太り方。出る所の大きさに対する倍</summary>
-        const float WispSpread = 4f;
+        /// <summary>昇りきった所の太り方。出る所の大きさに対する倍。流れながら広がって薄れる</summary>
+        const float WispSpread = 6f;
         /// <summary>横の揺れの強さ。昇るほど強くなる</summary>
-        const float WispSway = 0.09f;
+        const float WispSway = 0.11f;
         /// <summary>粒の濃さ（不透明さ）。口元の燻る煙（0.17〜0.26）より明るく</summary>
         const float WispAlpha = 0.6f;
         /// <summary>指先の骨から、煙草の火の所までの高さ。m</summary>
         const float WispLift = 0.02f;
-
-        // ---- 吸い終えた後にモニターの前を漂う煙（場面 1）。同じく定数
-        /// <summary>漂う粒を出す数。毎秒</summary>
-        const float HazeRate = 12f;
-        /// <summary>漂う粒の寿命。秒（この 0.8〜1.2 倍）</summary>
-        const float HazeLife = 7f;
-        /// <summary>漂う粒の大きさ。m（この 0.8〜1.3 倍）。目から 0.5〜0.8 m 先なので、一粒で画面の一部を覆う</summary>
-        const float HazeSize = 0.32f;
-        /// <summary>漂う粒の濃さ（不透明さ）。重なった所だけ濃くなり、全部は隠さない</summary>
-        const float HazeAlpha = 0.55f;
-        /// <summary>漂わせる箱の真ん中。体（Player の根）から見て、右・上・前。m。座った目の少し下、モニターの手前</summary>
-        static readonly Vector3 HazeCentre = new Vector3(0f, 1.12f, 0.85f);
-        /// <summary>漂わせる箱の広さ。右・上・前。m。正面のモニターの幅を覆う</summary>
-        static readonly Vector3 HazeBox = new Vector3(1.0f, 0.45f, 0.3f);
-        /// <summary>漂う速さ（横と上下のゆっくりした流れ）。m/秒</summary>
-        const float HazeDrift = 0.03f;
 
         float until = -1f;
         /// <summary>時刻が来ても止めずに立て続けるか</summary>
@@ -70,12 +63,11 @@ namespace HalfAware
         float[] baseRate = new float[0];
         float[] baseSizeMin = new float[0];
         float[] baseSizeMax = new float[0];
-        /// <summary>吸い終えた後の一筋と漂う煙。初めて要る時に作る</summary>
+        /// <summary>吸い終えた後の一筋。初めて要る時に作る</summary>
         ParticleSystem wisp;
-        ParticleSystem haze;
         /// <summary>一筋を出す所（右手の指先の骨）。無ければ口元から出す</summary>
         Transform wispAnchor;
-        /// <summary>吸い終えた後の煙（一筋と漂う煙）を立てているか（口元の煙から替わった後）</summary>
+        /// <summary>吸い終えた後の一筋を立てているか（口元の煙から替わった後）</summary>
         bool afterOn;
 
         /// <summary>今このとき煙を出しているか。動作確認から読む</summary>
@@ -87,7 +79,7 @@ namespace HalfAware
         /// <summary>細くしている途中か。動作確認から読む</summary>
         public bool Fading { get { return fadeStart >= 0f; } }
 
-        /// <summary>吸い終えた後の一筋と漂う煙を立てているか。動作確認から読む</summary>
+        /// <summary>吸い終えた後の一筋を立てているか。動作確認から読む</summary>
         public bool Wisping { get { return afterOn; } }
 
         /// <summary>
@@ -152,7 +144,7 @@ namespace HalfAware
             lingering = false;
             fadeStart = Time.time;
             fadeSeconds = Mathf.Max(0f, seconds);
-            fading = afterOn ? new[] { wisp, haze } : new[] { puffs };
+            fading = afterOn ? new[] { wisp } : new[] { puffs };
             baseRate = new float[fading.Length];
             baseSizeMin = new float[fading.Length];
             baseSizeMax = new float[fading.Length];
@@ -165,21 +157,44 @@ namespace HalfAware
             }
         }
 
-        /// <summary>口元の煙を止めて、一筋と漂う煙を立てる。settled なら、もう漂っている形から始める</summary>
+        /// <summary>口元の煙を止めて、一筋を立てる。settled なら、もう流れている形から始める</summary>
         void StartAfter(bool settled)
         {
             if (afterOn) return;
             var w = MakeWisp(wispAnchor);
-            var h = MakeHaze();
             if (puffs != null) puffs.Stop(true, ParticleSystemStopBehavior.StopEmitting);
-            foreach (var ps in new[] { w, h })
-            {
-                if (ps == null) continue;
-                // 思い出した時は寿命ひと回りぶん進めて、漂っている形から。吸い終えた時は出る所から少しずつ
-                if (settled) ps.Simulate(ps.main.startLifetime.constantMax, true, true);
-                ps.Play();
-            }
+            Breeze(Time.time);
+            // 思い出した時は寿命ひと回りぶん進めて、流れている形から。吸い終えた時は出る所から少しずつ
+            if (settled) w.Simulate(w.main.startLifetime.constantMax, true, true);
+            w.Play();
             afterOn = true;
+        }
+
+        /// <summary>
+        /// 時刻 t の空気の流れ。x は流れの向きのずれ（度。体の内側と前の間の向きから、上から見て右回りに正）、y は強さの倍率。
+        /// ゆっくり揺らいで、少しずつ変わる（Perlin の雑音。同じ t なら同じ値）
+        /// </summary>
+        public static Vector2 Draft(float t)
+        {
+            // 雑音の面を斜めに切って読む（軸に沿って読むと、格子の点を決まった間隔で通って同じ値に戻る）
+            var k = t * WispWanderRate;
+            var turn = (Mathf.PerlinNoise(k, k * 0.61f + 0.37f) - 0.5f) * 2f * WispWander;
+            var gust = 1f + (Mathf.PerlinNoise(k * 0.73f + 5.1f, k + 11.3f) - 0.5f) * 2f * WispGust;
+            return new Vector2(turn, gust);
+        }
+
+        /// <summary>
+        /// 一筋を時刻 t の空気の流れに乗せる。流れは出ている粒のすべてに効く（空気が動けば、昇った煙もまとめて流れる）。
+        /// 遊ぶ間は毎こま、エディタで撮るときは撮る前に呼ぶ
+        /// </summary>
+        public void Breeze(float t)
+        {
+            if (wisp == null) return;
+            var d = Draft(t);
+            var along = Quaternion.AngleAxis(d.x, Vector3.up) * Body(new Vector3(-WispDraft.x, 0f, WispDraft.y), false) * d.y;
+            var velocity = wisp.velocityOverLifetime;
+            velocity.x = new ParticleSystem.MinMaxCurve(along.x - 0.006f, along.x + 0.006f);
+            velocity.z = new ParticleSystem.MinMaxCurve(along.z - 0.006f, along.z + 0.006f);
         }
 
         /// <summary>
@@ -211,14 +226,13 @@ namespace HalfAware
             shape.shapeType = ParticleSystemShapeType.Sphere;
             shape.radius = 0.002f;
 
-            // 昇る。粒ごとに速さを少し違えて、筋が途切れず伸びるように。体の内側と前へ少し流し、正面の視界へ寄せる
-            var drift = Body(new Vector3(-WispDrift.x, 0f, WispDrift.y), false);
+            // 昇る。粒ごとに速さを少し違えて、筋が途切れず伸びるように。横（空気の流れ）は Breeze が毎こま決める
             var velocity = ps.velocityOverLifetime;
             velocity.enabled = true;
             velocity.space = ParticleSystemSimulationSpace.World;
-            velocity.x = new ParticleSystem.MinMaxCurve(drift.x - 0.004f, drift.x + 0.004f);
+            velocity.x = new ParticleSystem.MinMaxCurve(-0.006f, 0.006f);
             velocity.y = new ParticleSystem.MinMaxCurve(WispRise * 0.85f, WispRise * 1.15f);
-            velocity.z = new ParticleSystem.MinMaxCurve(drift.z - 0.004f, drift.z + 0.004f);
+            velocity.z = new ParticleSystem.MinMaxCurve(-0.006f, 0.006f);
 
             // 横の揺れ。出る所では細くまっすぐ、昇るほど大きく揺れる
             var noise = ps.noise;
@@ -230,71 +244,15 @@ namespace HalfAware
             noise.octaveCount = 1;
             noise.quality = ParticleSystemNoiseQuality.Medium;
 
-            // 昇るほど太る
+            // 流れながら広がる
             var size = ps.sizeOverLifetime;
             size.enabled = true;
             size.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.EaseInOut(0f, 1f / Mathf.Max(1f, WispSpread), 1f, 1f));
 
-            // 出てすぐ濃くなり、昇るにつれ薄れて消える
-            AlphaOverLife(ps, 0.08f, 0.7f, 0.6f);
+            // 出てすぐ濃くなり、流れて広がるにつれ薄れて消える
+            AlphaOverLife(ps, 0.08f, 0.6f, 0.55f);
             wisp = ps;
-            return ps;
-        }
-
-        /// <summary>
-        /// 吸い終えた後にモニターの前を漂う煙を作る（まだ無ければ）。体（Player の根）の前の箱（HazeCentre・HazeBox）の中に、
-        /// 大きく薄い粒をゆっくり出し、低い周波数の揺れで流す。粒はゆっくり膨らみ、現れて消える。
-        /// エディタで撮るときにも呼ぶ（その時は呼んだ側が撮った後に消す）
-        /// </summary>
-        public ParticleSystem MakeHaze()
-        {
-            if (haze != null) return haze;
-            var body = transform.root;
-            var ps = NewSystem("SmokeHaze", body, body.position + Body(HazeCentre, true));
-            // 箱は体の向きに合わせる
-            ps.transform.rotation = Quaternion.LookRotation(Flat(body.forward), Vector3.up);
-
-            var main = ps.main;
-            main.startLifetime = new ParticleSystem.MinMaxCurve(HazeLife * 0.8f, HazeLife * 1.2f);
-            main.startSize = new ParticleSystem.MinMaxCurve(HazeSize * 0.8f, HazeSize * 1.3f);
-            main.startColor = new ParticleSystem.MinMaxGradient(
-                new Color(0.86f, 0.85f, 0.83f, HazeAlpha), new Color(0.80f, 0.79f, 0.77f, HazeAlpha * 0.7f));
-            main.maxParticles = 120;
-
-            var emission = ps.emission;
-            emission.rateOverTime = HazeRate;
-
-            var shape = ps.shape;
-            shape.enabled = true;
-            shape.shapeType = ParticleSystemShapeType.Box;
-            shape.scale = HazeBox;
-
-            // ゆっくり流れる。横と上下へ少しずつ、粒ごとに違う向きへ
-            var velocity = ps.velocityOverLifetime;
-            velocity.enabled = true;
-            velocity.space = ParticleSystemSimulationSpace.World;
-            velocity.x = new ParticleSystem.MinMaxCurve(-HazeDrift, HazeDrift);
-            velocity.y = new ParticleSystem.MinMaxCurve(-HazeDrift * 0.3f, HazeDrift * 0.6f);
-            velocity.z = new ParticleSystem.MinMaxCurve(-HazeDrift * 0.5f, HazeDrift * 0.5f);
-
-            // 大きくゆっくりうねる
-            var noise = ps.noise;
-            noise.enabled = true;
-            noise.strength = 0.05f;
-            noise.frequency = 0.25f;
-            noise.scrollSpeed = 0.12f;
-            noise.damping = true;
-            noise.octaveCount = 1;
-            noise.quality = ParticleSystemNoiseQuality.Medium;
-
-            // ゆっくり膨らむ
-            var size = ps.sizeOverLifetime;
-            size.enabled = true;
-            size.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0.75f, 1f, 1.2f));
-
-            // ゆっくり現れて、ゆっくり消える（ぱっと出たり消えたりしない）
-            AlphaOverLife(ps, 0.25f, 1f, 0.7f);
-            haze = ps;
+            Breeze(Time.time);
             return ps;
         }
 
@@ -401,7 +359,6 @@ namespace HalfAware
             Unfade();
             if (puffs != null) puffs.Stop(true, ParticleSystemStopBehavior.StopEmitting);
             if (wisp != null) wisp.Stop(true, ParticleSystemStopBehavior.StopEmitting);
-            if (haze != null) haze.Stop(true, ParticleSystemStopBehavior.StopEmitting);
             afterOn = false;
         }
 
@@ -442,8 +399,9 @@ namespace HalfAware
                 Cancel();
                 return;
             }
-            // 吸い終えたら、口元の煙から指先の一筋とモニターの前を漂う煙へ替える
+            // 吸い終えたら、口元の煙から指先の一筋へ替える。立てている間は空気の流れを揺らがせる
             if (lingering && until >= 0f && Time.time >= until && !afterOn) StartAfter(false);
+            if (afterOn) Breeze(Time.time);
             if (until < 0f || lingering || Time.time < until) return;
             Cancel();
         }
