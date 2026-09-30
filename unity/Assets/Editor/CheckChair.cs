@@ -270,11 +270,20 @@ namespace HalfAware.EditorTools
             pose.Apply();
         }
 
-        /// <summary>主人公の体とジャックのケーブルを写すか。立って外から撮る時は写さない（座った形のまま置いてあるので）</summary>
+        /// <summary>
+        /// 主人公の体とジャックのケーブルを写すか。立って外から撮る時は写さない（座った形のまま置いてあるので）。
+        /// 写す時も、服（ジャケット）は場面に保存してある着ているかどうかのままにする（点けると、場面 1 のモニターの映り込みにまだ着ていないジャケットが写る）
+        /// </summary>
         static void Body(bool on)
         {
             var pro = GameObject.Find("Player/Protagonist");
-            if (pro != null) foreach (var r in pro.GetComponentsInChildren<Renderer>(true)) r.enabled = on;
+            if (pro != null)
+            {
+                var garment = pro.GetComponentInChildren<Garment>(true);
+                var cloth = new HashSet<Renderer>();
+                if (garment != null) foreach (var r in garment.Renderers) if (r != null) cloth.Add(r);
+                foreach (var r in pro.GetComponentsInChildren<Renderer>(true)) r.enabled = on && (!cloth.Contains(r) || garment.Worn);
+            }
             var cable = GameObject.Find("Room/Chair/Cable");
             if (cable != null) foreach (var r in cable.GetComponentsInChildren<Renderer>(true)) r.enabled = on;
         }

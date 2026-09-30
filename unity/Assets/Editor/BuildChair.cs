@@ -14,9 +14,9 @@ namespace HalfAware.EditorTools
     /// 上等な黒革の重役の椅子に、仕事の道具として後から電子機器を金具で留め、ケーブルを這わせた形。
     ///
     /// <list type="table">
-    /// <item><term>形</term><description>椅子: 厚く柔らかい革の座面、黒い漆の殻に収めた高い背もたれ（ダイヤ形のボタン留め）と頭の当て物、
-    /// 黒い漆の台に載せた丸みのある革の肘掛けと、それを支える磨いた金属の腕、磨いた金属の五本脚とガスシリンダー、リクライニングの機構とレバー、
-    /// 座の前の下から引き出す革のフットレスト。後から付けた物: 頭の後ろの黒い金属の箱（背もたれの上の縁に掛けた留め具で留める）と耳の筐体、
+    /// <item><term>形</term><description>椅子: 縁に縫い目を回した厚く柔らかい革の座面、前も裏も革で包んだ厚く幅の広い背もたれ
+    /// （脇の太い巻きと上の頭の当ての巻きを縫い目で区切り、内は大きな菱形のボタン留め）、黒い漆の台に載せた厚く丸い革の肘掛けと、
+    /// それを支える磨いた金属の腕、磨いた金属の五本脚とガスシリンダー、リクライニングの機構とレバー、座の前の下から引き出す革のフットレスト。後から付けた物: 頭の後ろの黒い金属の箱（背もたれの上の縁に掛けた留め具で留める）と耳の筐体、
     /// 左右の肘掛けの前の操作盤（当て物の下から回り込む留め具で留める）、右の肘掛けの差込口（螺子で留めた金属の板）、
     /// 背もたれの裏と金属の腕に沿って這わせたケーブル（<c>BuildChairShape.cs</c>）</description></item>
     /// <item><term>体との取り合い</term><description>座った体の形（SeatedPose）を組み直さずに済むよう、座面の高さの線・肘掛けの上面・差込口・
@@ -263,7 +263,7 @@ namespace HalfAware.EditorTools
             upholstery.SetTexture("_MainTex", upholstery.GetTexture("_BaseMap"));
             upholstery.SetColor("_BaseColor", Color.white);
             upholstery.SetFloat("_Metallic", 0f);
-            upholstery.SetFloat("_Smoothness", 0.55f);
+            upholstery.SetFloat("_Smoothness", UpholsteryGloss);
             upholstery.DisableKeyword("_EMISSION");
             EditorUtility.SetDirty(upholstery);
 
@@ -302,8 +302,12 @@ namespace HalfAware.EditorTools
 
         // ---- 絵 --------------------------------------------------------------------
 
-        /// <summary>張り地の色。部屋の黒い家具（ソファの黒い革 0.06〜0.075 ほど）に揃えた黒革。艶（Smoothness）で面の丸みと窪みを読ませる</summary>
-        static readonly Color Leather = new Color(0.090f, 0.083f, 0.092f);
+        /// <summary>
+        /// 張り地の色と艶。部屋の黒い家具（ソファの黒い革 0.075・艶 0.42）に揃えた黒革。艶を強くすると、ゲームの明かりで座面の平らな面が
+        /// 白く返って明るい灰色の板に見えるので、艶は控えめにし、照り返しは縁の丸みとボタン留めの膨らみに細く乗る程度にする
+        /// </summary>
+        static readonly Color Leather = new Color(0.066f, 0.061f, 0.066f);
+        const float UpholsteryGloss = 0.30f;
 
         /// <summary>乱れの代わりの決まった値（0〜1）。押すたびに同じ絵にする</summary>
         static float Hash(int x, int y)
