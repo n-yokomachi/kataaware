@@ -561,7 +561,7 @@ namespace HalfAware.EditorTools
         /// normal を渡した面（背もたれの前）は、法線をそれで決める
         /// </summary>
         static void PaintLeather(Canvas cv, RectInt r, float x0, float x1, float y0, float y1, System.Func<float, float, float> depth, System.Func<float, float, float> shade,
-            System.Func<float, float, float, float, Vector3> normal = null, System.Func<float, float, float> matte = null)
+            System.Func<float, float, float, float, Vector3> normal = null, System.Func<float, float, float> gloss = null)
         {
             var dx = (x1 - x0) / r.width;
             var dy = (y1 - y0) / r.height;
@@ -574,7 +574,7 @@ namespace HalfAware.EditorTools
                     var dark = Mathf.Clamp01(d / 0.012f);
                     var c = Leather * (Grain(r.x + i, r.y + j) * (1f - 0.5f * dark) * shade(x, y));
                     c.a = 1f;
-                    cv.Shine = Mathf.Lerp(LeatherGloss, 0.12f, Mathf.Max(dark, matte != null ? matte(x, y) : 0f));
+                    cv.Shine = gloss != null ? gloss(x, y) : Mathf.Lerp(LeatherGloss, 0.18f, dark);
                     cv.Put(r.x + i, r.y + j, c);
                     if (normal != null)
                     {
@@ -602,12 +602,24 @@ namespace HalfAware.EditorTools
                 (x, s) =>
                 {
                     var inside = Mathf.Abs(x) > BackW(s) ? 0f : TuftInside(x, s);
-                    // 折り目の際の急な斜面は窪みの陰で暗くする（明かりを受けた側が一画素の明るい筋にならないように）
-                    return 1f + inside * (0.18f * TuftDome(x, s) - 0.10f - 0.5f * TuftCrease(x, s));
+                    // 菱形の一つ一つを塊として読ませる、向きの無い陰: 膨らみの頂を明るく、折り目とボタンの周りを暗く
+                    var near = TuftNearest(x, s);
+                    var ring = Mathf.Exp(-Mathf.Pow((new Vector2(x, s) - near).magnitude / 0.024f, 2f));
+                    return Mathf.Max(0.2f, 1f + inside * (0.45f * TuftDome(x, s) - 0.2f - 0.5f * TuftCrease(x, s) - 0.5f * ring));
                 },
                 (x, s, ex, es) => Mathf.Abs(x) > BackW(s) - 0.002f ? Vector3.forward : BackFrontNormal(x, s, 1.5f * ex, 1.5f * es),
-                // 折り目の際（急な斜面）は艶を落とす（照り返しが一画素の明るい筋にならないように）
-                (x, s) => Mathf.Abs(x) > BackW(s) ? 0f : TuftInside(x, s) * TuftCrease(x, s));
+                // 艶。部屋の明かりでは椅子の明るさの多くが照り返しなので、地の色の陰だけでは折り目が暗くならない。
+                // 折り目とボタンの周りは艶を消して照り返しを落とし（菱形の輪郭）、膨らみの頂は艶を少し足す（菱形ごとの照り）
+                (x, s) =>
+                {
+                    if (Mathf.Abs(x) > BackW(s)) return LeatherGloss;
+                    var inside = TuftInside(x, s);
+                    var near = TuftNearest(x, s);
+                    var ring = Mathf.Exp(-Mathf.Pow((new Vector2(x, s) - near).magnitude / 0.024f, 2f));
+                    var dip = Mathf.Clamp01(BackFine(x, s) / 0.012f);
+                    var hollow = Mathf.Max(dip, inside * Mathf.Max(TuftCrease(x, s), ring));
+                    return Mathf.Lerp(LeatherGloss + 0.15f * inside * TuftDome(x, s), 0.02f, hollow);
+                });
             // 背もたれの裏（無地）
             PaintLeather(cv, BackRearArea, -BackHalfW, BackHalfW, 0f, BackLength, none, plain);
             // 肘掛けの上の面（上から写す）。上の面と脇の面の境の縫い目

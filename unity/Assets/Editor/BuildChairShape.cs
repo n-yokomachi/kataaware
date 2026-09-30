@@ -402,10 +402,11 @@ namespace HalfAware.EditorTools
         /// <summary>
         /// ボタン留めの膨らみ（0〜1）。ボタンを結ぶ斜めの線（菱形の辺）で 0、菱形の真ん中で 1。ボタンは (i·TuftDx, TuftS0 + j·TuftDs)、i + j が偶数の所
         /// </summary>
-        static float TuftDome(float x, float s) { return TuftDome(x, s, 0.8f); }
-
-        /// <summary>ボタン留めの膨らみ。power が小さいほど頂が平らで折り目の際が急（法線の絵は 0.8 で枕の形に、mesh は 1.3 で折り目の際をなだらかに）</summary>
-        static float TuftDome(float x, float s, float power)
+        /// <summary>
+        /// ボタン留めの膨らみ（0〜1）。菱形ごとの丸い枕の形: 真ん中が高く、四つの辺（折り目）で 0、四つの角（ボタン）で 0。
+        /// 菱形の中の位置 (fm, fn) の放物線の積を 0.7 乗して、頂をなだらかに、折り目の際を少し急にする
+        /// </summary>
+        static float TuftDome(float x, float s)
         {
             var a = x / TuftDx;
             var b = (s - TuftS0) / TuftDs;
@@ -413,7 +414,7 @@ namespace HalfAware.EditorTools
             var n = 0.5f * (b - a);
             var fm = m - Mathf.Floor(m);
             var fn = n - Mathf.Floor(n);
-            return Mathf.Pow(Mathf.Max(0f, Mathf.Sin(Mathf.PI * fm) * Mathf.Sin(Mathf.PI * fn)), power);
+            return Mathf.Pow(Mathf.Max(0f, 16f * fm * (1f - fm) * fn * (1f - fn)), 0.7f);
         }
 
         /// <summary>いちばん近いボタンの位置 (x, s)</summary>
@@ -452,10 +453,10 @@ namespace HalfAware.EditorTools
             var rise = Mathf.Lerp(topRise, sideRise, Smooth(TopBand - 0.012f, TopBand + 0.012f, top));
             // ボタン留めの膨らみ
             var inside = detail == BackDetail.Base ? 0f : TuftInside(x, s);
-            // mesh の膨らみは低め（6 割）。絵は上から真っすぐに写すので、mesh の膨らみを高くすると、折り目の際の急な斜面に一画素が引き伸ばされて明るい筋になる。
-            // 膨らみの丸い陰影は法線の絵（本当の高さ）が持つ
-            var puff = detail == BackDetail.Full ? TuftPuff : TuftPuff * 0.6f;
-            var tuft = inside > 0f ? inside * puff * TuftDome(x, s, detail == BackDetail.Full ? 0.8f : 1.3f) : 0f;
+            // mesh の膨らみは本当の高さの 9 割（輪郭と、斜めから見た時の起伏）。膨らみの丸い陰影は法線の絵が持ち、絵の傾きは 8 割の高さで作る
+            // （本当の高さのままだと斜面の大半が急な一つの向きになって、菱形が明るい半分と暗い半分に割れて見えた）
+            var puff = detail == BackDetail.Full ? TuftPuff * 0.8f : TuftPuff * 0.9f;
+            var tuft = inside > 0f ? inside * puff * TuftDome(x, s) : 0f;
             var fineDepth = detail == BackDetail.Full ? BackFine(x, s) : 0f;
             return BackMid + RollR(s, BackRound) * (h + rise + tuft - fineDepth);
         }
@@ -493,10 +494,10 @@ namespace HalfAware.EditorTools
             var real = Vector3.Cross(us, ux).normalized;
             if (Vector3.Dot(real, n) < 0f) real = -real;
             var ts = new Vector3(Vector3.Dot(real, t), Vector3.Dot(real, b), Vector3.Dot(real, n));
-            // 傾きは 40 度までに抑える。部屋の明かりでは椅子の明るさの多くが照り返し（斜めから見るほど強い）なので、
-            // 折り目の際の急な画素が一画素の明るい筋になる
+            // 傾きは 60 度までに抑える。部屋の明かりでは椅子の明るさの多くが照り返し（斜めから見るほど強い）なので、
+            // 折り目の際の急な画素が一画素の明るい筋になる（40 度まで抑えると、膨らみの斜面が平らな面になって、角錐を並べた筋に見えた）
             var tilt = new Vector2(ts.x, ts.y);
-            var limit = Mathf.Tan(40f * Mathf.Deg2Rad) * ts.z;
+            var limit = Mathf.Tan(60f * Mathf.Deg2Rad) * ts.z;
             if (tilt.magnitude > limit) tilt = tilt.normalized * limit;
             return new Vector3(tilt.x, tilt.y, ts.z).normalized;
         }
