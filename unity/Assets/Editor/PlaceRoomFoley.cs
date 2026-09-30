@@ -10,7 +10,7 @@ namespace HalfAware.EditorTools
     /// 場面 1 の物音を <c>Room.unity</c> に当てる（オーナー、2026-09-29）。
     /// - 椅子から立ち上がる音（<c>ChairRise.wav</c>、「椅子から立ち上がる際の音を追加」）: <see cref="SceneFlow"/> の rise と、
     ///   鳴らす音源 foley（<see cref="RoomIntroDirector"/> の口元の音源 Voice。煙草の息と同じ 2D の音源）。
-    ///   立ち上がり始めた時（ジャケットの後。場面 7 はジャックの後）と、端末の席から戻り始めた時（<see cref="TerminalSeat"/>）に鳴る
+    ///   立ち上がり始めた時（ジャケットの後。場面 7 はジャックの後）に鳴る（モニターは座ったまま調べるので、そこでは立たない）
     /// - メモの紙の音（<c>PaperTurn.wav</c>、「メモにインタラクトしたときの紙の音を追加」）: クリップボード（<see cref="RoomIds.Clipboard"/>）の
     ///   <see cref="Interactable"/> の sound。場面 3 の同じメモ（note）は <see cref="BuildConnect"/> が同じ音を付ける
     /// - ラグの足音（<c>Rug1〜6.wav</c>、「自室のラグの上を歩く時の音を変更」）: <c>Room/Rug</c> に当たり（BoxCollider）と

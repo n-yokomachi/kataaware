@@ -3,15 +3,18 @@ using UnityEngine;
 namespace HalfAware
 {
     /// <summary>
-    /// 場面 1 の端末を調べたら、その時（<see cref="SceneFlow.Examining"/>）に、椅子に座った目の高さの正面（モニターの方）へ
-    /// 視点を移し始め、体も椅子に座らせる。座ったまま、独白とモニターの映り込み（<see cref="TerminalReflection"/>）、
-    /// 「スリープを解除する」の二択と、「はい」の後の解除の文までを読ませ、どれも終わって映り込みが消えてから、
-    /// 体を立たせて元の所と向きへ戻す。「いいえ」なら二択を閉じたところで戻る（流れは <see cref="SeatVisit"/>）。
-    /// 戻り始めたところで椅子から立ち上がる音を鳴らす（<see cref="SceneFlow.PlayRise"/>）。
+    /// 場面 1 の端末（モニター）を、煙草を吸い終えた後に座ったまま調べる。調べたその時（<see cref="SceneFlow.Examining"/>）に、
+    /// 座った正面（モニターの方、seatYaw・seatPitch）へ視線を向き直し始め、独白とモニターの映り込み（<see cref="TerminalReflection"/>）、
+    /// 「スリープを解除する」の二択と、「はい」の後の解除の文までを読ませる。どれも終わって映り込みが消えたら、見回しを返す。
+    /// 座ったままなので、立たず、立ち上がる音も鳴らさない。「いいえ」なら二択を閉じたところで見回しを返す（流れは <see cref="SeatVisit"/>。戻す段は 0 秒）。
     ///
-    /// 移す・読む・戻す間は、見回しと歩きを止める。移す・戻す間は調べる操作と字幕送りも止める
-    /// （着く前に 2 ページ目へ送られて、映り込みが動いている途中で出ないように）。二択を出している間は止めない。
-    /// 立って調べたときだけ移す。座ったまま（場面の頭）調べたときは何もしない。
+    /// 2026-09-29 まではジャケットを着て立った後に調べ、立った所から椅子へ座らせて、読み終えたら立たせて戻していた。
+    /// モニターをジャケットの前に移し（<see cref="RoomIds.After"/>。オーナー「モニター調べるためにもう一度座り直すっていうのをなくす」）、
+    /// 立った所から座らせる動きは無くした。座った正面の値（seatSpot・seatEyeHeight・chairSeated）は確かめの撮影が使う。
+    ///
+    /// 向き直す・読む間は、見回しと歩きを止める。向き直す間は調べる操作と字幕送りも止める
+    /// （向き直す前に 2 ページ目へ送られて、映り込みが動いている途中で出ないように）。二択を出している間は止めない。
+    /// 読んでいる間だけ、両手を腿に置いて肩を落とした形（<see cref="SeatedPose"/> の二つ目の形）にする。
     ///
     /// **「はい」でスリープを解除したら、机のモニター 5 枚を起動する**（<see cref="TerminalScreen"/>、オーナー、2026-09-28
     /// 「モニターのスリープを解除したときに、別の場面の時と同じようにコンソール的なものを表示して」）。場面 3 でジャックを繋いだ時と同じ、
@@ -22,7 +25,7 @@ namespace HalfAware
     public sealed class TerminalSeat : MonoBehaviour, ISceneMemory
     {
         [SerializeField] SceneFlow flow;
-        [Tooltip("座った形。移す間だけ掛ける")]
+        [Tooltip("座った形。読んでいる間だけ二つ目の形（両手を腿に置いて肩を落とす）にする")]
         [SerializeField] SeatedPose pose;
         [Tooltip("モニターの映り込み。消えきってから戻す")]
         [SerializeField] TerminalReflection reflection;
@@ -32,45 +35,40 @@ namespace HalfAware
         [SerializeField] TerminalScreen screen;
 
         [Header("座った正面")]
-        [Tooltip("腰を下ろす場所。Player の足元の位置")]
+        [Tooltip("腰を下ろす場所。Player の足元の位置。座って始める所と同じ（確かめの撮影が使う）")]
         [SerializeField] Vector3 seatSpot;
         [Tooltip("座ったときの体の向き。度")]
         [SerializeField] float seatYaw;
         [Tooltip("座ったときの見下ろし。度（負で見上げる）")]
         [SerializeField] float seatPitch;
-        [Tooltip("座ったときの目線の高さ")]
+        [Tooltip("座ったときの目線の高さ（確かめの撮影が使う）")]
         [SerializeField] float seatEyeHeight = 1.1f;
 
-        [Header("椅子")]
-        [Tooltip("椅子。座る間は机へ寄せ、戻るときに元へ下げる")]
+        [Header("椅子（確かめの撮影が使う。遊ぶ間は動かさない）")]
+        [Tooltip("椅子")]
         [SerializeField] Transform chair;
         [Tooltip("座っているときの椅子の位置")]
         [SerializeField] Vector3 chairSeated;
-        [Tooltip("歩き回る間だけ点ける椅子のコライダー。座る間は切る")]
+        [Tooltip("歩き回る間だけ点ける椅子のコライダー")]
         [SerializeField] GameObject chairBlocker;
 
         [Header("秒数（仮置き）")]
-        [Tooltip("座った正面へ移すのにかける秒数")]
+        [Tooltip("座った正面へ向き直すのにかける秒数")]
         [SerializeField] float goSeconds = 1.8f;
-        [Tooltip("元の所へ戻すのにかける秒数")]
-        [SerializeField] float backSeconds = 1.6f;
 
         SeatVisit visit;
         /// <summary>「はい」を選んで、映り込みが消えきるのを待っている</summary>
         bool waking;
-        Vector3 fromSpot;
         float fromYaw;
         float fromPitch;
-        float fromEye;
-        Vector3 fromChair;
-        bool blockerWasOn;
 
-        /// <summary>移す・読む・戻すの流れ（動作確認から読む）</summary>
+        /// <summary>向き直す・読むの流れ（動作確認から読む）</summary>
         public SeatVisit Visit => visit;
 
         void Awake()
         {
-            visit = new SeatVisit(goSeconds, backSeconds);
+            // 座ったままなので戻す段は無い（0 秒）。読み終えたらその向きのまま見回しを返す
+            visit = new SeatVisit(goSeconds, 0f);
         }
 
         void OnEnable()
@@ -98,21 +96,10 @@ namespace HalfAware
         {
             if (item == null || item.Id != terminalId || visit == null || visit.Busy) return;
             var player = flow.Player;
-            // 立って歩ける時だけ。座ったまま調べたときは、もう正面にいる
-            if (player == null || !player.CanMove) return;
-            fromSpot = player.transform.position;
+            // 座ったまま調べる（前提は煙草で、立てるのはジャケットの後）。立って歩ける時は何もしない
+            if (player == null || player.CanMove) return;
             fromYaw = player.Yaw;
             fromPitch = player.Pitch;
-            fromEye = player.EyeHeight;
-            if (chair != null) fromChair = chair.position;
-            blockerWasOn = chairBlocker != null && chairBlocker.activeSelf;
-            if (chairBlocker != null) chairBlocker.SetActive(false);
-            if (pose != null)
-            {
-                pose.Seated = true;
-                // 端末の前では両手を腿に置いて肩を落とした形（二つ目の形）
-                pose.UseAlternate = true;
-            }
             visit.Start();
             Place();
         }
@@ -123,10 +110,11 @@ namespace HalfAware
             if (visit == null || !visit.Busy || flow == null || flow.Player == null) return;
             var was = visit.Now;
             visit.Tick(Time.deltaTime, flow.Talking, flow.Choosing, reflection != null && reflection.Level > 0f);
-            // 席から戻り始めたところで、椅子から立ち上がる音（オーナー、2026-09-29「椅子から立ち上がる際の音を追加」）
-            if (was == SeatVisit.Phase.Reading && visit.Now == SeatVisit.Phase.Leaving) flow.PlayRise();
+            // 向き直し終えて読み始めたら、両手を腿に置いた形。正面を向いているので、腕の入れ替わりは目に入らない
+            if (was == SeatVisit.Phase.Going && visit.Now == SeatVisit.Phase.Reading && pose != null) pose.UseAlternate = true;
             if (visit.Frozen(flow.Talking, flow.Choosing)) flow.Freeze(ConnectDirector.FreezeMargin);
-            Place();
+            // 戻す段は置き直さない（その向きのまま）
+            if (visit.Now == SeatVisit.Phase.Going || visit.Now == SeatVisit.Phase.Reading) Place();
             if (!visit.Busy) Finish();
         }
 
@@ -141,18 +129,15 @@ namespace HalfAware
             flow.Player.CanMove = false;
         }
 
-        /// <summary>寄った度合いのとおりに、目と体と椅子を置く</summary>
+        /// <summary>向き直した度合いのとおりに、視線を置く。座ったままなので、体と目の高さと椅子は動かさない</summary>
         void Place()
         {
             var player = flow.Player;
             var k = visit.Seat;
             player.CanMove = false;
             player.CanLook = false;
-            player.transform.position = Vector3.Lerp(fromSpot, seatSpot, k);
-            player.EyeHeight = Mathf.Lerp(fromEye, seatEyeHeight, k);
             player.Yaw = Mathf.LerpAngle(fromYaw, seatYaw, k);
             player.Pitch = Mathf.Lerp(fromPitch, seatPitch, k);
-            if (chair != null) chair.position = Vector3.Lerp(fromChair, chairSeated, k);
         }
 
         /// <summary>
@@ -172,7 +157,7 @@ namespace HalfAware
 
         public string MemoryKey { get { return "room.terminal"; } }
 
-        /// <summary>座った正面へ移す・読む・戻すの途中と、起動を待っている間は残さない</summary>
+        /// <summary>向き直す・読むの途中と、起動を待っている間は残さない</summary>
         public bool Settled { get { return (visit == null || !visit.Busy) && !waking; } }
 
         /// <summary>画面が点いたかは調べ済みの印（terminal）から決まるので、自分では残さない</summary>
@@ -188,23 +173,11 @@ namespace HalfAware
             screen.Scroll(true);
         }
 
-        /// <summary>戻りきったら、立った形に戻して歩きと見回しを返す</summary>
+        /// <summary>読み終えたら、座った形を戻して見回しを返す。座ったままなので歩きは返さない（立つのはジャケットの後。SceneFlow）</summary>
         void Finish()
         {
-            var player = flow.Player;
-            player.transform.position = fromSpot;
-            player.EyeHeight = fromEye;
-            player.Yaw = fromYaw;
-            player.Pitch = fromPitch;
-            if (chair != null) chair.position = fromChair;
-            if (pose != null)
-            {
-                pose.Seated = false;
-                pose.UseAlternate = false;
-            }
-            if (chairBlocker != null) chairBlocker.SetActive(blockerWasOn);
-            player.CanMove = true;
-            player.CanLook = true;
+            if (pose != null) pose.UseAlternate = false;
+            flow.Player.CanLook = true;
         }
     }
 }

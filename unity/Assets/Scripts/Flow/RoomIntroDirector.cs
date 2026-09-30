@@ -21,6 +21,12 @@ namespace HalfAware
     /// ジッポの音と火が移った音が鳴りきり、1 ページも送ってから、座り始めの向きへゆっくり向き直して、二服吸う。二服目を吐いたところで一度だけ画面を黒く覆い、
     /// 場所と時刻のカードを出して、薄れさせて明ける。吸い終わるまで見回しも移動も受け付けない。
     ///
+    /// **吸い終えた後も煙が立ち続ける**（オーナー、2026-09-29「タバコ吸った後だけど、しばらくは煙草の煙を出し続けるようにして。
+    /// その状態で、モニターへのインタラクトを必須にし、モニターへのインタラクトが終わったら煙草の煙を止め、ジャケットへのインタラクトを有効化」）。
+    /// 吸う音・吐く音は無く、細く燻る煙だけが続く。座ったままモニター（terminalId）を調べ、「はい」で済ませて文を読み終えたら、
+    /// 煙を snuffSeconds 秒で細くして止める（<see cref="Cigarette.Snuff"/>）。「いいえ」なら済んでいないので煙は続く。
+    /// ジャケットの前提はモニター（<see cref="RoomIds.After"/>）。
+    ///
     /// **ジャケット**: 吸い終わったら、座ったまま椅子の右の卓に置いたジャケットを着る。着る音を鳴らし、正面へ向き直してから、
     /// 音の終わりの少し前に体へ着せて卓のジャケットを消す（着る動きは作らない）。着た後の独白で締め、読み終えたら立ち上がる（SceneFlow の standAfter）。
     /// SceneFlow とは Examined / Say / Freeze / OpeningHeld / Talking だけで繋ぐ。
@@ -29,7 +35,7 @@ namespace HalfAware
     /// ここの既定の値は空にしてあり、文面を二か所で持たない。
     ///
     /// **思い出した時**（<see cref="ISceneMemory"/>）は、黒と瞬きと最初の独白を出さず、ジャックがまだなら呼吸を下げた大きさで鳴らしておく（残すのはいつも起き上がりの後）。
-    /// ジャケットを着た後なら着た形に置く。煙草は場に残る物が無いので、調べ済みの印だけでよい
+    /// ジャケットを着た後なら着た形に置く。煙草を吸い終えてモニターがまだなら、煙が立ち続けている形で始める
     /// </summary>
     public sealed class RoomIntroDirector : MonoBehaviour, ISceneMemory
     {
@@ -91,6 +97,12 @@ namespace HalfAware
         [Tooltip("二服目を吐いたところで出す、場所と時刻のカード。原稿の「暗転のカード」。空なら文字を出さずに黒くなるだけ")]
         [SerializeField, TextArea] string card = "";
 
+        [Header("吸い終えた後の煙")]
+        [Tooltip("この id を済ませて文を読み終えたら、立ち続けていた煙を止める")]
+        [SerializeField] string terminalId = RoomIds.Terminal;
+        [Tooltip("立ち続けていた煙を細くして止めるのにかける秒。出ていた粒はその後も寿命まで流れる")]
+        [SerializeField] float snuffSeconds = 4f;
+
         [Header("ジャケット")]
         [Tooltip("この id を調べたらジャケットを着る")]
         [SerializeField] string jacketId = RoomIds.Jacket;
@@ -113,6 +125,8 @@ namespace HalfAware
 
         bool opening;
         bool smoking;
+        /// <summary>吸い終えた後の煙が立ち続けているか（モニターを済ませるまで）</summary>
+        bool smoldering;
         /// <summary>箱の音の長さ。Web では鳴らした直後に長さが 0 になるので、鳴らす前に読んで持っておく（SoundLoad.Seconds）</summary>
         float packPullSeconds;
         bool dressing;
@@ -145,6 +159,18 @@ namespace HalfAware
 
         /// <summary>呼吸を鳴らしているか（薄れている途中も含む）。動作確認から読む</summary>
         public bool Breathing { get { return breathing; } }
+
+        /// <summary>吸い終えた後の煙が立ち続けているか。動作確認から読む</summary>
+        public bool Smoldering { get { return smoldering; } }
+
+        /// <summary>
+        /// 立ち続けていた煙を止める時か。吸い終えていて（smoking でない）、モニターが済み、その文も二択も読み終えた時。
+        /// 「いいえ」で二択を閉じた時は済んでいないので止めない
+        /// </summary>
+        public static bool SnuffNow(bool smoldering, bool smoking, bool terminalDone, bool talking, bool choosing)
+        {
+            return smoldering && !smoking && terminalDone && !talking && !choosing;
+        }
 
         /// <summary>
         /// 明けを預かる。Start より前に立てておかないと、SceneFlow の Start が黒から明けを始めてしまう。
@@ -181,6 +207,7 @@ namespace HalfAware
             StopAllCoroutines();
             opening = false;
             smoking = false;
+            smoldering = false;
             dressing = false;
             StopBreath();
             if (hud == null) return;
@@ -299,8 +326,23 @@ namespace HalfAware
             fading = false;
         }
 
-        /// <summary>ジャックが抜けたら、呼吸を短く薄れさせて止める</summary>
         void Update()
+        {
+            Snuff();
+            Fade();
+        }
+
+        /// <summary>モニターを済ませて読み終えたら、立ち続けていた煙を細くして止める</summary>
+        void Snuff()
+        {
+            var done = flow != null && flow.Progress != null && flow.Progress.Done.Contains(terminalId);
+            if (!SnuffNow(smoldering, smoking, done, flow != null && flow.Talking, flow != null && flow.Choosing)) return;
+            smoldering = false;
+            if (cigarette != null) cigarette.Snuff(snuffSeconds);
+        }
+
+        /// <summary>ジャックが抜けたら、呼吸を短く薄れさせて止める</summary>
+        void Fade()
         {
             if (!breathing || breath == null) return;
             if (!fading && Unplugged)
@@ -339,7 +381,14 @@ namespace HalfAware
             flow.OpeningHeld = false;
             // 座って始めた向きは、残した向きへ置き直す前に拾う（着る時に正面へ戻す先）
             if (flow.Player != null) seatedYaw = flow.Player.Yaw;
-            if (flow.Progress != null && flow.Progress.Done.Contains(jacketId)) Dress();
+            if (flow.Progress == null) return;
+            if (flow.Progress.Done.Contains(jacketId)) Dress();
+            // 吸い終えてモニターがまだなら、煙が立ち続けている形で始める
+            if (flow.Progress.Done.Contains(cigaretteId) && !flow.Progress.Done.Contains(terminalId) && cigarette != null)
+            {
+                cigarette.Smolder();
+                smoldering = true;
+            }
         }
 
         void OnExamined(IInteractable item)
@@ -385,8 +434,13 @@ namespace HalfAware
                     yield return null;
                 }
                 if (flow.Completed) yield break;
-                // 向き直す手前で時刻表を止めておき、1 ページを送ってから進める
-                if (cigarette != null) cigarette.Light(Drags, Turn, true);
+                // 向き直す手前で時刻表を止めておき、1 ページを送ってから進める。吸い終えても煙は止めない（モニターを済ませるまで）
+                if (cigarette != null)
+                {
+                    cigarette.Light(Drags, Turn, true);
+                    cigarette.Linger();
+                    smoldering = true;
+                }
                 var started = Time.time;
                 // ジッポの音と火が移った音が鳴りきり、1 ページも送ってから、座り始めの向きへ戻す
                 while (flow.Talking || Time.time < started + SmokeBeats.TurnAt)

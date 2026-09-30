@@ -10533,7 +10533,7 @@ MonoBehaviour:
   required: 1
   once: 1
   after:
-  - jacket
+  - cigarette
   sound: {fileID: 0}
 --- !u!1 &385806762
 GameObject:
@@ -18138,6 +18138,8 @@ MonoBehaviour:
   - "\u300E\u4E00\u65E6\u3053\u3053\u307E\u3067\u306B\u3057\u3066\u304A\u3053\u3046\u2026\u300F"
   packPull: {fileID: 8300000, guid: de7e20f87f12aab4b83bfaeda6513e69, type: 3}
   card: "<size=30>2166\u5E748\u670815\u65E5 19\u664235\u5206\u3000\u502B\u6566<\u30ED\u30F3\u30C9\u30F3>\u3000\u81EA\u5BA4</size>"
+  terminalId: terminal
+  snuffSeconds: 4
   jacketId: jacket
   garment: {fileID: 859949019}
   folded: {fileID: 36964918}
@@ -21927,7 +21929,7 @@ MonoBehaviour:
   required: 1
   once: 1
   after:
-  - cigarette
+  - terminal
   sound: {fileID: 0}
 --- !u!1 &1111285816
 GameObject:
@@ -41772,7 +41774,6 @@ MonoBehaviour:
   chairSeated: {x: 1.5, y: 0, z: 1.28}
   chairBlocker: {fileID: 588394904}
   goSeconds: 1.8
-  backSeconds: 1.6
 --- !u!114 &2105004600
 MonoBehaviour:
   m_ObjectHideFlags: 0

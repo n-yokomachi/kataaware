@@ -10,8 +10,8 @@ namespace HalfAware.EditorTools
     {
         // ---- 場面 1 の、椅子の右の卓に置いたジャケット ------------------------------
         //
-        // 場面 1 は着ていない形で始まり、煙草を吸い終えた後、座ったまま右の卓のジャケットを調べて着る（RoomIntroDirector）。
-        // 着ると立ち上がれる（SceneFlow の standAfter）。メモリハブ・端末・メモ・ドアは着た後。
+        // 場面 1 は着ていない形で始まり、煙草を吸い終えて座ったままモニターを調べた後、右の卓のジャケットを調べて着る（RoomIntroDirector）。
+        // 着ると立ち上がれる（SceneFlow の standAfter）。メモリハブ・メモ・ドアは着た後（調べる順は RoomIds.After）。
         // 卓の、メモリハブより手前（机の側）には明かり（Room/Lamp）が置いてあった。そこをジャケットの置き場にするので、明かりは切る
         // （Light を持たない置物なので、部屋の明るさは変わらない）。
         // ジャケットは前を上にして寝かせ、襟を卓の奥へ向けて身頃の上の半分を天板に載せ、下の半分と両の袖を天板の椅子の側の縁から垂らす（RocketboxJacketOff.MakeFolded）
@@ -136,30 +136,12 @@ namespace HalfAware.EditorTools
             so.FindProperty("radius").floatValue = JacketRadius;
             so.FindProperty("required").boolValue = true;
             so.FindProperty("once").boolValue = true;
-            After(so, RoomIds.Cigarette);
+            After(so, RoomIds.After(RoomIds.Jacket));
             so.ApplyModifiedPropertiesWithoutUndo();
             note.AppendFormat("ジャケットの調べる対象: {0}", item.position.ToString("F3")).AppendLine();
 
-            // 調べる順: 歩いて調べる物は着た後。ドアは前提の先頭に文を持たない id（ジャケット）を置いて、着るまで弾く
-            foreach (var other in Object.FindObjectsByType<Interactable>(FindObjectsInactive.Include, FindObjectsSortMode.None))
-            {
-                string[] chain = null;
-                switch (other.Id)
-                {
-                    case RoomIds.Chips:
-                    case RoomIds.Terminal:
-                    case RoomIds.Clipboard:
-                        chain = new[] { RoomIds.Jacket };
-                        break;
-                    case RoomIds.Door:
-                        chain = new[] { RoomIds.Jacket, RoomIds.Chips, RoomIds.Terminal };
-                        break;
-                }
-                if (chain == null) continue;
-                var oso = new SerializedObject(other);
-                After(oso, chain);
-                oso.ApplyModifiedPropertiesWithoutUndo();
-            }
+            // 調べる順: モニターは煙草の後に座ったまま、歩いて調べる物は着た後。ドアは前提の先頭に文を持たない id（ジャケット）を置いて、着るまで弾く
+            Order(note);
 
             // 立ち上がるのは着た後
             if (flow != null)
@@ -196,6 +178,32 @@ namespace HalfAware.EditorTools
                 AssetDatabase.LoadAssetAtPath<Material>(RocketboxJacket.LiningPath(who)),
                 AssetDatabase.LoadAssetAtPath<Material>(RocketboxJacket.TeethPath(who)),
             };
+        }
+
+        /// <summary>
+        /// 開いている場面 1 の調べる対象の前提（after）を、調べる順の表（<see cref="RoomIds.After"/>）のとおりに書く。
+        /// 書き替えた対象の数を返す
+        /// </summary>
+        public static int Order(StringBuilder note)
+        {
+            var changed = 0;
+            foreach (var item in Object.FindObjectsByType<Interactable>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                var want = RoomIds.After(item.Id);
+                var so = new SerializedObject(item);
+                var chain = so.FindProperty("after");
+                var same = chain.arraySize == want.Length;
+                for (var i = 0; same && i < want.Length; i++) same = chain.GetArrayElementAtIndex(i).stringValue == want[i];
+                if (same) continue;
+                var was = new string[chain.arraySize];
+                for (var i = 0; i < was.Length; i++) was[i] = chain.GetArrayElementAtIndex(i).stringValue;
+                After(so, want);
+                so.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(item);
+                if (note != null) note.AppendFormat("調べる順: {0} の前提 [{1}] → [{2}]", item.Id, string.Join(",", was), string.Join(",", want)).AppendLine();
+                changed++;
+            }
+            return changed;
         }
 
         static void After(SerializedObject so, params string[] ids)

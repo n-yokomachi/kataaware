@@ -73,6 +73,24 @@ namespace HalfAware
             caught = false;
         }
 
+        /// <summary>吸い終えた後も煙を立て続ける（場面 1。モニターを済ませるまで）。<see cref="Light"/> の後に呼ぶ</summary>
+        public void Linger()
+        {
+            if (puffs != null) puffs.Linger();
+        }
+
+        /// <summary>吸い終えた後の、煙が立ち続けている形で始める（場面 1 を思い出した時）。音は鳴らさない</summary>
+        public void Smolder()
+        {
+            if (puffs != null) puffs.Smolder();
+        }
+
+        /// <summary>立ち続けていた煙を seconds 秒で細くして止める</summary>
+        public void Snuff(float seconds)
+        {
+            if (puffs != null) puffs.Fade(seconds);
+        }
+
         /// <summary>向き直す手前で止めていた時刻表を進める。止める所に届く前に呼べば、止めずに進む</summary>
         public void Release()
         {

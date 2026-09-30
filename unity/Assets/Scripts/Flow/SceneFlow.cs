@@ -76,7 +76,7 @@ namespace HalfAware
         [Header("物音")]
         [Tooltip("物音を鳴らす音源（2D。口元の Voice と同じもの）。無ければ鳴らさない")]
         [SerializeField] AudioSource foley;
-        [Tooltip("椅子から立ち上がる音（ChairRise.wav）。standAfter で立ち上がり始めた時と、端末の席から戻り始めた時（TerminalSeat）に鳴らす")]
+        [Tooltip("椅子から立ち上がる音（ChairRise.wav）。standAfter で立ち上がり始めた時に鳴らす")]
         [SerializeField] AudioClip rise;
 
         [Header("目覚めの起き上がり")]
@@ -632,7 +632,7 @@ namespace HalfAware
 
         // ---- 物音 --------------------------------------------------------------
 
-        /// <summary>椅子から立ち上がる音を鳴らす。立ち上がり始めた時（standAfter）と、端末の席から戻り始めた時（<see cref="TerminalSeat"/>）</summary>
+        /// <summary>椅子から立ち上がる音を鳴らす。立ち上がり始めた時（standAfter）</summary>
         public void PlayRise()
         {
             Play(rise);
