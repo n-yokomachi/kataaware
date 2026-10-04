@@ -109,6 +109,12 @@ namespace HalfAware.EditorTools.Rocketbox
         /// 切ると、髪の人の髪を元の位置に置き、頂点ごとに押し出す（前のやり方）
         /// </summary>
         public bool Wig;
+        /// <summary>
+        /// 顔をリアル系のアニメ寄りにする（<see cref="RocketboxAnimeFace"/>。オーナーが 2026-10-05 に採用）。
+        /// 頭・髪・体・胸元・膝から下のマテリアルを HalfAware/AnimeSkin にし（絵は tools/make-anime-face.py が描いた物）、
+        /// 顔の比率の表を頭のメッシュに焼く。主人公・片割れ・場面 6 の過去の主人公（同じ顔の三人）
+        /// </summary>
+        public bool AnimeFace;
         /// <summary>胸元の絵（体の人の頭のテクスチャ）</summary>
         public string ChestSrc { get { return ChestFromBody ? BodyFrom.HeadSrc : null; } }
 
@@ -367,7 +373,7 @@ namespace HalfAware.EditorTools.Rocketbox
         /// 麦わら帽子は Look.hat で被せる（既定は被らない）
         /// </summary>
         public static readonly RocketboxPerson Face14Hair14MadeDress =
-            Legs(MadeDressOn(Dress(Compose("Face14_Hair14_MadeDress", "女大 14 の顔と髪、一から作ったワンピース（片割れ）", Adult14, Party01), OutfitMadeDress)), Party02, 0.50f);
+            AnimeOn(Legs(MadeDressOn(Dress(Compose("Face14_Hair14_MadeDress", "女大 14 の顔と髪、一から作ったワンピース（片割れ）", Adult14, Party01), OutfitMadeDress)), Party02, 0.50f));
 
         static RocketboxPerson MadeDressOn(RocketboxPerson p)
         {
@@ -382,7 +388,7 @@ namespace HalfAware.EditorTools.Rocketbox
         /// 模型は裏返さない（黒子は本人の左、口元の左下）。上着は着ない（シナリオ設計書 1 節）
         /// </summary>
         public static readonly RocketboxPerson Face14Hair14GardenWear =
-            Legs(GardenWearOn(Dress(Compose("Face14_Hair14_GardenWear", "女大 14 の顔と髪（黒）、一から作ったシャツと長いスカート（場面 6 の過去の主人公）", Adult14, Party01), OutfitGardenWear)), Party02, 0.50f);
+            AnimeOn(Legs(GardenWearOn(Dress(Compose("Face14_Hair14_GardenWear", "女大 14 の顔と髪（黒）、一から作ったシャツと長いスカート（場面 6 の過去の主人公）", Adult14, Party01), OutfitGardenWear)), Party02, 0.50f));
 
         static RocketboxPerson GardenWearOn(RocketboxPerson p)
         {
@@ -401,6 +407,12 @@ namespace HalfAware.EditorTools.Rocketbox
             k.matchSkinAll = true;
             k.naturalHair = false;
             k.brownShoes = true;
+        }
+
+        static RocketboxPerson AnimeOn(RocketboxPerson p)
+        {
+            p.AnimeFace = true;
+            return p;
         }
 
         static RocketboxPerson JacketOn(RocketboxPerson p)
@@ -444,7 +456,7 @@ namespace HalfAware.EditorTools.Rocketbox
         /// 胸元にネックレス（細い銀の鎖と丸い飾り）を描く。黒子は口の左下。華奢「強」は上半身だけ（下半身は元の太さ）
         /// </summary>
         public static readonly RocketboxPerson Face14Hair14BodySports02 =
-            JacketOn(UpperSlimOn(BodyChest(Dress(Compose("Face14_Hair14_BodySports02", "女大 14 の顔と髪をスポーツ 02 の体に（主人公）", Adult14, Sports02), OutfitProtagonistSports02))));
+            AnimeOn(JacketOn(UpperSlimOn(BodyChest(Dress(Compose("Face14_Hair14_BodySports02", "女大 14 の顔と髪をスポーツ 02 の体に（主人公）", Adult14, Sports02), OutfitProtagonistSports02)))));
 
         /// <summary>主人公（スポーツ 02 の体）の服: 元の色のまま。腕の肌を頭の肌に揃え、首の付け根の上の 14 のネックレスの鎖は消し、胸元に描き直す</summary>
         static void OutfitProtagonistSports02(RocketboxPaint.Look k)

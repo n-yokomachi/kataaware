@@ -12,7 +12,8 @@ namespace HalfAware.EditorTools.Rocketbox
     ///
     /// - 模型: Humanoid（骨は 3ds Max の Biped）。付いてくる動き・カメラ・灯りは読まない。
     ///   マテリアルは名前だけを取り込み、中身は組み立て（<see cref="BuildRocketboxProtagonist"/>）で縮めたテクスチャから作る
-    /// - テクスチャ: 512 以下。sRGB、ミップマップ、双線形、繰り返し無し
+    /// - テクスチャ: 512 以下。sRGB、ミップマップ、双線形、繰り返し無し。
+    ///   アニメ寄りの顔の部位の絵（*_mask.png。<see cref="RocketboxAnimeFace"/>）だけは線形で、α を持たない（値をそのまま読む）
     /// </summary>
     public sealed class RocketboxImport : AssetPostprocessor
     {
@@ -56,9 +57,10 @@ namespace HalfAware.EditorTools.Rocketbox
             if (!Ours(assetPath)) return;
             var ti = (TextureImporter)assetImporter;
             ti.textureType = TextureImporterType.Default;
-            ti.sRGBTexture = true;
-            ti.alphaSource = TextureImporterAlphaSource.FromInput;
-            ti.alphaIsTransparency = true;
+            var mask = assetPath.EndsWith("_mask.png", StringComparison.OrdinalIgnoreCase);
+            ti.sRGBTexture = !mask;
+            ti.alphaSource = mask ? TextureImporterAlphaSource.None : TextureImporterAlphaSource.FromInput;
+            ti.alphaIsTransparency = !mask;
             ti.mipmapEnabled = true;
             ti.filterMode = FilterMode.Bilinear;
             ti.wrapMode = TextureWrapMode.Clamp;
