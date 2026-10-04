@@ -11,8 +11,9 @@ namespace HalfAware
     /// 設定の枠の見た目と操作（設計書 1 節・5 節）。コンソール（<see cref="ImplantConsole"/>）とタイトルの画面（<see cref="TitleScreen"/>）が
     /// 同じ物を使う。置き場と、開け閉め・一つ前に戻る（Esc・右クリック・TAB）は呼び手が決める。
     ///
-    /// 行は <see cref="SettingsList"/> の表の順に並べる: 小見出し（字と細い線）、つまみの行（項目の名の升・つまみ・倍率の字）、
+    /// 行は <see cref="SettingsList"/> の表の順に並べる: 小見出し（字と細い線）、つまみの行（項目の名の升・つまみ・倍率や割合の字）、
     /// 選ぶ行（項目の名の升・左右の三角・選んでいる物の名）、既定に戻す、（タイトルの画面だけ）戻る。
+    /// いま効いていない行（<see cref="SettingRow.Live"/>）は、出したまま名・値・つまみを暗くする（行の並びも枠の高さも変えない）。
     /// 寸法はコンソールと同じ粗い画面の 1 画素（Dot）で、字はいちばん小さい 11 Dot。
     ///
     /// 操作: マウスは行に重ねると選び、つまみを掴んで動かす・溝を押すとそこへ飛ぶ。選ぶ行は左右の三角を押すとその向きへ一つ、
@@ -62,6 +63,19 @@ namespace HalfAware
 
         // 色は使う時に作る。タイトルの画面はシーンから読まれる部品なので、静的な値の初期化で色空間を訊かない
         static Color Groove { get { return ImplantConsole.Tint(ImplantConsole.Rgb(127, 227, 236, 0.35f)); } }
+        /// <summary>
+        /// 効いていないつまみの行の、つまみと塗り。溝と同じ濃さの青緑を、枠の地の上に重ねた色を、透けない色で持つ
+        /// （溝の色のまま透かすと、つまみの下の既定の目盛りが透けて見えた）
+        /// </summary>
+        static Color DimKnob
+        {
+            get
+            {
+                var c = Color.Lerp(ImplantConsole.Rgb(3, 10, 14, 1f), ImplantConsole.Accent, 0.35f);
+                c.a = 1f;
+                return c;
+            }
+        }
 
         readonly SettingsList list;
         readonly HoldRepeat nudge = new HoldRepeat();
@@ -209,8 +223,10 @@ namespace HalfAware
             tick.anchoredPosition = Vector2.zero;
             tick.sizeDelta = new Vector2(ImplantConsole.Line, TickHeight);
             // 溝の左の端からつまみまでの塗り
-            view.done = ImplantConsole.Fill(groove, "Done", ImplantConsole.Accent, false).rectTransform;
-            view.knob = ImplantConsole.Fill(groove, "Knob", ImplantConsole.Accent, false).rectTransform;
+            view.doneFill = ImplantConsole.Fill(groove, "Done", ImplantConsole.Accent, false);
+            view.done = view.doneFill.rectTransform;
+            view.knobFill = ImplantConsole.Fill(groove, "Knob", ImplantConsole.Accent, false);
+            view.knob = view.knobFill.rectTransform;
             view.knob.pivot = new Vector2(0.5f, 0.5f);
             view.knob.sizeDelta = new Vector2(KnobWidth, KnobHeight);
 
@@ -386,7 +402,9 @@ namespace HalfAware
         /// <summary>
         /// 一行の塗り。既定に戻す・戻るは、記憶する・思い出すの行と同じく行ごと塗る。
         /// つまみの行は、選んでいる時に項目の名の升だけ塗り、倍率の字を白に。つまみは青緑のまま見せる（行ごと塗ると、つまみが塗りに溶ける）。
-        /// 選ぶ行もつまみの行と同じく名の升だけ塗り、選んでいる物の名を白に。三角は青緑で、その向きへもう動けない端では溝の色に薄める
+        /// 選ぶ行もつまみの行と同じく名の升だけ塗り、選んでいる物の名を白に。三角は青緑で、その向きへもう動けない端では溝の色に薄める。
+        /// いま効いていないつまみの行は、名と値を選べない行の字の色（思い出すの空きと同じ）に、塗りとつまみを溝と同じ濃さの色に落とす。
+        /// 選んでいる時は名の升を薄く塗る（効いている行の塗りより一段暗い）
         /// </summary>
         sealed class RowView
         {
@@ -395,15 +413,21 @@ namespace HalfAware
             public TMP_Text label;
             public RectTransform done;
             public RectTransform knob;
+            public Image doneFill;
+            public Image knobFill;
             public TMP_Text value;
             public TMP_Text left;
             public TMP_Text right;
+            /// <summary>最後に塗った時、効いていない行として暗くしたか</summary>
+            public bool dim;
 
             public void Paint(bool on)
             {
                 if (row.Kind == SettingKind.Heading) return;
-                fill.color = on ? ImplantConsole.Accent : ImplantConsole.Clear;
-                label.color = on ? ImplantConsole.Ink : ImplantConsole.ButtonText;
+                var live = row.Live;
+                dim = !live;
+                fill.color = on ? (live ? ImplantConsole.Accent : ImplantConsole.ButtonLine) : ImplantConsole.Clear;
+                label.color = on ? ImplantConsole.Ink : live ? ImplantConsole.ButtonText : ImplantConsole.Faded;
                 if (row.Kind == SettingKind.Choice)
                 {
                     var c = row.Choice.Value;
@@ -424,7 +448,9 @@ namespace HalfAware
                 knob.anchorMax = new Vector2(t, 0.5f);
                 knob.anchoredPosition = Vector2.zero;
                 value.text = ImplantConsole.Mono(row.Dial.Text(v));
-                value.color = on ? Color.white : ImplantConsole.ButtonText;
+                value.color = !live ? ImplantConsole.Faded : on ? Color.white : ImplantConsole.ButtonText;
+                doneFill.color = live ? ImplantConsole.Accent : DimKnob;
+                knobFill.color = live ? ImplantConsole.Accent : DimKnob;
             }
         }
 
@@ -441,6 +467,12 @@ namespace HalfAware
             if (row < 0 || row >= views.Count) return null;
             var v = views[row];
             return v.value != null ? v.value.text : v.label != null ? v.label.text : null;
+        }
+
+        /// <summary>確認用。行 row を、いま効いていない行として暗くして出しているか（最後に塗った時）</summary>
+        public bool DimAt(int row)
+        {
+            return row >= 0 && row < views.Count && views[row].dim;
         }
     }
 }

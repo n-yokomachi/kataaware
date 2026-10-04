@@ -5,7 +5,8 @@ namespace HalfAware.Tests
 {
     /// <summary>
     /// タイトルの画面の設定（設計書 5 節）。ボタンの並びと上下、設定の枠の行（コンソールと同じ表に「戻る」）、
-    /// コンソールとタイトルの画面が同じ設定の枠（SettingsPanel）を使うこと
+    /// コンソールとタイトルの画面が同じ設定の枠（SettingsPanel）を使うこと、効いていない行を暗くすること、
+    /// 設定の枠を開いている間は題と読みを隠すこと
     /// </summary>
     public class TitleSettingsTests
     {
@@ -61,7 +62,7 @@ namespace HalfAware.Tests
                 Assert.AreSame(ConsoleSettings.Rows[i], rows[i], "コンソールと同じ行");
             Assert.AreEqual(SettingKind.Back, rows[rows.Length - 1].Kind);
             Assert.AreEqual("戻る", rows[rows.Length - 1].Label);
-            Assert.AreEqual(5, ConsoleSettings.Rows.Length, "コンソールの表は戻るを持たない");
+            Assert.AreEqual(7, ConsoleSettings.Rows.Length, "コンソールの表は戻るを持たない");
         }
 
         [Test]
@@ -77,6 +78,14 @@ namespace HalfAware.Tests
             Assert.IsTrue(list.Nudge(1));
             Assert.AreEqual((int)ScreenFilterKind.Dither, GameSettings.Filter.Value);
             list.MoveRow(1);
+            Assert.AreSame(GameSettings.FilterTint, list.Dial, "減色の強さの行");
+            Assert.IsTrue(list.Nudge(1));
+            Assert.AreEqual(GameSettings.FilterTint.Snap(GameSettings.FilterTint.Default + 0.05f), GameSettings.FilterTint.Value, 1e-6f);
+            list.MoveRow(1);
+            Assert.AreSame(GameSettings.FilterDots, list.Dial, "ディザの強さの行");
+            Assert.IsTrue(list.Nudge(-1));
+            Assert.AreEqual(GameSettings.FilterDots.Snap(GameSettings.FilterDots.Default - 0.05f), GameSettings.FilterDots.Value, 1e-6f);
+            list.MoveRow(1);
             Assert.AreEqual(SettingKind.Reset, list.Selected.Kind);
             list.MoveRow(1);
             Assert.IsTrue(list.AtBack);
@@ -88,7 +97,9 @@ namespace HalfAware.Tests
             Assert.IsTrue(list.Reset());
             Assert.AreEqual(1.5f, GameSettings.LookScale.Value);
             Assert.AreEqual((int)ScreenFilterKind.Standard, GameSettings.Filter.Value);
-            list.MoveRow(-5);
+            Assert.AreEqual(ScreenFilter.DefaultTint, GameSettings.FilterTint.Value);
+            Assert.AreEqual(ScreenFilter.DefaultDots, GameSettings.FilterDots.Value);
+            list.MoveRow(-9);
             Assert.AreEqual(1, list.Row, "小見出しへは上がらない");
         }
 
@@ -116,7 +127,21 @@ namespace HalfAware.Tests
                     StringAssert.Contains("0.50", p.TextAt(1));
                     Assert.AreEqual(-1f, p.KnobAt(0), "小見出しにつまみは無い");
                 }
-                Assert.AreEqual("戻る", title.TextAt(5));
+                Assert.AreEqual("戻る", title.TextAt(7));
+                // 減色の強さ・ディザの強さは割合の字。標準の型の間は名と値を暗くする（行は出したまま）
+                foreach (var p in new[] { console, title })
+                {
+                    foreach (var r in new[] { 4, 5 })
+                    {
+                        var dial = ConsoleSettings.Rows[r].Dial;
+                        StringAssert.Contains(Mathf.RoundToInt(dial.Default * 100f).ToString(), p.TextAt(r));
+                        StringAssert.EndsWith("%", p.TextAt(r));
+                        Assert.AreEqual(dial.Fraction(dial.Default), p.KnobAt(r), 1e-6f);
+                    }
+                    Assert.IsTrue(p.DimAt(4), "標準の時は名と値を暗く");
+                    Assert.IsTrue(p.DimAt(5));
+                    foreach (var r in new[] { 0, 1, 2, 3, 6 }) Assert.IsFalse(p.DimAt(r), "ほかの行は暗くしない: " + r);
+                }
                 // フィルターの行は選んでいる物の名を出す。つまみは無い
                 foreach (var p in new[] { console, title })
                 {
@@ -137,6 +162,11 @@ namespace HalfAware.Tests
                 Assert.AreEqual("減色＋ディザ", title.TextAt(3));
                 console.Paint();
                 Assert.AreEqual("減色＋ディザ", console.TextAt(3), "同じ値をコンソールの枠も出す");
+                foreach (var p in new[] { console, title })
+                {
+                    Assert.IsFalse(p.DimAt(4), "減色＋ディザの時は効いている");
+                    Assert.IsFalse(p.DimAt(5));
+                }
                 title.Press(3);
                 Assert.AreEqual((int)ScreenFilterKind.Standard, GameSettings.Filter.Value, "最後の次は最初へ");
                 title.Step(3, -1);
@@ -146,20 +176,47 @@ namespace HalfAware.Tests
                 Assert.AreEqual((int)ScreenFilterKind.Dither, GameSettings.Filter.Value, "右の三角は右の端で止まる");
                 title.Step(1, 1);
                 Assert.AreEqual(0.5f, GameSettings.LookScale.Value, "三角はつまみの行を動かさない");
-                title.Press(4);
+                title.Press(6);
                 Assert.AreEqual(1.5f, GameSettings.LookScale.Value);
                 Assert.AreEqual((int)ScreenFilterKind.Standard, GameSettings.Filter.Value);
                 Assert.AreEqual("標準", title.TextAt(3));
                 Assert.AreEqual(0, backs);
-                title.Press(5);
+                title.Press(7);
                 Assert.AreEqual(1, backs);
                 console.Back = () => backs++;
-                console.Press(4);
+                console.Press(6);
                 Assert.AreEqual(1, backs, "コンソールには戻るの行が無い");
             }
             finally
             {
                 Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void TheNamesHideWhileTheSettingsAreOpen()
+        {
+            var go = new GameObject("TitleSettingsTest");
+            var screen = go.AddComponent<TitleScreen>();
+            try
+            {
+                screen.Compose(false, null);
+                screen.Finish();
+                Assert.IsTrue(screen.NamesShown, "ボタンの並びでは題と読みを出す");
+                screen.OpenSettings();
+                Assert.IsTrue(screen.Settings.Box.gameObject.activeSelf);
+                Assert.IsFalse(screen.NamesShown, "設定の枠を開いている間は題と読みを隠す");
+                // 戻るの行で閉じると、題と読みを出し直す
+                screen.Settings.Press(TitleScreen.SettingRows.Length - 1);
+                Assert.IsFalse(screen.Settings.Box.gameObject.activeSelf);
+                Assert.IsTrue(screen.NamesShown);
+                screen.OpenList();
+                Assert.IsTrue(screen.NamesShown, "思い出すの枠では隠さない");
+            }
+            finally
+            {
+                screen.Release();
+                Object.DestroyImmediate(go);
             }
         }
     }

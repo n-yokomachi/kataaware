@@ -4,6 +4,11 @@
 // 近さは OKLab で測る（明るさの差と色の差が、見た目の差に近い重さで並ぶ）。二色を結ぶ線へ色を落とした位置 t を、
 // 閾値（0〜1）と比べ、閾値が t より小さい画素だけ二色めを出す。広い面で見ると、二色が t の割合で混ざって元の色に近づく。
 //
+// 強さは二つ（設定の「減色の強さ」「ディザの強さ」。ScreenFilter.Use がグローバルの値で入れる）。
+// - 色の寄せ（_HaFilterTint）: 元の色を、点を打たずに色の組へ寄せた色（二色を t で混ぜた色）へどこまで寄せるか。0 で元の色のまま、1 で寄せきる
+// - 点の濃さ（_HaFilterDots）: 選んだ一色と、二色を t で混ぜた色との差をどこまで足すか。0 で点を打たない、1 で選んだ一色の明暗差のまま
+// 選んだ一色は、広い面で見ると二色を t で混ぜた色に平均が揃うので、点の濃さを下げても面の色は動かない。二つとも 1 で、選んだ一色をそのまま出す
+//
 // 近い二色は前もって引いておく（_HaLut）。sRGB の各色を 64 段に分けた升（64³）ごとに、升の真ん中の色に近い二色の番号を入れてある。
 // 画素ごとに 52 色と比べると、標準の型の 7 倍ほど重かった（2026-10-05、エディタの RTX 4070 で 1280×720 に一回 0.19 ms。標準は 0.03 ms、表を引くと 0.03 ms）。
 // t は表に入れず、画素の色そのものと二色の OKLab から出す（升の大きさで段が付かない）。
@@ -19,16 +24,15 @@
 #define HA_LUT_STEPS 64
 #define HA_LUT_TILES 8
 
-// 点の強さ。1 で閾値を 0〜1 に広く散らし、0 で点を打たない（いちばん近い一色に塗るだけ）。
-// 0.5 ほどまで下げると、二色の境が筋に戻ってくる
-#define HA_DOT_STRENGTH 1.0
-
 // 青色雑音 64×64（BlueNoise64.png）
 Texture2D _HaNoise;
 // 近い二色の表（ScreenFilterLut.png）。r が一番めの番号、g が二番めの番号（0〜255 の値をそのまま）
 Texture2D _HaLut;
 // 色の組（ScreenFilterPalette.asset、64×2 の半精度）。行 0 が OKLab、行 1 が出す色（リニアの RGB）
 Texture2D _HaPalette;
+// 色の寄せと点の濃さ（0〜1）。グローバル。マテリアルには持たせない（ScreenFilter.Use が書く）
+float _HaFilterTint;
+float _HaFilterDots;
 
 // リニアの RGB を OKLab へ（Björn Ottosson の式。BuildScreenFilter.OkLab と同じ）
 float3 HaOkLab(float3 c)
@@ -52,14 +56,14 @@ float3 HaEncode(float3 c)
     return float3(c.r <= 0.0031308 ? low.r : high.r, c.g <= 0.0031308 ? low.g : high.g, c.b <= 0.0031308 ? low.b : high.b);
 }
 
-// 点の模様の値（0〜1、絵の 8 bit の値）を閾値へ。256 段の真ん中に置き、強さで 0.5 の周りへ縮める
+// 点の模様の値（0〜1、絵の 8 bit の値）を閾値へ。256 段の真ん中に置き、0〜1 に広く散らす。
+// 点を薄めるのは閾値を縮めてではなく、点の濃さ（_HaFilterDots）で差を縮めて行う（閾値を 0.5 へ縮めると、二色の境が筋に戻る）
 float HaThreshold(float noise)
 {
-    float t = (noise * 255.0 + 0.5) / 256.0;
-    return lerp(0.5, t, HA_DOT_STRENGTH);
+    return (noise * 255.0 + 0.5) / 256.0;
 }
 
-// 色（リニアの RGB）を、色の組の二色と、画素 pixel の点の閾値で一色にする。返すのもリニアの RGB
+// 色（リニアの RGB）を、色の組の二色と、画素 pixel の点の閾値で一色にし、色の寄せと点の濃さで元の色と混ぜる。返すのもリニアの RGB
 float3 HaDither(float3 linearRgb, uint2 pixel)
 {
     float3 c = saturate(linearRgb);
@@ -73,7 +77,12 @@ float3 HaDither(float3 linearRgb, uint2 pixel)
     float3 span = lab2 - lab1;
     float t = saturate(dot(HaOkLab(c) - lab1, span) / max(dot(span, span), 1e-8));
     float threshold = HaThreshold(_HaNoise.Load(int3(pixel % HA_NOISE_SIZE, 0)).r);
-    return _HaPalette.Load(int3(threshold < t ? i2 : i1, 1, 0)).rgb;
+    float3 rgb1 = _HaPalette.Load(int3(i1, 1, 0)).rgb;
+    float3 rgb2 = _HaPalette.Load(int3(i2, 1, 0)).rgb;
+    // 点を打たずに色の組へ寄せた色と、点の閾値で選んだ一色
+    float3 mean = lerp(rgb1, rgb2, t);
+    float3 picked = threshold < t ? rgb2 : rgb1;
+    return c + (mean - c) * saturate(_HaFilterTint) + (picked - mean) * saturate(_HaFilterDots);
 }
 
 #endif

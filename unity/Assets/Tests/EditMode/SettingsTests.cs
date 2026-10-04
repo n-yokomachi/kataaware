@@ -5,7 +5,7 @@ using UnityEngine.InputSystem;
 namespace HalfAware.Tests
 {
     /// <summary>
-    /// コンソールの設定の枠（設計書 1 節）。カメラの速さの範囲と刻み、残して読み直す（動きが止まってから書く）、
+    /// コンソールの設定の枠（設計書 1 節）。カメラの速さの範囲と刻み、減色の強さ・ディザの強さの範囲と刻みと効く時、残して読み直す（動きが止まってから書く）、
     /// 見回しの速さへの効き（マウスとスティック）、枠の上下と左右（つまみとフィルター）、右クリック（Esc）の戻り方、マウスの押した所からの値、左右の押し続け
     /// </summary>
     public class SettingsTests
@@ -81,6 +81,110 @@ namespace HalfAware.Tests
             Assert.AreEqual(2f, Look.Value);
             Assert.AreEqual("2.00×", Look.Text(Look.Value));
             Assert.AreEqual("0.50×", Look.Text(0.5f));
+        }
+
+        // ---- 減色の強さ・ディザの強さ --------------------------------------------
+
+        [Test]
+        public void TheFilterStrengthsRunFromNoneToFullInFivePercents()
+        {
+            foreach (var dial in new[] { GameSettings.FilterTint, GameSettings.FilterDots })
+            {
+                Assert.AreEqual(0f, dial.Min);
+                Assert.AreEqual(1f, dial.Max);
+                Assert.AreEqual(0.05f, dial.Step);
+                Assert.AreEqual(20, dial.Steps);
+                Assert.AreEqual(dial.Default, dial.Value, "何も書いていなければ既定");
+                Assert.AreEqual("50%", dial.Text(0.5f));
+                Assert.AreEqual("0%", dial.Text(0f));
+                Assert.AreEqual("100%", dial.Text(1f));
+                Assert.AreEqual("55%", dial.Text(0.55f));
+                dial.Value = 0.33f;
+                Assert.AreEqual(0.35f, dial.Value, 1e-6f, "5% 刻みへ揃える");
+                Assert.AreEqual("35%", dial.Text(dial.Value));
+                dial.Nudge(-100);
+                Assert.AreEqual(0f, dial.Value);
+                dial.Nudge(100);
+                Assert.AreEqual(1f, dial.Value);
+                Assert.AreEqual("1", box.Get(dial.Key));
+            }
+            // 既定は画面の加工の既定と同じ値
+            Assert.AreEqual(ScreenFilter.DefaultTint, GameSettings.FilterTint.Default);
+            Assert.AreEqual(ScreenFilter.DefaultDots, GameSettings.FilterDots.Default);
+            Assert.AreEqual("HalfAware.Settings.FilterTint", GameSettings.FilterTint.Key);
+            Assert.AreEqual("HalfAware.Settings.FilterDots", GameSettings.FilterDots.Key);
+            CollectionAssert.Contains(GameSettings.All, GameSettings.FilterTint, "読み直しと既定に戻すが回る");
+            CollectionAssert.Contains(GameSettings.All, GameSettings.FilterDots);
+        }
+
+        [Test]
+        public void TheFilterStrengthsAreWrittenAndReadBack()
+        {
+            // 既定と同じ値は書かないので、既定から離れた値で見る
+            GameSettings.FilterTint.Value = 0.85f;
+            GameSettings.FilterDots.Value = 0.65f;
+            Assert.AreEqual("0.85", box.Get(GameSettings.FilterTint.Key));
+            Assert.AreEqual("0.65", box.Get(GameSettings.FilterDots.Key));
+            GameSettings.Commit();
+            GameSettings.Forget();
+            Assert.AreEqual(0.85f, GameSettings.FilterTint.Value, 1e-6f);
+            Assert.AreEqual(0.65f, GameSettings.FilterDots.Value, 1e-6f);
+            box.Set(GameSettings.FilterDots.Key, "7");
+            box.Set(GameSettings.FilterTint.Key, "broken");
+            GameSettings.Forget();
+            Assert.AreEqual(1f, GameSettings.FilterDots.Value, "範囲の外は端");
+            Assert.AreEqual(GameSettings.FilterTint.Default, GameSettings.FilterTint.Value, "読めない字は既定");
+        }
+
+        [Test]
+        public void ADialTellsWhenItChanges()
+        {
+            var told = 0;
+            System.Action count = () => told++;
+            GameSettings.FilterTint.Value = 0.5f;
+            GameSettings.FilterTint.Changed += count;
+            try
+            {
+                GameSettings.FilterTint.Value = 0.5f;
+                Assert.AreEqual(0, told, "同じ値では知らせない");
+                GameSettings.FilterTint.Nudge(1);
+                Assert.AreEqual(1, told);
+                GameSettings.FilterTint.Nudge(-100);
+                GameSettings.FilterTint.Nudge(-1);
+                Assert.AreEqual(2, told, "端で止まって変わらなければ知らせない");
+                GameSettings.ResetAll();
+                Assert.AreEqual(3, told, "既定に戻すでも知らせる");
+                box.Set(GameSettings.FilterTint.Key, "0.2");
+                GameSettings.Forget();
+                Assert.AreEqual(0.2f, GameSettings.FilterTint.Value, 1e-6f);
+                Assert.AreEqual(3, told, "鍵から読み直しただけでは知らせない");
+            }
+            finally
+            {
+                GameSettings.FilterTint.Changed -= count;
+            }
+        }
+
+        [Test]
+        public void TheStrengthRowsWorkOnlyWithTheDitherFilter()
+        {
+            var tint = ConsoleSettings.Rows[4];
+            var dots = ConsoleSettings.Rows[5];
+            Assert.IsFalse(tint.Live, "標準の型には効かない");
+            Assert.IsFalse(dots.Live);
+            GameSettings.Filter.Value = (int)ScreenFilterKind.Dither;
+            Assert.IsTrue(tint.Live);
+            Assert.IsTrue(dots.Live);
+            // ほかの行はいつも効いている
+            foreach (var i in new[] { 1, 3, 6 }) Assert.IsTrue(ConsoleSettings.Rows[i].Live, ConsoleSettings.Rows[i].Label);
+            GameSettings.Filter.Value = (int)ScreenFilterKind.Standard;
+            foreach (var i in new[] { 1, 3, 6 }) Assert.IsTrue(ConsoleSettings.Rows[i].Live, ConsoleSettings.Rows[i].Label);
+            // 効いていなくても選べて、動かせる
+            var m = OpenSettings();
+            m.MoveRow(2);
+            Assert.AreSame(GameSettings.FilterTint, m.RowDial);
+            m.Move(-1);
+            Assert.AreEqual(GameSettings.FilterTint.Snap(GameSettings.FilterTint.Default - 0.05f), GameSettings.FilterTint.Value, 1e-6f);
         }
 
         // ---- 残して読み直す ----------------------------------------------------
@@ -176,11 +280,17 @@ namespace HalfAware.Tests
         {
             Look.Value = 0.4f;
             GameSettings.Filter.Value = (int)ScreenFilterKind.Dither;
+            GameSettings.FilterTint.Value = 1f;
+            GameSettings.FilterDots.Value = 0.1f;
             GameSettings.ResetAll();
             Assert.AreEqual(1.5f, Look.Value);
             Assert.AreEqual("1.5", box.Get(Look.Key));
             Assert.AreEqual((int)ScreenFilterKind.Standard, GameSettings.Filter.Value);
             Assert.AreEqual("Standard", box.Get(GameSettings.Filter.Key));
+            Assert.AreEqual(ScreenFilter.DefaultTint, GameSettings.FilterTint.Value);
+            Assert.AreEqual(ScreenFilter.DefaultDots, GameSettings.FilterDots.Value);
+            Assert.AreEqual(ScreenFilter.DefaultTint.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture), box.Get(GameSettings.FilterTint.Key));
+            Assert.AreEqual(ScreenFilter.DefaultDots.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture), box.Get(GameSettings.FilterDots.Key));
         }
 
         // ---- 見回しの速さ ------------------------------------------------------
@@ -268,7 +378,7 @@ namespace HalfAware.Tests
         public void TheTableHasTheCameraTheScreenAndReset()
         {
             var rows = ConsoleSettings.Rows;
-            Assert.AreEqual(5, rows.Length);
+            Assert.AreEqual(7, rows.Length);
             Assert.AreEqual(SettingKind.Heading, rows[0].Kind);
             Assert.AreEqual("カメラ", rows[0].Label);
             Assert.AreEqual(SettingKind.Dial, rows[1].Kind);
@@ -281,8 +391,14 @@ namespace HalfAware.Tests
             Assert.AreEqual("フィルター", rows[3].Label);
             Assert.AreSame(GameSettings.Filter, rows[3].Choice);
             Assert.IsNull(rows[3].Dial);
-            Assert.AreEqual(SettingKind.Reset, rows[4].Kind);
-            Assert.AreEqual("既定に戻す", rows[4].Label);
+            Assert.AreEqual(SettingKind.Dial, rows[4].Kind);
+            Assert.AreEqual("減色の強さ", rows[4].Label);
+            Assert.AreSame(GameSettings.FilterTint, rows[4].Dial);
+            Assert.AreEqual(SettingKind.Dial, rows[5].Kind);
+            Assert.AreEqual("ディザの強さ", rows[5].Label);
+            Assert.AreSame(GameSettings.FilterDots, rows[5].Dial);
+            Assert.AreEqual(SettingKind.Reset, rows[6].Kind);
+            Assert.AreEqual("既定に戻す", rows[6].Label);
             Assert.AreEqual("設定　　←→ で変える", ConsoleSettings.Title);
         }
 
@@ -308,13 +424,18 @@ namespace HalfAware.Tests
             Assert.AreEqual(SettingKind.Choice, m.SettingRow.Kind);
             Assert.AreSame(GameSettings.Filter, m.Settings.Choice);
             m.MoveRow(1);
-            Assert.AreEqual(4, m.Row);
+            Assert.AreEqual(4, m.Row, "フィルターの下は減色の強さ");
+            Assert.AreSame(GameSettings.FilterTint, m.RowDial);
+            m.MoveRow(1);
+            Assert.AreEqual(5, m.Row);
+            Assert.AreSame(GameSettings.FilterDots, m.RowDial);
+            m.MoveRow(1);
+            Assert.AreEqual(6, m.Row);
             Assert.AreEqual(SettingKind.Reset, m.SettingRow.Kind);
             Assert.IsNull(m.Settings.Choice);
             m.MoveRow(1);
-            Assert.AreEqual(4, m.Row, "下の端で止まる");
-            m.MoveRow(-1);
-            m.MoveRow(-1);
+            Assert.AreEqual(6, m.Row, "下の端で止まる");
+            m.MoveRow(-4);
             Assert.AreEqual(1, m.Row, "小見出しへは上がらない");
             m.MoveRow(-1);
             Assert.AreEqual(1, m.Row);
@@ -324,8 +445,8 @@ namespace HalfAware.Tests
             Assert.IsFalse(m.Usable(2));
             m.HoverRow(2);
             Assert.AreEqual(1, m.Row);
-            m.HoverRow(4);
-            Assert.AreEqual(4, m.Row);
+            m.HoverRow(6);
+            Assert.AreEqual(6, m.Row);
         }
 
         [Test]
@@ -341,7 +462,7 @@ namespace HalfAware.Tests
             Assert.AreEqual(ConsoleAction.Settings, m.Selected, "ボタンは動かない");
             Assert.AreEqual(ConsolePanel.Settings, m.Panel, "枠は閉じない");
             // 既定に戻すの行では、左右は何もしない
-            m.MoveRow(2);
+            m.MoveRow(4);
             Assert.AreEqual(SettingKind.Reset, m.SettingRow.Kind);
             m.Move(1);
             m.Move(-1);
@@ -383,9 +504,14 @@ namespace HalfAware.Tests
             Assert.IsFalse(m.ResetSettings(), "フィルターの行では戻さない");
             Assert.AreEqual((int)ScreenFilterKind.Dither, GameSettings.Filter.Value);
             m.MoveRow(1);
+            m.Move(-2);
+            Assert.IsFalse(m.ResetSettings(), "減色の強さの行では戻さない");
+            Assert.AreEqual(GameSettings.FilterTint.Snap(GameSettings.FilterTint.Default - 0.1f), GameSettings.FilterTint.Value, 1e-6f);
+            m.MoveRow(2);
             Assert.IsTrue(m.ResetSettings());
             Assert.AreEqual(1.5f, Look.Value);
             Assert.AreEqual((int)ScreenFilterKind.Standard, GameSettings.Filter.Value, "フィルターも標準へ戻す");
+            Assert.AreEqual(ScreenFilter.DefaultTint, GameSettings.FilterTint.Value, "強さも既定へ戻す");
             Assert.AreEqual(ConsolePanel.Settings, m.Panel, "枠は開いたまま");
         }
 

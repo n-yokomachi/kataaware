@@ -18,6 +18,7 @@ namespace HalfAware.EditorTools
     /// パイプラインの render scale 1/3 と Ps1 のパス、最近傍の引き伸ばしまでゲームと同じに通る。
     /// 型はシェーダーのグローバルの値で切り替え、撮り終えたら標準へ戻す（遊んでいない間のエディタは標準）。
     /// 設定の枠のフィルターの行（コンソールとタイトルの画面）も、標準と減色＋ディザの二通りで撮る（<see cref="Panels"/>）。
+    /// 減色＋ディザの強さ（色の寄せ・点の濃さ）の段も、同じ目から撮り比べる（<see cref="Strength"/>。HalfAware/Shoot the filter strengths）。
     ///
     /// **場面は開くが保存しない。** 撮る前に開いていた場面へ、撮り終えたら開き直す（保存されていない場面だったなら、カメラと灯りだけの新しい場面を作る）。
     /// 開いている場面に未保存の変更があるときは撮らない
@@ -58,26 +59,67 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 全部の所を、標準と減色＋ディザで撮って dir に置く（「名前_standard.png」「名前_dither.png」と、左右に並べた「名前_pair.png」）。
+        /// 全部の所を、標準と減色＋ディザ（既定の強さ）で撮って dir に置く（「名前_standard.png」「名前_dither.png」と、左右に並べた「名前_pair.png」）。
         /// only を渡すとその名前の所だけ
         /// </summary>
         public static string Shoot(string dir, string only)
         {
-            return Run(dir, only, false);
+            return Run(dir, Only(only), false, s => ShootPair(s, dir));
         }
 
         /// <summary>Ps1 のパスを素通しにして撮る（減色の前の色）。中の 320×180 を「名前_raw.png」で置く。色の組を決めるとき使う</summary>
         public static string Raw(string dir, string only)
         {
-            return Run(dir, only, true);
+            return Run(dir, Only(only), true, s => ShootRaw(s, dir));
         }
 
-        static string Run(string dir, string only, bool raw)
+        /// <summary>減色＋ディザの強さの段。x が色の寄せ、y が点の濃さ。(1, 1) が強さを分ける前と同じ絵</summary>
+        public static readonly Vector2[] StrengthSteps =
+        {
+            new Vector2(1f, 1f),
+            new Vector2(0.6f, 0.6f),
+            new Vector2(0.45f, 0.45f),
+            new Vector2(0.3f, 0.3f),
+            new Vector2(0.3f, 0.6f),
+            new Vector2(0.6f, 0.3f),
+        };
+
+        /// <summary>強さを撮り比べる所。自室・路地裏・村の朝</summary>
+        public static readonly string[] StrengthSpots = { "room", "alley", "village" };
+
+        [MenuItem("HalfAware/Shoot the filter strengths", false, 187)]
+        public static void StrengthMenu()
+        {
+            Debug.Log(Strength(Path.Combine(ConsoleShot.Scratch, "filter_strength"), StrengthSteps, StrengthSpots));
+        }
+
+        /// <summary>
+        /// 減色＋ディザの強さを撮り比べる。names の所を、同じ目から標準と、steps の段ごとの減色＋ディザで撮って dir に置く
+        /// （「名前_standard.png」「名前_t060_d030.png」。数は色の寄せと点の濃さの百分率）。
+        /// 強さはグローバルの値を直に入れ替える（<see cref="ScreenFilter.Use(ScreenFilterKind, float, float)"/>）ので、段ごとにシェーダーを組み直さない
+        /// </summary>
+        public static string Strength(string dir, Vector2[] steps, params string[] names)
+        {
+            return Run(dir, names, false, s => ShootSteps(s, dir, steps));
+        }
+
+        /// <summary>段の絵の名。「名前_t060_d030」</summary>
+        public static string StepName(string spot, Vector2 step)
+        {
+            return string.Format("{0}_t{1:000}_d{2:000}", spot, Mathf.RoundToInt(step.x * 100f), Mathf.RoundToInt(step.y * 100f));
+        }
+
+        static string[] Only(string only)
+        {
+            return string.IsNullOrEmpty(only) ? null : new[] { only };
+        }
+
+        /// <summary>names の所（null なら全部）を、場面を開いて shoot で撮る。撮り終えたら型を標準へ戻し、撮る前の場面へ戻す</summary>
+        static string Run(string dir, string[] names, bool raw, Func<Spot, string> shoot)
         {
             if (EditorApplication.isPlaying) return "再生中は撮らない";
-            for (var i = 0; i < SceneManager.sceneCount; i++)
-                if (SceneManager.GetSceneAt(i).isDirty)
-                    return "開いている場面に未保存の変更がある。保存するか捨ててからもう一度: " + SceneManager.GetSceneAt(i).path;
+            var busy = Busy();
+            if (busy != null) return busy;
             var setup = EditorSceneManager.GetSceneManagerSetup();
             var sb = new StringBuilder();
             var async = ShaderUtil.allowAsyncCompilation;
@@ -91,7 +133,7 @@ namespace HalfAware.EditorTools
                 string open = null;
                 foreach (var s in Spots())
                 {
-                    if (!string.IsNullOrEmpty(only) && s.Name != only) continue;
+                    if (names != null && Array.IndexOf(names, s.Name) < 0) continue;
                     if (open != s.Scene)
                     {
                         var scene = EditorSceneManager.OpenScene("Assets/Scenes/" + s.Scene + ".unity", OpenSceneMode.Single);
@@ -100,7 +142,7 @@ namespace HalfAware.EditorTools
                         if (s.Scene == "Village") BuildVillage.SetHour(VillageHour.Hour.Morning);
                         if (s.Way == Way.Drive) Board();
                     }
-                    sb.AppendLine(raw ? ShootRaw(s, dir) : ShootPair(s, dir));
+                    sb.AppendLine(shoot(s));
                 }
             }
             catch (Exception e)
@@ -169,6 +211,37 @@ namespace HalfAware.EditorTools
             }
         }
 
+        /// <summary>標準と、steps の段ごとの減色＋ディザで一枚ずつ撮る</summary>
+        static string ShootSteps(Spot s, string dir, Vector2[] steps)
+        {
+            ScreenFilter.Use(ScreenFilterKind.Standard);
+            var shot = Take(s);
+            if (shot == null) return s.Name + ": カメラが無い";
+            try
+            {
+                CheckDiveSky.Save(shot, Path.Combine(dir, s.Name + "_standard.png"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(shot);
+            }
+            foreach (var step in steps)
+            {
+                ScreenFilter.Use(ScreenFilterKind.Dither, step.x, step.y);
+                shot = Take(s);
+                if (shot == null) return s.Name + ": カメラが無い";
+                try
+                {
+                    CheckDiveSky.Save(shot, Path.Combine(dir, StepName(s.Name, step) + ".png"));
+                }
+                finally
+                {
+                    Object.DestroyImmediate(shot);
+                }
+            }
+            return string.Format("{0} → {1}（標準と {2} 段）", s.Name, dir, steps.Length);
+        }
+
         static Texture2D Take(Spot s)
         {
             switch (s.Way)
@@ -209,15 +282,16 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 設定の枠のフィルターの行を撮る。コンソール（自室で開いた形）とタイトルの画面の二つを、
-        /// フィルターの行を選んだ形で、標準と減色＋ディザの二通り。設定の値は手元の辞書に差し替えて動かす（PlayerPrefs を汚さない）
+        /// 設定の枠を、画面全体で撮る。コンソール（自室で開いた形）とタイトルの画面の二つを、
+        /// フィルターの行を選んだ形で、標準（減色の強さ・ディザの強さの行が暗い）と減色＋ディザの二通り。
+        /// 標準では、効いていないディザの強さの行を選んだ形も撮る（「_standard_dots」）。
+        /// 設定の値は手元の辞書に差し替えて動かす（PlayerPrefs を汚さない）
         /// </summary>
         public static string Panels(string dir)
         {
             if (EditorApplication.isPlaying) return "再生中は撮らない";
-            for (var i = 0; i < SceneManager.sceneCount; i++)
-                if (SceneManager.GetSceneAt(i).isDirty)
-                    return "開いている場面に未保存の変更がある。保存するか捨ててからもう一度: " + SceneManager.GetSceneAt(i).path;
+            var busy = Busy();
+            if (busy != null) return busy;
             var setup = EditorSceneManager.GetSceneManagerSetup();
             var sb = new StringBuilder();
             var async = ShaderUtil.allowAsyncCompilation;
@@ -229,22 +303,28 @@ namespace HalfAware.EditorTools
                 var scene = EditorSceneManager.OpenScene("Assets/Scenes/Room.unity", OpenSceneMode.Single);
                 if (!scene.IsValid()) return "Room を開けない";
                 var paint = typeof(ImplantConsole).GetMethod("Paint", BindingFlags.NonPublic | BindingFlags.Instance);
-                foreach (ScreenFilterKind kind in Enum.GetValues(typeof(ScreenFilterKind)))
+                // 開いた時はカメラの速さ。一つ下がフィルター、三つ下がディザの強さ
+                var shots = new[]
                 {
-                    GameSettings.Filter.Value = (int)kind;
-                    ScreenFilter.Use(kind);
-                    var name = kind == ScreenFilterKind.Dither ? "dither" : "standard";
-                    sb.AppendLine(TitleShots.Console(Path.Combine(dir, "console_settings_" + name + ".png"), ConsolePanel.Settings, c =>
+                    new { Kind = ScreenFilterKind.Dither, Name = "dither", Down = 1 },
+                    new { Kind = ScreenFilterKind.Standard, Name = "standard", Down = 1 },
+                    new { Kind = ScreenFilterKind.Standard, Name = "standard_dots", Down = 3 },
+                };
+                foreach (var shot in shots)
+                {
+                    var down = shot.Down;
+                    GameSettings.Filter.Value = (int)shot.Kind;
+                    ScreenFilter.Apply();
+                    sb.AppendLine(TitleShots.Console(Path.Combine(dir, "console_settings_" + shot.Name + ".png"), ConsolePanel.Settings, c =>
                     {
-                        // フィルターの行を選ぶ（開いた時はカメラの速さ）
-                        c.Menu.MoveRow(1);
+                        c.Menu.MoveRow(down);
                         if (paint != null) paint.Invoke(c, null);
                     }));
-                    sb.AppendLine(TitleShots.Screen(Path.Combine(dir, "title_settings_" + name + ".png"), false, TitleShots.Sample(1), false,
+                    sb.AppendLine(TitleShots.Screen(Path.Combine(dir, "title_settings_" + shot.Name + ".png"), false, TitleShots.Sample(1), false,
                         stage: t =>
                         {
                             t.OpenSettings();
-                            t.Settings.List.MoveRow(1);
+                            t.Settings.List.MoveRow(down);
                             t.Settings.Paint();
                         }));
                 }
@@ -263,6 +343,31 @@ namespace HalfAware.EditorTools
                 EditorUtility.UnloadUnusedAssetsImmediate();
             }
             return sb.ToString().TrimEnd();
+        }
+
+        /// <summary>
+        /// 開いている場面に未保存の変更があれば、撮らない訳。無ければ null。
+        /// 保存されていない場面がカメラと灯りだけ（<see cref="Back"/> が撮り終えた後に作る物）なら、変更ありでも撮る（撮り終えたら同じ物を作り直す）
+        /// </summary>
+        static string Busy()
+        {
+            for (var i = 0; i < SceneManager.sceneCount; i++)
+            {
+                var scene = SceneManager.GetSceneAt(i);
+                if (scene.isDirty && !Blank(scene))
+                    return "開いている場面に未保存の変更がある。保存するか捨ててからもう一度: " + scene.path;
+            }
+            return null;
+        }
+
+        /// <summary>保存されていない場面で、置いてあるのが新しい場面の既定の物（Main Camera と Directional Light、子無し）だけか</summary>
+        static bool Blank(Scene scene)
+        {
+            if (!string.IsNullOrEmpty(scene.path)) return false;
+            foreach (var go in scene.GetRootGameObjects())
+                if ((go.name != "Main Camera" && go.name != "Directional Light") || go.transform.childCount > 0)
+                    return false;
+            return true;
         }
 
         /// <summary>二枚を左右に並べる。あいだは gap 画素の黒</summary>

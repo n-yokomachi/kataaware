@@ -194,6 +194,10 @@ namespace HalfAware
         RectTransform rememberBox;
         RectTransform recallBox;
         RectTransform settingsBox;
+        /// <summary>ボタンの並び・ログの枠・スクロールバー。設定の枠を開いている間は隠す（設定の枠がその上に重なる）</summary>
+        CanvasGroup buttonGroup;
+        CanvasGroup logGroup;
+        CanvasGroup barGroup;
         /// <summary>上書きの確かめ。画面いっぱいの当たり（下のボタンや行へクリックを通さない）と、その上の板</summary>
         RectTransform askLayer;
         RectTransform askBoard;
@@ -404,10 +408,16 @@ namespace HalfAware
             List();
             rememberBox = SlotBox("Remember", RememberTitle, ConsoleMenu.RememberRows, rememberRows);
             recallBox = SlotBox("Recall", RecallTitle, ConsoleMenu.RecallRows, recallRows);
-            // 設定の枠。記憶する・思い出すの枠と同じく、ログの枠の中の左上に重ねる
+            // 設定の枠。行がほかの枠より多く、ログの枠の中には収まらない（オーナー、2026-10-05「設定画面は画面全体使っていいよ」）。
+            // コンソールの枠の中の、ボタンの並びの上の縁から、ログの枠の下の縁までの真ん中に出す。開いている間はボタンの並びとログの枠を隠す（Paint）
+            var area = Rect(panel, "SettingsArea");
+            Stretch(area, HeadSide, HeadSide, ButtonTop, LogBottom);
             settingsPanel = new SettingsPanel(menu.Settings);
-            settingsBox = settingsPanel.Build(viewport.parent, ConsoleSettings.Title, heavy);
-            settingsBox.anchoredPosition = new Vector2(PadLeft, -PadTop);
+            settingsBox = settingsPanel.Build(area, ConsoleSettings.Title, heavy);
+            settingsBox.anchorMin = new Vector2(0.5f, 0.5f);
+            settingsBox.anchorMax = new Vector2(0.5f, 0.5f);
+            settingsBox.pivot = new Vector2(0.5f, 0.5f);
+            settingsBox.anchoredPosition = Vector2.zero;
             // 浮かべる板は最後に作って、いちばん上の層に置く。知らせは確かめよりさらに上
             BuildAsk();
             BuildNote();
@@ -559,6 +569,7 @@ namespace HalfAware
         {
             var row = Rect(panel, "Buttons");
             Top(row, HeadSide, HeadSide, ButtonTop, ButtonHeight);
+            buttonGroup = row.gameObject.AddComponent<CanvasGroup>();
             var n = ConsoleMenu.Labels.Length;
             for (var i = 0; i < n; i++)
             {
@@ -591,6 +602,7 @@ namespace HalfAware
         {
             var frame = Rect(panel, "Log");
             Stretch(frame, LogSide, LogSide, LogTop, LogBottom);
+            logGroup = frame.gameObject.AddComponent<CanvasGroup>();
             Border(frame, LogLine, Line);
             viewport = Rect(frame, "Viewport");
             Stretch(viewport, PadLeft, PadRight, PadTop, PadBottom);
@@ -611,6 +623,7 @@ namespace HalfAware
             grip.pivot = new Vector2(0.5f, 0.5f);
             grip.offsetMin = new Vector2(-BarRight - BarGrip / 2f, BarBottom);
             grip.offsetMax = new Vector2(-BarRight + BarGrip / 2f, -BarTop);
+            barGroup = grip.gameObject.AddComponent<CanvasGroup>();
             var hitArea = grip.gameObject.AddComponent<Image>();
             hitArea.color = Clear;
             var track = Fill(grip, "Track", Track, false);
@@ -1274,8 +1287,14 @@ namespace HalfAware
                 : menu.Panel == ConsolePanel.Recall ? recallRows : null;
             if (slotRows != null)
                 for (var i = 0; i < slotRows.Count; i++) slotRows[i].PaintSlot(i == menu.Row, menu.Usable(i));
-            settingsBox.gameObject.SetActive(menu.Panel == ConsolePanel.Settings);
-            if (menu.Panel == ConsolePanel.Settings) settingsPanel.Paint();
+            var setting = menu.Panel == ConsolePanel.Settings;
+            settingsBox.gameObject.SetActive(setting);
+            if (setting) settingsPanel.Paint();
+            // 設定の枠を開いている間は、ボタンの並び・ログの枠・スクロールバーを隠す（設定の枠がその所に重なる）。
+            // 沈めて透かすと、ボタンの並びとログの枠の線が設定の枠の縁から覗いて混み合って見えた（2026-10-05 に撮り比べた）
+            Behind(buttonGroup, setting);
+            Behind(logGroup, setting);
+            Behind(barGroup, setting);
             if (askLayer.gameObject.activeSelf != menu.Asking) askLayer.gameObject.SetActive(menu.Asking);
             if (menu.Asking)
                 for (var i = 0; i < askCards.Count; i++) askCards[i].Paint(i == menu.Answer);
@@ -1283,6 +1302,13 @@ namespace HalfAware
             if (note.Visible) noteGroup.alpha = note.Alpha(Time.unscaledTime);
             var size = root.rect.size;
             if (size.x > 0f && size.y > 0f) scan.uvRect = new Rect(0f, 0f, 1f, size.y / (3f * Dot));
+        }
+
+        /// <summary>設定の枠の後ろになる物。開いている間は隠して、押せなくする</summary>
+        static void Behind(CanvasGroup group, bool setting)
+        {
+            group.alpha = setting ? 0f : 1f;
+            group.blocksRaycasts = !setting;
         }
 
         // ---- 部品 ------------------------------------------------------------

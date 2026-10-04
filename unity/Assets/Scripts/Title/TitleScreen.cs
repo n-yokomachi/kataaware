@@ -15,7 +15,7 @@ namespace HalfAware
     ///
     /// 黒い画面に、眼球インプラントが立ち上がる短い表示が一行ずつ流れ、そのあと背景が明けて、
     /// コンソールと同じ青緑の枠・題（HALF AWARE／かたあはれ）・ボタン（はじめる・思い出す・設定）が出る。制作の表記は出さない。
-    /// 設定はコンソールと同じ設定の枠（<see cref="SettingsPanel"/>）を、思い出すの枠と同じく横の真ん中、題の読みの下に出す。
+    /// 設定はコンソールと同じ設定の枠（<see cref="SettingsPanel"/>）を、横の真ん中に出す。開いている間は題と読みを隠す。
     ///
     /// **背景は前もって撮った絵。** クリアの印があれば朝の村、無ければいちばん新しいセーブの場面、セーブが無ければ自室
     /// （<see cref="TitleBackdrops.Pick"/>）。タイトルのために重い場面を読まない。絵は組み立ての道具
@@ -99,10 +99,11 @@ namespace HalfAware
         const float MenuTop = 0.60f;
         const float ListTop = 0.56f;
         /// <summary>
-        /// 設定の枠の下の縁を、枠の下の線からどれだけ上に置くか。設定の枠は思い出すの枠より背が高い（小見出しが二つ）ので、
-        /// 上を <see cref="ListTop"/> に揃えると下の線を越える。下を揃えて、上は題の読みの下に収める
+        /// 設定の枠の縦の真ん中（上からの割合）。起動の表示の下の縁（上から 25% ほど）と、枠の下の線（95%）の真ん中。
+        /// 設定の枠は題と読みのある所まで届くので、開いている間は題と読みを隠す（オーナー、2026-10-05「設定画面は画面全体使っていいよ」）。
+        /// 行があと二つ増えても、起動の表示と枠の下の線のあいだに収まる
         /// </summary>
-        const float SettingsLift = 2f * Dot;
+        const float SettingsMiddle = 0.6f;
 
         const float Line = 1f * Dot;
         const float HookSize = 12f * Dot;
@@ -632,6 +633,8 @@ namespace HalfAware
                 }
             settingsBox.gameObject.SetActive(phase == Phase.Settings);
             if (phase == Phase.Settings) settingsPanel.Paint();
+            // 題と読みは、設定の枠と同じ時に隠して出す（設定の枠がその所まで届く）
+            if (nameCanvas != null) nameCanvas.enabled = phase != Phase.Settings;
             var size = root.rect.size;
             if (size.x > 0f && size.y > 0f) scan.uvRect = new Rect(0f, 0f, 1f, size.y / (3f * Dot));
         }
@@ -979,7 +982,7 @@ namespace HalfAware
 
         /// <summary>
         /// 設定の枠。コンソールと同じ物（<see cref="SettingsPanel"/>）を、思い出すの枠と同じく横の真ん中に出す。
-        /// 縦は下の縁を枠の下の線の <see cref="SettingsLift"/> 上に揃える（思い出すの枠より背が高いので、上を揃えると下の線を越える）。
+        /// 縦は真ん中を <see cref="SettingsMiddle"/> に置く。開いている間は題と読みを隠す（<see cref="Paint"/>）。
         /// 行はコンソールと同じ表の最後に「戻る」
         /// </summary>
         void BuildSettings(RectTransform parent)
@@ -987,11 +990,14 @@ namespace HalfAware
             settingsPanel = new SettingsPanel(settings);
             settingsPanel.Back = CloseSettings;
             settingsBox = settingsPanel.Build(parent, ConsoleSettings.Title, heavy);
-            settingsBox.anchorMin = new Vector2(0.5f, FrameInset);
-            settingsBox.anchorMax = new Vector2(0.5f, FrameInset);
-            settingsBox.pivot = new Vector2(0.5f, 0f);
-            settingsBox.anchoredPosition = new Vector2(0f, SettingsLift);
+            settingsBox.anchorMin = new Vector2(0.5f, 1f - SettingsMiddle);
+            settingsBox.anchorMax = new Vector2(0.5f, 1f - SettingsMiddle);
+            settingsBox.pivot = new Vector2(0.5f, 0.5f);
+            settingsBox.anchoredPosition = Vector2.zero;
         }
+
+        /// <summary>題と読みを出しているか。設定の枠を開いている間は隠す。確認用</summary>
+        public bool NamesShown { get { return nameCanvas != null && nameCanvas.enabled; } }
 
         /// <summary>思い出すの枠。自動・1・2・3 と、戻る。空きは薄くして押せない</summary>
         void BuildList(RectTransform parent)

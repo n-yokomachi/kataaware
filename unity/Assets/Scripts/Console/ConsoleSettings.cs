@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace HalfAware
@@ -30,38 +31,48 @@ namespace HalfAware
         public readonly SettingDial Dial;
         /// <summary>選ぶ行が動かす値。ほかの行は null</summary>
         public readonly SettingChoice Choice;
+        /// <summary>行の値がいま効いているかを返す。null ならいつも効いている</summary>
+        readonly Func<bool> live;
 
-        SettingRow(SettingKind kind, string label, SettingDial dial, SettingChoice choice)
+        SettingRow(SettingKind kind, string label, SettingDial dial, SettingChoice choice, Func<bool> live)
         {
             Kind = kind;
             Label = label;
             Dial = dial;
             Choice = choice;
+            this.live = live;
         }
+
+        /// <summary>
+        /// 行の値がいま効いているか。効いていない行（フィルターが標準の時の減色の強さ・ディザの強さ）も出したまま、
+        /// 名と値を暗くして見せる。選べて、動かせる（動かした値は、効く型にした時に効く）
+        /// </summary>
+        public bool Live { get { return live == null || live(); } }
 
         public static SettingRow Heading(string label)
         {
-            return new SettingRow(SettingKind.Heading, label, null, null);
+            return new SettingRow(SettingKind.Heading, label, null, null, null);
         }
 
-        public static SettingRow Of(string label, SettingDial dial)
+        /// <summary>つまみの行。live を渡すと、それが偽を返す間は名と値を暗くする</summary>
+        public static SettingRow Of(string label, SettingDial dial, Func<bool> live = null)
         {
-            return new SettingRow(SettingKind.Dial, label, dial, null);
+            return new SettingRow(SettingKind.Dial, label, dial, null, live);
         }
 
         public static SettingRow Of(string label, SettingChoice choice)
         {
-            return new SettingRow(SettingKind.Choice, label, null, choice);
+            return new SettingRow(SettingKind.Choice, label, null, choice, null);
         }
 
         public static SettingRow Reset(string label)
         {
-            return new SettingRow(SettingKind.Reset, label, null, null);
+            return new SettingRow(SettingKind.Reset, label, null, null, null);
         }
 
         public static SettingRow Back(string label)
         {
-            return new SettingRow(SettingKind.Back, label, null, null);
+            return new SettingRow(SettingKind.Back, label, null, null, null);
         }
 
         /// <summary>選べる行か。小見出しは選べない</summary>
@@ -81,6 +92,8 @@ namespace HalfAware
         public const string LookSpeed = "カメラの速さ";
         public const string Display = "画面";
         public const string Filter = "フィルター";
+        public const string FilterTint = "減色の強さ";
+        public const string FilterDots = "ディザの強さ";
         public const string ResetLabel = "既定に戻す";
 
         /// <summary>上から並べる行</summary>
@@ -90,8 +103,16 @@ namespace HalfAware
             SettingRow.Of(LookSpeed, GameSettings.LookScale),
             SettingRow.Heading(Display),
             SettingRow.Of(Filter, GameSettings.Filter),
+            SettingRow.Of(FilterTint, GameSettings.FilterTint, Dithering),
+            SettingRow.Of(FilterDots, GameSettings.FilterDots, Dithering),
             SettingRow.Reset(ResetLabel),
         };
+
+        /// <summary>減色の強さ・ディザの強さが効くか。フィルターが減色＋ディザの時だけ（標準の型には効かない）</summary>
+        public static bool Dithering()
+        {
+            return GameSettings.Filter.Value == (int)ScreenFilterKind.Dither;
+        }
 
         /// <summary><see cref="Rows"/> の最後に「戻る」の行を足した表。タイトルの画面の枠に使う</summary>
         public static SettingRow[] WithBack(string label)

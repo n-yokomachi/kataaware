@@ -9,7 +9,7 @@ namespace HalfAware.Tests
 {
     /// <summary>
     /// 画面のフィルター（設計書 2.5 節・1 節の設定）。設定の値（既定・残して読み直す・知らない符丁・左右と回り・知らせ）、
-    /// シェーダーへの渡し方（グローバルの値）、色の組・近い二色の表・点の模様とマテリアルの繋ぎ、シェーダーが WebGL（GLES3）で通るか
+    /// シェーダーへの渡し方（型と二つの強さのグローバルの値）、色の組・近い二色の表・点の模様とマテリアルの繋ぎ、シェーダーが WebGL（GLES3）で通るか
     /// </summary>
     public class ScreenFilterTests
     {
@@ -134,8 +134,36 @@ namespace HalfAware.Tests
             {
                 var shader = Shader.Find(name);
                 Assert.IsNotNull(shader, name);
-                Assert.AreEqual(-1, shader.FindPropertyIndex(ScreenFilter.GlobalName), name);
+                foreach (var global in new[] { ScreenFilter.GlobalName, ScreenFilter.TintName, ScreenFilter.DotsName })
+                    Assert.AreEqual(-1, shader.FindPropertyIndex(global), name + ": " + global);
             }
+        }
+
+        [Test]
+        public void TheStrengthsReachTheShadersWithTheKind()
+        {
+            Assert.AreEqual("_HaFilterTint", ScreenFilter.TintName);
+            Assert.AreEqual("_HaFilterDots", ScreenFilter.DotsName);
+            // 値を直に渡す形（撮り比べ）。0〜1 に収める
+            ScreenFilter.Use(ScreenFilterKind.Dither, 0.3f, 0.7f);
+            Assert.AreEqual(1f, Shader.GetGlobalFloat(ScreenFilter.GlobalName));
+            Assert.AreEqual(0.3f, Shader.GetGlobalFloat(ScreenFilter.TintName), 1e-6f);
+            Assert.AreEqual(0.7f, Shader.GetGlobalFloat(ScreenFilter.DotsName), 1e-6f);
+            ScreenFilter.Use(ScreenFilterKind.Dither, -1f, 3f);
+            Assert.AreEqual(0f, Shader.GetGlobalFloat(ScreenFilter.TintName));
+            Assert.AreEqual(1f, Shader.GetGlobalFloat(ScreenFilter.DotsName));
+            // 型だけ渡すと既定の強さ
+            ScreenFilter.Use(ScreenFilterKind.Dither);
+            Assert.AreEqual(ScreenFilter.DefaultTint, Shader.GetGlobalFloat(ScreenFilter.TintName), 1e-6f);
+            Assert.AreEqual(ScreenFilter.DefaultDots, Shader.GetGlobalFloat(ScreenFilter.DotsName), 1e-6f);
+            // 設定から効かせると、設定の強さ
+            GameSettings.Filter.Value = (int)ScreenFilterKind.Dither;
+            GameSettings.FilterTint.Value = 0.25f;
+            GameSettings.FilterDots.Value = 0.8f;
+            ScreenFilter.Apply();
+            Assert.AreEqual(ScreenFilterKind.Dither, ScreenFilter.InEffect);
+            Assert.AreEqual(0.25f, Shader.GetGlobalFloat(ScreenFilter.TintName), 1e-6f);
+            Assert.AreEqual(0.8f, Shader.GetGlobalFloat(ScreenFilter.DotsName), 1e-6f);
         }
 
         [Test]
@@ -162,6 +190,13 @@ namespace HalfAware.Tests
                 GameSettings.ResetAll();
                 Assert.AreEqual(ScreenFilterKind.Standard, ScreenFilter.InEffect, "既定に戻すでも効く");
                 Filter.Value = 1;
+                // 強さのつまみも、動かすとその場で効く
+                GameSettings.FilterTint.Value = 0.3f;
+                Assert.AreEqual(0.3f, Shader.GetGlobalFloat(ScreenFilter.TintName), 1e-6f);
+                GameSettings.FilterDots.Value = 0.5f;
+                GameSettings.FilterDots.Nudge(2);
+                Assert.AreEqual(0.6f, Shader.GetGlobalFloat(ScreenFilter.DotsName), 1e-6f);
+                Assert.AreEqual(ScreenFilterKind.Dither, ScreenFilter.InEffect);
             }
             finally
             {
@@ -171,6 +206,8 @@ namespace HalfAware.Tests
             Filter.Value = 0;
             Filter.Value = 1;
             Assert.AreEqual(ScreenFilterKind.Standard, ScreenFilter.InEffect, "遊び終えた後は設定を動かしても画面は変わらない");
+            GameSettings.FilterTint.Value = 0.9f;
+            Assert.AreEqual(ScreenFilter.DefaultTint, Shader.GetGlobalFloat(ScreenFilter.TintName), 1e-6f, "強さのつまみも繋がっていない");
         }
 
         // ---- 色の組・点の模様・マテリアル --------------------------------------

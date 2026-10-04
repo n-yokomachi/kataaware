@@ -1,5 +1,5 @@
 // タイトルの画面の背景の絵（前もって撮った 320×180）を敷く。設定の「フィルター」が減色＋ディザのときは、
-// 3D の絵に Ps1 のパスが掛けるのと同じ色の組と点の模様で減色する（ScreenFilter.hlsl）。標準のときは絵をそのまま出す
+// 3D の絵に Ps1 のパスが掛けるのと同じ色の組と点の模様、同じ強さで減色する（ScreenFilter.hlsl）。標準のときは絵をそのまま出す
 // （絵は標準の加工で撮ってある）。点の模様は絵の画素の座標で引くので、一つの点がゲームの低解像度の 1 画素と同じ大きさになる。
 // 最近傍で引き伸ばすのは絵の側（filterMode = Point）。マテリアルは Resources/ScreenFilterPicture（TitleScreen が読む）
 Shader "HalfAware/FilteredPicture"
