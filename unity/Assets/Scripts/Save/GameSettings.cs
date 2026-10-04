@@ -1,17 +1,37 @@
+using System;
 using System.Globalization;
 using UnityEngine;
 
 namespace HalfAware
 {
     /// <summary>
+    /// 設定の一つの値の共通の形。鍵と、既定へ戻す・鍵から読み直す。
+    /// 値の形は二つ: 範囲と刻みのある数（<see cref="SettingDial"/>、つまみ）と、名の中から一つを選ぶ物（<see cref="SettingChoice"/>）
+    /// </summary>
+    public abstract class SettingValue
+    {
+        /// <summary>PlayerPrefs の鍵</summary>
+        public readonly string Key;
+
+        protected SettingValue(string key)
+        {
+            Key = key;
+        }
+
+        /// <summary>既定へ戻す</summary>
+        public abstract void Reset();
+
+        /// <summary>覚えている値を捨てる。次に読む時に鍵から読み直す</summary>
+        internal abstract void Forget();
+    }
+
+    /// <summary>
     /// 設定の一つの値（倍率など）。範囲・刻み・既定を持ち、書くたびに範囲へ収めて刻みへ揃える。
     /// 読み書きは <see cref="GameSettings.Box"/>。初めて読む時に鍵から読み、書くとすぐ鍵へ書く（Flush は <see cref="GameSettings.Tick"/>・<see cref="GameSettings.Commit"/>）。
     /// 見せ方は持たない（コンソールの設定の枠、<see cref="ConsoleSettings"/>）
     /// </summary>
-    public sealed class SettingDial
+    public sealed class SettingDial : SettingValue
     {
-        /// <summary>PlayerPrefs の鍵</summary>
-        public readonly string Key;
         public readonly float Min;
         public readonly float Max;
         public readonly float Step;
@@ -22,9 +42,8 @@ namespace HalfAware
         float value;
         bool loaded;
 
-        public SettingDial(string key, float min, float max, float step, float fallback, string suffix)
+        public SettingDial(string key, float min, float max, float step, float fallback, string suffix) : base(key)
         {
-            Key = key;
             Min = min;
             Max = max;
             Step = step;
@@ -71,7 +90,7 @@ namespace HalfAware
         }
 
         /// <summary>既定へ戻す</summary>
-        public void Reset()
+        public override void Reset()
         {
             Value = Default;
         }
@@ -112,7 +131,109 @@ namespace HalfAware
         }
 
         /// <summary>覚えている値を捨てる。次に読む時に鍵から読み直す</summary>
-        internal void Forget()
+        internal override void Forget()
+        {
+            loaded = false;
+        }
+    }
+
+    /// <summary>
+    /// 設定の、いくつかの名の中から一つを選ぶ値（画面のフィルターの型など）。左右で一つずつ動かし、両端で止まる。
+    /// 鍵には選んだ物の符丁（<see cref="Ids"/>）を書く。数で書かないのは、並びを入れ替えたり間に足したりしても、残した選びがずれないようにするため。
+    /// 読み書きと Flush は <see cref="SettingDial"/> と同じ。値が変わったら <see cref="Changed"/> で知らせる（その場で画面へ効かせる）
+    /// </summary>
+    public sealed class SettingChoice : SettingValue
+    {
+        /// <summary>鍵に書く符丁。並びの順</summary>
+        public readonly string[] Ids;
+        /// <summary>設定の枠に出す名。並びの順</summary>
+        public readonly string[] Labels;
+        /// <summary>既定の番号</summary>
+        public readonly int Default;
+
+        int value;
+        bool loaded;
+
+        /// <summary>値が変わった（書いた・既定に戻した）。鍵から読み直しただけでは呼ばない</summary>
+        public event Action Changed;
+
+        public SettingChoice(string key, string[] ids, string[] labels, int fallback) : base(key)
+        {
+            Ids = ids ?? new string[0];
+            Labels = labels ?? Ids;
+            Default = Mathf.Clamp(fallback, 0, Mathf.Max(0, Ids.Length - 1));
+        }
+
+        /// <summary>選べる物の数</summary>
+        public int Count { get { return Ids.Length; } }
+
+        /// <summary>いまの番号。書くと範囲へ収めて、鍵へ符丁を書く</summary>
+        public int Value
+        {
+            get
+            {
+                Load();
+                return value;
+            }
+            set
+            {
+                Load();
+                var v = Clamp(value);
+                if (v == this.value) return;
+                this.value = v;
+                if (Count > 0) GameSettings.Put(Key, Ids[v]);
+                if (Changed != null) Changed();
+            }
+        }
+
+        /// <summary>範囲へ収める</summary>
+        public int Clamp(int v)
+        {
+            return Mathf.Clamp(v, 0, Mathf.Max(0, Count - 1));
+        }
+
+        /// <summary>steps 個だけ動かす。両端で止まる</summary>
+        public void Nudge(int steps)
+        {
+            if (steps == 0) return;
+            Value = Value + steps;
+        }
+
+        /// <summary>次の物へ。最後の次は最初へ回る（マウスで名を押した時）</summary>
+        public void Cycle()
+        {
+            if (Count == 0) return;
+            Value = (Value + 1) % Count;
+        }
+
+        public override void Reset()
+        {
+            Value = Default;
+        }
+
+        /// <summary>番号 v の名</summary>
+        public string Text(int v)
+        {
+            return Count > 0 ? Labels[Clamp(v)] : string.Empty;
+        }
+
+        /// <summary>鍵に書いてあった符丁から番号。無い・知らない符丁は既定</summary>
+        public int Parse(string text)
+        {
+            if (!string.IsNullOrEmpty(text))
+                for (var i = 0; i < Ids.Length; i++)
+                    if (Ids[i] == text) return i;
+            return Default;
+        }
+
+        void Load()
+        {
+            if (loaded) return;
+            loaded = true;
+            value = Parse(GameSettings.Box.Get(Key));
+        }
+
+        internal override void Forget()
         {
             loaded = false;
         }
@@ -143,8 +264,14 @@ namespace HalfAware
         /// <summary>カメラの速さの既定の倍率。「既定に戻す」もここへ戻す</summary>
         public const float DefaultLookScale = 1.5f;
 
+        /// <summary>
+        /// 画面のフィルターの型（<see cref="ScreenFilter"/>）。「標準」（粗い画面に規則的な点）と「減色＋ディザ」（色の数を絞り、散らばった点で埋める）。
+        /// 既定は標準（オーナー、2026-10-05「ゲームにかけているフィルターだけど、この動画と同じようなパターンも作れる？設定から変更できるといい」）
+        /// </summary>
+        public static readonly SettingChoice Filter = new SettingChoice(KeyPrefix + "Filter", ScreenFilter.Ids, ScreenFilter.Labels, (int)ScreenFilterKind.Standard);
+
         /// <summary>持っている値の全部。値を足したらここにも足す（読み直しと既定に戻すが回る）</summary>
-        public static readonly SettingDial[] All = { LookScale };
+        public static readonly SettingValue[] All = { LookScale, Filter };
 
         /// <summary>動きが止まってから Flush するまでの秒</summary>
         public const float SaveDelay = 0.5f;

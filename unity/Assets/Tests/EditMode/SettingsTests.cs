@@ -6,7 +6,7 @@ namespace HalfAware.Tests
 {
     /// <summary>
     /// コンソールの設定の枠（設計書 1 節）。カメラの速さの範囲と刻み、残して読み直す（動きが止まってから書く）、
-    /// 見回しの速さへの効き（マウスとスティック）、枠の上下と左右、右クリック（Esc）の戻り方、マウスの押した所からの値、左右の押し続け
+    /// 見回しの速さへの効き（マウスとスティック）、枠の上下と左右（つまみとフィルター）、右クリック（Esc）の戻り方、マウスの押した所からの値、左右の押し続け
     /// </summary>
     public class SettingsTests
     {
@@ -25,6 +25,7 @@ namespace HalfAware.Tests
             GameSettings.Box = null;
             SaveStore.Box = null;
             ConsoleMenu.DebugOverride = null;
+            ScreenFilter.Use(ScreenFilterKind.Standard);
         }
 
         static SettingDial Look { get { return GameSettings.LookScale; } }
@@ -174,9 +175,12 @@ namespace HalfAware.Tests
         public void ResetBringsEverythingBackToDefault()
         {
             Look.Value = 0.4f;
+            GameSettings.Filter.Value = (int)ScreenFilterKind.Dither;
             GameSettings.ResetAll();
             Assert.AreEqual(1.5f, Look.Value);
             Assert.AreEqual("1.5", box.Get(Look.Key));
+            Assert.AreEqual((int)ScreenFilterKind.Standard, GameSettings.Filter.Value);
+            Assert.AreEqual("Standard", box.Get(GameSettings.Filter.Key));
         }
 
         // ---- 見回しの速さ ------------------------------------------------------
@@ -261,17 +265,24 @@ namespace HalfAware.Tests
         // ---- 枠の上下と左右 ----------------------------------------------------
 
         [Test]
-        public void TheTableHasTheCameraHeadingItsSpeedAndReset()
+        public void TheTableHasTheCameraTheScreenAndReset()
         {
             var rows = ConsoleSettings.Rows;
-            Assert.AreEqual(3, rows.Length);
+            Assert.AreEqual(5, rows.Length);
             Assert.AreEqual(SettingKind.Heading, rows[0].Kind);
             Assert.AreEqual("カメラ", rows[0].Label);
             Assert.AreEqual(SettingKind.Dial, rows[1].Kind);
             Assert.AreEqual("カメラの速さ", rows[1].Label);
             Assert.AreSame(GameSettings.LookScale, rows[1].Dial);
-            Assert.AreEqual(SettingKind.Reset, rows[2].Kind);
-            Assert.AreEqual("既定に戻す", rows[2].Label);
+            Assert.IsNull(rows[1].Choice);
+            Assert.AreEqual(SettingKind.Heading, rows[2].Kind);
+            Assert.AreEqual("画面", rows[2].Label);
+            Assert.AreEqual(SettingKind.Choice, rows[3].Kind);
+            Assert.AreEqual("フィルター", rows[3].Label);
+            Assert.AreSame(GameSettings.Filter, rows[3].Choice);
+            Assert.IsNull(rows[3].Dial);
+            Assert.AreEqual(SettingKind.Reset, rows[4].Kind);
+            Assert.AreEqual("既定に戻す", rows[4].Label);
             Assert.AreEqual("設定　　←→ で変える", ConsoleSettings.Title);
         }
 
@@ -285,26 +296,36 @@ namespace HalfAware.Tests
         }
 
         [Test]
-        public void SettingsOpensOnTheCameraSpeedAndSkipsTheHeading()
+        public void SettingsOpensOnTheCameraSpeedAndSkipsTheHeadings()
         {
             var m = OpenSettings();
             Assert.AreEqual(1, m.Row, "小見出しの次から");
             Assert.AreSame(GameSettings.LookScale, m.RowDial);
             Assert.AreEqual(ConsoleSettings.Rows.Length, m.Rows);
             m.MoveRow(1);
-            Assert.AreEqual(2, m.Row);
+            Assert.AreEqual(3, m.Row, "画面の小見出しを飛ばしてフィルターへ");
             Assert.IsNull(m.RowDial);
-            Assert.AreEqual(SettingKind.Reset, m.SettingRow.Kind);
+            Assert.AreEqual(SettingKind.Choice, m.SettingRow.Kind);
+            Assert.AreSame(GameSettings.Filter, m.Settings.Choice);
             m.MoveRow(1);
-            Assert.AreEqual(2, m.Row, "下の端で止まる");
+            Assert.AreEqual(4, m.Row);
+            Assert.AreEqual(SettingKind.Reset, m.SettingRow.Kind);
+            Assert.IsNull(m.Settings.Choice);
+            m.MoveRow(1);
+            Assert.AreEqual(4, m.Row, "下の端で止まる");
             m.MoveRow(-1);
             m.MoveRow(-1);
             Assert.AreEqual(1, m.Row, "小見出しへは上がらない");
+            m.MoveRow(-1);
+            Assert.AreEqual(1, m.Row);
             m.HoverRow(0);
             Assert.AreEqual(1, m.Row, "小見出しに重ねても選ばない");
             Assert.IsFalse(m.Usable(0));
+            Assert.IsFalse(m.Usable(2));
             m.HoverRow(2);
-            Assert.AreEqual(2, m.Row);
+            Assert.AreEqual(1, m.Row);
+            m.HoverRow(4);
+            Assert.AreEqual(4, m.Row);
         }
 
         [Test]
@@ -320,12 +341,34 @@ namespace HalfAware.Tests
             Assert.AreEqual(ConsoleAction.Settings, m.Selected, "ボタンは動かない");
             Assert.AreEqual(ConsolePanel.Settings, m.Panel, "枠は閉じない");
             // 既定に戻すの行では、左右は何もしない
-            m.MoveRow(1);
+            m.MoveRow(2);
+            Assert.AreEqual(SettingKind.Reset, m.SettingRow.Kind);
             m.Move(1);
             m.Move(-1);
             Assert.AreEqual(1.4f, Look.Value, 1e-6f);
+            Assert.AreEqual((int)ScreenFilterKind.Standard, GameSettings.Filter.Value);
             Assert.AreEqual(ConsoleAction.Settings, m.Selected);
             Assert.AreEqual(ConsolePanel.Settings, m.Panel);
+        }
+
+        [Test]
+        public void LeftAndRightSwitchTheFilterOnItsRow()
+        {
+            var m = OpenSettings();
+            m.MoveRow(1);
+            Assert.AreEqual(SettingKind.Choice, m.SettingRow.Kind);
+            m.Move(-1);
+            Assert.AreEqual((int)ScreenFilterKind.Standard, GameSettings.Filter.Value, "左の端で止まる");
+            m.Move(1);
+            Assert.AreEqual((int)ScreenFilterKind.Dither, GameSettings.Filter.Value);
+            Assert.AreEqual("Dither", box.Get(GameSettings.Filter.Key), "動かしたら鍵へ書く");
+            m.Move(1);
+            Assert.AreEqual((int)ScreenFilterKind.Dither, GameSettings.Filter.Value, "右の端で止まる");
+            Assert.AreEqual(1.5f, Look.Value, "カメラの速さは動かない");
+            Assert.AreEqual(ConsoleAction.Settings, m.Selected, "ボタンは動かない");
+            Assert.AreEqual(ConsolePanel.Settings, m.Panel, "枠は閉じない");
+            m.Move(-1);
+            Assert.AreEqual((int)ScreenFilterKind.Standard, GameSettings.Filter.Value);
         }
 
         [Test]
@@ -333,11 +376,16 @@ namespace HalfAware.Tests
         {
             var m = OpenSettings();
             Look.Value = 1.6f;
+            GameSettings.Filter.Value = (int)ScreenFilterKind.Dither;
             Assert.IsFalse(m.ResetSettings(), "つまみの行では戻さない");
             Assert.AreEqual(1.6f, Look.Value, 1e-6f);
             m.MoveRow(1);
+            Assert.IsFalse(m.ResetSettings(), "フィルターの行では戻さない");
+            Assert.AreEqual((int)ScreenFilterKind.Dither, GameSettings.Filter.Value);
+            m.MoveRow(1);
             Assert.IsTrue(m.ResetSettings());
             Assert.AreEqual(1.5f, Look.Value);
+            Assert.AreEqual((int)ScreenFilterKind.Standard, GameSettings.Filter.Value, "フィルターも標準へ戻す");
             Assert.AreEqual(ConsolePanel.Settings, m.Panel, "枠は開いたまま");
         }
 

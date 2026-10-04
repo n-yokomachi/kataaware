@@ -11,6 +11,9 @@ namespace HalfAware
         /// <summary>つまみ（スライダー）で値を動かす項目</summary>
         Dial,
 
+        /// <summary>いくつかの名の中から一つを、左右で選ぶ項目（フィルター）</summary>
+        Choice,
+
         /// <summary>既定に戻す。E・Enter か押すと、全部の値を既定へ戻す</summary>
         Reset,
 
@@ -25,32 +28,40 @@ namespace HalfAware
         public readonly string Label;
         /// <summary>つまみの行が動かす値。ほかの行は null</summary>
         public readonly SettingDial Dial;
+        /// <summary>選ぶ行が動かす値。ほかの行は null</summary>
+        public readonly SettingChoice Choice;
 
-        SettingRow(SettingKind kind, string label, SettingDial dial)
+        SettingRow(SettingKind kind, string label, SettingDial dial, SettingChoice choice)
         {
             Kind = kind;
             Label = label;
             Dial = dial;
+            Choice = choice;
         }
 
         public static SettingRow Heading(string label)
         {
-            return new SettingRow(SettingKind.Heading, label, null);
+            return new SettingRow(SettingKind.Heading, label, null, null);
         }
 
         public static SettingRow Of(string label, SettingDial dial)
         {
-            return new SettingRow(SettingKind.Dial, label, dial);
+            return new SettingRow(SettingKind.Dial, label, dial, null);
+        }
+
+        public static SettingRow Of(string label, SettingChoice choice)
+        {
+            return new SettingRow(SettingKind.Choice, label, null, choice);
         }
 
         public static SettingRow Reset(string label)
         {
-            return new SettingRow(SettingKind.Reset, label, null);
+            return new SettingRow(SettingKind.Reset, label, null, null);
         }
 
         public static SettingRow Back(string label)
         {
-            return new SettingRow(SettingKind.Back, label, null);
+            return new SettingRow(SettingKind.Back, label, null, null);
         }
 
         /// <summary>選べる行か。小見出しは選べない</summary>
@@ -68,6 +79,8 @@ namespace HalfAware
         public const string Title = ConsoleMenu.SettingsLabel + "　　←→ で変える";
         public const string Camera = "カメラ";
         public const string LookSpeed = "カメラの速さ";
+        public const string Display = "画面";
+        public const string Filter = "フィルター";
         public const string ResetLabel = "既定に戻す";
 
         /// <summary>上から並べる行</summary>
@@ -75,6 +88,8 @@ namespace HalfAware
         {
             SettingRow.Heading(Camera),
             SettingRow.Of(LookSpeed, GameSettings.LookScale),
+            SettingRow.Heading(Display),
+            SettingRow.Of(Filter, GameSettings.Filter),
             SettingRow.Reset(ResetLabel),
         };
 
@@ -101,7 +116,7 @@ namespace HalfAware
 
     /// <summary>
     /// 設定の枠の行の選びと、値の動かし（見せ方は持たない）。コンソール（<see cref="ConsoleMenu"/> が持つ）と
-    /// タイトルの画面が、それぞれ一つずつ持つ。上下で選べる行（小見出しは飛ばす）を選び、つまみの行なら左右で値を動かす
+    /// タイトルの画面が、それぞれ一つずつ持つ。上下で選べる行（小見出しは飛ばす）を選び、つまみの行・選ぶ行なら左右で値を動かす
     /// </summary>
     public sealed class SettingsList
     {
@@ -170,12 +185,32 @@ namespace HalfAware
             }
         }
 
-        /// <summary>選んでいるつまみを step 刻みだけ動かす。両端で止まる。つまみの行でなければ false</summary>
+        /// <summary>選んでいる、選ぶ行が動かす値。選ぶ行を選んでいなければ null</summary>
+        public SettingChoice Choice
+        {
+            get
+            {
+                var row = Selected;
+                return row != null ? row.Choice : null;
+            }
+        }
+
+        /// <summary>
+        /// 選んでいるつまみを step 刻みだけ、選ぶ行なら step 個だけ動かす。両端で止まる。
+        /// つまみの行でも選ぶ行でもなければ false
+        /// </summary>
         public bool Nudge(int step)
         {
+            if (step == 0) return false;
             var dial = Dial;
-            if (dial == null || step == 0) return false;
-            dial.Nudge(step);
+            if (dial != null)
+            {
+                dial.Nudge(step);
+                return true;
+            }
+            var choice = Choice;
+            if (choice == null) return false;
+            choice.Nudge(step);
             return true;
         }
 

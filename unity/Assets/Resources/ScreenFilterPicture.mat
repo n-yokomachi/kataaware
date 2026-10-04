@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Ps1
-  m_Shader: {fileID: 4800000, guid: 56d47e4632d374e458c142f6a4b9f137, type: 3}
+  m_Name: ScreenFilterPicture
+  m_Shader: {fileID: 4800000, guid: 81a26b226e4ec844ea67265de0602743, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -35,11 +35,12 @@ Material:
         m_Texture: {fileID: 2800000, guid: cc14868ac385d744080c0988862ddf46, type: 2}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
-    m_Floats:
-    - _Amount: 1
-    - _Dither: 1
-    - _Levels: 32
+    m_Floats: []
     m_Colors: []
   m_BuildTextureStacks: []
   m_AllowLocking: 1

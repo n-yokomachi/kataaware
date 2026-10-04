@@ -15,13 +15,14 @@ namespace HalfAware
     ///
     /// 黒い画面に、眼球インプラントが立ち上がる短い表示が一行ずつ流れ、そのあと背景が明けて、
     /// コンソールと同じ青緑の枠・題（HALF AWARE／かたあはれ）・ボタン（はじめる・思い出す・設定）が出る。制作の表記は出さない。
-    /// 設定はコンソールと同じ設定の枠（<see cref="SettingsPanel"/>）を、思い出すの枠と同じ置き場に出す。
+    /// 設定はコンソールと同じ設定の枠（<see cref="SettingsPanel"/>）を、思い出すの枠と同じく横の真ん中、題の読みの下に出す。
     ///
     /// **背景は前もって撮った絵。** クリアの印があれば朝の村、無ければいちばん新しいセーブの場面、セーブが無ければ自室
     /// （<see cref="TitleBackdrops.Pick"/>）。タイトルのために重い場面を読まない。絵は組み立ての道具
     /// （HalfAware/Shoot the title backgrounds）で撮り直す。
     ///
     /// 背景は画面の解像度の Canvas に最近傍で引き伸ばして敷き、暗く沈める（明るい朝の村は沈め方を弱める）。
+    /// 設定のフィルターが減色＋ディザなら、絵にも 3D と同じ色の組と点を掛ける（<see cref="ScreenFilter.PictureMaterial"/>）。
     /// 枠・起動の表示・ボタンはコンソールと同じ粗い画面（<see cref="UiLens"/>）で描く。
     /// **題と読みだけは粗くせず、画面の解像度でくっきり描く**（オーナー、2026-09-27）。
     /// 場面の見出し（<see cref="HudView.Unblur"/>）と同じく、粗い画面を重ねる層の一つ上の Canvas に分け、同じ拡縮を持たせる。
@@ -97,6 +98,11 @@ namespace HalfAware
         const float KanaTop = 0.455f;
         const float MenuTop = 0.60f;
         const float ListTop = 0.56f;
+        /// <summary>
+        /// 設定の枠の下の縁を、枠の下の線からどれだけ上に置くか。設定の枠は思い出すの枠より背が高い（小見出しが二つ）ので、
+        /// 上を <see cref="ListTop"/> に揃えると下の線を越える。下を揃えて、上は題の読みの下に収める
+        /// </summary>
+        const float SettingsLift = 2f * Dot;
 
         const float Line = 1f * Dot;
         const float HookSize = 12f * Dot;
@@ -655,6 +661,9 @@ namespace HalfAware
             picture.raycastTarget = false;
             picture.texture = backdrops != null && (int)backdrop < backdrops.Length ? backdrops[(int)backdrop] : null;
             picture.color = picture.texture != null ? Color.white : Color.black;
+            // 設定のフィルターが減色＋ディザなら、絵にも同じ色の組と点を掛ける（ScreenFilter。絵は標準の加工で撮ってある）
+            var filter = Resources.Load<Material>(ScreenFilter.PictureMaterial);
+            if (filter != null) picture.material = filter;
             ImplantConsole.Stretch(picture.rectTransform, 0f, 0f, 0f, 0f);
 
             dimTexture = MakeDim(TitleBackdrops.Light(backdrop));
@@ -969,7 +978,8 @@ namespace HalfAware
         }
 
         /// <summary>
-        /// 設定の枠。コンソールと同じ物（<see cref="SettingsPanel"/>）を、思い出すの枠と同じ置き場（横の真ん中、上から <see cref="ListTop"/>）に出す。
+        /// 設定の枠。コンソールと同じ物（<see cref="SettingsPanel"/>）を、思い出すの枠と同じく横の真ん中に出す。
+        /// 縦は下の縁を枠の下の線の <see cref="SettingsLift"/> 上に揃える（思い出すの枠より背が高いので、上を揃えると下の線を越える）。
         /// 行はコンソールと同じ表の最後に「戻る」
         /// </summary>
         void BuildSettings(RectTransform parent)
@@ -977,10 +987,10 @@ namespace HalfAware
             settingsPanel = new SettingsPanel(settings);
             settingsPanel.Back = CloseSettings;
             settingsBox = settingsPanel.Build(parent, ConsoleSettings.Title, heavy);
-            settingsBox.anchorMin = new Vector2(0.5f, 1f - ListTop);
-            settingsBox.anchorMax = new Vector2(0.5f, 1f - ListTop);
-            settingsBox.pivot = new Vector2(0.5f, 1f);
-            settingsBox.anchoredPosition = Vector2.zero;
+            settingsBox.anchorMin = new Vector2(0.5f, FrameInset);
+            settingsBox.anchorMax = new Vector2(0.5f, FrameInset);
+            settingsBox.pivot = new Vector2(0.5f, 0f);
+            settingsBox.anchoredPosition = new Vector2(0f, SettingsLift);
         }
 
         /// <summary>思い出すの枠。自動・1・2・3 と、戻る。空きは薄くして押せない</summary>

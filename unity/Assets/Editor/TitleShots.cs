@@ -248,7 +248,7 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>ゲームの目（Player/Main Camera）を写したカメラで、960×540 に一枚</summary>
-        static Texture2D Game(CheckVillage.View v)
+        internal static Texture2D Game(CheckVillage.View v)
         {
             var main = Main();
             if (main == null) return null;
@@ -289,7 +289,7 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>記憶 0 の場所と記憶を起こし、その場所の空と記憶の色味で撮る。抜けるときに全部戻す</summary>
-        static Texture2D Dive(CheckVillage.View v)
+        internal static Texture2D Dive(CheckVillage.View v)
         {
             var roster = AssetDatabase.LoadAssetAtPath<DiveRoster>(BuildDive.RosterPath);
             if (roster == null) return null;
@@ -595,8 +595,11 @@ namespace HalfAware.EditorTools
             };
         }
 
-        /// <summary>見本のセーブを手元の辞書に入れて、コンソールの記憶する・思い出すの枠を開いた形で撮る。開いている場面で撮る</summary>
-        public static string Console(string path, ConsolePanel panel)
+        /// <summary>
+        /// 見本のセーブを手元の辞書に入れて、コンソールの記憶する・思い出すの枠を開いた形で撮る。開いている場面で撮る。
+        /// after を渡すと、開いた後にコンソールへ手を入れてから撮る（設定の枠で行を選ぶ、など）
+        /// </summary>
+        public static string Console(string path, ConsolePanel panel, Action<ImplantConsole> after = null)
         {
             var box = new MemoryBox();
             var saves = Sample(3);
@@ -607,7 +610,7 @@ namespace HalfAware.EditorTools
             {
                 ShaderUtil.allowAsyncCompilation = false;
                 SaveStore.Box = box;
-                return ConsoleShot.Shoot(path, 960, 540, UiLens.Scale, true, 0f, panel, null);
+                return ConsoleShot.Shoot(path, 960, 540, UiLens.Scale, true, 0f, panel, null, after);
             }
             finally
             {

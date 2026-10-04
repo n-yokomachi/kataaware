@@ -12,11 +12,13 @@ namespace HalfAware
     /// 同じ物を使う。置き場と、開け閉め・一つ前に戻る（Esc・右クリック・TAB）は呼び手が決める。
     ///
     /// 行は <see cref="SettingsList"/> の表の順に並べる: 小見出し（字と細い線）、つまみの行（項目の名の升・つまみ・倍率の字）、
-    /// 既定に戻す、（タイトルの画面だけ）戻る。寸法はコンソールと同じ粗い画面の 1 画素（Dot）で、字はいちばん小さい 11 Dot。
+    /// 選ぶ行（項目の名の升・左右の三角・選んでいる物の名）、既定に戻す、（タイトルの画面だけ）戻る。
+    /// 寸法はコンソールと同じ粗い画面の 1 画素（Dot）で、字はいちばん小さい 11 Dot。
     ///
-    /// 操作: マウスは行に重ねると選び、つまみを掴んで動かす・溝を押すとそこへ飛ぶ。既定に戻す・戻るは押すと効く。
-    /// 鍵盤は上下で行（小見出しは飛ばす）、左右でつまみを一刻みずつ（押し続けると <see cref="HoldRepeat"/> で続けて）、
-    /// E・Enter で既定に戻す・戻る（<see cref="Keys"/>）。
+    /// 操作: マウスは行に重ねると選び、つまみを掴んで動かす・溝を押すとそこへ飛ぶ。選ぶ行は左右の三角を押すとその向きへ一つ、
+    /// ほかの所を押すと次の物へ（最後の次は最初へ）。既定に戻す・戻るは押すと効く。
+    /// 鍵盤は上下で行（小見出しは飛ばす）、左右でつまみを一刻みずつ・選ぶ行を一つずつ（押し続けると <see cref="HoldRepeat"/> で続けて）、
+    /// E・Enter で既定に戻す・戻る・選ぶ行の次の物（<see cref="Keys"/>）。
     /// 値は動かすとすぐ効き、残すのは <see cref="GameSettings.Tick"/>（動きが止まってから 0.5 秒）と呼び手の <see cref="GameSettings.Commit"/>
     /// </summary>
     public sealed class SettingsPanel
@@ -39,9 +41,19 @@ namespace HalfAware
         /// <summary>既定（1 倍）の所に立てる目盛りの高さ</summary>
         const float TickHeight = 8f * Dot;
         /// <summary>小見出し（先頭を除く）と「既定に戻す」の行の上に空ける</summary>
-        const float SectionGap = 6f * Dot;
+        const float SectionGap = 4f * Dot;
+        /// <summary>
+        /// 小見出しの行の高さ。選べる行（<see cref="BoxRow"/> 22 Dot）より詰める。小見出しが二つになり（カメラ・画面）、
+        /// 22 Dot のままではタイトルの画面で枠が題の読みから下の線まで収まらなかった（2026-10-05）
+        /// </summary>
+        const float HeadingRow = 14f * Dot;
         /// <summary>小見出しの字と、その後ろの細い線のあいだ</summary>
         const float RuleGap = 8f * Dot;
+        /// <summary>選ぶ行の左右の三角の当たりの幅。三角の字は 8 Dot</summary>
+        const float ArrowCell = 18f * Dot;
+        const float ArrowFont = 8f * Dot;
+        const string LeftArrow = "◀";
+        const string RightArrow = "▶";
 
         const float BoxRow = ImplantConsole.BoxRow;
         const float BoxPad = ImplantConsole.BoxPad;
@@ -70,10 +82,17 @@ namespace HalfAware
         /// <summary>組んだ枠。呼び手が置き場（anchor・pivot・位置）と出し入れを決める</summary>
         public RectTransform Box { get { return box; } }
 
+        /// <summary>行の高さ。小見出しは詰め、ほかは <see cref="BoxRow"/></summary>
+        public static float RowHeight(SettingRow row)
+        {
+            return row != null && row.Kind == SettingKind.Heading ? HeadingRow : BoxRow;
+        }
+
         /// <summary>行 index の上の縁。枠の上の縁から。小見出し（先頭を除く）と既定に戻すの上は少し空ける</summary>
         public static float RowTop(SettingsList list, int index)
         {
-            var top = BoxPad * 2f + HeadHeight + BoxRow * index;
+            var top = BoxPad * 2f + HeadHeight;
+            for (var i = 0; i < index; i++) top += RowHeight(list.RowAt(i));
             for (var i = 1; i <= index; i++)
             {
                 var kind = list.RowAt(i).Kind;
@@ -85,7 +104,7 @@ namespace HalfAware
         /// <summary>枠の高さ</summary>
         public static float Height(SettingsList list)
         {
-            return RowTop(list, list.Count - 1) + BoxRow + BoxPad;
+            return RowTop(list, list.Count - 1) + RowHeight(list.RowAt(list.Count - 1)) + BoxPad;
         }
 
         /// <summary>
@@ -110,7 +129,7 @@ namespace HalfAware
             for (var i = 0; i < list.Count; i++)
             {
                 var r = ImplantConsole.Rect(box, "Row" + i);
-                ImplantConsole.Top(r, BoxPad, BoxPad, RowTop(list, i), BoxRow);
+                ImplantConsole.Top(r, BoxPad, BoxPad, RowTop(list, i), RowHeight(list.RowAt(i)));
                 views.Add(MakeRow(r, list.RowAt(i), i));
             }
             box.gameObject.SetActive(false);
@@ -141,6 +160,7 @@ namespace HalfAware
             var hit = r.gameObject.AddComponent<ConsolePointer>();
             hit.Entered = () => { list.HoverRow(index); Paint(); };
             hit.Clicked = () => Press(index);
+            if (row.Kind == SettingKind.Choice) return MakeChoice(r, view, index);
             if (row.Kind != SettingKind.Dial)
             {
                 // 既定に戻す・戻る。記憶する・思い出すの行と同じく、選んでいる時は行ごと塗る
@@ -210,6 +230,65 @@ namespace HalfAware
             return view;
         }
 
+        /// <summary>
+        /// 選ぶ行を組む。左に項目の名の升（つまみの行と同じ）、右の広い所の両端に三角、真ん中に選んでいる物の名。
+        /// 三角はつまみの溝の両端と同じ所に置き、押すとその向きへ一つ動かす。端では薄くする
+        /// </summary>
+        RowView MakeChoice(RectTransform r, RowView view, int index)
+        {
+            var area = r.gameObject.AddComponent<Image>();
+            area.color = ImplantConsole.Clear;
+            var cell = ImplantConsole.Rect(r, "Name");
+            cell.anchorMin = new Vector2(0f, 0f);
+            cell.anchorMax = new Vector2(0f, 1f);
+            cell.pivot = new Vector2(0f, 0.5f);
+            cell.offsetMin = Vector2.zero;
+            cell.offsetMax = new Vector2(DialName, 0f);
+            view.fill = cell.gameObject.AddComponent<Image>();
+            view.fill.color = ImplantConsole.Clear;
+            view.fill.raycastTarget = false;
+            view.label = Label(cell, view.row.Label);
+            ImplantConsole.Stretch(view.label.rectTransform, RowInset, RowInset, 0f, 0f);
+
+            var pick = ImplantConsole.Rect(r, "Pick");
+            pick.anchorMin = Vector2.zero;
+            pick.anchorMax = Vector2.one;
+            pick.pivot = new Vector2(0.5f, 0.5f);
+            pick.offsetMin = new Vector2(DialName + DialGap, 0f);
+            pick.offsetMax = new Vector2(-RowInset, 0f);
+
+            view.value = ImplantConsole.Text(pick, "Value", ImplantConsole.RowFont, ImplantConsole.ButtonText, TextAlignmentOptions.Center);
+            ImplantConsole.Stretch(view.value.rectTransform, ArrowCell, ArrowCell, 0f, 0f);
+            view.value.fontStyle = FontStyles.Bold;
+            if (heavy != null) view.value.fontSharedMaterial = heavy;
+            view.value.raycastTarget = false;
+
+            view.left = Arrow(pick, "Left", LeftArrow, 0f, index, -1);
+            view.right = Arrow(pick, "Right", RightArrow, 1f, index, 1);
+            return view;
+        }
+
+        /// <summary>選ぶ行の三角。side は 0 で左の端、1 で右の端。押すと step の向きへ一つ</summary>
+        TMP_Text Arrow(RectTransform parent, string name, string glyph, float side, int index, int step)
+        {
+            var cell = ImplantConsole.Rect(parent, name);
+            cell.anchorMin = new Vector2(side, 0f);
+            cell.anchorMax = new Vector2(side, 1f);
+            cell.pivot = new Vector2(side, 0.5f);
+            cell.sizeDelta = new Vector2(ArrowCell, 0f);
+            cell.anchoredPosition = Vector2.zero;
+            var hit = cell.gameObject.AddComponent<Image>();
+            hit.color = ImplantConsole.Clear;
+            var press = cell.gameObject.AddComponent<ConsolePointer>();
+            press.Clicked = () => Step(index, step);
+            var t = ImplantConsole.Text(cell, "Glyph", ArrowFont, ImplantConsole.Accent,
+                side < 0.5f ? TextAlignmentOptions.Left : TextAlignmentOptions.Right);
+            ImplantConsole.Stretch(t.rectTransform, 0f, 0f, 0f, 0f);
+            t.raycastTarget = false;
+            t.text = glyph;
+            return t;
+        }
+
         /// <summary>行の字。塗りつぶしの上でも地に溶けないよう、太くして太らせた色づけを当てる</summary>
         TMP_Text Label(RectTransform parent, string text)
         {
@@ -251,10 +330,16 @@ namespace HalfAware
             nudge.Release();
         }
 
-        /// <summary>選んでいる行を決める。既定に戻すなら全部の値を既定へ戻す。戻るなら true</summary>
+        /// <summary>選んでいる行を決める。既定に戻すなら全部の値を既定へ戻す。選ぶ行なら次の物へ。戻るなら true</summary>
         public bool Decide()
         {
             if (list.Reset()) return false;
+            var choice = list.Choice;
+            if (choice != null)
+            {
+                choice.Cycle();
+                return false;
+            }
             return list.AtBack;
         }
 
@@ -266,6 +351,15 @@ namespace HalfAware
             var back = Decide();
             Paint();
             if (back && Back != null) Back();
+        }
+
+        /// <summary>選ぶ行の三角を押した。その行を選び、step の向きへ一つ動かす（両端で止まる）</summary>
+        public void Step(int row, int step)
+        {
+            list.HoverRow(row);
+            if (list.Row != row || list.Choice == null) return;
+            list.Nudge(step);
+            Paint();
         }
 
         /// <summary>
@@ -291,7 +385,8 @@ namespace HalfAware
 
         /// <summary>
         /// 一行の塗り。既定に戻す・戻るは、記憶する・思い出すの行と同じく行ごと塗る。
-        /// つまみの行は、選んでいる時に項目の名の升だけ塗り、倍率の字を白に。つまみは青緑のまま見せる（行ごと塗ると、つまみが塗りに溶ける）
+        /// つまみの行は、選んでいる時に項目の名の升だけ塗り、倍率の字を白に。つまみは青緑のまま見せる（行ごと塗ると、つまみが塗りに溶ける）。
+        /// 選ぶ行もつまみの行と同じく名の升だけ塗り、選んでいる物の名を白に。三角は青緑で、その向きへもう動けない端では溝の色に薄める
         /// </summary>
         sealed class RowView
         {
@@ -301,12 +396,23 @@ namespace HalfAware
             public RectTransform done;
             public RectTransform knob;
             public TMP_Text value;
+            public TMP_Text left;
+            public TMP_Text right;
 
             public void Paint(bool on)
             {
                 if (row.Kind == SettingKind.Heading) return;
                 fill.color = on ? ImplantConsole.Accent : ImplantConsole.Clear;
                 label.color = on ? ImplantConsole.Ink : ImplantConsole.ButtonText;
+                if (row.Kind == SettingKind.Choice)
+                {
+                    var c = row.Choice.Value;
+                    value.text = row.Choice.Text(c);
+                    value.color = on ? Color.white : ImplantConsole.ButtonText;
+                    left.color = c > 0 ? ImplantConsole.Accent : Groove;
+                    right.color = c < row.Choice.Count - 1 ? ImplantConsole.Accent : Groove;
+                    return;
+                }
                 if (row.Kind != SettingKind.Dial) return;
                 var v = row.Dial.Value;
                 var t = row.Dial.Fraction(v);
