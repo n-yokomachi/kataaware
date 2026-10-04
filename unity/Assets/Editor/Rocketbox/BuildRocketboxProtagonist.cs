@@ -106,7 +106,7 @@ namespace HalfAware.EditorTools.Rocketbox
             Dress(her, skin, twin && mode == TwinMode.MoleOnly);
             Shape(her, skin.JawScale, skin.JawClose);
             if (skin.Look != null) ShapeFace(her, skin.Look);
-            if (skin.Look != null && (skin.Look.noseFlatten > 0f || skin.Look.noseNarrow > 0f || AnimeOn(skin))) ShapeNose(her, skin);
+            if (skin.Look != null && (skin.Look.noseFlatten > 0f || skin.Look.noseNarrow > 0f)) ShapeNose(her, skin);
             if (skin.Look != null && skin.Look.hat)
             {
                 var hatSmr = her.GetComponentInChildren<SkinnedMeshRenderer>();
@@ -314,8 +314,7 @@ namespace HalfAware.EditorTools.Rocketbox
                 v[kv.Key] = fromRoot(q);
                 moved.Add(kv.Key);
             }
-            var anime = AnimeOn(skin);
-            if (moved.Count == 0 && !anime) return;
+            if (moved.Count == 0) return;
             var acc = new Dictionary<int, Vector3>();
             for (var t = 0; t < tris.Length; t += 3)
             {
@@ -339,8 +338,6 @@ namespace HalfAware.EditorTools.Rocketbox
             }
             mesh.vertices = v;
             mesh.normals = nrm;
-            // 顔の三人は、顔の比率の表（目を少し大きく、鼻と顎を小さく細く）も同じメッシュへ焼く（RocketboxAnimeFace）
-            if (anime) RocketboxAnimeFace.Bake(mesh, smr, skin.Person);
             mesh.RecalculateBounds();
             if (persist)
             {
@@ -445,8 +442,6 @@ namespace HalfAware.EditorTools.Rocketbox
             public RocketboxPaint.HeadResult HeadInfo, HeadTwinInfo;
             /// <summary>体の手の肌を頭の肌に揃えたときの測り（揃えていなければ null）</summary>
             public string SkinNote;
-            /// <summary>顔の三人でも、顔の比率の表を頭のメッシュへ焼かない（撮り比べの「前」）</summary>
-            public bool SkipAnime;
             /// <summary>その場で作った物（アセットでない）。使い終えたら <see cref="Destroy"/></summary>
             public readonly List<Object> Made = new List<Object>();
 
@@ -545,46 +540,8 @@ namespace HalfAware.EditorTools.Rocketbox
             if (withTwinHead) SaveMaterial(LitHead("Head_twin", Load(dir + "Head_twin.png"), spec), dir + "Head_twin.mat");
             SaveMaterial(Lit("Hair", Load(dir + "Hair.png"), 0.34f, true), dir + "Hair.mat");
             AssetDatabase.SaveAssets();
-            // 顔の三人は、tools/make-anime-face.py が描いた絵で HalfAware/AnimeSkin にする（絵が無ければ上の Lit のまま）。
-            // 元の絵（Head_self.png など）を描き変えたときは、地図を書き出して Python を回し直す（RocketboxAnimeFace の手順）
-            if (who.AnimeFace) sb.Append(RocketboxAnimeFace.ApplyMaterials(who));
             sb.AppendLine("書いた所: " + dir + (bodyPx != null ? "" : "（体は " + who.BodySrc + " をそのまま）"));
             return sb.ToString();
-        }
-
-        static bool AnimeOn(Skin skin)
-        {
-            return skin.Person.AnimeFace && !skin.SkipAnime;
-        }
-
-        /// <summary>
-        /// 頭のメッシュ（*_nose_mesh.asset。鼻の手入れと、顔の三人は顔の比率の表を焼いた物）だけを、組み立てと同じ流れで組み直す。
-        /// 見えない場面（プレビューの場面）で組み、場面のファイル・差込口の mesh・ジャケットには触らない。
-        /// メッシュのアセットは中身だけを移す（GUID を保つ）ので、場面の主人公はそのまま新しい形になる
-        /// </summary>
-        public static string RebuildHeadMesh(RocketboxPerson who)
-        {
-            var skin = LoadPainted(who, false);
-            if (skin == null) throw new InvalidOperationException("手を入れたマテリアルが無い: " + who.Painted);
-            skin.Look = who.Look();
-            var src = AssetDatabase.LoadAssetAtPath<GameObject>(who.Model);
-            var scene = UnityEditor.SceneManagement.EditorSceneManager.NewPreviewScene();
-            try
-            {
-                var her = (GameObject)PrefabUtility.InstantiatePrefab(src, scene);
-                var smr = her.GetComponentInChildren<SkinnedMeshRenderer>();
-                var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(who.CompositeMesh);
-                if (mesh == null) throw new InvalidOperationException("組み合わせたメッシュが無い: " + who.CompositeMesh);
-                smr.sharedMesh = mesh;
-                Dress(her, skin, false);
-                ShapeNose(her, skin);
-                var made = smr.sharedMesh;
-                return "頭のメッシュ: " + (made != null ? AssetDatabase.GetAssetPath(made) : "（作れなかった）");
-            }
-            finally
-            {
-                UnityEditor.SceneManagement.EditorSceneManager.ClosePreviewScene(scene);
-            }
         }
 
         /// <summary>
