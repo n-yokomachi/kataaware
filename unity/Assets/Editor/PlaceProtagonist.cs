@@ -80,7 +80,7 @@ namespace HalfAware.EditorTools
             }
             Remap(old != null ? old.gameObject : null, her, note);
             if (old != null) Object.DestroyImmediate(old.gameObject);
-            // モニターの映り込みの頭の写しは体の骨を使うので、体を置き直したら組み直す
+            // モニターの映り込みの写しは体のボーンを使うので、体を置き直したら組み直す（髪をなでつけた mesh も新しい体から作り直す）
             if (room && !Reflection(note)) return false;
             return true;
         }

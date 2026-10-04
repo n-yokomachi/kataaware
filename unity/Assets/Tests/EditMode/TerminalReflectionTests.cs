@@ -48,6 +48,33 @@ namespace HalfAware.Tests
         }
 
         [Test]
+        public void MouthSpanRunsFromBelowTheNoseToTheChest()
+        {
+            var mouth = TerminalReflection.Span(TerminalReflection.Extent.Mouth);
+            Assert.Greater(mouth.x, 0f, "上の縁は目より下（目と髪は枠の外）");
+            Assert.Less(mouth.x, 0.07f, "上の縁は唇（目から 7 cm 下）より上");
+            Assert.Greater(mouth.y, 0.2f, "下の縁は胸の上");
+        }
+
+        [Test]
+        public void FaceSpanTakesInTheHairAndTheEyes()
+        {
+            var face = TerminalReflection.Span(TerminalReflection.Extent.Face);
+            var mouth = TerminalReflection.Span(TerminalReflection.Extent.Mouth);
+            Assert.Less(face.x, -0.12f, "上の縁は頭の上（目から 12 cm より上）");
+            Assert.Greater(face.y, 0.18f, "下の縁は胸の上");
+            Assert.LessOrEqual(face.y, mouth.y, "胸から下は Mouth より深く入れない");
+        }
+
+        [Test]
+        public void TheMirrorLayerIsLeftUnnamed()
+        {
+            // 映り込みのカメラはこの層だけを撮る。名の付いた層（ほかの物が置かれる層）とは重ねない
+            Assert.That(TerminalReflection.MirrorLayer, Is.InRange(8, 31));
+            Assert.IsTrue(string.IsNullOrEmpty(LayerMask.LayerToName(TerminalReflection.MirrorLayer)), LayerMask.LayerToName(TerminalReflection.MirrorLayer));
+        }
+
+        [Test]
         public void FramingTurnsToTheRightAndLooksUpFromBelow()
         {
             var centre = Vector3.zero;

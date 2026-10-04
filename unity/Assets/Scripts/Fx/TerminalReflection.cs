@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Serialization;
 
 namespace HalfAware
 {
@@ -8,17 +9,22 @@ namespace HalfAware
     /// 場面 1 の机のモニターの黒い画面に映る、主人公の映り込み。
     ///
     /// 鏡の物理どおりには撮らない。画面ごとに決めた向き（<see cref="Pane.yaw"/>・<see cref="Pane.pitch"/>）から、
-    /// 主人公の「鼻の頭から胸の上まで」（<see cref="rangeTop"/>〜<see cref="rangeBottom"/>）が画面いっぱいに収まるように、
+    /// 主人公の決めた範囲（<see cref="extent"/>。鼻から胸の上まで、または髪から胸の上まで）が画面いっぱいに収まるように、
     /// 映り込みのカメラ（<see cref="Pane.camera"/>）で撮り、画面の面に貼った板（<see cref="Pane.face"/>）へ、
     /// 左右を返して、明るい所だけを薄く重ねる（加算。HalfAware/ScreenReflection）。
-    /// 正面の画面には正面の、左右の画面には横顔寄りの、上の段には見上げた顎と首の線が映り、どの画面にも自分がいるように見える。
     ///
-    /// 主人公の性別は対面まで見せない（シナリオ設計 1 節）。鼻から上と胸から下は画面の縁の外に置き、
-    /// 縁のきわも少し暗く沈める。唇の色はほぼ抜く。
+    /// **映っている主人公は煙草を吸っている最中**（<see cref="MirrorSmoking"/>。オーナー、2026-10-05）。右手を口元に添え、
+    /// 人差し指と中指で挟んだ煙草を唇に当てては脇へ離し、口から吐いた煙と煙草の先から立つ煙が、顔と髪の前を流れる。
+    /// 手は口元の右に置き、口元の左のほくろは見える。
+    ///
+    /// 主人公の性別は対面まで見せない（シナリオ設計 1 節）。範囲の外は画面の縁の外に置き、縁のきわも少し暗く沈める。
+    /// 唇の色はほぼ抜く。髪は映り込みの写しだけ後ろへなでつけ、顔と髪は煙と手越しにぼんやりとしか見えない。
     ///
     /// 一人称のカメラは頭を映さない（体のレンダラーの頭の面は何も描かない素材）。映り込みのカメラが撮る間だけ、
-    /// 頭を描く写し（<see cref="head"/>）と灯り（<see cref="lamps"/>）を点け、撮り終えたら消す。
-    /// 映り込みの板は、ほかの映り込みのカメラに撮られないよう、その間は伏せる。
+    /// 主人公の写し（<see cref="mirror"/>。髪をなでつけた頭と、煙草を口元へ運んだ右腕を含む体）と灯り（<see cref="lamps"/>）と煙草と煙を点け、
+    /// 場面の主人公の体（<see cref="original"/>。右腕は肘掛けに置いたまま）を伏せ、撮り終えたら戻す。
+    /// 上げた腕と煙は一人称の視界には入らない。映り込みの板は、ほかの映り込みのカメラに撮られないよう、その間は伏せる。
+    /// 映り込みのカメラは <see cref="MirrorLayer"/> の物（写し・煙草・煙）だけを撮り、人の周りは画面の黒のまま（組み立ての設定。部屋も撮る形に戻せる）。
     ///
     /// 端末を調べた独白の 2 ページ目（「こうして画面の反射で自分の顔が見られるからだ。」。原稿 docs/scenario/01-room.md の注記）から、独白を読み終えるまでだけ浮かべる。
     /// ほかの時は映り込みのカメラを止め、画面は黒のまま
@@ -56,6 +62,12 @@ namespace HalfAware
         /// </summary>
         public const int FromPage = 1;
 
+        /// <summary>
+        /// 映り込みの写し・煙草・煙を置く層。名の無い 30 番（ほかの物は置かない）。映り込みのカメラはこの層だけを撮り、人の周り（椅子・部屋）は映さない。
+        /// 一人称のカメラは全ての層を撮るが、この層の物は映り込みのカメラが撮る間しか点いていない
+        /// </summary>
+        public const int MirrorLayer = 30;
+
         [SerializeField] SceneFlow flow;
         [Tooltip("独白を持つ調べる対象（端末）")]
         [SerializeField] Interactable source;
@@ -67,25 +79,76 @@ namespace HalfAware
         [SerializeField] Pane[] panes = new Pane[0];
         [Tooltip("主人公の体。向きの基準")]
         [SerializeField] Transform body;
-        [Tooltip("映り込みのカメラが撮る間だけ点ける、頭の写し")]
-        [SerializeField] Renderer head;
+        [Tooltip("映り込みのカメラが撮る間だけ点ける、主人公の写し（髪をなでつけた頭と、煙草を口元へ運んだ右腕を含む体）")]
+        [FormerlySerializedAs("head")]
+        [SerializeField] Renderer mirror;
+        [Tooltip("映り込みのカメラが撮る間だけ伏せる、場面の主人公の体（右腕は肘掛けに置いたまま）")]
+        [SerializeField] Renderer original;
+        [Tooltip("映り込みの中の煙草と煙。映っている間だけ動かす")]
+        [SerializeField] MirrorSmoking smoking;
         [Tooltip("映り込みのカメラが撮る間だけ点ける灯り（口元を照らす灯りと、頭の後ろの壁を照らす灯り）")]
         [SerializeField] Light[] lamps = new Light[0];
         [Tooltip("映り込みのカメラの絵の大きさ（px）。画面の幅 1 m あたり。画面に貼る大きさの 2 倍ほどで撮り、" +
             "ぼかして重ねる（肩の輪郭の段と、タンクトップの紐の粒をならす。URP の設定で MSAA は効かない）")]
         [SerializeField] float pixelsPerMetre = 560f;
-        [Tooltip("画面の上の縁に来る所の、目からの下がり（m）。鼻の下の方")]
-        [SerializeField] float rangeTop = 0.035f;
-        [Tooltip("画面の下の縁に来る所の、目からの下がり（m）。胸の上（鎖骨のあたり）")]
-        [SerializeField] float rangeBottom = 0.23f;
+        [Tooltip("写す範囲。鼻から胸の上まで（Mouth）か、髪から胸の上まで（Face）")]
+        [SerializeField] Extent extent = Extent.Mouth;
         [Tooltip("映り込みのカメラの、映す範囲の真ん中からの離れ（m）")]
         [SerializeField] float distance = 0.6f;
+
+        /// <summary>写す範囲</summary>
+        public enum Extent
+        {
+            /// <summary>鼻の頭から胸の上まで。目と髪は画面の上の縁の外</summary>
+            Mouth,
+            /// <summary>髪の上から胸の上まで。目と髪も枠に入れ、手と煙で覆う</summary>
+            Face,
+        }
+
+        /// <summary>
+        /// 範囲 e の、画面の上の縁と下の縁に来る所の、目からの下がり（m。上は負）。
+        /// Mouth は鼻の下の方（3.5 cm）から胸の上（鎖骨のあたり、23 cm）。Face は髪の上の縁の少し上（14 cm 上）から胸の上（21 cm）
+        /// </summary>
+        public static Vector2 Span(Extent e)
+        {
+            return e == Extent.Face ? new Vector2(-0.14f, 0.21f) : new Vector2(0.035f, 0.23f);
+        }
+
+        /// <summary>範囲 e の、上の縁と下の縁から沈める幅（ScreenReflection の _Edge。uv）。Face は髪の上の縁を広めに沈める</summary>
+        public static Vector4 Edge(Extent e)
+        {
+            return e == Extent.Face ? new Vector4(0.10f, 0.06f, 0f, 0f) : new Vector4(0.06f, 0.05f, 0f, 0f);
+        }
+
+        /// <summary>範囲 e の、主役にする所（ScreenReflection の _Focus。真ん中の uv と半径）。Mouth は顎と首、Face は口元から目のあたり</summary>
+        public static Vector4 Focus(Extent e)
+        {
+            return e == Extent.Face ? new Vector4(0.5f, 0.55f, 0.75f, 0.85f) : new Vector4(0.5f, 0.65f, 0.7f, 0.8f);
+        }
+
+        /// <summary>写す範囲。撮り比べるときに切り替える</summary>
+        public Extent Range
+        {
+            get { return extent; }
+            set { extent = value; }
+        }
+
+        /// <summary>映り込みの中の煙草と煙（動作確認から読む）</summary>
+        public MirrorSmoking Smoking => smoking;
 
         static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
         static readonly int BaseMap = Shader.PropertyToID("_BaseMap");
         static readonly int TexelId = Shader.PropertyToID("_Texel");
+        static readonly int EdgeId = Shader.PropertyToID("_Edge");
+        static readonly int FocusId = Shader.PropertyToID("_Focus");
         MaterialPropertyBlock block;
         float level;
+        /// <summary>煙草と煙を動かしているか（映っている間）</summary>
+        bool smoked;
+        /// <summary>撮る支度の中か</summary>
+        bool shooting;
+        /// <summary>撮る間に伏せた、場面の主人公の体が点いていたか</summary>
+        bool originalWas;
 
         /// <summary>今の濃さ（0〜1）。動作確認から読む</summary>
         public float Level => level;
@@ -97,7 +160,7 @@ namespace HalfAware
         {
             block = new MaterialPropertyBlock();
             Show(false);
-            if (head != null) head.enabled = false;
+            if (mirror != null) mirror.enabled = false;
             Lamps(false);
         }
 
@@ -132,9 +195,20 @@ namespace HalfAware
             var want = Showing(source.Lines, flow.CurrentLine, fromLine) ? 1f : 0f;
             level = Mathf.MoveTowards(level, want, fadeSeconds > 0f ? Time.deltaTime / fadeSeconds : 1f);
             Show(level > 0f);
+            Smoke(level > 0f);
             if (level <= 0f) return;
             var eye = flow.Player != null && flow.Player.Eye != null ? flow.Player.Eye.position : Camera.main.transform.position;
             Aim(eye, level);
+        }
+
+        /// <summary>映っている間だけ煙草と煙を動かす。出始めで始め（煙はもう漂っている形から）、消えきったら止める</summary>
+        void Smoke(bool on)
+        {
+            if (smoking == null) return;
+            if (on && !smoked) smoking.Begin();
+            else if (!on && smoked) smoking.End();
+            smoked = on;
+            if (on) smoking.Tick(Time.deltaTime);
         }
 
         /// <summary>映り込みの板とカメラを点ける・消す</summary>
@@ -156,12 +230,13 @@ namespace HalfAware
         {
             if (block == null) block = new MaterialPropertyBlock();
             var facing = body != null ? Quaternion.Euler(0f, body.eulerAngles.y, 0f) : Quaternion.identity;
+            var span = Span(extent);
             foreach (var p in panes)
             {
                 if (p == null || p.screen == null || p.face == null || p.camera == null) continue;
-                var bottom = p.bottom > 0f ? p.bottom : rangeBottom;
-                var centre = eye + Vector3.down * ((rangeTop + bottom) * 0.5f);
-                var height = bottom - rangeTop;
+                var bottom = p.bottom > 0f ? p.bottom : span.y;
+                var centre = eye + Vector3.down * ((span.x + bottom) * 0.5f);
+                var height = bottom - span.x;
                 if (p.target == null)
                 {
                     var w = Mathf.Max(16, Mathf.RoundToInt(p.size.x * pixelsPerMetre));
@@ -190,6 +265,8 @@ namespace HalfAware
                 block.SetTexture(BaseMap, p.target);
                 block.SetColor(BaseColor, new Color(1f, 1f, 1f, Mathf.SmoothStep(0f, 1f, alpha)));
                 block.SetVector(TexelId, new Vector4(1f / p.target.width, 1f / p.target.height, 0f, 0f));
+                block.SetVector(EdgeId, Edge(extent));
+                block.SetVector(FocusId, Focus(extent));
                 p.face.SetPropertyBlock(block);
             }
         }
@@ -214,16 +291,27 @@ namespace HalfAware
             Shoot(false);
         }
 
-        /// <summary>映り込みのカメラが撮る間の支度。頭の写しと灯りを点け、映り込みの板を伏せる。off で元へ戻す</summary>
+        /// <summary>
+        /// 映り込みのカメラが撮る間の支度。主人公の写しと灯りと煙草と煙を点け、場面の主人公の体と映り込みの板を伏せる。off で元へ戻す。
+        /// 写しの右腕は撮る直前に今の形へ置き直す（根を重ねる場面の主人公の鎖骨のボーンは、座った形が毎こま当て直す）
+        /// </summary>
         void Shoot(bool on)
         {
-            if (head != null) head.enabled = on;
+            if (on && !shooting)
+            {
+                if (original != null) originalWas = original.enabled;
+                if (smoking != null) smoking.Pose(smoking.Clock);
+            }
+            if (mirror != null) mirror.enabled = on;
+            if (original != null && on != shooting) original.enabled = on ? false : originalWas;
+            if (smoking != null) smoking.Shoot(on);
             Lamps(on);
+            shooting = on;
             foreach (var p in panes)
                 if (p != null && p.face != null) p.face.enabled = !on && level > 0f;
         }
 
-        /// <summary>映り込みのカメラで一こまずつ撮る（エディタで確かめるとき）。撮った後は、板を show のとおりに点けておく</summary>
+        /// <summary>映り込みのカメラで一こまずつ撮る（エディタで確認するとき）。撮った後は、板を show のとおりに点けておく</summary>
         public void RenderNow(bool show)
         {
             level = show ? 1f : 0f;
