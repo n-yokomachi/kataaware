@@ -326,6 +326,8 @@ namespace HalfAware.EditorTools
                 var old = room.Find(name);
                 if (old != null) Object.DestroyImmediate(old.gameObject);
             }
+            // 前にまとめた家具を解いてから置き直す（置き終えたらまとめ直す。MergeFurniture）
+            Unmerge(room);
             // 前の机の当たり（椅子を押し下げて立った所との隙間はこの箱で測ってある）は、世界の同じ箱のまま残す
             var keepDesk = WorldBox(room.Find("Desk"));
             // 伸ばした後の箱からは、前の机の天板の高さ（0.653）へ戻して覚える
@@ -370,8 +372,36 @@ namespace HalfAware.EditorTools
                 if (p.Name == "KitchenLight") Glow(t, new Vector3(0f, -KitchenGlowDrop, 0f), KitchenColour, KitchenIntensity, KitchenRange);
             }
             notes.Add(Memo(scene, room));
+            notes.Add(MergeFurniture(room));
             AssetDatabase.SaveAssets();
             return Report(made, notes);
+        }
+
+        /// <summary>
+        /// 家具を一つの mesh へまとめ、描く回数を減らす（<see cref="MeshMerge"/>。<c>docs/superpowers/plans/2026-10-12-mesh-weight-survey.md</c>）。
+        /// 家具はどれも同じアトラスのマテリアル（Furniture）なので、Room の直下の Merged.Furniture 一つになる。
+        /// 元の家具は名前・当たり・灯り・mesh をそのまま残し、MeshRenderer を切るだけにする（hide）。
+        /// 家具は名前で引いて形や広がりを読む道具（ジャケットを置く卓、メモを置くローテーブル、見比べの撮影）があるため。
+        /// スクリプトを持つ物（ラグの StepGround、ラックの RackLights）はまとめない。
+        /// 置き直す時は先に <see cref="Unmerge"/> で解く
+        /// </summary>
+        public static string MergeFurniture(Transform room)
+        {
+            var log = new StringBuilder();
+            var n = MeshMerge.Merge(room, MeshDir, "Furniture", r => r.transform.parent != room || !InLayout(r.name), false, log, true);
+            return "家具をまとめた: " + n + " 点" + System.Environment.NewLine + log.ToString().TrimEnd();
+        }
+
+        /// <summary>まとめた家具を解く（Room の直下のまとめた物を消し、家具の MeshRenderer を点け直す）。見比べの撮影も、家具を一つずつ写す前に呼ぶ</summary>
+        public static void Unmerge(Transform room)
+        {
+            MeshMerge.Unmerge(room, r => r.transform.parent == room && InLayout(r.name));
+        }
+
+        static bool InLayout(string name)
+        {
+            foreach (var p in Layout) if (p.Name == name) return true;
+            return false;
         }
 
         /// <summary>Room の子を名前で出す。前の Kenney の物（mesh が家具の置き場の外）は捨てて作り直す</summary>
@@ -703,6 +733,8 @@ namespace HalfAware.EditorTools
             var name = path.Substring("Room/".Length);
             if (name.Contains("/")) return false;
             if (System.Array.IndexOf(Retired, name) >= 0) return true;
+            // 家具をまとめた物（MergeFurniture）
+            if (name.StartsWith(MeshMerge.Prefix + ".")) return true;
             foreach (var p in Layout) if (p.Name == name) return true;
             return false;
         }

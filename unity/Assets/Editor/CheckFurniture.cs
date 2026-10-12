@@ -107,6 +107,8 @@ namespace HalfAware.EditorTools
             {
                 ShaderUtil.allowAsyncCompilation = false;
                 var room = EditorSceneManager.OpenScene(BuildFurniture.RoomPath, OpenSceneMode.Single);
+                // 家具は一つにまとめてある（BuildFurniture.MergeFurniture）。一つずつ写すため、撮る前に解く
+                BuildFurniture.Unmerge(BuildChair.Find(room, "Room"));
                 Body(false);
                 foreach (var s in Subjects)
                 {
@@ -118,6 +120,7 @@ namespace HalfAware.EditorTools
                 Seated(dir, "before", sb);
 
                 sb.AppendLine(BuildFurniture.Assemble(room));
+                BuildFurniture.Unmerge(BuildChair.Find(room, "Room"));
                 Body(false);
                 foreach (var s in Subjects)
                 {

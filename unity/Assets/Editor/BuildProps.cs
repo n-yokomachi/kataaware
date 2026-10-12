@@ -207,6 +207,8 @@ namespace HalfAware.EditorTools
                 Slab(go.transform, "Line" + i, new Vector3(-w * 0.10f + len * 0.10f, 0.0119f, y), Vector3.zero,
                     new Vector3(len, 0.001f, 0.0035f), Mat("Ink"));
             }
+            // 部品はマテリアルごとに一つの mesh へまとめる（描く回数を減らす。MergeRoom）
+            MergeRoom.Binder(go.transform, null);
             return go;
         }
 

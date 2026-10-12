@@ -22,6 +22,8 @@ namespace HalfAware.EditorTools
     /// - 同じ組に 1 つしか無い物（まとめても描く回数が減らない）
     ///
     /// 元の物からは MeshRenderer と MeshFilter だけを外す。当たり判定・灯り・子が残らない物は消す（<c>keep</c> なら形だけ残す）。
+    /// <c>hide</c> なら元の物は何も外さず、MeshRenderer を切るだけにする（名前で物を引いて形や広がりを読む道具が多い自室で使う。
+    /// 切った MeshRenderer の bounds はそのまま読める）。切った物は次のまとめでは数えないので、組み直す道具は先にまとめを解く。
     /// 頂点は入れ物の座へ写す。鏡に映した置き方（拡縮が負）の物は面の向きを返す
     /// </summary>
     public static class MeshMerge
@@ -47,7 +49,7 @@ namespace HalfAware.EditorTools
         /// まとめた物の数（元のレンダラーの数）を返し、log に組ごとの内訳を書く
         /// </summary>
         public static int Merge(Transform holder, string assetDir, string name, System.Func<MeshRenderer, bool> skip = null,
-            bool keep = false, System.Text.StringBuilder log = null)
+            bool keep = false, System.Text.StringBuilder log = null, bool hide = false)
         {
             if (holder == null) return 0;
             var held = Held(holder);
@@ -81,11 +83,35 @@ namespace HalfAware.EditorTools
                 Place(holder, g, saved, Prefix + "." + label);
                 if (log != null)
                     log.AppendFormat("  {0}: {1} 個 → 1（頂点 {2}、ポリゴン数 {3}）", label, g.parts.Count, saved.vertexCount, saved.triangles.Length / 3).AppendLine();
-                foreach (var r in g.parts) Strip(r, holder, keep);
+                foreach (var r in g.parts)
+                {
+                    if (hide) r.enabled = false;
+                    else Strip(r, holder, keep);
+                }
                 merged += g.parts.Count;
             }
             AssetDatabase.SaveAssets();
             return merged;
+        }
+
+        /// <summary>
+        /// hide でまとめた物を解く。holder の直下のまとめた物を消し、owned が true を返す MeshRenderer を点け直す。
+        /// 消した数を返す。組み直す道具が、置き直す前に呼ぶ
+        /// </summary>
+        public static int Unmerge(Transform holder, System.Func<MeshRenderer, bool> owned)
+        {
+            if (holder == null) return 0;
+            var gone = 0;
+            for (var i = holder.childCount - 1; i >= 0; i--)
+            {
+                var c = holder.GetChild(i);
+                if (!IsMerged(c)) continue;
+                Object.DestroyImmediate(c.gameObject);
+                gone++;
+            }
+            foreach (var r in holder.GetComponentsInChildren<MeshRenderer>(true))
+                if (!r.enabled && owned(r)) r.enabled = true;
+            return gone;
         }
 
         /// <summary>まとめてよい物か</summary>
