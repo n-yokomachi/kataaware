@@ -768,6 +768,12 @@ namespace HalfAware.EditorTools
         /// </summary>
         static Mesh Simplify(Mesh full, string[] slots, RocketboxMob who, int target, bool near, string name)
         {
+            return Simplify(full, slots, who, target, near, name, near);
+        }
+
+        /// <summary>weighted を渡すと、中ほどの段でもボーンの重みを運ぶ（歩く人の遠くの段はボーンで動かす。<see cref="WalkerMesh"/>）</summary>
+        static Mesh Simplify(Mesh full, string[] slots, RocketboxMob who, int target, bool near, string name, bool weighted)
+        {
             var subs = full.subMeshCount;
             var counts = new int[subs];
             var hair = -1;
@@ -785,8 +791,8 @@ namespace HalfAware.EditorTools
             var verts = full.vertices;
             var norms = full.normals;
             var uvs = full.uv;
-            // 近い段は骨の組の重みも運ぶ（CrowdIdle が曲げて焼き直す）。中ほどの段は動かさないので落とす
-            var weights = near ? full.boneWeights : null;
+            // 近い段は骨の組の重みも運ぶ（CrowdIdle が曲げて焼き直す）。中ほどの段は動かさないので落とす（歩く人の段は両方とも運ぶ）
+            var weights = weighted ? full.boneWeights : null;
             var skinned = weights != null && weights.Length == verts.Length;
             var outV = new List<Vector3>();
             var outN = new List<Vector3>();

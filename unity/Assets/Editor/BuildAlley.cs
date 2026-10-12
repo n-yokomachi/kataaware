@@ -91,6 +91,8 @@ namespace HalfAware.EditorTools
             var temp = GameObject.Find("TempGround");
             if (temp != null) Object.DestroyImmediate(temp);
             Place(root);
+            // 小さな箱をマテリアルごとにまとめる。見直しはまとめた後の形で行う
+            Merge(root);
             // 組み終えたら必ず見直す。目で気づくまで放っておかない
             CheckAlley.Run(root);
             Selection.activeGameObject = root.gameObject;
@@ -1906,17 +1908,36 @@ namespace HalfAware.EditorTools
         static void Backdrop(Transform parent)
         {
             Clear(parent);
-            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/StreetBackdrop.png");
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(BackdropPicture);
             if (tex == null)
             {
                 Debug.Log("遠景の絵がまだ無い。HalfAware/Shoot the street backdrop で撮る");
                 return;
             }
+            ImportBackdrop();
             var size = BackdropSize();
             var m = BackdropMat(tex);
             Plate2(parent, "Backdrop.South", new Vector3(0f, AnchorY, BackdropZ), 180f, size, m, false);
             // 奥は同じ絵を左右で返して使う。並べて見ることは無い
             Plate2(parent, "Backdrop.North", new Vector3(0f, AnchorY, StreetNorth + 2.2f), 0f, size, m, true);
+        }
+
+        /// <summary>遠景の絵。板に貼る</summary>
+        const string BackdropPicture = "Assets/Textures/StreetBackdrop.png";
+
+        /// <summary>
+        /// 遠景の絵の取り込み。大きさを 2 の冪へ寄せる（1280×1391 → 1024×1024）。
+        /// 絵は 2 の冪でない大きさで撮れる（板の縦横比のまま撮る）。2 の冪でない絵に mipmap を付けると DXT に圧縮できず、
+        /// 前は非圧縮（RGB24、mip 込みで約 7 MB）のまま WebGL へ出ていた。2 の冪に寄せると DXT1（約 0.7 MB）になる。
+        /// 板は絵の全体を貼るので、縦横の伸び縮みは画面に出ない。絵は画面の 1/3 の解像度で板の小さい mip を読むので、
+        /// 1024 に縮めても画面の絵はほぼ変わらない（2048 へ広げた時と画素の差はほとんど同じだった）
+        /// </summary>
+        static void ImportBackdrop()
+        {
+            var importer = AssetImporter.GetAtPath(BackdropPicture) as TextureImporter;
+            if (importer == null || importer.npotScale == TextureImporterNPOTScale.ToNearest) return;
+            importer.npotScale = TextureImporterNPOTScale.ToNearest;
+            importer.SaveAndReimport();
         }
 
         static void Plate2(Transform parent, string name, Vector3 at, float yaw, Vector2 size, Material m, bool mirror)
@@ -2018,7 +2039,8 @@ namespace HalfAware.EditorTools
             cam.ResetAspect();
             if (body != null) body.SetActive(wasOn);
             if (old != null) old.gameObject.SetActive(true);
-            AssetDatabase.ImportAsset("Assets/Textures/StreetBackdrop.png");
+            AssetDatabase.ImportAsset(BackdropPicture);
+            ImportBackdrop();
             Debug.Log("遠景を撮った " + w + "x" + h + " 画角 " + fov.ToString("0.0"));
         }
 
@@ -2730,20 +2752,20 @@ namespace HalfAware.EditorTools
                 new Vector3(MyStallX + 5.0f, 3.2f, LaneZ + 0.4f),
                 new Vector3(MyStallX + 2.0f, 3.1f, LaneZ + 4.2f),
             };
+            var shape = BulbShape();
             for (var i = 0; i < at.Length; i++)
             {
                 var g = new GameObject("Bulb" + i);
                 g.transform.SetParent(parent, false);
                 g.transform.localPosition = at[i];
-                var ball = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                ball.name = "Glass";
+                var ball = new GameObject("Glass");
                 ball.transform.SetParent(g.transform, false);
                 ball.transform.localScale = new Vector3(0.11f, 0.11f, 0.11f);
+                ball.AddComponent<MeshFilter>().sharedMesh = shape;
                 // 3 つに 1 つは新しい白い玉。橙ばかりだと市が黄色一色になる
                 var cold = i % 3 == 1;
                 var hue = cold ? new Color(0.76f, 0.86f, 1.00f) : new Color(1.00f, 0.87f, 0.68f);
-                ball.GetComponent<MeshRenderer>().sharedMaterial = GlowMat(hue, 2.2f);
-                Object.DestroyImmediate(ball.GetComponent<Collider>());
+                ball.AddComponent<MeshRenderer>().sharedMaterial = GlowMat(hue, 2.2f);
                 var l = g.AddComponent<Light>();
                 l.type = LightType.Point;
                 l.color = hue;
@@ -2751,6 +2773,80 @@ namespace HalfAware.EditorTools
                 l.intensity = 17f;
                 l.shadows = LightShadows.None;
             }
+        }
+
+        /// <summary>
+        /// 裸電球の玉の形。正二十面体を一度割った 80 ポリゴンの玉（半径 0.5。組み込みの Sphere と同じ大きさ）。
+        /// 前は組み込みの Sphere（768 ポリゴン）を 11 個置いていたが、玉は Unlit の発光体で陰が付かず、見えるのは輪郭だけなので、
+        /// 輪郭が丸ければ足りる。辺の中ほどは頂点より内へ入るので、頂点を少し外へ出して、輪郭の平均の半径を 0.5 に揃える
+        /// </summary>
+        static Mesh BulbShape()
+        {
+            var t = (1f + Mathf.Sqrt(5f)) * 0.5f;
+            var verts = new List<Vector3>
+            {
+                new Vector3(-1f, t, 0f), new Vector3(1f, t, 0f), new Vector3(-1f, -t, 0f), new Vector3(1f, -t, 0f),
+                new Vector3(0f, -1f, t), new Vector3(0f, 1f, t), new Vector3(0f, -1f, -t), new Vector3(0f, 1f, -t),
+                new Vector3(t, 0f, -1f), new Vector3(t, 0f, 1f), new Vector3(-t, 0f, -1f), new Vector3(-t, 0f, 1f),
+            };
+            for (var i = 0; i < verts.Count; i++) verts[i] = verts[i].normalized;
+            var faces = new[]
+            {
+                0, 11, 5, 0, 5, 1, 0, 1, 7, 0, 7, 10, 0, 10, 11, 1, 5, 9, 5, 11, 4, 11, 10, 2, 10, 7, 6, 7, 1, 8,
+                3, 9, 4, 3, 4, 2, 3, 2, 6, 3, 6, 8, 3, 8, 9, 4, 9, 5, 2, 4, 11, 6, 2, 10, 8, 6, 7, 9, 8, 1,
+            };
+            // 一度割る。辺の中点を球の面へ押し出し、隣の面と共有する
+            var mid = new Dictionary<long, int>();
+            System.Func<int, int, int> Mid = (a, b) =>
+            {
+                var key = a < b ? ((long)a << 32) | (uint)b : ((long)b << 32) | (uint)a;
+                int m;
+                if (mid.TryGetValue(key, out m)) return m;
+                verts.Add(((verts[a] + verts[b]) * 0.5f).normalized);
+                mid[key] = verts.Count - 1;
+                return verts.Count - 1;
+            };
+            var tris = new List<int>();
+            for (var f = 0; f < faces.Length; f += 3)
+            {
+                int a = faces[f], b = faces[f + 1], c = faces[f + 2];
+                int ab = Mid(a, b), bc = Mid(b, c), ca = Mid(c, a);
+                tris.AddRange(new[] { a, ab, ca, b, bc, ab, c, ca, bc, ab, bc, ca });
+            }
+            // 表を外へ向ける（Unity は、外から見て時計回りが表）
+            for (var i = 0; i < tris.Count; i += 3)
+            {
+                Vector3 a = verts[tris[i]], b = verts[tris[i + 1]], c = verts[tris[i + 2]];
+                if (Vector3.Dot(Vector3.Cross(b - a, c - a), a + b + c) < 0f)
+                {
+                    var s = tris[i + 1];
+                    tris[i + 1] = tris[i + 2];
+                    tris[i + 2] = s;
+                }
+            }
+            // 辺の中ほどの半径の平均。頂点（1）との間を 1 に揃える
+            var edge = 0f;
+            for (var i = 0; i < tris.Count; i += 3)
+                for (var k = 0; k < 3; k++)
+                    edge += ((verts[tris[i + k]] + verts[tris[i + (k + 1) % 3]]) * 0.5f).magnitude;
+            edge /= tris.Count;
+            var reach = 0.5f * 2f / (1f + edge);
+            var uvs = new List<Vector2>();
+            var norms = new List<Vector3>();
+            for (var i = 0; i < verts.Count; i++)
+            {
+                var n = verts[i];
+                norms.Add(n);
+                uvs.Add(new Vector2(0.5f + Mathf.Atan2(n.x, n.z) / (2f * Mathf.PI), 0.5f + Mathf.Asin(n.y) / Mathf.PI));
+                verts[i] = n * reach;
+            }
+            var mesh = new Mesh { name = "BulbGlass" };
+            mesh.SetVertices(verts);
+            mesh.SetNormals(norms);
+            mesh.SetUVs(0, uvs);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateBounds();
+            return ProcMesh.Save(mesh, Generated + "BulbGlass.asset");
         }
 
 
@@ -4223,6 +4319,52 @@ namespace HalfAware.EditorTools
             player.transform.position = new Vector3(0f, 0.1f, StartZ);
             player.transform.rotation = Quaternion.identity;
             if (cc != null) cc.enabled = true;
+        }
+
+        // ---- 描く回数をまとめる（2026-10-12） ---------------------------------
+
+        /// <summary>
+        /// 一つずつ置いた小さな箱を、マテリアルごとに一つの mesh へまとめて描く回数を減らす（<see cref="MeshMerge"/>。
+        /// <c>docs/superpowers/plans/2026-10-12-mesh-weight-survey.md</c>）。
+        /// 組み終えてから見直しの前に行う。ネオンの置き場を決める面（<see cref="AlleySolid"/>）は、まとめる前の物で数え終えている。
+        /// 当たり判定と灯りは元の物に残るので、歩ける所と照らし方は変わらない。
+        ///
+        /// まとめるのは、中の物を誰も動かさない入れ物だけ: 露天席・市（出店・裸電球・品物）・腰掛け・提灯・街灯の玉・ヤードの灯り・
+        /// ネオンの腕と管・卓の上の小物。人（LODGroup）・買い手・チップ・煙草（演出が出し入れする）は入れ物に入れない。
+        /// - 卓の上の小物は小物ごとにまとめる（見直しの <c>Table</c> が小物ごとの広がりを見る）
+        /// - 自分の露店の卓と手前の柱 2 本は残す（見直しの <c>Table</c> と <c>Buyers</c> が一つずつ読む）
+        /// - ネオンの管は形（Transform）だけ残す（見直しの <c>Neon</c> が管ごとの箱を見る）
+        /// - 看板の板（Boards）はまとめない（見直しの <c>Boards</c>・<c>Buried</c>・<c>Buyers</c> が板と背板を一つずつ読む）
+        /// </summary>
+        static void Merge(Transform root)
+        {
+            var log = new System.Text.StringBuilder();
+            var total = 0;
+            total += MergeIn(root, "Terraces", null, false, log);
+            total += MergeIn(root, "Market", r =>
+            {
+                var p = r.transform.parent;
+                return p != null && p.name == "Stall" && p.parent != null && p.parent.name == "MyStall"
+                    && (r.name == "Table" || r.name == "Pole0" || r.name == "Pole1");
+            }, false, log);
+            total += MergeIn(root, "Crowd/Stools", null, false, log);
+            total += MergeIn(root, "Fixtures", null, false, log);
+            total += MergeIn(root, "Lamps", null, false, log);
+            total += MergeIn(root, "Heritage", null, false, log);
+            total += MergeIn(root, "Neon", null, true, log);
+            var dressing = root.Find("Items/Dressing");
+            if (dressing != null)
+                foreach (Transform prop in dressing)
+                    total += MergeIn(root, "Items/Dressing/" + prop.name, null, false, log);
+            Debug.Log("描く回数をまとめた: 箱など " + total + " 個\n" + log);
+        }
+
+        static int MergeIn(Transform root, string path, System.Func<MeshRenderer, bool> skip, bool keep, System.Text.StringBuilder log)
+        {
+            var holder = root.Find(path);
+            if (holder == null) return 0;
+            log.AppendLine(path);
+            return MeshMerge.Merge(holder, Generated, path.Replace('/', '_'), skip, keep, log);
         }
 
         // ---- 道具 ----------------------------------------------------------

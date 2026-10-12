@@ -858,6 +858,8 @@ namespace HalfAware.EditorTools
             Garage(root);
             Items(root);
             Wire(root);
+            // 同じマテリアルの物をまとめる。見直しはまとめた後の形で行う
+            Merge(root);
             // 組み終えたら必ず見直す。目で気づくまで放っておかない
             CheckDrive.Run(root);
 
@@ -870,6 +872,40 @@ namespace HalfAware.EditorTools
                 GarageWide, GarageDeep, GarageHigh, StandAt.ToString("F1"), SeatAt.ToString("F2"),
                 Vector3.Distance(new Vector3(StandAt.x, 0f, StandAt.z), new Vector3(SeatAt.x, 0f, SeatAt.z)),
                 Object.FindObjectsByType<Interactable>(FindObjectsInactive.Include, FindObjectsSortMode.None).Length));
+        }
+
+        /// <summary>
+        /// 同じマテリアルの物を一つの mesh へまとめて描く回数を減らす（<see cref="MeshMerge"/>。
+        /// <c>docs/superpowers/plans/2026-10-12-mesh-weight-survey.md</c>）。
+        ///
+        /// 沿道は区切りごとにまとめる。区切りは DriveWorld が一枚ずつ別の位置へ送るので、区切りをまたいではまとめられない。
+        /// 区切りの中は、組み立てで既にマテリアルごとに 1 つの mesh へ焼いてあり、まとまるのは同じ色の看板と柱の組ぐらい。
+        /// ガレージは丸ごと出し入れされるだけなので、ガレージの下でまとめる。
+        /// 見直しの <c>Ladder</c> が名前で読む床の重なり（Floor・BayPaint・OilStains・DrainPan・DrainGrate）は残す
+        /// </summary>
+        public static void Merge(Transform root)
+        {
+            var log = new System.Text.StringBuilder();
+            var total = 0;
+            var roadsides = root.Find("Roadsides");
+            if (roadsides != null)
+                foreach (Transform band in roadsides)
+                    foreach (Transform slice in band)
+                    {
+                        var part = new System.Text.StringBuilder();
+                        var n = MeshMerge.Merge(slice, Generated, band.name + slice.name, null, false, part);
+                        if (n > 0) log.AppendLine(band.name + "/" + slice.name).Append(part);
+                        total += n;
+                    }
+            var garage = root.Find("Garage");
+            var floors = new[] { "Floor", "BayPaint", "OilStains", "DrainPan", "DrainGrate" };
+            if (garage != null)
+            {
+                log.AppendLine("Garage");
+                total += MeshMerge.Merge(garage, Generated, "Garage",
+                    r => r.transform.parent == garage && System.Array.IndexOf(floors, r.name) >= 0, false, log);
+            }
+            Debug.Log("描く回数をまとめた: " + total + " 個\n" + log);
         }
 
         /// <summary>

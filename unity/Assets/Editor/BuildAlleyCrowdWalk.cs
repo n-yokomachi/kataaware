@@ -11,7 +11,8 @@ namespace HalfAware.EditorTools
     ///
     /// 群衆の置き場のうち、道筋を持つ人（<see cref="Walk"/>）だけは、焼いた形ではなく Rocketbox の模型をそのまま置いて骨で動かす
     /// （<see cref="PersonMotion"/>。場面 4 の記憶の人と同じ作りで、立ち・歩きの動きを一秒 12 こまで置く）。道筋を歩かせるのは <see cref="CrowdWalk"/>。
-    /// 人と服の色・インプラントは、その置き場に焼いた人を立てた時と同じ（乱数は同じ順に引く）。三角は近さの段の近い方と同じ 4,500 ほどに減らす（骨の重みは残す）
+    /// 人と服の色・インプラントは、その置き場に焼いた人を立てた時と同じ（乱数は同じ順に引く）。ポリゴン数は近さの段の近い方と同じ 4,500 ほどに減らす（ボーンの重みは残す）。
+    /// 遠くでは、同じボーンで動く 1,000 ポリゴンほどの段へ替える（<see cref="Far"/>）
     /// </summary>
     public static partial class BuildAlleyCrowd
     {
@@ -55,10 +56,12 @@ namespace HalfAware.EditorTools
             animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
             var skins = model.GetComponentsInChildren<SkinnedMeshRenderer>(true);
             var shapes = new Mesh[skins.Length];
+            var farShapes = new Mesh[skins.Length];
             tris = 0;
             for (var i = 0; i < skins.Length; i++)
             {
-                shapes[i] = WalkerMesh(who, skins[i].sharedMesh);
+                farShapes[i] = WalkerMesh(who, skins[i].sharedMesh, 1);
+                shapes[i] = WalkerMesh(who, skins[i].sharedMesh, 0);
                 Dress(skins[i], shapes[i], mats);
                 tris += shapes[i].triangles.Length / 3;
             }
@@ -94,11 +97,6 @@ namespace HalfAware.EditorTools
             so.FindProperty("turnHidden").boolValue = w.hidden;
             var player = Object.FindFirstObjectByType<PlayerController>();
             so.FindProperty("player").objectReferenceValue = player != null ? player.transform : null;
-            var seen = so.FindProperty("seen");
-            seen.arraySize = skins.Length;
-            for (var i = 0; i < skins.Length; i++) seen.GetArrayElementAtIndex(i).objectReferenceValue = skins[i];
-            so.ApplyModifiedPropertiesWithoutUndo();
-
             // 測りのために置いた骨の形を模型の素へ戻す（置いた形のまま保存すると、骨の数だけ上書きが残ってシーンが太る）。
             // 形は実行時に PersonMotion が毎こま置く。戻すと模型の中の、まだ上書きとして残していない変更も素に戻るので、形とマテリアルはそのあとでもう一度付ける
             foreach (var t in model.GetComponentsInChildren<Transform>(true))
@@ -110,7 +108,60 @@ namespace HalfAware.EditorTools
             for (var i = 0; i < skins.Length; i++) Dress(skins[i], shapes[i], mats);
             PrefabUtility.RecordPrefabInstancePropertyModifications(model.transform);
             PrefabUtility.RecordPrefabInstancePropertyModifications(animator);
+
+            // 遠くの段。同じボーンで動く 1,000 ポリゴンほどの形を並べ、焼いた形の人と同じ距離で替える
+            var far = Far(root, skins, farShapes, mats);
+            var seen = so.FindProperty("seen");
+            seen.arraySize = skins.Length + far.Length;
+            for (var i = 0; i < skins.Length; i++) seen.GetArrayElementAtIndex(i).objectReferenceValue = skins[i];
+            for (var i = 0; i < far.Length; i++) seen.GetArrayElementAtIndex(skins.Length + i).objectReferenceValue = far[i];
+            so.ApplyModifiedPropertiesWithoutUndo();
             return root.gameObject;
+        }
+
+        /// <summary>
+        /// 歩く人の遠くの段（2026-10-12、場面ごとの重さの調査）。前は近くの段の形（4,500 ポリゴンほど）を通りの先でも描いていた。
+        ///
+        /// 歩く人はボーンで動くので、焼いた形の人のようにボーンを持たない形には替えられない。
+        /// 模型の SkinnedMeshRenderer の隣に、同じボーン・同じマテリアルで、ボーンの重みごと 1,000 ポリゴンほどに減らした形（<see cref="WalkerMesh"/> の段 1）を
+        /// 持つ SkinnedMeshRenderer を置き、根に LODGroup を付けて焼いた形の人（<see cref="Make"/>）と同じ距離で替える。
+        /// ボーンは一揃いなので、どちらの段でも同じ歩き・立ちの形になる。描かれていない段の肌は組まれない（updateWhenOffscreen は切ってある）。
+        /// 歩く道筋の端で向きを変えるかを見る CrowdWalk の seen には、両方の段を渡す（遠くの段だけが写っている時も、写っていると数える）
+        /// </summary>
+        static SkinnedMeshRenderer[] Far(Transform root, SkinnedMeshRenderer[] skins, Mesh[] farShapes, Material[] mats)
+        {
+            var far = new SkinnedMeshRenderer[skins.Length];
+            for (var i = 0; i < skins.Length; i++)
+            {
+                var near = skins[i];
+                var go = new GameObject(near.name + "_LOD1");
+                go.transform.SetParent(near.transform.parent, false);
+                go.transform.localPosition = near.transform.localPosition;
+                go.transform.localRotation = near.transform.localRotation;
+                go.transform.localScale = near.transform.localScale;
+                go.layer = near.gameObject.layer;
+                var smr = go.AddComponent<SkinnedMeshRenderer>();
+                smr.sharedMesh = farShapes[i];
+                smr.bones = near.bones;
+                smr.rootBone = near.rootBone;
+                smr.quality = near.quality;
+                smr.localBounds = near.localBounds;
+                smr.sharedMaterials = mats;
+                smr.updateWhenOffscreen = false;
+                smr.shadowCastingMode = near.shadowCastingMode;
+                smr.receiveShadows = near.receiveShadows;
+                far[i] = smr;
+            }
+            var lod = root.gameObject.AddComponent<LODGroup>();
+            lod.fadeMode = LODFadeMode.None;
+            lod.SetLODs(new[] { new LOD(0.5f, skins), new LOD(0.01f, far) });
+            lod.RecalculateBounds();
+            lod.SetLODs(new[]
+            {
+                new LOD(Relative(lod.size, NearUntil), skins),
+                new LOD(Relative(lod.size, 250f), far),
+            });
+            return far;
         }
 
         /// <summary>模型の SkinnedMeshRenderer に減らした形と群衆のマテリアルを付け、プレハブの上書きとして残す</summary>
@@ -150,13 +201,17 @@ namespace HalfAware.EditorTools
             return low == float.MaxValue ? 0f : low;
         }
 
-        /// <summary>歩く人の形。模型の形を骨の重みごと 4,500 三角ほどに減らす。組み立ての間に一度だけ</summary>
-        static Mesh WalkerMesh(RocketboxMob who, Mesh full)
+        /// <summary>
+        /// 歩く人の形。模型の形をボーンの重みごと減らす。level 0 は近くの段（4,500 ポリゴンほど）、1 は遠くの段（1,000 ポリゴンほど。減らし方は焼いた形の人の中ほどの段と同じ）。
+        /// 組み立ての間に一度だけ
+        /// </summary>
+        static Mesh WalkerMesh(RocketboxMob who, Mesh full, int level)
         {
-            var path = Folder + who.Name + "_Walk_LOD0.asset";
+            var path = Folder + who.Name + "_Walk_LOD" + level + ".asset";
             if (!fresh.Contains(path))
             {
-                var m = Simplify(full, Prep(who).slots, who, NearTriangles, true, who.Name + "_Walk_LOD0");
+                var near = level == 0;
+                var m = Simplify(full, Prep(who).slots, who, near ? NearTriangles : MidTriangles, near, who.Name + "_Walk_LOD" + level, true);
                 RocketboxJacket.SaveMesh(m, path);
                 fresh.Add(path);
             }

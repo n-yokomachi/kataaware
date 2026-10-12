@@ -381,6 +381,8 @@
 
 小路が二本になったので、花の縁を組み直した（`BuildVillagePlants.Borders`）。細い縁が増えたが、近くの縁をまとめて一枚に焼き（`Border.Bake`）、描く回数は前と同じ焼いた物の数（花の縁 11 枚）に収めた。
 
+2026-10-12 から、焼いた縁は組み立ての最後に一つの mesh へまとめる（`BuildVillage.MergePlants`、`MeshMerge`）。マテリアルはどれも `VillageFlora` なので、Plants の 14 枚は影を落とす物 1 つと影を落とさない鉢（`FloraPots`）1 つに、LanePlants の 4 枚は影を落とす物 1 つと影を落とさないつる（`FloraLaneClimbers`）1 つになり、描く回数は 18 → 4。揺れは世界の座と uv1（根からの高さ）で決まるので、まとめても変わらない。縁ごとの名（`FloraWest` など）は場面から消え、`Merged.VillageFlora` になる。
+
 | 縁 | 所 | 植える物 | 焼く先 |
 |---|---|---|---|
 | WestLow | 格子戸の脇、塀のエスパリエの前（小路の西） | 低い物（前と同じ） | WestLow |

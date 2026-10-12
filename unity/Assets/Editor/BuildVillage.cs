@@ -108,6 +108,7 @@ namespace HalfAware.EditorTools
             LanePlants(Child(root, "LanePlants"), banks);
             banks.Emit(Child(root, "Built"), "Village");
             Plants(Child(root, "Plants"));
+            MergePlants(root);
             Fences(Child(root, "Bounds"));
 
             Stage(hours);
@@ -661,6 +662,25 @@ namespace HalfAware.EditorTools
         {
             var made = bank.Emit(parent, name, mat, collide, Generated);
             return made != null ? made.transform : null;
+        }
+
+        /// <summary>
+        /// 庭と家並みの花の縁をまとめる（<see cref="MeshMerge"/>。<c>docs/superpowers/plans/2026-10-12-mesh-weight-survey.md</c>）。
+        /// 縁ごとに一枚の mesh へ焼いてあり、マテリアルはどれも VillageFlora なので、影を落とす物と落とさない物の二つにまとまる。
+        /// 揺れは世界の座と uv1（根からの高さ）で決まるので、まとめても変わらない
+        /// </summary>
+        public static void MergePlants(Transform root)
+        {
+            var log = new System.Text.StringBuilder();
+            var total = 0;
+            foreach (var name in new[] { "Plants", "LanePlants" })
+            {
+                var holder = root.Find(name);
+                if (holder == null) continue;
+                log.AppendLine(name);
+                total += MeshMerge.Merge(holder, Generated, name, null, false, log);
+            }
+            Debug.Log("花の縁をまとめた: " + total + " 枚\n" + log);
         }
 
         /// <summary>影を落とさせない。書き割りと仮の地面</summary>

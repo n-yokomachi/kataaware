@@ -482,10 +482,12 @@ namespace HalfAware.EditorTools
             var looked = 0;
             foreach (Transform t in neon.GetComponentsInChildren<Transform>(true))
             {
-                var r = t.GetComponent<MeshRenderer>();
-                if (r == null || t.name.EndsWith(".Back") || t.name.EndsWith(".Arm")) continue;
-                looked++;
+                // 管は描く回数をまとめた後（BuildAlley.Merge）も、管ごとの形（Transform）だけ残っている。まとめた物そのものは見ない
+                if (MeshMerge.IsMerged(t)) continue;
                 var tube = t.parent != null && t.parent.name == "Tubes";
+                var r = t.GetComponent<MeshRenderer>();
+                if (!tube && (r == null || t.name.EndsWith(".Back") || t.name.EndsWith(".Arm"))) continue;
+                looked++;
                 // 管は箱、看板は薄い板（突き出す物は裏の板まで）
                 var half = tube
                     ? t.localScale * 0.5f
