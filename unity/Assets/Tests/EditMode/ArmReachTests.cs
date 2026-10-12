@@ -85,6 +85,43 @@ namespace HalfAware.Tests
         }
 
         [Test]
+        public void MoveLiftsTheHandOnlyBetweenTheEnds()
+        {
+            var root = new GameObject("shoulder").transform;
+            var elbow = new GameObject("elbow").transform;
+            var hand = new GameObject("hand").transform;
+            try
+            {
+                elbow.SetParent(root, false);
+                hand.SetParent(elbow, false);
+                var target = new Vector3(0.2f, -0.25f, 0.2f);
+                System.Action rest = () =>
+                {
+                    root.localRotation = Quaternion.identity;
+                    elbow.localPosition = new Vector3(0f, -Upper, 0f);
+                    elbow.localRotation = Quaternion.identity;
+                    hand.localPosition = new Vector3(0f, -Lower, 0f);
+                    hand.localRotation = Quaternion.identity;
+                };
+                rest();
+                var from = hand.position;
+                ArmReach.Move(root, elbow, hand, target, Quaternion.identity, Vector3.right, 0.5f, 0.1f);
+                var middle = Vector3.Lerp(from, target, 0.5f) + Vector3.up * 0.1f;
+                Assert.AreEqual(0f, Vector3.Distance(hand.position, middle), 1e-3f, "真ん中では、まっすぐな道から持ち上げの高さだけ上");
+                rest();
+                ArmReach.Move(root, elbow, hand, target, Quaternion.identity, Vector3.right, 1f, 0.1f);
+                Assert.AreEqual(0f, Vector3.Distance(hand.position, target), 1e-3f, "寄せきると狙いに届く（持ち上げない）");
+                Assert.AreEqual(0f, ArmReach.Arc(0f), 1e-6f);
+                Assert.AreEqual(1f, ArmReach.Arc(0.5f), 1e-6f);
+                Assert.Greater(ArmReach.Arc(0.1f), 0.5f, "端の近くでも早く上がる");
+            }
+            finally
+            {
+                Object.DestroyImmediate(root.gameObject);
+            }
+        }
+
+        [Test]
         public void TwistAngleReadsTheTurnAboutTheAxis()
         {
             var axis = new Vector3(0.2f, 1f, 0.1f).normalized;

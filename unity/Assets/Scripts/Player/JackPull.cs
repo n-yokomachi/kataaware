@@ -86,6 +86,8 @@ namespace HalfAware
 
         [Tooltip("置いて離した後、開いた指をジャックの尻の側（軸の向き）へ抜く距離（m）。抜いてから手を戻す")]
         [SerializeField] float releaseLift = 0.05f;
+        [Tooltip("左手が肘掛けの上の座った形の所から離れる時と戻る時に、まっすぐな道を途中で持ち上げる高さ（m。ArmReach.Arc）。肘掛けを座面とひと続きの厚い塊にしてから、まっすぐ戻すと指が肘掛けの内の縁と背もたれの下をかすめた")]
+        [SerializeField] float clearLift = 0.06f;
         [Tooltip("置き場へ下ろす前に、いったん運ぶ高さ（置き場の真上 m）。上げたままの右腕の下を通す")]
         [SerializeField] float placeLift = 0.10f;
         [Tooltip("そのとき置き場より後ろへ寄せる距離（m）")]
@@ -237,7 +239,7 @@ namespace HalfAware
             if (Carrying(t, out k, out ap, out ar, out bp, out br))
                 ArmReach.Carry(upperL, lowerL, handL, hp, ap, ar, bp, br, leftPole, k);
             else
-                ArmReach.Move(upperL, lowerL, handL, hp, hr, leftPole, w);
+                ArmReach.Move(upperL, lowerL, handL, hp, hr, leftPole, w, clearLift);
             Shape(open, openBones, Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.3f, 0.8f, w)));
             Shape(pinch, pinchBones, Closing(w));
 

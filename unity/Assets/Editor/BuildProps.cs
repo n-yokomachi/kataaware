@@ -1316,8 +1316,13 @@ namespace HalfAware.EditorTools
         /// **左手が届く所に置く。** 左の肩から右の肘掛けの真ん中の差込口の脇までは 0.60 m あり、腕（0.49 m）と指先までの 12 cm を足しても
         /// 手の向きによっては届かない。内の縁の後ろ寄りなら 0.58 m で届く。
         /// 座面の縁（腿と肘掛けの間）は、肩から下へ遠く（0.64 m）、上体を寄せても届かなかった。
-        /// reachFrom は使わなくなった（立てて置いていた頃に、指先の向きを揃えるのに使った）
+        /// reachFrom は使わなくなった（立てて置いていた頃に、指先の向きを揃えるのに使った）。
+        /// 肘掛けを座面とひと続きの厚い革の塊に作り替えて内の面が外（0.275）へ下がってからも、置き場はここのまま
+        /// （置く時の左腕は今でも伸びきっていて、外へ動かすと届かない）。肘掛けの内の面に留めた金具の受け台（BuildChair の RestCradle）に載せる
         /// </summary>
+        public static readonly Vector3 JackRestAt = new Vector3(0.255f, 0.676f + JackWasherRadius, -0.07f);
+
+        /// <summary><see cref="JackRestAt"/> に置き場を置く</summary>
         public static Transform JackRest(Transform chair, Vector3? reachFrom = null)
         {
             var rest = chair.Find("JackRest");
@@ -1331,7 +1336,7 @@ namespace HalfAware.EditorTools
             // **立てて置かない。** 立てると、置く左手は手のひらを真下へ向けて体の右後ろへ回り込むことになり、
             // 手のひらのひねりが 180 度近く、手首の曲げが 140 度になって腕が極端に細く見えた。
             // 寝かせると、左手は手のひらを右へ向けた楽な形（ひねり 50 度、曲げ 40 度ほど）で置ける
-            rest.localPosition = new Vector3(0.255f, 0.676f + JackWasherRadius, -0.07f);
+            rest.localPosition = JackRestAt;
             rest.localRotation = Quaternion.LookRotation(RestAxis, Vector3.up);
             rest.localScale = Vector3.one;
             return rest;

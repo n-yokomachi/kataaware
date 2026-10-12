@@ -11,19 +11,21 @@ namespace HalfAware.EditorTools
 {
     /// <summary>
     /// 自室（<c>Room.unity</c>）の椅子を組む（シナリオ設計 5 節）。潜り手が一日の大半を過ごし、長い潜行に体を預ける椅子。
-    /// 上等な黒革の重役の椅子に、仕事の道具として後から電子機器を金具で留め、ケーブルを這わせた形。
+    /// 上等な黒革の一人掛けの張りぐるみ（肘掛けと背の部分が U の字に座面を囲むクラブチェアの形に、高い背もたれ）に、仕事の道具として後から電子機器を金具で留め、ケーブルを這わせた形。
     ///
     /// <list type="table">
-    /// <item><term>形</term><description>椅子: 縁に縫い目を回した厚く柔らかい革の座面、前も裏も革で包んだ厚く幅の広い背もたれ
-    /// （脇の太い巻きと上の頭の当ての巻きを縫い目で区切り、内は大きな菱形のボタン留め）、黒い漆の台に載せた厚く丸い革の肘掛けと、
-    /// それを支える磨いた金属の腕、一本の柱が床の近くで逆さの漏斗の形に広がる磨いた金属の台座（キャスター無し）とガスシリンダー、リクライニングの機構とレバー、
-    /// 座の前の下から引き出す革のフットレスト。座面・フットレストにも背もたれと揃う菱形のボタン留めと縁の玉縁、肘掛けの上にも玉縁。後から付けた物: 頭の後ろの黒い金属の箱（背もたれの上の縁に掛けた留め具で留める）と耳の筐体、
-    /// 左右の肘掛けの前の操作盤（当て物の下から回り込む留め具で留める）、右の肘掛けの差込口（螺子で留めた金属の板）、
-    /// 背もたれの裏と金属の腕に沿って這わせたケーブル（<c>BuildChairShape.cs</c>）</description></item>
-    /// <item><term>体との取り合い</term><description>座った体の形（SeatedPose）を組み直さずに済むよう、座面の高さの線・肘掛けの上面・差込口・
-    /// ジャックの置き場は前の椅子と同じ所。フットレストは座った形の足の裏が乗る所まで引き出した形</description></item>
-    /// <item><term>軽さ</term><description>輪郭を作る起伏（背もたれの厚みと縁の巻き、菱形の膨らみ、肘掛けと座面の厚み、脚の形）は mesh に残し、
-    /// 面の上の細かい起伏（ボタンの窪み、折り目の鋭さ、縫い目、皺、螺子）は絵（地の色に焼いた窪みの陰と、法線の絵）へ移す（オーナー、2026-09-30
+    /// <item><term>形</term><description>椅子: 縁に縫い目を回した厚く柔らかい革の座面（左右の肘掛けの間いっぱい）、前も裏も革で包んだ厚く幅の広い背もたれ
+    /// （脇の太い巻きと上の頭の当ての巻きを縫い目で区切り、内は大きな菱形のボタン留め。下の部分は張りぐるみの背の部分の内から立ち上がる）、
+    /// 座面の両脇から立ち上がり、後ろの角を回って背もたれの下を横切る厚い革の塊（肘掛けと背の部分がひと続きの張りぐるみ。上の縁を太く巻き、前の端を丸めて板で閉じる）、
+    /// 一本の柱が床の近くで逆さの漏斗の形に広がる磨いた金属の台座（キャスター無し）とガスシリンダー、リクライニングの機構とレバー、
+    /// 座の前の下から引き出す革のフットレスト。座面・肘掛けの内と外の面・フットレストにも背もたれと揃う菱形のボタン留めと縁の玉縁。後から付けた物: 頭の後ろの黒い金属の箱（背もたれの上の縁に掛けた留め具で留める）と耳の筐体、
+    /// 左右の肘掛けの前の面の外寄りの操作盤（前の面に螺子で留めた板と下の棚で抱える）、右の肘掛けの差込口（螺子で留めた金属の板）とジャックの受け台（内の面に留めた金具）、
+    /// 背もたれの裏に這わせて張りぐるみの背の部分へ入るケーブル（<c>BuildChairShape.cs</c>）</description></item>
+    /// <item><term>体との取り合い</term><description>座面の高さの線・ジャックの置き場（とそこより後ろの肘掛けの上面の線）は前の椅子と同じ所なので、座った腰・背・脚と目の高さは変わらない。
+    /// 肘掛けの外へ広げて前へ伸ばした所に手を置くので、肘掛けの形を変えたら腕の形を解き直す（<c>HalfAware/Reseat the protagonist on the chair</c>。
+    /// 狙いは PlaceProtagonist.RoomSit）。フットレストは座った形の足の裏が乗る所まで引き出した形</description></item>
+    /// <item><term>軽さ</term><description>輪郭を作る起伏（背もたれの厚みと縁の巻き、菱形の膨らみ、肘掛けの塊の巻きと端の丸み、座面の厚み、脚の形）は mesh に残し、
+    /// 面の上の細かい起伏（ボタンの窪み、肘掛けと座面の菱形の膨らみ、折り目の鋭さ、縫い目、皺、螺子）は絵（地の色に焼いた窪みの陰と、法線の絵）へ移す（オーナー、2026-09-30
     /// 「椅子も含めて重くなりそうなところはテクスチャを張ることで軽くして」「テクスチャに変えても立体感は失われないように」）。
     /// マテリアルは一つ（描く回数 1）</description></item>
     /// <item><term>置き場</term><description><c>Room/Chair</c> の下の見た目の子を <c>ChairMesh</c> 一つ（マテリアル 1 つ）に替える。
@@ -176,15 +178,19 @@ namespace HalfAware.EditorTools
             var root = chair.Find("Blocker");
             if (root == null) return "当たり（Blocker）が無い";
             var sb = new StringBuilder("当たり: ");
-            // 座面
-            sb.Append(Box(root, "Seat", new Vector3(0f, 0.40f, 0.04f), new Vector3(0.60f, 0.80f, 0.50f)));
+            // 座面（左右の肘掛けの間）
+            sb.Append(Box(root, "Seat", new Vector3(0f, 0.40f, 0.045f), new Vector3(0.56f, 0.80f, 0.53f)));
             // 台座（床に接する丸い縁まで）
-            sb.Append(Box(root, "Base", new Vector3(0f, 0.40f, 0f), new Vector3(0.58f, 0.80f, 0.58f)));
+            sb.Append(Box(root, "Base", new Vector3(0f, 0.40f, 0f), new Vector3(2f * PedestalReach, 0.80f, 2f * PedestalReach)));
             // 背もたれと頭の後ろの端末・耳の筐体
             sb.Append(Box(root, "Back", new Vector3(0f, 0.75f, -0.39f), new Vector3(0.62f, 1.50f, 0.48f)));
-            // 肘掛け（前の操作盤まで）
-            sb.Append(Box(root, "ArmR", new Vector3(0.345f, 0.40f, 0.07f), new Vector3(0.20f, 0.80f, 0.54f)));
-            sb.Append(Box(root, "ArmL", new Vector3(-0.345f, 0.40f, 0.07f), new Vector3(0.20f, 0.80f, 0.54f)));
+            // 肘掛け（張りぐるみの背の部分の外の面から、前の操作盤の先まで。後ろの角は丸いが箱で覆う）
+            var armX = 0.5f * (ArmIn + PodOuter) + 0.0025f;
+            var back = TubIn - (ArmOut - ArmIn) - 0.005f;
+            var armSize = new Vector3(PodOuter - ArmIn + 0.015f, 0.80f, PodFront - back + 0.01f);
+            var armZ = 0.5f * (back + PodFront);
+            sb.Append(Box(root, "ArmR", new Vector3(armX, 0.40f, armZ), armSize));
+            sb.Append(Box(root, "ArmL", new Vector3(-armX, 0.40f, armZ), armSize));
             return sb.ToString();
         }
 
@@ -541,13 +547,13 @@ namespace HalfAware.EditorTools
                     Screw(cv, x, y);
         }
 
-        /// <summary>操作盤の外の面（16×6。x は後ろから前、y は下から上）。黒い金属の地に、留めた螺子二つ</summary>
+        /// <summary>操作盤の外の面（12×10。x は後ろから前、y は下から上）。黒い金属の地に、留めた螺子二つ（下の棚の上）</summary>
         static void PodSidePicture(Canvas cv, RectInt r)
         {
             cv.Shine = 0.5f;
             cv.Fill(r.x, r.y, r.width, r.height, SteelColour);
-            Screw(cv, r.x + 3, r.y + 2);
-            Screw(cv, r.x + 11, r.y + 2);
+            Screw(cv, r.x + 2, r.y + 2);
+            Screw(cv, r.x + 8, r.y + 2);
         }
 
         /// <summary>革の地の明るさ（1 の前後）。細かい粒と、ところどころの浅い皺の筋</summary>
@@ -629,9 +635,12 @@ namespace HalfAware.EditorTools
                 (x, s) => Mathf.Abs(x) > BackW(s) ? LeatherGloss : TuftGloss(BackLattice, TuftInside(x, s), Mathf.Clamp01(BackFine(x, s) / 0.012f), x, s, 0f));
             // 背もたれの裏（無地）
             PaintLeather(cv, BackRearArea, -BackHalfW, BackHalfW, 0f, BackLength, none, plain);
-            // 肘掛けの上の面（上から写す）。上の面と脇の面の境の玉縁
-            PaintLeather(cv, ArmArea, ArmAreaX0, ArmAreaX1, ArmAreaZ0, ArmAreaZ1, (x, z) => -ArmFine(x, z), plain, null,
-                (x, z) => Mathf.Clamp(LeatherGloss + 30f * ArmFine(x, z), 0.1f, 0.45f));
+            // 肘掛けと背の張りぐるみ（前の端から背の真ん中までの長さと、断面を回る長さで写す）。内と外の面に座面と揃う菱形のボタン留め（角と背の部分でも途切れない）、
+            // 上の縁の縫い目に玉縁
+            PaintLeather(cv, ArmArea, 0f, TubHalfLen, 0f, ArmPerim, (x, p) => -ArmFine(x, p), ArmShade, null, ArmGloss);
+            // 肘掛けの前の板。縁の 8 mm 内に玉縁を回す
+            PaintLeather(cv, ArmCapArea, 0f, ArmCapW, 0f, ArmCapH, (x, y) => -Piping(ArmCapBorder(x, y) - 0.008f), plain, null,
+                (x, y) => Mathf.Clamp(LeatherGloss + 30f * Piping(ArmCapBorder(x, y) - 0.008f), 0.1f, 0.45f));
             // 座面とフットレスト（上から写す）。背もたれと揃う菱形のボタン留めと、縁の玉縁
             PaintLeather(cv, SeatArea, -SeatHalf, SeatHalf, SeatAreaZ0, SeatAreaZ1, (x, z) => -SeatFine(x, z),
                 (x, z) => TuftShade(SeatLattice, SeatTuftInside(x, z), x, z), null,

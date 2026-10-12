@@ -487,8 +487,12 @@ namespace HalfAware.EditorTools
         /// - 脚: 腿はほぼ水平に座面へ乗せ、足は椅子のフットレストのパッド（座の前の下から引き出し、足の裏に沿わせて前へ下げた面。BuildChair）へ寄せて乗せる。
         ///   座面が高く（0.549）、足を床へ下ろすと腿が座面の前の縁に 8 cm 食い込むため
         /// - 腕: 肩から肘掛けまでが上腕より長いので、前腕は肘掛けへ斜めに下ろし、手首から先を肘掛けに預ける。
-        ///   右は手のひらを上へ返し（手首のジャックが目に入る）、差込口（肘掛けの前寄り）を前腕で塞がないよう内へ寄せる。
-        ///   左は手のひらを下へ
+        ///   肘掛けは座面とひと続きの厚い革の塊（内の面 0.275、外の面 0.45。BuildChair）で、手はその上の面の内寄りに置く。
+        ///   右は手のひらを上へ返し（手首のジャックが目に入る）、手の甲を上の面の前の端に預けて、指先と煙草を前の端の先へ出す
+        ///   （座った目で下を向ける限りまで正面を見下ろした時に、指先と煙草が画面の下の縁に入り、煙が手から立つと読める。手前に置くと手が画面の外に出た）。
+        ///   右腕はここで伸びきる。差込口（上の面の外寄り）は前腕で塞がない。
+        ///   左は手のひらを下へ、指を少し起こして上の面に沿わせる（指をまっすぐ前へ向けると、指先が下へ曲がって上の面に 2〜3 cm 沈んだ）。
+        ///   どちらも手の下の面は上の面に乗り、5 mm より沈む点は無く、前腕は肘掛けに刺さらない（CheckChair.HandRest・Clash）
         ///   （左の手を腿へ下ろした形も試したが、ジャックを抜くしぐさで左手が右の前腕に潜り、手のひらのひねりも目安を越えた）
         /// </summary>
         /// <summary>端末の映り込みを見る間の座った形。<see cref="RoomSit"/> と同じ腰と脚で、両手を腿の上に置き、肘を体の脇へ下ろす</summary>
@@ -523,15 +527,86 @@ namespace HalfAware.EditorTools
                 kneePoleL = P(-0.10f, 0.9f, 1.2f),
                 kneePoleR = P(0.10f, 0.9f, 1.2f),
                 footPoint = 15f,
-                wristL = P(-0.265f, 0.70f, 0.16f),
-                wristR = P(0.215f, 0.70f, 0.25f),
-                elbowPoleL = P(-0.45f, 0.6f, -0.28f),
-                elbowPoleR = P(0.45f, 0.6f, -0.28f),
-                fingersL = D(0f, -0.3f, 1f),
+                wristL = P(-0.335f, 0.700f, 0.15f),
+                wristR = P(0.31f, 0.662f, 0.25f),
+                elbowPoleL = P(-0.50f, 0.6f, -0.28f),
+                elbowPoleR = P(0.50f, 0.6f, -0.28f),
+                fingersL = D(0.02f, 0.09f, 1f),
                 palmL = D(0f, -1f, 0f),
-                fingersR = D(0f, -0.1f, 1f),
+                fingersR = D(-0.05f, 0.10f, 1f),
                 palmR = D(0f, 1f, 0f),
             };
+        }
+
+        [MenuItem("HalfAware/Reseat the protagonist on the chair", false, 205)]
+        public static void ReseatMenu()
+        {
+            if (EditorApplication.isPlaying) { Debug.LogError("再生中は組み直さない。止めてからもう一度"); return; }
+            var scene = EditorSceneManager.GetActiveScene();
+            if (scene.path != RoomPath) { Debug.LogError("座った形を解き直すのは場面 1（Room.unity）だけ。今開いているのは " + scene.path); return; }
+            if (scene.isDirty) { Debug.LogError("開いているシーンに未保存の変更がある。保存するか捨ててからもう一度: " + scene.path); return; }
+            var before = Snapshot();
+            var note = new StringBuilder();
+            var ok = Reseat(note, true);
+            var after = Snapshot();
+            var diff = Diff(before, after, out var unexpected);
+            note.AppendLine("場面の中の物の差（Player/Protagonist の下を除く）:").Append(diff);
+            if (!ok || unexpected > 0)
+            {
+                Debug.LogError("座った形を解き直したが、組み立ての外の物が " + unexpected + " 個変わった（または解き直せなかった）ので保存しない。開き直して捨てること\n" + note);
+                return;
+            }
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log("座った形を解き直して保存した: " + scene.path + "\n" + note);
+        }
+
+        /// <summary>
+        /// 開いている場面 1 の座った形（SeatedPose の一つ目の形）を、今の <see cref="RoomSit"/> で解き直す。体は組み直さない。
+        /// <see cref="Place"/> は体を作り直し、映り込みの写しや差込口の mesh まで組み直すが、椅子の肘掛けを作り替えた時に変わるのは腕の置き場だけなので、こちらで足りる。
+        /// 立った形から RoomSit で曲げるのは Place と同じなので、RoomSit が同じなら保存してある形と同じになる。
+        /// 座った形のほかに、ケーブルが避ける体の太さ（<see cref="BuildProps.Tune(Cable, Animator)"/>）と、
+        /// roll が真なら抜くしぐさの掴む手の角（<see cref="JackHoldRoll.ForPull"/>。流れを試すので時間がかかる）を合わせ直す。
+        /// 腰・背・脚は RoomSit のままなので座った目の高さは変わらない。変わったら何も書かずに false を返す（その時は Place で組み直す）。
+        /// **保存はしない**
+        /// </summary>
+        public static bool Reseat(StringBuilder note, bool roll)
+        {
+            var chair = GameObject.Find("Room/Chair");
+            var pro = GameObject.Find("Player/Protagonist");
+            if (chair == null || pro == null) { note.AppendLine("Room/Chair か Player/Protagonist が無い"); return false; }
+            var an = pro.GetComponent<Animator>();
+            var pose = pro.GetComponent<SeatedPose>();
+            if (an == null || pose == null) { note.AppendLine("主人公に Animator か SeatedPose が無い"); return false; }
+            var flow = Object.FindFirstObjectByType<SceneFlow>(FindObjectsInactive.Include);
+            var keep = BodyPoser.Capture(an);
+
+            BodyPoser.Stand(an);
+            BodyPoser.Pose(an, RoomSit(chair.transform));
+            var eye = pro.transform.parent.InverseTransformPoint(BodyPoser.Eyes(an));
+            var was = flow != null ? new SerializedObject(flow).FindProperty("seatEyeHeight").floatValue : eye.y;
+            note.AppendFormat("座った目: 足元から {0:0.0000} m（保存してある値 {1:0.0000}）", eye.y, was).AppendLine();
+            if (Mathf.Abs(eye.y - was) > 0.0005f)
+            {
+                Restore(an, keep);
+                note.AppendLine("座った目の高さが変わった。腰・背・脚を変えたなら Place（HalfAware/Put the protagonist in the scene）で組み直す");
+                return false;
+            }
+            BodyPoser.Write(pose, "seated", BodyPoser.Capture(an));
+            var cable = chair.transform.Find("Cable");
+            if (cable != null) BuildProps.Tune(cable.GetComponent<Cable>(), an);
+            if (roll)
+            {
+                var pull = pro.GetComponent<JackPull>();
+                if (pull != null)
+                {
+                    pose.Bind();
+                    JackHoldRoll.ForPull(pull, note);
+                }
+            }
+            pose.Bind();
+            pose.Apply();
+            return true;
         }
     }
 }

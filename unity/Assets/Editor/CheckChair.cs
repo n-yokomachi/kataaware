@@ -16,6 +16,8 @@ namespace HalfAware.EditorTools
     ///
     /// 撮る所: 立って斜め前と斜め後ろ・横・真後ろ（体は写さない）、座ったまま下（正面・右・左へ首を振って）、場面 1 の頭の天井を仰いだ形と起き上がった正面、
     /// 首を右へ振りきってジャケットを狙った所（印の文字も重ねる）、モニターの映り込み、ジャックの置き場の寄り、立ち上がった後の椅子と机のあいだ。
+    /// 肘掛けを座面とひと続きにした形の見比べは <see cref="Sofa"/>（座った手が肘掛けに乗っているかの <see cref="HandRest"/>、
+    /// ジャックを抜く・挿す流れで腕と手が椅子に入らないかの <see cref="Motion"/> も）。
     /// プローブのカメラと RenderTexture は撮った同じ呼び出しの中で捨てる。場面の物（主人公の向き・椅子の位置・体の見え方）を書き換えるので、
     /// **撮り終えたら撮る前の場面へ戻し、書き換えた場面は捨てる。** 未保存の変更がある場面では撮らない
     /// </summary>
@@ -39,6 +41,300 @@ namespace HalfAware.EditorTools
             var sb = new StringBuilder(Run(dir, "final", false));
             sb.AppendLine();
             sb.Append(Scenes(dir));
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// 肘掛けを座面とひと続きにした形（2026-10）の見比べ。前と後を同じ所から撮る: 部屋の中の斜め前 3/4（ゲームの見え方と後処理なし）、
+        /// 真横（体を写さない形と、座った体を写した形）、斜め上の前と後ろ（肘掛けと背の張りぐるみのつながり）、座った目から正面のモニターと両肘掛け、
+        /// 座った目から右の肘掛けを見下ろす（手と煙）、モニターの映り込み、ジャックの受け台、立ち上がった後の隙間と歩き、抜く流れの入り。座った手が肘掛けの上の面に乗っているか（<see cref="HandRest"/>）と食い込み（<see cref="Clash"/>）も測る。
+        /// build なら椅子を組み、座った形を解き直してから撮る（どちらも保存しない。撮り終えたら場面を捨てる）
+        /// </summary>
+        public static string Sofa(string dir, string tag, bool build)
+        {
+            var stop = Guard();
+            if (stop != null) return stop;
+            var filter = Shader.GetGlobalFloat("_HaFilter");
+            if (filter != 0f) return "画面のフィルターが標準でない（_HaFilter = " + filter + "）。標準に戻してから撮る";
+            Directory.CreateDirectory(dir);
+            var setup = EditorSceneManager.GetSceneManagerSetup();
+            var sb = new StringBuilder();
+            var async = ShaderUtil.allowAsyncCompilation;
+            try
+            {
+                ShaderUtil.allowAsyncCompilation = false;
+                var room = EditorSceneManager.OpenScene(BuildChair.RoomPath, OpenSceneMode.Single);
+                if (build)
+                {
+                    sb.AppendLine(BuildChair.Assemble(room));
+                    if (!PlaceProtagonist.Reseat(sb, true)) return sb.ToString().TrimEnd();
+                }
+                sb.AppendLine(Clash(room));
+                sb.AppendLine(HandRest(room));
+                SofaShots(room, dir, tag, sb);
+            }
+            catch (Exception e)
+            {
+                sb.AppendLine("例外: " + e);
+            }
+            finally
+            {
+                ShaderUtil.allowAsyncCompilation = async;
+                Back(setup);
+            }
+            File.WriteAllText(Path.Combine(dir, tag + "_log.txt"), sb.ToString());
+            return sb.ToString().TrimEnd();
+        }
+
+        static void SofaShots(Scene room, string dir, string tag, StringBuilder log)
+        {
+            var flow = Object.FindFirstObjectByType<SceneFlow>(FindObjectsInactive.Include);
+            var player = flow.Player;
+            var fso = new SerializedObject(flow);
+            var seatEye = fso.FindProperty("seatEyeHeight").floatValue;
+            var limit = fso.FindProperty("seatedHeadLimit").floatValue;
+            var foot = player.transform.position;
+            var body = player.transform.eulerAngles.y;
+            var chair = BuildChair.Find(room, BuildChair.ChairPath);
+            var home = chair.position;
+            var pose = Object.FindFirstObjectByType<SeatedPose>(FindObjectsInactive.Include);
+            Seat(pose);
+            string P(string name) { return Path.Combine(dir, tag + "_" + name + ".png"); }
+
+            // 部屋の中の斜め前 3/4（ゲームの見え方と後処理なし）と真横。体は写さない
+            Body(false);
+            log.AppendLine(Free(P("s1_quarter"), W(chair, 0.95f, 1.35f, 1.0f), W(chair, 0f, 0.62f, -0.02f), 0f));
+            log.AppendLine(Free(P("s1_quarter_raw"), W(chair, 0.95f, 1.35f, 1.0f), W(chair, 0f, 0.62f, -0.02f), 0f, 0f, false));
+            log.AppendLine(Free(P("s2_side"), W(chair, -1.45f, 0.85f, 0.02f), W(chair, 0f, 0.62f, 0.02f), 0f));
+            // 斜め上から、肘掛けと背の張りぐるみが U の字に座面を囲むつながり（前の上からと、後ろの上から）
+            log.AppendLine(Free(P("s7_top_front"), W(chair, 0.55f, 2.05f, 0.95f), W(chair, 0f, 0.55f, -0.08f), 0f));
+            log.AppendLine(Free(P("s7_top_back"), W(chair, 0.95f, 1.95f, -1.0f), W(chair, 0f, 0.55f, -0.05f), 0f));
+            // 真横から座った体と（手の置き場）
+            Body(true);
+            log.AppendLine(Free(P("s2_side_body"), W(chair, -1.45f, 0.85f, 0.02f), W(chair, 0f, 0.62f, 0.02f), 0f));
+
+            // 座った目から。部屋の煙（肘掛けに置いた右手の煙草から立つ一筋）を、もう流れている形で立てる
+            var wisp = Wisp(log);
+            player.PlaceAt(foot, body, limit, 0f, SofaFrontPitch, seatEye);
+            log.AppendLine(CheckRoom.Shoot(P("s3_seated_front"), null));
+            player.PlaceAt(foot, body, limit, 50f, PlayerController.PitchDownLimit, seatEye);
+            log.AppendLine(CheckRoom.Shoot(P("s4_seated_right"), null));
+            player.PlaceAt(foot, body, limit, -50f, PlayerController.PitchDownLimit, seatEye);
+            log.AppendLine(CheckRoom.Shoot(P("s4_seated_left"), null));
+            if (wisp != null) Object.DestroyImmediate(wisp.gameObject);
+
+            // モニターの映り込み（座った形のまま、正面のモニターへ向き直した所）
+            log.AppendLine(Mirror(P("s5_reflection"), player, chair));
+            chair.position = home;
+            Seat(pose);
+
+            // 抜く流れで、腕と手が椅子に入らないか
+            log.AppendLine(Motion(room, Object.FindFirstObjectByType<JackPull>(FindObjectsInactive.Include)));
+            Seat(pose);
+            // ジャックの置き場の受け台。場面 3 と同じく、手首のジャックを置き場へ移して、外の斜め前からと、座面の側から
+            Park(chair);
+            Body(false);
+            log.AppendLine(Free(P("s6_jack_rest"), W(chair, 0.62f, 1.02f, 0.32f), W(chair, 0.30f, 0.66f, 0.0f), 45f));
+            log.AppendLine(Free(P("s6_jack_rest_inside"), W(chair, -0.12f, 0.95f, 0.18f), W(chair, 0.27f, 0.66f, -0.07f), 40f, 0.8f));
+
+            // 立ち上がった後。椅子を押し下げて、立ち位置までの隙間と、椅子の前と脇を歩いた時の足元の上がり
+            var spot = (Transform)fso.FindProperty("standSpot").objectReferenceValue;
+            if (spot != null)
+            {
+                chair.position = home - chair.forward * fso.FindProperty("chairPushBack").floatValue;
+                log.AppendLine(Gap(chair, spot));
+                log.AppendLine(Walk(chair, player, spot));
+                chair.position = home;
+            }
+        }
+
+        /// <summary>
+        /// 抜く流れ（JackPull）か挿す流れ（JackPlug）を 0.05 秒ごとに止めて、両腕（上腕・前腕・手・指）の肌が椅子の中身の詰まった部品に
+        /// 5 mm より深く入るこまを数える。部品ごとに、入ったこまの数といちばん深い所
+        /// </summary>
+        public static string Motion(Scene scene, MonoBehaviour flow)
+        {
+            if (flow == null) return "流れが無い";
+            var chair = BuildChair.Find(scene, BuildChair.ChairPath);
+            var pose = Object.FindFirstObjectByType<SeatedPose>(FindObjectsInactive.Include);
+            if (chair == null || pose == null) return "椅子か座った形が無い";
+            var pull = flow as JackPull;
+            var plug = flow as JackPlug;
+            if (pull == null && plug == null) return "抜く流れでも挿す流れでもない";
+            var skin = SkinPoint.BodyOf(pose);
+            var bones = skin.bones;
+            var weights = skin.sharedMesh.boneWeights;
+            var arm = new bool[bones.Length];
+            for (var b = 0; b < bones.Length; b++)
+            {
+                var n = bones[b].name;
+                arm[b] = n.Contains("UpperArm") || n.Contains("Forearm") || n.Contains("Hand") || n.Contains("Finger");
+            }
+            var made = BuildChair.Shape();
+            var verts = made.Mesh.vertices;
+            Object.DestroyImmediate(made.Mesh);
+            var solids = new List<BuildChair.Piece>();
+            foreach (var piece in made.Pieces) if (piece.Solid) solids.Add(piece);
+            var frames = new Dictionary<string, int>();
+            var deepest = new Dictionary<string, float>();
+            var where = new Dictionary<string, string>();
+            var total = pull != null ? PullTimeline.Total : PlugTimeline.Total;
+            var baked = new Mesh();
+            try
+            {
+                pose.Seated = true;
+                pose.UseAlternate = false;
+                pose.Bind();
+                if (pull != null) { pull.ResetForStudy(); pull.Bind(); }
+                else { plug.ResetForStudy(); plug.Bind(); }
+                for (var t = 0f; t <= total + 1e-4f; t += 0.05f)
+                {
+                    // 実行時と同じく、こまごとに座った形を当て直してから流れを重ねる（JackHoldRoll と同じ）
+                    pose.Apply();
+                    if (pull != null) { pull.StepForStudy(t); pull.Apply(t); }
+                    else { plug.Step(t); plug.Apply(t); }
+                    skin.BakeMesh(baked, true);
+                    var local = baked.vertices;
+                    var hit = new Dictionary<string, float>();
+                    for (var i = 0; i < local.Length; i++)
+                    {
+                        if (!arm[weights[i].boneIndex0]) continue;
+                        var p = chair.InverseTransformPoint(skin.transform.TransformPoint(local[i]));
+                        foreach (var piece in solids)
+                        {
+                            var box = piece.Bounds;
+                            box.Expand(0.01f);
+                            if (!box.Contains(p)) continue;
+                            var depth = Inside(verts, piece, p);
+                            if (depth < 0.005f) continue;
+                            float was;
+                            if (!hit.TryGetValue(piece.Name, out was) || depth > was) hit[piece.Name] = depth;
+                            float deep;
+                            if (!deepest.TryGetValue(piece.Name, out deep) || depth > deep)
+                            {
+                                deepest[piece.Name] = depth;
+                                where[piece.Name] = string.Format("{0:0.00} 秒、{1} {2}", t, bones[weights[i].boneIndex0].name, p.ToString("F3"));
+                            }
+                        }
+                    }
+                    foreach (var k in hit.Keys)
+                    {
+                        int c;
+                        frames.TryGetValue(k, out c);
+                        frames[k] = c + 1;
+                    }
+                }
+            }
+            finally
+            {
+                Object.DestroyImmediate(baked);
+                if (pull != null) pull.ResetForStudy();
+                else plug.ResetForStudy();
+            }
+            var sb = new StringBuilder(pull != null ? "抜く流れ" : "挿す流れ");
+            sb.AppendFormat("（{0:0.00} 秒を 0.05 秒ごと）で、腕と手が椅子の部品に 5 mm より深く入るこま: ", total);
+            if (frames.Count == 0) return sb.Append("無し").ToString();
+            foreach (var k in frames.Keys) sb.AppendFormat("{0} {1} こま（最も深い {2:0.000} m、{3}）。", k, frames[k], deepest[k], where[k]);
+            return sb.ToString();
+        }
+
+        /// <summary>点 p が部品の面の内にあれば、いちばん近い面までの深さ（外なら 0）</summary>
+        static float Inside(Vector3[] verts, BuildChair.Piece piece, Vector3 p)
+        {
+            var best = float.MaxValue;
+            var sign = 1f;
+            for (var t = 0; t < piece.Triangles.Length; t += 3)
+            {
+                var a = verts[piece.Triangles[t]];
+                var b = verts[piece.Triangles[t + 1]];
+                var c = verts[piece.Triangles[t + 2]];
+                var q = Closest(p, a, b, c);
+                var dist = (p - q).sqrMagnitude;
+                if (dist >= best) continue;
+                var nrm = Vector3.Cross(b - a, c - a);
+                if (nrm.sqrMagnitude < 1e-14f) continue;
+                best = dist;
+                sign = Vector3.Dot(p - q, nrm) < 0f ? -1f : 1f;
+            }
+            return sign < 0f ? Mathf.Sqrt(best) : 0f;
+        }
+
+        /// <summary>
+        /// 座った目から正面のモニターと両肘掛けを一枚に入れる下向きの角（度）。肘掛けは目のほぼ真下の脇にあるので、
+        /// ゲームで向ける限り（<see cref="PlayerController.PitchDownLimit"/>）まで下を向いて、モニターの下の半分と肘掛けの前の端が入る
+        /// </summary>
+        const float SofaFrontPitch = PlayerController.PitchDownLimit;
+
+        /// <summary>部屋の煙の一筋（右手の人差し指の中の骨から。RoomIntroDirector と同じ所）を立て、数秒流した形にする</summary>
+        static ParticleSystem Wisp(StringBuilder log)
+        {
+            var puffs = Object.FindFirstObjectByType<SmokePuffs>(FindObjectsInactive.Include);
+            var pose = Object.FindFirstObjectByType<SeatedPose>(FindObjectsInactive.Include);
+            var an = pose != null ? pose.Animator : null;
+            var finger = an != null ? an.GetBoneTransform(HumanBodyBones.RightIndexIntermediate) : null;
+            if (puffs == null || finger == null) { log.AppendLine("部屋の煙が無い"); return null; }
+            puffs.Smolder(finger);
+            var wisp = puffs.MakeWisp(finger);
+            wisp.Simulate(wisp.main.startLifetime.constantMax, true, true);
+            log.AppendFormat("煙の一筋の出どころ（椅子から見た位置）: {0}、親 {1}", BuildChair.Find(SceneManager.GetActiveScene(), BuildChair.ChairPath).InverseTransformPoint(wisp.transform.position).ToString("F3"),
+                wisp.transform.parent != null ? wisp.transform.parent.name : "無し").AppendLine();
+            return wisp;
+        }
+
+        /// <summary>
+        /// 座った手が肘掛けの上の面に乗っているか。手（手の骨と指）の頂点のうち、上から見て肘掛けの当て物の上に来る点の、
+        /// 上の面からの高さ（負は沈み）。いちばん低い点と、面から 5 mm の内の点の数、5 mm より沈んだ点の数
+        /// </summary>
+        public static string HandRest(Scene room)
+        {
+            var chair = BuildChair.Find(room, BuildChair.ChairPath);
+            var pro = BuildChair.Find(room, "Player/Protagonist");
+            if (chair == null || pro == null) return "椅子か主人公が無い";
+            Seat(pro.GetComponent<SeatedPose>());
+            var an = pro.GetComponent<Animator>();
+            var skin = SkinPoint.BodyOf(pro);
+            var baked = new Mesh();
+            skin.BakeMesh(baked, true);
+            var local = baked.vertices;
+            Object.DestroyImmediate(baked);
+            for (var i = 0; i < local.Length; i++) local[i] = chair.InverseTransformPoint(skin.transform.TransformPoint(local[i]));
+            var weights = skin.sharedMesh.boneWeights;
+            var bones = skin.bones;
+            var made = BuildChair.Shape();
+            var verts = made.Mesh.vertices;
+            Object.DestroyImmediate(made.Mesh);
+            var sb = new StringBuilder("手の置き場（手の骨と指の頂点。上から見て肘掛けの当て物の上に来る点の、上の面からの高さ）: ");
+            foreach (var left in new[] { true, false })
+            {
+                BuildChair.Piece pad = null;
+                foreach (var piece in made.Pieces) if (piece.Name == (left ? "ArmPadL" : "ArmPadR")) pad = piece;
+                if (pad == null) { sb.Append(left ? "左の当て物が無い。" : "右の当て物が無い。"); continue; }
+                var own = new HashSet<Transform> { an.GetBoneTransform(left ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand) };
+                var first = left ? HumanBodyBones.LeftThumbProximal : HumanBodyBones.RightThumbProximal;
+                var last = left ? HumanBodyBones.LeftLittleDistal : HumanBodyBones.RightLittleDistal;
+                for (var b = first; b <= last; b++) { var t = an.GetBoneTransform(b); if (t != null) own.Add(t); }
+                var all = 0;
+                var over = 0;
+                var near = 0;
+                var sunk = 0;
+                var low = float.MaxValue;
+                var lowAt = Vector3.zero;
+                for (var i = 0; i < local.Length; i++)
+                {
+                    if (!own.Contains(bones[weights[i].boneIndex0])) continue;
+                    all++;
+                    float top;
+                    if (!PadTopAt(verts, pad, local[i].x, local[i].z, out top)) continue;
+                    over++;
+                    var gap = local[i].y - top;
+                    if (gap < low) { low = gap; lowAt = local[i]; }
+                    if (Mathf.Abs(gap) <= 0.005f) near++;
+                    if (gap < -0.005f) sunk++;
+                }
+                sb.AppendFormat("{0}手は {1} 点のうち {2} 点が当て物の上、いちばん低い点の隙間 {3:0.000} m（{4}）、面から 5 mm の内に {5} 点、5 mm より沈む点 {6}。手首 {7}。",
+                    left ? "左" : "右", all, over, over > 0 ? low : float.NaN, lowAt.ToString("F3"), near, sunk,
+                    chair.InverseTransformPoint(an.GetBoneTransform(left ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand).position).ToString("F3"));
+            }
             return sb.ToString();
         }
 
@@ -423,7 +719,7 @@ namespace HalfAware.EditorTools
         /// 主人公の目のカメラを写したプローブで、eye から look へ向けて撮る。fov が 0 なら目のカメラのまま。
         /// fill が 0 より大きければ、撮る間だけ目の脇に灯りを置く（形を読むための絵。ゲームの明るさではない）
         /// </summary>
-        static string Free(string path, Vector3 eye, Vector3 look, float fov, float fill = 0f)
+        static string Free(string path, Vector3 eye, Vector3 look, float fov, float fill = 0f, bool post = true)
         {
             if (!path.EndsWith(".png")) path += ".png";
             var main = TitleShots.Main();
@@ -449,7 +745,7 @@ namespace HalfAware.EditorTools
                 cam.CopyFrom(main);
                 cam.enabled = false;
                 cam.nearClipPlane = 0.02f;
-                cam.GetUniversalAdditionalCameraData().renderPostProcessing = true;
+                cam.GetUniversalAdditionalCameraData().renderPostProcessing = post;
                 if (fov > 0f) cam.fieldOfView = fov;
                 go.transform.SetPositionAndRotation(eye, Quaternion.LookRotation(look - eye, Vector3.up));
                 shot = TitleShots.Steady(cam);

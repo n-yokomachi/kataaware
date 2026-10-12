@@ -78,9 +78,11 @@ namespace HalfAware
         /// <summary>
         /// 手を、今の所（座った形の手）から狙い（target・endRotation）へ、weight の割合だけ寄せた所へ届かせる。
         /// 骨の向きを混ぜる <see cref="Solve"/> と違い、手は今の所と狙いを結ぶまっすぐな道を通る
-        /// （向きを混ぜると、手は肩のまわりの弧を通り、途中で物を横切ることがある）
+        /// （向きを混ぜると、手は肩のまわりの弧を通り、途中で物を横切ることがある）。
+        /// lift を渡すと、まっすぐな道を途中で上へ持ち上げる（両端で 0、真ん中で lift。<see cref="Arc"/>）。
+        /// 手を置いた所が肘掛けのような台の上だと、まっすぐな道では離れる時と戻る時に指が台の縁をかすめるので、台の上を越えさせる
         /// </summary>
-        public static void Move(Transform upperBone, Transform lowerBone, Transform end, Vector3 target, Quaternion endRotation, Vector3 pole, float weight)
+        public static void Move(Transform upperBone, Transform lowerBone, Transform end, Vector3 target, Quaternion endRotation, Vector3 pole, float weight, float lift = 0f)
         {
             if (upperBone == null || lowerBone == null || end == null || weight <= 0f) return;
             weight = Mathf.Min(1f, weight);
@@ -104,9 +106,17 @@ namespace HalfAware
             upperBone.rotation = keepUpper;
             lowerBone.rotation = keepLower;
             end.rotation = keepEnd;
-            Solve(upperBone, lowerBone, end, Vector3.Lerp(from, target, weight), pole, 1f);
+            Solve(upperBone, lowerBone, end, Vector3.Lerp(from, target, weight) + Vector3.up * (lift * Arc(weight)), pole, 1f);
             Roll(lowerBone, end, endRoll * weight - RollFrom(startLower, lowerBone, end));
             end.localRotation = Quaternion.Slerp(startWrist, endWrist, weight);
+        }
+
+        /// <summary>
+        /// 持ち上げの割合（0〜1）。両端で 0、真ん中で 1。端の近くで早く上がる（4w(1−w) の平方根）ので、台から離れてすぐ・台に降りる直前にも指が縁の上に来る
+        /// </summary>
+        public static float Arc(float weight)
+        {
+            return Mathf.Sqrt(Mathf.Clamp01(4f * weight * (1f - weight)));
         }
 
         /// <summary>前腕の骨の、start（親から見た向き）からの自分の軸まわりのひねり。度</summary>
