@@ -16,7 +16,7 @@ namespace HalfAware.EditorTools
     ///
     /// 撮る所: 立って斜め前と斜め後ろ・横・真後ろ（体は写さない）、座ったまま下（正面・右・左へ首を振って）、場面 1 の頭の天井を仰いだ形と起き上がった正面、
     /// 首を右へ振りきってジャケットを狙った所（印の文字も重ねる）、モニターの映り込み、ジャックの置き場の寄り、立ち上がった後の椅子と机のあいだ。
-    /// 肘掛けを座面とひと続きにした形の見比べは <see cref="Sofa"/>（座った手が肘掛けに乗っているかの <see cref="HandRest"/>、
+    /// 張りぐるみの形の見比べは <see cref="Sofa"/>（座った手が肘掛けに乗っているかの <see cref="HandRest"/>、
     /// ジャックを抜く・挿す流れで腕と手が椅子に入らないかの <see cref="Motion"/> も）。
     /// プローブのカメラと RenderTexture は撮った同じ呼び出しの中で捨てる。場面の物（主人公の向き・椅子の位置・体の見え方）を書き換えるので、
     /// **撮り終えたら撮る前の場面へ戻し、書き換えた場面は捨てる。** 未保存の変更がある場面では撮らない
@@ -45,12 +45,12 @@ namespace HalfAware.EditorTools
         }
 
         /// <summary>
-        /// 肘掛けを座面とひと続きにした形（2026-10）の見比べ。前と後を同じ所から撮る: 部屋の中の斜め前 3/4（ゲームの見え方と後処理なし）、
-        /// 真横（体を写さない形と、座った体を写した形）、斜め上の前と後ろ（肘掛けと背の張りぐるみのつながり）、座った目から正面のモニターと両肘掛け、
+        /// 椅子の形の見比べ（2026-10）。前と後を同じ所から撮る: 部屋の中の斜め前 3/4（ゲームの見え方と後処理なし）、
+        /// 真横（体を写さない形と、座った体を写した形）、斜め上の前と後ろ、足回りと足置きの寄り、真正面の低い所（前の端の揃い）、座った目から正面のモニターと両肘掛け、
         /// 座った目から右の肘掛けを見下ろす（手と煙）、モニターの映り込み、ジャックの受け台、立ち上がった後の隙間と歩き、抜く流れの入り。座った手が肘掛けの上の面に乗っているか（<see cref="HandRest"/>）と食い込み（<see cref="Clash"/>）も測る。
         /// build なら椅子を組み、座った形を解き直してから撮る（どちらも保存しない。撮り終えたら場面を捨てる）
         /// </summary>
-        public static string Sofa(string dir, string tag, bool build)
+        public static string Sofa(string dir, string tag, bool build, bool roll = true)
         {
             var stop = Guard();
             if (stop != null) return stop;
@@ -67,7 +67,7 @@ namespace HalfAware.EditorTools
                 if (build)
                 {
                     sb.AppendLine(BuildChair.Assemble(room));
-                    if (!PlaceProtagonist.Reseat(sb, true)) return sb.ToString().TrimEnd();
+                    if (!PlaceProtagonist.Reseat(sb, roll)) return sb.ToString().TrimEnd();
                 }
                 sb.AppendLine(Clash(room));
                 sb.AppendLine(HandRest(room));
@@ -106,9 +106,14 @@ namespace HalfAware.EditorTools
             log.AppendLine(Free(P("s1_quarter"), W(chair, 0.95f, 1.35f, 1.0f), W(chair, 0f, 0.62f, -0.02f), 0f));
             log.AppendLine(Free(P("s1_quarter_raw"), W(chair, 0.95f, 1.35f, 1.0f), W(chair, 0f, 0.62f, -0.02f), 0f, 0f, false));
             log.AppendLine(Free(P("s2_side"), W(chair, -1.45f, 0.85f, 0.02f), W(chair, 0f, 0.62f, 0.02f), 0f));
-            // 斜め上から、肘掛けと背の張りぐるみが U の字に座面を囲むつながり（前の上からと、後ろの上から）
+            // 斜め上から、肘掛けと座面と背もたれのつながり（前の上からと、後ろの上から）
             log.AppendLine(Free(P("s7_top_front"), W(chair, 0.55f, 2.05f, 0.95f), W(chair, 0f, 0.55f, -0.08f), 0f));
             log.AppendLine(Free(P("s7_top_back"), W(chair, 0.95f, 1.95f, -1.0f), W(chair, 0f, 0.55f, -0.05f), 0f));
+            // 足回り（台座と座面の下）と、足置きの寄り（低い斜め前から）
+            log.AppendLine(Free(P("s8_base_close"), W(chair, 0.95f, 0.38f, 0.70f), W(chair, 0f, 0.16f, -0.02f), 42f));
+            log.AppendLine(Free(P("s9_footrest_close"), W(chair, 0.62f, 0.62f, 1.0f), W(chair, 0f, 0.20f, 0.26f), 40f));
+            // 真正面（机との間の低い所から。肘掛けの前の端と座面の前の縁と、その下の揃い）
+            log.AppendLine(Free(P("s10_front"), W(chair, 0f, 0.46f, 0.70f), W(chair, 0f, 0.42f, 0f), 70f, 0.6f));
             // 真横から座った体と（手の置き場）
             Body(true);
             log.AppendLine(Free(P("s2_side_body"), W(chair, -1.45f, 0.85f, 0.02f), W(chair, 0f, 0.62f, 0.02f), 0f));

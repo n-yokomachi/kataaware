@@ -11,21 +11,23 @@ namespace HalfAware.EditorTools
 {
     /// <summary>
     /// 自室（<c>Room.unity</c>）の椅子を組む（シナリオ設計 5 節）。潜り手が一日の大半を過ごし、長い潜行に体を預ける椅子。
-    /// 上等な黒革の一人掛けの張りぐるみ（肘掛けと背の部分が U の字に座面を囲むクラブチェアの形に、高い背もたれ）に、仕事の道具として後から電子機器を金具で留め、ケーブルを這わせた形。
+    /// 上等な黒革の一人掛けの張りぐるみ（厚い背もたれの下の左右から U の字の肘掛けが同じ断面で延びて床の近くまで下りる外殻と、その内にぴったり収めた座面のクッション）に、
+    /// 仕事の道具として後から電子機器を金具で留め、ケーブルを這わせた形。
     ///
     /// <list type="table">
-    /// <item><term>形</term><description>椅子: 縁に縫い目を回した厚く柔らかい革の座面（左右の肘掛けの間いっぱい）、前も裏も革で包んだ厚く幅の広い背もたれ
-    /// （脇の太い巻きと上の頭の当ての巻きを縫い目で区切り、内は大きな菱形のボタン留め。下の部分は張りぐるみの背の部分の内から立ち上がる）、
-    /// 座面の両脇から立ち上がり、後ろの角を回って背もたれの下を横切る厚い革の塊（肘掛けと背の部分がひと続きの張りぐるみ。上の縁を太く巻き、前の端を丸めて板で閉じる）、
-    /// 一本の柱が床の近くで逆さの漏斗の形に広がる磨いた金属の台座（キャスター無し）とガスシリンダー、リクライニングの機構とレバー、
-    /// 座の前の下から引き出す革のフットレスト。座面・肘掛けの内と外の面・フットレストにも背もたれと揃う菱形のボタン留めと縁の玉縁。後から付けた物: 頭の後ろの黒い金属の箱（背もたれの上の縁に掛けた留め具で留める）と耳の筐体、
+    /// <item><term>形</term><description>椅子: 前も裏も革で包んだ厚い背もたれ（腰で 22 cm。下は外殻の外幅 0.90 m で、肩から上は 0.60 m。
+    /// 脇の太い巻きと上の頭の当ての巻きを縫い目で区切り、内は大きな菱形のボタン留め）と、その下の左右から同じ断面のまま前へ延びる U の字の外殻
+    /// （肘掛けと背の部分。床から 0.10 m までまっすぐ立ち、外の面は背もたれの下の幅と揃う。上の縁を太く巻いて縫い目に玉縁、内の面は菱形のボタン留め、外の面は無地。
+    /// 前の端は丸めて板で閉じる）、外殻の内にすき間なく収めた縁に縫い目を回した厚く柔らかい革の座面のクッション（前の端は肘掛けの前の端と揃う）、
+    /// 座面の下の前の面（座った脚を避けて斜めに後ろへ下り、足置きのクッションへつながる）、外殻の下にほとんど隠れる低く幅の広い黒く磨いた金属の円盤の台座（縁に光る面取り）、
+    /// 座面の前の下から出る厚い革の足置き。後から付けた物: 頭の後ろの黒い金属の箱（背もたれの上の縁に掛けた留め具で留める）と耳の筐体、
     /// 左右の肘掛けの前の面の外寄りの操作盤（前の面に螺子で留めた板と下の棚で抱える）、右の肘掛けの差込口（螺子で留めた金属の板）とジャックの受け台（内の面に留めた金具）、
-    /// 背もたれの裏に這わせて張りぐるみの背の部分へ入るケーブル（<c>BuildChairShape.cs</c>）</description></item>
+    /// 背もたれの裏に這わせて外殻の背の部分へ入るケーブル（<c>BuildChairShape.cs</c>）</description></item>
     /// <item><term>体との取り合い</term><description>座面の高さの線・ジャックの置き場（とそこより後ろの肘掛けの上面の線）は前の椅子と同じ所なので、座った腰・背・脚と目の高さは変わらない。
-    /// 肘掛けの外へ広げて前へ伸ばした所に手を置くので、肘掛けの形を変えたら腕の形を解き直す（<c>HalfAware/Reseat the protagonist on the chair</c>。
-    /// 狙いは PlaceProtagonist.RoomSit）。フットレストは座った形の足の裏が乗る所まで引き出した形</description></item>
-    /// <item><term>軽さ</term><description>輪郭を作る起伏（背もたれの厚みと縁の巻き、菱形の膨らみ、肘掛けの塊の巻きと端の丸み、座面の厚み、脚の形）は mesh に残し、
-    /// 面の上の細かい起伏（ボタンの窪み、肘掛けと座面の菱形の膨らみ、折り目の鋭さ、縫い目、皺、螺子）は絵（地の色に焼いた窪みの陰と、法線の絵）へ移す（オーナー、2026-09-30
+    /// 肘掛けの上面の線や手を置く所を変えたら、腕の形を解き直す（<c>HalfAware/Reseat the protagonist on the chair</c>。狙いは PlaceProtagonist.RoomSit）。
+    /// 足置きの上の面は座った形の足の裏に沿わせる。座面の下の前の面は、ふくらはぎと踵の後ろを通る</description></item>
+    /// <item><term>軽さ</term><description>輪郭を作る起伏（背もたれの厚みと縁の巻き、菱形の膨らみ、外殻の巻きと前の端の丸み、座面の厚み、台座の形）は mesh に残し、
+    /// 面の上の細かい起伏（ボタンの窪み、外殻と座面の菱形の膨らみ、折り目の鋭さ、縫い目、皺、螺子）は絵（地の色に焼いた窪みの陰と、法線の絵）へ移す（オーナー、2026-09-30
     /// 「椅子も含めて重くなりそうなところはテクスチャを張ることで軽くして」「テクスチャに変えても立体感は失われないように」）。
     /// マテリアルは一つ（描く回数 1）</description></item>
     /// <item><term>置き場</term><description><c>Room/Chair</c> の下の見た目の子を <c>ChairMesh</c> 一つ（マテリアル 1 つ）に替える。
@@ -158,11 +160,11 @@ namespace HalfAware.EditorTools
 
         /// <summary>
         /// 立ち上がる時に椅子を後ろへ押し下げる距離（SceneFlow の chairPushBack）。始めの椅子は 0.24 m。
-        /// フットレスト（当たりは持たない）の先（z 0.445）が、机との間の立ち位置（z 1.68、当たりの半径 0.3 m）の当たりの縁 1.38 から 3 cm 手前に来る所まで下げる。
-        /// 椅子の後ろ（押し下げた背の後ろの端は z 0.27）は床とラグだけ。
-        /// 台座をキャスターの無い逆さの漏斗の形にしてからも、押し下げは真っすぐ 0.38 m のまま。台座の床に接する縁は丸く巻いた滑らかな縁で、
-        /// 床の上を滑らせて下げる形に見える。回して退けても、前へ 0.445 m 出て幅 0.4 m あるフットレストが立ち位置から外れるには
-        /// 同じだけ下げる必要があり（30 度回して 0.25 m 下げると、フットレストの角が立ち位置の芯から 0.17 m に入る）、短くすると立った足の下にフットレストが来る
+        /// 足置き（当たりは持たない）の先（z 0.445）が、机との間の立ち位置（z 1.68、当たりの半径 0.3 m）の当たりの縁 1.38 から 3 cm 手前に来る所まで下げる。
+        /// 椅子の後ろ（押し下げた背もたれの裏の端は z 0.22）は床とラグだけ。
+        /// 台座をキャスターの無い形（今は低く幅の広い円盤）にしてからも、押し下げは真っすぐ 0.38 m のまま。台座の床に接する縁は丸めた滑らかな縁で、
+        /// 床の上を滑らせて下げる形に見える。回して退けても、前へ 0.445 m 出て幅 0.48 m ある足置きが立ち位置から外れるには
+        /// 同じだけ下げる必要があり（前の幅 0.4 m の足置きで、30 度回して 0.25 m 下げると、足置きの角が立ち位置の芯から 0.17 m に入った）、短くすると立った足の下に足置きが来る
         /// </summary>
         public const float PushBack = 0.38f;
 
@@ -178,15 +180,16 @@ namespace HalfAware.EditorTools
             var root = chair.Find("Blocker");
             if (root == null) return "当たり（Blocker）が無い";
             var sb = new StringBuilder("当たり: ");
-            // 座面（左右の肘掛けの間）
-            sb.Append(Box(root, "Seat", new Vector3(0f, 0.40f, 0.045f), new Vector3(0.56f, 0.80f, 0.53f)));
-            // 台座（床に接する丸い縁まで）
-            sb.Append(Box(root, "Base", new Vector3(0f, 0.40f, 0f), new Vector3(2f * PedestalReach, 0.80f, 2f * PedestalReach)));
+            // 外殻と座面（外殻の外の面まで。後ろは背の部分の外の面、前は座面と肘掛けの前の端まで）
+            var shellBack = TubIn - (ArmOut - ArmIn) - 0.005f;
+            sb.Append(Box(root, "Seat", new Vector3(0f, 0.40f, 0.5f * (shellBack + SeatFront)), new Vector3(2f * ArmOut + 0.02f, 0.80f, SeatFront - shellBack)));
+            // 台座（円盤の縁まで）
+            sb.Append(Box(root, "Base", new Vector3(0f, 0.40f, PedestalZ), new Vector3(2f * PedestalReach, 0.80f, 2f * PedestalReach)));
             // 背もたれと頭の後ろの端末・耳の筐体
-            sb.Append(Box(root, "Back", new Vector3(0f, 0.75f, -0.39f), new Vector3(0.62f, 1.50f, 0.48f)));
-            // 肘掛け（張りぐるみの背の部分の外の面から、前の操作盤の先まで。後ろの角は丸いが箱で覆う）
+            sb.Append(Box(root, "Back", new Vector3(0f, 0.75f, -0.43f), new Vector3(2f * ArmOut + 0.02f, 1.50f, 0.56f)));
+            // 肘掛け（外殻の背の部分の外の面から、前の操作盤の先まで。後ろの角は丸いが箱で覆う）
             var armX = 0.5f * (ArmIn + PodOuter) + 0.0025f;
-            var back = TubIn - (ArmOut - ArmIn) - 0.005f;
+            var back = shellBack;
             var armSize = new Vector3(PodOuter - ArmIn + 0.015f, 0.80f, PodFront - back + 0.01f);
             var armZ = 0.5f * (back + PodFront);
             sb.Append(Box(root, "ArmR", new Vector3(armX, 0.40f, armZ), armSize));
@@ -628,15 +631,16 @@ namespace HalfAware.EditorTools
             System.Func<float, float, float> none = (x, y) => 0f;
             System.Func<float, float, float> plain = (x, y) => 1f;
             // 背もたれの前。菱形の一つ一つを塊として読ませる、向きの無い陰と艶（TuftShade・TuftGloss）。法線は膨らみの無い下の面の向きで表した本当の面の法線
-            PaintLeather(cv, BackFrontArea, -BackHalfW, BackHalfW, 0f, BackLength,
-                (x, s) => Mathf.Abs(x) > BackW(s) ? 0f : BackFine(x, s),
-                (x, s) => Mathf.Abs(x) > BackW(s) ? 1f : TuftShade(BackLattice, TuftInside(x, s), x, s),
-                (x, s, ex, es) => Mathf.Abs(x) > BackW(s) - 0.002f ? Vector3.forward : BackFrontNormal(x, s, 1.5f * ex, 1.5f * es),
-                (x, s) => Mathf.Abs(x) > BackW(s) ? LeatherGloss : TuftGloss(BackLattice, TuftInside(x, s), Mathf.Clamp01(BackFine(x, s) / 0.012f), x, s, 0f));
+            // 横は高さごとの幅で割った割合（−1〜1）で写す（下は外殻の外幅まで広い）。起伏と陰は椅子の座標（u × 幅）で測る
+            PaintLeather(cv, BackFrontArea, -1f, 1f, 0f, BackLength,
+                (u, s) => BackFine(u * BackW(s), s),
+                (u, s) => TuftShade(BackLattice, TuftInside(u * BackW(s), s), u * BackW(s), s),
+                (u, s, eu, es) => Mathf.Abs(u) > 0.995f ? Vector3.forward : BackFrontNormal(u * BackW(s), s, 1.5f * eu * BackW(s), 1.5f * es),
+                (u, s) => TuftGloss(BackLattice, TuftInside(u * BackW(s), s), Mathf.Clamp01(BackFine(u * BackW(s), s) / 0.012f), u * BackW(s), s, 0f));
             // 背もたれの裏（無地）
-            PaintLeather(cv, BackRearArea, -BackHalfW, BackHalfW, 0f, BackLength, none, plain);
-            // 肘掛けと背の張りぐるみ（前の端から背の真ん中までの長さと、断面を回る長さで写す）。内と外の面に座面と揃う菱形のボタン留め（角と背の部分でも途切れない）、
-            // 上の縁の縫い目に玉縁
+            PaintLeather(cv, BackRearArea, -1f, 1f, 0f, BackLength, none, plain);
+            // 外殻（前の端から背の真ん中までの長さと、断面を回る長さで写す）。内の面に座面と揃う菱形のボタン留め（角と背の部分でも途切れない）、
+            // 外の面は無地、上の縁の縫い目に玉縁
             PaintLeather(cv, ArmArea, 0f, TubHalfLen, 0f, ArmPerim, (x, p) => -ArmFine(x, p), ArmShade, null, ArmGloss);
             // 肘掛けの前の板。縁の 8 mm 内に玉縁を回す
             PaintLeather(cv, ArmCapArea, 0f, ArmCapW, 0f, ArmCapH, (x, y) => -Piping(ArmCapBorder(x, y) - 0.008f), plain, null,
